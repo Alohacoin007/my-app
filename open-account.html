@@ -151,7 +151,7 @@ body{font-family:'Roboto',sans-serif;background:#fff;display:flex;justify-conten
 .csheet-list{overflow-y:auto;flex:1;padding-bottom:24px;}
 .cs-item{display:flex;align-items:center;padding:13px 18px;border-bottom:1px solid #f5f5f5;cursor:pointer;gap:12px;}
 .cs-item:active{background:#f5f5f5;}
-.cs-flag{font-size:22px;flex-shrink:0;width:28px;text-align:center;}
+.cs-flag{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:30px;height:22px;border-radius:4px;background:#f5f5f5;color:#424242;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;letter-spacing:.5px;}
 .cs-name{flex:1;font-size:14px;color:#212121;font-weight:500;}
 .cs-dial{font-size:12px;color:#9e9e9e;font-family:'JetBrains Mono',monospace;}
 .cs-chk{font-size:18px;color:#2196F3;flex-shrink:0;display:none;}
@@ -418,7 +418,7 @@ function step1(){
       <div class="field">
         <label class="field-label">Country</label>
         <div class="field-inner" onclick="openCountrySheet()" style="cursor:pointer">
-          ${data.country ? `<span style="font-size:18px">${(COUNTRIES.find(c=>c.name===data.country)||{}).flag||''}</span>` : ''}
+          ${data.country ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:20px;border-radius:4px;background:#f5f5f5;color:#424242;font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace;letter-spacing:.5px;">${(COUNTRIES.find(c=>c.name===data.country)||{}).code||''}</span>` : ''}
           <input readonly value="${data.country||''}" placeholder="Select your country" style="cursor:pointer;pointer-events:none;">
           <span class="msi">expand_more</span>
         </div>
@@ -488,10 +488,10 @@ function step3(){
       <label class="field-label">4-Digit PIN</label>
       <div class="otp-wrap" style="margin:14px 0 4px">
         ${[0,1,2,3].map(i => `
-          <input class="otp-cell pin-cell ${data.pin[i]?'filled':''}" maxlength="1" type="text" inputmode="numeric" autocomplete="off"
+          <input class="otp-cell pin-cell ${data.pin[i]?'filled':''}" maxlength="1" type="password" inputmode="numeric" autocomplete="off"
             value="${data.pin[i]||''}"
             oninput="pinInput(${i},this.value)" onkeydown="pinKey(event,${i})"
-            style="width:48px;height:54px;font-size:24px;-webkit-text-security:disc;text-security:disc;">
+            style="width:48px;height:54px;font-size:24px;">
         `).join('')}
       </div>
       <div style="text-align:center;font-size:11.5px;color:#9e9e9e;margin-top:2px;">
@@ -726,7 +726,7 @@ function goBack(){
   cur = Math.max(0, cur - 1); renderStep();
 }
 function goToApp(){
-  window.location.href = '../ALPEXA Trading App.html';
+  window.location.href = 'ALPEXA Trading App.html';
 }
 function copyAcct(){
   if (data.acctNum) { navigator.clipboard?.writeText(data.acctNum); showToast('Account number copied'); }
@@ -753,7 +753,7 @@ function renderCountries(list){
   if (!list.length) { el.innerHTML = '<div class="cs-empty">No countries match your search.</div>'; return; }
   el.innerHTML = list.map(c => `
     <div class="cs-item ${data.country===c.name?'sel':''}" onclick="selectCountry('${c.name.replace(/'/g,"\\'")}','${c.dial}')">
-      <div class="cs-flag">${c.flag}</div>
+      <div class="cs-flag">${c.code}</div>
       <div class="cs-name">${c.name}</div>
       <div class="cs-dial">${c.dial}</div>
       <span class="msi cs-chk">check_circle</span>
@@ -769,8 +769,8 @@ function filterCountries(q){
 }
 function selectCountry(name, dial){
   data.country = name;
-  if (!data.phone || /^\+?[\d\s]*$/.test(data.phone)) {
-    data.phone = dial ? dial + ' ' : data.phone;
+  if (!data.phone.trim() && dial) {
+    data.phone = dial + ' ';
   }
   closeCountrySheet({target:{id:'csheetBg'}});
   renderStep();

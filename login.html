@@ -103,7 +103,7 @@ body{font-family:'Roboto',sans-serif;background:#fff;display:flex;justify-conten
       <div class="error-bar" id="errBar"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span id="errTxt"></span></div>
       <div class="field">
         <label class="field-label">Login</label>
-        <div class="field-inner"><input id="loginInput" type="number" placeholder="Account number" oninput="clearErr()"></div>
+        <div class="field-inner"><input id="loginInput" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Account number" oninput="clearErr()"></div>
       </div>
       <div class="field">
         <label class="field-label">Password</label>
@@ -161,7 +161,7 @@ body{font-family:'Roboto',sans-serif;background:#fff;display:flex;justify-conten
   <div class="suc-ico"><svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg></div>
   <div class="suc-title">Login Successful</div>
   <div class="suc-sub" id="sucSub"></div>
-  <button class="suc-btn" onclick="window.location.href='../ALPEXA Trading App.html'">Start Trading →</button>
+  <button class="suc-btn" onclick="window.location.href='ALPEXA Trading App.html'">Start Trading →</button>
 </div>
 <div id="toast"></div>
 <script>
@@ -184,7 +184,7 @@ function doLogin(){const login=document.getElementById('loginInput').value.trim(
 function fillDemo(){document.getElementById('loginInput').value='44219982330';document.getElementById('pwInput').value='1234';selServer=2;const sv=document.getElementById('serverVal');sv.textContent=SERVERS[2].name;sv.style.color='#212121';clearErr();showToast('Demo account credentials filled in');}
 function switchTab(t){document.getElementById('tab-login').className='tab-btn'+(t==='login'?' active':'');document.getElementById('tab-qr').className='tab-btn'+(t==='qr'?' active':'');document.getElementById('loginForm').style.display=t==='login'?'block':'none';document.getElementById('qrForm').style.display=t==='qr'?'block':'none';if(t==='qr')startQR();else stopQR();}
 function buildQR(){const p=[1,1,1,1,1,1,1,0,1,0,0,0,0,0,1,0,1,0,1,1,1,0,1,1,1,0,1,0,1,0,1,0,1,0,1,1,1,0,1,1,1,0,0,0,0,0,1,0,1,1,1,1,1,1,1,0,0,1,0,1,0,0,0,1];const box=document.getElementById('qrBox');if(box)box.innerHTML=p.map(c=>`<div class="qr-cell" style="background:${c?'#212121':'transparent'}"></div>`).join('');}
-function startQR(){buildQR();qrSec=60;document.getElementById('qrTimer').textContent=qrSec;qrInterval=setInterval(()=>{qrSec--;const el=document.getElementById('qrTimer');if(el)el.textContent=qrSec;if(qrSec<=0){stopQR();buildQR();qrSec=60;}},1000);}
+function startQR(){buildQR();qrSec=60;document.getElementById('qrTimer').textContent=qrSec;qrInterval=setInterval(()=>{qrSec--;const el=document.getElementById('qrTimer');if(el)el.textContent=qrSec;if(qrSec<=0){buildQR();qrSec=60;}},1000);}
 function stopQR(){clearInterval(qrInterval);}
 function showToast(msg){const el=document.getElementById('toast');el.textContent=msg;el.style.display='block';setTimeout(()=>{el.style.display='none';},2200);}
 buildQR();
