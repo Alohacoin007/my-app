@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>ALPEXA SUISSE — Login</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Montserrat:wght@600;700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Roboto',sans-serif;background:#fff;display:flex;justify-content:center;min-height:100vh;}
+#wrap{width:100%;max-width:390px;min-height:100vh;display:flex;flex-direction:column;background:#fff;position:relative;overflow:hidden;}
+.top{display:flex;flex-direction:column;align-items:center;padding:60px 32px 36px;}
+
+
+.brand{font-size:20px;font-weight:700;color:#212121;letter-spacing:.5px;}
+.brand-sub{font-size:12px;color:#9e9e9e;margin-top:4px;letter-spacing:1px;}
+.tabs{display:flex;border-bottom:1px solid #f0f0f0;margin:0 32px 28px;}
+.tab-btn{flex:1;padding:10px 0;font-size:14px;color:#9e9e9e;border:none;background:none;border-bottom:2px solid transparent;cursor:pointer;font-family:'Roboto',sans-serif;}
+.tab-btn.active{color:#2196F3;font-weight:600;border-bottom-color:#2196F3;}
+.form{padding:0 32px;flex:1;}
+.field{margin-bottom:28px;}
+.field-label{font-size:12px;color:#9e9e9e;font-weight:500;margin-bottom:6px;display:block;}
+.field-inner{display:flex;align-items:center;border-bottom:1.5px solid #e0e0e0;padding-bottom:8px;transition:border-color .15s;}
+.field-inner:focus-within{border-bottom-color:#2196F3;}
+.field-inner input{flex:1;border:none;outline:none;font-size:16px;color:#212121;font-family:'Roboto',sans-serif;background:transparent;}
+.field-inner input::placeholder{color:#bdbdbd;}
+.field-inner .eye{background:none;border:none;cursor:pointer;padding:0 0 0 8px;display:flex;align-items:center;}
+.field-inner .eye svg{width:20px;height:20px;stroke:#bdbdbd;fill:none;stroke-width:2;stroke-linecap:round;}
+.server-field{margin-bottom:28px;}
+.server-inner{display:flex;align-items:center;justify-content:space-between;border-bottom:1.5px solid #e0e0e0;padding-bottom:8px;cursor:pointer;transition:border-color .15s;}
+.server-inner:hover{border-bottom-color:#2196F3;}
+.server-val{font-size:16px;}
+.server-arrow{width:20px;height:20px;stroke:#bdbdbd;fill:none;stroke-width:2;stroke-linecap:round;flex-shrink:0;}
+.save-pw{display:flex;align-items:center;gap:10px;margin-bottom:36px;cursor:pointer;}
+.checkbox{width:20px;height:20px;border-radius:4px;border:2px solid #e0e0e0;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;}
+.checkbox.on{background:#2196F3;border-color:#2196F3;}
+.checkbox.on svg{display:block;}
+.checkbox svg{width:12px;height:12px;stroke:#fff;fill:none;stroke-width:3;stroke-linecap:round;display:none;}
+.save-pw-txt{font-size:14px;color:#424242;}
+.signin-btn{width:100%;height:50px;background:#2196F3;border:none;border-radius:6px;color:#fff;font-size:16px;font-weight:500;cursor:pointer;font-family:'Roboto',sans-serif;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:24px;}
+.signin-btn:active{background:#1976d2;}
+.spinner{width:20px;height:20px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error-bar{background:#ffebee;border-radius:6px;padding:10px 14px;font-size:13px;color:#c62828;margin-bottom:20px;display:none;align-items:center;gap:8px;}
+.error-bar svg{width:16px;height:16px;stroke:#c62828;fill:none;stroke-width:2;stroke-linecap:round;flex-shrink:0;}
+.bottom-links{display:flex;flex-direction:column;align-items:center;gap:14px;padding:0 32px 40px;}
+.link-row{display:flex;align-items:center;gap:6px;}
+.link-btn{font-size:14px;color:#2196F3;background:none;border:none;cursor:pointer;font-family:'Roboto',sans-serif;padding:0;}
+.link-sep{font-size:14px;color:#bdbdbd;}
+.demo-btn{font-size:14px;color:#757575;background:none;border:none;cursor:pointer;font-family:'Roboto',sans-serif;text-decoration:underline;text-underline-offset:3px;}
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;display:flex;align-items:flex-end;justify-content:center;}
+.sheet{background:#fff;width:100%;max-width:390px;border-radius:12px 12px 0 0;padding-bottom:32px;animation:shUp .22s ease;}
+@keyframes shUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.sh-top{display:flex;justify-content:space-between;align-items:center;padding:14px 20px 10px;}
+.sh-ttl{font-size:17px;font-weight:700;color:#212121;}
+.sh-x{width:28px;height:28px;background:#f5f5f5;border-radius:14px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.sh-x svg{width:14px;height:14px;stroke:#757575;fill:none;stroke-width:2.5;stroke-linecap:round;}
+.sh-search{margin:0 16px 8px;display:flex;align-items:center;background:#f5f7fa;border-radius:8px;padding:0 12px;height:40px;}
+.sh-search svg{width:16px;height:16px;stroke:#9e9e9e;fill:none;stroke-width:2;stroke-linecap:round;flex-shrink:0;margin-right:8px;}
+.sh-search input{flex:1;border:none;outline:none;font-size:14px;color:#212121;font-family:'Roboto',sans-serif;background:transparent;}
+.sh-search input::placeholder{color:#bdbdbd;}
+.sh-list{max-height:340px;overflow-y:auto;}
+.sh-item{display:flex;align-items:center;padding:14px 20px;border-bottom:1px solid #f5f5f5;cursor:pointer;gap:14px;}
+.sh-item:active{background:#f5f5f5;}
+.sh-item:last-child{border-bottom:none;}
+.sh-ico{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.sh-ico svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;}
+.sh-item-body{flex:1;}
+.sh-item-name{font-size:14px;font-weight:600;color:#212121;}
+.sh-item-url{font-size:11px;color:#9e9e9e;margin-top:2px;}
+.sh-item-tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin-top:3px;display:inline-block;}
+.sh-chk{width:20px;height:20px;display:flex;align-items:center;justify-content:center;}
+.sh-chk svg{width:18px;height:18px;stroke:#2196F3;fill:none;stroke-width:2.5;stroke-linecap:round;}
+.qr-area{display:flex;flex-direction:column;align-items:center;padding:24px 32px;}
+.qr-box{width:160px;height:160px;background:#f5f5f5;border-radius:10px;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);gap:2px;padding:10px;margin-bottom:16px;}
+.qr-cell{border-radius:1.5px;}
+.success-screen{position:fixed;inset:0;background:#fff;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;}
+.suc-ico{width:80px;height:80px;border-radius:40px;background:#e8f5e9;display:flex;align-items:center;justify-content:center;margin-bottom:24px;}
+.suc-ico svg{width:40px;height:40px;stroke:#2e7d32;fill:none;stroke-width:3;stroke-linecap:round;}
+.suc-title{font-size:22px;font-weight:700;color:#212121;margin-bottom:8px;text-align:center;}
+.suc-sub{font-size:14px;color:#9e9e9e;text-align:center;line-height:1.6;margin-bottom:32px;}
+.suc-btn{width:100%;padding:15px 0;background:#2196F3;border:none;border-radius:8px;color:#fff;font-size:16px;font-weight:600;cursor:pointer;font-family:'Roboto',sans-serif;}
+#toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:#323232;color:#fff;padding:10px 20px;border-radius:24px;font-size:13px;white-space:nowrap;display:none;z-index:200;animation:tIn .2s ease;}
+@keyframes tIn{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+</style>
+</head>
+<body>
+<div id="wrap">
+    <div class="top">
+    <div class="brand" style="font-family:'Montserrat',sans-serif;font-size:21px;font-weight:800;color:#111;letter-spacing:4px;margin-top:10px;">ALPEXA</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:3px;">
+      <div style="width:22px;height:1px;background:#aaa;"></div>
+      <div style="font-family:'Montserrat',sans-serif;font-size:10px;font-weight:600;color:#555;letter-spacing:4px;">SUISSE</div>
+      <div style="width:22px;height:1px;background:#aaa;"></div>
+    </div>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">Account Login</button>
+    <button class="tab-btn" id="tab-qr" onclick="switchTab('qr')">QR Login</button>
+  </div>
+  <div id="loginForm">
+    <div class="form">
+      <div class="error-bar" id="errBar"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span id="errTxt"></span></div>
+      <div class="field">
+        <label class="field-label">Login</label>
+        <div class="field-inner"><input id="loginInput" type="number" placeholder="Account number" oninput="clearErr()"></div>
+      </div>
+      <div class="field">
+        <label class="field-label">Password</label>
+        <div class="field-inner">
+          <input id="pwInput" type="password" placeholder="Password" oninput="clearErr()" onkeydown="if(event.key==='Enter')doLogin()">
+          <button class="eye" onclick="togglePw()"><svg id="eyeIcon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </div>
+      </div>
+      <div class="server-field">
+        <label class="field-label">Server</label>
+        <div class="server-inner" onclick="openServerSheet()">
+          <span class="server-val" id="serverVal" style="color:#bdbdbd">Select a server</span>
+          <svg class="server-arrow" viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg>
+        </div>
+      </div>
+      <div class="save-pw" onclick="toggleSave()">
+        <div class="checkbox on" id="saveBox"><svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg></div>
+        <span class="save-pw-txt">Save password</span>
+      </div>
+      <button class="signin-btn" id="signinBtn" onclick="doLogin()">
+        <span id="signinTxt">Sign In</span>
+        <div class="spinner" id="spinner"></div>
+      </button>
+    </div>
+    <div class="bottom-links">
+      <div class="link-row">
+        <button class="link-btn" onclick="location.href='open-account.html'">Open an Account</button>
+        <span class="link-sep">·</span>
+        <button class="link-btn" onclick="showToast('Password reset email has been sent')">Forgot password?</button>
+      </div>
+      <button class="demo-btn" onclick="fillDemo()">Start with a Demo Account</button>
+    </div>
+  </div>
+  <div id="qrForm" style="display:none">
+    <div class="qr-area">
+      <div style="font-size:14px;color:#757575;text-align:center;margin-bottom:20px;line-height:1.6">On the desktop terminal, open<br><b style="color:#212121">Tools → Options → Community</b><br>and scan the QR code</div>
+      <div class="qr-box" id="qrBox"></div>
+      <div style="font-size:13px;color:#9e9e9e;text-align:center">QR code expires in 60 seconds<br><span id="qrTimer" style="color:#2196F3;font-weight:600">60</span>s</div>
+    </div>
+    <div class="bottom-links">
+      <button class="link-btn" onclick="switchTab('login')">← Back to account login</button>
+    </div>
+  </div>
+</div>
+<div id="serverSheet" style="display:none">
+  <div class="sheet-bg" onclick="closeSheet()">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="sh-top"><span class="sh-ttl">Select Server</span><button class="sh-x" onclick="closeSheet()"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+      <div class="sh-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input placeholder="Search servers..." oninput="filterServers(this.value)" id="serverSearch"></div>
+      <div class="sh-list" id="serverList"></div>
+    </div>
+  </div>
+</div>
+<div id="successScreen" class="success-screen" style="display:none">
+  <div class="suc-ico"><svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg></div>
+  <div class="suc-title">Login Successful</div>
+  <div class="suc-sub" id="sucSub"></div>
+  <button class="suc-btn" onclick="window.location.href='../ALPEXA Trading App.html'">Start Trading →</button>
+</div>
+<div id="toast"></div>
+<script>
+const SERVERS=[
+  {name:'ALPEXA SUISSE Live',  url:'live.alpexa.com:443',   color:'#2e7d32',tag:'Live',     tagBg:'#e8f5e9',tagTxt:'#2e7d32'},
+  {name:'ALPEXA SUISSE Crypto',url:'crypto.alpexa.com:443', color:'#1565c0',tag:'Crypto CFD',tagBg:'#e3f2fd',tagTxt:'#1565c0'},
+  {name:'ALPEXA SUISSE Sports',  url:'sports.alpexa.com:443',   color:'#757575',tag:'Sports',     tagBg:'#f5f5f5',tagTxt:'#757575'},
+];
+let selServer=-1,savePw=true,pwVisible=false,qrInterval=null,qrSec=60;
+function renderServers(list){document.getElementById('serverList').innerHTML=list.map(s=>{const i=SERVERS.indexOf(s);return`<div class="sh-item" onclick="selectServer(${i})"><div class="sh-ico" style="background:${s.color}"><svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></div><div class="sh-item-body"><div class="sh-item-name">${s.name}</div><div class="sh-item-url">${s.url}</div><span class="sh-item-tag" style="background:${s.tagBg};color:${s.tagTxt}">${s.tag}</span></div><div class="sh-chk">${i===selServer?'<svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>':''}</div></div>`;}).join('');}
+function openServerSheet(){document.getElementById('serverSheet').style.display='block';document.getElementById('serverSearch').value='';renderServers(SERVERS);setTimeout(()=>document.getElementById('serverSearch').focus(),100);}
+function closeSheet(){document.getElementById('serverSheet').style.display='none';}
+function filterServers(q){renderServers(q?SERVERS.filter(s=>s.name.toLowerCase().includes(q.toLowerCase())||s.url.includes(q)):SERVERS);}
+function selectServer(i){selServer=i;const sv=document.getElementById('serverVal');sv.textContent=SERVERS[i].name;sv.style.color='#212121';closeSheet();}
+function togglePw(){pwVisible=!pwVisible;const inp=document.getElementById('pwInput');inp.type=pwVisible?'text':'password';document.getElementById('eyeIcon').innerHTML=pwVisible?'<line x1="1" y1="1" x2="23" y2="23"/><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>':'<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';}
+function toggleSave(){savePw=!savePw;const b=document.getElementById('saveBox');b.className='checkbox'+(savePw?' on':'');b.innerHTML=savePw?'<svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>':'';}
+function clearErr(){document.getElementById('errBar').style.display='none';}
+function showErr(msg){const b=document.getElementById('errBar');document.getElementById('errTxt').textContent=msg;b.style.display='flex';}
+function doLogin(){const login=document.getElementById('loginInput').value.trim();const pw=document.getElementById('pwInput').value;if(!login){showErr('Please enter your account number.');return;}if(!pw){showErr('Please enter your password.');return;}if(selServer<0){showErr('Please select a server.');return;}document.getElementById('signinTxt').style.display='none';document.getElementById('spinner').style.display='block';document.getElementById('signinBtn').style.opacity='0.85';setTimeout(()=>{document.getElementById('spinner').style.display='none';document.getElementById('signinTxt').style.display='inline';document.getElementById('signinBtn').style.opacity='1';if(login.length>=5){document.getElementById('sucSub').innerHTML=`${SERVERS[selServer].name}<br>Connected to account #${login.slice(0,4)}-${login.slice(4,8)||'****'}`;document.getElementById('successScreen').style.display='flex';}else{showErr('Invalid account number.');}},1800);}
+function fillDemo(){document.getElementById('loginInput').value='44219982330';document.getElementById('pwInput').value='1234';selServer=2;const sv=document.getElementById('serverVal');sv.textContent=SERVERS[2].name;sv.style.color='#212121';clearErr();showToast('Demo account credentials filled in');}
+function switchTab(t){document.getElementById('tab-login').className='tab-btn'+(t==='login'?' active':'');document.getElementById('tab-qr').className='tab-btn'+(t==='qr'?' active':'');document.getElementById('loginForm').style.display=t==='login'?'block':'none';document.getElementById('qrForm').style.display=t==='qr'?'block':'none';if(t==='qr')startQR();else stopQR();}
+function buildQR(){const p=[1,1,1,1,1,1,1,0,1,0,0,0,0,0,1,0,1,0,1,1,1,0,1,1,1,0,1,0,1,0,1,0,1,0,1,1,1,0,1,1,1,0,0,0,0,0,1,0,1,1,1,1,1,1,1,0,0,1,0,1,0,0,0,1];const box=document.getElementById('qrBox');if(box)box.innerHTML=p.map(c=>`<div class="qr-cell" style="background:${c?'#212121':'transparent'}"></div>`).join('');}
+function startQR(){buildQR();qrSec=60;document.getElementById('qrTimer').textContent=qrSec;qrInterval=setInterval(()=>{qrSec--;const el=document.getElementById('qrTimer');if(el)el.textContent=qrSec;if(qrSec<=0){stopQR();buildQR();qrSec=60;}},1000);}
+function stopQR(){clearInterval(qrInterval);}
+function showToast(msg){const el=document.getElementById('toast');el.textContent=msg;el.style.display='block';setTimeout(()=>{el.style.display='none';},2200);}
+buildQR();
+</script>
+</body>
+</html>
