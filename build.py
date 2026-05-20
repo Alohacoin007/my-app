@@ -50,8 +50,10 @@ show('login');
 </html>
 """
 
-wrapper = wrapper.replace("__LOGIN__", json.dumps(login))
-wrapper = wrapper.replace("__OPENACC__", json.dumps(openacc))
+login_js = json.dumps(login).replace('</script>', '<\\/script>')
+openacc_js = json.dumps(openacc).replace('</script>', '<\\/script>')
+wrapper = wrapper.replace("__LOGIN__", login_js)
+wrapper = wrapper.replace("__OPENACC__", openacc_js)
 
 with open('alpexa-app.html', 'w', encoding='utf-8') as f:
     f.write(wrapper)
