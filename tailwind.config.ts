@@ -5,23 +5,26 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Boyd Gaming–inspired palette: deep black background, red primary, gold accent
-        bg: {
-          DEFAULT: "#0a0a0a",
-          surface: "#141414",
-          elevated: "#1c1c1c",
-          border: "#2a2a2a",
+        // Boyd Sports palette
+        navy: {
+          DEFAULT: "#0a2545", // header/footer/banner deep navy
+          dark: "#061a33",
+          tile: "#1c4587", // sport icon tile background
         },
-        brand: {
-          DEFAULT: "#c8102e", // Boyd red
-          dark: "#8c0a20",
-          light: "#e63c54",
+        orange: {
+          DEFAULT: "#f5a623", // primary CTA / login / place bet
+          dark: "#d18d12",
+          light: "#fbbe50",
         },
-        gold: {
-          DEFAULT: "#d4a64a",
-          dark: "#a8842f",
+        link: {
+          DEFAULT: "#1d6fb8", // bright blue used for times / "More Bets"
         },
-        muted: "#9ca3af",
+        chip: {
+          DEFAULT: "#eceff3", // odds card grey
+          border: "#d6dae0",
+        },
+        page: "#ffffff",
+        soft: "#f4f6f8",
       },
       fontFamily: {
         sans: [
@@ -32,6 +35,9 @@ const config: Config = {
           "Roboto",
           "sans-serif",
         ],
+      },
+      boxShadow: {
+        slip: "0 -8px 24px rgba(0,0,0,0.18)",
       },
     },
   },
