@@ -11,7 +11,7 @@ login = login.replace(
     "onclick=\"parent.postMessage('open-account','*')\""
 )
 login = login.replace(
-    "onclick=\"window.location.href='ALPEXA Trading App.html'\"",
+    "onclick=\"window.location.href='trading.html'\"",
     "onclick=\"alert('Trading App page is not included in this demo.')\""
 )
 openacc = openacc.replace(
@@ -19,7 +19,7 @@ openacc = openacc.replace(
     "parent.postMessage('login','*')"
 )
 openacc = openacc.replace(
-    "window.location.href = 'ALPEXA Trading App.html'",
+    "window.location.href = 'trading.html'",
     "alert('Trading App page is not included in this demo.')"
 )
 
