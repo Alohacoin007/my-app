@@ -659,60 +659,66 @@ function AppMenu({ indicators, setIndicators, liveOrders, closedHistory, onClose
         <div style={{display:'flex', justifyContent:'center', padding:'8px 0 4px'}}>
           <div style={{width:36, height:4, borderRadius:2, background:'var(--line-2)'}}/>
         </div>
-        <div style={{padding:'6px 16px 12px', display:'flex', alignItems:'center', gap:6}}>
+        <div style={{padding:'10px 14px 12px', display:'flex', alignItems:'center', gap:6, borderBottom:'1px solid var(--line)'}}>
           {view !== 'root' && (
             <button onClick={()=>setView('root')} style={{
-              width:28, height:28, borderRadius:14, background:'var(--bg-2)',
-              display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text-2)'
-            }}><Mi name="arrow_back" size={16}/></button>
+              width:28, height:28, display:'flex', alignItems:'center',
+              justifyContent:'center', color:'var(--text-2)', background:'transparent'
+            }}><Mi name="arrow_back_ios_new" size={16}/></button>
           )}
-          <div>
-            <div style={{fontSize:16, fontWeight:700, color:'var(--ink)'}}>
-              {view === 'root' && 'Menu'}
-              {view === 'chart' && 'Chart Settings'}
-              {view === 'stats' && 'Trading Statistics'}
-              {view === 'help' && 'Help & FAQ'}
-            </div>
+          <div style={{fontSize:15, fontWeight:600, color:'var(--ink)', flex:1}}>
+            {view === 'root' && 'Settings'}
+            {view === 'chart' && 'Charts'}
+            {view === 'stats' && 'Statistics'}
+            {view === 'help' && 'Help'}
           </div>
-          <span style={{flex:1}}/>
           <button onClick={onClose} style={{
-            width:28, height:28, borderRadius:14, background:'var(--bg-2)',
-            display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text-2)'
-          }}><Mi name="close" size={14}/></button>
+            width:28, height:28, display:'flex', alignItems:'center',
+            justifyContent:'center', color:'var(--text-2)', background:'transparent'
+          }}><Mi name="close" size={18}/></button>
         </div>
 
-        <div style={{flex:1, overflowY:'auto', padding:'0 12px 16px'}}>
+        <div style={{flex:1, overflowY:'auto', padding:'0 0 16px', background:'var(--bg)'}}>
 
           {view === 'root' && (
             <>
-              <MenuItem icon="tune"           label="Chart Settings"      sub="Indicators, grid, colors" onClick={()=>setView('chart')}/>
-              <MenuItem icon="dark_mode"      label="Dark Mode"           toggle={document.documentElement.classList.contains('dark')} onClick={toggleDark}/>
-              <MenuItem icon={muted()?'volume_off':'volume_up'} label="Sound" toggle={!muted()} onClick={toggleSound}/>
-              <MenuItem icon="bar_chart"      label="Trading Statistics"  sub={`${closed.length} closed · ${winRate}% win rate`} onClick={()=>setView('stats')}/>
-              <MenuItem icon="help_outline"   label="Help & FAQ"          sub="Get answers fast" onClick={()=>setView('help')}/>
-              <div style={{height:6, marginTop:8, borderTop:'1px solid var(--line)'}}/>
-              <MenuItem icon="logout"         label="Sign Out"            danger onClick={()=>{
-                if (confirm('Sign out of ALPEXA?')) window.location.href='brand_extracted/login.html';
+              <Mt5Section title="Charts"/>
+              <Mt5Row icon="candlestick_chart" label="Charts" value="Indicators, grid" onClick={()=>setView('chart')}/>
+
+              <Mt5Section title="Interface"/>
+              <Mt5Row icon="dark_mode" label="Dark Mode" toggle={document.documentElement.classList.contains('dark')} onClick={toggleDark}/>
+              <Mt5Row icon={muted()?'volume_off':'volume_up'} label="Sounds" toggle={!muted()} onClick={toggleSound}/>
+
+              <Mt5Section title="Trading"/>
+              <Mt5Row icon="bar_chart" label="Statistics" value={`${closed.length} closed · ${winRate}%`} onClick={()=>setView('stats')}/>
+
+              <Mt5Section title="Support"/>
+              <Mt5Row icon="help_outline" label="FAQ" onClick={()=>setView('help')}/>
+              <Mt5Row icon="info" label="About" value="v1.4.2"/>
+
+              <Mt5Section title=""/>
+              <Mt5Row icon="logout" label="Sign Out" danger onClick={()=>{
+                if (confirm('Sign out of ALPEXA?')) window.location.href='login.html';
               }}/>
             </>
           )}
 
           {view === 'chart' && (
             <>
-              <div style={{fontSize:10, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, margin:'4px 4px 8px'}}>INDICATORS</div>
+              <Mt5Section title="Indicators"/>
               {[
-                ['ma','MA(20) — Moving Average','show_chart'],
-                ['vol','Volume','equalizer'],
-                ['bb','Bollinger Bands','signal_cellular_alt'],
-                ['rsi','RSI(14) — Relative Strength','speed'],
-                ['macd','MACD','timeline'],
-              ].map(([k,l,ic])=> (
-                <MenuItem key={k} icon={ic} label={l} toggle={!!indicators[k]}
+                ['ma','Moving Average (20)'],
+                ['vol','Volume'],
+                ['bb','Bollinger Bands'],
+                ['rsi','RSI (14)'],
+                ['macd','MACD'],
+              ].map(([k,l])=> (
+                <Mt5Row key={k} label={l} toggle={!!indicators[k]}
                   onClick={()=>setIndicators({...indicators, [k]: !indicators[k]})}/>
               ))}
-              <div style={{fontSize:10, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, margin:'14px 4px 8px'}}>APPEARANCE</div>
-              <MenuItem icon="grid_on"      label="Show Grid"      toggle={true}/>
-              <MenuItem icon="palette"      label="Candle Colors"  sub="Green / Red (default)" chev/>
+              <Mt5Section title="Appearance"/>
+              <Mt5Row label="Grid" toggle={true}/>
+              <Mt5Row label="Colors" value="Green / Red" chev/>
             </>
           )}
 
@@ -764,6 +770,59 @@ function AppMenu({ indicators, setIndicators, liveOrders, closedHistory, onClose
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function Mt5Section({ title }) {
+  return (
+    <div style={{
+      fontSize:10.5, fontWeight:700, color:'var(--text-3)',
+      letterSpacing:0.8, textTransform:'uppercase',
+      padding: title ? '18px 16px 6px' : '12px 0 0'
+    }}>{title}</div>
+  );
+}
+
+function Mt5Row({ icon, label, value, toggle, chev, danger, onClick }) {
+  const interactive = !!onClick;
+  return (
+    <div onClick={onClick} style={{
+      display:'flex', alignItems:'center', gap:14,
+      padding:'12px 16px', background:'var(--surface)',
+      borderBottom:'1px solid var(--line)',
+      cursor: interactive ? 'pointer' : 'default'
+    }}
+    onMouseEnter={(e)=>{ if (interactive) e.currentTarget.style.background='var(--bg-2)'; }}
+    onMouseLeave={(e)=>{ e.currentTarget.style.background='var(--surface)'; }}>
+      {icon && (
+        <Mi name={icon} size={20} style={{
+          color: danger ? 'var(--sell-2)' : 'var(--text-2)',
+          flexShrink:0
+        }}/>
+      )}
+      <div style={{flex:1, fontSize:14, fontWeight:500,
+        color: danger ? 'var(--sell-2)' : 'var(--ink)'}}>{label}</div>
+      {value !== undefined && (
+        <div style={{fontSize:12.5, color:'var(--text-3)', textAlign:'right'}}>{value}</div>
+      )}
+      {toggle !== undefined && (
+        <div style={{
+          width:38, height:22, borderRadius:11, position:'relative',
+          background: toggle ? '#34C759' : 'var(--muted)',
+          transition:'background 0.2s', flexShrink:0
+        }}>
+          <div style={{
+            width:18, height:18, background:'#fff', borderRadius:9,
+            position:'absolute', top:2, left: toggle?18:2,
+            boxShadow:'0 1px 3px rgba(0,0,0,0.2)', transition:'left 0.2s'
+          }}/>
+        </div>
+      )}
+      {chev && <Mi name="chevron_right" size={18} style={{color:'var(--text-3)', flexShrink:0}}/>}
+      {!toggle && !value && chev === undefined && onClick && !danger && (
+        <Mi name="chevron_right" size={18} style={{color:'var(--text-3)', flexShrink:0}}/>
+      )}
     </div>
   );
 }
