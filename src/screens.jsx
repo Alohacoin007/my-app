@@ -27,6 +27,61 @@ const I = {
 };
 
 // ──────────────────────────────────────────────
+// MT5-style numeric stepper for prices
+// ──────────────────────────────────────────────
+function PriceStepper({ value, onChange, digits, placeholder }) {
+  const step = +(1 / Math.pow(10, digits)).toFixed(digits);
+  const holdRef = React.useRef(null);
+  const currentRef = React.useRef(value);
+  React.useEffect(() => { currentRef.current = value; }, [value]);
+  React.useEffect(() => () => { if (holdRef.current) clearTimeout(holdRef.current); }, []);
+
+  function startHold(dir) {
+    let speed = 220;
+    let count = 0;
+    const tick = () => {
+      const raw = currentRef.current && !isNaN(parseFloat(currentRef.current))
+        ? parseFloat(currentRef.current)
+        : parseFloat(placeholder) || 0;
+      const multiplier = count > 18 ? 10 : 1;
+      const next = (raw + dir * step * multiplier).toFixed(digits);
+      currentRef.current = next;
+      onChange(next);
+      count++;
+      if (count > 3) speed = Math.max(35, speed - 18);
+      holdRef.current = setTimeout(tick, speed);
+    };
+    tick();
+  }
+  function endHold() {
+    if (holdRef.current) { clearTimeout(holdRef.current); holdRef.current = null; }
+  }
+  const btn = {
+    width:36, height:36, borderRadius:18, background:'var(--bg-2)', border:'none',
+    color:'var(--ink)', fontSize:18, fontWeight:600, cursor:'pointer',
+    display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
+    userSelect:'none', touchAction:'none'
+  };
+  return (
+    <div style={{display:'flex', alignItems:'center', gap:8}}>
+      <button type="button" style={btn}
+        onMouseDown={() => startHold(-1)} onMouseUp={endHold} onMouseLeave={endHold}
+        onTouchStart={(e) => { e.preventDefault(); startHold(-1); }} onTouchEnd={endHold}
+        onContextMenu={(e) => e.preventDefault()}>−</button>
+      <input value={value} onChange={e=>onChange(e.target.value)}
+        placeholder={placeholder} inputMode="decimal" className="mono"
+        style={{flex:1, textAlign:'center', borderBottom:'1.5px solid var(--line-2)',
+          padding:'5px 0', fontSize:18, color:'var(--ink)', fontWeight:600,
+          outline:'none', border:'none', background:'transparent', minWidth:0}}/>
+      <button type="button" style={btn}
+        onMouseDown={() => startHold(1)} onMouseUp={endHold} onMouseLeave={endHold}
+        onTouchStart={(e) => { e.preventDefault(); startHold(1); }} onTouchEnd={endHold}
+        onContextMenu={(e) => e.preventDefault()}>+</button>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────
 // WATCHLIST
 // ──────────────────────────────────────────────
 function getFavSyms() {
@@ -440,6 +495,22 @@ function TradeTicket({ market, sym, setSym, lots, setLots, onPlace }) {
   }
   const slH = sltpHelper(sl, false);
   const tpH = sltpHelper(tp, true);
+
+  // Reject wrong-side pending triggers up front; otherwise the trigger
+  // check fires on the next tick and the order vanishes from Pending
+  // (looks like it executed at market).
+  function triggerHelper() {
+    if (otype === 'MARKET') return null;
+    const trig = parseFloat(otypePrice);
+    if (!otypePrice || isNaN(trig) || trig <= 0) return null;
+    const ref = side === 'BUY' ? ask : s.last;
+    let wrongSide = false;
+    if (otype === 'LIMIT') wrongSide = side === 'BUY' ? trig >= ref : trig <= ref;
+    else if (otype === 'STOP') wrongSide = side === 'BUY' ? trig <= ref : trig >= ref;
+    return { trig, ref, wrongSide };
+  }
+  const trigH = triggerHelper();
+
   // Contract size label
   let contractLabel;
   if (s.cls === 'FX') {
@@ -482,7 +553,7 @@ function TradeTicket({ market, sym, setSym, lots, setLots, onPlace }) {
       setConfirmOpen(true);
     }
   }
-  const canPlace = (otype === 'MARKET' || (otypePrice && !isNaN(parseFloat(otypePrice)) && parseFloat(otypePrice) > 0))
+  const canPlace = (otype === 'MARKET' || (trigH && !trigH.wrongSide))
     && (!slH || (!slH.invalid && !slH.tooClose))
     && (!tpH || (!tpH.invalid && !tpH.tooClose));
 
@@ -557,10 +628,23 @@ function TradeTicket({ market, sym, setSym, lots, setLots, onPlace }) {
           <Seg value={otype} onChange={setOtype} options={['MARKET','LIMIT','STOP']}/>
           {otype !== 'MARKET' && (
             <div style={{marginTop:12}}>
-              <div style={{fontSize:9.5, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5, marginBottom:5}}>TRIGGER PRICE</div>
-              <input value={otypePrice} onChange={e=>setOtypePrice(e.target.value)}
-                placeholder={ALPEXA_MARKET.fmt(entryPx, s.digits)} className="mono"
-                style={{width:'100%', borderBottom:'1.5px solid var(--line-2)', padding:'5px 0', fontSize:15, color:'var(--ink)', fontWeight:600, outline:'none'}}/>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:5}}>
+                <span style={{fontSize:9.5, fontWeight:700, color:'var(--text-3)', letterSpacing:0.5}}>TRIGGER PRICE</span>
+                <span className="mono" style={{fontSize:10, color:'var(--text-3)'}}>cur {ALPEXA_MARKET.fmt(entryPx, s.digits)}</span>
+              </div>
+              <PriceStepper
+                value={otypePrice}
+                onChange={setOtypePrice}
+                digits={s.digits}
+                placeholder={ALPEXA_MARKET.fmt(entryPx, s.digits)}
+              />
+              {trigH && (
+                <div className="mono" style={{fontSize:9.5, marginTop:5, color: trigH.wrongSide ? 'var(--warn)' : 'var(--text-3)'}}>
+                  {trigH.wrongSide
+                    ? `⚠ ${otype} ${side} must be ${(otype==='LIMIT') === (side==='BUY') ? 'below' : 'above'} ${ALPEXA_MARKET.fmt(trigH.ref, s.digits)}`
+                    : `${Math.round(Math.abs(trigH.trig - trigH.ref) * Math.pow(10, s.digits))} pt from market`}
+                </div>
+              )}
             </div>
           )}
         </div>

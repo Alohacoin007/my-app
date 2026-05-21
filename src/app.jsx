@@ -496,9 +496,12 @@ function SymPicker({ market, sym, onPick }) {
 // ──────────────────────────────────────────────
 // HEADER (compact)
 // ──────────────────────────────────────────────
-function AppHeader({ accent, account, onAccountClick, livePnl = 0, prevPnl = 0, usedMargin = 0, notifCount = 0, onBellClick, onMenuClick }) {
+function AppHeader({ accent, account, onAccountClick, livePnl = 0, prevPnl = 0, usedMargin = 0, realizedPnl = 0, notifCount = 0, onBellClick, onMenuClick }) {
   const a = ACCOUNTS.find(x => x.id === account) || ACCOUNTS[0];
-  const balanceNum = parseFloat(a.balance.replace(/[$,]/g, ''));
+  // Effective cash balance = starting balance + sum of realized P/L from
+  // closed positions. Without this, closing a position would just remove
+  // its unrealized P/L from equity and "reset" balance.
+  const balanceNum = parseFloat(a.balance.replace(/[$,]/g, '')) + realizedPnl;
   const prefs = getPrefs();
   const cur = window.getCurrency ? window.getCurrency(prefs.currency || 'USD') : { code:'USD', symbol:'$', rate:1 };
   const equityUsd = balanceNum + livePnl;
@@ -1102,6 +1105,9 @@ function App() {
   const staticPnl = ALPEXA_MARKET.POSITIONS.reduce((s,p)=>s+(p.pnl||0),0);
   const ordersPnl = liveOrders.reduce((s,o)=>s+(o.pnl||0),0);
   const livePnl = staticPnl + ordersPnl;
+  // Cumulative realized P/L from closed positions — added to balance so
+  // closing a winner/loser updates cash, not just unrealized equity.
+  const realizedPnl = closedHistory.reduce((s,c)=>s+(c.pnl||0),0);
   // Used margin from all open live orders
   const usedMargin = liveOrders.reduce((sum, o) => {
     const m = marketRef.current.state.find(s => s.sym === o.sym);
@@ -1115,7 +1121,7 @@ function App() {
 
   return (
     <div className="app">
-      <AppHeader accent={tweaks.accent} account={account} onAccountClick={()=>setAcctSheet(true)} livePnl={livePnl} prevPnl={prevPnl} usedMargin={usedMargin} notifCount={notifications.filter(n => !n.read).length} onBellClick={()=>setNotifOpen(true)} onMenuClick={()=>setMenuOpen(true)}/>
+      <AppHeader accent={tweaks.accent} account={account} onAccountClick={()=>setAcctSheet(true)} livePnl={livePnl} prevPnl={prevPnl} usedMargin={usedMargin} realizedPnl={realizedPnl} notifCount={notifications.filter(n => !n.read).length} onBellClick={()=>setNotifOpen(true)} onMenuClick={()=>setMenuOpen(true)}/>
       {tab === 'WATCH' && <Watchlist market={market} current={sym} onSelect={s => { setSym(s); setTab('CHART'); }} onDepositCrypto={()=>{
         try { localStorage.setItem('alpexa.openDeposit', 'crypto'); } catch(e) {}
         setTab('ACCT');
