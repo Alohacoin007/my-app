@@ -1,0 +1,4447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alpexa Suisse — All Screens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #F0EEE9; min-height: 100vh; }
+  * { box-sizing: border-box; }
+  @keyframes alpexa-pulse-dot {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.55); }
+    50%      { box-shadow: 0 0 0 5px rgba(34,197,94,0); }
+  }
+  .alpexa-pulse-dot { animation: alpexa-pulse-dot 1.8s ease-out infinite; }
+  .alpexa-color-shift { transition: color 220ms ease, fill 220ms ease; }
+  .alpexa-hide-scrollbar::-webkit-scrollbar { display: none; }
+  .alpexa-hide-scrollbar { -ms-overflow-style: none; }
+  #root { min-height: 100vh; }
+  #boot {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: #F0EEE9; color: #6e6a63;
+    font-family: 'Geist Mono', monospace; font-size: 12px; letter-spacing: 1.4px;
+    text-transform: uppercase; z-index: 1000;
+  }
+  #boot.hide { opacity: 0; pointer-events: none; transition: opacity 240ms ease; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="boot">Compiling JSX…</div>
+<div id="root"></div>
+
+<!-- 1) shared primitives: Phone, StatusBar, COIN_META, makeChart, Spark, etc. -->
+<script type="text/babel" data-presets="react">
+// Shared bits: chart paths, status bar, formatters, sparklines
+
+const fmt = (n, d = 2) => n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmtUsd = (n, d = 2) => '$' + fmt(n, d);
+const fmtPct = (n, d = 2) => (n >= 0 ? '+' : '') + n.toFixed(d) + '%';
+// Compact USD: $32.4B, $48M, $900K
+const fmtCompact = (n) => {
+  const abs = Math.abs(n);
+  if (abs >= 1e12) return '$' + (n / 1e12).toFixed(2) + 'T';
+  if (abs >= 1e9)  return '$' + (n / 1e9).toFixed(2) + 'B';
+  if (abs >= 1e6)  return '$' + (n / 1e6).toFixed(2) + 'M';
+  if (abs >= 1e3)  return '$' + (n / 1e3).toFixed(1) + 'K';
+  return '$' + n.toFixed(0);
+};
+
+// Multi-currency support. Rates as of May 26, 2026 (approximate snapshot).
+const CURRENCIES = {
+  USD: { code: 'USD', symbol: '$',   suffix: '',     rate: 1.000 },
+  CHF: { code: 'CHF', symbol: '',    suffix: ' CHF', rate: 0.812 },
+  EUR: { code: 'EUR', symbol: '€',   suffix: '',     rate: 0.921 },
+};
+const CURRENCY_ORDER = ['USD', 'CHF', 'EUR'];
+const cvt = (usdAmount, code = 'USD') => usdAmount * (CURRENCIES[code]?.rate || 1);
+const fmtMoney = (usdAmount, code = 'USD', d = 2) => {
+  const c = CURRENCIES[code] || CURRENCIES.USD;
+  return c.symbol + fmt(usdAmount * c.rate, d) + c.suffix;
+};
+
+// ─────────────────────────────────────────────────────────────
+// Chart path generator — deterministic pseudo-random walk
+// ─────────────────────────────────────────────────────────────
+function makeChart(seed, n = 96, drift = 0.06, vol = 1) {
+  let s = seed;
+  const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+  const pts = [];
+  let y = 0;
+  for (let i = 0; i < n; i++) {
+    y += (rnd() - 0.5) * vol + drift / n * 100;
+    pts.push(y);
+  }
+  return pts;
+}
+
+function pathFromPts(pts, w, h, pad = 0) {
+  const min = Math.min(...pts), max = Math.max(...pts);
+  const r = max - min || 1;
+  const dx = (w - pad * 2) / (pts.length - 1);
+  return pts.map((p, i) => {
+    const x = pad + i * dx;
+    const y = pad + (h - pad * 2) * (1 - (p - min) / r);
+    return (i === 0 ? 'M' : 'L') + x.toFixed(2) + ' ' + y.toFixed(2);
+  }).join(' ');
+}
+
+function areaFromPts(pts, w, h, pad = 0) {
+  const p = pathFromPts(pts, w, h, pad);
+  return p + ` L ${w - pad} ${h - pad} L ${pad} ${h - pad} Z`;
+}
+
+// Sparkline component — shape actually reflects the asset's net % move.
+// The line starts at 0, ends exactly at `pct`, with shape variation per seed
+// and volatility proportional to |pct|. So +6% looks visibly steeper than +2%.
+function Spark({ seed, w = 60, h = 22, color = '#C2FF3D', pct = 0, strokeWidth = 1.5 }) {
+  // True flat for stable coins (pct ≈ 0). No fake wave.
+  if (Math.abs(pct) < 0.05) {
+    const y = (h / 2).toFixed(2);
+    return (
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: 'block' }}>
+        <line x1="1" y1={y} x2={w - 1} y2={y} stroke={color} strokeWidth={strokeWidth} strokeLinecap="round"/>
+      </svg>
+    );
+  }
+  // Generate end-anchored series
+  const n = 36;
+  let s = seed;
+  const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+  const range = Math.max(0.4, Math.abs(pct));
+  const noiseAmp = range * 0.42;
+  // Pick two wave frequencies per seed for shape variety
+  const f1 = 1.5 + rnd() * 2.5;
+  const f2 = 0.7 + rnd() * 1.2;
+  const phase = rnd() * Math.PI * 2;
+  const pts = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1);
+    const base = pct * t;                                          // ramp 0 → pct
+    const taper = Math.sin(Math.PI * t);                           // 0 at ends, 1 mid
+    const wave = (Math.sin(t * Math.PI * 2 * f1 + phase) * 0.6
+                + Math.sin(t * Math.PI * 2 * f2 - phase) * 0.4)
+                * noiseAmp * taper;
+    const jitter = (rnd() - 0.5) * noiseAmp * 0.35 * taper;
+    pts[i] = base + wave + jitter;
+  }
+  pts[0] = 0;
+  pts[n - 1] = pct;
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: 'block' }}>
+      <path d={pathFromPts(pts, w, h, 1)} stroke={color} strokeWidth={strokeWidth} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Coin icons — simple stylized monograms (placeholder-friendly)
+// ─────────────────────────────────────────────────────────────
+const COIN_META = {
+  BTC: { name: 'Bitcoin',  bg: '#F7931A', fg: '#000', glyph: '₿' },
+  ETH: { name: 'Ethereum', bg: '#627EEA', fg: '#fff', glyph: 'Ξ' },
+  SOL: { name: 'Solana',   bg: '#9945FF', fg: '#fff', glyph: '◎' },
+  USDT:{ name: 'Tether',   bg: '#26A17B', fg: '#fff', glyph: '₮' },
+  AVAX:{ name: 'Avalanche',bg: '#E84142', fg: '#fff', glyph: 'A' },
+  LINK:{ name: 'Chainlink',bg: '#2A5ADA', fg: '#fff', glyph: '⌬' },
+  DOGE:{ name: 'Dogecoin', bg: '#C2A633', fg: '#000', glyph: 'Ð' },
+  XRP: { name: 'Ripple',   bg: '#23292F', fg: '#fff', glyph: 'X' },
+  ADA: { name: 'Cardano',  bg: '#0033AD', fg: '#fff', glyph: '₳' },
+  MATIC:{name: 'Polygon',  bg: '#8247E5', fg: '#fff', glyph: '◆' },
+};
+
+function CoinIcon({ sym, size = 32 }) {
+  const m = COIN_META[sym] || { bg: '#888', fg: '#fff', glyph: sym[0] };
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: m.bg, color: m.fg,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontWeight: 700, fontSize: size * 0.5, lineHeight: 1, flexShrink: 0,
+    }}>{m.glyph}</div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Status bar (custom, themable) — replaces IOSStatusBar so colors match
+// ─────────────────────────────────────────────────────────────
+function StatusBar({ color = '#fff', time = '9:41' }) {
+  return (
+    <div style={{
+      height: 54, padding: '14px 28px 0',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      color, fontFamily: "'Geist', system-ui, sans-serif",
+      fontWeight: 600, fontSize: 17, letterSpacing: -0.2,
+      flexShrink: 0,
+    }}>
+      <div>{time}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        {/* Signal */}
+        <svg width="18" height="11" viewBox="0 0 18 11"><g fill={color}>
+          <rect x="0" y="7" width="3" height="4" rx="0.5"/>
+          <rect x="5" y="5" width="3" height="6" rx="0.5"/>
+          <rect x="10" y="2" width="3" height="9" rx="0.5"/>
+          <rect x="15" y="0" width="3" height="11" rx="0.5"/>
+        </g></svg>
+        {/* Wifi */}
+        <svg width="17" height="12" viewBox="0 0 17 12" fill="none">
+          <path d="M8.5 11.5 L10.7 9.3 A3 3 0 0 0 6.3 9.3 Z" fill={color}/>
+          <path d="M3.5 6.5 A7 7 0 0 1 13.5 6.5" stroke={color} strokeWidth="1.6" fill="none" strokeLinecap="round"/>
+          <path d="M0.5 3 A11 11 0 0 1 16.5 3" stroke={color} strokeWidth="1.6" fill="none" strokeLinecap="round"/>
+        </svg>
+        {/* Battery */}
+        <svg width="28" height="12" viewBox="0 0 28 12" fill="none">
+          <rect x="0.5" y="0.5" width="23" height="11" rx="3" stroke={color} strokeOpacity="0.4"/>
+          <rect x="2" y="2" width="20" height="8" rx="1.5" fill={color}/>
+          <rect x="24.5" y="4" width="2" height="4" rx="1" fill={color} fillOpacity="0.4"/>
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+// Home indicator bar
+function HomeIndicator({ color = '#fff' }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 8px', flexShrink: 0 }}>
+      <div style={{ width: 134, height: 5, borderRadius: 3, background: color }} />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Phone frame — simple rounded device used in all artboards
+// ─────────────────────────────────────────────────────────────
+function Phone({ children, width = 390, height = 844, bg = '#000', radius = 54, chrome = true }) {
+  return (
+    <div style={{
+      width, height,
+      background: bg,
+      borderRadius: radius,
+      overflow: 'hidden',
+      position: 'relative',
+      display: 'flex',
+      flexDirection: 'column',
+      boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.04)',
+    }}>
+      {/* Dynamic island */}
+      {chrome && (
+        <div style={{
+          position: 'absolute', top: 11, left: '50%', transform: 'translateX(-50%)',
+          width: 124, height: 37, borderRadius: 20, background: '#000', zIndex: 100,
+        }} />
+      )}
+      {children}
+    </div>
+  );
+}
+
+Object.assign(window, {
+  fmt, fmtUsd, fmtPct, fmtCompact,
+  CURRENCIES, CURRENCY_ORDER, cvt, fmtMoney,
+  makeChart, pathFromPts, areaFromPts, Spark,
+  COIN_META, CoinIcon,
+  StatusBar, HomeIndicator, Phone,
+});
+
+</script>
+
+<!-- 2) data: PORTFOLIO, MARKETS, RANGES -->
+<script type="text/babel" data-presets="react">
+const PORTFOLIO = {
+  // Real prices snapshot from May 26, 2026 (Yahoo Finance).
+  // Crypto sum: 21903.33 + 2290.07 + 708.19 + 894.41 + 72.00 = 25867.99
+  // Securities sum: 5420.00 + 2185.00 = 7605.00
+  // Total balance: 25867.99 + 7605.00 = 33472.99
+  // 24h change derives from each asset's chg (securities use yield, not chg).
+  balance: 33472.99,
+  changeUsd: 638.57,
+  changePct: 1.95,
+  assets: [
+    { sym: 'BTC',  qty: 0.2845, price: 76988.90, chg: 2.48, mine: 21903.33, seed: 5421,
+      avgBuy: 48520.00, invested: 13803.94,
+      vol24h: 32_400_000_000, spreadBps: 0.4, depth1pct: 48_000_000,
+      alerts: [
+        { direction: 'above', target: 80000, active: true, note: 'Take profit' },
+        { direction: 'below', target: 70000, active: true, note: 'Reassess' },
+        { direction: 'above', target: 100000, active: false, note: 'All-time high' },
+      ],
+      txs: [
+        { type: 'Buy', qty: 0.1000, price: 52400.00, when: 'Mar 12, 2026' },
+        { type: 'Buy', qty: 0.1845, price: 46580.00, when: 'Jan 03, 2026' },
+      ],
+    },
+    { sym: 'ETH',  qty: 1.082,  price: 2116.51,  chg: 3.63, mine: 2290.07,  seed: 1822,
+      avgBuy: 2840.00, invested: 3072.88,
+      vol24h: 18_200_000_000, spreadBps: 0.6, depth1pct: 12_000_000,
+      alerts: [
+        { direction: 'above', target: 2500, active: true, note: 'Break even' },
+      ],
+      txs: [
+        { type: 'Buy',  qty: 1.500, price: 2840.00, when: 'Feb 21, 2026' },
+        { type: 'Sell', qty: 0.418, price: 2960.00, when: 'Apr 08, 2026' },
+      ],
+    },
+    { sym: 'SOL',  qty: 8.21,   price: 86.26,    chg: 3.75, mine: 708.19,   seed: 8311,
+      avgBuy: 124.80, invested: 1024.61,
+      vol24h: 2_100_000_000, spreadBps: 2.0, depth1pct: 2_000_000,
+      alerts: [],
+      txs: [
+        { type: 'Buy', qty: 8.21, price: 124.80, when: 'Dec 14, 2025' },
+      ],
+    },
+    { sym: 'USDT', qty: 894.41, price: 1.00,     chg: 0.00, mine: 894.41,   seed: 12, stable: true,
+      avgBuy: 1.00, invested: 894.41,
+      vol24h: 78_500_000_000, spreadBps: 0.1, depth1pct: 120_000_000,
+      alerts: [],
+      txs: [
+        { type: 'Buy', qty: 894.41, price: 1.00, when: 'Apr 21, 2026' },
+      ],
+    },
+    { sym: 'LINK', qty: 7.5,    price: 9.60,     chg: 4.68, mine: 72.00,    seed: 7102,
+      avgBuy: 14.20, invested: 106.50,
+      vol24h: 480_000_000, spreadBps: 3.2, depth1pct: 900_000,
+      alerts: [
+        { direction: 'above', target: 15, active: true, note: 'Break even' },
+      ],
+      txs: [
+        { type: 'Buy', qty: 7.5, price: 14.20, when: 'Jan 18, 2026' },
+      ],
+    },
+  ],
+  securities: [
+    {
+      sym: 'ALPX-RE1',
+      name: 'Alpexa Real Estate I',
+      issuer: 'Alpexa Securities AG',
+      qty: 54.2, price: 100.00, mine: 5420.00,
+      apy: 7.2,
+      maturity: '2028-09-30',
+      lockup: 'Q4 2026',
+      seed: 9012,
+      faceValue: 5420.00,
+      ytdReturn: 4.8,
+      creditRating: 'A−',
+      ratingAgency: 'S&P',
+      settlement: 'T+2',
+      paymentFreq: 'Quarterly',
+      nextPayment: 'Jun 30, 2026',
+      accruedInterest: 97.40,
+      bid: 99.30, ask: 100.20, spreadBps: 90, vol24h: 84_000, lastTrade: '2h ago',
+      couponHistory: [
+        { date: 'Mar 31, 2026', amount: 97.56, note: 'Q1 2026' },
+        { date: 'Dec 31, 2025', amount: 93.20, note: 'Q4 2025' },
+        { date: 'Sep 30, 2025', amount: 92.10, note: 'Q3 2025' },
+        { date: 'Jun 30, 2025', amount: 91.80, note: 'Q2 2025' },
+      ],
+    },
+    {
+      sym: 'ALPX-TB',
+      name: 'Swiss Treasury Bond 2027',
+      issuer: 'Alpexa Securities AG',
+      qty: 21.85, price: 100.00, mine: 2185.00,
+      apy: 3.4,
+      maturity: '2027-06-15',
+      lockup: 'None',
+      seed: 4471,
+      faceValue: 2185.00,
+      ytdReturn: 1.2,
+      creditRating: 'AAA',
+      ratingAgency: 'Moody\'s',
+      settlement: 'T+2',
+      paymentFreq: 'Semi-annual',
+      nextPayment: 'Jun 15, 2026',
+      accruedInterest: 18.62,
+      bid: 100.10, ask: 100.30, spreadBps: 20, vol24h: 1_200_000, lastTrade: '12m ago',
+      couponHistory: [
+        { date: 'Dec 15, 2025', amount: 37.15, note: 'H2 2025' },
+        { date: 'Jun 15, 2025', amount: 37.15, note: 'H1 2025' },
+        { date: 'Dec 15, 2024', amount: 37.15, note: 'H2 2024' },
+      ],
+    },
+  ],
+};
+
+const RANGES = ['1H', '1D', '1W', '1M', '3M', '1Y', 'ALL'];
+
+const MARKETS = [
+  { sym: 'BTC',   price: 76988.90, chg:  2.48, seed: 5421, category: 'crypto', vol24h: 32_400_000_000 },
+  { sym: 'ETH',   price: 2116.51,  chg:  3.63, seed: 1822, category: 'crypto', vol24h: 18_200_000_000 },
+  { sym: 'SOL',   price: 86.26,    chg:  3.75, seed: 8311, category: 'crypto', vol24h:  2_100_000_000 },
+  { sym: 'XRP',   price: 0.5421,   chg: -1.84, seed: 9933, category: 'crypto', vol24h:  4_300_000_000 },
+  { sym: 'DOGE',  price: 0.1718,   chg:  5.92, seed: 4471, category: 'crypto', vol24h:  3_800_000_000 },
+  { sym: 'ADA',   price: 0.4485,   chg: -0.32, seed: 7724, category: 'crypto', vol24h:  1_900_000_000 },
+  { sym: 'AVAX',  price: 32.18,    chg:  6.84, seed: 6582, category: 'crypto', vol24h:    540_000_000 },
+  { sym: 'LINK',  price: 9.60,     chg:  4.68, seed: 7102, category: 'crypto', vol24h:    480_000_000 },
+  { sym: 'MATIC', price: 0.4128,   chg: -2.18, seed: 1238, category: 'crypto', vol24h:    360_000_000 },
+  { sym: 'USDT',  price: 1.00,     chg:  0.00, seed: 12,   category: 'crypto', vol24h: 78_500_000_000, stable: true },
+];
+
+</script>
+
+<!-- 3) ALW palette + Odometer + Dashboard variants (AlpexaHomeWClean/Tiled/Statement) -->
+<script type="text/babel" data-presets="react">
+// Alpexa Suisse — WHITE HOME screen explorations.
+// Three variations of the home/portfolio screen on a light palette.
+
+// Count-up hook — animates a number from 0 → target on mount.
+// Robinhood-style: cubic ease-out, ~1.2s.
+function useCountUp(target, duration = 1200) {
+  const [val, setVal] = React.useState(0);
+  React.useEffect(() => {
+    let raf;
+    const start = performance.now();
+    const ease = (t) => 1 - Math.pow(1 - t, 3);
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / duration);
+      setVal(target * ease(t));
+      if (t < 1) raf = requestAnimationFrame(tick);
+      else setVal(target);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, duration]);
+  return val;
+}
+
+// Live-tick hook — counts up on mount, then random-walks around target
+// with mean reversion (so the displayed value jitters but stays in range).
+function useLiveTick(target, opts = {}) {
+  const {
+    mountDuration = 1100,
+    tickPeriod = 140,
+    volatility = 2.5,   // ± dollars per tick
+    meanRevert = 0.04,  // pull-back strength per tick
+  } = opts;
+  const [val, setVal] = React.useState(0);
+  const valRef = React.useRef(0);
+  React.useEffect(() => {
+    let raf, intervalId;
+    const start = performance.now();
+    const ease = (t) => 1 - Math.pow(1 - t, 3);
+    const mountTick = (now) => {
+      const t = Math.min(1, (now - start) / mountDuration);
+      const v = target * ease(t);
+      valRef.current = v;
+      setVal(v);
+      if (t < 1) {
+        raf = requestAnimationFrame(mountTick);
+      } else {
+        valRef.current = target;
+        setVal(target);
+        intervalId = setInterval(() => {
+          const delta = (Math.random() - 0.5) * 2 * volatility;
+          const revert = (target - valRef.current) * meanRevert;
+          valRef.current += delta + revert;
+          setVal(valRef.current);
+        }, tickPeriod);
+      }
+    };
+    raf = requestAnimationFrame(mountTick);
+    return () => {
+      cancelAnimationFrame(raf);
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [target, mountDuration, tickPeriod, volatility, meanRevert]);
+  return val;
+}
+
+// Direction-of-tick hook: returns 'up' | 'down' | null briefly after each change.
+function useTickDirection(value, decayMs = 480, threshold = 0.01) {
+  const [dir, setDir] = React.useState(null);
+  const prev = React.useRef(value);
+  React.useEffect(() => {
+    const diff = value - prev.current;
+    if (Math.abs(diff) > threshold) {
+      setDir(diff > 0 ? 'up' : 'down');
+      prev.current = value;
+      const t = setTimeout(() => setDir(null), decayMs);
+      return () => clearTimeout(t);
+    }
+  }, [value, decayMs, threshold]);
+  return dir;
+}
+
+// Odometer — each digit slot is a 0-9 column that slides vertically.
+// Non-digit characters ($ , .) stay put. Robinhood-style rolling number.
+// rowH > 1em prevents the next digit from bleeding into the current row
+// when the font's actual glyph height exceeds the em-box (Manrope etc).
+const ODO_ROW_H = 1.15; // multiplier of font size
+function OdometerColumn({ digit }) {
+  const rowH = `${ODO_ROW_H}em`;
+  return (
+    <span style={{
+      display: 'inline-block',
+      overflow: 'hidden',
+      height: rowH,
+      verticalAlign: 'baseline',
+      fontVariantNumeric: 'tabular-nums',
+    }}>
+      <span style={{
+        display: 'block',
+        transform: `translateY(-${digit * ODO_ROW_H}em)`,
+        transition: 'transform 600ms cubic-bezier(0.22, 0.85, 0.25, 1)',
+        willChange: 'transform',
+      }}>
+        {'0123456789'.split('').map((d) => (
+          <span key={d} style={{
+            display: 'block', height: rowH, lineHeight: rowH,
+          }}>{d}</span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
+function Odometer({ value, decimals = 2, prefix = '$', suffix = '', superDecimals = false }) {
+  const safeVal = Number.isFinite(value) ? value : 0;
+  const mult = Math.pow(10, decimals);
+  const total = Math.round(safeVal * mult);
+  const intPart = Math.floor(total / mult);
+  const fracPart = total % mult;
+  const intStr = intPart.toLocaleString('en-US');
+  const fracStr = String(fracPart).padStart(decimals, '0');
+  const renderDigits = (str) => str.split('').map((c, i) =>
+    /\d/.test(c)
+      ? <OdometerColumn key={i} digit={Number(c)}/>
+      : <span key={i}>{c}</span>
+  );
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', lineHeight: 1 }}>
+      {prefix && <span>{prefix}</span>}
+      {renderDigits(intStr)}
+      {decimals > 0 && (
+        superDecimals ? (
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'baseline',
+            fontSize: '0.46em',
+            alignSelf: 'flex-start',
+            marginLeft: '0.12em',
+            paddingTop: '0.4em',
+            lineHeight: 1,
+            fontFeatureSettings: '"tnum"',
+          }}>
+            {renderDigits(fracStr)}
+          </span>
+        ) : (
+          <React.Fragment>
+            <span>.</span>
+            {renderDigits(fracStr)}
+          </React.Fragment>
+        )
+      )}
+      {suffix && <span>{suffix}</span>}
+    </span>
+  );
+}
+
+// Minimal glyph-style coin icon — no background circle, monochrome stroke/fill.
+// Designed for the dark portfolio list where colored circles felt loud.
+function MinimalCoinIcon({ sym, size = 28, color = ALW.text }) {
+  const wrap = (children) => (
+    <div style={{
+      width: size, height: size,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0, color,
+    }}>{children}</div>
+  );
+  switch (sym) {
+    case 'BTC':
+      return wrap(
+        <span style={{
+          fontSize: size * 0.78, fontWeight: 700, lineHeight: 1,
+          fontFamily: '"Helvetica Neue", system-ui, sans-serif',
+        }}>₿</span>
+      );
+    case 'ETH':
+      return wrap(
+        <svg width={size * 0.7} height={size * 0.9} viewBox="0 0 20 32" fill={color}>
+          <path d="M10 1 L19 16 L10 21 L1 16 Z"/>
+          <path d="M10 23 L19 18 L10 31 L1 18 Z" opacity="0.55"/>
+        </svg>
+      );
+    case 'SOL':
+      return wrap(
+        <svg width={size * 0.85} height={size * 0.6} viewBox="0 0 24 18" fill={color}>
+          <path d="M3 1 H19 L21 3 H5 Z"/>
+          <path d="M3 7 H19 L21 9 H5 Z"/>
+          <path d="M3 13 H19 L21 15 H5 Z"/>
+        </svg>
+      );
+    case 'USDT':
+      return wrap(
+        <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="16" r="13.5" stroke={color} strokeWidth="1.6"/>
+          <path d="M11 10 H21 M16 10 V14 M11 14 H21 M14 14 Q12 16 16 17 Q20 16 18 14" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+        </svg>
+      );
+    case 'LINK':
+      return wrap(
+        <svg width={size * 0.85} height={size * 0.85} viewBox="0 0 24 24" fill="none"
+          stroke={color} strokeWidth="1.8" strokeLinejoin="round">
+          <path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/>
+          <path d="M12 7 L17 9.5 L17 14.5 L12 17 L7 14.5 L7 9.5 Z" fill={color}/>
+        </svg>
+      );
+    default:
+      return wrap(
+        <span style={{ fontSize: size * 0.5, fontWeight: 700, lineHeight: 1 }}>{sym[0]}</span>
+      );
+  }
+}
+
+// Live asset row — each holding ticks independently around its value.
+function LiveAssetRow({ a, i, currency = 'USD' }) {
+  const stable = a.stable;
+  const vol = stable ? 0 : Math.max(0.4, a.mine * 0.0008);
+  const liveValue = useLiveTick(a.mine, { volatility: vol, mountDuration: 900 + i * 80, tickPeriod: 2200 + i * 200 });
+  const ref = a.mine / (1 + a.chg / 100);
+  const livePct = stable ? 0 : ((liveValue - ref) / ref) * 100;
+  const up = livePct >= 0;
+  const color = stable ? ALW.textDim : up ? ALW.green : ALW.red;
+  return (
+    <a href={`Coin Detail.html?sym=${a.sym}`} style={{
+      display: 'grid',
+      gridTemplateColumns: '1fr 60px 1fr',
+      alignItems: 'center',
+      columnGap: 12,
+      padding: '13px 0',
+      borderTop: i === 0 ? 'none' : `1px solid ${ALW.lineSoft}`,
+      textDecoration: 'none', color: 'inherit', cursor: 'pointer',
+    }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ color: ALW.text, fontSize: 13, fontWeight: 500, letterSpacing: -0.1, lineHeight: 1.2 }}>
+          {COIN_META[a.sym].name}
+        </div>
+        <div style={{
+          color: ALW.textDim, fontSize: 10,
+          fontFamily: 'Geist Mono, monospace', marginTop: 3, letterSpacing: 0.2,
+          fontFeatureSettings: '"tnum"',
+        }}>
+          {a.qty.toFixed(4)} {a.sym}
+        </div>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <Spark
+          seed={a.seed}
+          pct={a.chg}
+          w={56}
+          h={20}
+          color={stable ? ALW.textMute : a.chg >= 0 ? ALW.green : ALW.red}
+          strokeWidth={1.5}
+        />
+      </div>
+      <div style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace' }}>
+        <div style={{
+          color: ALW.text, fontSize: 12.5, fontWeight: 500,
+          fontFeatureSettings: '"tnum"', lineHeight: 1.15,
+        }}>
+          {fmtMoney(liveValue, currency)}
+        </div>
+        <div style={{
+          color, fontSize: 10, marginTop: 2,
+          fontFeatureSettings: '"tnum"',
+        }}>
+          {stable ? '—' : fmtPct(livePct)}
+        </div>
+      </div>
+    </a>
+  );
+}
+
+// Security/STO row — different model from crypto: shows APY, maturity, no live tick.
+function SecurityRow({ s, i, currency = 'USD' }) {
+  return (
+    <a href={`STO Detail.html?sym=${s.sym}`} style={{
+      display: 'grid',
+      gridTemplateColumns: '1fr 60px 1fr',
+      alignItems: 'center',
+      columnGap: 12,
+      padding: '13px 0',
+      borderTop: i === 0 ? 'none' : `1px solid ${ALW.lineSoft}`,
+      textDecoration: 'none', color: 'inherit', cursor: 'pointer',
+    }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{
+          color: ALW.text, fontSize: 13, fontWeight: 500, letterSpacing: -0.1, lineHeight: 1.2,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {s.name}
+        </div>
+        <div style={{
+          color: ALW.textDim, fontSize: 10,
+          fontFamily: 'Geist Mono, monospace', marginTop: 3, letterSpacing: 0.2,
+        }}>
+          {s.sym} · matures {s.maturity}
+        </div>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <div style={{
+          color: ALW.text, fontSize: 9.5, fontWeight: 600,
+          fontFamily: 'Geist Mono, monospace', letterSpacing: 0.6,
+          border: `1px solid ${ALW.line}`, padding: '3px 6px', borderRadius: 4,
+          whiteSpace: 'nowrap',
+        }}>
+          {s.apy.toFixed(1)}% APY
+        </div>
+      </div>
+      <div style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace' }}>
+        <div style={{
+          color: ALW.text, fontSize: 12.5, fontWeight: 500,
+          fontFeatureSettings: '"tnum"', lineHeight: 1.15,
+        }}>
+          {fmtMoney(s.mine, currency)}
+        </div>
+        <div style={{
+          color: ALW.textDim, fontSize: 10, marginTop: 2,
+        }}>
+          {s.qty} units
+        </div>
+      </div>
+    </a>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Range timeline metadata for the balance chart
+// ─────────────────────────────────────────────────────────────
+const RANGES_FULL = ['1D', '1W', '1M', '3M', 'YTD', '1Y', 'ALL'];
+const RANGE_SEEDS = { '1D': 7771, '1W': 442, '1M': 9118, '3M': 3344, 'YTD': 5099, '1Y': 1822, 'ALL': 2233 };
+// Open price multipliers vs current balance — defines whether each
+// range is up or down overall (1D is derived from PORTFOLIO.changeUsd).
+const RANGE_OPEN_MULT = {
+  '1D':  null,
+  '1W':  0.928,
+  '1M':  1.041,
+  '3M':  0.866,
+  'YTD': 0.732,
+  '1Y':  0.781,
+  'ALL': 0.412,
+};
+const RANGE_LABEL = {
+  '1D': 'Today', '1W': 'Past week', '1M': 'Past month',
+  '3M': 'Past 3 months', 'YTD': 'YTD', '1Y': 'Past year', 'ALL': 'All time',
+};
+const RANGE_MS = {
+  '1D':  24 * 3600 * 1000,
+  '1W':  7  * 24 * 3600 * 1000,
+  '1M':  30 * 24 * 3600 * 1000,
+  '3M':  90 * 24 * 3600 * 1000,
+  'YTD': 145 * 24 * 3600 * 1000,
+  '1Y':  365 * 24 * 3600 * 1000,
+  'ALL': 3 * 365 * 24 * 3600 * 1000,
+};
+function getScrubTimeLabel(range, idx, n) {
+  const ms = RANGE_MS[range] || RANGE_MS['1D'];
+  const now = new Date();
+  const t = new Date(now.getTime() - (n - 1 - idx) / Math.max(1, n - 1) * ms);
+  if (range === '1D') {
+    return t.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  } else if (range === '1W') {
+    return t.toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+  } else if (range === '1Y' || range === 'ALL') {
+    return t.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  } else {
+    return t.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Generate a deterministic intraday series that opens at `open`
+// and lands exactly at `close`.
+// ─────────────────────────────────────────────────────────────
+function generateIntraday(open, close, n = 80, seed = 7771) {
+  let s = seed;
+  const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+  const vals = new Array(n);
+  vals[0] = open;
+  for (let i = 1; i < n; i++) {
+    const drift = (close - vals[i - 1]) / (n - i) * 0.7;
+    const noise = (rnd() - 0.5) * (Math.abs(close) * 0.0018);
+    vals[i] = vals[i - 1] + drift + noise;
+  }
+  vals[n - 1] = close;
+  return vals;
+}
+
+const ALW = {
+  bg: '#0A0A0A',          // app background — near-black
+  paper: '#0F0F0F',
+  panel: '#161616',       // raised tile
+  panel2: '#1F1F1F',
+  line: '#1F1F1F',        // hairline on dark
+  lineSoft: '#161616',
+  ink: '#FFFFFF',
+  text: '#FFFFFF',
+  textDim: '#8a8a8a',
+  textMute: '#5a5a5a',
+  // Emerald — calm, banker's green. 142° / 71% / 45%.
+  green: '#22C55E',
+  greenSoft: 'rgba(34,197,94,0.14)',
+  greenTint: '#22C55E',
+  red: '#EF4444',
+  swissRed: '#E5332A',
+};
+
+// White circle button
+function CircleBtnW({ children, size = 34 }) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: size / 2,
+      background: ALW.panel, border: `1px solid ${ALW.line}`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0,
+    }}>{children}</div>
+  );
+}
+
+// White tab bar
+function AlpexaTabBarW({ active = 0 }) {
+  const tabs = [
+    { l: 'Dashboard', d: 'M3 12 L12 4 L21 12 M5 11v9h14v-9', href: 'Dashboard.html' },
+    { l: 'Trade',     d: 'M3 17 L9 11 L13 15 L21 7 M14 7h7v7', href: 'Trade.html' },
+    { l: 'Discover',  d: 'M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14zM20 20l-4-4', href: 'Discover.html' },
+    { l: 'Ledger',    d: 'M4 4h16v16H4z M4 8h16 M8 12h8 M8 16h5', href: null },
+  ];
+  return (
+    <div style={{
+      borderTop: `1px solid ${ALW.line}`,
+      background: ALW.bg,
+      display: 'flex', justifyContent: 'space-around',
+      padding: '10px 14px 6px', flexShrink: 0,
+    }}>
+      {tabs.map((t, i) => {
+        const inner = (
+          <React.Fragment>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+              stroke={i === active ? ALW.ink : ALW.textMute}
+              strokeWidth={i === active ? 2 : 1.6} strokeLinecap="round" strokeLinejoin="round">
+              <path d={t.d}/>
+            </svg>
+            <span style={{
+              fontSize: 10, fontWeight: i === active ? 600 : 400,
+              color: i === active ? ALW.ink : ALW.textMute,
+              fontFamily: 'Geist Mono, monospace', letterSpacing: 0.4, textTransform: 'uppercase',
+            }}>{t.l}</span>
+          </React.Fragment>
+        );
+        const wrapperStyle = {
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+          textDecoration: 'none', cursor: t.href ? 'pointer' : 'default',
+        };
+        return t.href
+          ? <a key={t.l} href={t.href} style={wrapperStyle}>{inner}</a>
+          : <div key={t.l} style={wrapperStyle}>{inner}</div>;
+      })}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Robinhood-style live balance chart:
+//   • dotted baseline at period open
+//   • line color flips green/red based on current vs baseline
+//   • scrubbing — press/drag shows guide + scrub dot
+//   • pulsing endpoint when not scrubbing
+//   • range pills + Open/High/Low row below
+// ─────────────────────────────────────────────────────────────
+function LiveBalanceChart({
+  series, baseline, lineColor,
+  range, onRangeChange,
+  scrubIndex, onScrubChange,
+  height = 130,
+}) {
+  const W = 350, H = height;
+  const padTop = 24, padBot = 6;
+  const chartH = H - padTop - padBot;
+  const allVals = [...series, baseline];
+  const minV = Math.min(...allVals);
+  const maxV = Math.max(...allVals);
+  const valRange = (maxV - minV) || 1;
+  const padPx = valRange * 0.12;
+  const yMin = minV - padPx;
+  const yMax = maxV + padPx;
+  const yRange = yMax - yMin;
+  const xOf = (i) => (i / (series.length - 1)) * W;
+  const yOf = (v) => padTop + chartH - ((v - yMin) / yRange) * chartH;
+  const pathD = series.map((v, i) => `${i === 0 ? 'M' : 'L'}${xOf(i).toFixed(1)} ${yOf(v).toFixed(1)}`).join(' ');
+  const baselineY = yOf(baseline);
+  const endX = xOf(series.length - 1);
+  const endY = yOf(series[series.length - 1]);
+  const scrubbing = scrubIndex !== null;
+  const sX = scrubbing ? xOf(scrubIndex) : 0;
+  const sY = scrubbing ? yOf(series[scrubIndex]) : 0;
+
+  const ohlOpen = series[0];
+  const ohlHigh = Math.max(...series);
+  const ohlLow  = Math.min(...series);
+
+  const svgRef = React.useRef(null);
+  const dragging = React.useRef(false);
+  const updateFromX = (clientX) => {
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+    const idx = Math.round((x / Math.max(1, rect.width)) * (series.length - 1));
+    onScrubChange(Math.max(0, Math.min(series.length - 1, idx)));
+  };
+  const handlers = {
+    onPointerDown: (e) => {
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+      dragging.current = true;
+      updateFromX(e.clientX);
+      e.preventDefault();
+    },
+    onPointerMove: (e) => {
+      if (dragging.current) updateFromX(e.clientX);
+    },
+    onPointerUp: () => {
+      dragging.current = false;
+      onScrubChange(null);
+    },
+    onPointerCancel: () => {
+      dragging.current = false;
+      onScrubChange(null);
+    },
+    onPointerLeave: () => {
+      if (dragging.current) {
+        dragging.current = false;
+        onScrubChange(null);
+      }
+    },
+  };
+
+  return (
+    <div>
+      <div style={{ padding: '0 24px' }}>
+        <svg
+          ref={svgRef}
+          width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"
+          {...handlers}
+          style={{ display: 'block', touchAction: 'none', cursor: 'crosshair', userSelect: 'none', overflow: 'visible' }}
+        >
+        <line x1="0" y1={baselineY} x2={W} y2={baselineY}
+          stroke={ALW.textDim} strokeDasharray="2 5" strokeOpacity="0.45" strokeWidth="1"/>
+        <path d={pathD} stroke={lineColor} strokeWidth="2" fill="none"
+          strokeLinejoin="round" strokeLinecap="round"
+          style={{ transition: 'stroke 240ms ease' }}/>
+        {!scrubbing && (
+          <g>
+            <circle cx={endX} cy={endY} r="9" fill={lineColor} opacity="0.4">
+              <animate attributeName="r" values="3;14" dur="1.6s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="0.5;0" dur="1.6s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx={endX} cy={endY} r="3.5" fill={lineColor}/>
+          </g>
+        )}
+        {scrubbing && (
+          <g>
+            <line x1={sX} y1={padTop - 6} x2={sX} y2={padTop + chartH + 2}
+              stroke={ALW.text} strokeWidth="1" strokeOpacity="0.45"/>
+            <circle cx={sX} cy={sY} r="6" fill={ALW.bg} stroke={lineColor} strokeWidth="2.5"/>
+          </g>
+        )}
+      </svg>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-around', padding: '8px 12px 0' }}>
+        {RANGES_FULL.map((r) => {
+          const active = r === range;
+          return (
+            <div key={r} onClick={() => onRangeChange(r)} style={{
+              fontSize: 11, fontWeight: 600, letterSpacing: 0.6,
+              color: active ? ALW.text : ALW.textDim,
+              background: active ? ALW.panel : 'transparent',
+              padding: '5px 11px', borderRadius: 6,
+              fontFamily: 'Geist Mono, monospace',
+              cursor: 'pointer', userSelect: 'none',
+            }}>{r}</div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Data freshness strip — shows "last updated Xs ago · TZ" so a trader can
+// gauge whether the price they're seeing is decision-grade or stale.
+function DataFreshness() {
+  const [now, setNow] = React.useState(() => new Date());
+  const lastUpdate = React.useRef(new Date());
+  React.useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  React.useEffect(() => {
+    const id = setInterval(() => {
+      lastUpdate.current = new Date();
+      setNow(new Date());
+    }, 3400);
+    return () => clearInterval(id);
+  }, []);
+  const ageSec = Math.max(0, Math.floor((now - lastUpdate.current) / 1000));
+  const tz = 'UTC+1 · Zurich';
+  const tStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Europe/Zurich' });
+  return (
+    <div style={{
+      padding: '10px 22px 0',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      fontFamily: 'Geist Mono, monospace', fontSize: 10, letterSpacing: 0.6,
+      color: ALW.textMute, textTransform: 'uppercase', fontWeight: 600,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span
+          className="alpexa-pulse-dot"
+          style={{
+            width: 5, height: 5, borderRadius: 3,
+            background: ageSec < 5 ? ALW.green : ageSec < 30 ? '#B8860B' : ALW.red,
+          }}
+        />
+        <span style={{ color: ALW.textDim }}>Updated {ageSec}s ago</span>
+      </div>
+      <span>{tStr} · {tz}</span>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// W1 · CLEAN — Direct port of dark Alpexa to white
+//   Hero number, full-width chart, action chips, asset list
+// ════════════════════════════════════════════════════════════════
+function AlpexaHomeWClean() {
+  const W = 390, H = 844;
+  // Live balance: counts up on mount, then ticks around the target.
+  const liveBalance = useLiveTick(PORTFOLIO.balance, { tickPeriod: 2000, volatility: 4.2 });
+  const direction = useTickDirection(liveBalance);
+  // Range + scrubbing state
+  const [range, setRange] = React.useState('1D');
+  const [scrubIndex, setScrubIndex] = React.useState(null);
+  const [currency, setCurrency] = React.useState('USD');
+  const cycleCurrency = () => {
+    const i = CURRENCY_ORDER.indexOf(currency);
+    setCurrency(CURRENCY_ORDER[(i + 1) % CURRENCY_ORDER.length]);
+  };
+  const cur = CURRENCIES[currency];
+  const isScrubbing = scrubIndex !== null;
+  // Series for the current range — opens at the range's "open" price,
+  // lands at the current portfolio balance.
+  const seriesOpen = React.useMemo(() => {
+    if (range === '1D') return PORTFOLIO.balance - PORTFOLIO.changeUsd;
+    return PORTFOLIO.balance * RANGE_OPEN_MULT[range];
+  }, [range]);
+  const baseHistory = React.useMemo(
+    () => generateIntraday(seriesOpen, PORTFOLIO.balance, 80, RANGE_SEEDS[range]),
+    [seriesOpen, range],
+  );
+  const chartSeries = React.useMemo(
+    () => [...baseHistory.slice(0, -1), liveBalance],
+    [baseHistory, liveBalance],
+  );
+  // The value shown in the hero: live by default, scrubbed when dragging.
+  const displayValue = isScrubbing ? chartSeries[scrubIndex] : liveBalance;
+  // Change vs the range's open price.
+  const periodChange = displayValue - seriesOpen;
+  const periodPct = (periodChange / seriesOpen) * 100;
+  const isUp = periodChange >= 0;
+  const accent = isUp ? ALW.green : ALW.red;
+  // Flash color reflects the *direction of the latest tick*, not net P&L.
+  const flashColor = isScrubbing
+    ? ALW.text
+    : direction === 'up' ? ALW.green : direction === 'down' ? ALW.red : ALW.text;
+  // Right-hand caption under balance: scrub time OR period label.
+  const periodCaption = isScrubbing
+    ? getScrubTimeLabel(range, scrubIndex, chartSeries.length)
+    : RANGE_LABEL[range];
+  return (
+    <Phone width={W} height={H} bg={ALW.bg} chrome={false}>
+      <div style={{ height: 16 }}/>
+
+      {/* Header — empty left, icon cluster right (server hidden in icon) */}
+      <div style={{ padding: '12px 18px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+        {/* Alpexa Suisse wordmark */}
+        <div style={{
+          color: ALW.text, fontSize: 11, fontWeight: 700, letterSpacing: 1.6,
+          fontFamily: 'Geist Mono, monospace', textTransform: 'uppercase',
+        }}>
+          <span>Alpexa</span>
+          <span style={{ color: ALW.textMute, marginLeft: 5 }}>Suisse</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          {/* Server icon — LIVE dot indicates connection status, tap to switch */}
+        <div style={{
+          position: 'relative', width: 32, height: 32,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke={ALW.text} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            {/* Stacked server rack */}
+            <rect x="3" y="4"  width="18" height="6" rx="1.5"/>
+            <rect x="3" y="14" width="18" height="6" rx="1.5"/>
+            <path d="M7 7h.01M7 17h.01"/>
+          </svg>
+          <span
+            className="alpexa-pulse-dot"
+            style={{
+              position: 'absolute', top: 6, right: 5,
+              width: 6, height: 6, borderRadius: 3,
+              background: ALW.green,
+              border: `1.5px solid ${ALW.bg}`,
+            }}
+          />
+        </div>
+        {/* Bell with badge */}
+        <div style={{ position: 'relative', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ALW.text} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.7 21a2 2 0 0 1-3.4 0"/>
+          </svg>
+          <span style={{
+              position: 'absolute', top: 3, right: 2,
+              minWidth: 14, height: 14, padding: '0 3px',
+              borderRadius: 7, background: '#6E6E6E', color: '#fff',
+              fontSize: 9, fontWeight: 700, fontFamily: 'Geist Mono, monospace',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: `1.5px solid ${ALW.bg}`, lineHeight: 1,
+            }}>3</span>
+        </div>
+        {/* Overflow menu */}
+        <div style={{ width: 26, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width="4" height="18" viewBox="0 0 4 18">
+            <circle cx="2" cy="2" r="1.6" fill={ALW.text}/>
+            <circle cx="2" cy="9" r="1.6" fill={ALW.text}/>
+            <circle cx="2" cy="16" r="1.6" fill={ALW.text}/>
+          </svg>
+        </div>
+      </div>
+
+      {/* Balance — terminal-style hero matching Trade page */}
+      <div style={{ padding: '14px 22px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+          <div style={{
+            fontSize: 13, fontWeight: 700, letterSpacing: 1.4,
+            fontFamily: 'Geist Mono, monospace', textTransform: 'uppercase',
+          }}>
+            <span style={{ color: ALW.text }}>Portfolio</span>
+            <span style={{ color: ALW.textMute, fontWeight: 500, margin: '0 6px' }}>/</span>
+            <span
+              onClick={cycleCurrency}
+              style={{ color: ALW.textMute, fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}
+            >
+              {currency}
+              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke={ALW.textMute} strokeWidth="2.4"><path d="M6 9l6 6 6-6"/></svg>
+            </span>
+          </div>
+        </div>
+        <div style={{
+          fontSize: 42, fontWeight: 600, letterSpacing: -1.4, marginTop: 10, lineHeight: 1.02,
+          color: flashColor,
+          transition: 'color 260ms ease',
+          fontFamily: 'Geist Mono, monospace',
+        }}>
+          <Odometer value={cvt(displayValue, currency)} decimals={2} prefix={cur.symbol} suffix={cur.suffix}/>
+        </div>
+        <div className="alpexa-color-shift" style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, color: accent }}>
+          <span style={{
+            fontSize: 12, fontWeight: 600, fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"',
+            display: 'flex', alignItems: 'center', gap: 5,
+          }}>
+            <svg width="9" height="9" viewBox="0 0 10 10" className="alpexa-color-shift">
+              <path d={isUp ? "M5 1 L9 8 L1 8 Z" : "M5 9 L1 2 L9 2 Z"} fill={accent}/>
+            </svg>
+            {fmtMoney(Math.abs(periodChange), currency)}
+          </span>
+          <span style={{ fontSize: 12, fontWeight: 600, fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"' }}>
+            {fmtPct(periodPct)}
+          </span>
+          {/* 30D mini sparkline — portfolio P&L trajectory */}
+          <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Spark seed={5511} pct={periodPct * 5} w={64} h={22} color={accent} strokeWidth={1.4}/>
+            <span style={{
+              color: ALW.textMute, fontSize: 9.5, fontWeight: 700,
+              fontFamily: 'Geist Mono, monospace', letterSpacing: 0.8, textTransform: 'uppercase',
+            }}>30D</span>
+          </span>
+        </div>
+      </div>
+
+      {/* Live balance chart — dotted baseline, pulsing endpoint, scrubbing, range pills, OHL */}
+      <div style={{ marginTop: 20 }}>
+        <LiveBalanceChart
+          series={chartSeries}
+          baseline={seriesOpen}
+          lineColor={accent}
+          range={range}
+          onRangeChange={setRange}
+          scrubIndex={scrubIndex}
+          onScrubChange={setScrubIndex}
+        />
+      </div>
+
+      {/* Assets */}
+      <div style={{
+        marginTop: 56,
+        padding: '0 22px 12px',
+        flex: 1,
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
+      }} className="alpexa-hide-scrollbar">
+        {/* — CRYPTO SECTION — */}
+        <div style={{
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
+          marginBottom: 6, paddingBottom: 8, borderBottom: `1px solid ${ALW.line}`,
+        }}>
+          <div style={{
+            color: ALW.textMute, fontSize: 11,
+            fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2, fontWeight: 600,
+            textTransform: 'uppercase',
+          }}>
+            Crypto
+          </div>
+          <div style={{
+            color: ALW.textMute, fontSize: 11,
+            fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2, fontWeight: 600,
+            textTransform: 'uppercase',
+          }}>
+            {PORTFOLIO.assets.length} assets
+          </div>
+        </div>
+        {PORTFOLIO.assets.map((a, i) => (
+          <LiveAssetRow key={a.sym} a={a} i={i} currency={currency}/>
+        ))}
+
+        {/* — SECURITIES SECTION — */}
+        <div style={{
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
+          marginTop: 28, marginBottom: 6, paddingBottom: 8, borderBottom: `1px solid ${ALW.line}`,
+        }}>
+          <div style={{
+            color: ALW.textMute, fontSize: 11,
+            fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2, fontWeight: 600,
+            textTransform: 'uppercase',
+          }}>
+            Securities
+          </div>
+          <div style={{
+            color: ALW.textMute, fontSize: 11,
+            fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2, fontWeight: 600,
+            textTransform: 'uppercase',
+          }}>
+            {PORTFOLIO.securities.length} positions
+          </div>
+        </div>
+        {PORTFOLIO.securities.map((s, i) => (
+          <SecurityRow key={s.sym} s={s} i={i} currency={currency}/>
+        ))}
+      </div>
+
+      </div>
+      <AlpexaTabBarW active={0}/>
+    </Phone>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// W2 · TILED — Hero balance on pale-lime tile, chart below
+//   More premium / Swiss-bank feel with cards
+// ════════════════════════════════════════════════════════════════
+function AlpexaHomeWTiled() {
+  const W = 390, H = 844;
+  const pts = makeChart(5099, 120, 0.55, 0.85);
+  return (
+    <Phone width={W} height={H} bg={ALW.paper}>
+      <StatusBar color={ALW.ink}/>
+
+      {/* Header */}
+      <div style={{ padding: '12px 22px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <AlpexaWordmark color={ALW.ink}/>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <CircleBtnW>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={ALW.text} strokeWidth="1.9"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+          </CircleBtnW>
+          <div style={{
+            width: 34, height: 34, borderRadius: 17, background: ALW.ink,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: ALW.greenTint, fontWeight: 700, fontSize: 13,
+          }}>J</div>
+        </div>
+      </div>
+
+      {/* Lime hero tile */}
+      <div style={{ padding: '16px 18px 0' }}>
+        <div style={{
+          background: ALW.greenTint, borderRadius: 22, padding: '22px 22px 20px',
+          position: 'relative', overflow: 'hidden',
+        }}>
+          <div style={{
+            color: '#5a5249', fontSize: 11, letterSpacing: 2.4, fontWeight: 500,
+            textTransform: 'uppercase',
+          }}>
+            My Wallet  ·  CHF
+          </div>
+          <div style={{
+            color: ALW.ink, fontSize: 44, fontWeight: 600, letterSpacing: -1.4, marginTop: 6,
+            fontFeatureSettings: '"tnum"',
+          }}>
+            $24,832.<span style={{ color: '#2c4015' }}>17</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+            <span style={{
+              background: ALW.ink, color: ALW.greenTint,
+              fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 5,
+              fontFamily: 'Geist Mono, monospace',
+            }}>↑ {fmtPct(PORTFOLIO.changePct)}</span>
+            <span style={{ color: '#2c4015', fontSize: 12, fontFamily: 'Geist Mono, monospace', fontWeight: 600 }}>
+              +${fmt(PORTFOLIO.changeUsd)} today
+            </span>
+          </div>
+          {/* Concentric ring decoration */}
+          <svg style={{ position: 'absolute', right: -8, top: 18, opacity: 0.22 }} width="110" height="90" viewBox="0 0 110 90">
+            <circle cx="85" cy="45" r="40" fill="none" stroke={ALW.ink} strokeWidth="1"/>
+            <circle cx="85" cy="45" r="26" fill="none" stroke={ALW.ink} strokeWidth="1"/>
+            <circle cx="85" cy="45" r="12" fill={ALW.ink}/>
+          </svg>
+        </div>
+      </div>
+
+      {/* Chart card */}
+      <div style={{ padding: '10px 18px 0' }}>
+        <div style={{
+          background: ALW.bg, border: `1px solid ${ALW.line}`,
+          borderRadius: 18, padding: '14px 14px 10px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {['1D', '1W', '1M', '3M', '1Y'].map((r, i) => (
+                <div key={r} style={{
+                  fontSize: 10, fontWeight: 600,
+                  color: i === 1 ? '#fff' : ALW.textDim,
+                  background: i === 1 ? ALW.ink : 'transparent',
+                  padding: '3px 8px', borderRadius: 5,
+                  fontFamily: 'Geist Mono, monospace',
+                }}>{r}</div>
+              ))}
+            </div>
+            <div style={{
+              color: ALW.green, fontSize: 11, fontFamily: 'Geist Mono, monospace', fontWeight: 700,
+            }}>+12.84%</div>
+          </div>
+          <svg width="100%" height="90" viewBox={`0 0 ${W - 64} 90`} style={{ display: 'block', marginTop: 8 }}>
+            <defs>
+              <linearGradient id="alw-tiled-fill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={ALW.green} stopOpacity="0.14"/>
+                <stop offset="100%" stopColor={ALW.green} stopOpacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d={areaFromPts(pts, W - 64, 90, 2)} fill="url(#alw-tiled-fill)"/>
+            <path d={pathFromPts(pts, W - 64, 90, 2)} stroke={ALW.green} strokeWidth="1.8" fill="none"/>
+          </svg>
+        </div>
+      </div>
+
+      {/* Action chips */}
+      <div style={{ padding: '12px 18px 0', display: 'flex', gap: 8 }}>
+        {[
+          ['Buy', 'M12 5v14M5 12h14'],
+          ['Send', 'M5 12h14M13 5l7 7-7 7'],
+          ['Receive', 'M5 12h14M11 5l-7 7 7 7'],
+          ['Swap', 'M4 7h13M14 4l3 3-3 3M20 17H7M10 14l-3 3 3 3'],
+        ].map(([label, d], i) => (
+          <div key={label} style={{
+            flex: 1, padding: '12px 0', textAlign: 'center',
+            background: i === 0 ? ALW.ink : ALW.bg,
+            color: i === 0 ? '#fff' : ALW.text,
+            border: i === 0 ? 'none' : `1px solid ${ALW.line}`,
+            borderRadius: 14, fontWeight: 600, fontSize: 12,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={i === 0 ? '#fff' : ALW.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d}/></svg>
+            <span>{label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Holdings */}
+      <div style={{ padding: '16px 22px 0', flex: 1, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+          <div style={{ color: ALW.text, fontSize: 14, fontWeight: 600 }}>Portfolio</div>
+          <div style={{ color: ALW.textMute, fontSize: 11, fontFamily: 'Geist Mono, monospace' }}>5 ASSETS</div>
+        </div>
+        {PORTFOLIO.assets.slice(0, 4).map((a, i) => (
+          <div key={a.sym} style={{
+            display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0',
+            borderTop: i === 0 ? 'none' : `1px solid ${ALW.lineSoft}`,
+          }}>
+            <CoinIcon sym={a.sym} size={30}/>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: ALW.text, fontSize: 13.5, fontWeight: 500 }}>{COIN_META[a.sym].name}</div>
+              <div style={{ color: ALW.textDim, fontSize: 11, fontFamily: 'Geist Mono, monospace' }}>{a.qty} {a.sym}</div>
+            </div>
+            <Spark seed={a.seed} w={44} h={18} color={a.chg >= 0 ? ALW.green : ALW.red} strokeWidth={1.4}/>
+            <div style={{ textAlign: 'right', minWidth: 78, fontFamily: 'Geist Mono, monospace' }}>
+              <div style={{ color: ALW.text, fontSize: 13, fontWeight: 500 }}>{fmtUsd(a.mine)}</div>
+              <div style={{ color: a.stable ? ALW.textDim : a.chg >= 0 ? ALW.green : ALW.red, fontSize: 11 }}>
+                {a.stable ? '—' : fmtPct(a.chg)}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <AlpexaTabBarW active={0}/>
+    </Phone>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// W3 · STATEMENT — Swiss-banking statement, restrained
+//   Most "trust/private-bank" version. Lots of whitespace,
+//   tabular numerics, no decoration.
+// ════════════════════════════════════════════════════════════════
+function AlpexaHomeWStatement() {
+  const W = 390, H = 844;
+  const pts = makeChart(3344, 100, 0.42, 0.7);
+  return (
+    <Phone width={W} height={H} bg={ALW.bg}>
+      <StatusBar color={ALW.ink}/>
+
+      {/* Statement header */}
+      <div style={{ padding: '14px 24px 14px', borderBottom: `1px solid ${ALW.line}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <AlpexaWordmark color={ALW.ink} size={13}/>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{
+            fontFamily: 'Geist Mono, monospace', fontSize: 10, color: ALW.textDim,
+            letterSpacing: 1.4, fontWeight: 600,
+          }}>STMT · 25/05/2026</span>
+          <div style={{
+            width: 28, height: 28, borderRadius: 14, background: ALW.ink,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', fontWeight: 600, fontSize: 11,
+          }}>JR</div>
+        </div>
+      </div>
+
+      {/* Account meta row */}
+      <div style={{
+        padding: '14px 24px 0', display: 'flex', justifyContent: 'space-between',
+        fontFamily: 'Geist Mono, monospace', fontSize: 10, color: ALW.textDim, letterSpacing: 1.2, fontWeight: 600,
+      }}>
+        <span>ACCOUNT</span>
+        <span>CH 4291 · MAIN · CHF</span>
+      </div>
+
+      {/* Big balance */}
+      <div style={{ padding: '20px 24px 0' }}>
+        <div style={{ color: ALW.textDim, fontSize: 11, letterSpacing: 0.4, fontWeight: 500 }}>Total holdings</div>
+        <div style={{
+          color: ALW.text, fontSize: 52, fontWeight: 500, letterSpacing: -1.8, marginTop: 8,
+          fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"', lineHeight: 1,
+        }}>
+          $24,832.<span style={{ color: ALW.textMute }}>17</span>
+        </div>
+        <div style={{ display: 'flex', gap: 24, marginTop: 16, fontFamily: 'Geist Mono, monospace' }}>
+          <div>
+            <div style={{ color: ALW.textDim, fontSize: 10, letterSpacing: 0.8 }}>24H Δ</div>
+            <div style={{ color: ALW.green, fontSize: 14, fontWeight: 600, marginTop: 2 }}>+1,247.32</div>
+          </div>
+          <div>
+            <div style={{ color: ALW.textDim, fontSize: 10, letterSpacing: 0.8 }}>24H %</div>
+            <div style={{ color: ALW.green, fontSize: 14, fontWeight: 600, marginTop: 2 }}>+5.29%</div>
+          </div>
+          <div>
+            <div style={{ color: ALW.textDim, fontSize: 10, letterSpacing: 0.8 }}>YTD</div>
+            <div style={{ color: ALW.green, fontSize: 14, fontWeight: 600, marginTop: 2 }}>+18.7%</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Restrained line chart */}
+      <div style={{ padding: '20px 24px 0' }}>
+        <svg width={W - 48} height={80} viewBox={`0 0 ${W - 48} 80`} style={{ display: 'block' }}>
+          <line x1="0" y1="40" x2={W - 48} y2="40" stroke={ALW.line} strokeDasharray="2 4"/>
+          <path d={pathFromPts(pts, W - 48, 80, 3)} stroke={ALW.ink} strokeWidth="1.2" fill="none"/>
+          {(() => {
+            const mn = Math.min(...pts), mx = Math.max(...pts);
+            const last = pts[pts.length - 1];
+            const lx = W - 48 - 3;
+            const ly = 3 + (80 - 6) * (1 - (last - mn) / (mx - mn));
+            return <circle cx={lx} cy={ly} r="3" fill={ALW.green}/>;
+          })()}
+        </svg>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'Geist Mono, monospace', fontSize: 9, color: ALW.textDim, letterSpacing: 0.6, marginTop: 6 }}>
+          <span>30D</span><span>23D</span><span>15D</span><span>8D</span><span>NOW</span>
+        </div>
+      </div>
+
+      {/* Actions as bordered row */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr',
+        margin: '20px 24px 0',
+        borderTop: `1px solid ${ALW.line}`, borderBottom: `1px solid ${ALW.line}`,
+      }}>
+        {[
+          ['Buy', 'M12 5v14M5 12h14'],
+          ['Send', 'M5 12h14M13 5l7 7-7 7'],
+          ['Receive', 'M5 12h14M11 5l-7 7 7 7'],
+          ['Swap', 'M4 7h13M14 4l3 3-3 3M20 17H7M10 14l-3 3 3 3'],
+        ].map(([label, d], i) => (
+          <div key={label} style={{
+            padding: '14px 0', textAlign: 'center',
+            borderRight: i < 3 ? `1px solid ${ALW.line}` : 'none',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+          }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={ALW.text} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={d}/></svg>
+            <span style={{ fontSize: 10.5, color: ALW.text, fontWeight: 500, letterSpacing: 0.4 }}>{label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Positions table */}
+      <div style={{ padding: '18px 24px 0', flex: 1, overflow: 'hidden' }}>
+        <div style={{
+          display: 'grid', gridTemplateColumns: '1.6fr 0.7fr 0.9fr 0.7fr',
+          fontFamily: 'Geist Mono, monospace', fontSize: 9.5, color: ALW.textDim,
+          letterSpacing: 1.2, fontWeight: 700, paddingBottom: 8, borderBottom: `1px solid ${ALW.ink}`,
+        }}>
+          <span>POSITION</span>
+          <span style={{ textAlign: 'right' }}>QTY</span>
+          <span style={{ textAlign: 'right' }}>VALUE</span>
+          <span style={{ textAlign: 'right' }}>Δ 24H</span>
+        </div>
+        {PORTFOLIO.assets.map((a) => (
+          <div key={a.sym} style={{
+            display: 'grid', gridTemplateColumns: '1.6fr 0.7fr 0.9fr 0.7fr',
+            padding: '11px 0', alignItems: 'center',
+            borderBottom: `1px solid ${ALW.lineSoft}`,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              <CoinIcon sym={a.sym} size={22}/>
+              <span style={{ color: ALW.text, fontSize: 13, fontWeight: 500 }}>{a.sym}</span>
+            </div>
+            <span style={{ textAlign: 'right', color: ALW.text, fontSize: 12, fontFamily: 'Geist Mono, monospace' }}>{a.qty}</span>
+            <span style={{ textAlign: 'right', color: ALW.text, fontSize: 12, fontFamily: 'Geist Mono, monospace', fontWeight: 500 }}>{fmtUsd(a.mine)}</span>
+            <span style={{
+              textAlign: 'right', fontSize: 12, fontFamily: 'Geist Mono, monospace', fontWeight: 600,
+              color: a.stable ? ALW.textDim : a.chg >= 0 ? ALW.green : ALW.red,
+            }}>{a.stable ? '—' : fmtPct(a.chg)}</span>
+          </div>
+        ))}
+      </div>
+
+      <AlpexaTabBarW active={0}/>
+    </Phone>
+  );
+}
+
+Object.assign(window, {
+  ALW, AlpexaTabBarW, CircleBtnW,
+  AlpexaHomeWClean, AlpexaHomeWTiled, AlpexaHomeWStatement,
+});
+
+</script>
+
+<!-- 3b) Dark Alpexa file (only need AlpexaWordmark + AlpexaMark from here; rest is unused dark screens) -->
+<script type="text/babel" data-presets="react">
+// Alpexa Suisse — full screen set, Robinhood-DNA but original brand.
+// Brand notes:
+//   • Wordmark: "Alpexa" set in Geist tight, "Suisse" in Mono uppercase tag
+//   • Mark: ⟁ — geometric A/mountain hybrid (Alpine reference)
+//   • Color: pure black + neon lime + faint cream + small Swiss red dot accent
+//   • Type: Geist for UI, Geist Mono for all numbers (Swiss precision feel)
+
+const ALPEXA = {
+  ink: '#0A0A0A',
+  bg: '#000',
+  panel: '#0F0F0F',
+  panel2: '#161616',
+  line: '#1c1c1c',
+  text: '#FFFFFF',
+  textDim: '#8a8a8a',
+  textMute: '#5a5a5a',
+  neon: '#C2FF3D',
+  neonDim: '#7a9c20',
+  red: '#FF4D4D',
+  swissRed: '#E5332A',
+  cream: '#F6F4EE',
+};
+
+// Logo lockup
+function AlpexaMark({ size = 16, color = '#fff' }) {
+  return (
+    <svg width={size} height={size * 0.95} viewBox="0 0 20 19" fill="none" style={{ display: 'block' }}>
+      <path d="M10 1 L19 17 L13.5 17 L10 10.5 L6.5 17 L1 17 Z" stroke={color} strokeWidth="1.6" strokeLinejoin="round" fill="none"/>
+      <path d="M7.5 13.5 L12.5 13.5" stroke={color} strokeWidth="1.6" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+function AlpexaWordmark({ color = '#fff', size = 14 }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+      <span style={{ color, fontSize: size, fontWeight: 600, letterSpacing: -0.3 }}>Alpexa</span>
+      <span style={{
+        color,
+        fontSize: size * 0.62, fontWeight: 700, letterSpacing: 1.4,
+        fontFamily: 'Geist Mono, monospace', textTransform: 'uppercase',
+      }}>SUISSE</span>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// QR placeholder — black/white deterministic block pattern
+// ─────────────────────────────────────────────────────────────
+function QR({ size = 200, seed = 1, dark = '#fff', light = 'transparent' }) {
+  const N = 21;
+  const cell = size / N;
+  let s = seed;
+  const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+  const cells = [];
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      // 3 finder patterns
+      const inFinder = (
+        (x < 7 && y < 7) || (x >= N - 7 && y < 7) || (x < 7 && y >= N - 7)
+      );
+      const inFinderEdge = inFinder && (
+        // outer frame
+        (x === 0 || x === 6 || y === 0 || y === 6 ||
+         (x === N - 7 || x === N - 1 || y === 0 || y === 6) ||
+         (x === 0 || x === 6 || y === N - 7 || y === N - 1))
+      );
+      const inFinderCenter = (
+        (x >= 2 && x <= 4 && y >= 2 && y <= 4) ||
+        (x >= N - 5 && x <= N - 3 && y >= 2 && y <= 4) ||
+        (x >= 2 && x <= 4 && y >= N - 5 && y <= N - 3)
+      );
+      let on;
+      if (inFinder) {
+        if (x === 0 || x === 6 || y === 0 || y === 6 ||
+            (x === N - 7 && y < 7) || (x === N - 1 && y < 7) ||
+            (y === 0 && x >= N - 7) || (y === 6 && x >= N - 7) ||
+            (x === 0 && y >= N - 7) || (x === 6 && y >= N - 7) ||
+            (y === N - 7 && x < 7) || (y === N - 1 && x < 7)) {
+          on = true;
+        } else if (inFinderCenter) {
+          on = true;
+        } else {
+          on = false;
+        }
+      } else {
+        on = rnd() > 0.5;
+      }
+      if (on) cells.push(<rect key={`${x}-${y}`} x={x * cell} y={y * cell} width={cell} height={cell} fill={dark}/>);
+    }
+  }
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: 'block' }}>
+      {light !== 'transparent' && <rect width={size} height={size} fill={light}/>}
+      {cells}
+    </svg>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// 1 · HOME / PORTFOLIO — Alpexa branded
+// ════════════════════════════════════════════════════════════════
+function AlpexaHome() {
+  const W = 390, H = 844;
+  const pts = makeChart(7771, 120, 0.4, 0.9);
+  const chartW = W, chartH = 220;
+  return (
+    <Phone width={W} height={H} bg={ALPEXA.bg}>
+      <StatusBar color={ALPEXA.text}/>
+
+      {/* Header */}
+      <div style={{ padding: '12px 22px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <AlpexaWordmark/>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <CircleBtn>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+          </CircleBtn>
+          <CircleBtn>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth="1.8"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+          </CircleBtn>
+        </div>
+      </div>
+
+      {/* Balance */}
+      <div style={{ padding: '24px 24px 4px' }}>
+        <div style={{ color: ALPEXA.textDim, fontSize: 11, letterSpacing: 1.2, fontWeight: 600, textTransform: 'uppercase', fontFamily: 'Geist Mono, monospace' }}>
+          My Wallet · CHF
+        </div>
+        <div style={{
+          color: ALPEXA.text, fontSize: 42, fontWeight: 600, letterSpacing: -1.2, marginTop: 8,
+          fontFeatureSettings: '"tnum"',
+        }}>
+          $24,832.<span style={{ color: ALPEXA.textDim }}>17</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+          <span style={{ color: ALPEXA.neon, fontSize: 14, fontFamily: 'Geist Mono, monospace', fontWeight: 600 }}>
+            ↑ ${fmt(PORTFOLIO.changeUsd)}
+          </span>
+          <span style={{
+            color: ALPEXA.neon, fontSize: 12, fontWeight: 700,
+            border: `1px solid ${ALPEXA.neon}40`, borderRadius: 4, padding: '2px 6px',
+            fontFamily: 'Geist Mono, monospace',
+          }}>{fmtPct(PORTFOLIO.changePct)}</span>
+          <span style={{ color: ALPEXA.textMute, fontSize: 12 }}>Today</span>
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div style={{ marginTop: 6, position: 'relative' }}>
+        <svg width={chartW} height={chartH} viewBox={`0 0 ${chartW} ${chartH}`} style={{ display: 'block' }}>
+          <defs>
+            <linearGradient id="alp-home-fill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={ALPEXA.neon} stopOpacity="0.16"/>
+              <stop offset="100%" stopColor={ALPEXA.neon} stopOpacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d={areaFromPts(pts, chartW, chartH, 0)} fill="url(#alp-home-fill)"/>
+          <path d={pathFromPts(pts, chartW, chartH, 0)} stroke={ALPEXA.neon} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        <div style={{ display: 'flex', justifyContent: 'space-around', padding: '10px 18px 0' }}>
+          {RANGES.map((r, i) => (
+            <div key={r} style={{
+              fontSize: 11, fontWeight: 600,
+              color: i === 2 ? ALPEXA.bg : ALPEXA.textDim,
+              background: i === 2 ? ALPEXA.neon : 'transparent',
+              padding: '5px 10px', borderRadius: 6, fontFamily: 'Geist Mono, monospace',
+            }}>{r}</div>
+          ))}
+        </div>
+      </div>
+
+      {/* Action chips */}
+      <div style={{ padding: '16px 20px 6px', display: 'flex', gap: 8 }}>
+        {[
+          ['Buy', 'M12 5v14M5 12h14'],
+          ['Send', 'M5 12h14M13 5l7 7-7 7'],
+          ['Receive', 'M5 12h14M11 5l-7 7 7 7'],
+          ['Swap', 'M4 7h13M14 4l3 3-3 3M20 17H7M10 14l-3 3 3 3'],
+        ].map(([label, d], i) => (
+          <div key={label} style={{
+            flex: 1, padding: '11px 0', textAlign: 'center',
+            background: i === 0 ? ALPEXA.neon : ALPEXA.panel,
+            color: i === 0 ? ALPEXA.bg : ALPEXA.text,
+            border: i === 0 ? 'none' : `1px solid ${ALPEXA.line}`,
+            borderRadius: 14, fontWeight: 600, fontSize: 12,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={i === 0 ? ALPEXA.bg : ALPEXA.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d}/></svg>
+            <span>{label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Assets */}
+      <div style={{ padding: '12px 22px 0', flex: 1, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+          <div style={{ color: ALPEXA.text, fontSize: 14, fontWeight: 600 }}>Portfolio</div>
+          <div style={{ color: ALPEXA.textMute, fontSize: 11, fontFamily: 'Geist Mono, monospace' }}>5 ASSETS</div>
+        </div>
+        {PORTFOLIO.assets.slice(0, 4).map((a) => (
+          <div key={a.sym} style={{
+            display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0',
+            borderTop: `1px solid ${ALPEXA.line}`,
+          }}>
+            <CoinIcon sym={a.sym} size={30}/>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: ALPEXA.text, fontSize: 13.5, fontWeight: 500 }}>{COIN_META[a.sym].name}</div>
+              <div style={{ color: ALPEXA.textDim, fontSize: 11, fontFamily: 'Geist Mono, monospace' }}>{a.qty} {a.sym}</div>
+            </div>
+            <Spark seed={a.seed} w={44} h={18} color={a.chg >= 0 ? ALPEXA.neon : ALPEXA.red} strokeWidth={1.4}/>
+            <div style={{ textAlign: 'right', minWidth: 78, fontFamily: 'Geist Mono, monospace' }}>
+              <div style={{ color: ALPEXA.text, fontSize: 13, fontWeight: 500 }}>{fmtUsd(a.mine)}</div>
+              <div style={{ color: a.stable ? ALPEXA.textDim : a.chg >= 0 ? ALPEXA.neon : ALPEXA.red, fontSize: 11 }}>
+                {a.stable ? '—' : fmtPct(a.chg)}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <AlpexaTabBar active={0}/>
+      <HomeIndicator color={ALPEXA.text}/>
+    </Phone>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// 2 · COIN DETAIL — Bitcoin with hero line chart
+// ════════════════════════════════════════════════════════════════
+function AlpexaCoinDetail() {
+  const W = 390, H = 844;
+  const pts = makeChart(444, 140, 0.6, 1.4);
+  const chartW = W, chartH = 240;
+  return (
+    <Phone width={W} height={H} bg={ALPEXA.bg}>
+      <StatusBar color={ALPEXA.text}/>
+
+      {/* Top bar */}
+      <div style={{ padding: '10px 20px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <BackBtn/>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <CircleBtn size={32}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ALPEXA.neon} strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </CircleBtn>
+          <CircleBtn size={32}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ALPEXA.neon} strokeWidth="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/></svg>
+          </CircleBtn>
+          <CircleBtn size={32}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ALPEXA.neon} strokeWidth="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+          </CircleBtn>
+        </div>
+      </div>
+
+      {/* Coin meta */}
+      <div style={{ padding: '14px 22px 0' }}>
+        <div style={{
+          color: ALPEXA.textDim, fontSize: 10, fontFamily: 'Geist Mono, monospace',
+          letterSpacing: 1.5, fontWeight: 700,
+        }}>BTC · ALPEXA SUISSE</div>
+        <div style={{ color: ALPEXA.text, fontSize: 26, fontWeight: 600, marginTop: 8, letterSpacing: -0.4 }}>
+          Bitcoin
+        </div>
+        <div style={{ color: ALPEXA.text, fontSize: 36, fontWeight: 600, letterSpacing: -1, marginTop: 4, fontFeatureSettings: '"tnum"' }}>
+          $67,421.<span style={{ color: ALPEXA.textDim }}>50</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, fontFamily: 'Geist Mono, monospace' }}>
+          <svg width="10" height="10" viewBox="0 0 10 10"><path d="M5 1 L9 8 L1 8 Z" fill={ALPEXA.neon}/></svg>
+          <span style={{ color: ALPEXA.neon, fontSize: 13, fontWeight: 600 }}>$1,547.20 (2.34%)</span>
+          <span style={{ color: ALPEXA.textMute, fontSize: 12 }}>Today</span>
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div style={{ marginTop: 14, position: 'relative' }}>
+        <svg width={chartW} height={chartH} viewBox={`0 0 ${chartW} ${chartH}`} style={{ display: 'block' }}>
+          <line x1="0" y1={chartH * 0.6} x2={chartW} y2={chartH * 0.6} stroke={ALPEXA.textMute} strokeDasharray="2 4" strokeOpacity="0.4"/>
+          <path d={pathFromPts(pts, chartW, chartH, 6)} stroke={ALPEXA.neon} strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+          {(() => {
+            const min = Math.min(...pts), max = Math.max(...pts);
+            const last = pts[pts.length - 1];
+            const lx = chartW - 6;
+            const ly = 6 + (chartH - 12) * (1 - (last - min) / (max - min));
+            return (
+              <g>
+                <circle cx={lx} cy={ly} r="7" fill={ALPEXA.neon} fillOpacity="0.22"/>
+                <circle cx={lx} cy={ly} r="3.5" fill={ALPEXA.neon}/>
+              </g>
+            );
+          })()}
+        </svg>
+        <div style={{ display: 'flex', justifyContent: 'space-around', padding: '10px 18px 0', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'Geist Mono, monospace', fontSize: 10, color: ALPEXA.textDim }}>
+            <span style={{ width: 6, height: 6, borderRadius: 3, background: ALPEXA.neon }}/>
+            LIVE
+          </div>
+          {['1D', '1W', '1M', '3M'].map((r, i) => (
+            <div key={r} style={{
+              fontSize: 11, fontWeight: 600,
+              color: i === 0 ? ALPEXA.bg : ALPEXA.textDim,
+              background: i === 0 ? ALPEXA.neon : 'transparent',
+              padding: '4px 10px', borderRadius: 5, fontFamily: 'Geist Mono, monospace',
+            }}>{r}</div>
+          ))}
+          <div style={{
+            fontSize: 11, color: ALPEXA.text, fontFamily: 'Geist Mono, monospace',
+            border: `1px solid ${ALPEXA.line}`, padding: '4px 10px', borderRadius: 5, fontWeight: 500,
+          }}>Pro</div>
+        </div>
+      </div>
+
+      {/* Your position */}
+      <div style={{ padding: '20px 22px 0', flex: 1, overflow: 'hidden' }}>
+        <div style={{ color: ALPEXA.text, fontSize: 14, fontWeight: 600, marginBottom: 10 }}>Your position</div>
+        <div style={{
+          background: ALPEXA.panel, border: `1px solid ${ALPEXA.line}`,
+          borderRadius: 14, padding: '14px 16px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div>
+            <div style={{ color: ALPEXA.textDim, fontSize: 11 }}>Holdings</div>
+            <div style={{ color: ALPEXA.text, fontSize: 18, fontWeight: 600, fontFamily: 'Geist Mono, monospace', marginTop: 2 }}>
+              0.3142 BTC
+            </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ color: ALPEXA.textDim, fontSize: 11 }}>Value</div>
+            <div style={{ color: ALPEXA.neon, fontSize: 18, fontWeight: 600, fontFamily: 'Geist Mono, monospace', marginTop: 2 }}>
+              $21,184.43
+            </div>
+          </div>
+        </div>
+
+        {/* Stats grid */}
+        <div style={{ color: ALPEXA.text, fontSize: 14, fontWeight: 600, marginTop: 18, marginBottom: 8 }}>Stats</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 24, rowGap: 12 }}>
+          {[
+            ['Market Cap', '$1.32 T'],
+            ['24h Volume', '$28.4 B'],
+            ['Circulating', '19.71 M'],
+            ['All-time high', '$73,750.07'],
+          ].map(([k, v]) => (
+            <div key={k}>
+              <div style={{ color: ALPEXA.textDim, fontSize: 11 }}>{k}</div>
+              <div style={{ color: ALPEXA.text, fontSize: 14, fontWeight: 500, fontFamily: 'Geist Mono, monospace', marginTop: 2 }}>{v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Buy CTA */}
+      <div style={{ padding: '8px 22px 0' }}>
+        <div style={{
+          background: ALPEXA.neon, color: ALPEXA.bg,
+          padding: '15px 0', textAlign: 'center', borderRadius: 999,
+          fontWeight: 700, fontSize: 15,
+        }}>Buy</div>
+      </div>
+
+      <AlpexaTabBar active={1}/>
+      <HomeIndicator color={ALPEXA.text}/>
+    </Phone>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// 3 · BUY AMOUNT — Huge number, SOL/$ toggle, keypad
+// ════════════════════════════════════════════════════════════════
+function AlpexaBuyAmount() {
+  const W = 390, H = 844;
+  return (
+    <Phone width={W} height={H} bg={ALPEXA.bg}>
+      <StatusBar color={ALPEXA.text}/>
+
+      {/* Top */}
+      <div style={{ padding: '10px 20px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <BackBtn close/>
+        <div style={{ color: ALPEXA.text, fontSize: 14, fontWeight: 600 }}>Buy Bitcoin</div>
+        <div style={{ width: 36 }}/>
+      </div>
+
+      {/* Amount block */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 20px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
+          <span style={{ color: ALPEXA.text, fontSize: 56, fontWeight: 400, letterSpacing: -2, lineHeight: 1, marginTop: 22, fontFamily: 'Geist, system-ui' }}>$</span>
+          <span style={{ color: ALPEXA.text, fontSize: 96, fontWeight: 500, letterSpacing: -4.5, lineHeight: 1, fontFeatureSettings: '"tnum"' }}>500</span>
+          <div style={{
+            marginLeft: 12, marginTop: 30,
+            width: 36, height: 36, borderRadius: 18,
+            border: `1px solid ${ALPEXA.line}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ALPEXA.text} strokeWidth="2"><path d="M7 4v16M3 8l4-4 4 4M17 20V4M21 16l-4 4-4-4"/></svg>
+          </div>
+        </div>
+        <div style={{
+          color: ALPEXA.textDim, fontSize: 14, marginTop: 14,
+          fontFamily: 'Geist Mono, monospace',
+        }}>Est. 0.00742 BTC</div>
+
+        {/* CHF/$ toggle pills */}
+        <div style={{ display: 'flex', gap: 8, marginTop: 28 }}>
+          {['BTC', '$'].map((p, i) => (
+            <div key={p} style={{
+              padding: '7px 18px', borderRadius: 8,
+              background: i === 1 ? ALPEXA.panel2 : 'transparent',
+              border: i === 1 ? 'none' : `1px solid ${ALPEXA.line}`,
+              color: ALPEXA.text, fontSize: 14, fontWeight: 600,
+              fontFamily: 'Geist Mono, monospace',
+            }}>{p}</div>
+          ))}
+        </div>
+      </div>
+
+      {/* Payment method + Review */}
+      <div style={{ padding: '0 22px' }}>
+        <div style={{
+          color: ALPEXA.neon, fontSize: 14, fontWeight: 600, textAlign: 'center',
+          marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+        }}>
+          Choose a payment method
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ALPEXA.neon} strokeWidth="2"><path d="M9 6l6 6-6 6"/></svg>
+        </div>
+        <div style={{
+          background: '#2a2a2a', color: ALPEXA.text,
+          padding: '16px 0', textAlign: 'center', borderRadius: 999,
+          fontWeight: 600, fontSize: 15,
+        }}>Review order</div>
+      </div>
+
+      <HomeIndicator color={ALPEXA.text}/>
+    </Phone>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// 4 · BUY CONFIRM — Blue hero, summary, Done
+// ════════════════════════════════════════════════════════════════
+function AlpexaBuyConfirm() {
+  const W = 390, H = 844;
+  return (
+    <Phone width={W} height={H} bg={ALPEXA.bg}>
+      {/* Hero green block (Alpexa version of the blue confirm) */}
+      <div style={{
+        background: ALPEXA.neon,
+        position: 'absolute', top: 0, left: 0, right: 0, height: 420, zIndex: 0,
+      }}/>
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+        <StatusBar color={ALPEXA.bg}/>
+
+        <div style={{ padding: '6px 20px 0' }}>
+          <BackBtn dark/>
+        </div>
+
+        {/* Big title */}
+        <div style={{ padding: '40px 24px 0', color: ALPEXA.bg }}>
+          <div style={{ fontSize: 11, fontFamily: 'Geist Mono, monospace', fontWeight: 700, letterSpacing: 1.4, opacity: 0.55 }}>
+            ORDER COMPLETE
+          </div>
+          <div style={{ fontSize: 52, fontWeight: 600, letterSpacing: -2, lineHeight: 1.05, marginTop: 12, fontFeatureSettings: '"tnum"' }}>
+            $100.00
+          </div>
+          <div style={{ fontSize: 52, fontWeight: 600, letterSpacing: -2, lineHeight: 1.05 }}>
+            of Bitcoin
+          </div>
+          <div style={{ fontSize: 13, fontFamily: 'Geist Mono, monospace', opacity: 0.6, marginTop: 12 }}>
+            0.0014825 BTC · {new Date('2026-05-25T09:41:00').toLocaleString('en-CH')}
+          </div>
+        </div>
+
+        {/* Summary rows */}
+        <div style={{ flex: 1 }}/>
+        <div style={{ padding: '0 24px 12px', color: ALPEXA.text }}>
+          <div style={{
+            display: 'grid', gridTemplateColumns: '1fr 1fr', rowGap: 14,
+            paddingTop: 18, borderTop: `1px solid ${ALPEXA.line}`,
+          }}>
+            <div>
+              <div style={{ color: ALPEXA.textDim, fontSize: 11 }}>To wallet</div>
+              <div style={{ color: ALPEXA.text, fontSize: 13, marginTop: 3, fontFamily: 'Geist Mono, monospace' }}>bc1q...3m4n0</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ color: ALPEXA.textDim, fontSize: 11 }}>Network fee</div>
+              <div style={{ color: ALPEXA.text, fontSize: 13, marginTop: 3, fontFamily: 'Geist Mono, monospace' }}>$0.48</div>
+            </div>
+            <div>
+              <div style={{ color: ALPEXA.textDim, fontSize: 11 }}>Method</div>
+              <div style={{ color: ALPEXA.text, fontSize: 13, marginTop: 3 }}>SEPA · CH …4291</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ color: ALPEXA.textDim, fontSize: 11 }}>Total charged</div>
+              <div style={{ color: ALPEXA.text, fontSize: 13, marginTop: 3, fontFamily: 'Geist Mono, monospace' }}>$100.48</div>
+            </div>
+          </div>
+          <div style={{ color: ALPEXA.textDim, fontSize: 11.5, lineHeight: 1.5, marginTop: 18 }}>
+            You entered $100.00 and sent 0.0014825 BTC on the Bitcoin network. The network fee was added to the amount.
+          </div>
+        </div>
+
+        <div style={{ padding: '0 22px 6px' }}>
+          <div style={{
+            background: ALPEXA.text, color: ALPEXA.bg,
+            padding: '16px 0', textAlign: 'center', borderRadius: 999,
+            fontWeight: 700, fontSize: 15,
+          }}>Done</div>
+        </div>
+
+        <HomeIndicator color={ALPEXA.text}/>
+      </div>
+    </Phone>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// 5 · RECEIVE — QR + coin selector + recent deposits
+// ════════════════════════════════════════════════════════════════
+function AlpexaReceive() {
+  const W = 390, H = 844;
+  return (
+    <Phone width={W} height={H} bg={ALPEXA.bg}>
+      <StatusBar color={ALPEXA.text}/>
+
+      <div style={{ padding: '10px 20px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ width: 36 }}/>
+        <div style={{ width: 36 }}/>
+        <CircleBtn>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ALPEXA.text} strokeWidth="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </CircleBtn>
+      </div>
+
+      <div style={{ padding: '8px 24px 0' }}>
+        <div style={{ color: ALPEXA.text, fontSize: 26, fontWeight: 600, letterSpacing: -0.4 }}>Receive crypto</div>
+        <div style={{ color: ALPEXA.textDim, fontSize: 13, marginTop: 4 }}>Select cryptocurrency</div>
+
+        {/* Coin selector */}
+        <div style={{
+          marginTop: 14, padding: '10px 12px',
+          background: ALPEXA.panel, border: `1px solid ${ALPEXA.line}`,
+          borderRadius: 12, display: 'flex', alignItems: 'center', gap: 10,
+          maxWidth: 180,
+        }}>
+          <CoinIcon sym="BTC" size={22}/>
+          <span style={{ color: ALPEXA.text, fontSize: 14, fontWeight: 500, flex: 1 }}>Bitcoin</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={ALPEXA.textDim} strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+      </div>
+
+      {/* QR card */}
+      <div style={{ padding: '20px 24px 0', display: 'flex', justifyContent: 'center' }}>
+        <div style={{
+          background: ALPEXA.bg, padding: 14, borderRadius: 16,
+          border: `1px solid ${ALPEXA.line}`,
+          position: 'relative',
+        }}>
+          <QR size={220} seed={42} dark={ALPEXA.text}/>
+          {/* Center mark */}
+          <div style={{
+            position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            width: 38, height: 38, background: ALPEXA.bg, borderRadius: 8,
+            border: `1px solid ${ALPEXA.line}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <AlpexaMark size={20} color={ALPEXA.neon}/>
+          </div>
+        </div>
+      </div>
+
+      {/* Address + label */}
+      <div style={{ padding: '14px 24px 0', textAlign: 'center' }}>
+        <div style={{ color: ALPEXA.textDim, fontSize: 12, marginBottom: 6 }}>
+          Scan this QR code to send BTC to this wallet
+        </div>
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          background: ALPEXA.panel, border: `1px solid ${ALPEXA.line}`,
+          padding: '7px 12px', borderRadius: 999,
+          fontFamily: 'Geist Mono, monospace', fontSize: 12, color: ALPEXA.text,
+        }}>
+          <CoinIcon sym="BTC" size={16}/>
+          bc1q...gK8r3m4n0
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={ALPEXA.neon} strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </div>
+      </div>
+
+      {/* Recent deposits */}
+      <div style={{ padding: '20px 22px 0', flex: 1, overflow: 'hidden' }}>
+        <div style={{
+          color: ALPEXA.textDim, fontSize: 10, fontFamily: 'Geist Mono, monospace',
+          letterSpacing: 1.4, fontWeight: 700, marginBottom: 8,
+        }}>RECENT DEPOSITS</div>
+        {[
+          { amt: '+0.0045 BTC', when: 'Today · 10:30', status: 'Completed', good: true },
+          { amt: '+0.001235 BTC', when: 'Today · 11:30', status: 'Pending', good: false },
+        ].map((d, i) => (
+          <div key={i} style={{
+            background: ALPEXA.panel, border: `1px solid ${ALPEXA.line}`,
+            borderRadius: 14, padding: '12px 16px', marginBottom: 10,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <div>
+              <div style={{ color: ALPEXA.text, fontSize: 14, fontWeight: 500, fontFamily: 'Geist Mono, monospace' }}>{d.amt}</div>
+              <div style={{ color: ALPEXA.textDim, fontSize: 11, marginTop: 2 }}>{d.when}</div>
+            </div>
+            <div style={{
+              color: d.good ? ALPEXA.neon : '#FFB23D',
+              fontSize: 12, fontWeight: 600,
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <span style={{ width: 6, height: 6, borderRadius: 3, background: d.good ? ALPEXA.neon : '#FFB23D' }}/>
+              {d.status}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <HomeIndicator color={ALPEXA.text}/>
+    </Phone>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// 6 · SEND / SCAN — QR scanner
+// ════════════════════════════════════════════════════════════════
+function AlpexaScan() {
+  const W = 390, H = 844;
+  return (
+    <Phone width={W} height={H} bg={ALPEXA.bg}>
+      <StatusBar color={ALPEXA.text}/>
+
+      <div style={{ padding: '10px 20px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ width: 36 }}/>
+        {/* Toggle: QR / scan */}
+        <div style={{
+          display: 'flex', background: ALPEXA.panel, border: `1px solid ${ALPEXA.line}`,
+          borderRadius: 999, padding: 3,
+        }}>
+          <div style={{
+            padding: '6px 12px', borderRadius: 999, background: 'transparent',
+            display: 'flex', alignItems: 'center',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ALPEXA.textDim} strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </div>
+          <div style={{
+            padding: '6px 12px', borderRadius: 999, background: ALPEXA.text,
+            display: 'flex', alignItems: 'center',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ALPEXA.bg} strokeWidth="2"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/></svg>
+          </div>
+        </div>
+        <CircleBtn>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ALPEXA.text} strokeWidth="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </CircleBtn>
+      </div>
+
+      {/* Title */}
+      <div style={{ padding: '20px 24px 0', textAlign: 'center' }}>
+        <div style={{ color: ALPEXA.text, fontSize: 24, fontWeight: 600 }}>Wallet</div>
+        <div style={{ color: ALPEXA.textDim, fontSize: 13, marginTop: 4 }}>Send or pay with Bitcoin</div>
+      </div>
+
+      {/* Scanner frame */}
+      <div style={{ padding: '36px 30px 0', display: 'flex', justifyContent: 'center', flex: 1 }}>
+        <div style={{
+          width: 280, height: 360, position: 'relative',
+          borderRadius: 28, overflow: 'hidden',
+          background: 'linear-gradient(140deg, #C2FF3D 0%, #1a1a1a 70%)',
+        }}>
+          {/* Corner brackets */}
+          {[
+            { top: 14, left: 14, br: '14px 0 0 0' },
+            { top: 14, right: 14, br: '0 14px 0 0' },
+            { bottom: 14, left: 14, br: '0 0 0 14px' },
+            { bottom: 14, right: 14, br: '0 0 14px 0' },
+          ].map((c, i) => (
+            <div key={i} style={{
+              position: 'absolute', ...c, width: 30, height: 30,
+              border: `3px solid ${ALPEXA.text}`,
+              borderRadius: c.br,
+              borderRightWidth: c.br.includes('14px 0 0 0') || c.br.includes('0 0 0 14px') ? 0 : 3,
+              borderBottomWidth: c.br.includes('14px 0 0 0') || c.br.includes('0 14px 0 0') ? 0 : 3,
+              borderTopWidth: c.br.includes('0 0 0 14px') || c.br.includes('0 0 14px 0') ? 0 : 3,
+              borderLeftWidth: c.br.includes('0 14px 0 0') || c.br.includes('0 0 14px 0') ? 0 : 3,
+            }}/>
+          ))}
+          {/* QR placeholder inside */}
+          <div style={{
+            position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%) rotate(8deg)',
+          }}>
+            <div style={{ background: '#fff', padding: 10, borderRadius: 8 }}>
+              <QR size={140} seed={9} dark="#000"/>
+            </div>
+          </div>
+          {/* Scan line */}
+          <div style={{
+            position: 'absolute', left: 14, right: 14, top: '52%',
+            height: 2, background: ALPEXA.neon, boxShadow: `0 0 10px ${ALPEXA.neon}`,
+          }}/>
+        </div>
+      </div>
+
+      {/* Enter manually CTA */}
+      <div style={{ padding: '24px 22px 6px' }}>
+        <div style={{
+          background: ALPEXA.text, color: ALPEXA.bg,
+          padding: '15px 0', textAlign: 'center', borderRadius: 999,
+          fontWeight: 700, fontSize: 15,
+        }}>Enter address manually</div>
+      </div>
+
+      <HomeIndicator color={ALPEXA.text}/>
+    </Phone>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// 7 · SWAP — From/To dropdowns, big amount, keypad
+// ════════════════════════════════════════════════════════════════
+function AlpexaSwap() {
+  const W = 390, H = 844;
+  return (
+    <Phone width={W} height={H} bg={ALPEXA.bg}>
+      <StatusBar color={ALPEXA.text}/>
+
+      {/* Top */}
+      <div style={{ padding: '10px 20px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <CircleBtn>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ALPEXA.text} strokeWidth="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </CircleBtn>
+        <div style={{ color: ALPEXA.text, fontSize: 14, fontWeight: 600 }}>Swap on Solana</div>
+        <div style={{ width: 36 }}/>
+      </div>
+
+      {/* From/To selectors */}
+      <div style={{ padding: '18px 22px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <SwapPill sym="SOL"/>
+        <div style={{
+          width: 32, height: 32, borderRadius: 16,
+          background: ALPEXA.panel, border: `1px solid ${ALPEXA.line}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ALPEXA.neon} strokeWidth="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </div>
+        <SwapPill sym="USDC"/>
+      </div>
+
+      {/* Amount */}
+      <div style={{ padding: '40px 24px 0', textAlign: 'center' }}>
+        <div style={{
+          color: ALPEXA.text, fontSize: 76, fontWeight: 500, letterSpacing: -3.5,
+          lineHeight: 1, fontFeatureSettings: '"tnum"',
+        }}>
+          $250
+        </div>
+        <div style={{ display: 'inline-flex', gap: 6, marginTop: 18 }}>
+          <div style={{ padding: '6px 14px', border: `1px solid ${ALPEXA.line}`, borderRadius: 7, color: ALPEXA.text, fontSize: 13, fontFamily: 'Geist Mono, monospace', fontWeight: 600 }}>SOL</div>
+          <div style={{ padding: '6px 14px', background: ALPEXA.panel2, borderRadius: 7, color: ALPEXA.text, fontSize: 13, fontFamily: 'Geist Mono, monospace', fontWeight: 600 }}>$</div>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+        <div style={{ textAlign: 'center', color: ALPEXA.textDim, fontSize: 12, marginBottom: 10, fontFamily: 'Geist Mono, monospace' }}>
+          1.752 SOL available
+        </div>
+        <div style={{ padding: '0 22px 12px' }}>
+          <div style={{
+            background: '#2a2a2a', color: ALPEXA.text,
+            padding: '15px 0', textAlign: 'center', borderRadius: 999,
+            fontWeight: 600, fontSize: 15,
+          }}>Review</div>
+        </div>
+
+        {/* Keypad */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',
+          padding: '4px 22px 0', columnGap: 28, rowGap: 12,
+          color: ALPEXA.text, fontSize: 26, fontWeight: 400,
+          textAlign: 'center', fontFamily: 'Geist, system-ui',
+        }}>
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'].map((k) => (
+            <div key={k} style={{ padding: '4px 0' }}>{k}</div>
+          ))}
+        </div>
+      </div>
+
+      <HomeIndicator color={ALPEXA.text}/>
+    </Phone>
+  );
+}
+
+function SwapPill({ sym }) {
+  return (
+    <div style={{
+      flex: 1, padding: '8px 12px', background: ALPEXA.panel,
+      border: `1px solid ${ALPEXA.line}`, borderRadius: 999,
+      display: 'flex', alignItems: 'center', gap: 8,
+    }}>
+      <CoinIcon sym={sym} size={20}/>
+      <span style={{ color: ALPEXA.text, fontSize: 13, fontWeight: 600, flex: 1 }}>{sym}</span>
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={ALPEXA.textDim} strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// 8 · INSUFFICIENT BALANCE — Blurred swap behind bottom sheet
+// ════════════════════════════════════════════════════════════════
+function AlpexaInsufficient() {
+  const W = 390, H = 844;
+  return (
+    <Phone width={W} height={H} bg={ALPEXA.bg}>
+      {/* Dim background — render a faded swap-ish layout, then blur */}
+      <div style={{ position: 'absolute', inset: 0, opacity: 0.35, filter: 'blur(8px)' }}>
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: ALPEXA.bg }}>
+          <div style={{ height: 54 }}/>
+          <div style={{ padding: '18px 22px 0', display: 'flex', gap: 12 }}>
+            <div style={{ flex: 1, height: 38, background: ALPEXA.panel, borderRadius: 999 }}/>
+            <div style={{ width: 32, height: 32, borderRadius: 16, background: ALPEXA.panel, alignSelf: 'center' }}/>
+            <div style={{ flex: 1, height: 38, background: ALPEXA.panel, borderRadius: 999 }}/>
+          </div>
+          <div style={{ padding: '60px 24px 0', textAlign: 'center' }}>
+            <div style={{ color: ALPEXA.text, fontSize: 70, fontWeight: 500, letterSpacing: -3, opacity: 0.7 }}>$250</div>
+          </div>
+        </div>
+      </div>
+      {/* Radial glow */}
+      <div style={{
+        position: 'absolute', top: 280, left: '50%', transform: 'translateX(-50%)',
+        width: 320, height: 320, borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(150,80,255,0.45), transparent 70%)',
+        filter: 'blur(20px)', zIndex: 0,
+      }}/>
+
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+        <StatusBar color={ALPEXA.text}/>
+        <div style={{ flex: 1 }}/>
+
+        {/* Bottom sheet */}
+        <div style={{
+          background: '#0E0E0E', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+          padding: '12px 22px 22px',
+          boxShadow: '0 -20px 60px rgba(0,0,0,0.5)',
+        }}>
+          {/* Drag handle */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+            <div style={{ width: 38, height: 4, borderRadius: 2, background: '#3a3a3a' }}/>
+          </div>
+
+          <div style={{ textAlign: 'center', color: ALPEXA.text, fontSize: 20, fontWeight: 600 }}>
+            Not enough SOL
+          </div>
+          <div style={{ textAlign: 'center', color: ALPEXA.textDim, fontSize: 13, marginTop: 6, lineHeight: 1.4 }}>
+            You need additional SOL in this wallet to place this order.
+          </div>
+
+          <div style={{
+            marginTop: 18, background: ALPEXA.panel, border: `1px solid ${ALPEXA.line}`,
+            borderRadius: 12, padding: '12px 14px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <div>
+              <div style={{ color: ALPEXA.textDim, fontSize: 11 }}>Required</div>
+              <div style={{ color: ALPEXA.text, fontSize: 14, fontFamily: 'Geist Mono, monospace', marginTop: 2 }}>1.752 SOL</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ color: ALPEXA.textDim, fontSize: 11 }}>Available</div>
+              <div style={{ color: ALPEXA.red, fontSize: 14, fontFamily: 'Geist Mono, monospace', marginTop: 2 }}>0.000 SOL</div>
+            </div>
+          </div>
+
+          <div style={{
+            marginTop: 14, background: ALPEXA.text, color: ALPEXA.bg,
+            padding: '15px 0', textAlign: 'center', borderRadius: 999,
+            fontWeight: 700, fontSize: 15,
+          }}>Deposit SOL</div>
+          <div style={{
+            marginTop: 8, background: '#2a2a2a', color: ALPEXA.text,
+            padding: '15px 0', textAlign: 'center', borderRadius: 999,
+            fontWeight: 600, fontSize: 15,
+          }}>Cancel</div>
+        </div>
+        <HomeIndicator color={ALPEXA.text}/>
+      </div>
+    </Phone>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// Shared widgets
+// ════════════════════════════════════════════════════════════════
+function CircleBtn({ children, size = 34, onClick }) {
+  return (
+    <div onClick={onClick} style={{
+      width: size, height: size, borderRadius: size / 2,
+      background: ALPEXA.panel, border: `1px solid ${ALPEXA.line}`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0,
+    }}>{children}</div>
+  );
+}
+
+function BackBtn({ close = false, dark = false }) {
+  const stroke = dark ? ALPEXA.bg : ALPEXA.text;
+  return (
+    <div style={{
+      width: 36, height: 36, borderRadius: 18,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      {close
+        ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2"><path d="M15 6l-6 6 6 6"/></svg>}
+    </div>
+  );
+}
+
+function AlpexaTabBar({ active = 0 }) {
+  const tabs = [
+    { l: 'Home',    d: 'M3 12 L12 4 L21 12 M5 11v9h14v-9' },
+    { l: 'Trade',   d: 'M3 17 L9 11 L13 15 L21 7 M14 7h7v7' },
+    { l: 'Search',  d: 'M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14zM20 20l-4-4' },
+    { l: 'Activity',d: 'M12 6v6l4 2 M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20z' },
+  ];
+  return (
+    <div style={{
+      borderTop: `1px solid ${ALPEXA.line}`,
+      background: ALPEXA.bg,
+      display: 'flex', justifyContent: 'space-around',
+      padding: '10px 14px 6px', flexShrink: 0,
+    }}>
+      {tabs.map((t, i) => (
+        <div key={t.l} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+            stroke={i === active ? ALPEXA.neon : ALPEXA.textMute}
+            strokeWidth={i === active ? 2 : 1.6} strokeLinecap="round" strokeLinejoin="round">
+            <path d={t.d}/>
+          </svg>
+          <span style={{
+            fontSize: 10, fontWeight: i === active ? 600 : 400,
+            color: i === active ? ALPEXA.neon : ALPEXA.textMute,
+            fontFamily: 'Geist Mono, monospace', letterSpacing: 0.4, textTransform: 'uppercase',
+          }}>{t.l}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+Object.assign(window, {
+  ALPEXA, AlpexaMark, AlpexaWordmark,
+  AlpexaHome, AlpexaCoinDetail, AlpexaBuyAmount, AlpexaBuyConfirm,
+  AlpexaReceive, AlpexaScan, AlpexaSwap, AlpexaInsufficient,
+  AlpexaTabBar,
+});
+
+</script>
+
+<!-- 4) Order entry (AlpexaTradeOrderW) -->
+<script type="text/babel" data-presets="react">
+// Alpexa Suisse — Order Entry.
+// Simplified order ticket: side comes from URL (?side=buy|sell), no in-page Buy/Sell toggle.
+// Header: back · "Buy BTC ▾" · more
+// Order type pill (Market / Limit / Stop)
+// Big amount + Dollars/Coin toggle
+// Market price + Buying power info rows
+// Inline keypad + green Review CTA
+
+// Smooth interpolation between target values — used by the Order entry
+// so that user keypresses cause digits to roll instead of snapping instantly.
+function useSmoothNumber(target, duration = 220) {
+  const [val, setVal] = React.useState(target);
+  React.useEffect(() => {
+    let raf;
+    const start = performance.now();
+    const from = val;
+    const ease = (t) => 1 - Math.pow(1 - t, 3);
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / duration);
+      const v = from + (target - from) * ease(t);
+      setVal(v);
+      if (t < 1) raf = requestAnimationFrame(tick);
+      else setVal(target);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target, duration]);
+  return val;
+}
+
+function AlpexaTradeOrderW() {
+  const W = 390, H = 844;
+
+  const initialSide = (typeof location !== 'undefined' && new URLSearchParams(location.search).get('side')) || 'buy';
+  const initialSym  = (typeof location !== 'undefined' && new URLSearchParams(location.search).get('sym'))  || 'BTC';
+
+  const [side, setSide]     = React.useState(initialSide === 'sell' ? 'sell' : 'buy');
+  const [symbol, setSymbol] = React.useState(initialSym);
+  const [unit, setUnit]     = React.useState('usd');
+  const [amount, setAmount] = React.useState('500');
+  const [orderType, setOrderType] = React.useState('Market');
+  const [showCoinPicker, setShowCoinPicker] = React.useState(false);
+
+  const asset = MARKETS.find((m) => m.sym === symbol) || MARKETS[0];
+  const heldQty = PORTFOLIO.assets.find((a) => a.sym === symbol)?.qty || 0;
+  const buyingPowerUsd = PORTFOLIO.assets.find((a) => a.sym === 'USDT')?.mine || 1247.32;
+
+  const num = parseFloat(amount) || 0;
+
+  // Smooth number tween — when num changes (keypress), interpolate over 240ms.
+  // This drives the Odometer through intermediate values so digits roll instead
+  // of just snapping. Otherwise typing-driven changes look static.
+  const smoothNum = useSmoothNumber(num, 240);
+
+  const usdAmount  = unit === 'usd'  ? num : num * asset.price;
+  const coinAmount = unit === 'coin' ? num : (asset.price > 0 ? num / asset.price : 0);
+
+  const onKey = (k) => {
+    if (k === '⌫') { setAmount((s) => s.length <= 1 ? '0' : s.slice(0, -1)); return; }
+    if (k === '.') { if (amount.includes('.')) return; setAmount((s) => s + '.'); return; }
+    setAmount((s) => {
+      if (s === '0') return k;
+      if (s.includes('.')) {
+        const [, frac = ''] = s.split('.');
+        if (frac.length >= 8) return s;
+      }
+      return s + k;
+    });
+  };
+
+  const sideColor = side === 'buy' ? ALW.green : ALW.red;
+  const valid = num > 0;
+  const sideLabel = side === 'buy' ? 'Buy' : 'Sell';
+  const cycleOrderType = () => {
+    const order = ['Market', 'Limit', 'Stop'];
+    setOrderType(order[(order.indexOf(orderType) + 1) % order.length]);
+  };
+
+  // Pretty integer + fractional split for the big amount display
+  const [intPart, fracPart] = (amount.includes('.') ? amount.split('.') : [amount, null]);
+  const fracDisplay = fracPart === null ? '.00' : (fracPart === '' ? '.' : `.${fracPart}`);
+
+  return (
+    <Phone width={W} height={H} bg={ALW.bg} chrome={false}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ height: 16 }}/>
+
+        {/* Header */}
+        <div style={{ padding: '12px 18px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <a href={`Coin Detail.html?sym=${symbol}`} style={{
+            width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            textDecoration: 'none',
+          }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ALW.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 6 L9 12 L15 18"/>
+            </svg>
+          </a>
+          <div
+            onClick={() => setShowCoinPicker((s) => !s)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              cursor: 'pointer',
+            }}
+          >
+            <span style={{
+              color: ALW.text, fontSize: 17, fontWeight: 700, letterSpacing: -0.3,
+            }}>
+              {sideLabel} {symbol}
+            </span>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={ALW.textDim} strokeWidth="2.4"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="4" height="18" viewBox="0 0 4 18">
+              <circle cx="2" cy="2" r="1.6" fill={ALW.text}/>
+              <circle cx="2" cy="9" r="1.6" fill={ALW.text}/>
+              <circle cx="2" cy="16" r="1.6" fill={ALW.text}/>
+            </svg>
+          </div>
+        </div>
+
+        {/* Amount block */}
+        <div style={{ padding: '48px 22px 0', textAlign: 'center' }}>
+          <div style={{
+            display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 0,
+            color: ALW.text, fontSize: 60, fontWeight: 600, letterSpacing: -2,
+            fontFeatureSettings: '"tnum"', lineHeight: 1,
+          }}>
+            {unit === 'usd'
+              ? <Odometer value={num} decimals={2}/>
+              : (
+                <React.Fragment>
+                  <Odometer value={num} decimals={4} prefix=""/>
+                  <span style={{ fontSize: 22, fontWeight: 500, color: ALW.textDim, marginLeft: 6 }}>{symbol}</span>
+                </React.Fragment>
+              )}
+          </div>
+          <div style={{
+            color: ALW.textDim, fontSize: 13, marginTop: 12,
+            fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"',
+          }}>
+            ≈ {unit === 'usd'
+                ? `${coinAmount.toFixed(symbol === 'BTC' ? 6 : 4)} ${symbol}`
+                : fmtUsd(usdAmount)}
+          </div>
+          {/* Dollars / Coin pill toggle */}
+          <div style={{
+            display: 'inline-flex', gap: 0, marginTop: 18,
+            background: ALW.panel, border: `1px solid ${ALW.line}`,
+            padding: 3, borderRadius: 999,
+          }}>
+            {[
+              { id: 'usd',  label: 'Dollars' },
+              { id: 'coin', label: symbol },
+            ].map((u) => {
+              const active = u.id === unit;
+              return (
+                <div key={u.id} onClick={() => { setUnit(u.id); setAmount('0'); }} style={{
+                  padding: '6px 16px', borderRadius: 999,
+                  background: active ? ALW.text : 'transparent',
+                  color: active ? ALW.bg : ALW.textDim,
+                  fontSize: 12.5, fontWeight: 600,
+                  cursor: 'pointer',
+                }}>{u.label}</div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Keypad — pushed to bottom */}
+        <div style={{
+          marginTop: 'auto',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          padding: '0 22px 0',
+          color: ALW.text, fontSize: 24, fontWeight: 500,
+          textAlign: 'center',
+          fontFamily: 'Geist, system-ui',
+        }}>
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'].map((k) => (
+            <div key={k} onClick={() => onKey(k)} style={{
+              padding: '10px 0', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              userSelect: 'none',
+            }}>{k}</div>
+          ))}
+        </div>
+
+        {/* Review CTA */}
+        <div style={{ padding: '22px 22px 22px' }}>
+          <div style={{
+            padding: '16px 0', textAlign: 'center', borderRadius: 999,
+            background: valid ? sideColor : ALW.panel,
+            color: valid ? '#000' : ALW.textMute,
+            fontSize: 15, fontWeight: 700, letterSpacing: 0.4,
+            cursor: valid ? 'pointer' : 'default',
+          }}>
+            Review
+          </div>
+        </div>
+      </div>
+
+      {/* Coin picker bottom sheet */}
+      {showCoinPicker && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 200,
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        }} onClick={() => setShowCoinPicker(false)}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              background: '#0E0E0E',
+              borderTopLeftRadius: 24, borderTopRightRadius: 24,
+              padding: '14px 0 22px',
+              maxHeight: '70%', overflowY: 'auto',
+            }}
+            className="alpexa-hide-scrollbar"
+          >
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+              <div style={{ width: 38, height: 4, borderRadius: 2, background: '#3a3a3a' }}/>
+            </div>
+            <div style={{
+              padding: '0 22px 8px',
+              color: ALW.text, fontSize: 16, fontWeight: 600,
+            }}>Choose an asset</div>
+            {MARKETS.map((m) => {
+              const selected = m.sym === symbol;
+              return (
+                <div
+                  key={m.sym}
+                  onClick={() => { setSymbol(m.sym); setShowCoinPicker(false); setAmount('0'); }}
+                  style={{
+                    padding: '12px 22px', display: 'flex', alignItems: 'center', gap: 12,
+                    background: selected ? ALW.panel : 'transparent',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 16,
+                    background: ALW.panel, border: `1px solid ${ALW.line}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: ALW.text, fontSize: 12, fontWeight: 700,
+                    fontFamily: 'Geist Mono, monospace',
+                  }}>{m.sym[0]}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: ALW.text, fontSize: 14, fontWeight: 500 }}>{COIN_META[m.sym]?.name || m.sym}</div>
+                    <div style={{ color: ALW.textDim, fontSize: 11, fontFamily: 'Geist Mono, monospace', marginTop: 2 }}>{m.sym}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{
+                      color: ALW.text, fontSize: 13, fontWeight: 500,
+                      fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"',
+                    }}>{m.price < 10 ? `$${m.price.toFixed(4)}` : fmtUsd(m.price)}</div>
+                    <div style={{
+                      color: m.stable ? ALW.textDim : m.chg >= 0 ? ALW.green : ALW.red,
+                      fontSize: 11, marginTop: 2, fontFamily: 'Geist Mono, monospace',
+                    }}>{m.stable ? '—' : fmtPct(m.chg)}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </Phone>
+  );
+}
+
+Object.assign(window, {
+  AlpexaTradeOrderW,
+});
+
+</script>
+
+<!-- 5) STO Detail (AlpexaSTODetailW) -->
+<script type="text/babel" data-presets="react">
+// Alpexa Suisse — STO / Security Detail page.
+// Different from Coin Detail: fixed-income focused. Yield curve, coupon
+// history, secondary market, no live tick (STOs don't tick by the second).
+
+function AlpexaSTODetailW({ symbol = 'ALPX-RE1' }) {
+  const W = 390, H = 844;
+  const s = PORTFOLIO.securities.find((x) => x.sym === symbol);
+  if (!s) return null;
+
+  // Synthetic yield curve series for the chart.
+  // X: time-to-maturity buckets, Y: yield %
+  const yieldCurve = React.useMemo(() => {
+    let r = s.seed;
+    const rnd = () => { r = (r * 9301 + 49297) % 233280; return r / 233280; };
+    const pts = [];
+    const n = 36;
+    const base = s.apy;
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);
+      const ramp = base + (t - 0.5) * 0.6;
+      const noise = (rnd() - 0.5) * 0.18;
+      pts.push(ramp + noise);
+    }
+    return pts;
+  }, [s.seed, s.apy]);
+
+  const [scrubIndex, setScrubIndex] = React.useState(null);
+  const isScrubbing = scrubIndex !== null;
+  const baseline = s.apy;
+  const lineColor = ALW.green;
+
+  // The displayed yield (top): scrubbed point or current
+  const displayYield = isScrubbing ? yieldCurve[scrubIndex] : s.apy;
+
+  // Maturity buckets for labels: 3M, 6M, 1Y, 2Y, 3Y, 5Y, 10Y
+  const BUCKETS = ['3M', '6M', '1Y', '2Y', '3Y', '5Y', '10Y'];
+
+  return (
+    <Phone width={W} height={H} bg={ALW.bg} chrome={false}>
+      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }} className="alpexa-hide-scrollbar">
+      <div style={{ height: 16 }}/>
+
+      {/* Header */}
+      <div style={{ padding: '12px 18px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <a href="Dashboard.html" style={{
+          width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          textDecoration: 'none', cursor: 'pointer',
+        }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ALW.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 6 L9 12 L15 18"/>
+          </svg>
+        </a>
+        <div style={{
+          color: ALW.text, fontSize: 12, fontWeight: 600,
+          fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2, textTransform: 'uppercase',
+          maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {s.name}
+        </div>
+        <div style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width="4" height="18" viewBox="0 0 4 18">
+            <circle cx="2" cy="2" r="1.6" fill={ALW.text}/>
+            <circle cx="2" cy="9" r="1.6" fill={ALW.text}/>
+            <circle cx="2" cy="16" r="1.6" fill={ALW.text}/>
+          </svg>
+        </div>
+      </div>
+
+      {/* Hero — market value + YTD return */}
+      <div style={{ padding: '24px 24px 0' }}>
+        <div style={{
+          color: ALW.textMute, fontSize: 11,
+          fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2, fontWeight: 600,
+          textTransform: 'uppercase',
+        }}>
+          Market value · USD
+        </div>
+        <div style={{
+          color: ALW.text, fontSize: 38, fontWeight: 600, letterSpacing: -1.2, marginTop: 4, lineHeight: 1.15,
+          fontFeatureSettings: '"tnum"',
+        }}>
+          {fmtUsd(s.mine)}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+          <span style={{ color: ALW.textDim, fontSize: 13 }}>YTD</span>
+          <svg width="10" height="10" viewBox="0 0 10 10">
+            <path d="M5 1 L9 8 L1 8 Z" fill={ALW.green}/>
+          </svg>
+          <span style={{ color: ALW.green, fontSize: 13, fontWeight: 500, fontFeatureSettings: '"tnum"' }}>
+            {s.ytdReturn.toFixed(1)}%
+          </span>
+          <span style={{ color: ALW.textDim, fontSize: 13, marginLeft: 8 }}>
+            face {fmtUsd(s.faceValue)}
+          </span>
+        </div>
+      </div>
+
+      {/* Yield curve chart */}
+      <div style={{ marginTop: 20 }}>
+        <div style={{
+          padding: '0 22px 6px',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+        }}>
+          <div style={{
+            color: ALW.textMute, fontSize: 10, letterSpacing: 1.4,
+            fontFamily: 'Geist Mono, monospace', fontWeight: 700, textTransform: 'uppercase',
+          }}>
+            Yield curve
+          </div>
+          <div style={{
+            color: ALW.text, fontSize: 13, fontWeight: 500,
+            fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"',
+          }}>
+            {displayYield.toFixed(2)}%
+          </div>
+        </div>
+        <YieldCurveChart
+          series={yieldCurve}
+          baseline={baseline}
+          lineColor={lineColor}
+          buckets={BUCKETS}
+          scrubIndex={scrubIndex}
+          onScrubChange={setScrubIndex}
+        />
+      </div>
+
+      {/* INSTRUMENT card */}
+      <SecCard title="Instrument">
+        <SecStat label="Issuer" value={s.issuer}/>
+        <SecStat label="Credit rating" value={`${s.creditRating} · ${s.ratingAgency}`} align="right"/>
+        <SecStat label="Maturity" value={s.maturity}/>
+        <SecStat label="Settlement" value={s.settlement} align="right"/>
+        <SecStat label="Lockup expires" value={s.lockup}/>
+        <SecStat label="Units" value={`${s.qty} units`} align="right"/>
+      </SecCard>
+
+      {/* YIELD card */}
+      <SecCard title="Yield">
+        <SecStat label="Coupon rate" value={`${s.apy.toFixed(1)}% APY`}/>
+        <SecStat label="Payment freq" value={s.paymentFreq} align="right"/>
+        <SecStat label="Next payment" value={s.nextPayment}/>
+        <SecStat label="Accrued interest" value={fmtUsd(s.accruedInterest)} color={ALW.green} align="right"/>
+      </SecCard>
+
+      {/* SECONDARY MARKET card */}
+      <SecCard title="Secondary market">
+        <SecStat label="Bid" value={`$${s.bid.toFixed(2)}`}/>
+        <SecStat label="Ask" value={`$${s.ask.toFixed(2)}`} align="right"/>
+        <SecStat label="Spread" value={`${s.spreadBps} bps`}/>
+        <SecStat label="24h volume" value={fmtCompact(s.vol24h)} align="right"/>
+        <SecStat label="Last trade" value={s.lastTrade}/>
+      </SecCard>
+
+        <a href={`Order.html?sym=${s.sym}&kind=sto`} style={{
+          flex: 1, padding: '14px 0', textAlign: 'center',
+          background: ALW.text, color: ALW.bg,
+          borderRadius: 999,
+          fontSize: 14, fontWeight: 700, textDecoration: 'none',
+        }}>Buy</a>
+        <div style={{
+          flex: 1, padding: '14px 0', textAlign: 'center',
+          background: ALW.panel, color: ALW.text,
+          border: `1px solid ${ALW.line}`, borderRadius: 999,
+          fontSize: 14, fontWeight: 600,
+        }}>Sell</div>
+        <div style={{
+          flex: 1, padding: '14px 0', textAlign: 'center',
+          background: ALW.panel, color: ALW.text,
+          border: `1px solid ${ALW.line}`, borderRadius: 999,
+          fontSize: 14, fontWeight: 600,
+        }}>Transfer</div>
+      </div>
+      <div style={{
+        padding: '8px 22px 0',
+        color: ALW.textMute, fontSize: 10.5, fontStyle: 'italic',
+      }}>
+        Lockup expires {s.lockup}. Trading subject to KYC tier 2.
+      </div>
+
+      {/* Coupon payment history */}
+      <div style={{ padding: '24px 22px 16px' }}>
+        <div style={{
+          color: ALW.textMute, fontSize: 11,
+          fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2, fontWeight: 600,
+          textTransform: 'uppercase', marginBottom: 8, paddingBottom: 8,
+          borderBottom: `1px solid ${ALW.line}`,
+          display: 'flex', justifyContent: 'space-between',
+        }}>
+          <span>Coupon history</span>
+          <span>{s.couponHistory.length} payments</span>
+        </div>
+        {s.couponHistory.map((c, i) => (
+          <div key={i} style={{
+            display: 'grid', gridTemplateColumns: '70px 1fr auto',
+            alignItems: 'center', columnGap: 12,
+            padding: '11px 0',
+            borderTop: i === 0 ? 'none' : `1px solid ${ALW.lineSoft}`,
+          }}>
+            <span style={{
+              fontSize: 9.5, fontWeight: 600, letterSpacing: 0.6,
+              fontFamily: 'Geist Mono, monospace',
+              color: ALW.green,
+              border: `1px solid ${ALW.green}`,
+              padding: '3px 7px', borderRadius: 4, textAlign: 'center',
+              textTransform: 'uppercase', whiteSpace: 'nowrap',
+            }}>{c.note}</span>
+            <div style={{
+              color: ALW.textDim, fontSize: 11.5,
+              fontFamily: 'Geist Mono, monospace',
+            }}>
+              {c.date}
+            </div>
+            <div style={{
+              color: ALW.green, fontSize: 13, fontWeight: 500,
+              fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"',
+              textAlign: 'right',
+            }}>
+              +{fmtUsd(c.amount)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Phone>
+  );
+}
+
+// Reusable card for STO sections
+function SecCard({ title, children }) {
+  return (
+    <div style={{
+      margin: '16px 22px 0',
+      padding: '14px 16px',
+      background: ALW.panel,
+      border: `1px solid ${ALW.line}`,
+      borderRadius: 0,
+    }}>
+      <div style={{
+        color: ALW.textMute, fontSize: 10, letterSpacing: 1.4,
+        fontFamily: 'Geist Mono, monospace', fontWeight: 700, textTransform: 'uppercase',
+        paddingBottom: 10, borderBottom: `1px solid ${ALW.line}`,
+      }}>
+        {title}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 16, rowGap: 12, marginTop: 12 }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function SecStat({ label, value, color, align = 'left' }) {
+  return (
+    <div style={{ textAlign: align }}>
+      <div style={{ color: ALW.textDim, fontSize: 10.5, letterSpacing: 0.2, fontWeight: 500 }}>{label}</div>
+      <div style={{
+        color: color || ALW.text, fontSize: 13, fontWeight: 500, marginTop: 3,
+        fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"',
+      }}>{value}</div>
+    </div>
+  );
+}
+
+// Yield curve chart — like the balance chart but yield-axis, with maturity buckets.
+function YieldCurveChart({ series, baseline, lineColor, buckets, scrubIndex, onScrubChange }) {
+  const W = 350, H = 130;
+  const padTop = 24, padBot = 6;
+  const chartH = H - padTop - padBot;
+  const allVals = [...series, baseline];
+  const minV = Math.min(...allVals);
+  const maxV = Math.max(...allVals);
+  const valRange = (maxV - minV) || 1;
+  const padPx = valRange * 0.18;
+  const yMin = minV - padPx;
+  const yMax = maxV + padPx;
+  const yRange = yMax - yMin;
+  const xOf = (i) => (i / (series.length - 1)) * (W - 14);
+  const yOf = (v) => padTop + chartH - ((v - yMin) / yRange) * chartH;
+  const pathD = series.map((v, i) => `${i === 0 ? 'M' : 'L'}${xOf(i).toFixed(1)} ${yOf(v).toFixed(1)}`).join(' ');
+  const baselineY = yOf(baseline);
+  const endX = xOf(series.length - 1);
+  const endY = yOf(series[series.length - 1]);
+  const scrubbing = scrubIndex !== null;
+  const sX = scrubbing ? xOf(scrubIndex) : 0;
+  const sY = scrubbing ? yOf(series[scrubIndex]) : 0;
+
+  const svgRef = React.useRef(null);
+  const dragging = React.useRef(false);
+  const updateFromX = (clientX) => {
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+    const idx = Math.round((x / Math.max(1, rect.width)) * (series.length - 1));
+    onScrubChange(Math.max(0, Math.min(series.length - 1, idx)));
+  };
+  const handlers = {
+    onPointerDown: (e) => {
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+      dragging.current = true;
+      updateFromX(e.clientX);
+      e.preventDefault();
+    },
+    onPointerMove: (e) => { if (dragging.current) updateFromX(e.clientX); },
+    onPointerUp: () => { dragging.current = false; onScrubChange(null); },
+    onPointerCancel: () => { dragging.current = false; onScrubChange(null); },
+    onPointerLeave: () => { if (dragging.current) { dragging.current = false; onScrubChange(null); } },
+  };
+  return (
+    <div>
+      <div style={{ padding: '0 22px' }}>
+        <svg
+          ref={svgRef}
+          width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"
+          {...handlers}
+          style={{ display: 'block', touchAction: 'none', cursor: 'crosshair', userSelect: 'none', overflow: 'visible' }}
+        >
+          <line x1="0" y1={baselineY} x2={W} y2={baselineY}
+            stroke={ALW.textDim} strokeDasharray="2 5" strokeOpacity="0.45" strokeWidth="1"/>
+          <path d={pathD} stroke={lineColor} strokeWidth="2" fill="none"
+            strokeLinejoin="round" strokeLinecap="round"
+            style={{ transition: 'stroke 240ms ease' }}/>
+          {!scrubbing && (
+            <g>
+              <circle cx={endX} cy={endY} r="9" fill={lineColor} opacity="0.4">
+                <animate attributeName="r" values="3;14" dur="1.6s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.5;0" dur="1.6s" repeatCount="indefinite"/>
+              </circle>
+              <circle cx={endX} cy={endY} r="3.5" fill={lineColor}/>
+            </g>
+          )}
+          {scrubbing && (
+            <g>
+              <line x1={sX} y1={padTop - 6} x2={sX} y2={padTop + chartH + 2}
+                stroke={ALW.text} strokeWidth="1" strokeOpacity="0.45"/>
+              <circle cx={sX} cy={sY} r="6" fill={ALW.bg} stroke={lineColor} strokeWidth="2.5"/>
+            </g>
+          )}
+        </svg>
+      </div>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between',
+        padding: '6px 30px 0',
+        fontFamily: 'Geist Mono, monospace', fontSize: 9.5, color: ALW.textMute,
+        letterSpacing: 0.6, fontWeight: 600,
+      }}>
+        {buckets.map((b) => <span key={b}>{b}</span>)}
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, {
+  AlpexaSTODetailW,
+});
+
+</script>
+
+<!-- 6) Discover (AlpexaDiscoverW) -->
+<script type="text/babel" data-presets="react">
+// Alpexa Suisse — Trade / Markets screen.
+// Discovery-oriented. Search + category tabs + top movers + full market list.
+
+function AlpexaDiscoverW() {
+  const W = 390, H = 844;
+
+  const [tab, setTab] = React.useState('all');           // all | crypto | securities | watch
+  const [query, setQuery] = React.useState('');
+
+  // Build the rows the user sees, based on tab + query.
+  const rows = React.useMemo(() => {
+    let pool = [];
+    if (tab === 'securities') {
+      pool = PORTFOLIO.securities.map((s) => ({
+        kind: 'security', sym: s.sym, name: s.name, price: s.price, chg: 0,
+        secondary: `${s.apy.toFixed(1)}% APY`, seed: s.seed,
+      }));
+    } else if (tab === 'watch') {
+      // Use the user's holdings as the watchlist proxy
+      pool = PORTFOLIO.assets.map((a) => ({
+        kind: 'crypto', sym: a.sym, name: COIN_META[a.sym]?.name || a.sym,
+        price: a.price, chg: a.chg, seed: a.seed, stable: a.stable,
+      }));
+    } else if (tab === 'crypto') {
+      pool = MARKETS.map((m) => ({
+        kind: 'crypto', sym: m.sym, name: COIN_META[m.sym]?.name || m.sym,
+        price: m.price, chg: m.chg, seed: m.seed, stable: m.stable,
+      }));
+    } else {
+      // all
+      pool = [
+        ...MARKETS.map((m) => ({
+          kind: 'crypto', sym: m.sym, name: COIN_META[m.sym]?.name || m.sym,
+          price: m.price, chg: m.chg, seed: m.seed, stable: m.stable,
+        })),
+        ...PORTFOLIO.securities.map((s) => ({
+          kind: 'security', sym: s.sym, name: s.name, price: s.price, chg: 0,
+          secondary: `${s.apy.toFixed(1)}% APY`, seed: s.seed,
+        })),
+      ];
+    }
+    const q = query.trim().toLowerCase();
+    if (q) {
+      pool = pool.filter((r) =>
+        r.sym.toLowerCase().includes(q) ||
+        (r.name || '').toLowerCase().includes(q),
+      );
+    }
+    return pool;
+  }, [tab, query]);
+
+  // Top movers — biggest absolute %-movers in crypto universe
+  const movers = React.useMemo(() => {
+    return [...MARKETS]
+      .filter((m) => !m.stable)
+      .sort((a, b) => Math.abs(b.chg) - Math.abs(a.chg))
+      .slice(0, 5);
+  }, []);
+
+  return (
+    <Phone width={W} height={H} bg={ALW.bg} chrome={false}>
+      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 8 }} className="alpexa-hide-scrollbar">
+        <div style={{ height: 16 }}/>
+
+        {/* Header */}
+        <div style={{ padding: '12px 22px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{
+            color: ALW.text, fontSize: 22, fontWeight: 700, letterSpacing: -0.6,
+          }}>
+            Markets
+          </div>
+          <div style={{ width: 26, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="4" height="18" viewBox="0 0 4 18">
+              <circle cx="2" cy="2" r="1.6" fill={ALW.text}/>
+              <circle cx="2" cy="9" r="1.6" fill={ALW.text}/>
+              <circle cx="2" cy="16" r="1.6" fill={ALW.text}/>
+            </svg>
+          </div>
+        </div>
+
+        {/* Search */}
+        <div style={{ padding: '12px 22px 0' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            background: ALW.panel, border: `1px solid ${ALW.line}`,
+            borderRadius: 12, padding: '8px 12px',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ALW.textDim} strokeWidth="2">
+              <circle cx="11" cy="11" r="7"/>
+              <path d="m20 20-4-4"/>
+            </svg>
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by name or symbol"
+              style={{
+                flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                color: ALW.text, fontSize: 13.5, fontWeight: 500,
+              }}
+            />
+            {query && (
+              <div onClick={() => setQuery('')} style={{ cursor: 'pointer', display: 'flex' }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={ALW.textDim} strokeWidth="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{
+          padding: '14px 22px 0',
+          display: 'flex', gap: 6, overflowX: 'auto',
+        }} className="alpexa-hide-scrollbar">
+          {[
+            { id: 'all', label: 'All' },
+            { id: 'crypto', label: 'Crypto' },
+            { id: 'securities', label: 'Securities' },
+            { id: 'watch', label: 'Watchlist' },
+          ].map((t) => {
+            const active = t.id === tab;
+            return (
+              <div
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                style={{
+                  padding: '6px 12px',
+                  background: active ? ALW.text : 'transparent',
+                  color: active ? ALW.bg : ALW.textDim,
+                  border: active ? 'none' : `1px solid ${ALW.line}`,
+                  borderRadius: 999,
+                  fontSize: 12, fontWeight: 600, letterSpacing: 0.1,
+                  whiteSpace: 'nowrap', cursor: 'pointer',
+                }}
+              >{t.label}</div>
+            );
+          })}
+        </div>
+
+        {/* Top movers — only shown when not searching and not Securities/Watchlist */}
+        {!query && (tab === 'all' || tab === 'crypto') && (
+          <div style={{ marginTop: 22 }}>
+            <div style={{
+              padding: '0 22px 8px',
+              color: ALW.textMute, fontSize: 11,
+              fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2, fontWeight: 600,
+              textTransform: 'uppercase',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+            }}>
+              <span>Top movers · 24h</span>
+              <span style={{ fontSize: 10 }}>{movers.length}</span>
+            </div>
+            <div style={{
+              display: 'flex', gap: 10,
+              padding: '0 22px',
+              overflowX: 'auto',
+            }} className="alpexa-hide-scrollbar">
+              {movers.map((m) => (
+                <a key={m.sym} href={`Coin Detail.html?sym=${m.sym}`} style={{
+                  flexShrink: 0, width: 140,
+                  background: ALW.panel, border: `1px solid ${ALW.line}`, borderRadius: 14,
+                  padding: '12px 14px',
+                  textDecoration: 'none', color: 'inherit',
+                  display: 'flex', flexDirection: 'column', gap: 6,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{
+                      color: ALW.text, fontSize: 12.5, fontWeight: 600,
+                      fontFamily: 'Geist Mono, monospace',
+                    }}>{m.sym}</span>
+                    <span style={{
+                      color: m.chg >= 0 ? ALW.green : ALW.red,
+                      fontSize: 10.5, fontWeight: 600, fontFamily: 'Geist Mono, monospace',
+                      fontFeatureSettings: '"tnum"',
+                    }}>{fmtPct(m.chg)}</span>
+                  </div>
+                  <Spark seed={m.seed} pct={m.chg} w={112} h={28}
+                    color={m.chg >= 0 ? ALW.green : ALW.red} strokeWidth={1.4}/>
+                  <div style={{
+                    color: ALW.text, fontSize: 12.5, fontWeight: 500,
+                    fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"',
+                  }}>
+                    {m.price < 10 ? `$${m.price.toFixed(4)}` : fmtUsd(m.price)}
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Markets list */}
+        <div style={{ marginTop: 22, padding: '0 22px' }}>
+          <div style={{
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
+            paddingBottom: 8, marginBottom: 4, borderBottom: `1px solid ${ALW.line}`,
+          }}>
+            <div style={{
+              color: ALW.textMute, fontSize: 11,
+              fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2, fontWeight: 600,
+              textTransform: 'uppercase',
+            }}>
+              {tab === 'watch' ? 'Watchlist' : tab === 'securities' ? 'Securities' : tab === 'crypto' ? 'Crypto' : 'All markets'}
+            </div>
+            <div style={{
+              color: ALW.textMute, fontSize: 11,
+              fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2, fontWeight: 600,
+              textTransform: 'uppercase',
+            }}>
+              {rows.length} {rows.length === 1 ? 'item' : 'items'}
+            </div>
+          </div>
+          {rows.length === 0 ? (
+            <div style={{ color: ALW.textDim, fontSize: 13, textAlign: 'center', padding: '32px 0' }}>
+              No markets match your search.
+            </div>
+          ) : rows.map((r, i) => (
+            <a
+              key={`${r.kind}-${r.sym}`}
+              href={r.kind === 'security' ? `STO Detail.html?sym=${r.sym}` : `Coin Detail.html?sym=${r.sym}`}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 60px 1fr',
+                alignItems: 'center',
+                columnGap: 12,
+                padding: '13px 0',
+                borderTop: i === 0 ? 'none' : `1px solid ${ALW.lineSoft}`,
+                textDecoration: 'none', color: 'inherit',
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{
+                  color: ALW.text, fontSize: 14, fontWeight: 500, letterSpacing: -0.1, lineHeight: 1.2,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {r.name}
+                </div>
+                <div style={{
+                  color: ALW.textDim, fontSize: 10.5,
+                  fontFamily: 'Geist Mono, monospace', marginTop: 3, letterSpacing: 0.2,
+                }}>
+                  {r.sym}{r.secondary ? ` · ${r.secondary}` : ''}
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                {r.kind === 'crypto' ? (
+                  <Spark
+                    seed={r.seed}
+                    pct={r.chg}
+                    w={56}
+                    h={20}
+                    color={r.stable ? ALW.textMute : r.chg >= 0 ? ALW.green : ALW.red}
+                    strokeWidth={1.5}
+                  />
+                ) : (
+                  <div style={{
+                    color: ALW.text, fontSize: 9.5, fontWeight: 600,
+                    fontFamily: 'Geist Mono, monospace', letterSpacing: 0.6,
+                    border: `1px solid ${ALW.line}`, padding: '3px 6px', borderRadius: 4,
+                    whiteSpace: 'nowrap',
+                  }}>
+                    STO
+                  </div>
+                )}
+              </div>
+              <div style={{ textAlign: 'right', fontFamily: 'Geist Mono, monospace' }}>
+                <div style={{
+                  color: ALW.text, fontSize: 13, fontWeight: 500,
+                  fontFeatureSettings: '"tnum"', lineHeight: 1.15,
+                }}>
+                  {r.price < 10 ? `$${r.price.toFixed(4)}` : fmtUsd(r.price)}
+                </div>
+                <div style={{
+                  color: r.kind === 'security' ? ALW.textDim : r.stable ? ALW.textDim : r.chg >= 0 ? ALW.green : ALW.red,
+                  fontSize: 10.5, marginTop: 2,
+                  fontFeatureSettings: '"tnum"',
+                }}>
+                  {r.kind === 'security' ? 'Fixed' : r.stable ? '—' : fmtPct(r.chg)}
+                </div>
+              </div>
+            </a>
+          ))}
+        </div>
+      </div>
+
+      <AlpexaTabBarW active={2}/>
+    </Phone>
+  );
+}
+
+Object.assign(window, {
+  AlpexaDiscoverW,
+});
+
+</script>
+
+<!-- 7) Coin Detail (AlpexaCoinDetailW) -->
+<script type="text/babel" data-presets="react">
+// Alpexa Suisse — Coin Detail (drill-in from Dashboard tap).
+// Reuses the heavy machinery from screens-alpexa-white.jsx
+// (LiveBalanceChart, useLiveTick, Odometer, useTickDirection, etc.).
+
+function AlpexaCoinDetailW({ symbol = 'BTC', simple = false }) {
+  const W = 390, H = 844;
+  const asset = PORTFOLIO.assets.find((a) => a.sym === symbol);
+  if (!asset) return null;
+
+  // Local alerts state — seeded from PORTFOLIO, mutated via the +New flow.
+  const [alerts, setAlerts] = React.useState(asset.alerts || []);
+  const [showNewAlert, setShowNewAlert] = React.useState(false);
+  const [newAlertTarget, setNewAlertTarget] = React.useState('');
+  const [newAlertDirection, setNewAlertDirection] = React.useState('above');
+  const [newAlertNote, setNewAlertNote] = React.useState('');
+
+  // Remember the last viewed symbol so the Trade tab returns to it.
+  React.useEffect(() => {
+    try { localStorage.setItem('alpexa.lastSymbol', asset.sym); } catch (_) {}
+  }, [asset.sym]);
+
+  // Live ticking price (the asset's market price, not the user's mine value)
+  const livePrice = useLiveTick(asset.price, {
+    tickPeriod: 2000,
+    volatility: Math.max(0.5, asset.price * 0.0005),
+  });
+  const direction = useTickDirection(livePrice);
+
+  // Range + scrubbing — same architecture as the Dashboard balance chart.
+  const [range, setRange] = React.useState('1D');
+  const [scrubIndex, setScrubIndex] = React.useState(null);
+  const isScrubbing = scrubIndex !== null;
+
+  const seriesOpen = React.useMemo(() => {
+    if (range === '1D') return asset.price / (1 + asset.chg / 100);
+    return asset.price * RANGE_OPEN_MULT[range];
+  }, [range, asset.price, asset.chg]);
+
+  const baseHistory = React.useMemo(
+    () => generateIntraday(seriesOpen, asset.price, 80, (RANGE_SEEDS[range] || 1) ^ asset.seed),
+    [seriesOpen, range, asset.price, asset.seed],
+  );
+  const chartSeries = React.useMemo(
+    () => [...baseHistory.slice(0, -1), livePrice],
+    [baseHistory, livePrice],
+  );
+  const displayPrice = isScrubbing ? chartSeries[scrubIndex] : livePrice;
+  const periodChange = displayPrice - seriesOpen;
+  const periodPct = (periodChange / seriesOpen) * 100;
+  const isUp = periodChange >= 0;
+  const accent = isUp ? ALW.green : ALW.red;
+  const flashColor = isScrubbing
+    ? ALW.text
+    : direction === 'up' ? ALW.green : direction === 'down' ? ALW.red : ALW.text;
+  const periodCaption = isScrubbing
+    ? getScrubTimeLabel(range, scrubIndex, chartSeries.length)
+    : RANGE_LABEL[range];
+
+  // Live-ticking bid/ask spread (small wiggle around the base spread)
+  const baseSpreadBps = asset.spreadBps || 0.4;
+  const liveSpreadBps = useLiveTick(baseSpreadBps, {
+    tickPeriod: 900,
+    volatility: Math.max(0.08, baseSpreadBps * 0.18),
+    mountDuration: 600,
+  });
+  const liveBid = livePrice * (1 - liveSpreadBps / 20000);
+  const liveAsk = livePrice * (1 + liveSpreadBps / 20000);
+  const [spreadOpen, setSpreadOpen] = React.useState(false);
+  const marketValue = livePrice * asset.qty;
+  const unrealized = marketValue - asset.invested;
+  const returnPct = (unrealized / asset.invested) * 100;
+  const pctOfPortfolio = (marketValue / PORTFOLIO.balance) * 100;
+  const isProfitable = unrealized >= 0;
+  const posColor = isProfitable ? ALW.green : ALW.red;
+
+  // Series stats for OHL
+  const ohlOpen = chartSeries[0];
+  const ohlHigh = Math.max(...chartSeries);
+  const ohlLow  = Math.min(...chartSeries);
+
+  return (
+    <Phone width={W} height={H} bg={ALW.bg} chrome={false}>
+      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }} className="alpexa-hide-scrollbar">
+      <div style={{ height: 16 }}/>
+
+      {/* Header — back, coin name, share */}
+      <div style={{ padding: '12px 18px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <a href="Dashboard.html" style={{
+          width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          textDecoration: 'none', cursor: 'pointer',
+        }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ALW.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 6 L9 12 L15 18"/>
+          </svg>
+        </a>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={ALW.text} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.7 21a2 2 0 0 1-3.4 0"/>
+            </svg>
+          </div>
+          <div style={{ width: 26, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="4" height="18" viewBox="0 0 4 18">
+              <circle cx="2" cy="2" r="1.6" fill={ALW.text}/>
+              <circle cx="2" cy="9" r="1.6" fill={ALW.text}/>
+              <circle cx="2" cy="16" r="1.6" fill={ALW.text}/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      {/* Data freshness strip — full detail only */}
+      {!simple && <DataFreshnessB/>}
+
+      {/* Hero: ticker > name > price > change — terminal style, mono-leaning */}
+      <div style={{ padding: '14px 22px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+          <div style={{
+            fontSize: 13, fontWeight: 700, letterSpacing: 1.4,
+            fontFamily: 'Geist Mono, monospace', textTransform: 'uppercase',
+          }}>
+            <span style={{ color: ALW.text }}>{asset.sym}</span>
+            <span style={{ color: ALW.textMute, fontWeight: 500, margin: '0 6px' }}>/</span>
+            <span style={{ color: ALW.textMute, fontWeight: 500 }}>USD</span>
+          </div>
+        </div>
+        <div style={{
+          fontSize: 42, fontWeight: 600, letterSpacing: -1.4, marginTop: 10, lineHeight: 1.02,
+          color: flashColor,
+          transition: 'color 260ms ease',
+          fontFamily: 'Geist Mono, monospace',
+        }}>
+          <Odometer value={displayPrice} decimals={2}/>
+        </div>
+        <div className="alpexa-color-shift" style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, color: accent }}>
+          <span style={{
+            fontSize: 12, fontWeight: 600, fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"',
+            display: 'flex', alignItems: 'center', gap: 5,
+          }}>
+            <svg width="9" height="9" viewBox="0 0 10 10" className="alpexa-color-shift">
+              <path d={isUp ? "M5 1 L9 8 L1 8 Z" : "M5 9 L1 2 L9 2 Z"} fill={accent}/>
+            </svg>
+            {fmtUsd(Math.abs(periodChange))}
+          </span>
+          <span style={{ fontSize: 12, fontWeight: 600, fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"' }}>
+            {fmtPct(periodPct)}
+          </span>
+        </div>
+      </div>
+
+      {/* Chart — full Robinhood-style with scrubbing, baseline, OHL */}
+      <div style={{ marginTop: 14 }}>
+        <LiveBalanceChart
+          series={chartSeries}
+          baseline={seriesOpen}
+          lineColor={accent}
+          range={range}
+          onRangeChange={setRange}
+          scrubIndex={scrubIndex}
+          onScrubChange={setScrubIndex}
+          height={240}
+        />
+      </div>
+
+      {/* Stat strip — institutional terminal feel, label-above-value layout */}
+      <div style={{
+        margin: '14px 22px 0',
+        padding: '12px 14px',
+        background: ALW.bg,
+        border: `1px solid ${ALW.line}`,
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        columnGap: 16, rowGap: 12,
+      }}>
+        {[
+          ['Open',    fmtUsd(ohlOpen),                                                '#9A9A9A'],
+          ['High',    fmtUsd(ohlHigh),                                                '#9A9A9A'],
+          ['Low',     fmtUsd(ohlLow),                                                 '#9A9A9A'],
+          ['Vol 24h', fmtCompact(asset.vol24h || 0),                                  '#6E6E6E'],
+          ['VWAP',    fmtUsd((ohlOpen + ohlHigh + ohlLow + livePrice) / 4),           '#9A9A9A'],
+          ['Spread',  `${liveSpreadBps.toFixed(2)} bps`,                              '#6E6E6E'],
+        ].map(([k, v, c]) => (
+          <div key={k} style={{ minWidth: 0 }}>
+            <div style={{
+              color: ALW.textMute, fontSize: 9, letterSpacing: 1, fontWeight: 700,
+              fontFamily: 'Geist Mono, monospace', textTransform: 'uppercase',
+              whiteSpace: 'nowrap',
+            }}>{k}</div>
+            <div style={{
+              color: c, fontSize: 12, fontWeight: 600, marginTop: 3,
+              fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>{v}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* My Position quick line — only when user holds this asset */}
+      {asset.qty > 0 && (
+        <div style={{
+          margin: '12px 22px 0',
+          padding: '12px 14px',
+          background: ALW.bg,
+          border: `1px solid ${ALW.line}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+        }}>
+          <div>
+            <div style={{
+              color: ALW.textMute, fontSize: 10, letterSpacing: 1.4,
+              fontFamily: 'Geist Mono, monospace', fontWeight: 700, textTransform: 'uppercase',
+            }}>
+              You own
+            </div>
+            <div style={{
+              color: '#9A9A9A', fontSize: 13, fontWeight: 500, marginTop: 2,
+              fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"',
+            }}>
+              {asset.qty.toFixed(4)} {asset.sym}
+            </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{
+              color: '#9A9A9A', fontSize: 14, fontWeight: 600,
+              fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"',
+            }}>
+              {fmtUsd(marketValue)}
+            </div>
+            <div style={{
+              color: isProfitable ? ALW.green : ALW.red,
+              fontSize: 11, fontWeight: 500, marginTop: 2,
+              fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"',
+            }}>
+              {isProfitable ? '+' : ''}{fmtUsd(unrealized)} ({isProfitable ? '+' : ''}{returnPct.toFixed(2)}%)
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* — Your position card */}
+      {!simple && (
+      <div style={{
+        margin: '20px 22px 0',
+        padding: '14px 16px',
+        background: ALW.panel,
+        border: `1px solid ${ALW.line}`,
+        borderRadius: 0,
+      }}>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end',
+          paddingBottom: 10, borderBottom: `1px solid ${ALW.line}`,
+        }}>
+          <div style={{
+            color: ALW.textMute, fontSize: 10, letterSpacing: 1.4,
+            fontFamily: 'Geist Mono, monospace', fontWeight: 700, textTransform: 'uppercase',
+          }}>
+            Your position
+          </div>
+          <div style={{
+            color: ALW.textMute, fontSize: 10, letterSpacing: 1.2,
+            fontFamily: 'Geist Mono, monospace', fontWeight: 600,
+          }}>
+            {pctOfPortfolio.toFixed(1)}% of portfolio
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 16, rowGap: 12, marginTop: 12 }}>
+          <Stat label="Holdings" value={`${asset.qty.toFixed(4)} ${asset.sym}`}/>
+          <Stat label="Market value" value={fmtUsd(marketValue)} align="right"/>
+          <Stat label="Avg buy price" value={fmtUsd(asset.avgBuy)}/>
+          <Stat label="Total invested" value={fmtUsd(asset.invested)} align="right"/>
+          <Stat label="Unrealized P&L" value={`${isProfitable ? '+' : ''}${fmtUsd(unrealized)}`} color={posColor}/>
+          <Stat label="Return" value={`${isProfitable ? '+' : ''}${returnPct.toFixed(2)}%`} color={posColor} align="right"/>
+        </div>
+        {/* Allocation bar */}
+        <div style={{ marginTop: 14 }}>
+          <div style={{ height: 4, background: ALW.line, borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{
+              width: `${Math.min(100, pctOfPortfolio)}%`,
+              height: '100%', background: ALW.green,
+            }}/>
+          </div>
+        </div>
+      </div>
+      )}
+
+      {/* — Market liquidity card — */}
+      {!simple && (
+      <div style={{
+        margin: '16px 22px 0',
+        padding: '14px 16px',
+        background: ALW.panel,
+        border: `1px solid ${ALW.line}`,
+        borderRadius: 0,
+      }}>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end',
+          paddingBottom: 10, borderBottom: `1px solid ${ALW.line}`,
+        }}>
+          <div style={{
+            color: ALW.textMute, fontSize: 10, letterSpacing: 1.4,
+            fontFamily: 'Geist Mono, monospace', fontWeight: 700, textTransform: 'uppercase',
+          }}>
+            Market liquidity
+          </div>
+          {(() => {
+            // Decide exit-quality indicator
+            const ratio = marketValue / (asset.depth1pct || 1);
+            const easy = ratio < 0.05;
+            const moderate = ratio >= 0.05 && ratio < 0.25;
+            const slip = ratio >= 0.25;
+            const label = easy ? 'Exit · Easy' : moderate ? 'Exit · Moderate' : 'Exit · May slip';
+            const c = easy ? ALW.green : moderate ? '#B8860B' : ALW.red;
+            return (
+              <div style={{
+                color: c, fontSize: 10, fontWeight: 600,
+                fontFamily: 'Geist Mono, monospace', letterSpacing: 0.8,
+                textTransform: 'uppercase',
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}>
+                <span style={{ width: 5, height: 5, borderRadius: 3, background: c }}/>
+                {label}
+              </div>
+            );
+          })()}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 16, rowGap: 12, marginTop: 12 }}>
+          <Stat label="24h volume" value={fmtCompact(asset.vol24h)}/>
+          <Stat label="Bid–ask spread" value={`${asset.spreadBps.toFixed(1)} bps`} align="right"/>
+          <Stat label="Depth (±1%)" value={fmtCompact(asset.depth1pct)}/>
+          <Stat label="Your size" value={`${((marketValue / asset.depth1pct) * 100).toFixed(2)}% of depth`} align="right"/>
+        </div>
+      </div>
+      )}
+
+      {/* — Price alerts card — */}
+      {!simple && (
+      <div style={{
+        margin: '16px 22px 0',
+        padding: '14px 16px',
+        background: ALW.panel,
+        border: `1px solid ${ALW.line}`,
+        borderRadius: 0,
+      }}>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end',
+          paddingBottom: 10, borderBottom: `1px solid ${ALW.line}`,
+        }}>
+          <div style={{
+            color: ALW.textMute, fontSize: 10, letterSpacing: 1.4,
+            fontFamily: 'Geist Mono, monospace', fontWeight: 700, textTransform: 'uppercase',
+          }}>
+            Price alerts
+          </div>
+          <div
+            onClick={() => setShowNewAlert(true)}
+            style={{
+              color: ALW.text, fontSize: 10.5, fontWeight: 600,
+              fontFamily: 'Geist Mono, monospace', letterSpacing: 0.6,
+              textTransform: 'uppercase',
+              border: `1px solid ${ALW.line}`, padding: '4px 9px', borderRadius: 4,
+              display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer',
+            }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={ALW.text} strokeWidth="2.4" strokeLinecap="round">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+            New
+          </div>
+        </div>
+        {alerts.length === 0 ? (
+          <div style={{
+            color: ALW.textDim, fontSize: 12, padding: '14px 0 4px',
+            textAlign: 'center',
+          }}>
+            No price alerts set
+          </div>
+        ) : (
+          alerts.map((al, idx) => {
+            const distance = ((al.target - livePrice) / livePrice) * 100;
+            const triggered = al.direction === 'above' ? livePrice >= al.target : livePrice <= al.target;
+            const c = triggered ? ALW.green : al.active ? ALW.text : ALW.textMute;
+            return (
+              <div key={idx} style={{
+                display: 'grid', gridTemplateColumns: 'auto 1fr auto',
+                alignItems: 'center', columnGap: 12,
+                padding: '11px 0',
+                borderTop: idx === 0 ? 'none' : `1px solid ${ALW.lineSoft}`,
+              }}>
+                {/* direction arrow */}
+                <div style={{
+                  width: 28, height: 28, borderRadius: 14,
+                  background: ALW.bg, border: `1px solid ${ALW.line}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <svg width="12" height="12" viewBox="0 0 10 10">
+                    <path
+                      d={al.direction === 'above' ? 'M5 1 L9 8 L1 8 Z' : 'M5 9 L1 2 L9 2 Z'}
+                      fill={triggered ? ALW.green : al.active ? ALW.text : ALW.textMute}
+                    />
+                  </svg>
+                </div>
+                {/* target + note */}
+                <div>
+                  <div style={{
+                    color: c, fontSize: 13, fontWeight: 500,
+                    fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"',
+                  }}>
+                    {al.direction === 'above' ? '≥' : '≤'} {fmtUsd(al.target)}
+                    <span style={{ color: ALW.textDim, fontWeight: 400, marginLeft: 8 }}>
+                      {al.note}
+                    </span>
+                  </div>
+                  <div style={{
+                    color: ALW.textDim, fontSize: 10.5, marginTop: 2,
+                    fontFamily: 'Geist Mono, monospace',
+                  }}>
+                    {triggered ? 'Triggered' : `${Math.abs(distance).toFixed(1)}% ${distance >= 0 ? 'above' : 'below'} current`}
+                  </div>
+                </div>
+                {/* status pill */}
+                <div style={{
+                  color: triggered ? ALW.green : al.active ? ALW.text : ALW.textMute,
+                  fontSize: 9, fontWeight: 600, letterSpacing: 0.8,
+                  fontFamily: 'Geist Mono, monospace', textTransform: 'uppercase',
+                  border: `1px solid ${triggered ? ALW.green : al.active ? ALW.line : ALW.line}`,
+                  padding: '3px 7px', borderRadius: 4,
+                }}>
+                  {triggered ? 'Hit' : al.active ? 'Active' : 'Paused'}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+      )}
+
+      {/* Transaction history */}
+      {!simple && (
+      <div style={{ padding: '20px 22px 16px' }}>
+        <div style={{
+          color: ALW.textMute, fontSize: 11,
+          fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2, fontWeight: 600,
+          textTransform: 'uppercase', marginBottom: 8, paddingBottom: 8,
+          borderBottom: `1px solid ${ALW.line}`,
+          display: 'flex', justifyContent: 'space-between',
+        }}>
+          <span>Transactions</span>
+          <span>{asset.txs.length} entries</span>
+        </div>
+        {asset.txs.map((tx, i) => (
+          <div key={i} style={{
+            display: 'grid', gridTemplateColumns: '60px 1fr auto',
+            alignItems: 'center', columnGap: 12,
+            padding: '11px 0',
+            borderTop: i === 0 ? 'none' : `1px solid ${ALW.lineSoft}`,
+          }}>
+            <span style={{
+              fontSize: 9.5, fontWeight: 600, letterSpacing: 0.6,
+              fontFamily: 'Geist Mono, monospace',
+              color: tx.type === 'Buy' ? ALW.green : ALW.red,
+              border: `1px solid ${tx.type === 'Buy' ? ALW.green : ALW.red}`,
+              padding: '3px 7px', borderRadius: 4, textAlign: 'center',
+              textTransform: 'uppercase',
+            }}>{tx.type}</span>
+            <div>
+              <div style={{
+                color: ALW.text, fontSize: 12.5, fontWeight: 500,
+                fontFamily: 'Geist Mono, monospace',
+              }}>
+                {tx.qty} {asset.sym}
+              </div>
+              <div style={{ color: ALW.textDim, fontSize: 10.5, marginTop: 2 }}>
+                @ {fmtUsd(tx.price)}
+              </div>
+            </div>
+            <div style={{
+              color: ALW.textDim, fontSize: 10.5,
+              fontFamily: 'Geist Mono, monospace', textAlign: 'right',
+            }}>
+              {tx.when}
+            </div>
+          </div>
+        ))}
+      </div>
+      )}
+      </div>
+
+      {/* Sticky bottom Sell / Buy split with mid-spread indicator */}
+      <div style={{
+        padding: '0 0 16px',
+        background: ALW.bg,
+        borderTop: `1px solid ${ALW.line}`,
+        display: 'flex', alignItems: 'stretch', gap: 0, flexShrink: 0,
+      }}>
+        <div style={{
+          flex: 1,
+          background: ALW.panel, color: ALW.text,
+          padding: '14px 10px', textAlign: 'center',
+          fontSize: 14, fontWeight: 600, cursor: 'pointer',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+        }}>
+          <span>Sell</span>
+          <span style={{
+            color: '#6E6E6E', fontWeight: 500, fontSize: 11,
+            fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"',
+          }}>{fmtUsd(liveBid)}</span>
+        </div>
+        <div
+          onClick={() => setSpreadOpen((s) => !s)}
+          style={{
+            width: 72, padding: '6px 0', textAlign: 'center',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+            background: spreadOpen ? ALW.panel2 : ALW.bg,
+            borderLeft: `1px solid ${ALW.line}`,
+            borderRight: `1px solid ${ALW.line}`,
+            transition: 'background 200ms ease',
+          }}
+        >
+          <div style={{
+            color: ALW.textMute, fontSize: 9, letterSpacing: 0.8, fontWeight: 700,
+            fontFamily: 'Geist Mono, monospace', textTransform: 'uppercase',
+          }}>Spread</div>
+          <div style={{
+            color: '#9A9A9A', fontSize: 12, fontWeight: 600, marginTop: 3,
+            fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"',
+          }}>{liveSpreadBps.toFixed(2)} bps</div>
+        </div>
+        <a href={`Order.html?sym=${asset.sym}`} style={{
+          flex: 1,
+          background: ALW.green, color: '#000',
+          padding: '14px 10px', textAlign: 'center',
+          fontSize: 14, fontWeight: 700, textDecoration: 'none',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+        }}>
+          <span>Buy</span>
+          <span style={{
+            opacity: 0.7, fontWeight: 600, fontSize: 11,
+            fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"',
+          }}>{fmtUsd(liveAsk)}</span>
+        </a>
+      </div>
+
+      {/* Expanded spread detail — bid / mid / ask */}
+      {spreadOpen && (
+        <div style={{
+          padding: '10px 16px 14px',
+          background: ALW.bg,
+          borderTop: `1px solid ${ALW.line}`,
+          flexShrink: 0,
+        }}>
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+            background: ALW.panel, border: `1px solid ${ALW.line}`,
+            borderRadius: 10, padding: '10px 12px',
+          }}>
+            <div>
+              <div style={{
+                color: ALW.textMute, fontSize: 9.5, letterSpacing: 0.8, fontWeight: 700,
+                fontFamily: 'Geist Mono, monospace', textTransform: 'uppercase',
+              }}>Bid</div>
+              <div style={{
+                color: ALW.red, fontSize: 13, fontWeight: 600, marginTop: 3,
+                fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"',
+              }}>{fmtUsd(liveBid)}</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{
+                color: ALW.textMute, fontSize: 9.5, letterSpacing: 0.8, fontWeight: 700,
+                fontFamily: 'Geist Mono, monospace', textTransform: 'uppercase',
+              }}>Mid</div>
+              <div style={{
+                color: ALW.text, fontSize: 13, fontWeight: 600, marginTop: 3,
+                fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"',
+              }}>{fmtUsd(livePrice)}</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{
+                color: ALW.textMute, fontSize: 9.5, letterSpacing: 0.8, fontWeight: 700,
+                fontFamily: 'Geist Mono, monospace', textTransform: 'uppercase',
+              }}>Ask</div>
+              <div style={{
+                color: ALW.green, fontSize: 13, fontWeight: 600, marginTop: 3,
+                fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"',
+              }}>{fmtUsd(liveAsk)}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab bar — only on Trade tab (simple mode) */}
+      {simple && <AlpexaTabBarW active={1}/>}
+
+      {/* New alert modal — anchored to phone, bottom-sheet style */}
+      {showNewAlert && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 200,
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        }} onClick={() => setShowNewAlert(false)}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              background: '#0E0E0E',
+              borderTopLeftRadius: 24, borderTopRightRadius: 24,
+              padding: '14px 22px 22px',
+              boxShadow: '0 -20px 60px rgba(0,0,0,0.5)',
+            }}
+          >
+            {/* drag handle */}
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+              <div style={{ width: 38, height: 4, borderRadius: 2, background: '#3a3a3a' }}/>
+            </div>
+            <div style={{
+              color: ALW.text, fontSize: 18, fontWeight: 600, letterSpacing: -0.3,
+              marginBottom: 4,
+            }}>
+              New price alert
+            </div>
+            <div style={{
+              color: ALW.textDim, fontSize: 12, marginBottom: 18,
+            }}>
+              Notify me when {asset.sym} crosses a level
+            </div>
+
+            {/* Direction toggle */}
+            <div style={{
+              color: ALW.textMute, fontSize: 10, letterSpacing: 1.2, fontWeight: 700,
+              fontFamily: 'Geist Mono, monospace', textTransform: 'uppercase', marginBottom: 6,
+            }}>Direction</div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+              {['above', 'below'].map((dir) => (
+                <div
+                  key={dir}
+                  onClick={() => setNewAlertDirection(dir)}
+                  style={{
+                    flex: 1, padding: '10px 0', textAlign: 'center',
+                    background: newAlertDirection === dir ? ALW.text : ALW.panel,
+                    color: newAlertDirection === dir ? ALW.bg : ALW.text,
+                    border: newAlertDirection === dir ? 'none' : `1px solid ${ALW.line}`,
+                    borderRadius: 10, fontSize: 13, fontWeight: 600,
+                    cursor: 'pointer', textTransform: 'capitalize',
+                  }}
+                >
+                  {dir === 'above' ? '▲ Above' : '▼ Below'}
+                </div>
+              ))}
+            </div>
+
+            {/* Target price */}
+            <div style={{
+              color: ALW.textMute, fontSize: 10, letterSpacing: 1.2, fontWeight: 700,
+              fontFamily: 'Geist Mono, monospace', textTransform: 'uppercase', marginBottom: 6,
+            }}>Target price · USD</div>
+            <input
+              type="number"
+              value={newAlertTarget}
+              onChange={(e) => setNewAlertTarget(e.target.value)}
+              placeholder={`e.g. ${(asset.price * 1.05).toFixed(0)}`}
+              style={{
+                width: '100%', padding: '12px 14px', marginBottom: 14,
+                background: ALW.panel, border: `1px solid ${ALW.line}`,
+                borderRadius: 10, outline: 'none',
+                color: ALW.text, fontSize: 15, fontWeight: 600,
+                fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"',
+              }}
+            />
+
+            {/* Note */}
+            <div style={{
+              color: ALW.textMute, fontSize: 10, letterSpacing: 1.2, fontWeight: 700,
+              fontFamily: 'Geist Mono, monospace', textTransform: 'uppercase', marginBottom: 6,
+            }}>Note (optional)</div>
+            <input
+              type="text"
+              value={newAlertNote}
+              onChange={(e) => setNewAlertNote(e.target.value)}
+              placeholder="e.g. Take profit"
+              style={{
+                width: '100%', padding: '12px 14px', marginBottom: 20,
+                background: ALW.panel, border: `1px solid ${ALW.line}`,
+                borderRadius: 10, outline: 'none',
+                color: ALW.text, fontSize: 14, fontWeight: 500,
+              }}
+            />
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div
+                onClick={() => {
+                  setShowNewAlert(false);
+                  setNewAlertTarget('');
+                  setNewAlertNote('');
+                  setNewAlertDirection('above');
+                }}
+                style={{
+                  flex: 1, padding: '14px 0', textAlign: 'center',
+                  background: ALW.panel, color: ALW.text,
+                  border: `1px solid ${ALW.line}`, borderRadius: 999,
+                  fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                }}
+              >Cancel</div>
+              <div
+                onClick={() => {
+                  const target = parseFloat(newAlertTarget);
+                  if (!isFinite(target) || target <= 0) return;
+                  setAlerts((prev) => [{
+                    direction: newAlertDirection,
+                    target,
+                    active: true,
+                    note: newAlertNote.trim() || 'Custom alert',
+                  }, ...prev]);
+                  setShowNewAlert(false);
+                  setNewAlertTarget('');
+                  setNewAlertNote('');
+                  setNewAlertDirection('above');
+                }}
+                style={{
+                  flex: 1, padding: '14px 0', textAlign: 'center',
+                  background: ALW.text, color: ALW.bg,
+                  borderRadius: 999,
+                  fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                  opacity: newAlertTarget && parseFloat(newAlertTarget) > 0 ? 1 : 0.5,
+                }}
+              >Create alert</div>
+            </div>
+          </div>
+        </div>
+      )}
+    </Phone>
+  );
+}
+
+function Stat({ label, value, color, align = 'left' }) {
+  return (
+    <div style={{ textAlign: align }}>
+      <div style={{
+        color: ALW.textDim, fontSize: 10.5,
+        letterSpacing: 0.2, fontWeight: 500,
+      }}>{label}</div>
+      <div style={{
+        color: color || ALW.text, fontSize: 13, fontWeight: 500, marginTop: 3,
+        fontFamily: 'Geist Mono, monospace', fontFeatureSettings: '"tnum"',
+      }}>{value}</div>
+    </div>
+  );
+}
+
+function ActionBtn({ label, primary }) {
+  return (
+    <div style={{
+      flex: 1, padding: '11px 0', textAlign: 'center',
+      background: primary ? ALW.text : ALW.panel,
+      color: primary ? ALW.bg : ALW.text,
+      border: primary ? 'none' : `1px solid ${ALW.line}`,
+      borderRadius: 10,
+      fontSize: 13, fontWeight: 600,
+    }}>{label}</div>
+  );
+}
+
+// Data freshness — small pulsing dot + "Xs ago" — designed to sit inside
+// the OHL bar so the freshness signal lives with the data it qualifies.
+function FreshnessDot() {
+  const [now, setNow] = React.useState(() => new Date());
+  const lastUpdate = React.useRef(new Date());
+  React.useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  React.useEffect(() => {
+    const id = setInterval(() => {
+      lastUpdate.current = new Date();
+      setNow(new Date());
+    }, 3400);
+    return () => clearInterval(id);
+  }, []);
+  const ageSec = Math.max(0, Math.floor((now - lastUpdate.current) / 1000));
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 5,
+      fontFamily: 'Geist Mono, monospace', fontSize: 9.5,
+      color: ALW.textMute, textTransform: 'uppercase', fontWeight: 600, letterSpacing: 0.6,
+      flexShrink: 0,
+    }}>
+      <span
+        className="alpexa-pulse-dot"
+        style={{
+          width: 5, height: 5, borderRadius: 3,
+          background: ageSec < 5 ? ALW.green : ageSec < 30 ? '#B8860B' : ALW.red,
+        }}
+      />
+      {ageSec}s
+    </div>
+  );
+}
+
+// Data freshness strip — shows "last updated Xs ago · TZ" so a trader can
+// gauge whether the price they're seeing is decision-grade or stale.
+function DataFreshnessB() {
+  const [now, setNow] = React.useState(() => new Date());
+  const lastUpdate = React.useRef(new Date());
+  React.useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  // Simulate occasional refresh — reset lastUpdate every ~3-4s.
+  React.useEffect(() => {
+    const id = setInterval(() => {
+      lastUpdate.current = new Date();
+      setNow(new Date());
+    }, 3400);
+    return () => clearInterval(id);
+  }, []);
+  const ageSec = Math.max(0, Math.floor((now - lastUpdate.current) / 1000));
+  const tz = 'UTC+1 · Zurich';
+  const tStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Europe/Zurich' });
+  return (
+    <div style={{
+      padding: '10px 22px 0',
+      display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+      fontFamily: 'Geist Mono, monospace', fontSize: 10, letterSpacing: 0.6,
+      color: ALW.textMute, textTransform: 'uppercase', fontWeight: 600,
+    }}>
+      <span>{tStr} · {tz}</span>
+    </div>
+  );
+}
+
+Object.assign(window, {
+  AlpexaCoinDetailW,
+});
+
+</script>
+
+<!-- 8) App render -->
+<script type="text/babel" data-presets="react">
+
+// ── App: one screen at a time, click to advance ─────────────────────────
+const SCREENS = [
+  { id: 'home-clean',     label: 'Dashboard · W1 Clean',     sub: 'Direct & honest',           render: () => <AlpexaHomeWClean/> },
+  { id: 'home-tiled',     label: 'Dashboard · W2 Tiled',     sub: 'Lime hero card',            render: () => <AlpexaHomeWTiled/> },
+  { id: 'home-statement', label: 'Dashboard · W3 Statement', sub: 'Swiss banking',             render: () => <AlpexaHomeWStatement/> },
+  { id: 'discover',       label: 'Discover',                 sub: 'Markets + search',          render: () => <AlpexaDiscoverW/> },
+  { id: 'coin-btc',       label: 'Coin Detail · BTC',        sub: 'Trade view',                render: () => <AlpexaCoinDetailW symbol="BTC"/> },
+  { id: 'coin-eth',       label: 'Coin Detail · ETH',        sub: 'Trade view',                render: () => <AlpexaCoinDetailW symbol="ETH"/> },
+  { id: 'order',          label: 'Order',                    sub: 'Buy BTC · keypad',          render: () => <AlpexaTradeOrderW/> },
+  { id: 'sto',            label: 'STO Detail · ALPX-RE1',    sub: 'Fixed-income security',     render: () => <AlpexaSTODetailW symbol="ALPX-RE1"/> },
+];
+
+const TOKENS = {
+  bg: '#F0EEE9',
+  text: '#0E0E0C',
+  muted: '#6e6a63',
+  rule: 'rgba(0,0,0,0.08)',
+  chip: '#fff',
+  chipText: '#0E0E0C',
+  shadow: '0 50px 80px -30px rgba(0,0,0,0.35), 0 22px 40px -22px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.04)',
+};
+
+function ArrowBtn({ dir, onClick, disabled }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={dir === 'prev' ? 'Previous' : 'Next'}
+      style={{
+        width: 56, height: 56, borderRadius: 28, border: 'none',
+        background: disabled ? 'rgba(0,0,0,0.04)' : '#0E0E0C',
+        color: disabled ? '#bbb' : '#fff',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'transform 160ms ease, background 160ms ease',
+        boxShadow: disabled ? 'none' : '0 8px 20px -8px rgba(0,0,0,0.4)',
+      }}
+      onMouseDown={(e) => !disabled && (e.currentTarget.style.transform = 'scale(0.96)')}
+      onMouseUp={(e) => (e.currentTarget.style.transform = '')}
+      onMouseLeave={(e) => (e.currentTarget.style.transform = '')}
+    >
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        {dir === 'prev'
+          ? <path d="M15 6 L9 12 L15 18"/>
+          : <path d="M9 6 L15 12 L9 18"/>}
+      </svg>
+    </button>
+  );
+}
+
+function App() {
+  const [i, setI] = React.useState(0);
+  const total = SCREENS.length;
+  const cur = SCREENS[i];
+
+  const next = React.useCallback(() => setI((x) => (x + 1) % total), [total]);
+  const prev = React.useCallback(() => setI((x) => (x - 1 + total) % total), [total]);
+
+  React.useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+      else if (e.key >= '1' && e.key <= '9') {
+        const idx = parseInt(e.key, 10) - 1;
+        if (idx < total) setI(idx);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [next, prev, total]);
+
+  return (
+    <div style={{
+      minHeight: '100vh', background: TOKENS.bg,
+      fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+      backgroundImage: 'radial-gradient(circle, rgba(0,0,0,0.05) 1px, transparent 1px)',
+      backgroundSize: '32px 32px',
+      display: 'flex', flexDirection: 'column',
+    }}>
+      {/* Top bar */}
+      <header style={{
+        padding: '22px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        borderBottom: `1px solid ${TOKENS.rule}`, background: 'rgba(240,238,233,0.85)',
+        backdropFilter: 'blur(10px)', position: 'sticky', top: 0, zIndex: 10,
+      }}>
+        <div style={{
+          fontFamily: 'Geist Mono, monospace', fontSize: 11, fontWeight: 700,
+          letterSpacing: 2, color: TOKENS.muted, textTransform: 'uppercase',
+        }}>Alpexa Suisse · Click-through</div>
+        <div style={{
+          fontFamily: 'Geist Mono, monospace', fontSize: 11, fontWeight: 700,
+          letterSpacing: 2, color: TOKENS.text,
+        }}>{String(i+1).padStart(2,'0')} / {String(total).padStart(2,'0')}</div>
+      </header>
+
+      {/* Stage */}
+      <main style={{
+        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        gap: 48, padding: '40px 32px',
+      }}>
+        <ArrowBtn dir="prev" onClick={prev}/>
+
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24 }}>
+          {/* Label above */}
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              fontFamily: 'Geist Mono, monospace', fontSize: 10.5, fontWeight: 700,
+              letterSpacing: 1.6, color: TOKENS.muted, textTransform: 'uppercase', marginBottom: 6,
+            }}>{cur.sub || ''}</div>
+            <div style={{
+              fontFamily: 'Inter, system-ui', fontSize: 22, fontWeight: 500,
+              letterSpacing: -0.4, color: TOKENS.text,
+            }}>{cur.label}</div>
+          </div>
+
+          {/* Phone — click to advance */}
+          <div
+            onClick={next}
+            style={{
+              borderRadius: 54, boxShadow: TOKENS.shadow, overflow: 'hidden',
+              cursor: 'pointer', transition: 'transform 200ms ease',
+            }}
+            onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.98)')}
+            onMouseUp={(e) => (e.currentTarget.style.transform = '')}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = '')}
+            title="Click to go to next screen (→ key works too)"
+          >
+            {cur.render()}
+          </div>
+
+          {/* Hint */}
+          <div style={{
+            fontFamily: 'Geist Mono, monospace', fontSize: 10, letterSpacing: 1.4,
+            color: TOKENS.muted, textTransform: 'uppercase',
+          }}>Click phone · ← → · 1–{total}</div>
+        </div>
+
+        <ArrowBtn dir="next" onClick={next}/>
+      </main>
+
+      {/* Dots */}
+      <footer style={{
+        padding: '20px 32px 36px', display: 'flex', justifyContent: 'center',
+        gap: 8, borderTop: `1px solid ${TOKENS.rule}`,
+      }}>
+        {SCREENS.map((s, idx) => (
+          <button
+            key={s.id}
+            onClick={() => setI(idx)}
+            aria-label={s.label}
+            style={{
+              width: idx === i ? 28 : 8, height: 8, borderRadius: 4, border: 'none',
+              background: idx === i ? TOKENS.text : 'rgba(0,0,0,0.18)',
+              cursor: 'pointer', padding: 0, transition: 'all 220ms ease',
+            }}
+          />
+        ))}
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+
+window.addEventListener('load', () => {
+  const b = document.getElementById('boot');
+  if (b) { b.classList.add('hide'); setTimeout(() => b.remove(), 300); }
+});
+</script>
+</body>
+</html>
