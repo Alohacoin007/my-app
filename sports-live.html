@@ -2463,13 +2463,25 @@
     const ODDS_API_KEY = '57b7ab69c0f6937e770ce21a04c58358';
     const ODDS_SPORT = { NFL:'americanfootball_nfl', NBA:'basketball_nba', MLB:'baseball_mlb', NHL:'icehockey_nhl' };
     function nick(name){ return String(name||'').trim().toLowerCase().split(/\s+/).pop(); }
+    // ----- The Odds API quota guard: ration ~500 credits/month -----
+    function _ym(){ const d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1); }
+    function oddsBudget(){ try{ let b=JSON.parse(localStorage.getItem('alpexa.oddsBudget')||'null'); if(!b||b.ym!==_ym()){ b={ym:_ym(),used:0}; localStorage.setItem('alpexa.oddsBudget',JSON.stringify(b)); } return b; }catch(e){ return {ym:_ym(),used:0}; } }
+    function bumpOdds(n){ try{ const b=oddsBudget(); b.used+=(n||1); localStorage.setItem('alpexa.oddsBudget',JSON.stringify(b)); }catch(e){} }
+    const ODDS_MONTHLY_CAP=480; // leave margin under 500
     async function fetchOdds(sportKey){
       const cacheKey = 'alpexa.odds.'+sportKey;
-      try{ const c=JSON.parse(localStorage.getItem(cacheKey)||'null'); if(c && (Date.now()-c.t)<6*3600*1000) return c.data; }catch(e){}
+      // cache for 24h -> at most ~1 fetch per league per day
+      try{ const c=JSON.parse(localStorage.getItem(cacheKey)||'null'); if(c && (Date.now()-c.t)<24*3600*1000) return c.data; }catch(e){}
+      // monthly budget guard: if near cap, reuse last cached odds (even if stale) instead of spending credits
+      if(oddsBudget().used >= ODDS_MONTHLY_CAP){
+        try{ const c=JSON.parse(localStorage.getItem(cacheKey)||'null'); if(c) return c.data; }catch(e){}
+        throw new Error('odds budget reached');
+      }
       const url = 'https://api.the-odds-api.com/v4/sports/'+sportKey+'/odds/?apiKey='+ODDS_API_KEY+'&regions=us&markets=h2h,spreads,totals&oddsFormat=american';
       const res = await fetch(url, { cache:'no-store' });
       if (!res.ok) throw new Error('odds HTTP '+res.status);
       const data = await res.json();
+      bumpOdds(3); // h2h+spreads+totals = ~3 credits per request
       try{ localStorage.setItem(cacheKey, JSON.stringify({ t:Date.now(), data })); }catch(e){}
       return data;
     }
