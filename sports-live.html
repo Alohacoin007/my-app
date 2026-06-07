@@ -1794,9 +1794,10 @@
           else {ic='⏳';t2=`${w.asset||'USDT'} · Pending approval`;amt=+w.amount;}
         } else if(type==='transfer'){
           t1='Transfer'; const route=`${w.from||'Sports'} → ${w.to||'Crypto'}`;
-          if(w.status==='approved'){ic='🔄';t2=`${route} · Approved`;amt=-w.amount;}
+          const sAmt=(w.toKey==='sports')?+w.amount:(((w.fromKey||'sports')==='sports')?-w.amount:0);
+          if(w.status==='approved'){ic='🔄';t2=`${route} · Approved`;amt=sAmt;}
           else if(w.status==='rejected'){ic='↩️';t2=`${route} · Rejected · refunded`;amt=0;}
-          else {ic='🔄';t2=`${route} · Pending approval`;amt=-w.amount;}
+          else {ic='🔄';t2=`${route} · Pending approval`;amt=sAmt;}
         } else {
           t1='Withdraw'; const dest=`${w.asset||'USDT'}${w.network?' ('+w.network+')':''}`;
           if(w.status==='approved'){ic='⬆️';t2=`${dest} · Sent`;amt=-w.amount;}
@@ -1810,8 +1811,8 @@
       if(type==='withdraw' && w.status==='rejected' && !w.refunded){ balance+=w.amount; w.refunded=true; changed=true; updateTxnByReq(w.id,{ic:'↩️',t2:`Rejected by admin · refunded`,amt:0}); }
       if(type==='deposit' && w.status==='approved' && !w.credited){ balance+=w.amount; w.credited=true; changed=true; updateTxnByReq(w.id,{ic:'⬇️',t2:`${w.asset||'USDT'} · Approved`}); }
       if(type==='deposit' && w.status==='rejected' && !w.handled){ w.handled=true; changed=true; updateTxnByReq(w.id,{ic:'⛔',t2:`${w.asset||'USDT'} · Rejected by admin`,amt:0}); }
-      if(type==='transfer' && w.status==='approved' && !w.done){ w.done=true; changed=true; const cr=srvByKey('crypto'); if(cr){ cr.bal+=w.amount; saveCryptoBal(); } updateTxnByReq(w.id,{t2:`${w.from||'Sports'} → ${w.to||'Crypto'} · Approved`}); }
-      if(type==='transfer' && w.status==='rejected' && !w.refunded){ balance+=w.amount; w.refunded=true; changed=true; updateTxnByReq(w.id,{ic:'↩️',t2:`${w.from||'Sports'} → ${w.to||'Crypto'} · Rejected · refunded`,amt:0}); }
+      if(type==='transfer' && w.status==='approved' && !w.done){ w.done=true; changed=true; if(w.toKey==='sports'){balance+=w.amount;} else { const cr=srvByKey(w.toKey||'crypto'); if(cr){ cr.bal+=w.amount; if((w.toKey||'crypto')==='crypto')saveCryptoBal(); } } updateTxnByReq(w.id,{t2:`${w.from||'Sports'} → ${w.to||'Crypto'} · Approved`}); }
+      if(type==='transfer' && w.status==='rejected' && !w.refunded){ w.refunded=true; changed=true; if((w.fromKey||'sports')==='sports'){balance+=w.amount;} else { const cr=srvByKey(w.fromKey); if(cr){ cr.bal+=w.amount; if(w.fromKey==='crypto')saveCryptoBal(); } } updateTxnByReq(w.id,{ic:'↩️',t2:`${w.from||'Sports'} → ${w.to||'Crypto'} · Rejected · refunded`,amt:0}); }
     });
     if(changed){ saveWithdrawals(all); syncSportsBal(); saveTxns(); }
   }
@@ -1998,26 +1999,19 @@
     if(tfFrom===tfTo){showToast('⚠️','Select different servers');return;}
     if(v<=0){showToast('⚠️','Enter an amount');return;}
     if(v>from.bal){showToast('⚠️','Insufficient balance',`${from.short.replace('Alpexa ','')} is too low`);return;}
-    // Transfers TO the Crypto server require back-office approval.
-    if(tfTo==='crypto'){
-      balance-=v; syncSportsBal();   // hold the funds from Sports
-      const tid='tf_'+Date.now();
-      const reqs=loadWithdrawals();
-      reqs.unshift({id:tid,ts:Date.now(),type:'transfer',server:'Sports',from:'Sports',to:'Crypto',asset:'USD',amount:v,fee:0,net:v,status:'pending'});
-      saveWithdrawals(reqs);
-      txns.unshift({ts:Date.now(),ic:'🔄',t1:'Transfer',t2:`Sports → Crypto · Pending approval`,amt:-v,reqId:tid});
-      closeTransfer();updateWallet();
-      notify('⏳','Transfer requested',`${usd(v)} Sports → Crypto · awaiting approval`,'deposits');
-      showToast('⏳','Transfer requested','Pending back-office approval');
-      return;
-    }
-    from.bal-=v; to.bal+=v;
-    if(from.key==='sports'||to.key==='sports')balance=sportsSrv().bal;
-    syncSportsBal();
-    txns.unshift({ts:Date.now(),ic:'🔄',t1:'Transfer',t2:`${from.short} → ${to.short} · Just now`,amt:v,transfer:true});
-    notify('🔄','Transfer complete',`${usd(v)} · ${from.short.replace('Alpexa ','')} → ${to.short.replace('Alpexa ','')}`,'deposits');
+    // All server-to-server transfers require back-office approval (funds held until approved).
+    if(tfFrom==='sports'){ balance-=v; syncSportsBal(); }
+    else { from.bal-=v; if(from.key==='crypto') saveCryptoBal(); }
+    const fromNm=from.short.replace('Alpexa ',''), toNm=to.short.replace('Alpexa ','');
+    const tid='tf_'+Date.now();
+    const reqs=loadWithdrawals();
+    reqs.unshift({id:tid,ts:Date.now(),type:'transfer',server:'Sports',from:fromNm,to:toNm,fromKey:tfFrom,toKey:tfTo,asset:'USD',amount:v,fee:0,net:v,status:'pending'});
+    saveWithdrawals(reqs);
+    const sAmt=(tfTo==='sports')?+v:(tfFrom==='sports'?-v:0);
+    txns.unshift({ts:Date.now(),ic:'🔄',t1:'Transfer',t2:`${fromNm} → ${toNm} · Pending approval`,amt:sAmt,reqId:tid});
     closeTransfer();updateWallet();
-    showToast('🔄','Transfer complete',`${usd(v)} moved`);
+    notify('⏳','Transfer requested',`${usd(v)} ${fromNm} → ${toNm} · awaiting approval`,'deposits');
+    showToast('⏳','Transfer requested','Pending back-office approval');
   };
 
   // ---------- withdraw sheet (from Sports balance · auto-routed via Crypto) ----------
