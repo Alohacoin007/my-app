@@ -885,6 +885,17 @@
   </div>
 
 <script>
+  // ---------- real-mode reset (one-time): wipe demo data, start at $50,000 ----------
+  const ALPEXA_DATA_VERSION='real-1';
+  try{
+    if(localStorage.getItem('alpexa.dataVersion')!==ALPEXA_DATA_VERSION){
+      localStorage.setItem('alpexa.sportsBalance','50000');
+      localStorage.setItem('alpexa.txns','[]');
+      localStorage.removeItem('alpexa.withdrawals');
+      localStorage.setItem('alpexa.dataVersion',ALPEXA_DATA_VERSION);
+    }
+  }catch(e){}
+
   // ---------- data ----------
   const GAMES = [
     { id:'KC_BUF', lg:'NFL', live:true, time:"3Q 8:42", clk:{type:'clock',period:3,max:4,sec:522,plen:900}, home:{ab:'KC',nm:'Chiefs',sc:17}, away:{ab:'BUF',nm:'Bills',sc:14},
@@ -1017,41 +1028,16 @@
     renderGames();
   }
 
-  // open bets (with cashout) + settled history
-  let openBets = [
-    { id:'b1', type:'Parlay', cls:'parlay', stake:25, potential:182.50, cashout:28.50,
-      legs:[
-        {pk:'Chiefs -2.5', gm:'Chiefs vs Bills', am:-110, st:'o'},
-        {pk:'Lakers ML', gm:'Lakers vs Warriors', am:+125, st:'o'},
-        {pk:'Over 45.5', gm:'Cowboys vs Eagles', am:-110, st:'o'},
-      ]},
-    { id:'b2', type:'Singles', cls:'single', stake:20, potential:38.18, cashout:16.50,
-      legs:[ {pk:'Mahomes Pass Yds Over 274.5', gm:'Chiefs vs Bills', am:-115, st:'o'} ]},
-  ];
-  const settledBets = [
-    { id:'s1', type:'Parlay', cls:'parlay', stake:50, result:'won', payout:312.00,
-      legs:[{pk:'Warriors -3.5',gm:'Lakers vs Warriors',am:-110,st:'w'},{pk:'Under 224.5',gm:'Lakers vs Warriors',am:-112,st:'w'}]},
-    { id:'s2', type:'Singles', cls:'single', stake:30, result:'lost', payout:0,
-      legs:[{pk:'Eagles ML',gm:'Cowboys vs Eagles',am:-176,st:'l'}]},
-    { id:'s3', type:'Same Game', cls:'sgp', stake:15, result:'won', payout:97.50,
-      legs:[{pk:'LeBron Over 26.5 Pts',gm:'Lakers vs Warriors',am:-115,st:'w'},{pk:'Lakers +3.5',gm:'Lakers vs Warriors',am:-110,st:'w'}]},
-  ];
+  // open bets (with cashout) + settled history — start empty (real mode)
+  let openBets = [];
+  const settledBets = [];
   let txns = (function(){
     try{ const s=localStorage.getItem('alpexa.txns'); if(s) return JSON.parse(s); }catch(e){}
-    return [
-    {ic:'💰',t1:'Bet Won',t2:'Same Game Parlay · Yesterday',amt:+97.50},
-    {ic:'⬇️',t1:'Deposit',t2:'Credit card · 3 days ago',amt:+200.00},
-    {ic:'🎫',t1:'Bet placed',t2:'3-leg Parlay · 3 days ago',amt:-25.00},
-    {ic:'⬆️',t1:'Withdraw',t2:'Bank Transfer · 5 days ago',amt:-150.00},
-    ];
+    return [];
   })();
   function saveTxns(){ try{ localStorage.setItem('alpexa.txns', JSON.stringify(txns)); }catch(e){} }
   // ---------- notifications ----------
-  let notifs = [
-    {ic:'🎁',t1:'Welcome bonus',t2:'$100 credit added to your account',time:'Just now',unread:true},
-    {ic:'💰',t1:'Bet won',t2:'Same Game Parlay · +$97.50',time:'Yesterday',unread:true},
-    {ic:'💵',t1:'Cashback credit',t2:'$1.50 earned from your losses',time:'2 days ago',unread:false},
-  ];
+  let notifs = [];
   function notify(ic,t1,t2,cat){
     // categories: 'liveStart' | 'betResults' | 'deposits' | 'promos' | undefined (always show)
     if(cat && settings.notifications && settings.notifications[cat]===false) return;
@@ -1670,7 +1656,7 @@
   const SERVERS=[
     {key:'live', name:'Alpexa Live', short:'Alpexa Live', desc:'FX · Metals · Indices · CFD', ic:'green', tag:'LIVE', tagcls:'live', bal:8420.50},
     {key:'crypto', name:'Alpexa Crypto', short:'Alpexa Crypto', desc:'Global crypto spot', ic:'blue', tag:'CRYPTO', tagcls:'crypto', bal:3150.00},
-    {key:'sports', name:'Alpexa Sports', short:'Alpexa Sports', desc:'Live sports betting', ic:'gray', tag:'SPORTS', tagcls:'sports', bal:500.00},
+    {key:'sports', name:'Alpexa Sports', short:'Alpexa Sports', desc:'Live sports betting', ic:'gray', tag:'SPORTS', tagcls:'sports', bal:50000.00},
     {key:'manager', name:'Alpexa Manager', short:'Alpexa Manager', desc:'Managed · Copy trading', ic:'purple', tag:'MANAGER', tagcls:'mgr', bal:12000.00, locked:true},
   ];
   const srvIconSVG='<svg viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="7" rx="1.5" stroke="#fff" stroke-width="1.8"/><rect x="4" y="13" width="16" height="7" rx="1.5" stroke="#fff" stroke-width="1.8"/><circle cx="8" cy="7.5" r="1" fill="#fff"/><circle cx="8" cy="16.5" r="1" fill="#fff"/></svg>';
@@ -1678,7 +1664,7 @@
   const sportsSrv=()=>SERVERS.find(s=>s.key==='sports');
   // 'balance' = Sports server balance (where bets/cashouts occur)
   let balance=(function(){try{const s=localStorage.getItem('alpexa.sportsBalance');return s!==null?parseFloat(s):sportsSrv().bal;}catch(e){return sportsSrv().bal;}})();
-  let credit=100.00; // welcome credit on account open, withdrawable like cash
+  let credit=0.00; // real mode — no demo welcome credit
   let totalLost=0;   // cumulative net losses (for 5% cashback credit)
   const CASHBACK_RATE=0.05;
   function syncSportsBal(){sportsSrv().bal=balance;try{localStorage.setItem('alpexa.sportsBalance',String(balance));}catch(e){}}
