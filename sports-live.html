@@ -808,23 +808,23 @@
       <div class="grip"></div>
       <div class="sh"><h3>Deposit</h3><button class="close" id="dpCloseBtn">✕</button></div>
       <div class="tf-body">
-        <div class="wd-info">아래 <b>회사 입금 주소</b>로 USDT를 전송한 뒤, 보낸 금액을 입력하고 신청하세요. 입금이 확인되면 관리자가 승인합니다.</div>
-        <div class="tf-field"><label>네트워크</label></div>
+        <div class="wd-info">Send USDT to the <b>company deposit address</b> below, then enter the amount you sent and submit. Your deposit is credited once the back office confirms receipt.</div>
+        <div class="tf-field"><label>Network</label></div>
         <div class="wd-net" id="dpNet">
           <button class="wd-net-pill on" data-net="TRC-20">USDT · TRC-20</button>
           <button class="wd-net-pill" data-net="ERC-20">USDT · ERC-20</button>
         </div>
-        <div class="tf-field"><label>회사 입금 주소 (이 주소로 USDT 전송)</label></div>
-        <div class="dp-addr-box"><span class="dp-addr" id="dpAddr">—</span><button class="dp-copy" id="dpCopy">복사</button></div>
+        <div class="tf-field"><label>Company deposit address (send USDT here)</label></div>
+        <div class="dp-addr-box"><span class="dp-addr" id="dpAddr">—</span><button class="dp-copy" id="dpCopy">Copy</button></div>
         <div class="tf-field">
-          <label>보낸 금액 (USDT)</label>
+          <label>Amount sent (USDT)</label>
           <input type="number" id="dpAmt" value="100" min="0" step="10">
         </div>
         <div class="tf-chips" id="dpChips">
           <div class="chip" data-set="50">$50</div><div class="chip" data-set="100">$100</div>
           <div class="chip" data-set="500">$500</div><div class="chip" data-set="1000">$1,000</div>
         </div>
-        <button class="place" id="dpConfirm">입금 신청 (관리자 승인 대기)</button>
+        <button class="place" id="dpConfirm">Submit deposit request</button>
       </div>
     </div>
 
@@ -1837,8 +1837,8 @@
   document.getElementById('dpNet').onclick=e=>{const p=e.target.closest('.wd-net-pill');if(!p)return;
     document.querySelectorAll('#dpNet .wd-net-pill').forEach(x=>x.classList.remove('on'));p.classList.add('on');dpNet=p.dataset.net;updateDpAddr();};
   document.getElementById('dpCopy').onclick=()=>{const a=DEPOSIT_ADDR[dpNet]||'';
-    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(a).then(()=>showToast('📋','주소 복사됨',a.slice(0,12)+'…')).catch(()=>showToast('📋','회사 입금 주소',a));}
-    else showToast('📋','회사 입금 주소',a);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(a).then(()=>showToast('📋','Address copied',a.slice(0,12)+'…')).catch(()=>showToast('📋','Deposit address',a));}
+    else showToast('📋','Deposit address',a);};
   document.getElementById('dpChips').onclick=e=>{const c=e.target.closest('.chip');if(!c)return;
     dpAmt.value=c.dataset.set;};
   document.getElementById('dpConfirm').onclick=()=>{
@@ -1852,7 +1852,7 @@
     txns.unshift({ts:Date.now(),ic:'⏳',t1:'Deposit',t2:`USDT (${dpNet}) · Pending approval`,amt:+v,reqId:reqId});
     closeDeposit();updateWallet();
     notify('⏳','Deposit requested',`${usd(v)} USDT (${dpNet}) · awaiting approval`,'deposits');
-    showToast('⏳','입금 신청됨','관리자 확인 후 반영됩니다');
+    showToast('⏳','Deposit requested','Pending back-office approval');
   };
 
   // ---------- transfer between servers (Sports <-> Crypto only) ----------
