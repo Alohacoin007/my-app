@@ -2230,10 +2230,21 @@
         return { id:lg+'_'+ev.id, lg, live: state==='in', time, home, away, core: mkCore(home, away, ev), props: [] };
       }catch(e){ return null; }
     }
-    async function fetchLeague(L){
-      const res = await fetch('https://site.api.espn.com/apis/site/v2/sports/'+L.path+'/scoreboard', { cache:'no-store' });
+    async function fetchJson(url){
+      const res = await fetch(url, { cache:'no-store' });
       if (!res.ok) throw new Error('HTTP '+res.status);
-      const data = await res.json();
+      return res.json();
+    }
+    async function fetchLeague(L){
+      const direct = 'https://site.api.espn.com/apis/site/v2/sports/'+L.path+'/scoreboard';
+      let data;
+      try {
+        data = await fetchJson(direct);                 // 1) try ESPN directly
+      } catch (e1) {
+        // 2) CORS / network fallback via public proxies
+        try { data = await fetchJson('https://corsproxy.io/?url=' + encodeURIComponent(direct)); }
+        catch (e2) { data = await fetchJson('https://api.allorigins.win/raw?url=' + encodeURIComponent(direct)); }
+      }
       return (data.events||[]).map(ev=>mapEvent(ev, L.lg)).filter(Boolean);
     }
     (async () => {
