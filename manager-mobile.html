@@ -90,6 +90,11 @@
   <div class="sec">Recently processed</div>
   <div id="history"></div>
 
+  <div class="bal" style="text-align:center">
+    <button class="copybtn" id="resetBtn" style="background:#C62828;width:100%">🗑 Reset all demo data</button>
+    <div class="co-hint">Temporary tool · clears balances, bets, requests &amp; activity (keeps wallet address &amp; settings).</div>
+  </div>
+
   <div class="foot">Shares data with the apps in this browser · <a href="launcher.html">← Launcher</a></div>
 
 <script>
@@ -154,6 +159,13 @@
   var coIn=document.getElementById('coAddrIn'); if(coIn)coIn.value=getCoAddr();
   var coSave=document.getElementById('coSave');
   if(coSave)coSave.onclick=function(){var v=(coIn.value||'').trim(); if(!v)return; try{localStorage.setItem(CO_KEY,v);}catch(e){} coSave.textContent='Saved ✓'; setTimeout(function(){coSave.textContent='Save';},1300);};
+  var resetBtn=document.getElementById('resetBtn');
+  if(resetBtn)resetBtn.onclick=function(){
+    if(!confirm('Reset ALL demo data?\nThis clears balances, bets, requests and activity for a fresh start.'))return;
+    try{ Object.keys(localStorage).forEach(function(k){ if(k==='alpexa.companyAddr'||k==='alpexaSettings')return; if(k.indexOf('alpexa')===0)localStorage.removeItem(k); }); }catch(e){}
+    alert('Done. The apps will start fresh — Sports balance $50,000.');
+    render();
+  };
   var coCopy=document.getElementById('coCopy');
   if(coCopy)coCopy.onclick=function(){try{if(navigator.clipboard)navigator.clipboard.writeText((coIn.value||'').trim());}catch(e){}coCopy.textContent='Copied!';setTimeout(function(){coCopy.textContent='Copy';},1200);};
   setInterval(render,2000);

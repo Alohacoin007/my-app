@@ -1611,7 +1611,14 @@
     const d=legs.reduce((a,l)=>a*dec(l.am),1),stake=parseInt(stakeInput.value)||legs.reduce((a,l)=>a+l.stake,0);
     const pot = mode==='single'? legs.reduce((a,l)=>a+l.stake*dec(l.am),0) : stake*d;
     if(stake>balance){showToast('⚠️','Insufficient balance','Transfer funds to Sports first');return;}
-    // single tap: place immediately
+    if(!window._placeArmed){
+      window._placeArmed=true;
+      const _p=document.getElementById('place'); _p.classList.add('confirm'); _p.textContent='Tap again to confirm · '+usd(pot);
+      if(placeTimer)clearTimeout(placeTimer); placeTimer=setTimeout(resetPlaceBtn,4000);
+      return;
+    }
+    window._placeArmed=false; if(placeTimer){clearTimeout(placeTimer);placeTimer=null;} document.getElementById('place').classList.remove('confirm');
+    // confirmed: place the bet
     const betType=mode==='single'?'Singles':mode==='sgp'?'Same Game':'Parlay';
     const legCount=legs.length;
     // baseline decimal-odds product at placement (for live cashout calc)
@@ -2486,26 +2493,22 @@
       return data;
     }
     function oddsToCore(ev, home, away){
-      const bk = ev.bookmakers && ev.bookmakers[0];
-      if (!bk) return null;
-      const byKey = {}; (bk.markets||[]).forEach(m=>byKey[m.key]=m);
-      const fmt = (p)=> (p>0?'+':'')+p;
-      const core = {};
-      const h2h = byKey['h2h'];
-      if (h2h){
-        const oH=h2h.outcomes.find(o=>nick(o.name)===nick(home.nm)), oA=h2h.outcomes.find(o=>nick(o.name)===nick(away.nm));
-        if (oH && oA) core.ml=[{ln:'',am:oH.price,sel:home.nm+' ML'},{ln:'',am:oA.price,sel:away.nm+' ML'}];
+      if(!ev.bookmakers||!ev.bookmakers.length) return null;
+      const decP=(p)=> p>0?1+p/100:1+100/(-p);
+      const fmt=(p)=>(p>0?'+':'')+p;
+      function best(marketKey, matchFn){
+        let b=null;
+        ev.bookmakers.forEach(bk=>{ const m=(bk.markets||[]).find(x=>x.key===marketKey); if(!m)return;
+          (m.outcomes||[]).forEach(o=>{ if(matchFn(o)){ if(b===null||decP(o.price)>decP(b.price)) b={price:o.price,point:o.point}; } }); });
+        return b;
       }
-      const sp = byKey['spreads'];
-      if (sp){
-        const oH=sp.outcomes.find(o=>nick(o.name)===nick(home.nm)), oA=sp.outcomes.find(o=>nick(o.name)===nick(away.nm));
-        if (oH && oA) core.spread=[{ln:fmt(oH.point),am:oH.price,sel:home.nm+' '+fmt(oH.point)},{ln:fmt(oA.point),am:oA.price,sel:away.nm+' '+fmt(oA.point)}];
-      }
-      const tt = byKey['totals'];
-      if (tt){
-        const ov=tt.outcomes.find(o=>/over/i.test(o.name)), un=tt.outcomes.find(o=>/under/i.test(o.name));
-        if (ov && un) core.total=[{ln:'Over '+ov.point,am:ov.price,sel:'Over '+ov.point},{ln:'Under '+un.point,am:un.price,sel:'Under '+un.point}];
-      }
+      const core={};
+      const mlH=best('h2h',o=>nick(o.name)===nick(home.nm)), mlA=best('h2h',o=>nick(o.name)===nick(away.nm));
+      if(mlH&&mlA) core.ml=[{ln:'',am:mlH.price,sel:home.nm+' ML'},{ln:'',am:mlA.price,sel:away.nm+' ML'}];
+      const spH=best('spreads',o=>nick(o.name)===nick(home.nm)), spA=best('spreads',o=>nick(o.name)===nick(away.nm));
+      if(spH&&spA&&spH.point!=null&&spA.point!=null) core.spread=[{ln:fmt(spH.point),am:spH.price,sel:home.nm+' '+fmt(spH.point)},{ln:fmt(spA.point),am:spA.price,sel:away.nm+' '+fmt(spA.point)}];
+      const ov=best('totals',o=>/over/i.test(o.name)), un=best('totals',o=>/under/i.test(o.name));
+      if(ov&&un&&ov.point!=null&&un.point!=null) core.total=[{ln:'Over '+ov.point,am:ov.price,sel:'Over '+ov.point},{ln:'Under '+un.point,am:un.price,sel:'Under '+un.point}];
       return (core.ml||core.spread||core.total) ? core : null;
     }
     async function applyRealOdds(games){
