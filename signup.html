@@ -1,122 +1,805 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Alpexa · Sign up</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>ALPEXA SUISSE — Open an Account</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
-<meta name="theme-color" content="#0E0E0C">
+<link rel="shortcut icon" href="favicon.ico">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Alpexa Suisse">
+<meta name="mobile-web-app-capable" content="yes">
 <style>
-  :root{--acc:#1565C0;--ink:#0F1B2D;--dim:#5A6478;--line:#E6EAF0;--bg:#F0F2F5;--pos:#1B5E20;--pos-bg:#E8F5E9;--neg:#C62828;--card:#fff}
-  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-  html,body{background:var(--bg)}
-  body{font-family:'Roboto',system-ui,-apple-system,Arial,sans-serif;color:var(--ink);max-width:480px;margin:0 auto;min-height:100vh;padding:0 0 40px}
-  .top{background:var(--acc);color:#fff;padding:20px 18px}
-  .top h1{font-size:20px;font-weight:800;letter-spacing:-.3px}
-  .top .sub{font-size:11px;opacity:.85;margin-top:3px;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
-  .conn{margin:12px 14px;border-radius:10px;padding:9px 12px;font-size:12px;font-weight:700}
-  .conn.ok{background:var(--pos-bg);color:var(--pos)} .conn.bad{background:#FFEBEE;color:var(--neg)} .conn.wait{background:#E3F2FD;color:var(--acc)}
-  .card{margin:0 14px 14px;background:var(--card);border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(15,27,45,.06)}
-  .sec{margin:6px 14px 8px;font-size:12px;font-weight:800;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
-  label{font-size:12px;font-weight:700;color:var(--dim);display:block;margin:10px 0 4px}
-  input{width:100%;font-size:15px;color:var(--ink);background:#f1f3f4;border:1px solid var(--line);border-radius:9px;padding:12px;font-family:inherit}
-  .btn{width:100%;margin-top:14px;background:var(--acc);color:#fff;border:none;border-radius:10px;padding:14px;font:800 15px system-ui;cursor:pointer}
-  .btn:disabled{opacity:.5}
-  .ok-box{margin:0 14px 14px;background:var(--pos-bg);border-radius:12px;padding:14px;display:none}
-  .ok-box.show{display:block}
-  .ok-box h3{color:var(--pos);font-size:15px;margin-bottom:8px}
-  .acct{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.06)}
-  .acct b{font-family:ui-monospace,monospace}
-  .plist .row{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);font-size:13.5px}
-  .plist .row:last-child{border-bottom:none}
-  .muted{color:var(--dim);font-size:12px}
-  .empty{color:#9aa3b2;text-align:center;padding:18px;font-size:13px}
-  .foot{text-align:center;margin-top:14px;font-size:12px}
-  .foot a{color:var(--acc);font-weight:700;text-decoration:none}
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Montserrat:wght@600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,300..700,0..1,-50..200');
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Roboto',sans-serif;background:#fff;display:flex;justify-content:center;min-height:100vh;color:#212121;}
+#wrap{width:100%;max-width:390px;min-height:100vh;display:flex;flex-direction:column;background:#fff;position:relative;}
+
+.msi{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;line-height:1;display:inline-block;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;-webkit-font-feature-settings:'liga';font-feature-settings:'liga';user-select:none;vertical-align:middle;}
+.mono{font-family:'JetBrains Mono',monospace;font-feature-settings:'tnum' 1;}
+
+/* ── Header ── */
+.hdr{display:flex;align-items:center;padding:14px 16px 10px;border-bottom:1px solid #f0f0f0;flex-shrink:0;}
+.hdr-back{width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;color:#212121;border-radius:18px;}
+.hdr-back:active{background:#f5f5f5;}
+.hdr-ttl{flex:1;font-size:16px;font-weight:600;text-align:center;color:#212121;margin-right:36px;}
+
+/* ── Progress ── */
+.progress{display:flex;align-items:center;padding:18px 24px 8px;gap:6px;flex-shrink:0;}
+.pstep{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;position:relative;}
+.pdot{width:22px;height:22px;border-radius:11px;background:#f0f0f0;color:#bdbdbd;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;transition:all .2s;}
+.pstep.done .pdot{background:#2196F3;color:#fff;}
+.pstep.done .pdot::after{content:'';width:6px;height:10px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) translate(-1px,-1px);}
+.pstep.done .pdot .pn{display:none;}
+.pstep.active .pdot{background:#2196F3;color:#fff;box-shadow:0 0 0 4px rgba(33,150,243,.15);}
+.plabel{font-size:9.5px;color:#bdbdbd;font-weight:500;letter-spacing:.3px;text-align:center;white-space:nowrap;}
+.pstep.active .plabel,.pstep.done .plabel{color:#212121;font-weight:600;}
+.pbar{flex:1;height:2px;background:#f0f0f0;margin-bottom:24px;}
+.pbar.done{background:#2196F3;}
+
+/* ── Body ── */
+.body{flex:1;padding:14px 24px 24px;overflow-y:auto;}
+.body-title{font-size:22px;font-weight:700;color:#111;margin-bottom:6px;letter-spacing:-.3px;}
+.body-sub{font-size:13px;color:#9e9e9e;line-height:1.5;margin-bottom:24px;}
+
+/* ── Step 1: Cards ── */
+.opt-grid{display:flex;flex-direction:column;gap:10px;margin-bottom:20px;}
+.opt-card{display:flex;align-items:center;padding:14px 14px;border:1.5px solid #e0e0e0;border-radius:10px;cursor:pointer;background:#fff;transition:all .15s;gap:12px;}
+.opt-card:active{transform:scale(.99);}
+.opt-card.sel{border-color:#2196F3;background:#e3f2fd;}
+.opt-ico{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.opt-body{flex:1;}
+.opt-name{font-size:14px;font-weight:600;color:#212121;display:flex;align-items:center;gap:6px;}
+.opt-desc{font-size:11.5px;color:#9e9e9e;margin-top:2px;line-height:1.4;}
+.opt-tag{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;letter-spacing:.3px;}
+.opt-check{width:20px;height:20px;border-radius:10px;border:2px solid #e0e0e0;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.opt-check .msi{display:none;font-size:14px;}
+.opt-card.sel .opt-check{border-color:#2196F3;background:#2196F3;}
+.opt-card.sel .opt-check .msi{display:inline-block;font-size:14px;color:#fff;}
+
+.opt-row{display:flex;gap:8px;margin-bottom:20px;}
+.opt-row .opt-card{flex:1;flex-direction:column;align-items:flex-start;padding:12px 10px;}
+.opt-row .opt-name{font-size:13px;}
+.opt-row .opt-desc{font-size:10.5px;}
+
+.section-label{font-size:11px;font-weight:700;color:#9e9e9e;letter-spacing:.5px;margin-bottom:8px;text-transform:uppercase;}
+
+/* ── Fields ── */
+.field{margin-bottom:22px;}
+.field-label{font-size:11.5px;color:#9e9e9e;font-weight:500;margin-bottom:6px;display:block;letter-spacing:.2px;}
+.field-inner{display:flex;align-items:center;border-bottom:1.5px solid #e0e0e0;padding-bottom:8px;transition:border-color .15s;gap:8px;}
+.field-inner:focus-within{border-bottom-color:#2196F3;}
+.field-inner input,.field-inner select{flex:1;border:none;outline:none;font-size:15px;color:#212121;font-family:'Roboto',sans-serif;background:transparent;width:100%;}
+.field-inner input::placeholder{color:#bdbdbd;}
+.field-inner select{appearance:none;-webkit-appearance:none;cursor:pointer;}
+.field-inner .msi{color:#bdbdbd;font-size:18px;}
+.field-row{display:flex;gap:14px;}
+.field-row .field{flex:1;}
+
+/* ── OTP ── */
+.otp-wrap{display:flex;gap:8px;justify-content:center;margin:24px 0;}
+.otp-cell{width:44px;height:54px;border:1.5px solid #e0e0e0;border-radius:8px;text-align:center;font-size:22px;font-family:'JetBrains Mono',monospace;font-weight:600;color:#212121;outline:none;transition:all .15s;background:#fff;}
+.otp-cell:focus{border-color:#2196F3;box-shadow:0 0 0 3px rgba(33,150,243,.12);}
+.otp-cell.filled{border-color:#2196F3;background:#fff;}
+.otp-help{text-align:center;font-size:12px;color:#9e9e9e;margin-bottom:12px;}
+.otp-resend{text-align:center;font-size:13px;color:#2196F3;cursor:pointer;background:none;border:none;padding:8px;font-family:'Roboto',sans-serif;font-weight:500;}
+.otp-resend:disabled{color:#bdbdbd;cursor:not-allowed;}
+
+/* ── Terms checkboxes ── */
+.term-row{display:flex;align-items:flex-start;gap:10px;padding:10px 0;cursor:pointer;}
+.term-cb{width:18px;height:18px;border-radius:4px;border:2px solid #e0e0e0;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;background:#fff;}
+.term-cb .msi{display:none;}
+.term-cb.on{background:#2196F3;border-color:#2196F3;}
+.term-cb.on .msi{display:inline-block;font-size:13px;color:#fff;}
+.term-text{flex:1;font-size:13px;color:#424242;line-height:1.5;}
+.term-text .req{color:#e53935;font-weight:600;}
+.term-text .opt{color:#9e9e9e;font-weight:500;}
+.term-link{color:#2196F3;text-decoration:underline;cursor:pointer;}
+
+/* ── Pwd strength ── */
+.strength{display:flex;gap:3px;margin-top:6px;}
+.s-bar{flex:1;height:3px;background:#f0f0f0;border-radius:2px;}
+.s-bar.f1{background:#e53935;}
+.s-bar.f2{background:#fb8c00;}
+.s-bar.f3{background:#fdd835;}
+.s-bar.f4{background:#43a047;}
+.strength-txt{font-size:11px;margin-top:4px;color:#9e9e9e;}
+
+/* ── PIN dots ── */
+.pin-wrap{display:flex;gap:14px;justify-content:center;margin:18px 0;}
+.pin-dot{width:14px;height:14px;border-radius:7px;border:2px solid #e0e0e0;background:#fff;transition:all .15s;}
+.pin-dot.on{background:#2196F3;border-color:#2196F3;}
+
+/* ── Success ── */
+.suc-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;text-align:center;}
+.suc-ico-big{width:96px;height:96px;border-radius:48px;background:#e8f5e9;display:flex;align-items:center;justify-content:center;margin-bottom:24px;animation:pop .4s cubic-bezier(.34,1.56,.64,1);}
+.suc-ico-big .msi{font-size:54px;color:#2e7d32;font-variation-settings:'wght' 500;}
+@keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
+.suc-title-big{font-size:24px;font-weight:700;color:#111;margin-bottom:8px;}
+.suc-sub-big{font-size:14px;color:#757575;line-height:1.6;margin-bottom:28px;}
+.acct-card{width:100%;background:#0d47a1;color:#fff;border-radius:14px;padding:20px;margin-bottom:24px;text-align:left;position:relative;overflow:hidden;}
+.acct-card::after{content:'';position:absolute;top:-40px;right:-40px;width:160px;height:160px;border-radius:80px;background:rgba(255,255,255,.05);}
+.acct-card-label{font-size:10px;letter-spacing:1px;color:rgba(255,255,255,.6);font-weight:600;}
+.acct-card-num{font-size:24px;font-weight:700;letter-spacing:1.5px;font-family:'JetBrains Mono',monospace;margin:6px 0 18px;}
+.acct-card-meta{display:flex;gap:24px;font-size:11px;}
+.acct-card-meta div{display:flex;flex-direction:column;gap:2px;}
+.acct-card-meta .l{color:rgba(255,255,255,.55);font-size:9px;letter-spacing:.5px;}
+.acct-card-meta .v{font-weight:600;font-size:12px;}
+.copy-btn{position:absolute;top:18px;right:18px;background:rgba(255,255,255,.15);border:none;border-radius:6px;padding:6px 10px;font-size:11px;color:#fff;cursor:pointer;font-family:'Roboto',sans-serif;display:flex;align-items:center;gap:4px;}
+
+/* ── Footer ── */
+.foot{padding:14px 24px 28px;background:#fff;border-top:1px solid #f5f5f5;flex-shrink:0;}
+.primary-btn{width:100%;height:50px;background:#2196F3;border:none;border-radius:8px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:'Roboto',sans-serif;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:8px;}
+.primary-btn:disabled{background:#bdbdbd;cursor:not-allowed;}
+.primary-btn:not(:disabled):active{background:#1976d2;}
+.secondary-btn{width:100%;height:46px;background:none;border:none;color:#757575;font-size:13px;font-family:'Roboto',sans-serif;cursor:pointer;margin-top:6px;}
+.secondary-btn:active{color:#212121;}
+
+/* ── Toast ── */
+#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#212121;color:#fff;padding:10px 18px;border-radius:24px;font-size:13px;white-space:nowrap;display:none;z-index:200;}
+
+/* ── Country Sheet ── */
+.csheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;display:none;align-items:flex-end;justify-content:center;animation:fIn .15s ease;}
+.csheet-bg.open{display:flex;}
+.csheet{background:#fff;width:100%;max-width:390px;border-radius:14px 14px 0 0;max-height:80vh;display:flex;flex-direction:column;animation:shUp .22s cubic-bezier(.2,.8,.2,1);}
+@keyframes shUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@keyframes fIn{from{opacity:0}to{opacity:1}}
+.csheet-grab{width:36px;height:4px;border-radius:2px;background:#e0e0e0;margin:8px auto 4px;flex-shrink:0;}
+.csheet-hdr{display:flex;align-items:center;padding:10px 16px 4px;flex-shrink:0;}
+.csheet-ttl{flex:1;font-size:16px;font-weight:700;color:#212121;}
+.csheet-x{width:30px;height:30px;background:#f5f5f5;border-radius:15px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#757575;}
+.csheet-search{display:flex;align-items:center;background:#f5f7fa;border-radius:10px;padding:0 12px;height:42px;margin:12px 16px;flex-shrink:0;}
+.csheet-search .msi{color:#9e9e9e;font-size:18px;margin-right:8px;}
+.csheet-search input{flex:1;border:none;outline:none;font-size:14px;color:#212121;font-family:'Roboto',sans-serif;background:transparent;}
+.csheet-list{overflow-y:auto;flex:1;padding-bottom:24px;}
+.cs-item{display:flex;align-items:center;padding:13px 18px;border-bottom:1px solid #f5f5f5;cursor:pointer;gap:12px;}
+.cs-item:active{background:#f5f5f5;}
+.cs-flag{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:30px;height:22px;border-radius:4px;background:#f5f5f5;color:#424242;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;letter-spacing:.5px;}
+.cs-name{flex:1;font-size:14px;color:#212121;font-weight:500;}
+.cs-dial{font-size:12px;color:#9e9e9e;font-family:'JetBrains Mono',monospace;}
+.cs-chk{font-size:18px;color:#2196F3;flex-shrink:0;display:none;}
+.cs-item.sel .cs-chk{display:block;}
+.cs-empty{padding:32px;text-align:center;color:#bdbdbd;font-size:13px;}
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <div class="top"><h1>Create your Alpexa account</h1><div class="sub">One sign-up · 3 accounts (Sports · Crypto · FX)</div></div>
-  <div class="conn wait" id="conn">Connecting to server…</div>
-
-  <div class="card">
-    <label>Full name</label>
-    <input id="name" placeholder="e.g. Christian Kang" autocomplete="name">
-    <label>Email</label>
-    <input id="email" type="email" placeholder="you@email.com" autocomplete="email">
-    <button class="btn" id="go" disabled>Create account</button>
+<div id="wrap">
+  <!-- Header -->
+  <div class="hdr">
+    <button class="hdr-back" onclick="goBack()"><span class="msi" style="font-size:22px">arrow_back</span></button>
+    <div class="hdr-ttl" id="hdrTtl">Open an Account</div>
   </div>
 
-  <div class="ok-box" id="okBox">
-    <h3>✅ Account created!</h3>
-    <div class="muted" id="okName"></div>
-    <div id="okAccts" style="margin-top:8px"></div>
+  <!-- Progress -->
+  <div class="progress" id="progress"></div>
+
+  <!-- Step containers -->
+  <div class="body" id="body"></div>
+
+  <!-- Footer -->
+  <div class="foot" id="foot"></div>
+</div>
+
+<!-- Country Sheet -->
+<div class="csheet-bg" id="csheetBg" onclick="closeCountrySheet(event)">
+  <div class="csheet" onclick="event.stopPropagation()">
+    <div class="csheet-grab"></div>
+    <div class="csheet-hdr">
+      <span class="csheet-ttl">Select your country</span>
+      <button class="csheet-x" onclick="closeCountrySheet()"><span class="msi" style="font-size:16px">close</span></button>
+    </div>
+    <div class="csheet-search">
+      <span class="msi">search</span>
+      <input id="csheetSearch" placeholder="Search by name or code…" oninput="filterCountries(this.value)">
+    </div>
+    <div class="csheet-list" id="csheetList"></div>
   </div>
+</div>
 
-  <div class="sec">Registered customers (from server)</div>
-  <div class="card plist"><div id="players"><div class="empty">Loading…</div></div></div>
+<div id="toast"></div>
 
-  <div class="foot"><a href="launcher.html">← Launcher</a></div>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  var SUPA_URL='https://grxnbgtfnaayeluenvqh.supabase.co';
-  var SUPA_KEY='sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu';
-  var db=null;
-  function setConn(cls,txt){var e=document.getElementById('conn');e.className='conn '+cls;e.textContent=txt;}
-  function acctNo(p){return p+'-'+Math.floor(100000+Math.random()*900000);}
+const SERVERS = [
+  { id:'live',   name:'ALPEXA SUISSE Live',   tag:'LIVE',   color:'#2e7d32', tagBg:'#e8f5e9', desc:'Real-money trading. FX, metals, indices, crypto CFD.' },
+  { id:'stocks', name:'ALPEXA SUISSE Crypto', tag:'STOCKS', color:'#1565c0', tagBg:'#e3f2fd', desc:'Global equities CFD. US/EU/Asia markets, 1:10 leverage.' },
+  { id:'demo',   name:'ALPEXA SUISSE Sports',   tag:'DEMO',   color:'#757575', tagBg:'#f5f5f5', desc:'$100,000 paper trading. No KYC required. Risk-free practice.' },
+];
+const LEVERAGES = [
+  { id:'1:30',  desc:'EU regulated (ESMA cap)' },
+  { id:'1:100', desc:'Standard (most popular)', recommended:true },
+  { id:'1:200', desc:'Pro tier (KYC required)' },
+  { id:'1:500', desc:'Max (eligibility review)' },
+];
+const CURRENCIES = ['USD','EUR','GBP','JPY','CHF','KRW','USDT'];
+const COUNTRIES = [
+  { code:'KR', flag:'🇰🇷', name:'South Korea',    dial:'+82'  },
+  { code:'US', flag:'🇺🇸', name:'United States',  dial:'+1'   },
+  { code:'GB', flag:'🇬🇧', name:'United Kingdom', dial:'+44'  },
+  { code:'CH', flag:'🇨🇭', name:'Switzerland',    dial:'+41'  },
+  { code:'DE', flag:'🇩🇪', name:'Germany',        dial:'+49'  },
+  { code:'FR', flag:'🇫🇷', name:'France',         dial:'+33'  },
+  { code:'IT', flag:'🇮🇹', name:'Italy',          dial:'+39'  },
+  { code:'ES', flag:'🇪🇸', name:'Spain',          dial:'+34'  },
+  { code:'NL', flag:'🇳🇱', name:'Netherlands',    dial:'+31'  },
+  { code:'SE', flag:'🇸🇪', name:'Sweden',         dial:'+46'  },
+  { code:'NO', flag:'🇳🇴', name:'Norway',         dial:'+47'  },
+  { code:'JP', flag:'🇯🇵', name:'Japan',          dial:'+81'  },
+  { code:'CN', flag:'🇨🇳', name:'China',          dial:'+86'  },
+  { code:'HK', flag:'🇭🇰', name:'Hong Kong',      dial:'+852' },
+  { code:'TW', flag:'🇹🇼', name:'Taiwan',         dial:'+886' },
+  { code:'SG', flag:'🇸🇬', name:'Singapore',      dial:'+65'  },
+  { code:'MY', flag:'🇲🇾', name:'Malaysia',       dial:'+60'  },
+  { code:'TH', flag:'🇹🇭', name:'Thailand',       dial:'+66'  },
+  { code:'VN', flag:'🇻🇳', name:'Vietnam',        dial:'+84'  },
+  { code:'PH', flag:'🇵🇭', name:'Philippines',    dial:'+63'  },
+  { code:'ID', flag:'🇮🇩', name:'Indonesia',      dial:'+62'  },
+  { code:'IN', flag:'🇮🇳', name:'India',          dial:'+91'  },
+  { code:'AU', flag:'🇦🇺', name:'Australia',      dial:'+61'  },
+  { code:'NZ', flag:'🇳🇿', name:'New Zealand',    dial:'+64'  },
+  { code:'CA', flag:'🇨🇦', name:'Canada',         dial:'+1'   },
+  { code:'MX', flag:'🇲🇽', name:'Mexico',         dial:'+52'  },
+  { code:'BR', flag:'🇧🇷', name:'Brazil',         dial:'+55'  },
+  { code:'AR', flag:'🇦🇷', name:'Argentina',      dial:'+54'  },
+  { code:'AE', flag:'🇦🇪', name:'UAE',            dial:'+971' },
+  { code:'SA', flag:'🇸🇦', name:'Saudi Arabia',   dial:'+966' },
+  { code:'IL', flag:'🇮🇱', name:'Israel',         dial:'+972' },
+  { code:'TR', flag:'🇹🇷', name:'Turkey',         dial:'+90'  },
+  { code:'ZA', flag:'🇿🇦', name:'South Africa',   dial:'+27'  },
+  { code:'EG', flag:'🇪🇬', name:'Egypt',          dial:'+20'  },
+  { code:'PL', flag:'🇵🇱', name:'Poland',         dial:'+48'  },
+  { code:'RU', flag:'🇷🇺', name:'Russia',         dial:'+7'   },
+  { code:'UA', flag:'🇺🇦', name:'Ukraine',        dial:'+380' },
+  { code:'OT', flag:'🌐',     name:'Other…',          dial:''     },
+];
 
-  try{ db=window.supabase.createClient(SUPA_URL,SUPA_KEY); }catch(e){ setConn('bad','Supabase library failed to load'); }
+const STEPS = ['Account Type','Personal Info','Verify Email','Security','Complete'];
+var _db=null; try{ _db=window.supabase.createClient('https://grxnbgtfnaayeluenvqh.supabase.co','sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu'); window._db=_db; }catch(e){ console.error('Supabase init failed',e); }
+let cur = 0;
+let data = {
+  server: 'live',
+  leverage: '1:100',
+  currency: 'USD',
+  firstName: '',
+  lastName: '',
+  email: '',
+  phone: '',
+  dob: '',
+  country: '',
+  otp: '',
+  otpSent: '',
+  password: '',
+  pin: '',
+  termsMain: false,
+  termsRisk: false,
+  termsPromo: false,
+};
 
-  async function checkConn(){
-    if(!db){return;}
-    try{
-      const {error}=await db.from('players').select('id',{count:'exact',head:true});
-      if(error) throw error;
-      setConn('ok','✅ Connected to server');
-      document.getElementById('go').disabled=false;
-      loadPlayers();
-    }catch(e){
-      setConn('bad','⚠️ '+(e.message||'Connection/table error')+' — run the table SQL in Supabase');
-      console.error(e);
+function renderProgress(){
+  const el = document.getElementById('progress');
+  let html = '';
+  STEPS.forEach((s,i) => {
+    const cls = i < cur ? 'done' : i === cur ? 'active' : '';
+    html += `<div class="pstep ${cls}">
+      <div class="pdot"><span class="pn">${i+1}</span></div>
+      <div class="plabel">${s}</div>
+    </div>`;
+    if (i < STEPS.length - 1) {
+      html += `<div class="pbar ${i < cur ? 'done' : ''}"></div>`;
     }
+  });
+  el.innerHTML = html;
+}
+
+function renderStep(){
+  renderProgress();
+  document.getElementById('hdrTtl').textContent = `Step ${cur+1} of ${STEPS.length}`;
+  const body = document.getElementById('body');
+  const foot = document.getElementById('foot');
+  if (cur === 0)      { body.innerHTML = step0(); foot.innerHTML = footBtns('Continue', true, 0); }
+  else if (cur === 1) { body.innerHTML = step1(); foot.innerHTML = footBtns('Continue', validPersonal(), 1); }
+  else if (cur === 2) { body.innerHTML = step2(); foot.innerHTML = footBtns('Verify', data.otp.length === 6, 2); setTimeout(()=>document.querySelector('.otp-cell')?.focus(),50); }
+  else if (cur === 3) { body.innerHTML = step3(); foot.innerHTML = footBtns('Create Account', validSecurity(), 3); }
+  else if (cur === 4) { body.innerHTML = step4(); foot.innerHTML = `
+    <button class="primary-btn" onclick="goToApp()"><span class="msi" style="font-size:18px">login</span> Sign in to Trading App</button>
+    <button class="secondary-btn" onclick="goBack()">Back to login</button>`; }
+}
+
+function footBtns(label, enabled, reasonFn){
+  if (enabled) {
+    return `<button class="primary-btn" onclick="nextStep()">${label}<span class="msi" style="font-size:18px">arrow_forward</span></button>`;
   }
-
-  async function loadPlayers(){
-    const el=document.getElementById('players');
-    try{
-      const {data,error}=await db.from('players').select('cust_id,name,email,created_at').order('created_at',{ascending:false}).limit(50);
-      if(error) throw error;
-      if(!data||!data.length){ el.innerHTML='<div class="empty">No customers yet — create the first one above.</div>'; return; }
-      el.innerHTML=data.map(function(p){return '<div class="row"><span><b>'+(p.name||'—')+'</b><div class="muted">'+(p.cust_id||'')+' · '+(p.email||'')+'</div></span></div>';}).join('');
-    }catch(e){ el.innerHTML='<div class="empty">'+(e.message||'load error')+'</div>'; }
+  return `<button class="primary-btn" style="background:#bdbdbd" onclick="showMissing(${reasonFn||0})">${label}<span class="msi" style="font-size:18px">arrow_forward</span></button>`;
+}
+function showMissing(which){
+  let msg = 'Please complete all required fields';
+  if (which === 1) {
+    const miss = [];
+    if (!data.firstName.trim()) miss.push('first name');
+    if (!data.lastName.trim()) miss.push('last name');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) miss.push('valid email');
+    if (data.phone.trim().length < 7) miss.push('phone');
+    if (!data.dob) miss.push('date of birth');
+    if (!data.country) miss.push('country');
+    if (miss.length) msg = 'Missing: ' + miss.join(', ');
+  } else if (which === 3) {
+    const miss = [];
+    if (data.password.length < 8) miss.push('password (8+ chars)');
+    if (data.pin.length !== 4) miss.push('4-digit PIN');
+    if (!data.termsMain) miss.push('Terms of Service');
+    if (!data.termsRisk) miss.push('Risk Disclosure');
+    if (miss.length) msg = 'Missing: ' + miss.join(', ');
+  } else if (which === 2) {
+    msg = 'Please enter the 6-digit verification code';
   }
+  showToast(msg);
+}
 
-  document.getElementById('go').onclick=async function(){
-    const name=document.getElementById('name').value.trim(), email=document.getElementById('email').value.trim();
-    if(!name||!email){ alert('Enter name and email.'); return; }
-    const btn=this; btn.disabled=true; btn.textContent='Creating…';
-    try{
-      const cust='P-'+Math.floor(1000+Math.random()*9000);
-      const {data:pl,error:e1}=await db.from('players').insert({cust_id:cust,name:name,email:email}).select().single();
-      if(e1) throw e1;
-      const accts=[
-        {player_id:pl.id,server:'sports',acct_no:acctNo('SP'),balance:0},
-        {player_id:pl.id,server:'crypto',acct_no:acctNo('CR'),balance:0},
-        {player_id:pl.id,server:'fx',acct_no:acctNo('FX'),balance:0}
-      ];
-      const {error:e2}=await db.from('accounts').insert(accts);
-      if(e2) throw e2;
-      document.getElementById('okName').textContent=name+' · '+cust;
-      document.getElementById('okAccts').innerHTML=accts.map(function(a){return '<div class="acct"><span>'+a.server.toUpperCase()+' account</span><b>'+a.acct_no+'</b></div>';}).join('');
-      document.getElementById('okBox').classList.add('show');
-      document.getElementById('name').value=''; document.getElementById('email').value='';
-      loadPlayers();
-    }catch(e){ alert('Error: '+(e.message||e)); console.error(e); }
-    btn.disabled=false; btn.textContent='Create account';
-  };
+// ── Step 0: Account Type ──
+function step0(){
+  return `
+    <div class="body-title">Choose your account</div>
+    <div class="body-sub">You can open additional accounts later from settings.</div>
 
-  checkConn();
+    <div class="section-label">Server</div>
+    <div class="opt-grid">
+      ${SERVERS.map(s => `
+        <div class="opt-card ${data.server===s.id?'sel':''}" onclick="setData('server','${s.id}')">
+          <div class="opt-ico" style="background:${s.color}">
+            <span class="msi" style="color:#fff;font-size:20px">dns</span>
+          </div>
+          <div class="opt-body">
+            <div class="opt-name">${s.name} <span class="opt-tag" style="background:${s.tagBg};color:${s.color}">${s.tag}</span></div>
+            <div class="opt-desc">${s.desc}</div>
+          </div>
+          <div class="opt-check"><span class="msi">check</span></div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="section-label">Leverage</div>
+    <div class="opt-row" style="flex-wrap:wrap">
+      ${LEVERAGES.map(l => `
+        <div class="opt-card ${data.leverage===l.id?'sel':''}" style="min-width:calc(50% - 4px);flex:0 0 calc(50% - 4px)" onclick="setData('leverage','${l.id}')">
+          <div class="opt-name mono">${l.id}${l.recommended?' <span class="opt-tag" style="background:#fff3e0;color:#e65100">★</span>':''}</div>
+          <div class="opt-desc">${l.desc}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="section-label">Base Currency</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+      ${CURRENCIES.map(c => `
+        <button onclick="setData('currency','${c}')" style="
+          padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;
+          background:${data.currency===c?'#2196F3':'#f5f5f5'};
+          color:${data.currency===c?'#fff':'#757575'};
+          border:none;cursor:pointer;font-family:'JetBrains Mono',monospace;letter-spacing:.5px;
+        ">${c}</button>
+      `).join('')}
+    </div>
+  `;
+}
+
+// ── Step 1: Personal info ──
+function step1(){
+  return `
+    <div class="body-title">Tell us about you</div>
+    <div class="body-sub">We need this information for KYC and to comply with financial regulations.</div>
+
+    <div class="field-row">
+      <div class="field">
+        <label class="field-label">First Name</label>
+        <div class="field-inner"><input id="firstName" value="${data.firstName}" oninput="setField('firstName',this.value)" placeholder="John"></div>
+      </div>
+      <div class="field">
+        <label class="field-label">Last Name</label>
+        <div class="field-inner"><input id="lastName" value="${data.lastName}" oninput="setField('lastName',this.value)" placeholder="Doe"></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Email Address</label>
+      <div class="field-inner">
+        <span class="msi">mail</span>
+        <input type="email" value="${data.email}" oninput="setField('email',this.value)" placeholder="you@example.com">
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Phone Number</label>
+      <div class="field-inner">
+        <span class="msi">call</span>
+        <input type="tel" value="${data.phone}" oninput="setField('phone',this.value)" placeholder="+82 10 1234 5678">
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label class="field-label">Date of Birth</label>
+        <div class="field-inner"><input type="date" value="${data.dob}" oninput="setField('dob',this.value)"></div>
+      </div>
+      <div class="field">
+        <label class="field-label">Country</label>
+        <div class="field-inner" onclick="openCountrySheet()" style="cursor:pointer">
+          ${data.country ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:20px;border-radius:4px;background:#f5f5f5;color:#424242;font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace;letter-spacing:.5px;">${(COUNTRIES.find(c=>c.name===data.country)||{}).code||''}</span>` : ''}
+          <input readonly value="${data.country||''}" placeholder="Select your country" style="cursor:pointer;pointer-events:none;">
+          <span class="msi">expand_more</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── Step 2: Email OTP ──
+function step2(){
+  const emailShown = data.email || 'your inbox';
+  return `
+    <div class="body-title">Verify your email</div>
+    <div class="body-sub">We sent a 6-digit code to <b>${emailShown}</b>. Enter it below to continue.</div>
+
+    <div class="otp-wrap">
+      ${[0,1,2,3,4,5].map(i => `
+        <input class="otp-cell ${data.otp[i]?'filled':''}" maxlength="1" type="text" inputmode="numeric"
+          value="${data.otp[i]||''}"
+          oninput="otpInput(${i},this.value)" onkeydown="otpKey(event,${i})">
+      `).join('')}
+    </div>
+
+    <div class="otp-help">Code expires in <span class="mono" id="otpTimer" style="color:#2196F3;font-weight:600">02:59</span></div>
+    <button class="otp-resend" id="resendBtn" onclick="resendOTP()" disabled>Resend code (30s)</button>
+    <div id="otpError" style="text-align:center;font-size:12.5px;color:#e53935;margin-top:14px;font-weight:600;display:none;"></div>
+    <div style="text-align:center;margin-top:16px;">
+      <button onclick="revealCode()" style="background:#e3f2fd;color:#1565c0;border:none;padding:8px 16px;border-radius:18px;font-size:11.5px;font-weight:600;font-family:'Roboto',sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:5px;">
+        <span class="msi" style="font-size:14px">visibility</span>Show test code (demo)
+      </button>
+    </div>
+    <div id="codeReveal" style="text-align:center;font-size:14px;color:#757575;margin-top:10px;display:none;">
+      Your code: <b class="mono" id="codeRevealNum" style="font-size:18px;color:#212121;letter-spacing:4px;"></b>
+    </div>
+  `;
+}
+function revealCode(){
+  const el = document.getElementById('codeReveal');
+  if (!el) return;
+  document.getElementById('codeRevealNum').textContent = data.otpSent || '------';
+  el.style.display = 'block';
+}
+
+// ── Step 3: Security ──
+function step3(){
+  const strength = pwStrength(data.password);
+  return `
+    <div class="body-title">Set up security</div>
+    <div class="body-sub">Choose a strong password and a 4-digit PIN. You'll use both to access your account.</div>
+
+    <div class="field">
+      <label class="field-label">Trading Password</label>
+      <div class="field-inner">
+        <span class="msi">lock</span>
+        <input id="pwInput" type="password" value="${data.password}" oninput="setField('password',this.value); updateStrength()" placeholder="At least 8 characters">
+        <button class="eye" onclick="togglePw()" style="background:none;border:none;cursor:pointer;padding:0 0 0 8px;display:flex;align-items:center;">
+          <span class="msi" id="eyeIcon" style="color:#bdbdbd;font-size:18px">visibility</span>
+        </button>
+      </div>
+      <div class="strength" id="strBars">
+        ${[1,2,3,4].map(n => `<div class="s-bar ${n <= strength.score ? 'f'+strength.score : ''}"></div>`).join('')}
+      </div>
+      <div class="strength-txt" id="strTxt">${strength.label}</div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">4-Digit PIN</label>
+      <div class="otp-wrap" style="margin:14px 0 4px">
+        ${[0,1,2,3].map(i => `
+          <input class="otp-cell pin-cell ${data.pin[i]?'filled':''}" maxlength="1" type="password" inputmode="numeric" autocomplete="off"
+            value="${data.pin[i]||''}"
+            oninput="pinInput(${i},this.value)" onkeydown="pinKey(event,${i})"
+            style="width:48px;height:54px;font-size:24px;">
+        `).join('')}
+      </div>
+      <div style="text-align:center;font-size:11.5px;color:#9e9e9e;margin-top:2px;">
+        Enter a 4-digit numeric PIN you'll remember
+      </div>
+    </div>
+
+    <div style="margin-top:12px;">
+      <div class="term-row" onclick="toggleTerm('termsMain')">
+        <div class="term-cb ${data.termsMain?'on':''}"><span class="msi">check</span></div>
+        <div class="term-text">
+          <span class="req">[Required]</span> I have read and agree to the
+          <span class="term-link">Terms of Service</span> and <span class="term-link">Privacy Policy</span>.
+        </div>
+      </div>
+      <div class="term-row" onclick="toggleTerm('termsRisk')">
+        <div class="term-cb ${data.termsRisk?'on':''}"><span class="msi">check</span></div>
+        <div class="term-text">
+          <span class="req">[Required]</span> I understand the <span class="term-link">Risk Disclosure</span>.
+          Trading leveraged products carries risk of loss exceeding deposits.
+        </div>
+      </div>
+      <div class="term-row" onclick="toggleTerm('termsPromo')">
+        <div class="term-cb ${data.termsPromo?'on':''}"><span class="msi">check</span></div>
+        <div class="term-text">
+          <span class="opt">[Optional]</span> Send me product updates, market analysis, and promotional offers.
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── Step 4: Complete ──
+function step4(){
+  const acctNum = 'ALX-' + Math.floor(10000000 + Math.random()*89999999);
+  data.acctNum = data.acctNum || acctNum;
+  return `
+    <div class="suc-wrap">
+      <div class="suc-ico-big"><span class="msi">check</span></div>
+      <div class="suc-title-big">Welcome to ALPEXA</div>
+      <div class="suc-sub-big">Your account has been created.<br>An email with your details has been sent to ${data.email||'you'}.</div>
+
+      <div class="acct-card">
+        <button class="copy-btn" onclick="copyAcct()"><span class="msi" style="font-size:13px">content_copy</span> Copy</button>
+        <div class="acct-card-label">YOUR CUSTOMER ID</div>
+        <div class="acct-card-num">${data.custId||data.acctNum}</div>
+        <div class="acct-card-meta">
+          <div><span class="l">SPORTS</span><span class="v">${data.accts?data.accts.sports:'—'}</span></div>
+          <div><span class="l">CRYPTO</span><span class="v">${data.accts?data.accts.crypto:'—'}</span></div>
+          <div><span class="l">FX</span><span class="v">${data.accts?data.accts.fx:'—'}</span></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;width:100%;font-size:12px;color:#9e9e9e;">
+        <span class="msi" style="color:#2196F3;font-size:18px">info</span>
+        <span style="flex:1;line-height:1.5">
+          Keep your account number safe. You'll need it to sign in along with your password.
+        </span>
+      </div>
+    </div>
+  `;
+}
+
+// ── Validation ──
+function validPersonal(){
+  return data.firstName.trim() && data.lastName.trim()
+    && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)
+    && data.phone.trim().length >= 7
+    && data.dob && data.country;
+}
+function validSecurity(){
+  return data.password.length >= 8 && data.pin.length === 4
+    && data.termsMain && data.termsRisk;
+}
+function pwStrength(pw){
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (pw.length >= 12) score++;
+  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+  if (/\d/.test(pw) && /[^A-Za-z0-9]/.test(pw)) score++;
+  if (!pw) return { score:0, label:'Use 8+ characters with a mix of cases, numbers, and symbols' };
+  return { score, label: ['Too short','Weak','Fair','Good','Strong'][score] || 'Strong' };
+}
+function updateStrength(){
+  const r = pwStrength(data.password);
+  const bars = document.getElementById('strBars');
+  if (bars) bars.innerHTML = [1,2,3,4].map(n => `<div class="s-bar ${n <= r.score ? 'f'+r.score : ''}"></div>`).join('');
+  const txt = document.getElementById('strTxt');
+  if (txt) txt.textContent = r.label;
+  const foot = document.getElementById('foot');
+  if (foot) foot.innerHTML = footBtns('Create Account', validSecurity(), 3);
+}
+
+// ── Setters ──
+function setData(k,v){ data[k]=v; renderStep(); }
+function setField(k,v){
+  data[k]=v;
+  const foot = document.getElementById('foot');
+  if (cur === 1) foot.innerHTML = footBtns('Continue', validPersonal(), 1);
+  if (cur === 3) foot.innerHTML = footBtns('Create Account', validSecurity(), 3);
+}
+function toggleTerm(k){ data[k] = !data[k]; renderStep(); }
+
+// ── PIN handling ──
+function pinInput(i, v){
+  v = v.replace(/[^0-9]/g,'').slice(0,1);
+  data.pin = (data.pin.slice(0,i) + v + data.pin.slice(i+1)).slice(0,4);
+  const cells = document.querySelectorAll('.pin-cell');
+  cells[i].value = v;
+  if (v && i < 3) cells[i+1].focus();
+  cells.forEach((c,j) => c.classList.toggle('filled', !!data.pin[j]));
+  const foot = document.getElementById('foot');
+  if (foot) foot.innerHTML = footBtns('Create Account', validSecurity(), 3);
+}
+function pinKey(e, i){
+  if (e.key === 'Backspace' && !e.target.value && i > 0) {
+    document.querySelectorAll('.pin-cell')[i-1].focus();
+  }
+}
+
+// ── OTP handling ──
+function otpInput(i, v){
+  v = v.replace(/[^0-9]/g,'').slice(0,1);
+  data.otp = (data.otp.slice(0,i) + v + data.otp.slice(i+1)).slice(0,6);
+  const cells = document.querySelectorAll('.otp-cell');
+  cells[i].value = v;
+  if (v && i < 5) cells[i+1].focus();
+  cells.forEach((c,j) => c.classList.toggle('filled', !!data.otp[j]));
+  const foot = document.getElementById('foot');
+  foot.innerHTML = footBtns('Verify', data.otp.length === 6, 2);
+}
+function otpKey(e, i){
+  if (e.key === 'Backspace' && !e.target.value && i > 0) {
+    document.querySelectorAll('.otp-cell')[i-1].focus();
+  }
+}
+function resendOTP(){
+  data.otpSent = generateOTP();
+  data.otp = '';
+  document.querySelectorAll('.otp-cell').forEach(c => { c.value = ''; c.classList.remove('filled'); });
+  const errEl = document.getElementById('otpError');
+  if (errEl) errEl.style.display = 'none';
+  showToast('New code sent: ' + data.otpSent);
+  console.log('[ALPEXA OTP] New code:', data.otpSent);
+  startResendTimer();
+  startOTPTimer();
+}
+function generateOTP(){
+  let c = '';
+  for (let i = 0; i < 6; i++) c += Math.floor(Math.random() * 10);
+  return c;
+}
+let resendTimer = null;
+function startResendTimer(){
+  let sec = 30;
+  const btn = document.getElementById('resendBtn');
+  if (!btn) return;
+  btn.disabled = true;
+  clearInterval(resendTimer);
+  resendTimer = setInterval(() => {
+    sec--;
+    if (btn) btn.textContent = `Resend code (${sec}s)`;
+    if (sec <= 0) {
+      clearInterval(resendTimer);
+      if (btn) { btn.disabled = false; btn.textContent = 'Resend code'; }
+    }
+  }, 1000);
+}
+let otpTimerInt = null;
+function startOTPTimer(){
+  let sec = 179;
+  clearInterval(otpTimerInt);
+  otpTimerInt = setInterval(() => {
+    sec--;
+    const m = Math.floor(sec/60), s = sec%60;
+    const el = document.getElementById('otpTimer');
+    if (el) el.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    if (sec <= 0) clearInterval(otpTimerInt);
+  }, 1000);
+}
+
+// ── Pw toggle ──
+function togglePw(){
+  const inp = document.getElementById('pwInput');
+  const ico = document.getElementById('eyeIcon');
+  if (inp.type === 'password') { inp.type = 'text'; ico.textContent = 'visibility_off'; }
+  else { inp.type = 'password'; ico.textContent = 'visibility'; }
+}
+
+// ── Nav ──
+async function createOnServer(){
+  var cust='P-'+Math.floor(1000+Math.random()*9000);
+  function aN(p){return p+'-'+Math.floor(100000+Math.random()*900000);}
+  data.custId=cust; data.accts={sports:aN('SP'),crypto:aN('CR'),fx:aN('FX')}; data.acctNum=data.accts.sports;
+  if(!window._db) throw new Error('No server connection');
+  var r1=await window._db.from('players').insert({cust_id:cust,name:(data.firstName+' '+data.lastName).trim(),email:data.email}).select().single();
+  if(r1.error) throw r1.error;
+  var rows=[{player_id:r1.data.id,server:'sports',acct_no:data.accts.sports,balance:0},{player_id:r1.data.id,server:'crypto',acct_no:data.accts.crypto,balance:0},{player_id:r1.data.id,server:'fx',acct_no:data.accts.fx,balance:0}];
+  var r2=await window._db.from('accounts').insert(rows);
+  if(r2.error) throw r2.error;
+}
+function nextStep(){
+  if (cur === 0) { cur = 1; renderStep(); }
+  else if (cur === 1) {
+    if (!validPersonal()) return;
+    cur = 2;
+    data.otpSent = generateOTP();
+    renderStep();
+    showToast('Code sent to ' + data.email + ': ' + data.otpSent);
+    console.log('[ALPEXA OTP] Verification code:', data.otpSent);
+    startOTPTimer();
+    startResendTimer();
+  }
+  else if (cur === 2) {
+    if (data.otp.length !== 6) return;
+    if (data.otp !== data.otpSent) {
+      const errEl = document.getElementById('otpError');
+      if (errEl) {
+        errEl.textContent = 'Incorrect code. Please check your email and try again.';
+        errEl.style.display = 'block';
+      }
+      // Shake the cells
+      document.querySelectorAll('.otp-cell').forEach(c => {
+        c.style.borderColor = '#e53935';
+        c.style.animation = 'shake 0.3s';
+        setTimeout(() => { c.style.animation = ''; c.style.borderColor = ''; }, 400);
+      });
+      return;
+    }
+    cur = 3; renderStep();
+  }
+  else if (cur === 3) {
+    if (!validSecurity()) return;
+    // Simulate API call
+    const foot = document.getElementById('foot');
+    foot.innerHTML = `<button class="primary-btn" disabled><div style="width:18px;height:18px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite"></div> Creating account…</button>
+      <style>@keyframes spin{to{transform:rotate(360deg)}}</style>`;
+    createOnServer().then(function(){ cur = 4; renderStep(); })
+      .catch(function(err){ showToast('Server error: '+((err&&err.message)||err)); cur=3; renderStep(); });
+  }
+}
+function goBack(){
+  if (cur === 0 || cur === 4) { window.location.href = 'login.html'; return; }
+  cur = Math.max(0, cur - 1); renderStep();
+}
+function goToApp(){
+  window.location.href = 'trading.html';
+}
+function copyAcct(){
+  if (data.acctNum) { navigator.clipboard?.writeText(data.acctNum); showToast('Account number copied'); }
+}
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';
+  clearTimeout(window.__toastT);
+  window.__toastT = setTimeout(() => { t.style.display = 'none'; }, 2200);
+}
+
+function openCountrySheet(){
+  document.getElementById('csheetBg').classList.add('open');
+  document.getElementById('csheetSearch').value='';
+  renderCountries(COUNTRIES);
+  setTimeout(()=>document.getElementById('csheetSearch').focus(),120);
+}
+function closeCountrySheet(e){
+  if (e && e.target && e.target.id !== 'csheetBg') return;
+  document.getElementById('csheetBg').classList.remove('open');
+}
+function renderCountries(list){
+  const el = document.getElementById('csheetList');
+  if (!list.length) { el.innerHTML = '<div class="cs-empty">No countries match your search.</div>'; return; }
+  el.innerHTML = list.map(c => `
+    <div class="cs-item ${data.country===c.name?'sel':''}" onclick="selectCountry('${c.name.replace(/'/g,"\\'")}','${c.dial}')">
+      <div class="cs-flag">${c.code}</div>
+      <div class="cs-name">${c.name}</div>
+      <div class="cs-dial">${c.dial}</div>
+      <span class="msi cs-chk">check_circle</span>
+    </div>
+  `).join('');
+}
+function filterCountries(q){
+  q = q.trim().toLowerCase();
+  if (!q) { renderCountries(COUNTRIES); return; }
+  renderCountries(COUNTRIES.filter(c =>
+    c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || c.dial.includes(q)
+  ));
+}
+function selectCountry(name, dial){
+  data.country = name;
+  if (!data.phone.trim() && dial) {
+    data.phone = dial + ' ';
+  }
+  closeCountrySheet({target:{id:'csheetBg'}});
+  renderStep();
+}
+
+renderStep();
 </script>
 </body>
 </html>
