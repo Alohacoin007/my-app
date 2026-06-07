@@ -366,6 +366,10 @@
   .wd-net-pill.on{border-color:var(--accent);background:rgba(26,115,232,.10);color:var(--accent);font-weight:700}
   /* deposit coin methods */
   .dp-methods{display:flex;gap:8px;margin-bottom:14px}
+  .dp-addr-box{display:flex;align-items:center;gap:8px;background:var(--surface-2,#eef0f3);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px}
+  .dp-addr{flex:1;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;word-break:break-all;color:var(--text)}
+  .dp-copy{flex:0 0 auto;background:var(--accent);color:#fff;border:none;border-radius:6px;padding:8px 13px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+  .dp-warn{font-size:11.5px;color:#b06a00;background:#fff6e6;border-radius:6px;padding:7px 10px;margin-bottom:12px}
   .dp-method{flex:1;display:flex;flex-direction:row;align-items:center;gap:11px;padding:12px 14px;border-radius:6px;background:var(--surface);border:1.5px solid var(--line);cursor:pointer;transition:.15s}
   .dp-method.on{border-color:var(--accent);background:rgba(71,159,246,.06)}
   .dpm-ic{width:34px;height:34px;border-radius:50%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;color:var(--text);flex:0 0 auto}
@@ -799,28 +803,24 @@
       <div class="grip"></div>
       <div class="sh"><h3>Deposit</h3><button class="close" id="dpCloseBtn">✕</button></div>
       <div class="tf-body">
-        <div class="wd-source">
-          <div class="wd-source-l"><span class="wd-src-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.6c4.5-.1 8.2 3.6 8.3 8.1.1 4.6-3.6 8.4-8.1 8.5C7.7 20.3 4 16.6 3.9 12 3.8 7.5 7.5 3.7 12 3.6Z"/><path d="M9.5 7.8c1.5-.1 3-.1 4.4.1 1.5.3 1.9 2.3.5 3-1.3.5-2.9.4-4.3.4m0 0c1.6-.1 3.4-.2 4.8.3 1.4.6 1.3 2.7-.3 3.1-1.4.4-3 .3-4.5.2M9.5 7.6v9.2M11.8 6v2M11.8 16.4v2"/></svg></span><div><b>Crypto Server</b><span id="dpSrcBal">$0.00</span></div></div>
-          <span class="wd-src-tag">CRYPTO ONLY</span>
+        <div class="wd-info">아래 <b>회사 입금 주소</b>로 USDT를 전송한 뒤, 보낸 금액을 입력하고 신청하세요. 입금이 확인되면 관리자가 승인합니다.</div>
+        <div class="tf-field"><label>네트워크</label></div>
+        <div class="wd-net" id="dpNet">
+          <button class="wd-net-pill on" data-net="TRC-20">USDT · TRC-20</button>
+          <button class="wd-net-pill" data-net="ERC-20">USDT · ERC-20</button>
         </div>
-        <div class="wd-route">
-          <div class="wd-route-step"><span class="wd-rs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.6c4.5-.1 8.2 3.6 8.3 8.1.1 4.6-3.6 8.4-8.1 8.5C7.7 20.3 4 16.6 3.9 12 3.8 7.5 7.5 3.7 12 3.6Z"/><path d="M9.5 7.8c1.5-.1 3-.1 4.4.1 1.5.3 1.9 2.3.5 3-1.3.5-2.9.4-4.3.4m0 0c1.6-.1 3.4-.2 4.8.3 1.4.6 1.3 2.7-.3 3.1-1.4.4-3 .3-4.5.2M9.5 7.6v9.2M11.8 6v2M11.8 16.4v2"/></svg></span><span>Crypto Server</span></div>
-          <span class="wd-route-arrow">→</span>
-          <div class="wd-route-step"><span class="wd-rs-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5c.1-1.2 1-2 2.2-2 4 .2 8 .1 12 0 1.2 0 2 .8 2 2-.2 2.6-.2 5.3 0 7.9.1 1.2-.7 2-1.9 2.1-4 .2-8.1.2-12.1 0-1.2 0-2-.8-2-2 .2-2.7.2-5.3-.2-8Z"/><path d="M15 12c-.1-1 .6-1.6 1.6-1.5 1.1.1 2.3 0 3.4.1M15.5 12c0 .9.5 1.5 1.4 1.5 1.1.1 2.3 0 3.5 0"/></svg></span><span>Your Wallet</span></div>
-        </div>
-        <div class="wd-info">Deposits arrive into the <b>Crypto server</b>. To bet on sports, transfer funds to the Sports server afterward.</div>
-        <div class="dp-methods" id="dpMethods">
-          <div class="dp-method on" data-c="USDT"><span class="dpm-ic">₮</span><div class="dpm-t"><b>USDT</b><span>TRC-20 · ERC-20</span></div></div>
-        </div>
+        <div class="tf-field"><label>회사 입금 주소 (이 주소로 USDT 전송)</label></div>
+        <div class="dp-addr-box"><span class="dp-addr" id="dpAddr">—</span><button class="dp-copy" id="dpCopy">복사</button></div>
+        <div class="dp-warn">⚠️ 더미(테스트) 주소예요. 실제 자금을 보내지 마세요.</div>
         <div class="tf-field">
-          <label>Deposit Amount (USDT)</label>
+          <label>보낸 금액 (USDT)</label>
           <input type="number" id="dpAmt" value="100" min="0" step="10">
         </div>
         <div class="tf-chips" id="dpChips">
           <div class="chip" data-set="50">$50</div><div class="chip" data-set="100">$100</div>
           <div class="chip" data-set="500">$500</div><div class="chip" data-set="1000">$1,000</div>
         </div>
-        <button class="place" id="dpConfirm">Confirm Deposit</button>
+        <button class="place" id="dpConfirm">입금 신청 (관리자 승인 대기)</button>
       </div>
     </div>
 
@@ -1816,19 +1816,25 @@
   document.getElementById('depBtn').onclick=()=>openDeposit();
 
   // ---------- deposit sheet (external wallet -> Crypto server) ----------
-  let dpCoin='USDT';
+  // Company deposit wallet addresses (DUMMY — replace with real ones later)
+  const DEPOSIT_ADDR={'TRC-20':'TXa1peXaDeposiTDummyWa11et5555Examp1eZ','ERC-20':'0x1A2b3C4d5E6f70819203A4b5C6d7E8f90A1b2C3d'};
+  let dpNet='TRC-20';
   const dpSheet=document.getElementById('dpSheet'),dpOverlay=document.getElementById('dpOverlay'),dpAmt=document.getElementById('dpAmt');
+  function updateDpAddr(){const el=document.getElementById('dpAddr');if(el)el.textContent=DEPOSIT_ADDR[dpNet]||'—';}
   function openDeposit(){
     if(isLocked()){showToast('🔒','Account locked','Self-exclusion is active');return;}
     syncSportsBal();
-    document.getElementById('dpSrcBal').textContent=usd(srvByKey('crypto').bal);
+    updateDpAddr();
     dpSheet.classList.add('show');dpOverlay.classList.add('show');
   }
   function closeDeposit(){dpSheet.classList.remove('show');dpOverlay.classList.remove('show');}
   document.getElementById('dpCloseBtn').onclick=closeDeposit;
   dpOverlay.onclick=closeDeposit;
-  document.getElementById('dpMethods').onclick=e=>{const m=e.target.closest('.dp-method');if(!m)return;
-    document.querySelector('.dp-method.on').classList.remove('on');m.classList.add('on');dpCoin=m.dataset.c;};
+  document.getElementById('dpNet').onclick=e=>{const p=e.target.closest('.wd-net-pill');if(!p)return;
+    document.querySelectorAll('#dpNet .wd-net-pill').forEach(x=>x.classList.remove('on'));p.classList.add('on');dpNet=p.dataset.net;updateDpAddr();};
+  document.getElementById('dpCopy').onclick=()=>{const a=DEPOSIT_ADDR[dpNet]||'';
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(a).then(()=>showToast('📋','주소 복사됨',a.slice(0,12)+'…')).catch(()=>showToast('📋','회사 입금 주소',a));}
+    else showToast('📋','회사 입금 주소',a);};
   document.getElementById('dpChips').onclick=e=>{const c=e.target.closest('.chip');if(!c)return;
     dpAmt.value=c.dataset.set;};
   document.getElementById('dpConfirm').onclick=()=>{
@@ -1837,12 +1843,12 @@
     if(checkDepositLimit(v)){showToast('🛡️','Deposit limit exceeded',`Daily limit ${usd(settings.depositLimit)}`);return;}
     const reqId='dp_'+Date.now();
     const reqs=loadWithdrawals();
-    reqs.unshift({id:reqId,ts:Date.now(),type:'deposit',server:'Sports',asset:dpCoin,amount:v,fee:0,net:v,status:'pending'});
+    reqs.unshift({id:reqId,ts:Date.now(),type:'deposit',server:'Sports',asset:'USDT',network:dpNet,address:DEPOSIT_ADDR[dpNet],amount:v,fee:0,net:v,status:'pending'});
     saveWithdrawals(reqs);
-    txns.unshift({ts:Date.now(),ic:'⏳',t1:'Deposit',t2:`${dpCoin} · Pending approval`,amt:+v,reqId:reqId});
+    txns.unshift({ts:Date.now(),ic:'⏳',t1:'Deposit',t2:`USDT (${dpNet}) · Pending approval`,amt:+v,reqId:reqId});
     closeDeposit();updateWallet();
-    notify('⏳','Deposit requested',`${usd(v)} ${dpCoin} · awaiting back-office approval`,'deposits');
-    showToast('⏳','Deposit requested','Pending back-office approval');
+    notify('⏳','Deposit requested',`${usd(v)} USDT (${dpNet}) · awaiting approval`,'deposits');
+    showToast('⏳','입금 신청됨','관리자 확인 후 반영됩니다');
   };
 
   // ---------- transfer between servers (Sports <-> Crypto only) ----------
