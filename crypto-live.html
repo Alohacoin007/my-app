@@ -10472,11 +10472,28 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
   const RANGE_OPEN   = { '1m': 0.9998, '5m': 0.999, '30m': 0.997, '1h': 0.995, '4h': 0.99, '1D': 0.981, '1W': 0.965 };
   const close = livePrice;
   const open  = (meta.price || 1) * (RANGE_OPEN[range] || 0.98);
-  const series = React.useMemo(() => {
+
+  // Real historical chart data (CoinGecko) for the wider ranges; falls back
+  // to the synthetic series for very short ranges or if the fetch fails.
+  const [realSeries, setRealSeries] = React.useState(null);
+  React.useEffect(() => {
+    let alive = true;
+    setRealSeries(null);
+    if (typeof alpexaFetchChart === 'function') {
+      alpexaFetchChart(sym, range)
+        .then((arr) => { if (alive && arr && arr.length > 3) setRealSeries(arr); })
+        .catch(() => {});
+    }
+    return () => { alive = false; };
+  }, [sym, range]);
+
+  const synthSeries = React.useMemo(() => {
     const n = RANGE_POINTS[range] || 78;
     return makeChartSeries(open, close, n, (meta.seed || 100) + range.charCodeAt(0));
   }, [range, sym, open, close]);
-  const baseline = open;
+  const usingReal = !!(realSeries && realSeries.length > 3);
+  const series    = usingReal ? realSeries : synthSeries;
+  const baseline  = usingReal ? series[0] : open;
   const scrubPrice = scrubIdx !== null && series[scrubIdx] != null ? series[scrubIdx] : close;
   const chartChange = scrubPrice - baseline;
   const chartPct    = (chartChange / baseline) * 100;
@@ -12784,6 +12801,33 @@ async function alpexaLoadLivePrices() {
   const data = await res.json();
   const hits = alpexaApplyLivePrices(data);
   console.log('[ALPEXA] live prices applied to', hits, 'rows');
+}
+
+// Real historical chart data (CoinGecko market_chart). Cached per coin+span
+// so flipping ranges / reopening a coin does not re-hit the network.
+const __alpexaChartCache = {};
+async function alpexaFetchChart(sym, range) {
+  const id = ALPEXA_LIVE_IDS[sym];
+  if (!id) return null;                          // not a real coin → keep synthetic
+  if (range === '1m' || range === '5m') return null; // no free sub-5min data → synthetic
+  const days = (range === '1W') ? 7 : 1;
+  const key  = id + ':' + days;
+  let full = __alpexaChartCache[key];
+  if (!full) {
+    const url = 'https://api.coingecko.com/api/v3/coins/' + id +
+                '/market_chart?vs_currency=usd&days=' + days;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    full = (data.prices || []).map((p) => p[1]).filter((n) => typeof n === 'number' && n > 0);
+    __alpexaChartCache[key] = full;
+  }
+  // days=1 is ~5-min data; slice the tail so shorter ranges zoom in.
+  const TAIL = { '30m': 6, '1h': 12, '4h': 48 };
+  if (days === 1 && TAIL[range]) {
+    return full.length > TAIL[range] ? full.slice(-TAIL[range]) : full;
+  }
+  return full;                                   // 1D (24h) or 1W (7d)
 }
 
 (async () => {
