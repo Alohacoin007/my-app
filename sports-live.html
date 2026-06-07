@@ -260,6 +260,14 @@
   .cashout{background:var(--surface-2);border:1px solid var(--accent);color:var(--accent);padding:9px 14px;border-radius:6px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;line-height:1.2}
   .cashout span{font-size:10px;color:var(--dim);font-weight:700}
   .cashout:active{transform:scale(.97)}
+  .cash-btns{display:flex;gap:6px;align-items:stretch}
+  .cashout.half{flex:0 0 auto;min-width:64px;background:transparent;font-size:12px}
+  .betstats{margin:0 0 12px}
+  .bs-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .bs-cell{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 5px;text-align:center}
+  .bs-lbl{font-size:9px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.3px}
+  .bs-v{font-size:14px;font-weight:800;margin-top:3px;font-variant-numeric:tabular-nums}
+  .bs-v.pos{color:var(--pos)}.bs-v.neg{color:var(--neg)}
 
   /* wallet */
   .wallet{padding:0 16px 150px;overflow-y:auto}
@@ -646,6 +654,7 @@
         <div class="s active" data-seg="open" data-i18n="seg_open">Open</div>
         <div class="s" data-seg="settled" data-i18n="seg_settled">Settled</div>
       </div>
+      <div class="betstats" id="betStats"></div>
       <div class="tickets" id="tickets"></div>
     </div>
 
@@ -1053,6 +1062,7 @@
   let openBets = (function(){try{const s=localStorage.getItem('alpexa.openBets');return s?JSON.parse(s):[];}catch(e){return [];}})();
   let settledBets = (function(){try{const s=localStorage.getItem('alpexa.settledBets');return s?JSON.parse(s):[];}catch(e){return [];}})();
   function saveBets(){try{localStorage.setItem('alpexa.openBets',JSON.stringify(openBets));localStorage.setItem('alpexa.settledBets',JSON.stringify(settledBets));}catch(e){}}
+  const RESULTS={};  // gameId -> final result (for auto-settlement)
   let txns = (function(){
     try{ const s=localStorage.getItem('alpexa.txns'); if(s) return JSON.parse(s); }catch(e){}
     return [];
@@ -1636,7 +1646,7 @@
       <span class="res ${isOpen?'open':b.result}">${isOpen?'Open':b.result==='won'?'Won':b.result==='cashed'?'Cashed Out':'Lost'}</span></div>`;
     let foot;
     if(isOpen){foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b>Est. ${usd(b.potential)}</b></div>
-      <button class="cashout" data-cash="${b.id}">Cash Out ${usd(b.cashout)}<span>Settle now</span></button></div>`;}
+      <div class="cash-btns"><button class="cashout half" data-cashhalf="${b.id}">50%<span>${usd(b.cashout/2)}</span></button><button class="cashout" data-cash="${b.id}">Cash Out ${usd(b.cashout)}<span>Settle now</span></button></div></div>`;}
     else if(b.result==='cashed'){foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b class="c">Cashed ${usd(b.payout)}</b></div></div>`;}
     else{foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b class="${b.result==='won'?'g':'l'}">${b.result==='won'?'Win '+usd(b.payout):'Loss '+usd(b.stake)}</b></div></div>`;}
     return `<div class="ticket ${isOpen?'':b.result}">${head}${legsH}${foot}</div>`;
@@ -1648,42 +1658,103 @@
       el.innerHTML=openBets.length?openBets.map(b=>ticketHTML(b,true)).join(''):'<div class="empty empty-cta"><div class="ec-ic">🎫</div><div class="ec-t">No open bets</div><div class="ec-s">Place a bet to see it here</div><button class="ec-btn" id="ecGo">Browse games</button></div>';
       const go=document.getElementById('ecGo'); if(go)go.onclick=()=>document.querySelector('[data-page="home"]').click();
     }else{el.innerHTML=settledBets.map(b=>ticketHTML(b,false)).join('');}
+    renderStats();
+  }
+  function renderStats(){
+    const el=document.getElementById('betStats'); if(!el)return;
+    const sb=settledBets||[];
+    if(!sb.length){el.innerHTML='';return;}
+    const staked=sb.reduce((a,b)=>a+(b.stake||0),0), returned=sb.reduce((a,b)=>a+(b.payout||0),0), net=returned-staked;
+    const won=sb.filter(b=>b.result==='won').length, winRate=Math.round(won/sb.length*100), roi=staked?Math.round(net/staked*1000)/10:0, np=net>=0;
+    el.innerHTML=`<div class="bs-grid">
+      <div class="bs-cell"><div class="bs-lbl">P&amp;L</div><div class="bs-v ${np?'pos':'neg'}">${np?'+':'-'}${usd(Math.abs(net))}</div></div>
+      <div class="bs-cell"><div class="bs-lbl">ROI</div><div class="bs-v ${np?'pos':'neg'}">${np?'+':''}${roi}%</div></div>
+      <div class="bs-cell"><div class="bs-lbl">Win rate</div><div class="bs-v">${winRate}%</div></div>
+      <div class="bs-cell"><div class="bs-lbl">Settled</div><div class="bs-v">${sb.length}</div></div>
+    </div>`;
   }
   // event delegation: works regardless of re-render / tab switches
   document.getElementById('tickets').addEventListener('click',e=>{
+    const half=e.target.closest('[data-cashhalf]'); if(half){doCashout(half.dataset.cashhalf,0.5);return;}
     const btn=e.target.closest('[data-cash]');
     if(btn)doCashout(btn.dataset.cash);
   });
-  function doCashout(id){
+  function doCashout(id,frac){
     const b=openBets.find(x=>x.id===id);if(!b)return;
-    balance+=b.cashout; playTapSound();
-    txns.unshift({ts:Date.now(),ic:'💵',t1:'Cashout',t2:b.type+' · Just now',amt:+b.cashout});
-    // 5% cashback credit on net loss
-    const loss=b.stake-b.cashout;
-    if(loss>0){
-      totalLost+=loss;
-      const back=Math.round(loss*CASHBACK_RATE*100)/100;
-      if(back>0){credit+=back;
-        txns.unshift({ts:Date.now(),ic:'🎁',t1:'Cashback Credit',t2:`5% of ${usd(loss)} loss · Just now`,amt:+back});}
+    frac=(frac&&frac>0&&frac<1)?frac:1; const partial=frac<1;
+    const payAmt=Math.round(b.cashout*frac*100)/100, stakePart=b.stake*frac;
+    balance+=payAmt; playTapSound();
+    txns.unshift({ts:Date.now(),ic:'💵',t1:'Cashout',t2:(partial?'Partial '+Math.round(frac*100)+'% · ':'')+b.type+' · Just now',amt:+payAmt});
+    const loss=stakePart-payAmt;
+    if(loss>0){ totalLost+=loss; const back=Math.round(loss*CASHBACK_RATE*100)/100;
+      if(back>0){credit+=back; txns.unshift({ts:Date.now(),ic:'🎁',t1:'Cashback Credit',t2:`5% of ${usd(loss)} loss · Just now`,amt:+back});} }
+    if(partial){
+      b.stake=Math.round((b.stake-stakePart)*100)/100;
+      b.cashout=Math.round((b.cashout-payAmt)*100)/100;
+      if(b.potential) b.potential=Math.round(b.potential*(1-frac)*100)/100;
+      if(b.baseCash) b.baseCash=Math.round(b.baseCash*(1-frac)*100)/100;
+    } else {
+      settledBets.unshift({ id:'c'+b.id, type:b.type, cls:b.cls, stake:b.stake, result:'cashed', payout:payAmt, legs:(b.legs||[]).map(l=>({pk:l.pk||l.sel,gm:l.gm||l.game,am:l.am,st:'c'})) });
+      openBets=openBets.filter(x=>x.id!==id);
     }
-    // move to settled history as a cashed-out bet
-    settledBets.unshift({
-      id:'c'+b.id, type:b.type, cls:b.cls, stake:b.stake,
-      result:'cashed', payout:b.cashout,
-      legs:(b.legs||[]).map(l=>({pk:l.pk,gm:l.gm,am:l.am,st:'c'}))
-    });
-    openBets=openBets.filter(x=>x.id!==id);
     const nb=document.getElementById('navBadge');
     if(nb){nb.textContent=openBets.length||'';nb.style.display=openBets.length?'flex':'none';}
     renderTickets();updateWallet();
-    notify('💵','Bet cashed out',`${b.type} · +${usd(b.cashout)}`,'betResults');
-    if(loss>0){const back=Math.round(loss*CASHBACK_RATE*100)/100;if(back>0)notify('🎁','Cashback credit',`+${usd(back)} from your loss`,'promos');}
-    // toast feedback
+    notify('💵',partial?'Partial cash out':'Bet cashed out',`${b.type} · +${usd(payAmt)}`,'betResults');
     const toast=document.getElementById('creditToast');
-    document.getElementById('ctMain').textContent='Cashed out '+usd(b.cashout);
+    document.getElementById('ctMain').textContent=(partial?'Partial cash out ':'Cashed out ')+usd(payAmt);
     document.getElementById('ctSub').textContent='Added to your balance';
     toast.querySelector('.ct-ic').textContent='💵';
     toast.classList.remove('show'); void toast.offsetWidth; toast.classList.add('show');
+  }
+
+  // ---------- auto-settlement (grade open bets vs real results) ----------
+  function teamSide(team,r){ const t=(team||'').toLowerCase().trim(); if(!t)return null;
+    if(r.homeNm&&r.homeNm.toLowerCase()===t)return 'home';
+    if(r.awayNm&&r.awayNm.toLowerCase()===t)return 'away';
+    if(r.homeAb&&r.homeAb.toLowerCase()===t)return 'home';
+    if(r.awayAb&&r.awayAb.toLowerCase()===t)return 'away';
+    if(r.homeNm&&r.homeNm.toLowerCase().indexOf(t)>=0)return 'home';
+    if(r.awayNm&&r.awayNm.toLowerCase().indexOf(t)>=0)return 'away';
+    return null; }
+  function gradeLeg(l,r){
+    const sel=(l.sel||l.pk||'').trim(), mkt=(l.market||'').toLowerCase();
+    const hs=r.hs, as=r.as; if(typeof hs!=='number'||typeof as!=='number')return null;
+    if(mkt.indexOf('total')>=0||/^(over|under)/i.test(sel)){
+      const m=sel.match(/(over|under)\s+([\d.]+)/i); if(!m)return null;
+      const tot=hs+as, line=parseFloat(m[2]); if(tot===line)return 'push';
+      return (m[1].toLowerCase()==='over')?(tot>line?'won':'lost'):(tot<line?'won':'lost'); }
+    if(mkt.indexOf('money')>=0||/ ML$/i.test(sel)){
+      const team=sel.replace(/\s*ML$/i,'').trim(), side=teamSide(team,r); if(!side)return null;
+      const my=side==='home'?hs:as, op=side==='home'?as:hs; if(my===op)return 'push'; return my>op?'won':'lost'; }
+    if(mkt.indexOf('spread')>=0||/[-+][\d.]+\s*$/.test(sel)){
+      const m=sel.match(/([-+]?[\d.]+)\s*$/); if(!m)return null;
+      const line=parseFloat(m[1]), team=sel.replace(/\s*[-+]?[\d.]+\s*$/,'').trim(), side=teamSide(team,r); if(!side)return null;
+      const my=side==='home'?hs:as, op=side==='home'?as:hs, diff=(my+line)-op;
+      if(diff===0)return 'push'; return diff>0?'won':'lost'; }
+    return null; }
+  function settleBets(){
+    if(!openBets.length)return; let changed=false; const still=[];
+    openBets.forEach(b=>{
+      let allDone=true, anyLost=false, decMul=1;
+      (b.legs||[]).forEach(l=>{ const r=RESULTS[l.gid]; if(!r||!r.completed){allDone=false;return;}
+        const res=gradeLeg(l,r); if(res===null){allDone=false;return;}
+        if(res==='lost')anyLost=true; else if(res==='won')decMul*=dec(l.am); });
+      if(!allDone){still.push(b);return;}
+      changed=true;
+      if(anyLost){
+        settledBets.unshift({id:'st'+b.id,type:b.type,cls:b.cls,stake:b.stake,result:'lost',payout:0,legs:(b.legs||[]).map(l=>({pk:l.sel||l.pk,gm:l.game||l.gm,am:l.am,st:'l'}))});
+        txns.unshift({ts:Date.now(),ic:'❌',t1:'Bet lost',t2:`${b.type} · ${usd(b.stake)} stake`,amt:0});
+      } else {
+        const payout=Math.round(b.stake*decMul*100)/100; balance+=payout;
+        settledBets.unshift({id:'st'+b.id,type:b.type,cls:b.cls,stake:b.stake,result:'won',payout:payout,legs:(b.legs||[]).map(l=>({pk:l.sel||l.pk,gm:l.game||l.gm,am:l.am,st:'w'}))});
+        txns.unshift({ts:Date.now(),ic:'🏆',t1:'Bet Won',t2:`${b.type} · +${usd(payout)}`,amt:+payout});
+        try{notify('🏆','Bet won!',`${b.type} · +${usd(payout)}`,'betResults');}catch(e){}
+      }
+    });
+    if(changed){ openBets=still; syncSportsBal();
+      const nb=document.getElementById('navBadge'); if(nb){nb.textContent=openBets.length||'';nb.style.display=openBets.length?'flex':'none';}
+      renderTickets(); updateWallet(); }
   }
 
   // ---------- wallet (multi-server balances) ----------
@@ -2356,7 +2427,6 @@
         if (!hc || !ac || !hc.team || !ac.team) return null;
         const st = (ev.status && ev.status.type) ? ev.status.type : {};
         const state = st.state;
-        if (state === 'post' || st.completed === true) return null;  // hide finished games — no betting on ended games
         const home = { ab:String(hc.team.abbreviation||hc.team.shortDisplayName||'').toUpperCase(), nm:hc.team.shortDisplayName||hc.team.name||hc.team.displayName||'Home' };
         const away = { ab:String(ac.team.abbreviation||ac.team.shortDisplayName||'').toUpperCase(), nm:ac.team.shortDisplayName||ac.team.name||ac.team.displayName||'Away' };
         if (state==='in' || state==='post'){
@@ -2364,7 +2434,7 @@
           if(!isNaN(hs)) home.sc=hs; if(!isNaN(as)) away.sc=as;
         }
         const time = (st.shortDetail || st.description || '').trim() || 'TBD';
-        return { id:lg+'_'+ev.id, lg, live: state==='in', real: true, time, home, away, core: mkCore(home, away, ev), props: [] };
+        return { id:lg+'_'+ev.id, lg, state:state, live: state==='in', real: true, time, home, away, core: mkCore(home, away, ev), props: [] };
       }catch(e){ return null; }
     }
     async function fetchJson(url){
@@ -2381,7 +2451,9 @@
       ];
       let lastE;
       for (const u of tries){
-        try { const d = await fetchJson(u); return (d.events||[]).map(ev=>mapEvent(ev, L.lg)).filter(Boolean); }
+        try { const d = await fetchJson(u); const mapped=(d.events||[]).map(ev=>mapEvent(ev, L.lg)).filter(Boolean);
+          mapped.forEach(g=>{ if(g.state==='post' && typeof g.home.sc==='number' && typeof g.away.sc==='number'){ RESULTS[g.id]={completed:true,homeNm:g.home.nm,awayNm:g.away.nm,homeAb:g.home.ab,awayAb:g.away.ab,hs:g.home.sc,as:g.away.sc}; } });
+          return mapped.filter(g=>g.state!=='post'); }
         catch (e) { lastE = e; }
       }
       if (!firstErr) firstErr = L.lg + ': ' + ((lastE && lastE.message) || 'failed');
@@ -2449,6 +2521,7 @@
           GAMES.length = 0;
           all.forEach(g => GAMES.push(g));
           if (typeof renderGames === 'function') renderGames();
+          try{ settleBets(); }catch(e){}
           if(!isRefresh){
             setBadge('✅ 실시간 경기 ' + all.length + '개' + (oddsMatched? ' · 진짜배당 '+oddsMatched : ''), '#1e8e3e');
             setTimeout(() => { badge.style.transition = 'opacity .5s'; badge.style.opacity = '0'; setTimeout(() => badge.remove(), 600); }, 4000);
