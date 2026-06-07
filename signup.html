@@ -262,6 +262,17 @@ const COUNTRIES = [
 
 const STEPS = ['Account Type','Personal Info','Verify Email','Security','Complete'];
 var _db=null; try{ _db=window.supabase.createClient('https://grxnbgtfnaayeluenvqh.supabase.co','sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu'); window._db=_db; }catch(e){ console.error('Supabase init failed',e); }
+window.addEventListener('load',function(){
+  function banner(txt,bg){var b=document.getElementById('alpconn');if(!b){b=document.createElement('div');b.id='alpconn';b.style.cssText='position:fixed;left:0;right:0;top:0;z-index:99999;padding:9px 12px;font:700 12px system-ui,sans-serif;text-align:center;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.2)';document.body.appendChild(b);}b.textContent=txt;b.style.background=bg;}
+  banner('Checking server…','#1565c0');
+  if(!window._db){ banner('Supabase library failed to load (internet/CDN blocked)','#c62828'); return; }
+  try{
+    window._db.from('players').select('id',{count:'exact',head:true}).then(function(r){
+      if(r.error) banner('DB error: '+r.error.message+'  — run the table SQL','#c62828');
+      else { banner('Server connected','#1e8e3e'); setTimeout(function(){var b=document.getElementById('alpconn');if(b)b.remove();},2500); }
+    }).catch(function(e){ banner('Connection error: '+((e&&e.message)||e),'#c62828'); });
+  }catch(e){ banner('Error: '+((e&&e.message)||e),'#c62828'); }
+});
 let cur = 0;
 let data = {
   server: 'live',
