@@ -17,16 +17,14 @@
 <style>
   html, body { width: 100%; min-height: 100vh; background: #E5E7EB; }
   #root { width: 100%; }
-  /* On a real phone: fill the whole screen (drop the desktop device frame). */
+  /* On a real phone: scale the fixed 402x874 design to fill the screen
+     (its aspect ratio matches modern iPhones almost exactly). */
   @media (max-width: 600px) {
-    html, body { background: #000; min-height: 100dvh; }
-    .stage { padding: 0 !important; min-height: 100dvh !important; background: #000 !important; }
-    .phone-shell { width: 100vw !important; height: 100vh !important; height: 100dvh !important; border-radius: 0 !important; box-shadow: none !important; }
-  }
-  /* When installed to the home screen, hide the mock chrome and clear the notch. */
-  @media (display-mode: standalone) {
-    .ios-island, .ios-statusbar, .ios-home-indicator { display: none !important; }
-    .ios-content-wrap { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+    html, body { background: #000; height: 100dvh; overflow: hidden; }
+    .stage { padding: 0 !important; min-height: 100dvh !important; height: 100dvh !important; overflow: hidden; background: #000 !important; }
+    .phone-shell { border-radius: 0 !important; box-shadow: none !important;
+      transform: scale(min(calc(100vw / 402), calc(100dvh / 874)));
+      transform-origin: center center; }
   }
 </style>
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
