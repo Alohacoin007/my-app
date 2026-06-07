@@ -328,6 +328,8 @@
   .tf-sel{display:flex;gap:8px;justify-content:center;scrollbar-width:none;padding-bottom:2px}
   .tf-sel::-webkit-scrollbar{display:none}
   .tf-chip{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:10px 14px;border-radius:6px;background:var(--surface);border:1.5px solid var(--line);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;transition:.15s}
+  .tf-chip-info{display:flex;flex-direction:column;line-height:1.25}
+  .tf-chip-bal{font-size:11px;color:var(--dim);font-weight:600;font-variant-numeric:tabular-nums}
   .tf-chip .d{width:9px;height:9px;border-radius:50%}
   .tf-chip .d.green{background:#1e8e3e}.tf-chip .d.blue{background:#1a73e8}
   .tf-chip .d.gray{background:#5f6368}.tf-chip .d.purple{background:#7c4dff}
@@ -1673,6 +1675,8 @@
   let totalLost=0;   // cumulative net losses (for 5% cashback credit)
   const CASHBACK_RATE=0.05;
   function syncSportsBal(){sportsSrv().bal=balance;try{localStorage.setItem('alpexa.sportsBalance',String(balance));}catch(e){}}
+  function saveCryptoBal(){try{const c=SERVERS.find(s=>s.key==='crypto');if(c)localStorage.setItem('alpexa.cryptoBalance',String(c.bal));}catch(e){}}
+  (function(){try{const s=localStorage.getItem('alpexa.cryptoBalance');if(s!==null){const c=SERVERS.find(x=>x.key==='crypto');if(c)c.bal=parseFloat(s);}}catch(e){}})();
   // ---- Shared withdrawal requests (shared with the Manager dashboard via localStorage) ----
   const WD_STORE='alpexa.withdrawals';
   function loadWithdrawals(){try{return JSON.parse(localStorage.getItem(WD_STORE)||'[]');}catch(e){return [];}}
@@ -1708,7 +1712,7 @@
       if(type==='withdraw' && w.status==='rejected' && !w.refunded){ balance+=w.amount; w.refunded=true; changed=true; updateTxnByReq(w.id,{ic:'↩️',t2:`Rejected by admin · refunded`,amt:0}); }
       if(type==='deposit' && w.status==='approved' && !w.credited){ balance+=w.amount; w.credited=true; changed=true; updateTxnByReq(w.id,{ic:'⬇️',t2:`${w.asset||'USDT'} · Approved`}); }
       if(type==='deposit' && w.status==='rejected' && !w.handled){ w.handled=true; changed=true; updateTxnByReq(w.id,{ic:'⛔',t2:`${w.asset||'USDT'} · Rejected by admin`,amt:0}); }
-      if(type==='transfer' && w.status==='approved' && !w.done){ w.done=true; changed=true; const cr=srvByKey('crypto'); if(cr) cr.bal+=w.amount; updateTxnByReq(w.id,{t2:`${w.from||'Sports'} → ${w.to||'Crypto'} · Approved`}); }
+      if(type==='transfer' && w.status==='approved' && !w.done){ w.done=true; changed=true; const cr=srvByKey('crypto'); if(cr){ cr.bal+=w.amount; saveCryptoBal(); } updateTxnByReq(w.id,{t2:`${w.from||'Sports'} → ${w.to||'Crypto'} · Approved`}); }
       if(type==='transfer' && w.status==='rejected' && !w.refunded){ balance+=w.amount; w.refunded=true; changed=true; updateTxnByReq(w.id,{ic:'↩️',t2:`${w.from||'Sports'} → ${w.to||'Crypto'} · Rejected · refunded`,amt:0}); }
     });
     if(changed){ saveWithdrawals(all); syncSportsBal(); saveTxns(); }
@@ -1851,7 +1855,8 @@
     const build=(elId,selKey,otherKey,isFrom)=>{
       document.getElementById(elId).innerHTML=tfServers.map(s=>`
         <div class="tf-chip ${s.key===selKey?'on':''}" data-key="${s.key}">
-        <span class="d ${s.ic}"></span>${s.short.replace('Alpexa ','')}</div>`).join('');
+        <span class="d ${s.ic}"></span>
+        <span class="tf-chip-info"><span>${s.short.replace('Alpexa ','')}</span><span class="tf-chip-bal">${usd(s.key==='sports'?balance:s.bal)}</span></span></div>`).join('');
       document.querySelectorAll('#'+elId+' .tf-chip').forEach(c=>c.onclick=()=>{
         const k=c.dataset.key;
         if(isFrom){
