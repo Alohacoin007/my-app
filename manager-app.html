@@ -276,7 +276,7 @@ setTimeout(function() {
     '.aw-empty{padding:24px 16px;text-align:center;color:#9E9E9E;font-size:13px}';
   document.head.appendChild(css);
 
-  var btn=document.createElement('button'); btn.id='awBtn'; btn.innerHTML='💸 출금 승인 <span class="n" id="awN">0</span>';
+  var btn=document.createElement('button'); btn.id='awBtn'; btn.innerHTML='💸 입출금 승인 <span class="n" id="awN">0</span>';
   var panel=document.createElement('div'); panel.id='awPanel';
   document.body.appendChild(btn); document.body.appendChild(panel);
 
@@ -285,20 +285,24 @@ setTimeout(function() {
     var n=document.getElementById('awN'); if(n)n.textContent=pendingCount();
     var pend=all.filter(function(w){return w.status==='pending';});
     var done=all.filter(function(w){return w.status!=='pending';}).slice(0,8);
-    var html='<div class="aw-h">출금 승인 대기 <button id="awX">✕</button></div>';
-    if(!pend.length) html+='<div class="aw-empty">대기 중인 출금이 없어요.</div>';
+    var html='<div class="aw-h">입출금 승인 대기 <button id="awX">✕</button></div>';
+    if(!pend.length) html+='<div class="aw-empty">대기 중인 요청이 없어요.</div>';
     pend.forEach(function(w){
+      var type=w.type||'withdraw';
+      var label=type==='deposit'?'입금':'출금';
+      var color=type==='deposit'?'#1B5E20':'#C62828';
       html+='<div class="aw-item">'+
-        '<div class="aw-row"><span>'+w.server+' · '+w.asset+' ('+(w.network||'')+')</span><b>'+usd(w.amount)+'</b></div>'+
-        '<div class="aw-row"><span>받는 금액 (수수료 후)</span><b>'+usd(w.net)+'</b></div>'+
-        '<div class="aw-addr">'+(w.address||'')+'</div>'+
+        '<div class="aw-row"><span><b style="color:'+color+'">'+label+'</b> · '+w.server+' · '+(w.asset||'USDT')+(w.network?' ('+w.network+')':'')+'</span><b>'+usd(w.amount)+'</b></div>'+
+        (type==='withdraw'?'<div class="aw-row"><span>받는 금액 (수수료 후)</span><b>'+usd(w.net)+'</b></div>':'')+
+        (w.address?'<div class="aw-addr">'+w.address+'</div>':'')+
         '<div class="aw-btns"><button class="aw-ok" data-ok="'+w.id+'">승인</button><button class="aw-no" data-no="'+w.id+'">거절</button></div>'+
       '</div>';
     });
     if(done.length){
       html+='<div class="aw-h" style="border-top:1px solid #ECEFF3">최근 처리</div>';
       done.forEach(function(w){
-        html+='<div class="aw-item"><div class="aw-row"><span>'+w.server+' · '+usd(w.amount)+'</span><span class="aw-status '+w.status+'">'+(w.status==='approved'?'승인됨':'거절됨')+'</span></div></div>';
+        var label=(w.type||'withdraw')==='deposit'?'입금':'출금';
+        html+='<div class="aw-item"><div class="aw-row"><span>'+label+' · '+w.server+' · '+usd(w.amount)+'</span><span class="aw-status '+w.status+'">'+(w.status==='approved'?'승인됨':'거절됨')+'</span></div></div>';
       });
     }
     panel.innerHTML=html;

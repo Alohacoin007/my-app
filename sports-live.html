@@ -1676,8 +1676,11 @@
     const all=loadWithdrawals(); let changed=false;
     all.forEach(w=>{
       if(w.server!=='Sports')return;
-      if(w.status==='rejected' && !w.refunded){ balance+=w.amount; w.refunded=true; changed=true;
+      const type=w.type||'withdraw';
+      if(type==='withdraw' && w.status==='rejected' && !w.refunded){ balance+=w.amount; w.refunded=true; changed=true;
         if(typeof txns!=='undefined') txns.unshift({ts:Date.now(),ic:'↩️',t1:'Withdraw refunded',t2:`Rejected by admin · ${usd(w.amount)} returned`,amt:+w.amount}); }
+      if(type==='deposit' && w.status==='approved' && !w.credited){ balance+=w.amount; w.credited=true; changed=true;
+        if(typeof txns!=='undefined') txns.unshift({ts:Date.now(),ic:'⬇️',t1:'Deposit',t2:`${w.asset||'USDT'} · Approved · ${usd(w.amount)}`,amt:+w.amount}); }
     });
     if(changed){ saveWithdrawals(all); syncSportsBal(); }
   }
@@ -1799,14 +1802,12 @@
     const v=parseFloat(dpAmt.value)||0;
     if(v<=0){showToast('⚠️','Enter a deposit amount');return;}
     if(checkDepositLimit(v)){showToast('🛡️','Deposit limit exceeded',`Daily limit ${usd(settings.depositLimit)}`);return;}
-    const src=srvByKey('crypto');
-    if(src.bal < v){showToast('⚠️','Insufficient balance',`Only ${usd(src.bal)} in ${src.short.replace('Alpexa ','')}`);return;}
-    src.bal-=v;                  // take from the source server
-    balance+=v; syncSportsBal(); // add to the Sports betting balance
-    txns.unshift({ts:Date.now(),ic:'⬇️',t1:'Deposit',t2:`${src.short.replace('Alpexa ','')} → Sports · Just now`,amt:+v});
+    const reqs=loadWithdrawals();
+    reqs.unshift({id:'dp_'+Date.now(),ts:Date.now(),type:'deposit',server:'Sports',asset:dpCoin,amount:v,fee:0,net:v,status:'pending'});
+    saveWithdrawals(reqs);
     closeDeposit();updateWallet();
-    notify('⬇️','Deposit complete',`${usd(v)} moved to Sports`,'deposits');
-    showToast('⬇️','Deposit complete',`${usd(v)} added to your Sports balance`);
+    notify('⏳','Deposit requested',`${usd(v)} ${dpCoin} · awaiting back-office approval`,'deposits');
+    showToast('⏳','Deposit requested','Pending back-office approval');
   };
 
   // ---------- transfer between servers (Sports <-> Crypto only) ----------
@@ -1926,7 +1927,7 @@
     const fee=v*WD_FEE, net=v-fee;
     balance-=v; syncSportsBal();   // hold the funds while the request is pending
     const reqs=loadWithdrawals();
-    reqs.unshift({id:'wd_'+Date.now(),ts:Date.now(),server:'Sports',asset:'USDT',network:wdNet,amount:v,fee:fee,net:net,address:addr,status:'pending'});
+    reqs.unshift({id:'wd_'+Date.now(),ts:Date.now(),type:'withdraw',server:'Sports',asset:'USDT',network:wdNet,amount:v,fee:fee,net:net,address:addr,status:'pending'});
     saveWithdrawals(reqs);
     txns.unshift({ts:Date.now(),ic:'⬆️',t1:'Withdraw',t2:`USDT (${wdNet}) → ${addr.slice(0,6)}…${addr.slice(-4)} · Pending approval`,amt:-v});
     closeWithdraw();updateWallet();
