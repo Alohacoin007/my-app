@@ -886,7 +886,7 @@
 
 <script>
   // ---------- real-mode reset (one-time): wipe demo data, start at $50,000 ----------
-  const ALPEXA_DATA_VERSION='real-2';
+  const ALPEXA_DATA_VERSION='real-3';
   try{
     if(localStorage.getItem('alpexa.dataVersion')!==ALPEXA_DATA_VERSION){
       localStorage.setItem('alpexa.sportsBalance','50000');
@@ -1682,10 +1682,21 @@
     all.forEach(w=>{
       if(w.server!=='Sports')return;
       const type=w.type||'withdraw';
-      // ensure every request has a matching activity row (back-fill legacy ones)
+      // ensure every request has a matching activity row reflecting its CURRENT status
       if(typeof txns!=='undefined' && !txns.some(t=>t.reqId===w.id)){
-        if(type==='deposit') txns.unshift({ts:w.ts||Date.now(),ic:'⏳',t1:'Deposit',t2:`${w.asset||'USDT'} · Pending approval`,amt:+w.amount,reqId:w.id});
-        else txns.unshift({ts:w.ts||Date.now(),ic:'⬆️',t1:'Withdraw',t2:`${w.asset||'USDT'}${w.network?' ('+w.network+')':''} · Pending approval`,amt:-w.amount,reqId:w.id});
+        let ic,t1,t2,amt;
+        if(type==='deposit'){
+          t1='Deposit';
+          if(w.status==='approved'){ic='⬇️';t2=`${w.asset||'USDT'} · Approved`;amt=+w.amount;}
+          else if(w.status==='rejected'){ic='⛔';t2=`${w.asset||'USDT'} · Rejected by admin`;amt=0;}
+          else {ic='⏳';t2=`${w.asset||'USDT'} · Pending approval`;amt=+w.amount;}
+        } else {
+          t1='Withdraw'; const dest=`${w.asset||'USDT'}${w.network?' ('+w.network+')':''}`;
+          if(w.status==='approved'){ic='⬆️';t2=`${dest} · Sent`;amt=-w.amount;}
+          else if(w.status==='rejected'){ic='↩️';t2=`Rejected by admin · refunded`;amt=0;}
+          else {ic='⬆️';t2=`${dest} · Pending approval`;amt=-w.amount;}
+        }
+        txns.unshift({ts:w.ts||Date.now(),ic:ic,t1:t1,t2:t2,amt:amt,reqId:w.id});
         changed=true;
       }
       if(type==='withdraw' && w.status==='approved' && !w.notified){ w.notified=true; changed=true; updateTxnByReq(w.id,{t2:`${w.asset||'USDT'} · Sent`}); }
