@@ -1039,6 +1039,7 @@
     return [];
   })();
   function saveTxns(){ try{ localStorage.setItem('alpexa.txns', JSON.stringify(txns)); }catch(e){} }
+  function updateTxnByReq(reqId,patch){ if(typeof txns==='undefined')return false; for(let i=0;i<txns.length;i++){ if(txns[i].reqId===reqId){ Object.assign(txns[i],patch); return true; } } return false; }
   // ---------- notifications ----------
   let notifs = [];
   function notify(ic,t1,t2,cat){
@@ -1684,7 +1685,10 @@
       if(type==='withdraw' && w.status==='rejected' && !w.refunded){ balance+=w.amount; w.refunded=true; changed=true;
         if(typeof txns!=='undefined') txns.unshift({ts:Date.now(),ic:'↩️',t1:'Withdraw refunded',t2:`Rejected by admin · ${usd(w.amount)} returned`,amt:+w.amount}); }
       if(type==='deposit' && w.status==='approved' && !w.credited){ balance+=w.amount; w.credited=true; changed=true;
-        if(typeof txns!=='undefined') txns.unshift({ts:Date.now(),ic:'⬇️',t1:'Deposit',t2:`${w.asset||'USDT'} · Approved · ${usd(w.amount)}`,amt:+w.amount}); }
+        if(!updateTxnByReq(w.id,{ic:'⬇️',t2:`${w.asset||'USDT'} · Approved`}) && typeof txns!=='undefined')
+          txns.unshift({ts:Date.now(),ic:'⬇️',t1:'Deposit',t2:`${w.asset||'USDT'} · Approved · ${usd(w.amount)}`,amt:+w.amount}); }
+      if(type==='deposit' && w.status==='rejected' && !w.handled){ w.handled=true; changed=true;
+        updateTxnByReq(w.id,{ic:'⛔',t2:`${w.asset||'USDT'} · Rejected by admin`,amt:0}); }
     });
     if(changed){ saveWithdrawals(all); syncSportsBal(); }
   }
@@ -1806,9 +1810,11 @@
     const v=parseFloat(dpAmt.value)||0;
     if(v<=0){showToast('⚠️','Enter a deposit amount');return;}
     if(checkDepositLimit(v)){showToast('🛡️','Deposit limit exceeded',`Daily limit ${usd(settings.depositLimit)}`);return;}
+    const reqId='dp_'+Date.now();
     const reqs=loadWithdrawals();
-    reqs.unshift({id:'dp_'+Date.now(),ts:Date.now(),type:'deposit',server:'Sports',asset:dpCoin,amount:v,fee:0,net:v,status:'pending'});
+    reqs.unshift({id:reqId,ts:Date.now(),type:'deposit',server:'Sports',asset:dpCoin,amount:v,fee:0,net:v,status:'pending'});
     saveWithdrawals(reqs);
+    txns.unshift({ts:Date.now(),ic:'⏳',t1:'Deposit',t2:`${dpCoin} · Pending approval`,amt:+v,reqId:reqId});
     closeDeposit();updateWallet();
     notify('⏳','Deposit requested',`${usd(v)} ${dpCoin} · awaiting back-office approval`,'deposits');
     showToast('⏳','Deposit requested','Pending back-office approval');
