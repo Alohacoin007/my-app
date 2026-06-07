@@ -78,6 +78,14 @@
   function sportsBal(){return num('alpexa.sportsBalance',0);}
   function cryptoBal(){return num('alpexa.cryptoBalance',3150);}
   function CO_ADDR(){return localStorage.getItem('alpexa.companyAddr')||'0xeB25999eF152AFcb70A7C1867d85814B13369C3c';}
+  // demo customer identity + 3 account numbers (generated once; real server issues these per user)
+  function customer(){
+    var c=getJSON('alpexa.customer',null);
+    if(!c){ function n(p){return p+'-'+Math.floor(100000+Math.random()*900000);}
+      c={id:'P-1001',name:'Player #1001',email:'demo@alpexa.io',acct:{sports:n('SP'),crypto:n('CR'),fx:n('FX')}};
+      setJSON('alpexa.customer',c); }
+    return c;
+  }
 
   function finance(){
     var R=reqs(), ob=openB(), sb=settB();
@@ -130,6 +138,7 @@
   }
 
   function viewApprovals(){
+    var cust=customer();
     var all=reqs(), pend=all.filter(function(w){return w.status==='pending';}),
         done=all.filter(function(w){return w.status!=='pending';}).sort(function(a,b){return (b.decidedTs||0)-(a.decidedTs||0);}).slice(0,8);
     var h='<div class="sec">Pending approvals</div>';
@@ -138,6 +147,7 @@
       var t=w.type||'withdraw', label=t==='deposit'?'DEPOSIT':t==='transfer'?'TRANSFER':'WITHDRAW';
       var meta=t==='transfer'?((w.from||'Sports')+' → '+(w.to||'Crypto')):((w.asset||'USDT')+(w.network?' ('+w.network+')':''));
       h+='<div class="card"><div class="row" style="border:none;padding:0 0 6px"><span class="badge '+t+'">'+label+'</span><span class="req-amt">'+usd(w.amount)+'</span></div>'+
+        '<div class="req-meta">👤 '+cust.id+' · '+cust.acct.sports+'</div>'+
         '<div class="req-meta">'+w.server+' · '+meta+' · '+ago(w.ts)+'</div>'+
         (t==='withdraw'?'<div class="req-meta">You receive (after fee): <b>'+usd(w.net)+'</b></div>':'')+
         (w.address?('<div class="req-addr-lbl">'+(t==='withdraw'?'▶ Send to · user wallet':'Deposit address')+'</div><div class="req-addr" data-copy="'+w.address+'">'+w.address+'</div>'):'')+
@@ -152,11 +162,14 @@
   }
 
   function viewPlayers(f){
-    var st=getJSON('alpexaSettings',{}); var kyc=localStorage.getItem('alpexa.kyc')||'pending';
+    var st=getJSON('alpexaSettings',{}); var kyc=localStorage.getItem('alpexa.kyc')||'pending'; var cust=customer();
     var dl=(st.depositLimit||0), ll=(st.lossLimit||0), se=(st.selfExcludeUntil||0);
     return '<div class="sec">Customers <span class="tag">1 / live demo</span></div>'+
-      '<div class="card"><div class="row" style="border:none;padding:0 0 8px"><b>Player #1001</b><span class="badge '+(kyc==='verified'?'won':'cashed')+'">KYC '+kyc+'</span></div>'+
-        '<div class="row"><span>This device</span><b class="muted">demo@alpexa</b></div>'+
+      '<div class="card"><div class="row" style="border:none;padding:0 0 8px"><b>'+cust.name+'</b><span class="badge '+(kyc==='verified'?'won':'cashed')+'">KYC '+kyc+'</span></div>'+
+        '<div class="row"><span>Customer ID · email</span><b class="muted">'+cust.id+' · '+cust.email+'</b></div>'+
+        '<div class="row"><span>Sports acct</span><b class="muted">'+cust.acct.sports+'</b></div>'+
+        '<div class="row"><span>Crypto acct</span><b class="muted">'+cust.acct.crypto+'</b></div>'+
+        '<div class="row"><span>FX acct</span><b class="muted">'+cust.acct.fx+'</b></div>'+
         '<div class="row"><span>Sports balance</span><b>'+usd(sportsBal())+'</b></div>'+
         '<div class="row"><span>Crypto balance</span><b>'+usd(cryptoBal())+'</b></div>'+
         '<div class="row"><span>Open bets / liability</span><b>'+f.openCount+' · '+usd(f.liab)+'</b></div>'+
@@ -198,13 +211,16 @@
   }
 
   function viewBets(){
+    var cust=customer();
     var feed=openB().map(function(b){return {b:b,st:'open'};}).concat(settB().map(function(b){return {b:b,st:b.result||'settled'};}));
     var h='<div class="sec">Bet feed (#3)</div><div class="card">';
     if(!feed.length) return h+'<div class="empty">No bets yet.</div></div>';
     feed.slice(0,40).forEach(function(x){var b=x.b, st=x.st;
       var leg=(b.legs&&b.legs[0])?(b.legs[0].pk||''):'';
       var more=(b.legs&&b.legs.length>1)?(' +'+(b.legs.length-1)):'';
-      h+='<div class="row"><span><b>'+(b.type||'Bet')+'</b> · '+usd(b.stake)+'<div class="req-meta" style="margin:2px 0 0">'+leg+more+'</div></span>'+
+      h+='<div class="row"><span><b>'+(b.type||'Bet')+'</b> · '+usd(b.stake)+
+          '<div class="req-meta" style="margin:2px 0 0">👤 '+cust.id+' · '+cust.acct.sports+'</div>'+
+          '<div class="req-meta" style="margin:1px 0 0">'+leg+more+'</div></span>'+
         '<span class="badge '+(st==='open'?'open':st)+'">'+(st==='open'?'OPEN':String(st).toUpperCase())+(b.payout?(' '+usd(b.payout)):'')+'</span></div>';
     });
     h+='</div><div class="hint" style="margin:0 14px">This account\'s tickets. With the server: every customer\'s bets live, with void/limit controls.</div>';
