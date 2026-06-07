@@ -289,10 +289,11 @@ setTimeout(function() {
     if(!pend.length) html+='<div class="aw-empty">대기 중인 요청이 없어요.</div>';
     pend.forEach(function(w){
       var type=w.type||'withdraw';
-      var label=type==='deposit'?'입금':'출금';
-      var color=type==='deposit'?'#1B5E20':'#C62828';
+      var label=type==='deposit'?'입금':type==='transfer'?'이체':'출금';
+      var color=type==='deposit'?'#1B5E20':type==='transfer'?'#1565C0':'#C62828';
+      var meta=type==='transfer'?((w.from||'Sports')+' → '+(w.to||'Crypto')):((w.asset||'USDT')+(w.network?' ('+w.network+')':''));
       html+='<div class="aw-item">'+
-        '<div class="aw-row"><span><b style="color:'+color+'">'+label+'</b> · '+w.server+' · '+(w.asset||'USDT')+(w.network?' ('+w.network+')':'')+'</span><b>'+usd(w.amount)+'</b></div>'+
+        '<div class="aw-row"><span><b style="color:'+color+'">'+label+'</b> · '+w.server+' · '+meta+'</span><b>'+usd(w.amount)+'</b></div>'+
         (type==='withdraw'?'<div class="aw-row"><span>받는 금액 (수수료 후)</span><b>'+usd(w.net)+'</b></div>':'')+
         (w.address?'<div class="aw-addr">'+w.address+'</div>':'')+
         '<div class="aw-btns"><button class="aw-ok" data-ok="'+w.id+'">승인</button><button class="aw-no" data-no="'+w.id+'">거절</button></div>'+
@@ -301,7 +302,7 @@ setTimeout(function() {
     if(done.length){
       html+='<div class="aw-h" style="border-top:1px solid #ECEFF3">최근 처리</div>';
       done.forEach(function(w){
-        var label=(w.type||'withdraw')==='deposit'?'입금':'출금';
+        var label=(w.type||'withdraw')==='deposit'?'입금':(w.type==='transfer'?'이체':'출금');
         html+='<div class="aw-item"><div class="aw-row"><span>'+label+' · '+w.server+' · '+usd(w.amount)+'</span><span class="aw-status '+w.status+'">'+(w.status==='approved'?'승인됨':'거절됨')+'</span></div></div>';
       });
     }

@@ -33,6 +33,7 @@
   .badge{font-size:11px;font-weight:800;padding:3px 9px;border-radius:7px}
   .badge.deposit{background:var(--pos-bg);color:var(--pos)}
   .badge.withdraw{background:var(--neg-bg);color:var(--neg)}
+  .badge.transfer{background:#E3F2FD;color:#1565C0}
   .req-amt{font-size:19px;font-weight:800;letter-spacing:-.4px}
   .req-meta{font-size:12.5px;color:var(--dim);margin-bottom:3px}
   .req-addr{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:#8a93a6;word-break:break-all;margin:4px 0 0}
@@ -106,10 +107,11 @@
     else{
       p.innerHTML=pend.map(function(w){
         var type=w.type||'withdraw';
-        var label=type==='deposit'?'입금 DEPOSIT':'출금 WITHDRAW';
+        var label=type==='deposit'?'입금 DEPOSIT':type==='transfer'?'이체 TRANSFER':'출금 WITHDRAW';
+        var meta=type==='transfer'?((w.from||'Sports')+' → '+(w.to||'Crypto')):((w.asset||'USDT')+(w.network?' ('+w.network+')':''));
         return '<div class="req">'+
           '<div class="req-top"><span class="badge '+type+'">'+label+'</span><span class="req-amt">'+usd(w.amount)+'</span></div>'+
-          '<div class="req-meta">'+w.server+' · '+(w.asset||'USDT')+(w.network?' ('+w.network+')':'')+' · '+ago(w.ts)+'</div>'+
+          '<div class="req-meta">'+w.server+' · '+meta+' · '+ago(w.ts)+'</div>'+
           (type==='withdraw'?'<div class="req-meta">받는 금액(수수료 후): <b>'+usd(w.net)+'</b></div>':'')+
           (w.address?'<div class="req-addr">'+w.address+'</div>':'')+
           '<div class="req-btns"><button class="ok" onclick="decide(\''+w.id+'\',\'approved\')">승인</button>'+
@@ -122,7 +124,7 @@
     if(!done.length){ h.innerHTML='<div class="empty">아직 처리한 내역이 없어요.</div>'; }
     else{
       h.innerHTML='<div class="hist">'+done.map(function(w){
-        var label=(w.type||'withdraw')==='deposit'?'입금':'출금';
+        var label=(w.type||'withdraw')==='deposit'?'입금':(w.type==='transfer'?'이체':'출금');
         return '<div class="hrow"><span>'+label+' · '+w.server+' · '+usd(w.amount)+'</span>'+
           '<span class="st '+w.status+'">'+(w.status==='approved'?'승인됨':'거절됨')+'</span></div>';
       }).join('')+'</div>';
