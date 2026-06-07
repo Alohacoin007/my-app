@@ -61,6 +61,8 @@
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="alpexa-sync.js?v=1"></script>
 </head>
 <body>
 <div class="stage">
@@ -7866,7 +7868,7 @@ function TransferHistoryPanel({ kind, transactions, setTransactions, flashAndClo
               : kind === 'deposit'
                 ? `${methodLabel(t.method)} → ${serverLabel(t.dest)} · ${fmtAgo(t.ts)}`
                 : `${methodLabel(t.method)} from ${serverLabel(t.source)} · ${fmtAgo(t.ts)}`;
-            const canApprove = st.label === 'Pending';
+            const canApprove = false; // approvals now happen in the back office only
             return (
               <React.Fragment key={t.id || i}>
                 {i > 0 ? <AcctDivider/> : null}
@@ -8690,7 +8692,7 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
               : kind === 'deposit'
                 ? `${methodLabel(t.method)} → ${serverLabel(t.dest)} · ${fmtAgo(t.ts)}`
                 : `${methodLabel(t.method)} from ${serverLabel(t.source)} · ${fmtAgo(t.ts)}`;
-            const canApprove = st.label === 'Pending';
+            const canApprove = false; // approvals now happen in the back office only
             return (
               <React.Fragment key={t.id || i}>
                 {i > 0 ? <AcctDivider/> : null}
@@ -12518,38 +12520,80 @@ function App() {
   // serverBalances.crypto back to balances.USDT on every mount. That broke
   // Transfer because the transfer would silently revert after navigation.
   // Removed — Transfer now persists correctly.
+  const newTxId = () => 't-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+  const serverName = (s) => s === 'crypto' ? 'Crypto' : s === 'fx' ? 'FX' : s === 'sports' ? 'Sports' : (s || '');
   const onTransferConfirmed = (fromId, toId, usd) => {
-    setServerBalances((b) => ({
-      ...b,
-      [fromId]: Math.max(0, (b[fromId] || 0) - usd),
-      [toId]:   (b[toId] || 0) + usd,
-    }));
-    // Crypto pool is mirrored by balances.USDT — keep them in sync so the
-    // Dashboard total reflects transfers cleanly.
-    if (fromId === 'crypto' && toId !== 'crypto') {
-      setBalances((b) => ({ ...b, USDT: Math.max(0, (b.USDT || 0) - usd) }));
-    } else if (toId === 'crypto' && fromId !== 'crypto') {
-      setBalances((b) => ({ ...b, USDT: (b.USDT || 0) + usd }));
-    }
-    pushTx({ type: 'transfer', sym: 'USDT', usd, from: fromId, to: toId });
+    // Approval-gated: do NOT move balances yet. Create a pending request the
+    // back office must approve; balances are applied when approval arrives.
+    const id = newTxId();
+    pushTx({ id, type: 'transfer', sym: 'USDT', usd, from: fromId, to: toId });
+    try { window.AlpexaSync && AlpexaSync.pushRequest({
+      id, type: 'transfer', server: 'Crypto', amount: usd,
+      from: serverName(fromId), to: serverName(toId), fromKey: fromId, toKey: toId, asset: 'USDT' }); } catch (e) {}
   };
 
   const onFundsConfirmed = (destId, netUsd, methodId) => {
-    // Demo: Card / ACH / Wire deposits are not actually wired to a real
-    // payment processor yet. We log a PENDING transaction so the user can
-    // see it in Deposit history, but the balance does NOT change until the
-    // back-office operator approves it (tap the row in Deposit history).
-    pushTx({ type: 'deposit', sym: 'USDT', usd: netUsd, method: methodId, dest: destId });
+    // Pending deposit — balance changes only after back-office approval.
+    const id = newTxId();
+    pushTx({ id, type: 'deposit', sym: 'USDT', usd: netUsd, method: methodId, dest: destId });
+    try { window.AlpexaSync && AlpexaSync.pushRequest({
+      id, type: 'deposit', server: 'Crypto', amount: netUsd, asset: 'USDT', network: 'ERC-20',
+      address: (window.AlpexaSync && AlpexaSync.acctFor) ? 'crypto deposit' : '' }); } catch (e) {}
   };
 
   const onWithdrawConfirmed = (fromId, grossUsd, netUsd, methodId, destination) => {
-    // Same pattern as deposits — log pending withdrawal, balance is held
-    // (reserved) until operator approval. For demo we don't reserve either,
-    // matching the original deposit-pending behavior.
-    // `destination` carries the full bank info (bank/holder/routing/account/swift/address)
-    // so the back-office Withdrawal history can display what's needed to wire the funds.
-    pushTx({ type: 'withdraw', sym: 'USDT', usd: netUsd, gross: grossUsd, method: methodId, source: fromId, destination });
+    // Pending withdrawal — balance held until back-office approval.
+    const id = newTxId();
+    pushTx({ id, type: 'withdraw', sym: 'USDT', usd: netUsd, gross: grossUsd, method: methodId, source: fromId, destination });
+    var addr = '';
+    try { addr = destination ? (destination.address || destination.account || destination.bank || '') : ''; } catch (e) {}
+    try { window.AlpexaSync && AlpexaSync.pushRequest({
+      id, type: 'withdraw', server: 'Crypto', amount: grossUsd, net: netUsd, fee: Math.max(0, grossUsd - netUsd),
+      asset: 'USDT', network: methodId === 'wire' ? 'Wire' : methodId === 'ach' ? 'ACH' : 'ERC-20', address: addr }); } catch (e) {}
   };
+
+  // Apply the balance change for a request the back office just approved.
+  const txRef = React.useRef(transactions); txRef.current = transactions;
+  const applyApproval = React.useCallback((t) => {
+    if (t.type === 'deposit') {
+      if (t.dest === 'crypto') setBalances((b) => ({ ...b, USDT: (b.USDT || 0) + t.usd }));
+      setServerBalances((s) => ({ ...s, [t.dest]: (s[t.dest] || 0) + t.usd }));
+    } else if (t.type === 'withdraw') {
+      const g = t.gross || t.usd;
+      if (t.source === 'crypto') setBalances((b) => ({ ...b, USDT: Math.max(0, (b.USDT || 0) - g) }));
+      setServerBalances((s) => ({ ...s, [t.source]: Math.max(0, (s[t.source] || 0) - g) }));
+    } else if (t.type === 'transfer') {
+      setServerBalances((s) => ({ ...s, [t.from]: Math.max(0, (s[t.from] || 0) - t.usd), [t.to]: (s[t.to] || 0) + t.usd }));
+      if (t.from === 'crypto' && t.to !== 'crypto') setBalances((b) => ({ ...b, USDT: Math.max(0, (b.USDT || 0) - t.usd) }));
+      else if (t.to === 'crypto' && t.from !== 'crypto') setBalances((b) => ({ ...b, USDT: (b.USDT || 0) + t.usd }));
+    }
+  }, [setBalances, setServerBalances]);
+  React.useEffect(() => {
+    if (!window.AlpexaSync || !AlpexaSync.db) return;
+    let stop = false;
+    const tick = () => {
+      AlpexaSync.pullMine().then((rows) => {
+        if (stop || !rows || !rows.length) return;
+        const map = {}; rows.forEach((r) => { map[r.local_id] = r.status; });
+        const list = txRef.current || [];
+        const toApprove = list.filter((t) => map[t.id] === 'approved' && !t.approvedAt && !t.rejectedAt);
+        const toReject  = list.filter((t) => map[t.id] === 'rejected'  && !t.rejectedAt && !t.approvedAt);
+        if (!toApprove.length && !toReject.length) return;
+        toApprove.forEach(applyApproval);
+        setTransactions((cur) => cur.map((x) => {
+          if (map[x.id] === 'approved' && !x.approvedAt) return { ...x, approvedAt: Date.now() };
+          if (map[x.id] === 'rejected' && !x.rejectedAt) return { ...x, rejectedAt: Date.now() };
+          return x;
+        }));
+        if (typeof AudioFX !== 'undefined' && toApprove.length) { try { AudioFX.cash(); } catch (e) {} }
+      }).catch(() => {});
+    };
+    tick();
+    const iv = setInterval(() => { if (!document.hidden) tick(); }, 15000);
+    const vis = () => { if (!document.hidden) tick(); };
+    document.addEventListener('visibilitychange', vis);
+    return () => { stop = true; clearInterval(iv); document.removeEventListener('visibilitychange', vis); };
+  }, [applyApproval, setTransactions]);
 
   const flashAsset = (sym) => {
     setPulseAsset(sym);

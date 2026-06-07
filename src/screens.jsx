@@ -2823,6 +2823,16 @@ function AcctSheet({ kind, presetMethod, onNavigate, onClose }) {
   function submit() {
     if (kind !== 'report' && !amount) return;
     setStep('processing');
+    if (kind === 'deposit' || kind === 'withdraw' || kind === 'transfer') {
+      try {
+        var id = 'fx-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+        var amt = parseFloat(amount) || 0;
+        window.AlpexaSync && AlpexaSync.pushRequest({
+          id, type: kind, server: 'FX', amount: amt, asset: 'USD', network: method, address: '',
+          from: kind === 'transfer' ? 'FX' : '', to: kind === 'transfer' ? destAcct : '',
+        });
+      } catch (e) {}
+    }
     setTimeout(()=>setStep('done'), 1300);
   }
 
@@ -2853,15 +2863,15 @@ function AcctSheet({ kind, presetMethod, onNavigate, onClose }) {
               <Mi name="check" size={32} fill style={{color:'var(--buy)'}}/>
             </div>
             <div style={{fontSize:17, fontWeight:700, color:'var(--ink)', marginBottom:6}}>
-              {kind === 'deposit' && 'Deposit Confirmed'}
+              {kind === 'deposit' && 'Deposit Submitted'}
               {kind === 'withdraw' && 'Withdrawal Requested'}
-              {kind === 'transfer' && 'Transfer Complete'}
+              {kind === 'transfer' && 'Transfer Submitted'}
               {kind === 'report' && 'Report Sent'}
             </div>
             <div style={{fontSize:13, color:'var(--text-2)', lineHeight:1.5, marginBottom:18}}>
-              {kind === 'deposit' && <>$ {amount || '0'} added to your account.<br/>Available immediately for trading.</>}
-              {kind === 'withdraw' && <>$ {amount || '0'} withdrawal initiated.<br/>Expected arrival: 1–3 business days.</>}
-              {kind === 'transfer' && <>$ {amount || '0'} transferred to {destAcct} account.</>}
+              {kind === 'deposit' && <>$ {amount || '0'} deposit submitted.<br/>Pending back-office approval.</>}
+              {kind === 'withdraw' && <>$ {amount || '0'} withdrawal requested.<br/>Pending back-office approval.</>}
+              {kind === 'transfer' && <>$ {amount || '0'} transfer to {destAcct} submitted.<br/>Pending back-office approval.</>}
               {kind === 'report' && <>{reportType} {reportFormat.toUpperCase()} report<br/>has been sent to your email.</>}
             </div>
             <button onClick={()=>{
