@@ -556,6 +556,7 @@
   .nav .item.active .ic{background:rgba(26,115,232,.12)}
   .nav .item .nbadge{position:absolute;top:-1px;right:18px;background:var(--neg);color:#fff;font-size:8px;font-weight:700;min-width:15px;height:15px;border-radius:4px;display:flex;align-items:center;justify-content:center;padding:0 3px;border:1.5px solid var(--surface)}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 </head>
 <body class="m-parlay">
   <div class="phone">
@@ -1990,12 +1991,41 @@
   document.getElementById('wdNet').onclick=e=>{const p=e.target.closest('.wd-net-pill');if(!p)return;
     document.querySelector('.wd-net-pill.on').classList.remove('on');p.classList.add('on');wdNet=p.dataset.net;};
   // QR scan (demo: fills a sample address matching the selected network)
-  document.getElementById('wdScan').onclick=()=>{
-    const sample = wdNet==='ERC-20'
-      ? '0x'+Array.from({length:40},()=>'0123456789abcdef'[Math.floor(Math.random()*16)]).join('')
-      : 'T'+Array.from({length:33},()=>'0123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'[Math.floor(Math.random()*58)]).join('');
-    wdAddr.value=sample;
-    showToast('📷','QR scanned',`${wdNet} address filled`);
+  document.getElementById('wdScan').onclick=async ()=>{
+    if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)||typeof jsQR==='undefined'){
+      showToast('📷','Camera unavailable','Enter the address manually');return;
+    }
+    let ov=document.getElementById('qrScanOv');
+    if(!ov){
+      ov=document.createElement('div'); ov.id='qrScanOv';
+      ov.style.cssText='position:fixed;inset:0;z-index:99999;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px';
+      ov.innerHTML='<div style="color:#fff;font:600 14px system-ui;text-align:center;padding:0 20px">Point your camera at the recipient\'s QR code</div>'+
+        '<video id="qrVid" playsinline muted style="width:88%;max-width:340px;aspect-ratio:1;object-fit:cover;border-radius:16px;background:#111"></video>'+
+        '<button id="qrCancel" style="background:#fff;border:none;border-radius:10px;padding:11px 22px;font:700 14px system-ui;cursor:pointer">Cancel</button>';
+      document.body.appendChild(ov);
+    }
+    ov.style.display='flex';
+    const vid=document.getElementById('qrVid');
+    const cv=document.createElement('canvas'),cx=cv.getContext('2d');
+    let stream=null,raf=null,stopped=false;
+    function stop(){ stopped=true; if(raf)cancelAnimationFrame(raf); if(stream)stream.getTracks().forEach(t=>t.stop()); ov.style.display='none'; }
+    document.getElementById('qrCancel').onclick=stop;
+    try{
+      stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+      vid.srcObject=stream; await vid.play();
+      const tick=()=>{
+        if(stopped)return;
+        if(vid.readyState===vid.HAVE_ENOUGH_DATA){
+          cv.width=vid.videoWidth; cv.height=vid.videoHeight;
+          cx.drawImage(vid,0,0,cv.width,cv.height);
+          const img=cx.getImageData(0,0,cv.width,cv.height);
+          const code=jsQR(img.data,img.width,img.height);
+          if(code&&code.data){ let a=code.data.trim().replace(/^ethereum:/i,'').split('?')[0]; wdAddr.value=a; updateWdSummary(); stop(); showToast('✅','QR scanned','Address filled'); return; }
+        }
+        raf=requestAnimationFrame(tick);
+      };
+      raf=requestAnimationFrame(tick);
+    }catch(e){ stop(); showToast('📷','Camera blocked','Allow camera or type the address'); }
   };
   document.getElementById('wdConfirm').onclick=()=>{
     syncSportsBal();
