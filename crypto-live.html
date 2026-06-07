@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Alpexa · Dashboard</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -22,6 +22,18 @@
     0 50px 90px -30px rgba(0,0,0,0.28),
     0 24px 48px -24px rgba(0,0,0,0.18),
     0 0 0 1px rgba(0,0,0,0.06); }
+  /* On a real phone: fill the whole screen (no desktop "device frame"). */
+  @media (max-width: 600px) {
+    html, body { background: #0E1116; min-height: 100dvh; }
+    .stage { padding: 0 !important; min-height: 100dvh; background: #0E1116; }
+    .phone-shadow { box-shadow: none !important; border-radius: 0 !important; }
+    .phone-shell { width: 100vw !important; height: 100vh !important; height: 100dvh !important; border-radius: 0 !important; }
+  }
+  /* When installed to the home screen, hide the mock status bar and clear the notch. */
+  @media (display-mode: standalone) {
+    .fake-statusbar { display: none !important; }
+    .phone-shell { padding-top: env(safe-area-inset-top); }
+  }
   .alpexa-hide-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
   .alpexa-hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   @keyframes alpexa-movers-scroll {
@@ -351,7 +363,7 @@ function makeChartSeries(open, close, n, seed) {
 // iPhone-ish frame
 function Phone({ children, width = 390, height = 844, bg = RH.bg }) {
   return (
-    <div style={{
+    <div className="phone-shell" style={{
       width, height, background: bg, borderRadius: 54, overflow: 'hidden', position: 'relative',
       display: 'flex', flexDirection: 'column', color: RH.text,
       fontFamily: 'Geist, Inter, system-ui, sans-serif',
@@ -364,7 +376,7 @@ function Phone({ children, width = 390, height = 844, bg = RH.bg }) {
 // Status bar
 function StatusBar({ time = '9:41' }) {
   return (
-    <div style={{
+    <div className="fake-statusbar" style={{
       height: 50, padding: '14px 28px 0', display: 'flex',
       alignItems: 'center', justifyContent: 'space-between',
       fontSize: 15, fontWeight: 600, color: RH.text, flexShrink: 0,

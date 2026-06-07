@@ -1294,7 +1294,7 @@ function App() {
 // Mount
 function Root() {
   return (
-    <div style={{
+    <div className="stage" style={{
       minHeight:'100vh', width:'100%', display:'flex', alignItems:'center',
       justifyContent:'center', padding:'24px 0', background:'#E5E7EB'
     }}>
