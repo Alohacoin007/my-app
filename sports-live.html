@@ -1036,12 +1036,16 @@
     { id:'s3', type:'Same Game', cls:'sgp', stake:15, result:'won', payout:97.50,
       legs:[{pk:'LeBron Over 26.5 Pts',gm:'Lakers vs Warriors',am:-115,st:'w'},{pk:'Lakers +3.5',gm:'Lakers vs Warriors',am:-110,st:'w'}]},
   ];
-  let txns = [
+  let txns = (function(){
+    try{ const s=localStorage.getItem('alpexa.txns'); if(s) return JSON.parse(s); }catch(e){}
+    return [
     {ic:'💰',t1:'Bet Won',t2:'Same Game Parlay · Yesterday',amt:+97.50},
     {ic:'⬇️',t1:'Deposit',t2:'Credit card · 3 days ago',amt:+200.00},
     {ic:'🎫',t1:'Bet placed',t2:'3-leg Parlay · 3 days ago',amt:-25.00},
     {ic:'⬆️',t1:'Withdraw',t2:'Bank Transfer · 5 days ago',amt:-150.00},
-  ];
+    ];
+  })();
+  function saveTxns(){ try{ localStorage.setItem('alpexa.txns', JSON.stringify(txns)); }catch(e){} }
   // ---------- notifications ----------
   let notifs = [
     {ic:'🎁',t1:'Welcome bonus',t2:'$100 credit added to your account',time:'Just now',unread:true},
@@ -1765,6 +1769,7 @@
     return t.ts>=cutoff;
   }
   function renderTxns(){
+    saveTxns();
     const el=document.getElementById('txns'); if(!el)return;
     const list=txns.filter(t=>txnMatchesType(t)&&txnMatchesPeriod(t));
     if(!list.length){el.innerHTML='<div class="txn-empty">No transactions in this range</div>';return;}
