@@ -811,8 +811,7 @@
         <div class="wd-info">Send USDT to the <b>company deposit address</b> below, then enter the amount you sent and submit. Your deposit is credited once the back office confirms receipt.</div>
         <div class="tf-field"><label>Network</label></div>
         <div class="wd-net" id="dpNet">
-          <button class="wd-net-pill on" data-net="TRC-20">USDT · TRC-20</button>
-          <button class="wd-net-pill" data-net="ERC-20">USDT · ERC-20</button>
+          <button class="wd-net-pill on" data-net="ERC-20">USDT · ERC-20 (Ethereum)</button>
         </div>
         <div class="tf-field"><label>Company deposit address (send USDT here)</label></div>
         <div class="dp-addr-box"><span class="dp-addr" id="dpAddr">—</span><button class="dp-copy" id="dpCopy">Copy</button></div>
@@ -1335,25 +1334,12 @@
     }catch(_){return {...DEFAULT_SETTINGS};}
   })();
   function saveSettings(){try{localStorage.setItem('alpexaSettings',JSON.stringify(settings));}catch(_){}}
-  // Exciting "bet placed" sound (Web Audio, synthesized — no files needed)
+  // Synthesized SFX (Web Audio — no files needed)
   let _alpexaActx=null;
-  function playBetSound(){
-    try{
-      if(!(settings.notifications&&settings.notifications.sound))return;
-      _alpexaActx=_alpexaActx||new (window.AudioContext||window.webkitAudioContext)();
-      const ctx=_alpexaActx; if(ctx.state==='suspended')ctx.resume();
-      const now=ctx.currentTime;
-      const seq=[523.25,659.25,783.99,1046.50]; // rising C-E-G-C arpeggio
-      seq.forEach((f,i)=>{const t=now+i*0.075;const o=ctx.createOscillator(),g=ctx.createGain();
-        o.type='triangle';o.frequency.setValueAtTime(f,t);
-        g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.28,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+0.18);
-        o.connect(g).connect(ctx.destination);o.start(t);o.stop(t+0.2);});
-      const t2=now+0.32;const o2=ctx.createOscillator(),g2=ctx.createGain(); // final sparkle
-      o2.type='square';o2.frequency.setValueAtTime(1567.98,t2);
-      g2.gain.setValueAtTime(0.0001,t2);g2.gain.exponentialRampToValueAtTime(0.2,t2+0.02);g2.gain.exponentialRampToValueAtTime(0.0001,t2+0.28);
-      o2.connect(g2).connect(ctx.destination);o2.start(t2);o2.stop(t2+0.32);
-    }catch(e){}
-  }
+  function _actx(){ _alpexaActx=_alpexaActx||new (window.AudioContext||window.webkitAudioContext)(); if(_alpexaActx.state==='suspended')_alpexaActx.resume(); return _alpexaActx; }
+  function _blip(ctx,f,t,dur,vol,type){ const o=ctx.createOscillator(),g=ctx.createGain(); o.type=type||'triangle'; o.frequency.setValueAtTime(f,t); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+0.012); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); o.connect(g).connect(ctx.destination); o.start(t); o.stop(t+dur+0.02); }
+  function playBetSound(){ try{ if(!(settings.notifications&&settings.notifications.sound))return; const ctx=_actx(),now=ctx.currentTime; _blip(ctx,784,now,0.09,0.28,'triangle'); _blip(ctx,1174.66,now+0.05,0.10,0.28,'triangle'); }catch(e){} }
+  function playTapSound(){ try{ if(!(settings.notifications&&settings.notifications.sound))return; const ctx=_actx(),now=ctx.currentTime; _blip(ctx,520,now,0.07,0.30,'triangle'); }catch(e){} }
   // odds formatter (American or Decimal based on settings)
   const fmtAm=a=>{
     if(settings.oddsFormat==='decimal'){
@@ -1669,7 +1655,7 @@
   });
   function doCashout(id){
     const b=openBets.find(x=>x.id===id);if(!b)return;
-    balance+=b.cashout;
+    balance+=b.cashout; playTapSound();
     txns.unshift({ts:Date.now(),ic:'💵',t1:'Cashout',t2:b.type+' · Just now',amt:+b.cashout});
     // 5% cashback credit on net loss
     const loss=b.stake-b.cashout;
@@ -1857,8 +1843,8 @@
 
   // ---------- deposit sheet (external wallet -> Crypto server) ----------
   // Company deposit wallet addresses (DUMMY — replace with real ones later)
-  const DEPOSIT_ADDR={'TRC-20':'TXa1peXaDeposiTDummyWa11et5555Examp1eZ','ERC-20':'0x1A2b3C4d5E6f70819203A4b5C6d7E8f90A1b2C3d'};
-  let dpNet='TRC-20';
+  const DEPOSIT_ADDR={'ERC-20':'0xeB25999eF152AFcb70A7C1867d85814B13369C3c'};
+  let dpNet='ERC-20';
   const dpSheet=document.getElementById('dpSheet'),dpOverlay=document.getElementById('dpOverlay'),dpAmt=document.getElementById('dpAmt');
   function updateDpAddr(){const el=document.getElementById('dpAddr');if(el)el.textContent=DEPOSIT_ADDR[dpNet]||'—';}
   function openDeposit(){
