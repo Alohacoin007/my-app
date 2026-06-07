@@ -84,6 +84,13 @@
     <div class="co-hint">Saved address is used by the app's deposit screen.</div>
   </div>
 
+  <div class="bal">
+    <div class="lbl">Withdrawal network fee · USDT</div>
+    <input class="addr-in" id="feeIn" type="number" step="0.5" min="0">
+    <div class="co-btns"><button class="copybtn" id="feeSave">Save</button></div>
+    <div class="co-hint">Match Coinbase's current send fee. Charged to the user on withdrawal.</div>
+  </div>
+
   <div class="sec">Pending approvals</div>
   <div id="pending"></div>
 
@@ -157,6 +164,11 @@
   var CO_KEY='alpexa.companyAddr', CO_DEF='0xeB25999eF152AFcb70A7C1867d85814B13369C3c';
   function getCoAddr(){try{return localStorage.getItem(CO_KEY)||CO_DEF;}catch(e){return CO_DEF;}}
   var coIn=document.getElementById('coAddrIn'); if(coIn)coIn.value=getCoAddr();
+  var FEE_KEY='alpexa.wdFee';
+  var feeIn=document.getElementById('feeIn');
+  if(feeIn){ var fv=parseFloat(localStorage.getItem(FEE_KEY)); feeIn.value=(!isNaN(fv)&&fv>=0)?fv:5; }
+  var feeSave=document.getElementById('feeSave');
+  if(feeSave)feeSave.onclick=function(){ var v=parseFloat(feeIn.value); if(isNaN(v)||v<0){return;} try{localStorage.setItem(FEE_KEY,String(v));}catch(e){} feeSave.textContent='Saved ✓'; setTimeout(function(){feeSave.textContent='Save';},1300); };
   var coSave=document.getElementById('coSave');
   if(coSave)coSave.onclick=function(){var v=(coIn.value||'').trim(); if(!v)return; try{localStorage.setItem(CO_KEY,v);}catch(e){} coSave.textContent='Saved ✓'; setTimeout(function(){coSave.textContent='Save';},1300);};
   var resetBtn=document.getElementById('resetBtn');

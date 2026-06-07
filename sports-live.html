@@ -1611,14 +1611,7 @@
     const d=legs.reduce((a,l)=>a*dec(l.am),1),stake=parseInt(stakeInput.value)||legs.reduce((a,l)=>a+l.stake,0);
     const pot = mode==='single'? legs.reduce((a,l)=>a+l.stake*dec(l.am),0) : stake*d;
     if(stake>balance){showToast('⚠️','Insufficient balance','Transfer funds to Sports first');return;}
-    if(!window._placeArmed){
-      window._placeArmed=true;
-      const _p=document.getElementById('place'); _p.classList.add('confirm'); _p.textContent='Tap again to confirm · '+usd(pot);
-      if(placeTimer)clearTimeout(placeTimer); placeTimer=setTimeout(resetPlaceBtn,4000);
-      return;
-    }
-    window._placeArmed=false; if(placeTimer){clearTimeout(placeTimer);placeTimer=null;} document.getElementById('place').classList.remove('confirm');
-    // confirmed: place the bet
+    // single tap: place immediately
     const betType=mode==='single'?'Singles':mode==='sgp'?'Same Game':'Parlay';
     const legCount=legs.length;
     // baseline decimal-odds product at placement (for live cashout calc)
@@ -2028,7 +2021,7 @@
   };
 
   // ---------- withdraw sheet (from Sports balance · auto-routed via Crypto) ----------
-  const WD_FEE=0.005; // 0.5% network fee
+  function wdFee(){try{const x=parseFloat(localStorage.getItem('alpexa.wdFee'));return (!isNaN(x)&&x>=0)?x:5;}catch(e){return 5;}} // flat USDT network fee (set in back office)
   const wdSheet=document.getElementById('wdSheet'),wdOverlay=document.getElementById('wdOverlay'),
         wdAmt=document.getElementById('wdAmt'),wdAddr=document.getElementById('wdAddr');
   function updateWdSummary(){
@@ -2036,10 +2029,10 @@
     const bal=sportsSrv().bal, v=parseFloat(wdAmt.value)||0;
     document.getElementById('wdSrcBal').textContent=usd(bal);
     document.getElementById('wdAvail').textContent='Available '+usd(bal);
-    const fee=v*WD_FEE, net=Math.max(0,v-fee);
+    const fee=v>0?wdFee():0, net=Math.max(0,v-fee);
     document.getElementById('wdSummary').innerHTML=`
       <div class="r"><span class="k">Withdrawal Amount</span><span class="v">${usd(v)}</span></div>
-      <div class="r"><span class="k">Network Fee (0.5%)</span><span class="v">${fee>0?'-'+usd(fee):'Free'}</span></div>
+      <div class="r"><span class="k">Network Fee</span><span class="v">${fee>0?'-'+usd(fee):'Free'}</span></div>
       <div class="r t"><span class="k">You Receive</span><span class="v">${usd(net)}</span></div>`;
     const note=document.getElementById('wdNote');
     if(v>bal){
@@ -2112,7 +2105,7 @@
     if(v<=0){showToast('⚠️','Enter a withdrawal amount');return;}
     if(v>sportsSrv().bal){showToast('⚠️','Insufficient balance','Exceeds your Sports balance');return;}
     if(addr.length<8){showToast('⚠️','Invalid wallet address','Enter a valid USDT address');return;}
-    const fee=v*WD_FEE, net=v-fee;
+    const fee=wdFee(); if(v<=fee){showToast('⚠️','Amount too low','Must exceed the network fee '+usd(fee));return;} const net=v-fee;
     balance-=v; syncSportsBal();   // hold the funds while the request is pending
     const wid='wd_'+Date.now();
     const reqs=loadWithdrawals();
