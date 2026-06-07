@@ -68,10 +68,16 @@ window.AlpexaSync = (function () {
   }
 
   // Back office: approve / reject a request on the server.
+  // NOTE: supabase-js only fires the request when .then() is attached, so we
+  // must chain it here — otherwise the update is built but never sent.
   function setStatus(localId, status) {
     if (!db) return Promise.resolve({ skipped: true });
     return db.from('requests').update({ status: status, decided_at: new Date().toISOString() })
-      .eq('local_id', String(localId));
+      .eq('local_id', String(localId))
+      .then(function (res) {
+        if (res && res.error) console.warn('AlpexaSync setStatus error', res.error.message);
+        return res;
+      }, function (e) { console.warn('AlpexaSync setStatus failed', e); return { error: e }; });
   }
 
   return { db: db, me: me, acctFor: acctFor, pushRequest: pushRequest,
