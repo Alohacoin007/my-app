@@ -66,7 +66,7 @@
   <div id="content"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="alpexa-sync.js?v=2"></script>
+<script src="alpexa-sync.js?v=3"></script>
 <script>
   function getJSON(k,d){try{var v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}}
   function setJSON(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
@@ -262,13 +262,21 @@
         '<div class="hint">Temporary · clears balances, bets, requests & activity (keeps config).</div></div>';
   }
 
+  function toast(msg,bad){var t=document.getElementById('mtoast');if(!t){t=document.createElement('div');t.id='mtoast';t.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99999;padding:10px 16px;border-radius:10px;font:600 13px system-ui;color:#fff;max-width:90%;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.25)';document.body.appendChild(t);}t.textContent=msg;t.style.background=bad?'#C62828':'#1B5E20';t.style.display='block';clearTimeout(window.__mt);window.__mt=setTimeout(function(){t.style.display='none';},3500);}
   function decide(id,status){
     // local copy (this device's own requests, if any)
     var loc=getJSON('alpexa.withdrawals',[]); for(var i=0;i<loc.length;i++){if(loc[i].id===id){loc[i].status=status;loc[i].decidedTs=Date.now();break;}} setJSON('alpexa.withdrawals',loc);
     // server cache (so the UI updates instantly) + server write (so the customer's app sees it)
     for(var j=0;j<SRV_REQS.length;j++){if(SRV_REQS[j].local_id===id){SRV_REQS[j].status=status;SRV_REQS[j].decided_at=new Date().toISOString();break;}}
-    try{window.AlpexaSync&&AlpexaSync.setStatus(id,status);}catch(e){}
     render();
+    if(window.AlpexaSync&&AlpexaSync.db){
+      AlpexaSync.setStatus(id,status).then(function(res){
+        if(res&&res.error){ toast('Server error: '+res.error.message,true); }
+        else if(res&&res.data&&res.data.length===0){ toast('⚠ No matching server row (id '+id+')',true); }
+        else { toast(status==='approved'?'Approved on server ✓':'Rejected on server ✓'); }
+        pullServer();
+      });
+    } else { toast('⚠ Not connected to server',true); }
   }
   function copy(t){try{if(navigator.clipboard)navigator.clipboard.writeText(t);}catch(e){}}
   function flash(b,txt){if(!b)return;var o=b.textContent;b.textContent=txt||'Saved ✓';setTimeout(function(){b.textContent=o;},1200);}

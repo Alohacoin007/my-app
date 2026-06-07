@@ -73,7 +73,7 @@ window.AlpexaSync = (function () {
   function setStatus(localId, status) {
     if (!db) return Promise.resolve({ skipped: true });
     return db.from('requests').update({ status: status, decided_at: new Date().toISOString() })
-      .eq('local_id', String(localId))
+      .eq('local_id', String(localId)).select()
       .then(function (res) {
         if (res && res.error) console.warn('AlpexaSync setStatus error', res.error.message);
         return res;
