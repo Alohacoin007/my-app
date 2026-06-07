@@ -162,10 +162,12 @@
         '<div class="row"><span>Open bets / liability</span><b>'+f.openCount+' · '+usd(f.liab)+'</b></div>'+
         '<button class="save" id="kycToggle" style="width:100%">'+(kyc==='verified'?'Mark KYC pending':'Verify KYC ✓')+'</button></div>'+
       '<div class="sec">Responsible gambling (#12)</div>'+
-      '<div class="card"><div class="row"><span>Deposit limit</span><b>'+(dl?usd(dl):'—')+'</b></div>'+
-        '<div class="row"><span>Loss limit</span><b>'+(ll?usd(ll):'—')+'</b></div>'+
-        '<div class="row"><span>Self-exclusion</span><b>'+(se>Date.now()?'Active':'—')+'</b></div>'+
-        '<div class="hint">Players set these in-app; operators monitor & intervene here. Multi-player view needs the live server.</div></div>';
+      '<div class="card">'+
+        cfgRow('Deposit limit (USDT · 0 = none)','rgDep',dl)+
+        cfgRow('Loss limit (USDT · 0 = none)','rgLoss',ll)+
+        cfgRow('Self-exclude (days · 0 = none)','rgSE',(se>Date.now()?Math.ceil((se-Date.now())/86400000):0))+
+        '<button class="save" id="rgSave" style="width:100%">Save & enforce</button>'+
+        '<div class="hint">Applied to the player\'s app (deposit/loss caps & self-exclusion lock) on next open. Multi-player view needs the live server.</div></div>';
   }
 
   function barP(v,max){var p=Math.min(100,Math.round(v/Math.max(1,max)*100));var col=p>80?'var(--neg)':p>50?'var(--warn)':'var(--pos)';
@@ -241,6 +243,7 @@
     document.querySelectorAll('[data-copy]').forEach(function(b){b.onclick=function(){copy(b.getAttribute('data-copy'));flash(b,'Copied!');};});
     var g;
     if(g=document.getElementById('kycToggle'))g.onclick=function(){var k=localStorage.getItem('alpexa.kyc')||'pending';localStorage.setItem('alpexa.kyc',k==='verified'?'pending':'verified');render();};
+    if(g=document.getElementById('rgSave'))g.onclick=function(){var st=getJSON('alpexaSettings',{});st.depositLimit=parseFloat(val('rgDep'))||0;st.lossLimit=parseFloat(val('rgLoss'))||0;var d=parseFloat(val('rgSE'))||0;st.selfExcludeUntil=d>0?Date.now()+d*86400000:0;setJSON('alpexaSettings',st);flash(g,'Saved ✓');render();};
     if(g=document.getElementById('saveLimits'))g.onclick=function(){localStorage.setItem('alpexa.maxBet',val('cfgMaxBet'));localStorage.setItem('alpexa.maxDeposit',val('cfgMaxDep'));localStorage.setItem('alpexa.maxWithdraw',val('cfgMaxWd'));flash(g);};
     if(g=document.getElementById('saveMargin'))g.onclick=function(){localStorage.setItem('alpexa.margin',val('cfgMargin'));flash(g);};
     if(g=document.getElementById('savePromo'))g.onclick=function(){localStorage.setItem('alpexa.cashback',val('cfgCashback'));flash(g);};
