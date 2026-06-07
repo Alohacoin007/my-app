@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Alpexa · Sign up</title>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<meta name="theme-color" content="#0E0E0C">
+<style>
+  :root{--acc:#1565C0;--ink:#0F1B2D;--dim:#5A6478;--line:#E6EAF0;--bg:#F0F2F5;--pos:#1B5E20;--pos-bg:#E8F5E9;--neg:#C62828;--card:#fff}
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{background:var(--bg)}
+  body{font-family:'Roboto',system-ui,-apple-system,Arial,sans-serif;color:var(--ink);max-width:480px;margin:0 auto;min-height:100vh;padding:0 0 40px}
+  .top{background:var(--acc);color:#fff;padding:20px 18px}
+  .top h1{font-size:20px;font-weight:800;letter-spacing:-.3px}
+  .top .sub{font-size:11px;opacity:.85;margin-top:3px;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+  .conn{margin:12px 14px;border-radius:10px;padding:9px 12px;font-size:12px;font-weight:700}
+  .conn.ok{background:var(--pos-bg);color:var(--pos)} .conn.bad{background:#FFEBEE;color:var(--neg)} .conn.wait{background:#E3F2FD;color:var(--acc)}
+  .card{margin:0 14px 14px;background:var(--card);border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(15,27,45,.06)}
+  .sec{margin:6px 14px 8px;font-size:12px;font-weight:800;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+  label{font-size:12px;font-weight:700;color:var(--dim);display:block;margin:10px 0 4px}
+  input{width:100%;font-size:15px;color:var(--ink);background:#f1f3f4;border:1px solid var(--line);border-radius:9px;padding:12px;font-family:inherit}
+  .btn{width:100%;margin-top:14px;background:var(--acc);color:#fff;border:none;border-radius:10px;padding:14px;font:800 15px system-ui;cursor:pointer}
+  .btn:disabled{opacity:.5}
+  .ok-box{margin:0 14px 14px;background:var(--pos-bg);border-radius:12px;padding:14px;display:none}
+  .ok-box.show{display:block}
+  .ok-box h3{color:var(--pos);font-size:15px;margin-bottom:8px}
+  .acct{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.06)}
+  .acct b{font-family:ui-monospace,monospace}
+  .plist .row{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+  .plist .row:last-child{border-bottom:none}
+  .muted{color:var(--dim);font-size:12px}
+  .empty{color:#9aa3b2;text-align:center;padding:18px;font-size:13px}
+  .foot{text-align:center;margin-top:14px;font-size:12px}
+  .foot a{color:var(--acc);font-weight:700;text-decoration:none}
+</style>
+</head>
+<body>
+  <div class="top"><h1>Create your Alpexa account</h1><div class="sub">One sign-up · 3 accounts (Sports · Crypto · FX)</div></div>
+  <div class="conn wait" id="conn">Connecting to server…</div>
+
+  <div class="card">
+    <label>Full name</label>
+    <input id="name" placeholder="e.g. Christian Kang" autocomplete="name">
+    <label>Email</label>
+    <input id="email" type="email" placeholder="you@email.com" autocomplete="email">
+    <button class="btn" id="go" disabled>Create account</button>
+  </div>
+
+  <div class="ok-box" id="okBox">
+    <h3>✅ Account created!</h3>
+    <div class="muted" id="okName"></div>
+    <div id="okAccts" style="margin-top:8px"></div>
+  </div>
+
+  <div class="sec">Registered customers (from server)</div>
+  <div class="card plist"><div id="players"><div class="empty">Loading…</div></div></div>
+
+  <div class="foot"><a href="launcher.html">← Launcher</a></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  var SUPA_URL='https://grxnbgtfnaayeluenvqh.supabase.co';
+  var SUPA_KEY='sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu';
+  var db=null;
+  function setConn(cls,txt){var e=document.getElementById('conn');e.className='conn '+cls;e.textContent=txt;}
+  function acctNo(p){return p+'-'+Math.floor(100000+Math.random()*900000);}
+
+  try{ db=window.supabase.createClient(SUPA_URL,SUPA_KEY); }catch(e){ setConn('bad','Supabase library failed to load'); }
+
+  async function checkConn(){
+    if(!db){return;}
+    try{
+      const {error}=await db.from('players').select('id',{count:'exact',head:true});
+      if(error) throw error;
+      setConn('ok','✅ Connected to server');
+      document.getElementById('go').disabled=false;
+      loadPlayers();
+    }catch(e){
+      setConn('bad','⚠️ '+(e.message||'Connection/table error')+' — run the table SQL in Supabase');
+      console.error(e);
+    }
+  }
+
+  async function loadPlayers(){
+    const el=document.getElementById('players');
+    try{
+      const {data,error}=await db.from('players').select('cust_id,name,email,created_at').order('created_at',{ascending:false}).limit(50);
+      if(error) throw error;
+      if(!data||!data.length){ el.innerHTML='<div class="empty">No customers yet — create the first one above.</div>'; return; }
+      el.innerHTML=data.map(function(p){return '<div class="row"><span><b>'+(p.name||'—')+'</b><div class="muted">'+(p.cust_id||'')+' · '+(p.email||'')+'</div></span></div>';}).join('');
+    }catch(e){ el.innerHTML='<div class="empty">'+(e.message||'load error')+'</div>'; }
+  }
+
+  document.getElementById('go').onclick=async function(){
+    const name=document.getElementById('name').value.trim(), email=document.getElementById('email').value.trim();
+    if(!name||!email){ alert('Enter name and email.'); return; }
+    const btn=this; btn.disabled=true; btn.textContent='Creating…';
+    try{
+      const cust='P-'+Math.floor(1000+Math.random()*9000);
+      const {data:pl,error:e1}=await db.from('players').insert({cust_id:cust,name:name,email:email}).select().single();
+      if(e1) throw e1;
+      const accts=[
+        {player_id:pl.id,server:'sports',acct_no:acctNo('SP'),balance:0},
+        {player_id:pl.id,server:'crypto',acct_no:acctNo('CR'),balance:0},
+        {player_id:pl.id,server:'fx',acct_no:acctNo('FX'),balance:0}
+      ];
+      const {error:e2}=await db.from('accounts').insert(accts);
+      if(e2) throw e2;
+      document.getElementById('okName').textContent=name+' · '+cust;
+      document.getElementById('okAccts').innerHTML=accts.map(function(a){return '<div class="acct"><span>'+a.server.toUpperCase()+' account</span><b>'+a.acct_no+'</b></div>';}).join('');
+      document.getElementById('okBox').classList.add('show');
+      document.getElementById('name').value=''; document.getElementById('email').value='';
+      loadPlayers();
+    }catch(e){ alert('Error: '+(e.message||e)); console.error(e); }
+    btn.disabled=false; btn.textContent='Create account';
+  };
+
+  checkConn();
+</script>
+</body>
+</html>
