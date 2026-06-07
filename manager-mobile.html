@@ -66,7 +66,7 @@
   <div id="content"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="alpexa-sync.js?v=3"></script>
+<script src="alpexa-sync.js?v=4"></script>
 <script>
   function getJSON(k,d){try{var v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}}
   function setJSON(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
@@ -113,7 +113,7 @@
       hold: settledStake? (ggr/settledStake*100):0, pending:R.filter(function(w){return w.status==='pending';}).length};
   }
 
-  var TABS=[['overview','Overview'],['approvals','Approvals'],['players','Players'],['risk','Risk'],['bets','Bets'],['config','Config']];
+  var TABS=[['overview','Overview'],['approvals','Approvals'],['history','History'],['players','Players'],['risk','Risk'],['bets','Bets'],['config','Config']];
   var cur='overview';
   function renderTabs(){
     document.getElementById('tabs').innerHTML=TABS.map(function(t){return '<button class="tab '+(t[0]===cur?'on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join('');
@@ -126,6 +126,7 @@
     var c=document.getElementById('content'), h='';
     if(cur==='overview')h=viewOverview(f);
     else if(cur==='approvals')h=viewApprovals();
+    else if(cur==='history')h=viewHistory();
     else if(cur==='players')h=viewPlayers(f);
     else if(cur==='risk')h=viewRisk(f);
     else if(cur==='bets')h=viewBets();
@@ -172,6 +173,62 @@
       h+='<div class="row"><span>'+label+' · '+usd(w.amount)+'</span><span class="badge '+(w.status==='approved'?'won':'lost')+'">'+(w.status==='approved'?'Approved':'Rejected')+'</span></div>';});
     h+='</div>';
     return h;
+  }
+
+  // ── History: full transaction log for ALL customers, with edit/fix ──
+  var HIST_FILTER='', EDIT_ID=null;
+  function statusBadge(s){var cls=s==='approved'?'won':s==='rejected'?'lost':'open';var t=s==='approved'?'Approved':s==='rejected'?'Rejected':'Pending';return '<span class="badge '+cls+'">'+t+'</span>';}
+  function typeLabel(t){return t==='deposit'?'Deposit':t==='transfer'?'Transfer':t==='withdraw'?'Withdraw':(t||'—');}
+  function findReq(id){var all=reqs();for(var i=0;i<all.length;i++){if(all[i].id===id)return all[i];}return null;}
+  function viewHistory(){
+    var all=reqs().slice().sort(function(a,b){return (b.ts||0)-(a.ts||0);});
+    var q=(HIST_FILTER||'').toLowerCase();
+    if(q){ all=all.filter(function(w){return (((w.custName||'')+' '+(w.acctNo||'')+' '+(w.custId||'')+' '+(w.type||'')+' '+(w.server||'')+' '+(w.status||'')+' '+w.amount).toLowerCase().indexOf(q)>=0);}); }
+    var h='<div class="sec">Transaction history · all customers</div>';
+    h+='<div class="card" style="padding:10px 12px"><input class="in" id="histSearch" placeholder="Search name, account, type, status…" value="'+(HIST_FILTER||'').replace(/"/g,'&quot;')+'" style="margin-top:0"></div>';
+    h+='<div class="hint" style="margin:-4px 14px 8px">'+all.length+' transaction(s). Tap Edit to fix mistakes — changes sync to the customer’s app.</div>';
+    if(!all.length){ h+='<div class="card"><div class="empty">No transactions found.</div></div>'; return h; }
+    all.forEach(function(w){
+      var meta=w.type==='transfer'?((w.from||'?')+' → '+(w.to||'?')):((w.asset||'')+(w.network?' ('+w.network+')':''));
+      if(EDIT_ID===w.id){
+        h+='<div class="card" style="border:2px solid var(--acc)">'+
+          '<div class="row" style="border:none;padding:0 0 6px"><span class="badge '+(w.type||'')+'">'+typeLabel(w.type).toUpperCase()+'</span><span class="req-meta">'+(w.custName||'')+' · '+(w.acctNo||'')+'</span></div>'+
+          '<label class="lbl">Status</label>'+
+          '<select class="in" id="edStatus"><option value="pending"'+(w.status==='pending'?' selected':'')+'>Pending</option><option value="approved"'+(w.status==='approved'?' selected':'')+'>Approved</option><option value="rejected"'+(w.status==='rejected'?' selected':'')+'>Rejected</option></select>'+
+          '<label class="lbl" style="display:block;margin-top:8px">Amount (USD)</label>'+
+          '<input class="in" id="edAmount" type="number" value="'+(w.amount||0)+'">'+
+          (w.address!=null?('<label class="lbl" style="display:block;margin-top:8px">Address / destination</label><input class="in" id="edAddress" value="'+(w.address||'').replace(/"/g,'&quot;')+'">'):'')+
+          '<div class="btns"><button class="ok" data-save="'+w.id+'">Save</button><button class="no" data-cancel="1">Cancel</button></div>'+
+          '<button class="save danger" data-del="'+w.id+'" style="margin-top:8px">Delete this transaction</button>'+
+        '</div>';
+      } else {
+        h+='<div class="card">'+
+          '<div class="row" style="border:none;padding:0 0 6px"><span class="badge '+(w.type||'')+'">'+typeLabel(w.type).toUpperCase()+'</span><span class="req-amt">'+usd(w.amount)+'</span></div>'+
+          '<div class="req-meta">👤 '+(w.custName||'—')+' · '+(w.acctNo||'')+(w.custId?(' · '+w.custId):'')+'</div>'+
+          '<div class="req-meta">'+(w.server||'')+' · '+meta+' · '+ago(w.ts)+'</div>'+
+          '<div class="row" style="border:none;padding:6px 0 0"><span>'+statusBadge(w.status)+'</span><button class="save ghost" data-edit="'+w.id+'" style="margin-top:0;padding:7px 14px">Edit</button></div>'+
+        '</div>';
+      }
+    });
+    return h;
+  }
+  function applyEditLocal(id,patch){
+    for(var j=0;j<SRV_REQS.length;j++){if(SRV_REQS[j].local_id===id){if(patch.status!=null)SRV_REQS[j].status=patch.status;if(patch.amount!=null)SRV_REQS[j].amount=patch.amount;if(patch.address!=null)SRV_REQS[j].address=patch.address;break;}}
+    var loc=getJSON('alpexa.withdrawals',[]);var ch=false;for(var i=0;i<loc.length;i++){if(loc[i].id===id){if(patch.status!=null)loc[i].status=patch.status;if(patch.amount!=null)loc[i].amount=patch.amount;if(patch.address!=null)loc[i].address=patch.address;ch=true;break;}}if(ch)setJSON('alpexa.withdrawals',loc);
+  }
+  function editSave(id){
+    var st=val('edStatus'); var amt=parseFloat(val('edAmount'))||0; var ad=document.getElementById('edAddress'); var addr=ad?ad.value:null;
+    var patch={status:st,amount:amt}; if(addr!=null)patch.address=addr;
+    applyEditLocal(id,patch); EDIT_ID=null; render();
+    if(window.AlpexaSync&&AlpexaSync.db){ AlpexaSync.updateRequest(id,patch).then(function(res){ if(res&&res.error)toast('Server error: '+res.error.message,true); else toast('Saved ✓ — synced to app'); pullServer(); }); }
+    else toast('Saved locally (offline)',true);
+  }
+  function editDelete(id){
+    if(!confirm('Delete this transaction permanently?'))return;
+    for(var j=SRV_REQS.length-1;j>=0;j--){if(SRV_REQS[j].local_id===id)SRV_REQS.splice(j,1);}
+    var loc=getJSON('alpexa.withdrawals',[]).filter(function(w){return w.id!==id;}); setJSON('alpexa.withdrawals',loc);
+    EDIT_ID=null; render();
+    if(window.AlpexaSync&&AlpexaSync.db){ AlpexaSync.deleteRequest(id).then(function(res){ if(res&&res.error)toast('Server error: '+res.error.message,true); else toast('Deleted ✓'); pullServer(); }); }
   }
 
   function viewPlayers(f){
@@ -285,6 +342,11 @@
     document.querySelectorAll('[data-ok]').forEach(function(b){b.onclick=function(){decide(b.getAttribute('data-ok'),'approved');};});
     document.querySelectorAll('[data-no]').forEach(function(b){b.onclick=function(){decide(b.getAttribute('data-no'),'rejected');};});
     document.querySelectorAll('[data-copy]').forEach(function(b){b.onclick=function(){copy(b.getAttribute('data-copy'));flash(b,'Copied!');};});
+    document.querySelectorAll('[data-edit]').forEach(function(b){b.onclick=function(){EDIT_ID=b.getAttribute('data-edit');render();};});
+    document.querySelectorAll('[data-save]').forEach(function(b){b.onclick=function(){editSave(b.getAttribute('data-save'));};});
+    document.querySelectorAll('[data-del]').forEach(function(b){b.onclick=function(){editDelete(b.getAttribute('data-del'));};});
+    document.querySelectorAll('[data-cancel]').forEach(function(b){b.onclick=function(){EDIT_ID=null;render();};});
+    var hs=document.getElementById('histSearch'); if(hs){hs.oninput=function(){HIST_FILTER=hs.value;render();var n=document.getElementById('histSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
     var g;
     if(g=document.getElementById('kycToggle'))g.onclick=function(){var k=localStorage.getItem('alpexa.kyc')||'pending';localStorage.setItem('alpexa.kyc',k==='verified'?'pending':'verified');render();};
     if(g=document.getElementById('rgSave'))g.onclick=function(){var st=getJSON('alpexaSettings',{});st.depositLimit=parseFloat(val('rgDep'))||0;st.lossLimit=parseFloat(val('rgLoss'))||0;var d=parseFloat(val('rgSE'))||0;st.selfExcludeUntil=d>0?Date.now()+d*86400000:0;setJSON('alpexaSettings',st);flash(g,'Saved ✓');render();};
@@ -300,10 +362,12 @@
       alert('Done. Apps start fresh — Sports $50,000.');render();};
   }
 
-  window.addEventListener('storage',function(e){ if(e.key&&e.key.indexOf('alpexa')===0) render(); });
+  // Don't redraw while the operator is mid-edit or typing a search (would lose input).
+  function busyEditing(){ return cur==='history' && (EDIT_ID || (document.activeElement && document.activeElement.id==='histSearch')); }
+  window.addEventListener('storage',function(e){ if(e.key&&e.key.indexOf('alpexa')===0 && !busyEditing()) render(); });
   setInterval(function(){ if(cur==='overview'||cur==='approvals'||cur==='risk'||cur==='bets') render(); }, 4000);
   // Pull every customer's requests from the shared server.
-  function pullServer(){ if(!window.AlpexaSync||!AlpexaSync.db) return; AlpexaSync.pullAll().then(function(rows){ SRV_REQS=rows||[]; render(); }).catch(function(){}); }
+  function pullServer(){ if(!window.AlpexaSync||!AlpexaSync.db) return; AlpexaSync.pullAll().then(function(rows){ SRV_REQS=rows||[]; if(!busyEditing()) render(); }).catch(function(){}); }
   pullServer();
   setInterval(function(){ if(!document.hidden) pullServer(); }, 8000);
   render();

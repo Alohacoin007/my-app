@@ -59,12 +59,34 @@ window.AlpexaSync = (function () {
       .then(function (r) { return (r && r.data) || []; }, function () { return []; });
   }
 
-  // This device: fetch just my requests' statuses (id + status) to reconcile.
+  // This device: fetch my requests (status + amounts) so the app can reconcile
+  // both admin approvals and any amount the operator corrected.
   function pullMine() {
     if (!db) return Promise.resolve([]);
     var m = me();
-    return db.from('requests').select('local_id,status').eq('cust_id', m.custId)
+    return db.from('requests').select('local_id,status,amount,net,fee').eq('cust_id', m.custId)
       .then(function (r) { return (r && r.data) || []; }, function () { return []; });
+  }
+
+  // Back office: edit a request's fields (status/amount/address) and sync it.
+  function updateRequest(localId, patch) {
+    if (!db) return Promise.resolve({ skipped: true });
+    var p = {}; if (patch.status != null) p.status = patch.status;
+    if (patch.amount != null) p.amount = patch.amount;
+    if (patch.net != null) p.net = patch.net;
+    if (patch.address != null) p.address = patch.address;
+    if (patch.status != null) p.decided_at = new Date().toISOString();
+    return db.from('requests').update(p).eq('local_id', String(localId)).select()
+      .then(function (res) { if (res && res.error) console.warn('updateRequest', res.error.message); return res; },
+            function (e) { return { error: e }; });
+  }
+
+  // Back office: permanently remove a request.
+  function deleteRequest(localId) {
+    if (!db) return Promise.resolve({ skipped: true });
+    return db.from('requests').delete().eq('local_id', String(localId)).select()
+      .then(function (res) { if (res && res.error) console.warn('deleteRequest', res.error.message); return res; },
+            function (e) { return { error: e }; });
   }
 
   // Back office: approve / reject a request on the server.
@@ -81,5 +103,6 @@ window.AlpexaSync = (function () {
   }
 
   return { db: db, me: me, acctFor: acctFor, pushRequest: pushRequest,
-           pullAll: pullAll, pullMine: pullMine, setStatus: setStatus };
+           pullAll: pullAll, pullMine: pullMine, setStatus: setStatus,
+           updateRequest: updateRequest, deleteRequest: deleteRequest };
 })();

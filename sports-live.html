@@ -566,7 +566,7 @@
 </style>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="alpexa-sync.js?v=3"></script>
+<script src="alpexa-sync.js?v=4"></script>
 </head>
 <body class="m-parlay">
   <div class="phone">
@@ -2370,9 +2370,16 @@
     if(!window.AlpexaSync||!AlpexaSync.db) return;
     AlpexaSync.pullMine().then(rows=>{
       if(!rows||!rows.length) return;
-      const map={}; rows.forEach(r=>{map[r.local_id]=r.status;});
+      const map={}; rows.forEach(r=>{map[r.local_id]=r;});
       const all=loadWithdrawals(); let changed=false;
-      all.forEach(w=>{ const s=map[String(w.id)]; if(s && s!==w.status){ w.status=s; changed=true; } });
+      all.forEach(w=>{ const r=map[String(w.id)]; if(!r) return;
+        // operator may have corrected the amount before approving
+        if(w.status==='pending'){
+          if(r.amount!=null && +r.amount!==+w.amount){ w.amount=+r.amount; changed=true; }
+          if(r.net!=null && +r.net!==+w.net){ w.net=+r.net; changed=true; }
+        }
+        if(r.status && r.status!==w.status){ w.status=r.status; changed=true; }
+      });
       if(changed){ saveWithdrawals(all); reconcileWithdrawals(); updateWallet(); }
     }).catch(()=>{});
   }
