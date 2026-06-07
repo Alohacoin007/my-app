@@ -111,7 +111,7 @@ function AccountSheet({ open, current, onPick, onClose }) {
         {ACCOUNTS.map(a => {
           const sel = current === a.id;
           return (
-            <button key={a.id} onClick={()=>{ onPick(a.id); onClose(); }} style={{
+            <button key={a.id} onClick={()=>{ if(a.id==='sports'){window.location.href='sports-live.html';return;} if(a.id==='crypto'){window.location.href='crypto-live.html';return;} onPick(a.id); onClose(); }} style={{
               width:'100%', display:'flex', alignItems:'center', gap:12, padding:'14px 16px',
               background: sel?'var(--acc-3)':'transparent',
               borderTop:'1px solid var(--line)', textAlign:'left'
