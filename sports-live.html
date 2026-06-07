@@ -886,11 +886,13 @@
 
 <script>
   // ---------- real-mode reset (one-time): wipe demo data, start at $50,000 ----------
-  const ALPEXA_DATA_VERSION='real-1';
+  const ALPEXA_DATA_VERSION='real-2';
   try{
     if(localStorage.getItem('alpexa.dataVersion')!==ALPEXA_DATA_VERSION){
       localStorage.setItem('alpexa.sportsBalance','50000');
       localStorage.setItem('alpexa.txns','[]');
+      localStorage.setItem('alpexa.openBets','[]');
+      localStorage.setItem('alpexa.settledBets','[]');
       localStorage.removeItem('alpexa.withdrawals');
       localStorage.setItem('alpexa.dataVersion',ALPEXA_DATA_VERSION);
     }
@@ -1028,9 +1030,10 @@
     renderGames();
   }
 
-  // open bets (with cashout) + settled history — start empty (real mode)
-  let openBets = [];
-  const settledBets = [];
+  // open bets (with cashout) + settled history — persisted (real mode)
+  let openBets = (function(){try{const s=localStorage.getItem('alpexa.openBets');return s?JSON.parse(s):[];}catch(e){return [];}})();
+  let settledBets = (function(){try{const s=localStorage.getItem('alpexa.settledBets');return s?JSON.parse(s):[];}catch(e){return [];}})();
+  function saveBets(){try{localStorage.setItem('alpexa.openBets',JSON.stringify(openBets));localStorage.setItem('alpexa.settledBets',JSON.stringify(settledBets));}catch(e){}}
   let txns = (function(){
     try{ const s=localStorage.getItem('alpexa.txns'); if(s) return JSON.parse(s); }catch(e){}
     return [];
@@ -1609,6 +1612,7 @@
     return `<div class="ticket ${isOpen?'':b.result}">${head}${legsH}${foot}</div>`;
   }
   function renderTickets(){
+    saveBets();
     const el=document.getElementById('tickets');
     if(seg==='open'){
       el.innerHTML=openBets.length?openBets.map(b=>ticketHTML(b,true)).join(''):'<div class="empty empty-cta"><div class="ec-ic">🎫</div><div class="ec-t">No open bets</div><div class="ec-s">Place a bet to see it here</div><button class="ec-btn" id="ecGo">Browse games</button></div>';
