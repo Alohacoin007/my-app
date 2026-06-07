@@ -2256,15 +2256,69 @@
       if (!firstErr) firstErr = L.lg + ': ' + ((lastE && lastE.message) || 'failed');
       throw (lastE || new Error('failed'));
     }
+    // ---- Real bookmaker odds (The Odds API) -------------------------------
+    const ODDS_API_KEY = '57b7ab69c0f6937e770ce21a04c58358';
+    const ODDS_SPORT = { NFL:'americanfootball_nfl', NBA:'basketball_nba', MLB:'baseball_mlb', NHL:'icehockey_nhl' };
+    function nick(name){ return String(name||'').trim().toLowerCase().split(/\s+/).pop(); }
+    async function fetchOdds(sportKey){
+      const cacheKey = 'alpexa.odds.'+sportKey;
+      try{ const c=JSON.parse(localStorage.getItem(cacheKey)||'null'); if(c && (Date.now()-c.t)<6*3600*1000) return c.data; }catch(e){}
+      const url = 'https://api.the-odds-api.com/v4/sports/'+sportKey+'/odds/?apiKey='+ODDS_API_KEY+'&regions=us&markets=h2h,spreads,totals&oddsFormat=american';
+      const res = await fetch(url, { cache:'no-store' });
+      if (!res.ok) throw new Error('odds HTTP '+res.status);
+      const data = await res.json();
+      try{ localStorage.setItem(cacheKey, JSON.stringify({ t:Date.now(), data })); }catch(e){}
+      return data;
+    }
+    function oddsToCore(ev, home, away){
+      const bk = ev.bookmakers && ev.bookmakers[0];
+      if (!bk) return null;
+      const byKey = {}; (bk.markets||[]).forEach(m=>byKey[m.key]=m);
+      const fmt = (p)=> (p>0?'+':'')+p;
+      const core = {};
+      const h2h = byKey['h2h'];
+      if (h2h){
+        const oH=h2h.outcomes.find(o=>nick(o.name)===nick(home.nm)), oA=h2h.outcomes.find(o=>nick(o.name)===nick(away.nm));
+        if (oH && oA) core.ml=[{ln:'',am:oH.price,sel:home.nm+' ML'},{ln:'',am:oA.price,sel:away.nm+' ML'}];
+      }
+      const sp = byKey['spreads'];
+      if (sp){
+        const oH=sp.outcomes.find(o=>nick(o.name)===nick(home.nm)), oA=sp.outcomes.find(o=>nick(o.name)===nick(away.nm));
+        if (oH && oA) core.spread=[{ln:fmt(oH.point),am:oH.price,sel:home.nm+' '+fmt(oH.point)},{ln:fmt(oA.point),am:oA.price,sel:away.nm+' '+fmt(oA.point)}];
+      }
+      const tt = byKey['totals'];
+      if (tt){
+        const ov=tt.outcomes.find(o=>/over/i.test(o.name)), un=tt.outcomes.find(o=>/under/i.test(o.name));
+        if (ov && un) core.total=[{ln:'Over '+ov.point,am:ov.price,sel:'Over '+ov.point},{ln:'Under '+un.point,am:un.price,sel:'Under '+un.point}];
+      }
+      return (core.ml||core.spread||core.total) ? core : null;
+    }
+    async function applyRealOdds(games){
+      const leagues = Array.from(new Set(games.map(g=>g.lg).filter(l=>ODDS_SPORT[l])));
+      let matched = 0;
+      for (const lg of leagues){
+        let data;
+        try{ data = await fetchOdds(ODDS_SPORT[lg]); }catch(e){ continue; }
+        if (!Array.isArray(data)) continue;
+        games.filter(g=>g.lg===lg).forEach(g=>{
+          const ev = data.find(e=>{ const s=new Set([nick(e.home_team),nick(e.away_team)]); return s.has(nick(g.home.nm)) && s.has(nick(g.away.nm)); });
+          if (ev){ const core=oddsToCore(ev, g.home, g.away); if (core){ g.core=Object.assign({}, g.core, core); matched++; } }
+        });
+      }
+      return matched;
+    }
+
     (async () => {
       try{
         const results = await Promise.all(LEAGUES.map(L => fetchLeague(L).catch(()=>[])));
         const all = [].concat.apply([], results);
+        let oddsMatched = 0;
+        try{ oddsMatched = await applyRealOdds(all); }catch(e){}
         if (all.length >= 1){
           GAMES.length = 0;
           all.forEach(g => GAMES.push(g));
           if (typeof renderGames === 'function') renderGames();
-          setBadge('✅ 실시간 경기 ' + all.length + '개 로드됨', '#1e8e3e');
+          setBadge('✅ 실시간 경기 ' + all.length + '개' + (oddsMatched? ' · 진짜배당 '+oddsMatched : ''), '#1e8e3e');
           setTimeout(() => { badge.style.transition = 'opacity .5s'; badge.style.opacity = '0'; setTimeout(() => badge.remove(), 600); }, 4000);
         } else {
           setBadge('⚠️ 실시간 실패 → 데모 표시 · ' + (firstErr || '경기 없음/차단됨'), '#b00020');
