@@ -2439,7 +2439,7 @@
       return matched;
     }
 
-    (async () => {
+    async function loadLive(isRefresh){
       try{
         const results = await Promise.all(LEAGUES.map(L => fetchLeague(L).catch(()=>[])));
         const all = [].concat.apply([], results);
@@ -2449,16 +2449,22 @@
           GAMES.length = 0;
           all.forEach(g => GAMES.push(g));
           if (typeof renderGames === 'function') renderGames();
-          setBadge('✅ 실시간 경기 ' + all.length + '개' + (oddsMatched? ' · 진짜배당 '+oddsMatched : ''), '#1e8e3e');
-          setTimeout(() => { badge.style.transition = 'opacity .5s'; badge.style.opacity = '0'; setTimeout(() => badge.remove(), 600); }, 4000);
-        } else {
+          if(!isRefresh){
+            setBadge('✅ 실시간 경기 ' + all.length + '개' + (oddsMatched? ' · 진짜배당 '+oddsMatched : ''), '#1e8e3e');
+            setTimeout(() => { badge.style.transition = 'opacity .5s'; badge.style.opacity = '0'; setTimeout(() => badge.remove(), 600); }, 4000);
+          }
+        } else if(!isRefresh){
           setBadge('⚠️ 실시간 실패 → 데모 표시 · ' + (firstErr || '경기 없음/차단됨'), '#b00020');
         }
       }catch(e){
-        setBadge('⚠️ 실시간 오류 → 데모 표시 · ' + (firstErr || (e && e.message) || 'error'), '#b00020');
-        try{ GAMES.length=0; DEMO.forEach(g=>GAMES.push(g)); if(typeof renderGames==='function') renderGames(); }catch(_){}
+        if(!isRefresh){
+          setBadge('⚠️ 실시간 오류 → 데모 표시 · ' + (firstErr || (e && e.message) || 'error'), '#b00020');
+          try{ GAMES.length=0; DEMO.forEach(g=>GAMES.push(g)); if(typeof renderGames==='function') renderGames(); }catch(_){}
+        }
       }
-    })();
+    }
+    loadLive(false);
+    setInterval(()=>{ if(!document.hidden) loadLive(true); }, 30000); // auto-refresh live scores
   })();
 </script>
 </body>
