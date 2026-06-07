@@ -565,6 +565,8 @@
   .nav .item .nbadge{position:absolute;top:-1px;right:18px;background:var(--neg);color:#fff;font-size:8px;font-weight:700;min-width:15px;height:15px;border-radius:4px;display:flex;align-items:center;justify-content:center;padding:0 3px;border:1.5px solid var(--surface)}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="alpexa-sync.js?v=1"></script>
 </head>
 <body class="m-parlay">
   <div class="phone">
@@ -1947,6 +1949,7 @@
     const reqs=loadWithdrawals();
     reqs.unshift({id:reqId,ts:Date.now(),type:'deposit',server:'Sports',asset:'USDT',network:dpNet,address:companyAddr(),amount:v,fee:0,net:v,status:'pending'});
     saveWithdrawals(reqs);
+    try{window.AlpexaSync&&AlpexaSync.pushRequest(reqs[0]);}catch(e){}
     txns.unshift({ts:Date.now(),ic:'⏳',t1:'Deposit',t2:`USDT (${dpNet}) · Pending approval`,amt:+v,reqId:reqId});
     closeDeposit();updateWallet();
     notify('⏳','Deposit requested',`${usd(v)} USDT (${dpNet}) · awaiting approval`,'deposits');
@@ -2009,6 +2012,7 @@
     const reqs=loadWithdrawals();
     reqs.unshift({id:tid,ts:Date.now(),type:'transfer',server:'Sports',from:fromNm,to:toNm,fromKey:tfFrom,toKey:tfTo,asset:'USD',amount:v,fee:0,net:v,status:'pending'});
     saveWithdrawals(reqs);
+    try{window.AlpexaSync&&AlpexaSync.pushRequest(reqs[0]);}catch(e){}
     const sAmt=(tfTo==='sports')?+v:(tfFrom==='sports'?-v:0);
     txns.unshift({ts:Date.now(),ic:'🔄',t1:'Transfer',t2:`${fromNm} → ${toNm} · Pending approval`,amt:sAmt,reqId:tid});
     closeTransfer();updateWallet();
@@ -2107,6 +2111,7 @@
     const reqs=loadWithdrawals();
     reqs.unshift({id:wid,ts:Date.now(),type:'withdraw',server:'Sports',asset:'USDT',network:wdNet,amount:v,fee:fee,net:net,address:addr,status:'pending'});
     saveWithdrawals(reqs);
+    try{window.AlpexaSync&&AlpexaSync.pushRequest(reqs[0]);}catch(e){}
     txns.unshift({ts:Date.now(),ic:'⬆️',t1:'Withdraw',t2:`USDT (${wdNet}) → ${addr.slice(0,6)}…${addr.slice(-4)} · Pending approval`,amt:-v,reqId:wid});
     closeWithdraw();updateWallet();
     notify('⏳','Withdrawal requested',`${usd(v)} · awaiting back-office approval`,'deposits');
@@ -2360,6 +2365,20 @@
   renderCurServerIcon();renderGames();calc();renderTickets();updateWallet();
   applyLang();
   window.addEventListener('storage',e=>{ if(e.key==='alpexa.withdrawals'){ reconcileWithdrawals(); updateWallet(); } });
+  // Pull admin decisions (approve/reject) made on the server, then reconcile locally.
+  function syncServerStatuses(){
+    if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.pullMine().then(rows=>{
+      if(!rows||!rows.length) return;
+      const map={}; rows.forEach(r=>{map[r.local_id]=r.status;});
+      const all=loadWithdrawals(); let changed=false;
+      all.forEach(w=>{ const s=map[String(w.id)]; if(s && s!==w.status){ w.status=s; changed=true; } });
+      if(changed){ saveWithdrawals(all); reconcileWithdrawals(); updateWallet(); }
+    }).catch(()=>{});
+  }
+  syncServerStatuses();
+  setInterval(()=>{ if(!document.hidden) syncServerStatuses(); }, 15000);
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden) syncServerStatuses(); });
   // settings initial application
   restartRealityCheck();
   applySelfExclusion();

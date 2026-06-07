@@ -719,6 +719,10 @@ async function createOnServer(){
   var rows=[{player_id:r1.data.id,server:'sports',acct_no:data.accts.sports,balance:0},{player_id:r1.data.id,server:'crypto',acct_no:data.accts.crypto,balance:0},{player_id:r1.data.id,server:'fx',acct_no:data.accts.fx,balance:0}];
   var r2=await window._db.from('accounts').insert(rows);
   if(r2.error) throw r2.error;
+  // Remember who this is on the device so the apps can tag their transactions.
+  try{ localStorage.setItem('alpexa.me', JSON.stringify({
+    custId:cust, name:(data.firstName+' '+data.lastName).trim(), email:data.email,
+    accts:data.accts })); }catch(e){}
 }
 function nextStep(){
   if (cur === 0) { cur = 1; renderStep(); }
