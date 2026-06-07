@@ -891,11 +891,11 @@ function Stat({label,val,color}){
     </div>
   );
 }
-function Meta({lbl,val}){
+function Meta({lbl,val,color}){
   return(
     <div style={{textAlign:'center',borderLeft:'1px solid var(--line)',padding:'2px 0'}}>
       <div style={{fontSize:8.5,fontWeight:700,color:'var(--text-3)',letterSpacing:0.4}}>{lbl}</div>
-      <div className="mono" style={{fontSize:11,fontWeight:600,color:'var(--ink)',marginTop:1}}>{val}</div>
+      <div className="mono" style={{fontSize:11,fontWeight:600,color:color||'var(--ink)',marginTop:1}}>{val}</div>
     </div>
   );
 }
@@ -1510,6 +1510,8 @@ function PosCard({p,onClose,onModify}){
   const symInfo=ALPEXA_MARKET.SYMBOLS.find(s=>s.sym===p.sym);
   const digits=symInfo?symInfo.digits:5;const cls=symInfo?symInfo.cls:'FX';
   const fmtPx=v=>typeof v==='number'?v.toFixed(digits):v;
+  const curPx=(typeof p.current==='number')?p.current:p.open;
+  const curColor=curPx>p.open?'#2E6FB0':curPx<p.open?'#E04141':'var(--ink)';
   return(
     <div style={{background:'var(--surface)',marginBottom:6,padding:'12px 14px',position:'relative',animation:fresh?'newOrder 1.5s ease':'none',borderLeft:fresh?'3px solid '+(p.side==='BUY'?'#2E6FB0':'#E04141'):'3px solid transparent'}}>
       {fresh&&<div style={{position:'absolute',top:8,right:10,fontSize:8.5,fontWeight:800,padding:'2px 6px',borderRadius:3,background:'#1B3955',color:'#fff',letterSpacing:0.5,animation:'pulse 1.2s ease infinite'}}>NEW</div>}
@@ -1521,8 +1523,8 @@ function PosCard({p,onClose,onModify}){
         {!p.placedAt&&<span style={{flex:1}}/>}
         <span className="mono" style={{fontSize:15,fontWeight:700,color:up?'#2E6FB0':'#E04141'}}>{up?'+':''}${p.pnl.toFixed(2)}</span>
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',background:'var(--bg)',borderRadius:3,padding:'6px 0',marginBottom:9,border:'1px solid var(--line-2)'}}>
-        <Meta lbl="OPEN" val={fmtPx(p.open)}/><Meta lbl="SL" val={p.sl?fmtPx(p.sl):'—'}/><Meta lbl="TP" val={p.tp?fmtPx(p.tp):'—'}/><Meta lbl="SWAP" val={p.swap!==undefined?(p.swap>=0?'+':'')+p.swap.toFixed(2):'0.00'}/>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr',background:'var(--bg)',borderRadius:3,padding:'6px 0',marginBottom:9,border:'1px solid var(--line-2)'}}>
+        <Meta lbl="OPEN" val={fmtPx(p.open)}/><Meta lbl="CUR" val={fmtPx(curPx)} color={curColor}/><Meta lbl="SL" val={p.sl?fmtPx(p.sl):'—'}/><Meta lbl="TP" val={p.tp?fmtPx(p.tp):'—'}/><Meta lbl="SWAP" val={p.swap!==undefined?(p.swap>=0?'+':'')+p.swap.toFixed(2):'0.00'}/>
       </div>
       <div style={{display:'flex',gap:6}}>
         <button onClick={()=>onModify&&onModify(p)} style={{flex:1,padding:'7px 0',borderRadius:3,fontSize:11.5,fontWeight:600,background:'var(--bg-2)',color:'var(--text-2)',border:'1px solid var(--line-2)'}}>Modify</button>
@@ -3130,7 +3132,7 @@ function App(){
         if(!m)return o;
         const cur=o.side==='BUY'?m.last:m.last+m.spread;
         const pnl=ALPEXA_MARKET.getPnlUSD(m,o.open,cur,o.side,o.vol);
-        return{...o,pnl};
+        return{...o,pnl,current:cur};
       }));
       setPendingOrders(prev=>{
         const triggered=[];
