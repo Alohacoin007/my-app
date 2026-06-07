@@ -213,9 +213,9 @@ const SERVERS = [
   { id:'demo',   name:'ALPEXA SUISSE Sports',   tag:'DEMO',   color:'#757575', tagBg:'#f5f5f5', desc:'$100,000 paper trading. No KYC required. Risk-free practice.' },
 ];
 const LEVERAGES = [
-  { id:'1:30',  desc:'EU regulated (ESMA cap)' },
+  { id:'1:1',   desc:'No leverage · spot (Crypto/Sports)' },
+  { id:'1:50',  desc:'Conservative' },
   { id:'1:100', desc:'Standard (most popular)', recommended:true },
-  { id:'1:200', desc:'Pro tier (KYC required)' },
   { id:'1:500', desc:'Max (eligibility review)' },
 ];
 const CURRENCIES = ['USD','EUR','GBP','JPY','CHF','KRW','USDT'];
@@ -344,6 +344,7 @@ function showMissing(which){
 
 // ── Step 0: Account Type ──
 function step0(){
+  const levLock=(data.server==='stocks'||data.server==='demo');
   return `
     <div class="body-title">Choose your account</div>
     <div class="body-sub">You can open additional accounts later from settings.</div>
@@ -365,13 +366,15 @@ function step0(){
     </div>
 
     <div class="section-label">Leverage</div>
+    ${levLock?'<div class="body-sub" style="margin:0 0 10px;color:#1565c0">Leverage is fixed at <b>1:1</b> for Crypto &amp; Sports accounts.</div>':''}
     <div class="opt-row" style="flex-wrap:wrap">
-      ${LEVERAGES.map(l => `
-        <div class="opt-card ${data.leverage===l.id?'sel':''}" style="min-width:calc(50% - 4px);flex:0 0 calc(50% - 4px)" onclick="setData('leverage','${l.id}')">
-          <div class="opt-name mono">${l.id}${l.recommended?' <span class="opt-tag" style="background:#fff3e0;color:#e65100">★</span>':''}</div>
+      ${LEVERAGES.map(l => {
+        const dis = levLock && l.id!=='1:1';
+        return `<div class="opt-card ${data.leverage===l.id?'sel':''}" style="min-width:calc(50% - 4px);flex:0 0 calc(50% - 4px);${dis?'opacity:.4;pointer-events:none':''}" ${levLock?'':`onclick="setData('leverage','${l.id}')"`}>
+          <div class="opt-name mono">${l.id}${(l.recommended&&!levLock)?' <span class="opt-tag" style="background:#fff3e0;color:#e65100">★</span>':''}</div>
           <div class="opt-desc">${l.desc}</div>
-        </div>
-      `).join('')}
+        </div>`;
+      }).join('')}
     </div>
 
     <div class="section-label">Base Currency</div>
@@ -597,7 +600,7 @@ function updateStrength(){
 }
 
 // ── Setters ──
-function setData(k,v){ data[k]=v; renderStep(); }
+function setData(k,v){ data[k]=v; if(k==='server' && (v==='stocks'||v==='demo')) data.leverage='1:1'; renderStep(); }
 function setField(k,v){
   data[k]=v;
   const foot = document.getElementById('foot');
