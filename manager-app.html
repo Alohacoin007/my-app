@@ -246,5 +246,76 @@ setTimeout(function() {
 <div id="root"><div class="boot"><div class="spinner"></div><div id="mgrStatus">Loading ALPEXA Manager…</div></div></div>
 
 <script src="vendor/manager-compiled.js?v=1780769444219" defer onload="console.log('[MGR] App script loaded')" onerror="window.__alpexaCDNFail&&window.__alpexaCDNFail('Manager App')"></script>
+
+<!-- Alpexa back-office: withdrawal approvals (shared with the apps via localStorage) -->
+<script>
+(function(){
+  var STORE='alpexa.withdrawals';
+  function load(){try{return JSON.parse(localStorage.getItem(STORE)||'[]');}catch(e){return [];}}
+  function save(a){try{localStorage.setItem(STORE,JSON.stringify(a));}catch(e){}}
+  function usd(n){return '$'+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+  function pendingCount(){return load().filter(function(w){return w.status==='pending';}).length;}
+
+  var css=document.createElement('style');
+  css.textContent=
+    '#awBtn{position:fixed;right:18px;bottom:18px;z-index:2147483000;background:#1565C0;color:#fff;border:none;border-radius:24px;padding:12px 18px;font:700 13px system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.3);cursor:pointer}'+
+    '#awBtn .n{background:#fff;color:#1565C0;border-radius:10px;padding:1px 7px;margin-left:6px;font-size:12px}'+
+    '#awPanel{position:fixed;right:18px;bottom:74px;width:360px;max-width:calc(100vw - 36px);max-height:72vh;overflow:auto;background:#fff;border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.35);z-index:2147483000;display:none;font-family:system-ui,sans-serif}'+
+    '#awPanel.show{display:block}'+
+    '.aw-h{padding:14px 16px;font-weight:800;font-size:15px;color:#0F1B2D;border-bottom:1px solid #ECEFF3;display:flex;justify-content:space-between;align-items:center}'+
+    '.aw-h button{border:none;background:#f1f3f4;border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:15px}'+
+    '.aw-item{padding:12px 16px;border-bottom:1px solid #f2f4f7}'+
+    '.aw-row{display:flex;justify-content:space-between;font-size:13px;color:#5A6478;margin-bottom:3px}'+
+    '.aw-row b{color:#0F1B2D}'+
+    '.aw-addr{font-family:monospace;font-size:11px;color:#8a93a6;word-break:break-all;margin:4px 0 8px}'+
+    '.aw-btns{display:flex;gap:8px}'+
+    '.aw-btns button{flex:1;border:none;border-radius:8px;padding:8px;font-weight:700;font-size:13px;cursor:pointer}'+
+    '.aw-ok{background:#2E7D32;color:#fff}.aw-no{background:#fff;color:#C62828;border:1px solid #f0c0c0}'+
+    '.aw-status{font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px}'+
+    '.aw-status.approved{background:#E8F5E9;color:#1B5E20}.aw-status.rejected{background:#FFEBEE;color:#C62828}'+
+    '.aw-empty{padding:24px 16px;text-align:center;color:#9E9E9E;font-size:13px}';
+  document.head.appendChild(css);
+
+  var btn=document.createElement('button'); btn.id='awBtn'; btn.innerHTML='💸 출금 승인 <span class="n" id="awN">0</span>';
+  var panel=document.createElement('div'); panel.id='awPanel';
+  document.body.appendChild(btn); document.body.appendChild(panel);
+
+  function render(){
+    var all=load();
+    var n=document.getElementById('awN'); if(n)n.textContent=pendingCount();
+    var pend=all.filter(function(w){return w.status==='pending';});
+    var done=all.filter(function(w){return w.status!=='pending';}).slice(0,8);
+    var html='<div class="aw-h">출금 승인 대기 <button id="awX">✕</button></div>';
+    if(!pend.length) html+='<div class="aw-empty">대기 중인 출금이 없어요.</div>';
+    pend.forEach(function(w){
+      html+='<div class="aw-item">'+
+        '<div class="aw-row"><span>'+w.server+' · '+w.asset+' ('+(w.network||'')+')</span><b>'+usd(w.amount)+'</b></div>'+
+        '<div class="aw-row"><span>받는 금액 (수수료 후)</span><b>'+usd(w.net)+'</b></div>'+
+        '<div class="aw-addr">'+(w.address||'')+'</div>'+
+        '<div class="aw-btns"><button class="aw-ok" data-ok="'+w.id+'">승인</button><button class="aw-no" data-no="'+w.id+'">거절</button></div>'+
+      '</div>';
+    });
+    if(done.length){
+      html+='<div class="aw-h" style="border-top:1px solid #ECEFF3">최근 처리</div>';
+      done.forEach(function(w){
+        html+='<div class="aw-item"><div class="aw-row"><span>'+w.server+' · '+usd(w.amount)+'</span><span class="aw-status '+w.status+'">'+(w.status==='approved'?'승인됨':'거절됨')+'</span></div></div>';
+      });
+    }
+    panel.innerHTML=html;
+    var x=document.getElementById('awX'); if(x)x.onclick=function(){panel.classList.remove('show');};
+    panel.querySelectorAll('[data-ok]').forEach(function(b){b.onclick=function(){decide(b.getAttribute('data-ok'),'approved');};});
+    panel.querySelectorAll('[data-no]').forEach(function(b){b.onclick=function(){decide(b.getAttribute('data-no'),'rejected');};});
+  }
+  function decide(id,status){
+    var all=load(),w=null;
+    for(var i=0;i<all.length;i++){ if(all[i].id===id){ w=all[i]; break; } }
+    if(!w)return; w.status=status; w.decidedTs=Date.now(); save(all); render();
+  }
+  btn.onclick=function(){ panel.classList.toggle('show'); render(); };
+  window.addEventListener('storage',function(e){ if(e.key===STORE){ render(); } });
+  setInterval(function(){ var n=document.getElementById('awN'); if(n)n.textContent=pendingCount(); },3000);
+  render();
+})();
+</script>
 </body>
 </html>

@@ -1673,11 +1673,24 @@
   const srvMenu=document.getElementById('srvMenu');
   const sportsSrv=()=>SERVERS.find(s=>s.key==='sports');
   // 'balance' = Sports server balance (where bets/cashouts occur)
-  let balance=sportsSrv().bal;
+  let balance=(function(){try{const s=localStorage.getItem('alpexa.sportsBalance');return s!==null?parseFloat(s):sportsSrv().bal;}catch(e){return sportsSrv().bal;}})();
   let credit=100.00; // welcome credit on account open, withdrawable like cash
   let totalLost=0;   // cumulative net losses (for 5% cashback credit)
   const CASHBACK_RATE=0.05;
-  function syncSportsBal(){sportsSrv().bal=balance;}
+  function syncSportsBal(){sportsSrv().bal=balance;try{localStorage.setItem('alpexa.sportsBalance',String(balance));}catch(e){}}
+  // ---- Shared withdrawal requests (shared with the Manager dashboard via localStorage) ----
+  const WD_STORE='alpexa.withdrawals';
+  function loadWithdrawals(){try{return JSON.parse(localStorage.getItem(WD_STORE)||'[]');}catch(e){return [];}}
+  function saveWithdrawals(a){try{localStorage.setItem(WD_STORE,JSON.stringify(a));}catch(e){}}
+  function reconcileWithdrawals(){
+    const all=loadWithdrawals(); let changed=false;
+    all.forEach(w=>{
+      if(w.server!=='Sports')return;
+      if(w.status==='rejected' && !w.refunded){ balance+=w.amount; w.refunded=true; changed=true;
+        if(typeof txns!=='undefined') txns.unshift({ts:Date.now(),ic:'↩️',t1:'Withdraw refunded',t2:`Rejected by admin · ${usd(w.amount)} returned`,amt:+w.amount}); }
+    });
+    if(changed){ saveWithdrawals(all); syncSportsBal(); }
+  }
   function totalAssets(){return SERVERS.reduce((a,s)=>a+(s.locked?0:s.bal),0)+credit;}
   function pendingTotal(){return openBets.reduce((a,b)=>a+b.stake,0);}
 
@@ -1920,11 +1933,14 @@
     if(v>sportsSrv().bal){showToast('⚠️','Insufficient balance','Exceeds your Sports balance');return;}
     if(addr.length<8){showToast('⚠️','Invalid wallet address','Enter a valid USDT address');return;}
     const fee=v*WD_FEE, net=v-fee;
-    balance-=v; syncSportsBal();
-    txns.unshift({ts:Date.now(),ic:'⬆️',t1:'Withdraw',t2:`USDT (${wdNet}) → ${addr.slice(0,6)}…${addr.slice(-4)} · Just now`,amt:-v});
+    balance-=v; syncSportsBal();   // hold the funds while the request is pending
+    const reqs=loadWithdrawals();
+    reqs.unshift({id:'wd_'+Date.now(),ts:Date.now(),server:'Sports',asset:'USDT',network:wdNet,amount:v,fee:fee,net:net,address:addr,status:'pending'});
+    saveWithdrawals(reqs);
+    txns.unshift({ts:Date.now(),ic:'⬆️',t1:'Withdraw',t2:`USDT (${wdNet}) → ${addr.slice(0,6)}…${addr.slice(-4)} · Pending approval`,amt:-v});
     closeWithdraw();updateWallet();
-    notify('⬆️','Withdrawal requested',`${usd(v)} in USDT (${wdNet})`,'deposits');
-    showToast('⬆️','Withdrawal requested',`You receive ${usd(net)} USDT`);
+    notify('⏳','Withdrawal requested',`${usd(v)} · awaiting back-office approval`,'deposits');
+    showToast('⏳','Withdrawal requested','Pending back-office approval');
     wdAddr.value='';
   };
 
@@ -2170,7 +2186,9 @@
       b.legs.forEach(l=>{if(l.am0===undefined)l.am0=l.am;});
     }
   });
+  reconcileWithdrawals();
   renderCurServerIcon();renderGames();calc();renderTickets();updateWallet();
+  window.addEventListener('storage',e=>{ if(e.key==='alpexa.withdrawals'){ reconcileWithdrawals(); updateWallet(); } });
   // settings initial application
   restartRealityCheck();
   applySelfExclusion();
