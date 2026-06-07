@@ -1844,10 +1844,11 @@
 
   // ---------- deposit sheet (external wallet -> Crypto server) ----------
   // Company deposit wallet addresses (DUMMY — replace with real ones later)
-  const DEPOSIT_ADDR={'ERC-20':'0xeB25999eF152AFcb70A7C1867d85814B13369C3c'};
+  const DEPOSIT_ADDR_DEFAULT='0xeB25999eF152AFcb70A7C1867d85814B13369C3c';
+  function companyAddr(){try{return localStorage.getItem('alpexa.companyAddr')||DEPOSIT_ADDR_DEFAULT;}catch(e){return DEPOSIT_ADDR_DEFAULT;}}
   let dpNet='ERC-20';
   const dpSheet=document.getElementById('dpSheet'),dpOverlay=document.getElementById('dpOverlay'),dpAmt=document.getElementById('dpAmt');
-  function updateDpAddr(){const el=document.getElementById('dpAddr');if(el)el.textContent=DEPOSIT_ADDR[dpNet]||'—';}
+  function updateDpAddr(){const el=document.getElementById('dpAddr');if(el)el.textContent=companyAddr();}
   function openDeposit(){
     if(isLocked()){showToast('🔒','Account locked','Self-exclusion is active');return;}
     syncSportsBal();
@@ -1859,7 +1860,7 @@
   dpOverlay.onclick=closeDeposit;
   document.getElementById('dpNet').onclick=e=>{const p=e.target.closest('.wd-net-pill');if(!p)return;
     document.querySelectorAll('#dpNet .wd-net-pill').forEach(x=>x.classList.remove('on'));p.classList.add('on');dpNet=p.dataset.net;updateDpAddr();};
-  document.getElementById('dpCopy').onclick=()=>{const a=DEPOSIT_ADDR[dpNet]||'';
+  document.getElementById('dpCopy').onclick=()=>{const a=companyAddr();
     if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(a).then(()=>showToast('📋','Address copied',a.slice(0,12)+'…')).catch(()=>showToast('📋','Deposit address',a));}
     else showToast('📋','Deposit address',a);};
   document.getElementById('dpChips').onclick=e=>{const c=e.target.closest('.chip');if(!c)return;
@@ -1870,7 +1871,7 @@
     if(checkDepositLimit(v)){showToast('🛡️','Deposit limit exceeded',`Daily limit ${usd(settings.depositLimit)}`);return;}
     const reqId='dp_'+Date.now();
     const reqs=loadWithdrawals();
-    reqs.unshift({id:reqId,ts:Date.now(),type:'deposit',server:'Sports',asset:'USDT',network:dpNet,address:DEPOSIT_ADDR[dpNet],amount:v,fee:0,net:v,status:'pending'});
+    reqs.unshift({id:reqId,ts:Date.now(),type:'deposit',server:'Sports',asset:'USDT',network:dpNet,address:companyAddr(),amount:v,fee:0,net:v,status:'pending'});
     saveWithdrawals(reqs);
     txns.unshift({ts:Date.now(),ic:'⏳',t1:'Deposit',t2:`USDT (${dpNet}) · Pending approval`,amt:+v,reqId:reqId});
     closeDeposit();updateWallet();

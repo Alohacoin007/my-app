@@ -26,7 +26,11 @@
   .bal .lbl{font-size:11px;color:var(--dim);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
   .bal .v{font-size:26px;font-weight:800;letter-spacing:-.6px;margin-top:3px}
   .addr{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px;word-break:break-all;color:var(--ink);margin-top:6px}
-  .copybtn{margin-top:10px;background:var(--acc);color:#fff;border:none;border-radius:8px;padding:9px 14px;font:700 13px system-ui;cursor:pointer}
+  .copybtn{background:var(--acc);color:#fff;border:none;border-radius:8px;padding:10px 16px;font:700 13px system-ui;cursor:pointer}
+  .copybtn.ghost{background:#eef0f3;color:var(--acc)}
+  .addr-in{width:100%;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px;color:var(--ink);background:#f1f3f4;border:1px solid var(--line);border-radius:8px;padding:10px 11px;margin-top:6px;word-break:break-all}
+  .co-btns{display:flex;gap:8px;margin-top:10px}
+  .co-hint{font-size:11px;color:#9aa3b2;margin-top:8px}
   /* section */
   .sec{margin:18px 14px 6px;font-size:13px;font-weight:800;color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
   /* request card */
@@ -75,8 +79,9 @@
 
   <div class="bal">
     <div class="lbl">Company deposit wallet · USDT (ERC-20)</div>
-    <div class="addr" id="coAddr">0xeB25999eF152AFcb70A7C1867d85814B13369C3c</div>
-    <button class="copybtn" id="coCopy">Copy address</button>
+    <input class="addr-in" id="coAddrIn" spellcheck="false" autocomplete="off">
+    <div class="co-btns"><button class="copybtn" id="coSave">Save</button><button class="copybtn ghost" id="coCopy">Copy</button></div>
+    <div class="co-hint">Saved address is used by the app's deposit screen.</div>
   </div>
 
   <div class="sec">Pending approvals</div>
@@ -144,8 +149,13 @@
   }
 
   window.addEventListener('storage',function(e){ if(e.key===STORE||e.key==='alpexa.sportsBalance') render(); });
+  var CO_KEY='alpexa.companyAddr', CO_DEF='0xeB25999eF152AFcb70A7C1867d85814B13369C3c';
+  function getCoAddr(){try{return localStorage.getItem(CO_KEY)||CO_DEF;}catch(e){return CO_DEF;}}
+  var coIn=document.getElementById('coAddrIn'); if(coIn)coIn.value=getCoAddr();
+  var coSave=document.getElementById('coSave');
+  if(coSave)coSave.onclick=function(){var v=(coIn.value||'').trim(); if(!v)return; try{localStorage.setItem(CO_KEY,v);}catch(e){} coSave.textContent='Saved ✓'; setTimeout(function(){coSave.textContent='Save';},1300);};
   var coCopy=document.getElementById('coCopy');
-  if(coCopy)coCopy.onclick=function(){var a='0xeB25999eF152AFcb70A7C1867d85814B13369C3c';try{if(navigator.clipboard)navigator.clipboard.writeText(a);}catch(e){}coCopy.textContent='Copied!';setTimeout(function(){coCopy.textContent='Copy address';},1200);};
+  if(coCopy)coCopy.onclick=function(){try{if(navigator.clipboard)navigator.clipboard.writeText((coIn.value||'').trim());}catch(e){}coCopy.textContent='Copied!';setTimeout(function(){coCopy.textContent='Copy';},1200);};
   setInterval(render,2000);
   render();
 </script>
