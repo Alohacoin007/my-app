@@ -1795,11 +1795,14 @@
     const v=parseFloat(dpAmt.value)||0;
     if(v<=0){showToast('⚠️','Enter a deposit amount');return;}
     if(checkDepositLimit(v)){showToast('🛡️','Deposit limit exceeded',`Daily limit ${usd(settings.depositLimit)}`);return;}
-    srvByKey('crypto').bal+=v;
-    txns.unshift({ts:Date.now(),ic:'⬇️',t1:'Deposit',t2:`${dpCoin} → Crypto · Just now`,amt:+v});
+    const src=srvByKey('crypto');
+    if(src.bal < v){showToast('⚠️','Insufficient balance',`Only ${usd(src.bal)} in ${src.short.replace('Alpexa ','')}`);return;}
+    src.bal-=v;                  // take from the source server
+    balance+=v; syncSportsBal(); // add to the Sports betting balance
+    txns.unshift({ts:Date.now(),ic:'⬇️',t1:'Deposit',t2:`${src.short.replace('Alpexa ','')} → Sports · Just now`,amt:+v});
     closeDeposit();updateWallet();
-    notify('⬇️','Deposit complete',`${usd(v)} via ${dpCoin}`,'deposits');
-    showToast('⬇️','Deposit complete',`${usd(v)} via ${dpCoin}`);
+    notify('⬇️','Deposit complete',`${usd(v)} moved to Sports`,'deposits');
+    showToast('⬇️','Deposit complete',`${usd(v)} added to your Sports balance`);
   };
 
   // ---------- transfer between servers (Sports <-> Crypto only) ----------
