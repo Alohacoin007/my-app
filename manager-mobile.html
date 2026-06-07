@@ -60,22 +60,22 @@
         <h1>Alpexa Manager</h1>
         <div class="sub">Back office · Mobile</div>
       </div>
-      <div class="pill"><span id="pendN">0</span> 대기</div>
+      <div class="pill"><span id="pendN">0</span> pending</div>
     </div>
   </div>
 
   <div class="bal">
-    <div class="lbl">Sports 계좌 잔액</div>
+    <div class="lbl">Sports balance</div>
     <div class="v" id="sportsBal">$0.00</div>
   </div>
 
-  <div class="sec">승인 대기</div>
+  <div class="sec">Pending approvals</div>
   <div id="pending"></div>
 
-  <div class="sec">최근 처리</div>
+  <div class="sec">Recently processed</div>
   <div id="history"></div>
 
-  <div class="foot">같은 브라우저의 앱들과 데이터를 공유해요 · <a href="launcher.html">← 런처</a></div>
+  <div class="foot">Shares data with the apps in this browser · <a href="launcher.html">← Launcher</a></div>
 
 <script>
   var STORE='alpexa.withdrawals';
@@ -84,8 +84,8 @@
   function usd(n){return '$'+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
   function sportsBalance(){try{var s=localStorage.getItem('alpexa.sportsBalance');return s!==null?parseFloat(s):0;}catch(e){return 0;}}
   function ago(ts){ if(!ts) return ''; var s=Math.floor((Date.now()-ts)/1000);
-    if(s<60)return s+'초 전'; var m=Math.floor(s/60); if(m<60)return m+'분 전';
-    var h=Math.floor(m/60); if(h<24)return h+'시간 전'; return Math.floor(h/24)+'일 전'; }
+    if(s<60)return s+'s ago'; var m=Math.floor(s/60); if(m<60)return m+'m ago';
+    var h=Math.floor(m/60); if(h<24)return h+'h ago'; return Math.floor(h/24)+'d ago'; }
 
   function decide(id,status){
     var all=load(),w=null;
@@ -103,30 +103,30 @@
     document.getElementById('sportsBal').textContent=usd(sportsBalance());
 
     var p=document.getElementById('pending');
-    if(!pend.length){ p.innerHTML='<div class="empty">대기 중인 요청이 없어요 👍</div>'; }
+    if(!pend.length){ p.innerHTML='<div class="empty">No pending requests 👍</div>'; }
     else{
       p.innerHTML=pend.map(function(w){
         var type=w.type||'withdraw';
-        var label=type==='deposit'?'입금 DEPOSIT':type==='transfer'?'이체 TRANSFER':'출금 WITHDRAW';
+        var label=type==='deposit'?'DEPOSIT':type==='transfer'?'TRANSFER':'WITHDRAW';
         var meta=type==='transfer'?((w.from||'Sports')+' → '+(w.to||'Crypto')):((w.asset||'USDT')+(w.network?' ('+w.network+')':''));
         return '<div class="req">'+
           '<div class="req-top"><span class="badge '+type+'">'+label+'</span><span class="req-amt">'+usd(w.amount)+'</span></div>'+
           '<div class="req-meta">'+w.server+' · '+meta+' · '+ago(w.ts)+'</div>'+
-          (type==='withdraw'?'<div class="req-meta">받는 금액(수수료 후): <b>'+usd(w.net)+'</b></div>':'')+
+          (type==='withdraw'?'<div class="req-meta">You receive (after fee): <b>'+usd(w.net)+'</b></div>':'')+
           (w.address?'<div class="req-addr">'+w.address+'</div>':'')+
-          '<div class="req-btns"><button class="ok" onclick="decide(\''+w.id+'\',\'approved\')">승인</button>'+
-          '<button class="no" onclick="decide(\''+w.id+'\',\'rejected\')">거절</button></div>'+
+          '<div class="req-btns"><button class="ok" onclick="decide(\''+w.id+'\',\'approved\')">Approve</button>'+
+          '<button class="no" onclick="decide(\''+w.id+'\',\'rejected\')">Reject</button></div>'+
         '</div>';
       }).join('');
     }
 
     var h=document.getElementById('history');
-    if(!done.length){ h.innerHTML='<div class="empty">아직 처리한 내역이 없어요.</div>'; }
+    if(!done.length){ h.innerHTML='<div class="empty">Nothing processed yet.</div>'; }
     else{
       h.innerHTML='<div class="hist">'+done.map(function(w){
-        var label=(w.type||'withdraw')==='deposit'?'입금':(w.type==='transfer'?'이체':'출금');
+        var label=(w.type||'withdraw')==='deposit'?'Deposit':(w.type==='transfer'?'Transfer':'Withdraw');
         return '<div class="hrow"><span>'+label+' · '+w.server+' · '+usd(w.amount)+'</span>'+
-          '<span class="st '+w.status+'">'+(w.status==='approved'?'승인됨':'거절됨')+'</span></div>';
+          '<span class="st '+w.status+'">'+(w.status==='approved'?'Approved':'Rejected')+'</span></div>';
       }).join('')+'</div>';
     }
   }
