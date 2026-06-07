@@ -2063,7 +2063,7 @@
     g.time=clkLabel(g);return null;
   }
   setInterval(()=>{
-    GAMES.filter(g=>g.live).forEach(g=>{
+    GAMES.filter(g=>g.live && !g.real).forEach(g=>{
       // baseline gentle odds drift (smaller; bigger shift comes from scoring)
       if(Math.random()<0.5){
         const pool=[...g.core.spread,...g.core.total,...g.core.ml];
@@ -2234,7 +2234,7 @@
           if(!isNaN(hs)) home.sc=hs; if(!isNaN(as)) away.sc=as;
         }
         const time = (st.shortDetail || st.description || '').trim() || 'TBD';
-        return { id:lg+'_'+ev.id, lg, live: state==='in', time, home, away, core: mkCore(home, away, ev), props: [] };
+        return { id:lg+'_'+ev.id, lg, live: state==='in', real: true, time, home, away, core: mkCore(home, away, ev), props: [] };
       }catch(e){ return null; }
     }
     async function fetchJson(url){
