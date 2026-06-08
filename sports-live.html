@@ -1779,7 +1779,8 @@
   let credit=0.00; // real mode — no demo welcome credit
   let totalLost=0;   // cumulative net losses (for 5% cashback credit)
   const CASHBACK_RATE=0.05;
-  function syncSportsBal(){sportsSrv().bal=balance;try{localStorage.setItem('alpexa.sportsBalance',String(balance));}catch(e){}}
+  function syncSportsBal(){sportsSrv().bal=balance;try{localStorage.setItem('alpexa.sportsBalance',String(balance));}catch(e){}
+    try{var o=Object.assign({crypto:10000,fx:25000,sports:50000},JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}'));o.sports=balance;localStorage.setItem('alpexa.serverBalances',JSON.stringify(o));}catch(e){}}
   function saveCryptoBal(){try{const c=SERVERS.find(s=>s.key==='crypto');if(c)localStorage.setItem('alpexa.cryptoBalance',String(c.bal));}catch(e){}}
   (function(){try{const s=localStorage.getItem('alpexa.cryptoBalance');if(s!==null){const c=SERVERS.find(x=>x.key==='crypto');if(c)c.bal=parseFloat(s);}}catch(e){}})();
   // ---- Shared withdrawal requests (shared with the Manager dashboard via localStorage) ----

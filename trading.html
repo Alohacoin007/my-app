@@ -454,6 +454,12 @@ function setBalances(obj){try{localStorage.setItem('alpexa.balances',JSON.string
 function addBalance(acctId,delta){const b=getBalances();b[acctId]=Math.max(0,(b[acctId]||0)+delta);setBalances(b);}
 function fmtBalance(n){return '$'+(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
 window.getBalances=getBalances;window.addBalance=addBalance;window.fmtBalance=fmtBalance;
+// Shared cross-app server balances (so every app's server switcher agrees).
+function getServerBalances(){try{return Object.assign({crypto:10000,fx:25000,sports:50000},JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}'));}catch(e){return {crypto:10000,fx:25000,sports:50000};}}
+function srvBalById(id){const s=getServerBalances();return id==='live'?s.fx:(id==='crypto'?s.crypto:s.sports);}
+function syncMyServerBalance(){try{const o=getServerBalances();o.fx=getBalances().live;localStorage.setItem('alpexa.serverBalances',JSON.stringify(o));}catch(e){}}
+window.addEventListener('alpexa-balance-change',syncMyServerBalance);
+syncMyServerBalance();
 const DEFAULT_LEVERAGE={FX:100,INDEX:20,STOCK:5,CRYPTO:5};
 function getLeverageSettings(){try{const raw=localStorage.getItem('alpexa.leverage');if(raw)return{...DEFAULT_LEVERAGE,...JSON.parse(raw)};}catch(e){}return{...DEFAULT_LEVERAGE};}
 function setLeverageSettings(settings){try{localStorage.setItem('alpexa.leverage',JSON.stringify(settings));}catch(e){}window.dispatchEvent(new Event('alpexa-leverage-change'));}
@@ -2673,7 +2679,7 @@ function AccountSheet({open,current,onPick,onClose}){
                 <div className="mono" style={{fontSize:10.5,color:'var(--text-3)',marginTop:2}}>#{a.acct} · {a.type} · {a.url}</div>
               </div>
               <div style={{textAlign:'right'}}>
-                <div className="mono" style={{fontSize:12.5,fontWeight:700,color:'var(--ink)'}}>{fmtBalance(bal[a.id])}</div>
+                <div className="mono" style={{fontSize:12.5,fontWeight:700,color:'var(--ink)'}}>{fmtBalance(srvBalById(a.id))}</div>
                 {sel&&<div style={{fontSize:9.5,fontWeight:700,color:'var(--acc-2)',marginTop:2,letterSpacing:0.4}}>● CONNECTED</div>}
               </div>
             </button>
@@ -3348,7 +3354,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v10';
+(function(){try{var b=document.createElement('div');b.textContent='FX v11';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>

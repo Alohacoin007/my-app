@@ -1131,10 +1131,13 @@ function ServerSwitcher() {
     document.addEventListener('mousedown', h); document.addEventListener('touchstart', h);
     return () => { document.removeEventListener('mousedown', h); document.removeEventListener('touchstart', h); };
   }, [open]);
+  let SB = { crypto: 10000, fx: 25000, sports: 50000 };
+  try { SB = Object.assign(SB, JSON.parse(localStorage.getItem('alpexa.serverBalances') || '{}')); } catch (e) {}
+  const money = (n) => '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const servers = [
-    { id: 'crypto', label: 'Alpexa Crypto', desc: 'Crypto · securities', code: 'CR' },
-    { id: 'fx',     label: 'Alpexa FX',     desc: 'Foreign exchange',    code: 'FX' },
-    { id: 'sports', label: 'Alpexa Sports', desc: 'Sports markets',      code: 'SP' },
+    { id: 'crypto', label: 'Alpexa Crypto', desc: 'Crypto · securities', code: 'CR', bal: SB.crypto },
+    { id: 'fx',     label: 'Alpexa FX',     desc: 'Foreign exchange',    code: 'FX', bal: SB.fx },
+    { id: 'sports', label: 'Alpexa Sports', desc: 'Sports markets',      code: 'SP', bal: SB.sports },
   ];
   const go = (id) => { if (id === 'fx') { window.location.href = 'trading.html'; return; } if (id === 'sports') { window.location.href = 'sports-live.html'; return; } setOpen(false); };
   return (
@@ -1158,7 +1161,10 @@ function ServerSwitcher() {
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 28, height: 28, borderRadius: 8, background: RH.surfaceUp, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: RH.text }}>{s.code}</div>
               <div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 600, color: RH.text }}>{s.label}</div><div style={{ fontSize: 11, color: RH.textMute }}>{s.desc}</div></div>
-              {active ? <div style={{ fontSize: 10, fontWeight: 700, color: '#22c55e' }}>● ON</div> : null}
+              <div style={{ textAlign: 'right' }}>
+                <div className="mono" style={{ fontSize: 12, fontWeight: 700, color: RH.text }}>{money(s.bal)}</div>
+                {active ? <div style={{ fontSize: 9, fontWeight: 700, color: '#22c55e', marginTop: 1 }}>● ON</div> : null}
+              </div>
             </button>
           ); })}
         </div>
@@ -12573,8 +12579,8 @@ function App() {
   // Server-level pool balances shown in the header server picker.
   const [serverBalances, setServerBalances] = usePersistedState('alpexa.serverBalances', {
     crypto: 10000,
-    fx:     0,
-    sports: 0,
+    fx:     25000,
+    sports: 50000,
   });
   const [whitelist,    setWhitelist]    = usePersistedState('alpexa.whitelist', []);
   const [beneficiaries, setBeneficiaries] = usePersistedState('alpexa.beneficiaries', []);
@@ -13050,7 +13056,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v11';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v12';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
