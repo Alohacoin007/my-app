@@ -331,8 +331,11 @@ function applyReal(state,map){
   return state;
 }
 // Market hours (so closed markets hold their price instead of drifting).
-function fxOpenUTC(){var d=new Date(),day=d.getUTCDay(),t=d.getUTCHours()*60+d.getUTCMinutes();
-  if(day===6)return false; if(day===0)return t>=1320; if(day===5)return t<1320; return true;}
+function fxOpenUTC(){ // Forex week: Sun 17:00 ET open → Fri 17:00 ET close (DST-aware via NY tz)
+  try{var d=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'})),day=d.getDay(),t=d.getHours()*60+d.getMinutes();
+    if(day===6)return false; if(day===0)return t>=1020; if(day===5)return t<1020; return true;
+  }catch(e){var u=new Date(),wd=u.getUTCDay(),m=u.getUTCHours()*60+u.getUTCMinutes();
+    if(wd===6)return false; if(wd===0)return m>=1320; if(wd===5)return m<1320; return true;}}
 function stockOpenET(){try{var d=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'})),day=d.getDay();
   if(day===0||day===6)return false; var t=d.getHours()*60+d.getMinutes(); return t>=570&&t<960;}catch(e){return true;}}
 function symOpen(s){ if(s.cls==='CRYPTO')return true; if(typeof s.marketOpen==='boolean')return s.marketOpen;
@@ -697,17 +700,43 @@ function genTfSeries(sym,tf,currentPrice){
   if(arr.length){const last=arr[arr.length-1];last.c=currentPrice;last.h=Math.max(last.h,currentPrice);last.l=Math.min(last.l,currentPrice);}
   return arr;
 }
+// Twelve Data helpers for real chart history
+const TD_KEY_CHART='6fef3bc69c2842a2b4a127969f766eb0';
+const TD_INTERVAL={M1:'1min',M5:'5min',M15:'15min',H1:'1h',H4:'4h',D1:'1day',W1:'1week'};
+function tdSymbolFor(symStr){var o=(window.ALPEXA_MARKET&&ALPEXA_MARKET.SYMBOLS||[]).find(x=>x.sym===symStr);if(o&&o.cls==='STOCK')return symStr;return symStr.length===6?symStr.slice(0,3)+'/'+symStr.slice(3):symStr;}
 function Chart({series,sym,tf,digits=5,showMA=true,showVol=true,showBB=false,showRSI=false,showMACD=false,accent='#22B8CF',height=280,candleCount,fillContainer=false}){
   const ref=useRef(null);const wrapRef=useRef(null);
   const [hover,setHover]=useState(null);const [w,setW]=useState(360);const [h,setH]=useState(height);
+  // Real historical candles from Twelve Data (only for the main chart, cached per sym|tf).
+  const [realMap,setRealMap]=useState({});
+  const realKey=sym+'|'+tf;
+  useEffect(()=>{
+    if(!fillContainer||!sym||!tf||typeof fetch!=='function')return;
+    if(realMap[realKey])return;
+    const iv=TD_INTERVAL[tf]||'5min';const n=(candleCount&&candleCount>0)?candleCount:80;
+    let cancelled=false;
+    fetch('https://api.twelvedata.com/time_series?symbol='+encodeURIComponent(tdSymbolFor(sym))+'&interval='+iv+'&outputsize='+n+'&order=ASC&apikey='+TD_KEY_CHART)
+      .then(r=>r.json()).then(j=>{ if(cancelled)return;
+        if(j&&j.values&&j.values.length){
+          const candles=j.values.map(v=>({o:+v.open,h:+v.high,l:+v.low,c:+v.close,v:+(v.volume||0)||0.5})).filter(c=>isFinite(c.c)&&c.c>0);
+          if(candles.length)setRealMap(m=>({...m,[realKey]:candles}));
+        }
+      }).catch(()=>{});
+    return ()=>{cancelled=true;};
+  },[sym,tf,fillContainer,candleCount]);
   const liveSeries=useMemo(()=>{
+    if(realMap[realKey]&&realMap[realKey].length){
+      const full=realMap[realKey];
+      if(candleCount&&full.length>candleCount)return full.slice(full.length-candleCount);
+      return full;
+    }
     if(sym&&tf&&series&&series.length){
       const last=series[series.length-1].c;
       const full=genTfSeries(sym,tf,last);
       if(candleCount&&full.length>candleCount)return full.slice(full.length-candleCount);
       return full;
     }return series;
-  },[sym,tf,candleCount,series&&series[series.length-1]&&series[series.length-1].c]);
+  },[sym,tf,candleCount,realMap[realKey],series&&series[series.length-1]&&series[series.length-1].c]);
   useEffect(()=>{const ro=new ResizeObserver(entries=>{for(const e of entries){setW(e.contentRect.width);if(fillContainer&&e.contentRect.height>0)setH(e.contentRect.height);}});if(wrapRef.current)ro.observe(wrapRef.current);return()=>ro.disconnect();},[fillContainer]);
   useEffect(()=>{if(!fillContainer)setH(height);},[height,fillContainer]);
   useEffect(()=>{if(!ref.current||!liveSeries||!liveSeries.length)return;draw();},[liveSeries,w,h,showMA,showVol,showBB,showRSI,showMACD,hover,accent,tf]);
@@ -3413,7 +3442,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v20 (live)';
+(function(){try{var b=document.createElement('div');b.textContent='FX v21 (real chart)';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
