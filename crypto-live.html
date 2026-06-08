@@ -1138,11 +1138,11 @@ function ServerSwitcher() {
   ];
   const go = (id) => { if (id === 'fx') { window.location.href = 'trading.html'; return; } if (id === 'sports') { window.location.href = 'sports-live.html'; return; } setOpen(false); };
   return (
-    <div ref={ref} style={{ position: 'fixed', top: 'calc(env(safe-area-inset-top) + 8px)', right: 12, zIndex: 9000 }}>
+    <div ref={ref} style={{ position: 'relative' }}>
       <button aria-label="Switch server" onClick={() => setOpen((o) => !o)} style={{
-        width: 32, height: 32, borderRadius: 16, background: open ? RH.surfaceUp : RH.surface,
+        width: 34, height: 34, borderRadius: 17, background: open ? RH.surfaceUp : RH.surface,
         border: `1px solid ${RH.line}`, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'pointer', padding: 0, boxShadow: '0 2px 10px rgba(0,0,0,0.45)' }}>
+        cursor: 'pointer', padding: 0 }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={RH.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/>
           <circle cx="7" cy="7" r="0.6" fill={RH.text}/><circle cx="7" cy="17" r="0.6" fill={RH.text}/></svg>
@@ -9693,6 +9693,7 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
             </svg>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <ServerSwitcher/>
             <button aria-label="Alerts" onClick={() => setAlertsOpen(true)} style={{
               position: 'relative',
               width: 34, height: 34, borderRadius: 17,
@@ -10637,7 +10638,8 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
             </svg>
           </button>
         )}
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {inTab ? <ServerSwitcher/> : null}
           <button aria-label="Alerts" onClick={async () => {
             const ok = await alpexa.confirm(`Set a price alert for ${sym}?`, { title: 'Price alert' });
             if (ok) alpexa.alert(`Price alert set for ${sym}.
@@ -12816,7 +12818,7 @@ function App() {
 
   // Main tab content (Home/Trade/Discover/Account) — wrapped with TabBar.
   if (screen === 'dashboard' || screen === 'main') {
-    const TB = <><TabBar active={tab} onTabChange={setTab}/>{tab !== 'home' ? <ServerSwitcher/> : null}</>;
+    const TB = <TabBar active={tab} onTabChange={setTab}/>;
     if (tab === 'home') {
       return <Dashboard onAction={onAction} balances={balances} staked={staked} pulseAsset={pulseAsset} serverBalances={serverBalances} pendingOrders={pendingOrders} onCancelOrder={cancelOrder} onTapAsset={(kind, sym) => { setDetail({ kind, sym }); setScreen('detail'); }} tabBar={TB} securityRedeemed={securityRedeemed}/>;
     }
@@ -13048,7 +13050,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v10';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v11';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
