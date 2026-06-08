@@ -3001,7 +3001,9 @@ function AppHeader({accent,account,onAccountClick,livePnl=0,prevPnl=0,usedMargin
   const balance=balanceNum*cur.rate;
   const free=freeUsd*cur.rate;
   const pnlConverted=livePnl*cur.rate;
-  const marginLevel=usedMargin>0?(equityUsd/usedMargin)*100:Infinity;
+  // Treat negligible used margin (no real open positions) as no margin in use,
+  // so the level shows "—" instead of an absurd number from floating-point dust.
+  const marginLevel=usedMargin>=0.01?(equityUsd/usedMargin)*100:Infinity;
   const MARGIN_CALL=100;const STOP_OUT=50;const SAFE_THRESHOLD=500;
   const marginColor=marginLevel<STOP_OUT?'#FB7185':marginLevel<MARGIN_CALL?'#F59E0B':marginLevel<200?'#FBBF24':marginLevel>=SAFE_THRESHOLD?'#86EFAC':'rgba(255,255,255,0.92)';
   const marginWarn=marginLevel<MARGIN_CALL;
@@ -3306,7 +3308,7 @@ function App(){
   const [lots,setLots]=useState(0.10);
   const [indicators,setIndicators]=useState({ma:true,vol:false,bb:false,rsi:false,macd:false});
   // Open positions & pending orders persist across server switches / reloads.
-  const [liveOrders,setLiveOrders]=useState(()=>{try{return JSON.parse(localStorage.getItem('alpexa.fxLive')||'[]');}catch(e){return [];}});
+  const [liveOrders,setLiveOrders]=useState(()=>{try{return (JSON.parse(localStorage.getItem('alpexa.fxLive')||'[]')||[]).filter(o=>o&&(+o.vol)>0);}catch(e){return [];}});
   const [pendingOrders,setPendingOrders]=useState(()=>{try{return JSON.parse(localStorage.getItem('alpexa.fxPending')||'[]');}catch(e){return [];}});
   const [closedHistory,setClosedHistory]=useState(()=>{try{return JSON.parse(localStorage.getItem('alpexa.fxClosed')||'[]');}catch(e){return [];}});
   useEffect(()=>{try{localStorage.setItem('alpexa.fxClosed',JSON.stringify(closedHistory));}catch(e){}},[closedHistory]);
@@ -3396,7 +3398,7 @@ function App(){
       // ── Margin call (100%) + stop out (50%) ──
       // Include the static demo positions in the floating P&L / used margin too.
       ALPEXA_MARKET.POSITIONS.forEach(p=>{ floatPnl+=(p.pnl||0); const m=marketRef.current.state.find(s=>s.sym===p.sym); if(m)usedM+=ALPEXA_MARKET.getMarginUSD(m,p.vol||0,p.open||0,(levSet[m.cls]||100)); });
-      if(usedM>0){
+      if(usedM>=0.01){
         const bal=(window.getBalances?window.getBalances():{})[accountRef.current]||0;
         const lvl=((bal+floatPnl)/usedM)*100;
         if(lvl<50&&worst){ // stop out: liquidate the worst-losing live position
@@ -3633,7 +3635,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v49';
+(function(){try{var b=document.createElement('div');b.textContent='FX v50';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
