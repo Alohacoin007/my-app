@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0.7 -->
+<!-- v1.0.8 -->
 
 <html lang="en">
 <head>
@@ -1168,7 +1168,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.0.7</div>`;
+      <div class="s-foot">Alpexa Sports v1.0.8</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -2027,14 +2027,10 @@
         <span class="d ${s.ic}"></span>
         <span class="tf-chip-info"><span class="tf-chip-nm">${s.short.replace('Alpexa ','')}</span><span class="tf-chip-bal">${usd(s.key==='sports'?balance:s.bal)}</span></span></div>`).join('');
       document.querySelectorAll('#'+elId+' .tf-chip').forEach(c=>c.onclick=()=>{
+        if(isFrom) return;             // From is locked to Sports (so the source is always debited correctly)
         const k=c.dataset.key;
-        if(isFrom){
-          if(k===tfTo){[tfFrom,tfTo]=[tfTo,tfFrom];} // tapping the other server flips direction
-          else tfFrom=k;
-        }else{
-          if(k===tfFrom){[tfFrom,tfTo]=[tfTo,tfFrom];}
-          else tfTo=k;
-        }
+        if(k===tfFrom) return;          // can't send to the same server
+        tfTo=k;
         renderTfSelectors();updateTfAvail();});
     };
     build('tfFrom',tfFrom,tfTo,true);
@@ -2045,7 +2041,9 @@
   }
   function openTransfer(){
     syncSportsBal();
+    tfFrom='sports';                               // From is locked to Sports
     if(tfFrom===tfTo)tfTo=TF_KEYS.find(k=>k!==tfFrom);
+    var sw=document.getElementById('tfSwap'); if(sw)sw.style.display='none';
     renderTfSelectors();updateTfAvail();
     tfSheet.classList.add('show');tfOverlay.classList.add('show');
   }

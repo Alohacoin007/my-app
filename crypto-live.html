@@ -3809,18 +3809,18 @@ function Transfer({ onBack, serverBalances = {}, onTransferred }) {
   const [intPart, fracPart] = amountStr.includes('.') ? amountStr.split('.') : [amountStr, null];
   const fracDisplay = fracPart === null ? '.00' : `.${fracPart}`;
 
-  const renderServerCard = (label, sid, open, setOpen, otherSid) => {
+  const renderServerCard = (label, sid, open, setOpen, otherSid, locked) => {
     const meta = SERVERS[sid];
     const bal  = serverBalances[sid] != null ? serverBalances[sid] : 0;
     return (
       <div style={{ position: 'relative' }}>
         <div
-          onClick={() => setOpen((o) => !o)}
+          onClick={locked ? undefined : () => setOpen((o) => !o)}
           style={{
             padding: '14px 16px',
             background: RH.surface, border: `1px solid ${RH.line}`,
             borderRadius: 14,
-            display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 12, cursor: locked ? 'default' : 'pointer',
             fontFamily: 'Geist, Inter, system-ui',
           }}
         >
@@ -3834,21 +3834,23 @@ function Transfer({ onBack, serverBalances = {}, onTransferred }) {
               fontVariantNumeric: 'tabular-nums', letterSpacing: -0.1,
             }}>${bal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </div>
+          {locked ? null : (
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={RH.textDim} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{
             transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
             transition: 'transform 200ms ease',
           }}>
             <path d="M6 9l6 6 6-6"/>
           </svg>
+          )}
         </div>
-        {open ? (
+        {(!locked && open) ? (
           <div style={{
             position: 'absolute', left: 0, right: 0, top: 'calc(100% + 6px)',
             background: RH.surface, border: `1px solid ${RH.line}`,
             borderRadius: 12, padding: 4, zIndex: 30,
             boxShadow: '0 16px 40px -12px rgba(0,0,0,0.6)',
           }}>
-            {ids.map((i) => {
+            {ids.filter((i) => i !== otherSid).map((i) => {
               const m = SERVERS[i]; const b = serverBalances[i] != null ? serverBalances[i] : 0;
               const active = i === sid;
               return (
@@ -3930,23 +3932,22 @@ function Transfer({ onBack, serverBalances = {}, onTransferred }) {
       }}>
         {/* From + Swap + To */}
         <div style={{ padding: '6px 22px 0', position: 'relative' }}>
-          {renderServerCard('FROM', fromId, fromOpen, setFromOpen, toId)}
+          {renderServerCard('FROM', fromId, fromOpen, setFromOpen, toId, true)}
           <div style={{ position: 'relative', height: 22 }}>
-            <button onClick={swapServers} aria-label="Swap" style={{
+            <div style={{
               position: 'absolute', left: '50%', top: '50%',
               transform: 'translate(-50%, -50%)',
               width: 32, height: 32, borderRadius: 16,
               background: RH.surfaceUp, border: `1px solid ${RH.line}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', padding: 0, zIndex: 10,
+              padding: 0, zIndex: 10,
             }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={RH.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M7 4 L7 20 M4 17 L7 20 L10 17"/>
-                <path d="M17 20 L17 4 M14 7 L17 4 L20 7"/>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={RH.textDim} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 5 L12 19 M6 13 L12 19 L18 13"/>
               </svg>
-            </button>
+            </div>
           </div>
-          {renderServerCard('TO', toId, toOpen, setToOpen, fromId)}
+          {renderServerCard('TO', toId, toOpen, setToOpen, fromId, false)}
         </div>
 
         {/* Hero amount */}
@@ -13207,7 +13208,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v31';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v32';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
