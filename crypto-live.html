@@ -108,16 +108,12 @@
 (function(){try{
   var OWNER='zbnyme@gmail.com';
   var me=null;try{me=JSON.parse(localStorage.getItem('alpexa.me')||'null');}catch(e){}
-  if(me&&me.email&&String(me.email).trim().toLowerCase()===OWNER&&localStorage.getItem('alpexa.ownerFunded')!=='1M'){
+  if(me&&me.email&&String(me.email).trim().toLowerCase()===OWNER){
+    // Owner test account: ALWAYS $1,000,000 (run every load so it can't flip).
     localStorage.setItem('alpexa.serverBalances',JSON.stringify({crypto:1000000,fx:1000000,sports:1000000}));
     localStorage.setItem('alpexa.sportsBalance','1000000');
-    var b={};try{b=JSON.parse(localStorage.getItem('alpexa.balances')||'{}')||{};}catch(e){b={};}
-    b.live=1000000;b.crypto=1000000;b.sports=1000000;
-    localStorage.setItem('alpexa.balances',JSON.stringify(b));
-    // crypto coin holdings now live in their own key (separate from FX per-server balances)
-    var ch={};try{ch=JSON.parse(localStorage.getItem('alpexa.cryptoHoldings')||'{}')||{};}catch(e){ch={};}
-    ch.USDT=1000000;
-    localStorage.setItem('alpexa.cryptoHoldings',JSON.stringify(ch));
+    localStorage.setItem('alpexa.balances',JSON.stringify({live:1000000,crypto:1000000,sports:1000000}));
+    localStorage.setItem('alpexa.cryptoHoldings',JSON.stringify({USDT:1000000}));
     localStorage.setItem('alpexa.ownerFunded','1M');
   }
 }catch(e){}})();
@@ -13214,7 +13210,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v33';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v34';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>

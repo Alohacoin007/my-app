@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.2.1 -->
+<!-- v1.2.2 -->
 
 <html lang="en">
 <head>
@@ -943,12 +943,13 @@
   (function(){try{
   var OWNER='zbnyme@gmail.com';
   var me=null;try{me=JSON.parse(localStorage.getItem('alpexa.me')||'null');}catch(e){}
-  if(me&&me.email&&String(me.email).trim().toLowerCase()===OWNER&&localStorage.getItem('alpexa.ownerFunded')!=='1M'){
+  if(me&&me.email&&String(me.email).trim().toLowerCase()===OWNER){
+    // Owner test account: ALWAYS $1,000,000 per server (run every load so a
+    // reset/seed in another app can never flip it back to $10,000).
     localStorage.setItem('alpexa.serverBalances',JSON.stringify({crypto:1000000,fx:1000000,sports:1000000}));
     localStorage.setItem('alpexa.sportsBalance','1000000');
-    var b={};try{b=JSON.parse(localStorage.getItem('alpexa.balances')||'{}')||{};}catch(e){b={};}
-    b.live=1000000;b.USDT=1000000;b.crypto=1000000;b.sports=1000000;
-    localStorage.setItem('alpexa.balances',JSON.stringify(b));
+    localStorage.setItem('alpexa.balances',JSON.stringify({live:1000000,crypto:1000000,sports:1000000}));
+    localStorage.setItem('alpexa.cryptoHoldings',JSON.stringify({USDT:1000000}));
     localStorage.setItem('alpexa.ownerFunded','1M');
   }
 }catch(e){}})();
@@ -1168,7 +1169,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.1</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.2</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }

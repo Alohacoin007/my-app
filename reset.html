@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alpexa — Reset</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',Arial,sans-serif;background:#0F1729;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .card{width:100%;max-width:360px;background:#1A2334;border:1px solid #2F384C;border-radius:18px;padding:26px 22px;text-align:center}
+  h1{font-size:20px;font-weight:800;margin-bottom:8px}
+  p{font-size:13.5px;color:#9FB0C4;line-height:1.6;margin-bottom:20px}
+  .btn{display:block;width:100%;padding:14px 0;border-radius:12px;border:none;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:10px;text-decoration:none}
+  .danger{background:#E04141;color:#fff}
+  .ghost{background:#232B3D;color:#cdd7e4}
+  .ok{background:#1e8e3e;color:#fff}
+  #done{display:none}
+  #list{font-size:11px;color:#5f6f82;margin-top:14px;word-break:break-all;line-height:1.5}
+  .big{font-size:40px;margin-bottom:6px}
+</style>
+</head>
+<body>
+  <div class="card" id="confirm">
+    <div class="big">🧹</div>
+    <h1>데이터 전체 초기화</h1>
+    <p>이 기기에 저장된 <b>모든 Alpexa 데이터</b>(계정·잔고·거래·설정)를 지웁니다.<br>지운 뒤 다시 가입/로그인하면 깨끗한 상태로 시작해요.</p>
+    <button class="btn danger" onclick="wipe()">전부 지우기</button>
+    <a class="btn ghost" href="login.html">취소 (로그인으로)</a>
+  </div>
+
+  <div class="card" id="done">
+    <div class="big">✅</div>
+    <h1>초기화 완료</h1>
+    <p id="cnt">데이터를 모두 지웠어요.</p>
+    <a class="btn ok" href="signup.html">새로 가입하기</a>
+    <a class="btn ghost" href="login.html">로그인하기</a>
+    <div id="list"></div>
+  </div>
+
+<script>
+function wipe(){
+  var removed=[];
+  try{
+    // Collect every key first (can't delete while iterating).
+    var keys=[];
+    for(var i=0;i<localStorage.length;i++){ keys.push(localStorage.key(i)); }
+    keys.forEach(function(k){
+      if(k && k.indexOf('alpexa')===0){ removed.push(k); localStorage.removeItem(k); }
+    });
+    // Belt-and-suspenders: clear known keys explicitly too.
+    ['alpexa.me','alpexa.serverBalances','alpexa.sportsBalance','alpexa.balances',
+     'alpexa.cryptoHoldings','alpexa.cryptoBalance','alpexa.transactions','alpexa.staked',
+     'alpexa.pendingOrders','alpexa.withdrawals','alpexa.funding','alpexa.fxNotifs',
+     'alpexa.fxClosed','alpexa.fxLive','alpexa.fxPending','alpexa.positions',
+     'alpexa.appliedTransfers','alpexa.dataVersion','alpexa.ownerFunded','alpexa.leverage',
+     'alpexa.tf','alpexa.favs','alpexa.alerts','alpexa.notif','alpexa.prefs'
+    ].forEach(function(k){ try{ if(localStorage.getItem(k)!==null && removed.indexOf(k)<0) removed.push(k); localStorage.removeItem(k); }catch(e){} });
+    try{ sessionStorage.clear(); }catch(e){}
+  }catch(e){}
+  document.getElementById('confirm').style.display='none';
+  document.getElementById('done').style.display='block';
+  document.getElementById('cnt').textContent = removed.length + '개 항목을 지웠어요. 이제 새로 시작할 수 있어요.';
+  document.getElementById('list').textContent = removed.join(' · ');
+}
+</script>
+</body>
+</html>
