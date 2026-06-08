@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0.6 -->
+<!-- v1.0.7 -->
 
 <html lang="en">
 <head>
@@ -571,7 +571,7 @@
 </style>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="alpexa-sync.js?v=5"></script>
+<script src="alpexa-sync.js?v=6"></script>
 <script>
 (function(){try{var k='alpexa.serverBalances';var o={};try{o=JSON.parse(localStorage.getItem(k)||'{}')||{};}catch(e){o={};}
   var ch=false;
@@ -1168,7 +1168,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.0.6</div>`;
+      <div class="s-foot">Alpexa Sports v1.0.7</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -2439,6 +2439,15 @@
         if(r.status && r.status!==w.status){ w.status=r.status; changed=true; }
       });
       if(changed){ saveWithdrawals(all); reconcileWithdrawals(); updateWallet(); }
+    }).catch(()=>{});
+    // Credit transfers that OTHER apps (FX / Crypto) sent to Sports — idempotent.
+    AlpexaSync.pullIncomingTransfers('sports').then(legs=>{
+      if(!legs||!legs.length) return;
+      legs.forEach(l=>{ balance+=(+l.amount||0);
+        txns.unshift({ts:Date.now(),ic:'🔄',t1:'Transfer',t2:'Received · Approved',amt:+l.amount||0}); });
+      syncSportsBal(); saveTxns(); updateWallet();
+      const tot=legs.reduce((a,l)=>a+(+l.amount||0),0);
+      showToast('✅','Transfer received','$'+tot.toLocaleString()+' added to Sports');
     }).catch(()=>{});
   }
   syncServerStatuses();

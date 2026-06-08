@@ -86,7 +86,7 @@
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="alpexa-sync.js?v=5"></script>
+<script src="alpexa-sync.js?v=6"></script>
 <script>
 // Seed/repair the shared server balances so the dropdown never shows stale $0
 // for servers the user hasn't opened yet. (FX/Sports overwrite with real values.)
@@ -12747,15 +12747,21 @@ function App() {
       if (t.source === 'crypto') setBalances((b) => ({ ...b, USDT: Math.max(0, (b.USDT || 0) - g) }));
       setServerBalances((s) => ({ ...s, [t.source]: Math.max(0, (s[t.source] || 0) - g) }));
     } else if (t.type === 'transfer') {
-      setServerBalances((s) => ({ ...s, [t.from]: Math.max(0, (s[t.from] || 0) - t.usd), [t.to]: (s[t.to] || 0) + t.usd }));
+      // Debit only the crypto source leg; the destination app credits itself
+      // (incoming transfers to crypto are applied via pullIncomingTransfers).
       if (t.from === 'crypto' && t.to !== 'crypto') setBalances((b) => ({ ...b, USDT: Math.max(0, (b.USDT || 0) - t.usd) }));
-      else if (t.to === 'crypto' && t.from !== 'crypto') setBalances((b) => ({ ...b, USDT: (b.USDT || 0) + t.usd }));
     }
   }, [setBalances, setServerBalances]);
   React.useEffect(() => {
     if (!window.AlpexaSync || !AlpexaSync.db) return;
     let stop = false;
     const tick = () => {
+      // Credit transfers that OTHER apps sent to Crypto (idempotent across apps).
+      AlpexaSync.pullIncomingTransfers('crypto').then((legs) => {
+        if (stop || !legs || !legs.length) return;
+        legs.forEach((l) => { setBalances((b) => ({ ...b, USDT: (b.USDT || 0) + l.amount })); });
+        if (typeof AudioFX !== 'undefined') { try { AudioFX.cash(); } catch (e) {} }
+      }).catch(() => {});
       AlpexaSync.pullMine().then((rows) => {
         if (stop || !rows || !rows.length) return;
         const map = {}; rows.forEach((r) => { map[r.local_id] = r.status; });
@@ -13201,7 +13207,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v30';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v31';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>

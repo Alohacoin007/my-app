@@ -64,8 +64,42 @@ window.AlpexaSync = (function () {
   function pullMine() {
     if (!db) return Promise.resolve([]);
     var m = me();
-    return db.from('requests').select('local_id,status,amount,net,fee').eq('cust_id', m.custId)
+    return db.from('requests').select('local_id,status,amount,net,fee,type,from_label,to_label,server').eq('cust_id', m.custId)
       .then(function (r) { return (r && r.data) || []; }, function () { return []; });
+  }
+
+  // Normalize a server label (FX/Crypto/Sports in any case) to a key.
+  function normSrv(x) {
+    x = (x || '').toString().toLowerCase();
+    if (x === 'fx' || x === 'live') return 'live';
+    if (x.indexOf('crypto') >= 0 || x === 'cr') return 'crypto';
+    if (x.indexOf('sport') >= 0 || x === 'sp') return 'sports';
+    return x;
+  }
+
+  // Cross-app transfers: the DESTINATION app calls this to find approved
+  // transfers headed to its own server and credit itself exactly once. Each
+  // applied leg is recorded in a shared ledger so no app double-credits and
+  // re-opening the app doesn't re-apply. (Each app still debits its own source.)
+  function pullIncomingTransfers(myServer) {
+    if (!db) return Promise.resolve([]);
+    var mine = normSrv(myServer);
+    return pullMine().then(function (rows) {
+      if (!rows || !rows.length) return [];
+      var applied = {};
+      try { applied = JSON.parse(localStorage.getItem('alpexa.appliedTransfers') || '{}') || {}; } catch (e) { applied = {}; }
+      var got = [], changed = false;
+      rows.forEach(function (r) {
+        if ((r.type || '') !== 'transfer' || (r.status || '') !== 'approved') return;
+        var amt = +r.amount || 0; if (!(amt > 0)) return;
+        if (normSrv(r.to_label) === mine && !applied[r.local_id + ':in']) {
+          got.push({ id: r.local_id, amount: amt, from: normSrv(r.from_label || r.server) });
+          applied[r.local_id + ':in'] = 1; changed = true;
+        }
+      });
+      if (changed) { try { localStorage.setItem('alpexa.appliedTransfers', JSON.stringify(applied)); } catch (e) {} }
+      return got;
+    }, function () { return []; });
   }
 
   // Back office: edit a request's fields (status/amount/address) and sync it.
@@ -134,5 +168,6 @@ window.AlpexaSync = (function () {
   return { db: db, me: me, acctFor: acctFor, pushRequest: pushRequest,
            pullAll: pullAll, pullMine: pullMine, setStatus: setStatus,
            updateRequest: updateRequest, deleteRequest: deleteRequest,
-           sendPayment: sendPayment, pullIncoming: pullIncoming, claimPayment: claimPayment };
+           sendPayment: sendPayment, pullIncoming: pullIncoming, claimPayment: claimPayment,
+           pullIncomingTransfers: pullIncomingTransfers, normSrv: normSrv };
 })();
