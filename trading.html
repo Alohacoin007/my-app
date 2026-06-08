@@ -2001,7 +2001,7 @@ function LeverageSheet({ openPositions, onClose }) {
                 </div>
                 <div style={{display:'flex',gap:4}}>
                   {presets.map(p=>(
-                    <button key={p} onClick={()=>!locked&&setLev({...lev,[cls]:p})} disabled={locked} className="mono" style={{flex:1,padding:'8px 0',borderRadius:7,fontSize:11,fontWeight:700,background:cur===p?(locked?'var(--muted)':'#1B3955'):'var(--surface)',color:cur===p?'#fff':(locked?'var(--text-3)':'var(--text-2)'),border:'1px solid '+(cur===p?(locked?'var(--muted)':'#1B3955'):'var(--line-2)'),opacity:locked&&cur!==p?0.5:1,cursor:locked?'not-allowed':'pointer'}}>1:{p}</button>
+                    <button key={p} onClick={()=>{if(locked)return;const next={...lev,[cls]:p};setLev(next);setLeverageSettings(next);window.dispatchEvent(new Event('alpexa-balance-change'));}} disabled={locked} className="mono" style={{flex:1,padding:'8px 0',borderRadius:7,fontSize:11,fontWeight:700,background:cur===p?(locked?'var(--muted)':'#1B3955'):'var(--surface)',color:cur===p?'#fff':(locked?'var(--text-3)':'var(--text-2)'),border:'1px solid '+(cur===p?(locked?'var(--muted)':'#1B3955'):'var(--line-2)'),opacity:locked&&cur!==p?0.5:1,cursor:locked?'not-allowed':'pointer'}}>1:{p}</button>
                   ))}
                 </div>
               </div>
@@ -2050,6 +2050,11 @@ const I18N={
   'Balance':{ko:'잔고',ja:'残高',zh:'余额','zh-TW':'餘額',es:'Saldo',pt:'Saldo',fr:'Solde',de:'Guthaben',ru:'Баланс'},
   'Settings':{ko:'설정',ja:'設定',zh:'设置','zh-TW':'設定',es:'Ajustes',pt:'Configurações',fr:'Paramètres',de:'Einstellungen',ru:'Настройки'},
   'Language':{ko:'언어',ja:'言語',zh:'语言','zh-TW':'語言',es:'Idioma',pt:'Idioma',fr:'Langue',de:'Sprache',ru:'Язык'},
+  'Margin':{ko:'증거금',ja:'証拠金',zh:'保证金','zh-TW':'保證金',es:'Margen',pt:'Margem',fr:'Marge',de:'Margin',ru:'Маржа'},
+  'Free margin':{ko:'주문가능',ja:'余剰証拠金',zh:'可用保证金','zh-TW':'可用保證金',es:'Margen libre',pt:'Margem livre',fr:'Marge libre',de:'Freie Margin',ru:'Свободно'},
+  'Margin level':{ko:'증거금비율',ja:'証拠金維持率',zh:'保证金水平','zh-TW':'保證金水平',es:'Nivel margen',pt:'Nível margem',fr:'Niveau marge',de:'Margin-Level',ru:'Уровень маржи'},
+  'Report':{ko:'리포트',ja:'レポート',zh:'报告','zh-TW':'報告',es:'Informe',pt:'Relatório',fr:'Rapport',de:'Bericht',ru:'Отчёт'},
+  'Equity':{ko:'순자산',ja:'有効証拠金',zh:'净值','zh-TW':'淨值',es:'Patrimonio',pt:'Patrimônio',fr:'Capital',de:'Equity',ru:'Капитал'},
 };
 function tr(s){ try{ const l=(getPrefs().language)||'en'; if(l==='en')return s; const e=I18N[s]; return (e&&e[l])||s; }catch(e){ return s; } }
 window.alpexaTR=tr;
@@ -2665,7 +2670,7 @@ function Account({openPositions=0,onNavigate}){
         <ActionBtn icon="south" label={tr("Deposit")} active={sheet==='deposit'} onClick={()=>setSheet('deposit')}/>
         <ActionBtn icon="north" label={tr("Withdraw")} active={sheet==='withdraw'} onClick={()=>setSheet('withdraw')}/>
         <ActionBtn icon="swap_horiz" label={tr("Transfer")} active={sheet==='transfer'} onClick={()=>setSheet('transfer')}/>
-        <ActionBtn icon="assessment" label="Report" active={sheet==='report'} onClick={()=>setSheet('report')}/>
+        <ActionBtn icon="assessment" label={tr("Report")} active={sheet==='report'} onClick={()=>setSheet('report')}/>
       </div>
       <Section title="Account">
         <Row label="Name" val="Christian Kang"/>
@@ -2978,26 +2983,26 @@ function AppHeader({accent,account,onAccountClick,livePnl=0,prevPnl=0,usedMargin
         <button onClick={onMenuClick} style={{padding:6,color:'rgba(255,255,255,0.85)'}}>{ScreenIcons.menu}</button>
       </div>
       <div style={{display:'flex',alignItems:'baseline',gap:6,marginTop:4}}>
-        <div style={{fontSize:9.5,fontWeight:600,color:'#8FB3D9',letterSpacing:0.4}}>Equity, {cur.code}</div>
+        <div style={{fontSize:9.5,fontWeight:600,color:'#8FB3D9',letterSpacing:0.4}}>{tr('Equity')}, {cur.code}</div>
       </div>
       <div style={{display:'flex',alignItems:'baseline',marginTop:1}}>
         <div className={`mono ${flashClass}`} style={{fontSize:26,fontWeight:600,lineHeight:1.1,letterSpacing:-0.3,whiteSpace:'nowrap'}}>{cur.symbol}{fmtN(equity)}</div>
       </div>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',rowGap:4,columnGap:22,marginTop:10,paddingTop:9,borderTop:'1px solid rgba(255,255,255,0.10)'}}>
         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between'}}>
-          <span style={{fontSize:9,color:'#8FB3D9',fontWeight:600,letterSpacing:0.6}}>Balance</span>
+          <span style={{fontSize:9,color:'#8FB3D9',fontWeight:600,letterSpacing:0.6}}>{tr('Balance')}</span>
           <span className="mono" style={{fontSize:11.5,color:'rgba(255,255,255,0.95)',fontWeight:500}}>{fmtN(balance)}</span>
         </div>
         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between'}}>
-          <span style={{fontSize:9,color:'#8FB3D9',fontWeight:600,letterSpacing:0.6}}>Free margin</span>
+          <span style={{fontSize:9,color:'#8FB3D9',fontWeight:600,letterSpacing:0.6}}>{tr('Free margin')}</span>
           <span className="mono" style={{fontSize:11.5,color:'rgba(255,255,255,0.95)',fontWeight:500}}>{fmtN(free)}</span>
         </div>
         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between'}}>
-          <span style={{fontSize:9,color:'#8FB3D9',fontWeight:600,letterSpacing:0.6}}>Margin</span>
+          <span style={{fontSize:9,color:'#8FB3D9',fontWeight:600,letterSpacing:0.6}}>{tr('Margin')}</span>
           <span className="mono" style={{fontSize:11.5,color:usedMargin>0?'#FCD34D':'rgba(255,255,255,0.55)',fontWeight:500}}>{fmtN(usedMargin*cur.rate)}</span>
         </div>
         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:4}}>
-          <span style={{fontSize:9,color:'#8FB3D9',fontWeight:600,letterSpacing:0.6}}>Margin level</span>
+          <span style={{fontSize:9,color:'#8FB3D9',fontWeight:600,letterSpacing:0.6}}>{tr('Margin level')}</span>
           <span style={{display:'flex',alignItems:'center',gap:4}}>
             <span className="mono" style={{fontSize:11.5,color:marginColor,fontWeight:600}}>{marginDisplay}</span>
             {marginWarn&&<Mi name="warning" size={11} style={{color:marginColor}}/>}
@@ -3478,7 +3483,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v24 (i18n)';
+(function(){try{var b=document.createElement('div');b.textContent='FX v25';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
