@@ -2231,6 +2231,8 @@ function PriceAlertsPanel(){
 const DEFAULT_NOTIF={orderFilled:{push:true,email:true},pendingTriggered:{push:true,email:false},slTpHit:{push:true,email:true},priceAlert:{push:true,email:false},marginCall:{push:true,email:true},newsHigh:{push:true,email:false},newsMedium:{push:false,email:false},deposit:{push:true,email:true},withdrawal:{push:true,email:true},login:{push:false,email:true},weeklySummary:{push:false,email:true}};
 function getNotifPrefs(){try{return{...DEFAULT_NOTIF,...JSON.parse(localStorage.getItem('alpexa.notif')||'{}')};}catch(e){return{...DEFAULT_NOTIF};}}
 function saveNotifPrefs(p){try{localStorage.setItem('alpexa.notif',JSON.stringify(p));}catch(e){}}
+// Fire an in-app notification (respects the user's push toggles via `pref`).
+window.alpexaNotify=function(d){ try{ if(d&&d.pref){ var p=getNotifPrefs()[d.pref]; if(p&&p.push===false) return; } window.dispatchEvent(new CustomEvent('alpexa-notify',{detail:d||{}})); }catch(e){} };
 const NOTIF_LABELS=[{group:'Trading',items:[{key:'orderFilled',label:'Order Filled',sub:'Market orders executed',icon:'task_alt'},{key:'pendingTriggered',label:'Pending Order Triggered',sub:'Limit/Stop activated',icon:'bolt'},{key:'slTpHit',label:'SL / TP Hit',sub:'Position auto-closed',icon:'flag'},{key:'marginCall',label:'Margin Call',sub:'Account at risk',icon:'warning'}]},{group:'Market',items:[{key:'priceAlert',label:'Price Alerts',sub:'Custom price targets',icon:'notifications_active'},{key:'newsHigh',label:'High-Impact News',sub:'FOMC, NFP, CPI, etc.',icon:'campaign'},{key:'newsMedium',label:'Medium-Impact News',sub:'GDP, PMI, retail sales',icon:'feed'}]},{group:'Account',items:[{key:'deposit',label:'Deposits',sub:'Funds added',icon:'south'},{key:'withdrawal',label:'Withdrawals',sub:'Funds removed',icon:'north'},{key:'login',label:'New Sign-in',sub:'Security alerts',icon:'login'},{key:'weeklySummary',label:'Weekly Summary',sub:'P/L digest every Mon',icon:'mail'}]}];
 
 function NotifCheck({on,onChange}){
@@ -2421,6 +2423,7 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
         // Pending until the back office approves — balance changes on approval.
         try{pushFundingHistory({id:reqId,kind,method,amount:amt,currency:'USD',ref:REF_PREFIX[kind]+Math.floor(10000000+Math.random()*89999999),note,account:(account||'live'),destAcct:(kind==='transfer'?destAcct:undefined),status:'pending'});}catch(e){}
         try{window.AlpexaSync&&AlpexaSync.pushRequest({id:reqId,type:kind,server:'FX',amount:amt,asset:'USD',network:method,from:(kind==='transfer'?'FX':''),to:(kind==='transfer'?(destAcct||'crypto'):'')});}catch(e){}
+        try{ window.alpexaNotify&&alpexaNotify({type:kind,pref:(kind==='withdraw'?'withdrawal':'deposit'),title:(kind==='deposit'?'Deposit':kind==='withdraw'?'Withdrawal':'Transfer')+' requested · $'+amt.toLocaleString()+' · pending approval'}); }catch(e){}
       }
     },1300);
   }
@@ -3134,14 +3137,14 @@ function NotificationSheet({notifications,setNotifications,onClose}){
   function markAllRead(){setNotifications(notifications.map(n=>({...n,read:true})));}
   function clear(id){setNotifications(notifications.filter(n=>n.id!==id));}
   function markRead(id){setNotifications(notifications.map(n=>n.id===id?{...n,read:true}:n));}
-  const META={orderFill:{icon:'task_alt',tint:'var(--buy-tint)',col:'var(--buy-2)',label:'Order Filled'},pendingTriggered:{icon:'bolt',tint:'#FFF3E0',col:'#E65100',label:'Pending Triggered'},priceAlert:{icon:'notifications_active',tint:'var(--acc-3)',col:'var(--acc-2)',label:'Price Alert'},news:{icon:'campaign',tint:'#FCE4EC',col:'#C2185B',label:'Market News'},login:{icon:'login',tint:'var(--bg-2)',col:'var(--text-2)',label:'New Sign-in'},marginCall:{icon:'warning',tint:'var(--sell-tint)',col:'var(--sell-2)',label:'Margin Call'}};
+  const META={orderFill:{icon:'task_alt',tint:'var(--buy-tint)',col:'var(--buy-2)',label:'Order Filled'},pendingTriggered:{icon:'bolt',tint:'#FFF3E0',col:'#E65100',label:'Pending Triggered'},priceAlert:{icon:'notifications_active',tint:'var(--acc-3)',col:'var(--acc-2)',label:'Price Alert'},news:{icon:'campaign',tint:'#FCE4EC',col:'#C2185B',label:'Market News'},login:{icon:'login',tint:'var(--bg-2)',col:'var(--text-2)',label:'New Sign-in'},marginCall:{icon:'warning',tint:'var(--sell-tint)',col:'var(--sell-2)',label:'Margin Call'},deposit:{icon:'south',tint:'var(--buy-tint)',col:'var(--buy-2)',label:'Deposit'},withdraw:{icon:'north',tint:'var(--sell-tint)',col:'var(--sell-2)',label:'Withdrawal'},transfer:{icon:'swap_horiz',tint:'var(--acc-3)',col:'var(--acc-2)',label:'Transfer'},approved:{icon:'check_circle',tint:'var(--buy-tint)',col:'var(--buy-2)',label:'Approved'},rejected:{icon:'cancel',tint:'var(--sell-tint)',col:'var(--sell-2)',label:'Rejected'},marketClosed:{icon:'lock',tint:'var(--sell-tint)',col:'var(--sell-2)',label:'Market Closed'},marketOpen:{icon:'lock_open',tint:'var(--buy-tint)',col:'var(--buy-2)',label:'Market Open'}};
   function renderBody(n){
     if(n.type==='orderFill')return<>Filled <b>{n.side} {n.vol&&n.vol.toFixed(2)} {n.sym}</b> @ <span className="mono">{n.px}</span></>;
     if(n.type==='pendingTriggered')return<><b>{n.side} {n.sym}</b> triggered at <span className="mono">{n.px}</span></>;
     if(n.type==='priceAlert')return<><b>{n.sym}</b> crossed {n.side==='above'?'↑':'↓'} <span className="mono">{n.px&&n.px.toLocaleString()}</span></>;
     if(n.type==='news')return<>{n.title}</>;
-    if(n.type==='login')return<>New sign-in from <b>{n.device}</b> · {n.loc}</>;
-    return null;
+    if(n.type==='login')return n.title?<>{n.title}</>:<>New sign-in from <b>{n.device}</b> · {n.loc}</>;
+    return n.title?<>{n.title}</>:null;
   }
   return(
     <div onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(10,14,26,0.55)',zIndex:300,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
@@ -3211,6 +3214,10 @@ function App(){
           else if(h.kind==='withdraw') window.addBalance(h.account||'live', -amt);
           else if(h.kind==='transfer'){ window.addBalance(h.account||'live', -amt); window.addBalance(h.destAcct||'crypto', amt); }
         }
+        if(r.status==='approved'||r.status==='rejected'){
+          const lbl=(h.kind==='deposit'?'Deposit':h.kind==='withdraw'?'Withdrawal':'Transfer')+' $'+(+h.amount||0).toLocaleString();
+          window.alpexaNotify&&alpexaNotify({type:(r.status==='approved'?'approved':'rejected'),pref:(h.kind==='withdraw'?'withdrawal':'deposit'),title:lbl+(r.status==='approved'?' approved ✓':' rejected')});
+        }
         h.status=r.status; changed=true;
       });
       if(changed){ try{localStorage.setItem('alpexa.funding',JSON.stringify(hist));}catch(e){} window.dispatchEvent(new Event('alpexa-balance-change')); }
@@ -3222,13 +3229,43 @@ function App(){
   const [acctSheet,setAcctSheet]=useState(false);
   const [notifOpen,setNotifOpen]=useState(false);
   const [menuOpen,setMenuOpen]=useState(false);
-  const [notifications,setNotifications]=useState([
-    {id:1,type:'orderFill',side:'BUY',sym:'EURUSD',vol:0.10,px:1.08412,time:'14:32',read:false},
-    {id:2,type:'priceAlert',sym:'BTCUSD',side:'above',px:71200,time:'13:18',read:false},
-    {id:3,type:'news',impact:'high',title:'US CPI release in 30 minutes',time:'13:00',read:false},
-    {id:4,type:'pendingTriggered',side:'SELL',sym:'GBPUSD',vol:0.50,px:1.26500,time:'11:45',read:true},
-    {id:5,type:'login',device:'iPhone',loc:'Seoul, KR',time:'09:12',read:true},
-  ]);
+  const [notifications,setNotifications]=useState(()=>{try{return JSON.parse(localStorage.getItem('alpexa.fxNotifs')||'[]');}catch(e){return [];}});
+  useEffect(()=>{try{localStorage.setItem('alpexa.fxNotifs',JSON.stringify(notifications));}catch(e){}},[notifications]);
+  // Receive notifications fired anywhere in the app.
+  useEffect(()=>{
+    function onNotify(e){ const d=(e&&e.detail)||{};
+      const now=new Date(); const time=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+      setNotifications(prev=>[{id:Date.now()+Math.random(),read:false,time,...d},...prev].slice(0,60));
+    }
+    window.addEventListener('alpexa-notify',onNotify);
+    return ()=>window.removeEventListener('alpexa-notify',onNotify);
+  },[]);
+  // New sign-in (once per browser session)
+  useEffect(()=>{ try{ if(!sessionStorage.getItem('alpexa.loginNotif')){ sessionStorage.setItem('alpexa.loginNotif','1'); window.alpexaNotify&&alpexaNotify({type:'login',pref:'login',title:'New sign-in · '+((navigator.platform)||'this device')}); } }catch(e){} },[]);
+  // Market open / closed transitions
+  const mktOpenRef=useRef(null);
+  useEffect(()=>{
+    function check(){
+      const cur={FX:symOpen({cls:'FX'}),STOCK:symOpen({cls:'STOCK'}),INDEX:symOpen({cls:'INDEX'})};
+      const prev=mktOpenRef.current;
+      if(prev){ [['FX','Forex'],['STOCK','US stocks'],['INDEX','Indices']].forEach(([k,lbl])=>{ if(prev[k]!==cur[k]) window.alpexaNotify&&alpexaNotify({type:cur[k]?'marketOpen':'marketClosed',title:lbl+(cur[k]?' market is now open':' market is now closed')}); }); }
+      mktOpenRef.current=cur;
+    }
+    check(); const iv=setInterval(check,30000); return ()=>clearInterval(iv);
+  },[]);
+  // Price alerts — fire when the target is crossed, then deactivate.
+  useEffect(()=>{
+    function check(){
+      let alerts; try{alerts=JSON.parse(localStorage.getItem('alpexa.alerts')||'[]');}catch(e){return;}
+      if(!alerts.length||!marketRef.current) return; let changed=false;
+      alerts.forEach(a=>{ if(!a.active)return; const m=marketRef.current.state.find(s=>s.sym===a.sym); if(!m)return;
+        const hit=a.side==='above'?m.last>=a.px:m.last<=a.px;
+        if(hit){ a.active=false; changed=true; window.alpexaNotify&&alpexaNotify({type:'priceAlert',pref:'priceAlert',sym:a.sym,side:a.side,px:a.px}); }
+      });
+      if(changed){ try{localStorage.setItem('alpexa.alerts',JSON.stringify(alerts));}catch(e){} }
+    }
+    const iv=setInterval(check,5000); return ()=>clearInterval(iv);
+  },[]);
   const [lots,setLots]=useState(0.10);
   const [indicators,setIndicators]=useState({ma:true,vol:false,bb:false,rsi:false,macd:false});
   const [liveOrders,setLiveOrders]=useState([]);
@@ -3515,7 +3552,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v38';
+(function(){try{var b=document.createElement('div');b.textContent='FX v39 (alerts)';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
