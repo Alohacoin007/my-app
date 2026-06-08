@@ -34,9 +34,12 @@
       transform: scale(var(--ph-sx, 1), var(--ph-sy, 1));
       transform-origin: top left; }
     /* hide the mock "9:41" text but KEEP its height as the top status-bar space */
-    /* collapse the mock status-bar space on phones: 0 in browser, notch height
-       when installed — so the header sits at the very top with no gap. */
-    .fake-statusbar { height: env(safe-area-inset-top) !important; min-height: 0 !important; padding: 0 !important; overflow: hidden !important; }
+    /* browser: remove the mock status-bar entirely (content flexes to fill, no gap).
+       installed app: keep a thin notch spacer so the header clears the notch. */
+    .fake-statusbar { display: none !important; }
+  }
+  @media (max-width: 600px) and (display-mode: standalone) {
+    .fake-statusbar { display: block !important; height: env(safe-area-inset-top) !important; min-height: 0 !important; padding: 0 !important; overflow: hidden !important; }
   }
   .alpexa-hide-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
   .alpexa-hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -13068,7 +13071,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v14';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v15';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
