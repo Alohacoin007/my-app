@@ -25,13 +25,13 @@
   /* On a real phone: scale the fixed 390x844 design to fill the screen
      (the design's aspect ratio matches modern iPhones almost exactly). */
   @media (max-width: 600px) {
-    html, body { background: #0E1116 !important; height: 100dvh !important; min-height: 0 !important; overflow: hidden !important; }
-    .stage { padding: 0 !important; min-height: 0 !important; height: 100dvh !important; overflow: hidden !important; background: #0E1116; display: block !important; }
-    #phone.phone-shadow { box-shadow: none !important; border-radius: 0 !important; width: 100vw; height: 100dvh; overflow: hidden; }
-    /* stretch the fixed 390x844 design to fill BOTH dimensions exactly — no gap,
-       no crop, no scroll. (aspect is near-identical to phones, so distortion is tiny) */
+    html, body { background: #0E1116 !important; height: var(--ph-vh, 100dvh) !important; min-height: 0 !important; overflow: hidden !important; }
+    .stage { padding: 0 !important; min-height: 0 !important; height: var(--ph-vh, 100dvh) !important; overflow: hidden !important; background: #0E1116; display: block !important; }
+    #phone.phone-shadow { box-shadow: none !important; border-radius: 0 !important; width: 100vw; height: var(--ph-vh, 100dvh); overflow: hidden; }
+    /* stretch the fixed 390x844 design to fill BOTH dimensions exactly — JS keeps
+       --ph-sx/--ph-sy in sync with the real visible viewport (address bar safe). */
     .phone-shell { border-radius: 0 !important;
-      transform: scale(calc(100vw / 390px), calc(100dvh / 844px));
+      transform: scale(var(--ph-sx, 1), var(--ph-sy, 1));
       transform-origin: top left; }
     /* hide the mock "9:41" text but KEEP its height as the top status-bar space */
     .fake-statusbar { visibility: hidden !important; }
@@ -13021,26 +13021,34 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-// Mobile fit: fill the screen width by scaling the fixed 390px design, height
-// follows (page scrolls vertically). Avoids side gaps and avoids cropping.
+// Mobile fit: stretch the fixed 390x844 design to fill the REAL visible viewport.
+// Uses visualViewport so it auto-corrects when Safari's address bar shows/hides
+// (no more manual nudge after switching servers).
 (function(){
+  var root=document.documentElement;
   function fit(){
     if(window.innerWidth<=600){
-      var s=window.innerWidth/390;
-      document.documentElement.style.setProperty('--ph-scale', s);
-      document.documentElement.style.setProperty('--ph-h', (844*s)+'px');
+      var w=(window.visualViewport&&window.visualViewport.width)||window.innerWidth;
+      var h=(window.visualViewport&&window.visualViewport.height)||window.innerHeight;
+      root.style.setProperty('--ph-sx', w/390);
+      root.style.setProperty('--ph-sy', h/844);
+      root.style.setProperty('--ph-vh', h+'px');
     } else {
-      document.documentElement.style.removeProperty('--ph-scale');
-      document.documentElement.style.removeProperty('--ph-h');
+      root.style.removeProperty('--ph-sx');
+      root.style.removeProperty('--ph-sy');
+      root.style.removeProperty('--ph-vh');
     }
   }
   fit();
   window.addEventListener('resize', fit);
   window.addEventListener('orientationchange', fit);
+  if(window.visualViewport){ window.visualViewport.addEventListener('resize', fit); window.visualViewport.addEventListener('scroll', fit); }
+  // catch the address-bar settle right after load
+  [60,150,300,600,1000].forEach(function(ms){ setTimeout(fit, ms); });
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v9';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v10';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
