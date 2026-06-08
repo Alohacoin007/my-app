@@ -373,9 +373,13 @@ function genSeries(base,n){
 function fmt(n,digits){return n.toLocaleString('en-US',{minimumFractionDigits:digits,maximumFractionDigits:digits});}
 function getLotSize(s){if(s.sym==='XAUUSD')return 100;if(s.sym==='XAGUSD')return 5000;if(s.cls==='FX')return 100000;return 1;}
 function isUsdBaseFx(s){return s.cls==='FX'&&/^USD/.test(s.sym)&&!/^USD$/.test(s.sym);}
-function getNotionalUSD(s,vol,price){const ls=getLotSize(s);if(isUsdBaseFx(s))return vol*ls;return vol*ls*price;}
+// USD value of one unit of a currency code. For cross pairs (e.g. EURJPY) the
+// profit/notional comes out in the quote/base currency, so we convert it to USD
+// using a reference rate (the seed rate from SYMBOLS — close enough for demo).
+function ccyToUsd(code){if(code==='USD')return 1;var p=SYMBOLS.find(function(x){return x.sym===code+'USD';});if(p)return p.bid;var q=SYMBOLS.find(function(x){return x.sym==='USD'+code;});if(q&&q.bid)return 1/q.bid;return 1;}
+function getNotionalUSD(s,vol,price){var ls=getLotSize(s);if(s.cls!=='FX')return vol*ls*price;var base=s.sym.slice(0,3),quote=s.sym.slice(3,6);if(quote==='USD')return vol*ls*price;if(base==='USD')return vol*ls;return vol*ls*ccyToUsd(base);}
 function getMarginUSD(s,vol,price,leverage){return getNotionalUSD(s,vol,price)/leverage;}
-function getPnlUSD(s,openPx,closePx,side,vol){const dist=(closePx-openPx)*(side==='BUY'?1:-1);const ls=getLotSize(s);if(isUsdBaseFx(s))return(dist*ls*vol)/closePx;return dist*ls*vol;}
+function getPnlUSD(s,openPx,closePx,side,vol){var dist=(closePx-openPx)*(side==='BUY'?1:-1);var ls=getLotSize(s);var pnlQuote=dist*ls*vol;if(s.cls!=='FX')return pnlQuote;var base=s.sym.slice(0,3),quote=s.sym.slice(3,6);if(quote==='USD')return pnlQuote;if(base==='USD')return pnlQuote/closePx;return pnlQuote*ccyToUsd(quote);}
 function getUnitLabel(cls,plural=true){if(cls==='STOCK')return plural?'shares':'share';if(cls==='CRYPTO')return'units';if(cls==='INDEX')return plural?'contracts':'contract';return'lots';}
 function fmtVol(cls,vol){if(cls==='STOCK'||cls==='INDEX')return Math.round(vol).toString();return vol.toFixed(2);}
 window.getLotSize=getLotSize;window.isUsdBaseFx=isUsdBaseFx;window.getNotionalUSD=getNotionalUSD;window.getMarginUSD=getMarginUSD;window.getPnlUSD=getPnlUSD;window.getUnitLabel=getUnitLabel;window.fmtVol=fmtVol;
@@ -1285,9 +1289,9 @@ function TradeTicket({market,sym,setSym,lots,setLots,onPlace}){
   const marginPct=(100/lev).toFixed(lev<10?0:1);const margin=notional/lev;
   const commission=s.cls==='STOCK'?Math.max(1,vol*0.02):s.cls==='CRYPTO'?notional*0.001:0;
   const lotSize=ALPEXA_MARKET.getLotSize(s);const tickSize=Math.pow(10,-s.digits);
-  let tickValueUSD;
-  if(ALPEXA_MARKET.isUsdBaseFx(s))tickValueUSD=(tickSize*lotSize*vol)/entryPx;
-  else tickValueUSD=tickSize*lotSize*vol;
+  // USD value of one point — derived from the (USD-correct) P&L of a 1-point move,
+  // so cross pairs like EURJPY convert to USD just like the position P&L does.
+  const tickValueUSD=Math.abs(ALPEXA_MARKET.getPnlUSD(s,entryPx,entryPx+tickSize,'BUY',vol));
 
   function sltpHelper(val,isTp){
     if(val===''||val==null)return null;
@@ -1522,7 +1526,8 @@ function ModifySheet({position,isPending=false,market=[],onSave,onClose}){
   const curPx=position.side==='BUY'?bid:ask;
   const lotSize=ALPEXA_MARKET.getLotSize?ALPEXA_MARKET.getLotSize(symInfo||{sym:position.sym,cls:'FX'}):(symInfo?.cls==='FX'?100000:1);
   const tickSize=Math.pow(10,-digits);
-  const tickValueUSD=ALPEXA_MARKET.isUsdBaseFx&&ALPEXA_MARKET.isUsdBaseFx(symInfo||{})?(tickSize*lotSize*(position.vol||0))/(curPx||1):tickSize*lotSize*(position.vol||0);
+  // USD value of one point via the corrected P&L (handles cross pairs like EURJPY).
+  const tickValueUSD=symInfo?Math.abs(ALPEXA_MARKET.getPnlUSD(symInfo,curPx,curPx+tickSize,'BUY',position.vol||0)):tickSize*lotSize*(position.vol||0);
   const entryPx=isPending?(parseFloat(trigger)||position.trigger||curPx):position.open;
   function sltpHelper(val,isTp){
     if(val===''||val==null)return null;
@@ -3604,7 +3609,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v45';
+(function(){try{var b=document.createElement('div');b.textContent='FX v46';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
