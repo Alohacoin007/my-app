@@ -2054,6 +2054,7 @@ const I18N={
   'Free margin':{ko:'주문가능',ja:'余剰証拠金',zh:'可用保证金','zh-TW':'可用保證金',es:'Margen libre',pt:'Margem livre',fr:'Marge libre',de:'Freie Margin',ru:'Свободно'},
   'Margin level':{ko:'증거금비율',ja:'証拠金維持率',zh:'保证金水平','zh-TW':'保證金水平',es:'Nivel margen',pt:'Nível margem',fr:'Niveau marge',de:'Margin-Level',ru:'Уровень маржи'},
   'Report':{ko:'리포트',ja:'レポート',zh:'报告','zh-TW':'報告',es:'Informe',pt:'Relatório',fr:'Rapport',de:'Bericht',ru:'Отчёт'},
+  'Market closed':{ko:'시장 마감',ja:'市場クローズ',zh:'休市','zh-TW':'休市',es:'Mercado cerrado',pt:'Mercado fechado',fr:'Marché fermé',de:'Markt geschlossen',ru:'Рынок закрыт'},
   'Equity':{ko:'순자산',ja:'有効証拠金',zh:'净值','zh-TW':'淨值',es:'Patrimonio',pt:'Patrimônio',fr:'Capital',de:'Equity',ru:'Капитал'},
 };
 function tr(s){ try{ const l=(getPrefs().language)||'en'; if(l==='en')return s; const e=I18N[s]; return (e&&e[l])||s; }catch(e){ return s; } }
@@ -3252,6 +3253,7 @@ function App(){
   // anchoring real prices; the simulation drifts smoothly around them.
   // Degrades to pure simulation if offline / rate-limited.
   const symRef=useRef(sym); symRef.current=sym;
+  const pullRef=useRef(null);
   useEffect(()=>{
     if(typeof fetch!=='function') return;
     const KEY='6fef3bc69c2842a2b4a127969f766eb0';
@@ -3274,9 +3276,12 @@ function App(){
     function poll(){ if(document.hidden) return;
       let s; if(useChart){ s=SYMS.find(x=>x.sym===symRef.current); } else { s=SYMS[idx%SYMS.length]; idx++; } useChart=!useChart; pull(s);
     }
+    pullRef.current=pull;
     poll(); const ivTD=setInterval(poll, 10000);
     return ()=>{ stop=true; clearInterval(ivTD); };
   },[]);
+  // Immediately fetch the live price of the symbol you just opened (so it's ready to trade fast).
+  useEffect(()=>{ const s=ALPEXA_MARKET.SYMBOLS.find(x=>x.sym===sym); if(s&&pullRef.current) pullRef.current(s); },[sym]);
 
   useEffect(()=>{
     const id=setInterval(()=>{
@@ -3322,6 +3327,13 @@ function App(){
   },[]);
 
   function placeOrder(orderData){
+    // Guard: don't allow trading a closed market or a symbol whose live price
+    // hasn't loaded yet (prevents bad fills at the stale demo price).
+    const sObj=marketRef.current.state.find(x=>x.sym===orderData.sym);
+    if(sObj){
+      if(!symOpen(sObj)){ if(window.ALPEXA_SFX&&ALPEXA_SFX.error)ALPEXA_SFX.error(); alert((window.alpexaTR?alpexaTR('Market closed'):'Market closed')+' — '+orderData.sym); return; }
+      if(!sObj.real){ if(window.ALPEXA_SFX&&ALPEXA_SFX.error)ALPEXA_SFX.error(); alert('Fetching live price for '+orderData.sym+'… try again in a moment.'); if(pullRef.current)pullRef.current(sObj); return; }
+    }
     const id=Date.now();
     const now=new Date();
     const time=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
@@ -3483,7 +3495,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v25';
+(function(){try{var b=document.createElement('div');b.textContent='FX v26';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
