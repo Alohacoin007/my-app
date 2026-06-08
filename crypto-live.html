@@ -13121,10 +13121,16 @@ function alpexaPortfolioSeries(range, n, endValue) {
 // (no more manual nudge after switching servers).
 (function(){
   var root=document.documentElement;
+  var baseH=0; // largest stable viewport height seen (keyboard closed)
   function fit(){
     if(window.innerWidth<=600){
       var w=(window.visualViewport&&window.visualViewport.width)||window.innerWidth;
       var h=(window.visualViewport&&window.visualViewport.height)||window.innerHeight;
+      // When the on-screen keyboard opens, the visible viewport shrinks a lot.
+      // Don't re-scale then — otherwise the whole app squishes while typing.
+      // (The address bar only changes height by ~100px, so it still re-fits.)
+      if(baseH && h < baseH - 150){ return; }
+      if(h > baseH) baseH = h;
       root.style.setProperty('--ph-sx', w/390);
       root.style.setProperty('--ph-sy', h/844);
       root.style.setProperty('--ph-vh', h+'px');
@@ -13136,14 +13142,14 @@ function alpexaPortfolioSeries(range, n, endValue) {
   }
   fit();
   window.addEventListener('resize', fit);
-  window.addEventListener('orientationchange', fit);
+  window.addEventListener('orientationchange', function(){ baseH=0; fit(); setTimeout(fit,300); });
   if(window.visualViewport){ window.visualViewport.addEventListener('resize', fit); window.visualViewport.addEventListener('scroll', fit); }
   // catch the address-bar settle right after load
   [60,150,300,600,1000].forEach(function(ms){ setTimeout(fit, ms); });
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v22';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v23';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
