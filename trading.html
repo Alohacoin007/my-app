@@ -184,6 +184,15 @@ window.addEventListener('error', function(ev){
     tick(){if(!getMuted())tone({freq:1200,dur:0.04,type:'sine',vol:0.06});},
   };
   window.ALPEXA_SFX=sfx;
+  // iOS unlocks Web Audio only inside a user gesture — prime it on first touch
+  // so the very first order-fill sound plays reliably.
+  function unlock(){
+    var ac=audio(); if(ac){ try{ var o=ac.createOscillator(); var g=ac.createGain(); g.gain.value=0; o.connect(g).connect(ac.destination); o.start(); o.stop(ac.currentTime+0.02); }catch(e){} }
+    document.removeEventListener('touchend',unlock,true); document.removeEventListener('mousedown',unlock,true); document.removeEventListener('click',unlock,true);
+  }
+  document.addEventListener('touchend',unlock,true);
+  document.addEventListener('mousedown',unlock,true);
+  document.addEventListener('click',unlock,true);
 })();
 </script>
 
@@ -3336,7 +3345,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v8';
+(function(){try{var b=document.createElement('div');b.textContent='FX v9';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
