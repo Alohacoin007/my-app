@@ -935,6 +935,19 @@
       localStorage.setItem('alpexa.dataVersion',ALPEXA_DATA_VERSION);
     }
   }catch(e){}
+  // Owner test account: $1,000,000 per server.
+  (function(){try{
+  var OWNER='zbnyme@gmail.com';
+  var me=null;try{me=JSON.parse(localStorage.getItem('alpexa.me')||'null');}catch(e){}
+  if(me&&me.email&&String(me.email).trim().toLowerCase()===OWNER&&localStorage.getItem('alpexa.ownerFunded')!=='1M'){
+    localStorage.setItem('alpexa.serverBalances',JSON.stringify({crypto:1000000,fx:1000000,sports:1000000}));
+    localStorage.setItem('alpexa.sportsBalance','1000000');
+    var b={};try{b=JSON.parse(localStorage.getItem('alpexa.balances')||'{}')||{};}catch(e){b={};}
+    b.live=1000000;b.USDT=1000000;b.crypto=1000000;b.sports=1000000;
+    localStorage.setItem('alpexa.balances',JSON.stringify(b));
+    localStorage.setItem('alpexa.ownerFunded','1M');
+  }
+}catch(e){}})();
 
   // ---------- i18n (core UI strings) ----------
   const I18N={
