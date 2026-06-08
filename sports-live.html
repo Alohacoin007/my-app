@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0.1 -->
+<!-- v1.0.2 -->
 
 <html lang="en">
 <head>
@@ -468,6 +468,10 @@
   body:not(.m-single) .stake-row{display:flex}
   .stake-row label{font-size:13px;color:var(--dim);font-weight:700;white-space:nowrap}
   .stake-row input{flex:1;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:12px 14px;color:var(--text);font-family:inherit;font-size:17px;font-weight:700;text-align:right}
+  /* − / + steppers so the wager can be changed by tapping on mobile (number-input arrows don't show there) */
+  .stp{flex:0 0 auto;width:42px;height:46px;border-radius:9px;background:var(--surface-2);border:1px solid var(--line);color:var(--text);font-size:24px;font-weight:700;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;user-select:none;-webkit-tap-highlight-color:transparent}
+  .stp:active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .ss .stp{width:34px;height:36px;font-size:19px;border-radius:6px}
   .chips{display:flex;gap:6px;margin-bottom:12px}
   body.m-single .chips{display:none}
   .chip{flex:1;padding:8px 0;border-radius:6px;background:var(--surface-2);border:1px solid var(--line);color:var(--dim);font-size:12px;font-weight:700;cursor:pointer}
@@ -880,7 +884,7 @@
       <div class="sgp-note" data-i18n="sgp_note">Same Game Parlay (SGP): combine multiple markets from one game.</div>
       <div class="legs" id="legs"><div class="empty">Tap odds to add to your slip</div></div>
       <div class="summary">
-        <div class="stake-row"><label>Wager</label><input type="number" id="stake" value="20" min="0" step="5"></div>
+        <div class="stake-row"><label>Wager</label><button type="button" class="stp" id="stakeMinus">−</button><input type="number" id="stake" value="20" min="0" step="5"><button type="button" class="stp" id="stakePlus">+</button></div>
         <div class="chips" id="chips">
           <div class="chip" data-add="10">+$10</div><div class="chip" data-add="25">+$25</div>
           <div class="chip" data-add="100">+$100</div><div class="chip" data-set="0">Clear</div>
@@ -1164,7 +1168,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.0.1</div>`;
+      <div class="s-foot">Alpexa Sports v1.0.2</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -1604,6 +1608,8 @@
   function restoreSlip(){document.querySelector('.sh h3').textContent='Bet Slip';document.querySelector('.modes').style.display='flex';
     document.querySelector('.summary').style.display='block';delete legsEl.dataset.props;drawLegs();}
   stakeInput.oninput=calc;
+  document.getElementById('stakeMinus').onclick=()=>{stakeInput.value=Math.max(0,(parseInt(stakeInput.value)||0)-5);calc();};
+  document.getElementById('stakePlus').onclick=()=>{stakeInput.value=(parseInt(stakeInput.value)||0)+5;calc();};
   document.getElementById('chips').onclick=e=>{const c=e.target.closest('.chip');if(!c)return;
     if(c.dataset.set!==undefined)stakeInput.value=0;else stakeInput.value=(parseInt(stakeInput.value)||0)+parseInt(c.dataset.add);calc();};
   function gameCount(){return new Set(legs.map(l=>l.gid)).size;}
@@ -1620,10 +1626,11 @@
     legsEl.innerHTML=legs.map(l=>`<div class="leg${mode==='sgp'?' sgp':''}"><span class="x" data-uid="${l.uid}">✕</span>
       ${mode==='sgp'?'<span class="tag">SGP</span>':''}<div class="l1">${l.game} · ${l.market}</div>
       <div class="l3"><span class="p">Pick: <b>${l.sel}</b></span><span class="pr">${fmtAm(l.am)}</span></div>
-      <div class="ss"><input type="number" data-stake="${l.uid}" value="${l.stake}" min="0" step="5">
+      <div class="ss"><button type="button" class="stp" data-legstep="-5" data-uid="${l.uid}">−</button><input type="number" data-stake="${l.uid}" value="${l.stake}" min="0" step="5"><button type="button" class="stp" data-legstep="5" data-uid="${l.uid}">+</button>
         <span class="r">To win<b>${usd(l.stake*(dec(l.am)-1))}</b></span></div></div>`).join('');
     legsEl.querySelectorAll('.x').forEach(x=>x.onclick=()=>{legs=legs.filter(l=>l.uid!==x.dataset.uid);renderGames();syncSlip();});
     legsEl.querySelectorAll('[data-stake]').forEach(inp=>inp.oninput=()=>{legs.find(l=>l.uid===inp.dataset.stake).stake=parseInt(inp.value)||0;calc();});
+    legsEl.querySelectorAll('[data-legstep]').forEach(btn=>btn.onclick=()=>{const lg=legs.find(l=>l.uid===btn.dataset.uid);if(!lg)return;lg.stake=Math.max(0,(parseInt(lg.stake)||0)+parseInt(btn.dataset.legstep));drawLegs();calc();});
   }
   function calc(){
     const n=legs.length,place=document.getElementById('place');
