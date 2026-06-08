@@ -12650,6 +12650,15 @@ function App() {
     fx:     10000,
     sports: 10000,
   });
+  // Keep serverBalances.crypto in sync with the live crypto wallet (cash + coins
+  // + staked), so the server-switcher dropdowns here and in the FX/Sports apps
+  // always show the current crypto balance instead of a stale value.
+  React.useEffect(() => {
+    let walletUsd = 0;
+    Object.values(balances).forEach((v) => { walletUsd += (v || 0); });
+    Object.values(staked).forEach((s) => { if (s && s.usd) walletUsd += s.usd; });
+    setServerBalances((s) => (Math.abs((s.crypto || 0) - walletUsd) < 0.005 ? s : { ...s, crypto: walletUsd }));
+  }, [balances, staked]);
   const [whitelist,    setWhitelist]    = usePersistedState('alpexa.whitelist', []);
   const [beneficiaries, setBeneficiaries] = usePersistedState('alpexa.beneficiaries', []);
   const [savedCards,  setSavedCards]  = usePersistedState('alpexa.savedCards',  []);
@@ -13153,7 +13162,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v24';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v25';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>

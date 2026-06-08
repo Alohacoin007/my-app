@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0.5 -->
+<!-- v1.0.6 -->
 
 <html lang="en">
 <head>
@@ -1168,7 +1168,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.0.5</div>`;
+      <div class="s-foot">Alpexa Sports v1.0.6</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -1874,7 +1874,17 @@
   function renderCurServerIcon(){
     document.getElementById('srvCurIc').innerHTML=srvLineIconSVG;
   }
+  // Re-read the latest per-server balances so the dropdown is always current
+  // (the Crypto/FX apps write these to localStorage as they change).
+  function refreshSrvBalances(){
+    try{var sb=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{};
+      var c=SERVERS.find(x=>x.key==='crypto'); if(c&&typeof sb.crypto==='number')c.bal=sb.crypto;
+      var lv=SERVERS.find(x=>x.key==='live'); if(lv&&typeof sb.fx==='number')lv.bal=sb.fx;
+      var sp=SERVERS.find(x=>x.key==='sports'); if(sp)sp.bal=balance;
+    }catch(e){}
+  }
   function renderSrvMenu(){
+    refreshSrvBalances();
     document.getElementById('srvList').innerHTML=SERVERS.map(s=>`
       <div class="srv-opt ${s.key===curSrvKey?'sel':''} ${s.locked?'locked':''}" data-key="${s.key}">
         <div class="srv-ic ${s.ic}">${srvIconSVG}</div>
@@ -2383,7 +2393,7 @@
 
   // ---------- server selector ----------
   const notifMenu=document.getElementById('notifMenu');
-  document.getElementById('serverSel').onclick=e=>{e.stopPropagation();notifMenu.classList.remove('show');srvMenu.classList.toggle('show');};
+  document.getElementById('serverSel').onclick=e=>{e.stopPropagation();notifMenu.classList.remove('show');renderSrvMenu();srvMenu.classList.toggle('show');};
   document.addEventListener('click',()=>{srvMenu.classList.remove('show');notifMenu.classList.remove('show');});
   // notifications
   document.getElementById('bellBtn').onclick=e=>{
