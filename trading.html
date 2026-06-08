@@ -313,7 +313,19 @@ function createMarket(){
     });
     return state;
   }
-  return{state,tick};
+  return{state,tick,applyReal:(map)=>applyReal(state,map)};
+}
+// Inject real prices (from Twelve Data). Sets the mean-reversion target to the
+// real price and snaps current price to it; simulation then drifts around real.
+function applyReal(state,map){
+  state.forEach((s)=>{
+    var r=map[s.sym]; if(r==null) return; r=+r; if(!isFinite(r)||r<=0) return;
+    s.bid=r; s.last=r; s.real=true;
+    if(!(s.high>=r))s.high=r;
+    if(!(s.low>0)||s.low>r)s.low=r;
+    var cur=s.series&&s.series[s.series.length-1]; if(cur)cur.c=r;
+  });
+  return state;
 }
 function genSeries(base,n){
   let p=base*(1-0.008);const arr=[];
@@ -3155,6 +3167,29 @@ function App(){
     return()=>{window.removeEventListener('alpexa-leverage-change',h);window.removeEventListener('alpexa-balance-change',h);};
   },[]);
 
+  // ── Real market data (Twelve Data, free tier ~8 req/min) ──
+  // Polls the symbol you're viewing + rotates through the rest one at a time,
+  // anchoring real prices; the simulation drifts smoothly around them.
+  // Degrades to pure simulation if offline / rate-limited.
+  const symRef=useRef(sym); symRef.current=sym;
+  useEffect(()=>{
+    if(typeof fetch!=='function') return;
+    const KEY='6fef3bc69c2842a2b4a127969f766eb0';
+    const SYMS=ALPEXA_MARKET.SYMBOLS;
+    const tdSym=(s)=> s.cls==='STOCK' ? s.sym : (s.sym.length===6 ? s.sym.slice(0,3)+'/'+s.sym.slice(3) : s.sym);
+    let stop=false, idx=0, useChart=true;
+    function pull(s){ if(!s) return;
+      fetch('https://api.twelvedata.com/price?symbol='+encodeURIComponent(tdSym(s))+'&apikey='+KEY)
+        .then(r=>r.json()).then(j=>{ if(stop)return; const px=parseFloat(j&&j.price);
+          if(isFinite(px)&&px>0){ const o={}; o[s.sym]=px; marketRef.current.applyReal(o); force(x=>x+1); } }).catch(()=>{});
+    }
+    function poll(){ if(document.hidden) return;
+      let s; if(useChart){ s=SYMS.find(x=>x.sym===symRef.current); } else { s=SYMS[idx%SYMS.length]; idx++; } useChart=!useChart; pull(s);
+    }
+    poll(); const ivTD=setInterval(poll, 10000);
+    return ()=>{ stop=true; clearInterval(ivTD); };
+  },[]);
+
   useEffect(()=>{
     const id=setInterval(()=>{
       marketRef.current.tick();
@@ -3360,7 +3395,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v17';
+(function(){try{var b=document.createElement('div');b.textContent='FX v18 (live data)';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
