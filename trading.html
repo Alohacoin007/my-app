@@ -1637,12 +1637,14 @@ function PosCard({p,onClose,onModify}){
 // ── Positions ──
 function filterByDate(history,mode,customFrom,customTo){
   if(mode==='all')return history;
-  const now=new Date();const today=now.toISOString().slice(0,10);
+  const now=new Date();const _p=n=>String(n).padStart(2,'0');
+  const _ymd=d=>d.getFullYear()+'-'+_p(d.getMonth()+1)+'-'+_p(d.getDate());
+  const today=_ymd(now);
   function toIso(d){if(!d)return null;const md=d.slice(0,5);return now.getFullYear()+'-'+md;}
   return history.filter(h=>{
     const iso=toIso(h.date);if(!iso)return false;
     if(mode==='today')return iso===today;
-    if(mode==='7d'||mode==='30d'){const days=mode==='7d'?7:30;const cutoff=new Date(now.getTime()-days*24*60*60*1000).toISOString().slice(0,10);return iso>=cutoff&&iso<=today;}
+    if(mode==='7d'||mode==='30d'){const days=mode==='7d'?7:30;const cutoff=_ymd(new Date(now.getTime()-days*86400000));return iso>=cutoff&&iso<=today;}
     if(mode==='custom'){if(!customFrom&&!customTo)return true;if(customFrom&&iso<customFrom)return false;if(customTo&&iso>customTo)return false;return true;}
     return true;
   });
@@ -3241,7 +3243,8 @@ function App(){
   const [indicators,setIndicators]=useState({ma:true,vol:false,bb:false,rsi:false,macd:false});
   const [liveOrders,setLiveOrders]=useState([]);
   const [pendingOrders,setPendingOrders]=useState([]);
-  const [closedHistory,setClosedHistory]=useState([]);
+  const [closedHistory,setClosedHistory]=useState(()=>{try{return JSON.parse(localStorage.getItem('alpexa.fxClosed')||'[]');}catch(e){return [];}});
+  useEffect(()=>{try{localStorage.setItem('alpexa.fxClosed',JSON.stringify(closedHistory));}catch(e){}},[closedHistory]);
   const [modifyTarget,setModifyTarget]=useState(null);
   const [toast,setToast]=useState(null);
   const marketRef=useRef(null);
@@ -3522,7 +3525,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v33';
+(function(){try{var b=document.createElement('div');b.textContent='FX v34';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
