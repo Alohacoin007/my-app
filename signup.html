@@ -794,6 +794,13 @@ function goBack(){
 }
 function goToApp(){
   var dest = data.server==='demo' ? 'sports-live.html' : data.server==='stocks' ? 'crypto-live.html' : 'trading.html';
+  // Carry the identity in the URL so that if the user "Adds to Home Screen" from
+  // the app, the installed app (which has separate iOS storage) can restore the
+  // same account automatically — no re-login needed.
+  try{
+    var me={custId:data.custId,name:(data.firstName+' '+data.lastName).trim(),email:data.email,accts:data.accts};
+    dest += '#alpexa='+btoa(encodeURIComponent(JSON.stringify(me)));
+  }catch(e){}
   window.location.href = dest;
 }
 function copyAcct(){
