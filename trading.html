@@ -3444,17 +3444,16 @@ function App(){
   },[]);
 
   function placeOrder(orderData){
-    // Guard: don't allow trading a closed market or a symbol whose live price
-    // hasn't loaded yet (prevents bad fills at the stale demo price).
+    // Guard: only block a genuinely closed market. If the live price hasn't
+    // loaded yet (free data tier is rate-limited), still fill at the current
+    // simulated price and fetch the real one in the background — never block.
     const sObj=marketRef.current.state.find(x=>x.sym===orderData.sym);
     if(sObj){
       const TT=(window.alpexaTR||((x)=>x));
       if(!symOpen(sObj)){ if(window.ALPEXA_SFX&&ALPEXA_SFX.error)ALPEXA_SFX.error();
         setToast({error:true,icon:'lock',msg:TT('Market closed'),sub:orderData.sym+' · '+(sObj.cls==='STOCK'?'Stocks 09:30–16:00 ET (Mon–Fri)':sObj.cls==='INDEX'?'Index hours':'FX 24/5 (closed weekends)')});
         setTimeout(()=>setToast(null),4000); return; }
-      if(!sObj.real){ if(window.ALPEXA_SFX&&ALPEXA_SFX.error)ALPEXA_SFX.error();
-        setToast({error:true,icon:'sync',msg:'Fetching live price…',sub:'Loading '+orderData.sym+' — try again in a moment.'});
-        if(pullRef.current)pullRef.current(sObj); setTimeout(()=>setToast(null),3000); return; }
+      if(!sObj.real&&pullRef.current){ pullRef.current(sObj); }
     }
     const id=Date.now();
     const now=new Date();
@@ -3634,7 +3633,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v48';
+(function(){try{var b=document.createElement('div');b.textContent='FX v49';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
