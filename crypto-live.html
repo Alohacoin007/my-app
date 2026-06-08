@@ -850,10 +850,10 @@ const ROW_GRID = '26px 1fr 52px 96px';
 
 function AssetRow({ a, kind, liveValue, onTap }) {
   const baseValue = a.mine;
-  // A holding's USD value is your money — keep it FIXED (don't tick it). Show the
-  // asset's daily % next to it; the chart is what animates, not the balance.
-  const v         = baseValue;
-  const livePct   = a.stable ? 0 : (typeof a.chg === 'number' ? a.chg : 0);
+  // Live value moves with the market tick; stablecoins stay flat.
+  const v         = a.stable ? baseValue : (liveValue != null ? liveValue : baseValue);
+  const startBasis = baseValue / (1 + (a.chg || 0) / 100);
+  const livePct   = a.stable ? 0 : ((v - startBasis) / startBasis) * 100;
   const isUp      = livePct >= 0;
   const color     = isUp ? RH.green : RH.red;
   const isSecurity = kind === 'security';
@@ -1390,9 +1390,8 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
   }, [range, open, liveClose]);
 
   const baseline      = open;
-  // Hero number = FIXED wallet total (your balance shouldn't fluctuate). It equals
-  // the sum of the holding rows. Only the chart line animates (off liveClose).
-  const scrubValue    = scrubIdx !== null ? series[scrubIdx] : heroBase;
+  // Hero number = live total (moves with the market), matching the live rows.
+  const scrubValue    = scrubIdx !== null ? series[scrubIdx] : heroLive;
   const change        = scrubValue - baseline;
   const changePct     = (change / baseline) * 100;
   const isUp          = change >= 0;
@@ -1548,35 +1547,35 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
         </div>
       </div>
 
-      {/* Scroll body */}
+      {/* Balance card — PINNED at the top (stays put while holdings scroll) */}
+      <div style={{ padding: '14px 22px 8px', flexShrink: 0 }}>
+        <div style={{
+          fontSize: 38, fontWeight: 600, letterSpacing: -1.2,
+          lineHeight: 1.05,
+        }}>
+          <Odometer value={scrubValue} fontSize={38} color={RH.text}/>
+        </div>
+        <div style={{
+          marginTop: 8, display: 'flex', alignItems: 'center', gap: 6,
+          fontSize: 14, fontWeight: 600,
+          fontVariantNumeric: 'tabular-nums',
+        }}>
+          <span style={{ color, display: 'inline-flex', alignItems: 'center', gap: 4, lineHeight: 1 }}>
+            <span>{sym}</span>
+            <Odometer value={Math.abs(change)} fontSize={14} color={color} prefix="$"/>
+            <span>(</span>
+            <Odometer value={Math.abs(changePct)} fontSize={14} color={color} prefix={changePct >= 0 ? '+' : '−'} suffix="%"/>
+            <span>)</span>
+          </span>
+          <span style={{ color: RH.textDim }}>{footerLabel}</span>
+        </div>
+      </div>
+
+      {/* Scroll body — chart + holdings scroll under the pinned balance card */}
       <div style={{
         flex: 1, overflowY: 'auto', overflowX: 'hidden',
         scrollbarWidth: 'none', overscrollBehavior: 'none', WebkitOverflowScrolling: 'touch',
       }}>
-        {/* Hero */}
-        <div style={{ padding: '14px 22px 8px' }}>
-          <div style={{
-            fontSize: 38, fontWeight: 600, letterSpacing: -1.2,
-            lineHeight: 1.05,
-          }}>
-            <Odometer value={scrubValue} fontSize={38} color={RH.text}/>
-          </div>
-          <div style={{
-            marginTop: 8, display: 'flex', alignItems: 'center', gap: 6,
-            fontSize: 14, fontWeight: 600,
-            fontVariantNumeric: 'tabular-nums',
-          }}>
-            <span style={{ color, display: 'inline-flex', alignItems: 'center', gap: 4, lineHeight: 1 }}>
-              <span>{sym}</span>
-              <Odometer value={Math.abs(change)} fontSize={14} color={color} prefix="$"/>
-              <span>(</span>
-              <Odometer value={Math.abs(changePct)} fontSize={14} color={color} prefix={changePct >= 0 ? '+' : '−'} suffix="%"/>
-              <span>)</span>
-            </span>
-            <span style={{ color: RH.textDim }}>{footerLabel}</span>
-          </div>
-        </div>
-
         {/* Chart */}
         <div style={{ marginTop: 4 }}>
           <Chart
@@ -9686,15 +9685,14 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
     t += (serverBalances.sports || 0);
     return t;
   }, [balances, staked, serverBalances]);
-  // Displayed balance is FIXED (your money shouldn't tick); only the chart animates.
-  const liveClose = useLiveTick(baseTotal, { interval: 1800, vol: 0.0008, swayPct: 0.012 });
-  const total = baseTotal;
+  // Live total — moves gently with the market.
+  const total = useLiveTick(baseTotal, { interval: 1800, vol: 0.0008, swayPct: 0.012 });
 
   // Synthetic historical baseline so the chart has data — scaled to current total.
   const RANGE_BASIS = { '1D': 0.995, '1W': 0.985, '1M': 0.92, '3M': 0.81, 'YTD': 0.62, '1Y': 0.50, 'ALL': 0.10 };
   const RANGE_POINTS = { '1D': 78, '1W': 84, '1M': 90, '3M': 120, 'YTD': 150, '1Y': 252, 'ALL': 220 };
   const open  = baseTotal * (RANGE_BASIS[range] || 0.9);
-  const close = liveClose;
+  const close = total;
   const series = React.useMemo(() => {
     const n = RANGE_POINTS[range] || 90;
     const real = (typeof alpexaPortfolioSeries === 'function')
@@ -9706,9 +9704,11 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
   // Period chart baseline stays at `open`, but the color + headline change
   // track the live total against the steady centre (baseTotal). When the tick
   // dips below the centre, the up/down indicator flips red.
-  const change   = total - open;                 // fixed period change (no tick)
-  const changePct = open > 0 ? (change / open) * 100 : 0;
-  const isUp = change >= 0;
+  const liveChange = total - baseTotal;
+  const liveChangePct = baseTotal > 0 ? (liveChange / baseTotal) * 100 : 0;
+  const change   = liveChange;
+  const changePct = liveChangePct;
+  const isUp = liveChange >= 0;
   const accent = isUp ? RH.green : RH.red;
 
   const SERVER_ROWS = ['crypto', 'fx', 'sports'].map((id) => ({
@@ -13213,7 +13213,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v39';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v40';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
