@@ -102,7 +102,37 @@ window.AlpexaSync = (function () {
       }, function (e) { console.warn('AlpexaSync setStatus failed', e); return { error: e }; });
   }
 
+  // ── Peer-to-peer payments (internal users send crypto to each other) ──
+  function sendPayment(p) {
+    if (!db) return Promise.resolve({ error: 'offline' });
+    var m = me();
+    var row = {
+      local_id: 'pay-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+      from_cust: m.custId, from_name: m.name,
+      to_acct: String((p && p.to) || '').trim().toUpperCase(),
+      amount: +((p && p.amount)) || 0, asset: (p && p.asset) || 'USDT',
+      note: (p && p.note) || '', status: 'sent'
+    };
+    return db.from('payments').insert(row).select()
+      .then(function (res) { if (res && res.error) console.warn('sendPayment', res.error.message); return res; },
+            function (e) { return { error: e }; });
+  }
+  function pullIncoming() {
+    if (!db) return Promise.resolve([]);
+    var m = me(); var a = m.accts || {};
+    var accts = [a.crypto, a.fx, a.sports, m.custId].filter(Boolean).map(function (x) { return String(x).toUpperCase(); });
+    if (!accts.length) return Promise.resolve([]);
+    return db.from('payments').select('*').eq('status', 'sent').in('to_acct', accts)
+      .then(function (r) { return (r && r.data) || []; }, function () { return []; });
+  }
+  function claimPayment(localId) {
+    if (!db) return Promise.resolve();
+    return db.from('payments').update({ status: 'claimed', claimed_at: new Date().toISOString() })
+      .eq('local_id', String(localId)).then(function (x) { return x; }, function () {});
+  }
+
   return { db: db, me: me, acctFor: acctFor, pushRequest: pushRequest,
            pullAll: pullAll, pullMine: pullMine, setStatus: setStatus,
-           updateRequest: updateRequest, deleteRequest: deleteRequest };
+           updateRequest: updateRequest, deleteRequest: deleteRequest,
+           sendPayment: sendPayment, pullIncoming: pullIncoming, claimPayment: claimPayment };
 })();

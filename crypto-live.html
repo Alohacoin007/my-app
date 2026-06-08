@@ -86,7 +86,7 @@
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="alpexa-sync.js?v=4"></script>
+<script src="alpexa-sync.js?v=5"></script>
 <script>
 // Seed/repair the shared server balances so the dropdown never shows stale $0
 // for servers the user hasn't opened yet. (FX/Sports overwrite with real values.)
@@ -2363,6 +2363,10 @@ function Send({ onBack, balances = {}, onSent }) {
   // 2) email   → internal-or-invited user
   // 3) other   → external wallet address
   const detectRecipient = (v) => {
+    if (/^(CR|SP|FX|P)-?\d{3,}$/i.test((v || '').trim())) {
+      const acct = v.trim().toUpperCase();
+      return { id: 'alx-' + acct, name: 'Alpexa account', handle: acct, initials: 'AX', color: '#1565C0', type: 'alpexa', account: acct };
+    }
     if (v.startsWith('@') && v.length >= 3) {
       return {
         id: 'h-' + v,
@@ -2546,11 +2550,29 @@ function Send({ onBack, balances = {}, onSent }) {
                 background: '#fff', padding: 12, borderRadius: 8,
                 boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
               }}>
-                <QrPattern data="alpexa-send" size={140} dark="#000" light="#FFF"/>
+                {(() => {
+                  const myAcct = (window.AlpexaSync && AlpexaSync.me && AlpexaSync.me().accts && AlpexaSync.me().accts.crypto) || '';
+                  return myAcct
+                    ? <img src={'https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=0&data=' + encodeURIComponent(myAcct)} width={140} height={140} alt="My pay QR" style={{ display: 'block', borderRadius: 2 }}/>
+                    : <QrPattern data="alpexa-send" size={140} dark="#000" light="#FFF"/>;
+                })()}
               </div>
             </div>
           </button>
         </div>
+
+        {/* Your pay ID (share so others can send to you) */}
+        {(() => {
+          const myAcct = (window.AlpexaSync && AlpexaSync.me && AlpexaSync.me().accts && AlpexaSync.me().accts.crypto) || '';
+          if (!myAcct) return null;
+          return (
+            <div onClick={() => { try { navigator.clipboard && navigator.clipboard.writeText(myAcct); alpexa.toast && alpexa.toast('Pay ID copied'); } catch (e) {} }}
+              style={{ textAlign: 'center', marginTop: 14, cursor: 'pointer' }}>
+              <div style={{ fontSize: 10.5, color: RH.textMute, letterSpacing: 0.6, textTransform: 'uppercase' }}>Your pay ID · tap to copy</div>
+              <div className="mono" style={{ fontSize: 15, fontWeight: 700, color: RH.text, marginTop: 3 }}>{myAcct}</div>
+            </div>
+          );
+        })()}
 
         {/* Enter Manually CTA */}
         <div style={{ padding: '20px 18px 26px' }}>
@@ -2581,7 +2603,7 @@ function Send({ onBack, balances = {}, onSent }) {
             setTimeout(() => {
               setSendState('sent');
               if (typeof AudioFX !== 'undefined') AudioFX.success();
-              if (onSent) onSent(assetId, amount);
+              if (onSent) onSent(assetId, amount, recipient);
             }, 900);
           }}
           onClose={() => {
@@ -12700,11 +12722,34 @@ function App() {
   };
 
   // Deduct USD from a source asset; called by Send.
-  const onSendConfirmed = (assetId, usdAmount) => {
+  const onSendConfirmed = (assetId, usdAmount, recipient) => {
     setBalances((b) => ({ ...b, [assetId]: Math.max(0, (b[assetId] || 0) - usdAmount) }));
-    pushTx({ type: 'send', sym: assetId, usd: usdAmount });
+    pushTx({ type: 'send', sym: assetId, usd: usdAmount, to: recipient && (recipient.account || recipient.name) });
+    // Internal pay (to an Alpexa account) → record on the server so the recipient receives it.
+    if (recipient && recipient.type === 'alpexa' && window.AlpexaSync && AlpexaSync.db) {
+      try { AlpexaSync.sendPayment({ to: recipient.account, amount: usdAmount, asset: assetId }); } catch (e) {}
+    }
     flashAsset(assetId);
   };
+  // Incoming payments from other Alpexa users → credit balance + notify.
+  React.useEffect(() => {
+    if (!window.AlpexaSync || !AlpexaSync.db) return;
+    let stop = false;
+    const tick = () => { AlpexaSync.pullIncoming().then((rows) => {
+      if (stop || !rows || !rows.length) return;
+      rows.forEach((r) => {
+        const amt = +r.amount || 0; if (!(amt > 0)) { AlpexaSync.claimPayment(r.local_id); return; }
+        const sym = r.asset || 'USDT';
+        setBalances((b) => ({ ...b, [sym]: (b[sym] || 0) + amt }));
+        pushTx({ type: 'receive', sym: sym, usd: amt, from: r.from_name || r.from_cust });
+        AlpexaSync.claimPayment(r.local_id);
+        if (typeof AudioFX !== 'undefined') { try { AudioFX.cash(); } catch (e) {} }
+      });
+    }).catch(() => {}); };
+    tick(); const iv = setInterval(() => { if (!document.hidden) tick(); }, 12000);
+    const vis = () => { if (!document.hidden) tick(); }; document.addEventListener('visibilitychange', vis);
+    return () => { stop = true; clearInterval(iv); document.removeEventListener('visibilitychange', vis); };
+  }, []);
   // Move USD from balance → staked. Stores period alongside USD so the
   // Dashboard can render the lock-period chip.
   const onStakeConfirmed = (assetId, usdAmount, period = 'flexible') => {
@@ -13081,7 +13126,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v18';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v19 (pay)';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
