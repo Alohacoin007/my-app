@@ -112,11 +112,11 @@ input{font-family:inherit;outline:none;border:none;background:none;color:inherit
 .cat-strip::-webkit-scrollbar{display:none;}
 /* On phones the device frame's status bar is gone, so the 56px header top
    padding is too tall — shrink it (keep notch clearance via safe-area). */
-@media (max-width:600px){ html,body{ min-height:0 !important; height:100dvh !important; overflow:hidden !important; margin:0 !important; background:var(--surface,#fff) !important; } }
+@media (max-width:600px){ html,body{ min-height:0 !important; height:100dvh !important; overflow:hidden !important; margin:0 !important; background:#1B3955 !important; } }
 @media (max-width:600px){ .app-hdr, .chart-hdr{ padding-top: max(10px, env(safe-area-inset-top)) !important; } }
-/* footer tab bar: the 30px bottom padding is for the device frame's home bar;
-   on phones use the real safe-area instead so the footer sits at the bottom. */
-@media (max-width:600px){ .bottom-nav{ padding-bottom: 6px !important; } }
+/* pin the footer to the very bottom and give it a solid bg so nothing shows under it */
+@media (max-width:600px){ .bottom-nav{ margin-top:auto !important; background:var(--surface) !important; padding-bottom: 6px !important; } }
+@media (max-width:600px) and (display-mode: standalone){ .bottom-nav{ padding-bottom: calc(env(safe-area-inset-bottom) + 4px) !important; } }
 @media (max-width:600px) and (display-mode: standalone){ .bottom-nav{ padding-bottom: calc(env(safe-area-inset-bottom) + 4px) !important; } }
 </style>
 </head>
@@ -3493,7 +3493,7 @@ function Root(){
   // fill-container logic have a bounded parent (prevents infinite growth).
   if(isMobile){
     return(
-      <div style={{height:'100dvh',width:'100%',overflow:'hidden',background:'var(--surface)'}}>
+      <div style={{height:'100dvh',width:'100%',overflow:'hidden',background:'#1B3955'}}>
         <App/>
       </div>
     );
@@ -3513,7 +3513,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v28';
+(function(){try{var b=document.createElement('div');b.textContent='FX v29';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
