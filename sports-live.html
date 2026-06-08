@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0.0 -->
+<!-- v1.0.1 -->
 
 <html lang="en">
 <head>
@@ -924,8 +924,8 @@
       localStorage.setItem('alpexa.openBets','[]');
       localStorage.setItem('alpexa.settledBets','[]');
       localStorage.removeItem('alpexa.withdrawals');
-      // reset balances across all servers (apps re-seed to $10,000) — keep identity (alpexa.me)
-      localStorage.removeItem('alpexa.serverBalances');
+      // reset balances across all servers to $10,000 — keep identity (alpexa.me)
+      localStorage.setItem('alpexa.serverBalances',JSON.stringify({crypto:10000,fx:10000,sports:10000}));
       localStorage.removeItem('alpexa.balances');
       localStorage.removeItem('alpexa.cryptoBalance');
       localStorage.removeItem('alpexa.funding');
@@ -1164,7 +1164,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.0.0</div>`;
+      <div class="s-foot">Alpexa Sports v1.0.1</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -1810,8 +1810,17 @@
   const CASHBACK_RATE=0.05;
   function syncSportsBal(){sportsSrv().bal=balance;try{localStorage.setItem('alpexa.sportsBalance',String(balance));}catch(e){}
     try{var o=Object.assign({crypto:10000,fx:25000,sports:50000},JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}'));o.sports=balance;localStorage.setItem('alpexa.serverBalances',JSON.stringify(o));}catch(e){}}
-  function saveCryptoBal(){try{const c=SERVERS.find(s=>s.key==='crypto');if(c)localStorage.setItem('alpexa.cryptoBalance',String(c.bal));}catch(e){}}
-  (function(){try{const s=localStorage.getItem('alpexa.cryptoBalance');if(s!==null){const c=SERVERS.find(x=>x.key==='crypto');if(c)c.bal=parseFloat(s);}}catch(e){}})();
+  function saveCryptoBal(){try{const c=SERVERS.find(s=>s.key==='crypto');if(c){localStorage.setItem('alpexa.cryptoBalance',String(c.bal));var o={};try{o=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{};}catch(e){o={};}o.crypto=c.bal;localStorage.setItem('alpexa.serverBalances',JSON.stringify(o));}}catch(e){}}
+  // Read the REAL per-server balances written by the Crypto and FX apps so the
+  // switcher never shows stale demo numbers.
+  (function(){try{
+    var sb={};try{sb=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{};}catch(e){sb={};}
+    var legacy=localStorage.getItem('alpexa.cryptoBalance');
+    var c=SERVERS.find(x=>x.key==='crypto');
+    if(c){ if(typeof sb.crypto==='number') c.bal=sb.crypto; else if(legacy!==null) c.bal=parseFloat(legacy); }
+    var lv=SERVERS.find(x=>x.key==='live');
+    if(lv && typeof sb.fx==='number') lv.bal=sb.fx;
+  }catch(e){}})();
   // ---- Shared withdrawal requests (shared with the Manager dashboard via localStorage) ----
   const WD_STORE='alpexa.withdrawals';
   function loadWithdrawals(){try{return JSON.parse(localStorage.getItem(WD_STORE)||'[]');}catch(e){return [];}}
