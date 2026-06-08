@@ -1298,12 +1298,25 @@ function TradeTicket({market,sym,setSym,lots,setLots,onPlace}){
   const [pickerSearch,setPickerSearch]=useState('');
   const [confirmOpen,setConfirmOpen]=useState(false);
   const vol=lots;const setVol=setLots;
-  useEffect(()=>{if(!s)return;if((s.cls==='STOCK'||s.cls==='INDEX')&&lots<1)setLots(1);else if(s.cls!=='STOCK'&&s.cls!=='INDEX'&&lots>5&&Number.isInteger(lots))setLots(1);},[s&&s.cls]);
+  const cryptoUsdRef=useRef(500);            // desired USD size for crypto orders
+  const prevClsRef=useRef(s?s.cls:null);
+  useEffect(()=>{if(!s)return;
+    const px=s.last||s.bid||1;
+    const classChanged=prevClsRef.current!==s.cls; prevClsRef.current=s.cls;
+    // Crypto is sized in USD: keep ~the same dollar amount as you switch coins.
+    if(s.cls==='CRYPTO'){ setLots(+(cryptoUsdRef.current/px).toFixed(6)); }
+    else if(classChanged){ setLots((s.cls==='STOCK'||s.cls==='INDEX')?1:0.10); }
+  },[s&&s.cls, s&&s.sym]);
   const ask=s.last+s.spread;const entryPx=side==='BUY'?ask:s.last;
   const notional=ALPEXA_MARKET.getNotionalUSD(s,vol,entryPx);
   const levSettings=getLeverageSettings();
   const lev=levSettings[s.cls]||(s.cls==='STOCK'?5:s.cls==='CRYPTO'?5:s.cls==='INDEX'?20:100);
   const marginPct=(100/lev).toFixed(lev<10?0:1);const margin=notional/lev;
+  // Crypto order sizing in USD (internal vol stays in coins, so all the math below is unchanged).
+  const coinSym=s.sym.replace('USD','');
+  const cryptoUsd=vol*entryPx;
+  const cryptoStep=cryptoUsd<=100?10:cryptoUsd<=1000?50:100;
+  const setCryptoUsd=(u)=>{const nu=Math.max(10,u);cryptoUsdRef.current=nu;setVol(+(nu/entryPx).toFixed(6));};
   const commission=s.cls==='STOCK'?Math.max(1,vol*0.02):s.cls==='CRYPTO'?notional*0.001:0;
   const lotSize=ALPEXA_MARKET.getLotSize(s);const tickSize=Math.pow(10,-s.digits);
   // USD value of one point — derived from the (USD-correct) P&L of a 1-point move,
@@ -1385,6 +1398,25 @@ function TradeTicket({market,sym,setSym,lots,setLots,onPlace}){
           )}
         </div>
         <div style={{background:'var(--surface)',borderRadius:4,padding:'12px 14px',border:'1px solid var(--line-2)'}}>
+          {s.cls==='CRYPTO'?(
+          <>
+          <div style={{fontSize:9.5,fontWeight:700,color:'var(--text-3)',letterSpacing:0.7,marginBottom:10}}>AMOUNT (USD)</div>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:8}}>
+            <button onClick={()=>setCryptoUsd(cryptoUsd-cryptoStep)} style={{width:38,height:38,borderRadius:19,background:'var(--bg-2)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--ink)'}}><Mi name="remove" size={20} weight={600}/></button>
+            <div style={{flex:1,textAlign:'center'}}>
+              <div className="mono" style={{fontSize:28,fontWeight:700,color:'var(--ink)',lineHeight:1,letterSpacing:-0.5}}>${cryptoUsd.toLocaleString('en-US',{maximumFractionDigits:0})}</div>
+              <div className="mono" style={{fontSize:10,color:'var(--text-3)',marginTop:5,letterSpacing:0.3}}>≈ {vol.toLocaleString('en-US',{maximumFractionDigits:vol<1?6:2})} {coinSym}</div>
+            </div>
+            <button onClick={()=>setCryptoUsd(cryptoUsd+cryptoStep)} style={{width:38,height:38,borderRadius:19,background:'var(--bg-2)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--ink)'}}><Mi name="add" size={20} weight={600}/></button>
+          </div>
+          <div style={{display:'flex',gap:5}}>
+            {[50,100,500,1000,5000].map(u=>(
+              <button key={u} onClick={()=>setCryptoUsd(u)} className="mono" style={{flex:1,padding:'6px 0',borderRadius:6,fontSize:11,fontWeight:600,background:Math.abs(cryptoUsd-u)<1?'var(--ink)':'var(--bg-2)',color:Math.abs(cryptoUsd-u)<1?'var(--ink-fg)':'var(--text-2)'}}>${u>=1000?(u/1000)+'k':u}</button>
+            ))}
+          </div>
+          </>
+          ):(
+          <>
           <div style={{fontSize:9.5,fontWeight:700,color:'var(--text-3)',letterSpacing:0.7,marginBottom:10}}>VOLUME ({ALPEXA_MARKET.getUnitLabel(s.cls).toUpperCase()})</div>
           <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:8}}>
             <button onClick={()=>{const step=s.cls==='STOCK'?(vol<=1?1:vol<=10?1:vol<=100?5:10):s.cls==='INDEX'?1:vol<0.1?0.01:vol<1?0.10:vol<10?1:5;const min=s.cls==='STOCK'||s.cls==='INDEX'?1:0.01;setVol(Math.max(min,+(vol-step).toFixed(2)));}} style={{width:38,height:38,borderRadius:19,background:'var(--bg-2)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--ink)'}}><Mi name="remove" size={20} weight={600}/></button>
@@ -1399,6 +1431,8 @@ function TradeTicket({market,sym,setSym,lots,setLots,onPlace}){
               <button key={p} onClick={()=>setVol(p)} className="mono" style={{flex:1,padding:'6px 0',borderRadius:6,fontSize:11,fontWeight:600,background:Math.abs(vol-p)<0.001?'var(--ink)':'var(--bg-2)',color:Math.abs(vol-p)<0.001?'var(--ink-fg)':'var(--text-2)'}}>{ALPEXA_MARKET.fmtVol(s.cls,p)}</button>
             ))}
           </div>
+          </>
+          )}
         </div>
         <div style={{background:'var(--surface)',borderRadius:4,padding:'12px 14px',border:'1px solid var(--line-2)'}}>
           <div style={{fontSize:9.5,fontWeight:700,color:'var(--text-3)',letterSpacing:0.7,marginBottom:10}}>STOP LOSS / TAKE PROFIT</div>
@@ -2863,7 +2897,12 @@ function ChartScreen({market,sym,setSym,accent,density,indicators,setIndicators,
     const oneClick=(typeof window.getPrefs==='function')&&window.getPrefs().oneClick;
     if(oneClick){onPlace&&onPlace(order);}else{setPendingTrade(order);}
   }
-  useEffect(()=>{if(!s)return;if((s.cls==='STOCK'||s.cls==='INDEX')&&lots<1)setLots(1);},[s&&s.cls]);
+  useEffect(()=>{if(!s)return;
+    if((s.cls==='STOCK'||s.cls==='INDEX')&&lots<1)setLots(1);
+    // Crypto: keep the size within a sane USD range (resize to ~$500 if the
+    // current quantity would be worth too little or way too much for the coin).
+    else if(s.cls==='CRYPTO'){const px=s.last||s.bid||1; const notl=lots*px; if(notl<10||notl>100000)setLots(+(500/px).toFixed(6));}
+  },[s&&s.cls, s&&s.sym]);
   const ask=s.last+s.spread;
   const up=s.chgPct>=0;
   const cur=s.series[s.series.length-1];
@@ -3635,7 +3674,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v50';
+(function(){try{var b=document.createElement('div');b.textContent='FX v51';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
