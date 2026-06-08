@@ -576,8 +576,8 @@
 (function(){try{var k='alpexa.serverBalances';var o={};try{o=JSON.parse(localStorage.getItem(k)||'{}')||{};}catch(e){o={};}
   var ch=false;
   if(!(o.crypto>0)){o.crypto=10000;ch=true;}
-  if(!(o.fx>0)){o.fx=25000;ch=true;}
-  if(!(o.sports>0)){o.sports=50000;ch=true;}
+  if(!(o.fx>0)){o.fx=10000;ch=true;}
+  if(!(o.sports>0)){o.sports=10000;ch=true;}
   if(ch)localStorage.setItem(k,JSON.stringify(o));}catch(e){}})();
 </script>
 </head>
@@ -915,15 +915,23 @@
   </div>
 
 <script>
-  // ---------- real-mode reset (one-time): wipe demo data, start at $50,000 ----------
-  const ALPEXA_DATA_VERSION='real-3';
+  // ---------- one-time reset: clean demo, every account starts at $10,000 ----------
+  const ALPEXA_DATA_VERSION='demo-10k-1';
   try{
     if(localStorage.getItem('alpexa.dataVersion')!==ALPEXA_DATA_VERSION){
-      localStorage.setItem('alpexa.sportsBalance','50000');
+      localStorage.setItem('alpexa.sportsBalance','10000');
       localStorage.setItem('alpexa.txns','[]');
       localStorage.setItem('alpexa.openBets','[]');
       localStorage.setItem('alpexa.settledBets','[]');
       localStorage.removeItem('alpexa.withdrawals');
+      // reset balances across all servers (apps re-seed to $10,000) — keep identity (alpexa.me)
+      localStorage.removeItem('alpexa.serverBalances');
+      localStorage.removeItem('alpexa.balances');
+      localStorage.removeItem('alpexa.cryptoBalance');
+      localStorage.removeItem('alpexa.funding');
+      localStorage.removeItem('alpexa.fxNotifs');
+      localStorage.removeItem('alpexa.fxClosed');
+      localStorage.removeItem('alpexa.positions');
       localStorage.setItem('alpexa.dataVersion',ALPEXA_DATA_VERSION);
     }
   }catch(e){}
@@ -1776,7 +1784,7 @@
   const SERVERS=[
     {key:'live', name:'Alpexa Live', short:'Alpexa Live', desc:'FX · Metals · Indices · CFD', ic:'green', tag:'LIVE', tagcls:'live', bal:8420.50},
     {key:'crypto', name:'Alpexa Crypto', short:'Alpexa Crypto', desc:'Global crypto spot', ic:'blue', tag:'CRYPTO', tagcls:'crypto', bal:3150.00},
-    {key:'sports', name:'Alpexa Sports', short:'Alpexa Sports', desc:'Live sports betting', ic:'gray', tag:'SPORTS', tagcls:'sports', bal:50000.00},
+    {key:'sports', name:'Alpexa Sports', short:'Alpexa Sports', desc:'Live sports betting', ic:'gray', tag:'SPORTS', tagcls:'sports', bal:10000.00},
     {key:'manager', name:'Alpexa Manager', short:'Alpexa Manager', desc:'Managed · Copy trading', ic:'purple', tag:'MANAGER', tagcls:'mgr', bal:12000.00, locked:true},
   ];
   const srvIconSVG='<svg viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="7" rx="1.5" stroke="#fff" stroke-width="1.8"/><rect x="4" y="13" width="16" height="7" rx="1.5" stroke="#fff" stroke-width="1.8"/><circle cx="8" cy="7.5" r="1" fill="#fff"/><circle cx="8" cy="16.5" r="1" fill="#fff"/></svg>';
