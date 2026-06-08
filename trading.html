@@ -3307,6 +3307,8 @@ function App(){
   // anchoring real prices; the simulation drifts smoothly around them.
   // Degrades to pure simulation if offline / rate-limited.
   const symRef=useRef(sym); symRef.current=sym;
+  const accountRef=useRef(account); accountRef.current=account;
+  const marginCallRef=useRef(false);
   const pullRef=useRef(null);
   useEffect(()=>{
     if(typeof fetch!=='function') return;
@@ -3341,12 +3343,17 @@ function App(){
     const id=setInterval(()=>{
       marketRef.current.tick();
       const sltpHits=[];
+      const levSet=(window.getLeverageSettings?window.getLeverageSettings():{FX:100,INDEX:20,STOCK:5,CRYPTO:5});
+      let floatPnl=0,usedM=0,worst=null;
       setLiveOrders(prev=>prev.map(o=>{
         if(o.status!=='OPEN')return o;
         const m=marketRef.current.state.find(s=>s.sym===o.sym);
         if(!m)return o;
         const cur=o.side==='BUY'?m.last:m.last+m.spread;
         const pnl=ALPEXA_MARKET.getPnlUSD(m,o.open,cur,o.side,o.vol);
+        // tally floating P&L + used margin for the margin-level check
+        floatPnl+=pnl; usedM+=ALPEXA_MARKET.getMarginUSD(m,o.vol||0,o.open||0,(levSet[m.cls]||100));
+        if(!worst||pnl<worst.pnl)worst={id:o.id,pnl,sym:o.sym};
         // Auto-close when the live price reaches the take-profit or stop-loss.
         if(o.tp&&(o.side==='BUY'?cur>=o.tp:cur<=o.tp))sltpHits.push({id:o.id,reason:'TP',sym:o.sym});
         else if(o.sl&&(o.side==='BUY'?cur<=o.sl:cur>=o.sl))sltpHits.push({id:o.id,reason:'SL',sym:o.sym});
@@ -3361,6 +3368,23 @@ function App(){
         setToast({error:last.reason==='SL',icon:last.reason==='TP'?'flag':'shield',msg:last.reason==='TP'?'Take profit hit':'Stop loss hit',sub:last.sym+' closed automatically'});
         setTimeout(()=>setToast(null),3200);
       }
+      // ── Margin call (100%) + stop out (50%) ──
+      // Include the static demo positions in the floating P&L / used margin too.
+      ALPEXA_MARKET.POSITIONS.forEach(p=>{ floatPnl+=(p.pnl||0); const m=marketRef.current.state.find(s=>s.sym===p.sym); if(m)usedM+=ALPEXA_MARKET.getMarginUSD(m,p.vol||0,p.open||0,(levSet[m.cls]||100)); });
+      if(usedM>0){
+        const bal=(window.getBalances?window.getBalances():{})[accountRef.current]||0;
+        const lvl=((bal+floatPnl)/usedM)*100;
+        if(lvl<50&&worst){ // stop out: liquidate the worst-losing live position
+          closeOrder(worst.id);
+          try{window.alpexaNotify&&alpexaNotify({type:'marginCall',pref:'marginCall',title:'Stop out · '+worst.sym+' liquidated at '+Math.round(lvl)+'% margin'});}catch(e){}
+          setToast({error:true,icon:'warning',msg:'Stop out — '+Math.round(lvl)+'%',sub:worst.sym+' liquidated to protect your account'});
+          setTimeout(()=>setToast(null),4000);
+        } else if(lvl<100){ if(!marginCallRef.current){ marginCallRef.current=true;
+          try{window.alpexaNotify&&alpexaNotify({type:'marginCall',pref:'marginCall',title:'Margin call · level '+Math.round(lvl)+'% — add funds or reduce positions'});}catch(e){}
+          setToast({error:true,icon:'warning',msg:'Margin call — '+Math.round(lvl)+'%',sub:'Add funds or close positions to avoid stop out (50%)'});
+          setTimeout(()=>setToast(null),4500);
+        } } else if(lvl>=120){ marginCallRef.current=false; } // re-arm once safely recovered
+      } else { marginCallRef.current=false; }
       setPendingOrders(prev=>{
         const triggered=[];
         const stillPending=prev.filter(p=>{
@@ -3580,7 +3604,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v44';
+(function(){try{var b=document.createElement('div');b.textContent='FX v45';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
