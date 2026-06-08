@@ -1313,7 +1313,7 @@ function TradeTicket({market,sym,setSym,lots,setLots,onPlace}){
   function place(){
     setConfirmOpen(false);if(!onPlace)return;
     const trigger=otype==='MARKET'?null:parseFloat(otypePrice);
-    const order={sym:s.sym,side,vol,open:otype==='MARKET'?entryPx:trigger,trigger,sl:sl?parseFloat(sl):0,tp:tp?parseFloat(tp):0,otype,swap:0};
+    const order={sym:s.sym,side,vol,open:otype==='MARKET'?entryPx:trigger,trigger,sl:slH?parseFloat(slH.targetPx):0,tp:tpH?parseFloat(tpH.targetPx):0,otype,swap:0};
     onPlace(order);
   }
   function submit(){
@@ -3340,14 +3340,27 @@ function App(){
   useEffect(()=>{
     const id=setInterval(()=>{
       marketRef.current.tick();
+      const sltpHits=[];
       setLiveOrders(prev=>prev.map(o=>{
         if(o.status!=='OPEN')return o;
         const m=marketRef.current.state.find(s=>s.sym===o.sym);
         if(!m)return o;
         const cur=o.side==='BUY'?m.last:m.last+m.spread;
         const pnl=ALPEXA_MARKET.getPnlUSD(m,o.open,cur,o.side,o.vol);
+        // Auto-close when the live price reaches the take-profit or stop-loss.
+        if(o.tp&&(o.side==='BUY'?cur>=o.tp:cur<=o.tp))sltpHits.push({id:o.id,reason:'TP',sym:o.sym});
+        else if(o.sl&&(o.side==='BUY'?cur<=o.sl:cur>=o.sl))sltpHits.push({id:o.id,reason:'SL',sym:o.sym});
         return{...o,pnl,current:cur};
       }));
+      if(sltpHits.length){
+        sltpHits.forEach(h=>{
+          closeOrder(h.id);
+          try{window.alpexaNotify&&alpexaNotify({type:h.reason==='TP'?'tp':'sl',title:(h.reason==='TP'?'Take profit hit ✓ · ':'Stop loss hit · ')+h.sym+' closed automatically'});}catch(e){}
+        });
+        const last=sltpHits[sltpHits.length-1];
+        setToast({error:last.reason==='SL',icon:last.reason==='TP'?'flag':'shield',msg:last.reason==='TP'?'Take profit hit':'Stop loss hit',sub:last.sym+' closed automatically'});
+        setTimeout(()=>setToast(null),3200);
+      }
       setPendingOrders(prev=>{
         const triggered=[];
         const stillPending=prev.filter(p=>{
@@ -3567,7 +3580,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v43';
+(function(){try{var b=document.createElement('div');b.textContent='FX v44';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
