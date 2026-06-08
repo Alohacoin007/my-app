@@ -1325,8 +1325,9 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
     const SECURITY_SYMS = new Set(PORTFOLIO.securities.map((s) => s.sym));
     const byPortfolio = PORTFOLIO.assets.map((a) => {
       const mine = balances[a.sym] != null ? balances[a.sym] : 0;
-      // qty derived from the live USD value (so USDT shows its real amount, not a seed)
-      return { ...a, mine, qty: (a.price > 0 ? mine / a.price : a.qty) };
+      // Stablecoins are exactly 1:1, so qty == USD value. Others: value / price.
+      const qty = a.stable ? mine : (a.price > 0 ? mine / a.price : a.qty);
+      return { ...a, mine, qty };
     });
     const known = new Set(PORTFOLIO.assets.map((a) => a.sym));
     const extras = Object.keys(balances)
@@ -13212,7 +13213,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v38';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v39';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
