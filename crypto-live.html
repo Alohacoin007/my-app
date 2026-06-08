@@ -844,10 +844,11 @@ const ROW_GRID = '26px 1fr 52px 96px';
 
 function AssetRow({ a, kind, liveValue, onTap }) {
   const baseValue = a.mine;
-  // Holdings are stored in USD, so show the exact value (no fake drift) — this
-  // keeps every row summing to the hero total. Stablecoins never change.
-  const v         = baseValue;
-  const livePct   = a.stable ? 0 : (typeof a.chg === 'number' ? a.chg : 0);
+  // Live value moves with the market tick; stablecoins stay flat. The hero
+  // total sums these same live values, so rows and total move together + match.
+  const v         = a.stable ? baseValue : (liveValue != null ? liveValue : baseValue);
+  const startBasis = baseValue / (1 + (a.chg || 0) / 100);
+  const livePct   = a.stable ? 0 : ((v - startBasis) / startBasis) * 100;
   const isUp      = livePct >= 0;
   const color     = isUp ? RH.green : RH.red;
   const isSecurity = kind === 'security';
@@ -1361,6 +1362,15 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
   const cryptoLive      = useLiveAssetTicks(cryptoBases,   { interval: 1800, vol: 0.0014 });
   const securityLive    = useLiveAssetTicks(securityBases, { interval: 1800, vol: 0.0004 });
   const watchLive       = useLiveAssetTicks(watchBases,    { interval: 1800, vol: 0.0022 });
+  // Hero total = sum of the SAME live values shown in the rows (stablecoins flat,
+  // staked at principal), so the big number moves with the rows and always matches.
+  const heroLive = (() => {
+    let t = 0;
+    liveAssets.forEach((a, i) => { t += a.stable ? a.mine : (cryptoLive[i] != null ? cryptoLive[i] : a.mine); });
+    liveSecurities.forEach((s, i) => { t += (securityLive[i] != null ? securityLive[i] : s.mine); });
+    Object.values(staked).forEach((info) => { if (info && info.usd > 0) t += info.usd; });
+    return t;
+  })();
 
   // Per-range seeded series. Last point uses live close so the chart's tip
   // moves with the tick.
@@ -1374,10 +1384,9 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
   }, [range, open, liveClose]);
 
   const baseline      = open;
-  // Show the exact portfolio total (= sum of the holding rows) instead of the
-  // swayed value, so the hero number always matches the rows below. The chart
-  // line still animates off liveClose.
-  const scrubValue    = scrubIdx !== null ? series[scrubIdx] : heroBase;
+  // Hero number = live sum of the rows (matches them and moves with them).
+  // The chart line still animates off liveClose.
+  const scrubValue    = scrubIdx !== null ? series[scrubIdx] : heroLive;
   const change        = scrubValue - baseline;
   const changePct     = (change / baseline) * 100;
   const isUp          = change >= 0;
@@ -13192,7 +13201,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v29';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v30';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
