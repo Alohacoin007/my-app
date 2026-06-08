@@ -269,7 +269,7 @@ window.addEventListener('load',function(){
   try{
     window._db.from('players').select('id',{count:'exact',head:true}).then(function(r){
       if(r.error) banner('DB error: '+r.error.message+'  — run the table SQL','#c62828');
-      else { banner('Server connected · v8 (latest)','#1e8e3e'); setTimeout(function(){var b=document.getElementById('alpconn');if(b)b.remove();},4000); }
+      else { banner('Server connected · v9 (latest)','#1e8e3e'); setTimeout(function(){var b=document.getElementById('alpconn');if(b)b.remove();},4000); }
     }).catch(function(e){ banner('Connection error: '+((e&&e.message)||e),'#c62828'); });
   }catch(e){ banner('Error: '+((e&&e.message)||e),'#c62828'); }
 });
@@ -723,6 +723,13 @@ async function createOnServer(){
   try{ localStorage.setItem('alpexa.me', JSON.stringify({
     custId:cust, name:(data.firstName+' '+data.lastName).trim(), email:data.email,
     accts:data.accts })); }catch(e){}
+  // Carry the chosen FX leverage into the FX app (crypto/sports are spot 1:1).
+  try{
+    if(data.server==='live'){
+      var n=parseInt((data.leverage||'1:100').split(':')[1])||100;
+      localStorage.setItem('alpexa.leverage', JSON.stringify({FX:n,INDEX:20,STOCK:5,CRYPTO:5}));
+    }
+  }catch(e){}
 }
 function nextStep(){
   if (cur === 0) { cur = 1; renderStep(); }
