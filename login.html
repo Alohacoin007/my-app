@@ -95,6 +95,8 @@ body{font-family:'Roboto',sans-serif;background:#fff;display:flex;justify-conten
 #toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:#323232;color:#fff;padding:10px 20px;border-radius:24px;font-size:13px;white-space:nowrap;display:none;z-index:200;animation:tIn .2s ease;}
 @keyframes tIn{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>try{window._db=window.supabase.createClient('https://grxnbgtfnaayeluenvqh.supabase.co','sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu');}catch(e){console.error('supabase init',e);}</script>
 </head>
 <body>
 <div id="wrap">
@@ -115,7 +117,7 @@ body{font-family:'Roboto',sans-serif;background:#fff;display:flex;justify-conten
       <div class="error-bar" id="errBar"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span id="errTxt"></span></div>
       <div class="field">
         <label class="field-label">Login</label>
-        <div class="field-inner"><input id="loginInput" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Account number" oninput="clearErr()"></div>
+        <div class="field-inner"><input id="loginInput" type="text" autocapitalize="none" autocorrect="off" placeholder="Account number or email" oninput="clearErr()"></div>
       </div>
       <div class="field">
         <label class="field-label">Password</label>
@@ -191,7 +193,44 @@ function togglePw(){pwVisible=!pwVisible;const inp=document.getElementById('pwIn
 function toggleSave(){savePw=!savePw;const b=document.getElementById('saveBox');b.className='checkbox'+(savePw?' on':'');b.innerHTML=savePw?'<svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>':'';}
 function clearErr(){document.getElementById('errBar').style.display='none';}
 function showErr(msg){const b=document.getElementById('errBar');document.getElementById('errTxt').textContent=msg;b.style.display='flex';}
-function doLogin(){const login=document.getElementById('loginInput').value.trim();const pw=document.getElementById('pwInput').value;if(!login){showErr('Please enter your account number.');return;}if(!pw){showErr('Please enter your password.');return;}if(selServer<0){showErr('Please select a server.');return;}document.getElementById('signinTxt').style.display='none';document.getElementById('spinner').style.display='block';document.getElementById('signinBtn').style.opacity='0.85';setTimeout(()=>{document.getElementById('spinner').style.display='none';document.getElementById('signinTxt').style.display='inline';document.getElementById('signinBtn').style.opacity='1';if(login.length>=5){document.getElementById('sucSub').innerHTML=`${SERVERS[selServer].name}<br>Connected to account #${login.slice(0,4)}-${login.slice(4,8)||'****'}`;document.getElementById('successScreen').style.display='flex';setTimeout(()=>{window.location.href='trading.html';},1400);}else{showErr('Invalid account number.');}},1800);}
+async function doLogin(){
+  const login=document.getElementById('loginInput').value.trim();
+  const pw=document.getElementById('pwInput').value;
+  if(!login){showErr('Please enter your account number or email.');return;}
+  if(!pw){showErr('Please enter your password.');return;}
+  if(selServer<0){showErr('Please select a server.');return;}
+  document.getElementById('signinTxt').style.display='none';
+  document.getElementById('spinner').style.display='block';
+  document.getElementById('signinBtn').style.opacity='0.85';
+  const fail=(m)=>{document.getElementById('spinner').style.display='none';document.getElementById('signinTxt').style.display='inline';document.getElementById('signinBtn').style.opacity='1';showErr(m);};
+  try{
+    if(!window._db) throw new Error('No server connection — check your internet.');
+    let player=null;
+    if(login.indexOf('@')>=0){
+      const pr=await window._db.from('players').select('id,cust_id,name,email').ilike('email',login).limit(1);
+      if(pr.error) throw pr.error;
+      if(pr.data&&pr.data.length) player=pr.data[0];
+    } else {
+      const ac=await window._db.from('accounts').select('player_id').ilike('acct_no',login.toUpperCase()).limit(1);
+      if(ac.error) throw ac.error;
+      if(ac.data&&ac.data.length){
+        const pr=await window._db.from('players').select('id,cust_id,name,email').eq('id',ac.data[0].player_id).single();
+        if(pr.error) throw pr.error; player=pr.data;
+      }
+    }
+    if(!player){ fail('Account not found. Check it, or tap "Open an Account".'); return; }
+    const accs=await window._db.from('accounts').select('server,acct_no').eq('player_id',player.id);
+    if(accs.error) throw accs.error;
+    const accts={sports:'',crypto:'',fx:''};
+    (accs.data||[]).forEach(a=>{ if(a.server) accts[a.server]=a.acct_no; });
+    // Restore identity on THIS device so the apps show the right account.
+    localStorage.setItem('alpexa.me', JSON.stringify({custId:player.cust_id,name:player.name,email:player.email,accts:accts}));
+    document.getElementById('sucSub').innerHTML=`${SERVERS[selServer].name}<br>Signed in as ${player.name||player.cust_id}`;
+    document.getElementById('successScreen').style.display='flex';
+    const dest=selServer===1?'crypto-live.html':selServer===2?'sports-live.html':'trading.html';
+    setTimeout(()=>{window.location.href=dest;},1200);
+  }catch(err){ fail((err&&err.message)||'Login failed. Please try again.'); }
+}
 function fillDemo(){document.getElementById('loginInput').value='44219982330';document.getElementById('pwInput').value='1234';selServer=2;const sv=document.getElementById('serverVal');sv.textContent=SERVERS[2].name;sv.style.color='#212121';clearErr();showToast('Demo account credentials filled in');}
 function switchTab(t){document.getElementById('tab-login').className='tab-btn'+(t==='login'?' active':'');document.getElementById('tab-qr').className='tab-btn'+(t==='qr'?' active':'');document.getElementById('loginForm').style.display=t==='login'?'block':'none';document.getElementById('qrForm').style.display=t==='qr'?'block':'none';if(t==='qr')startQR();else stopQR();}
 function buildQR(){const p=[1,1,1,1,1,1,1,0,1,0,0,0,0,0,1,0,1,0,1,1,1,0,1,1,1,0,1,0,1,0,1,0,1,0,1,1,1,0,1,1,1,0,0,0,0,0,1,0,1,1,1,1,1,1,1,0,0,1,0,1,0,0,0,1];const box=document.getElementById('qrBox');if(box)box.innerHTML=p.map(c=>`<div class="qr-cell" style="background:${c?'#212121':'transparent'}"></div>`).join('');}
