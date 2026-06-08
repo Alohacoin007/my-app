@@ -846,11 +846,10 @@ const ROW_GRID = '26px 1fr 52px 96px';
 
 function AssetRow({ a, kind, liveValue, onTap }) {
   const baseValue = a.mine;
-  // Live value moves with the market tick; stablecoins stay flat. The hero
-  // total sums these same live values, so rows and total move together + match.
-  const v         = a.stable ? baseValue : (liveValue != null ? liveValue : baseValue);
-  const startBasis = baseValue / (1 + (a.chg || 0) / 100);
-  const livePct   = a.stable ? 0 : ((v - startBasis) / startBasis) * 100;
+  // A holding's USD value is your money — keep it FIXED (don't tick it). Show the
+  // asset's daily % next to it; the chart is what animates, not the balance.
+  const v         = baseValue;
+  const livePct   = a.stable ? 0 : (typeof a.chg === 'number' ? a.chg : 0);
   const isUp      = livePct >= 0;
   const color     = isUp ? RH.green : RH.red;
   const isSecurity = kind === 'security';
@@ -1386,9 +1385,9 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
   }, [range, open, liveClose]);
 
   const baseline      = open;
-  // Hero number = live sum of the rows (matches them and moves with them).
-  // The chart line still animates off liveClose.
-  const scrubValue    = scrubIdx !== null ? series[scrubIdx] : heroLive;
+  // Hero number = FIXED wallet total (your balance shouldn't fluctuate). It equals
+  // the sum of the holding rows. Only the chart line animates (off liveClose).
+  const scrubValue    = scrubIdx !== null ? series[scrubIdx] : heroBase;
   const change        = scrubValue - baseline;
   const changePct     = (change / baseline) * 100;
   const isUp          = change >= 0;
@@ -13210,7 +13209,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v34';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v35';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
