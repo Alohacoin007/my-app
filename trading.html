@@ -3331,8 +3331,13 @@ function App(){
     // hasn't loaded yet (prevents bad fills at the stale demo price).
     const sObj=marketRef.current.state.find(x=>x.sym===orderData.sym);
     if(sObj){
-      if(!symOpen(sObj)){ if(window.ALPEXA_SFX&&ALPEXA_SFX.error)ALPEXA_SFX.error(); alert((window.alpexaTR?alpexaTR('Market closed'):'Market closed')+' — '+orderData.sym); return; }
-      if(!sObj.real){ if(window.ALPEXA_SFX&&ALPEXA_SFX.error)ALPEXA_SFX.error(); alert('Fetching live price for '+orderData.sym+'… try again in a moment.'); if(pullRef.current)pullRef.current(sObj); return; }
+      const TT=(window.alpexaTR||((x)=>x));
+      if(!symOpen(sObj)){ if(window.ALPEXA_SFX&&ALPEXA_SFX.error)ALPEXA_SFX.error();
+        setToast({error:true,icon:'lock',msg:TT('Market closed'),sub:orderData.sym+' · '+(sObj.cls==='STOCK'?'Stocks 09:30–16:00 ET (Mon–Fri)':sObj.cls==='INDEX'?'Index hours':'FX 24/5 (closed weekends)')});
+        setTimeout(()=>setToast(null),4000); return; }
+      if(!sObj.real){ if(window.ALPEXA_SFX&&ALPEXA_SFX.error)ALPEXA_SFX.error();
+        setToast({error:true,icon:'sync',msg:'Fetching live price…',sub:'Loading '+orderData.sym+' — try again in a moment.'});
+        if(pullRef.current)pullRef.current(sObj); setTimeout(()=>setToast(null),3000); return; }
     }
     const id=Date.now();
     const now=new Date();
@@ -3404,7 +3409,20 @@ function App(){
       <AccountSheet open={acctSheet} current={account} onPick={setAccount} onClose={()=>setAcctSheet(false)}/>
       {notifOpen&&<NotificationSheet notifications={notifications} setNotifications={setNotifications} onClose={()=>setNotifOpen(false)}/>}
       {menuOpen&&<AppMenu indicators={indicators} setIndicators={setIndicators} liveOrders={liveOrders} closedHistory={closedHistory} onClose={()=>setMenuOpen(false)}/>}
-      {toast&&(
+      {toast&&toast.error&&(
+        <div onClick={()=>setToast(null)} style={{position:'absolute',inset:0,zIndex:600,background:'rgba(10,14,26,0.55)',display:'flex',alignItems:'center',justifyContent:'center',padding:24,animation:'tFade .18s ease'}}>
+          <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:300,background:'var(--surface)',borderRadius:18,padding:'24px 22px 18px',textAlign:'center',boxShadow:'0 20px 60px rgba(0,0,0,0.4)',animation:'tPop .22s cubic-bezier(0.34,1.56,0.64,1)'}}>
+            <div style={{width:60,height:60,borderRadius:30,background:'#FFEBEE',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 14px'}}>
+              <Mi name={toast.icon||'lock'} size={30} fill style={{color:'#E04141'}}/>
+            </div>
+            <div style={{fontSize:17,fontWeight:800,color:'var(--ink)',letterSpacing:-0.2}}>{toast.msg}</div>
+            {toast.sub?<div style={{fontSize:12.5,color:'var(--text-2)',lineHeight:1.5,marginTop:7}}>{toast.sub}</div>:null}
+            <button onClick={()=>setToast(null)} style={{width:'100%',marginTop:18,padding:'13px 0',borderRadius:11,fontSize:14,fontWeight:700,color:'#fff',background:'#1B3955',border:'1px solid #0F2742'}}>OK</button>
+          </div>
+          <style>{`@keyframes tFade{from{opacity:0}to{opacity:1}}@keyframes tPop{from{transform:scale(0.9);opacity:0}to{transform:scale(1);opacity:1}}`}</style>
+        </div>
+      )}
+      {toast&&!toast.error&&(
         <div style={{position:'absolute',top:96,left:14,right:14,zIndex:500,background:'var(--ink)',color:'var(--ink-fg)',borderRadius:11,padding:'12px 14px',boxShadow:'var(--shadow-lg)',display:'flex',alignItems:'center',gap:10,animation:'tIn 0.3s cubic-bezier(0.2,0.8,0.2,1)',borderLeft:'4px solid '+(toast.pending?'var(--warn)':(toast.side==='BUY'?'var(--buy-bright)':'var(--sell-bright)'))}}>
           <div style={{width:32,height:32,borderRadius:16,background:toast.pending?'rgba(229,139,30,0.18)':(toast.side==='BUY'?'var(--buy-glow)':'var(--sell-glow)'),color:toast.pending?'var(--warn)':(toast.side==='BUY'?'var(--buy-bright)':'var(--sell-bright)'),display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
             <Mi name={toast.pending?'hourglass_empty':toast.triggered?'bolt':(toast.side==='BUY'?'trending_up':'trending_down')} size={18} fill/>
@@ -3495,7 +3513,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v26';
+(function(){try{var b=document.createElement('div');b.textContent='FX v27';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
