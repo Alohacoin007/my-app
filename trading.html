@@ -114,10 +114,11 @@ input{font-family:inherit;outline:none;border:none;background:none;color:inherit
    padding is too tall — shrink it (keep notch clearance via safe-area). */
 @media (max-width:600px){ html,body{ min-height:0 !important; height:100dvh !important; overflow:hidden !important; margin:0 !important; background:#1B3955 !important; } }
 @media (max-width:600px){ .app-hdr, .chart-hdr{ padding-top: max(10px, env(safe-area-inset-top)) !important; } }
-/* pin the footer to the very bottom and give it a solid bg so nothing shows under it */
-@media (max-width:600px){ .bottom-nav{ margin-top:auto !important; background:var(--surface) !important; padding-bottom: 6px !important; } }
-@media (max-width:600px) and (display-mode: standalone){ .bottom-nav{ padding-bottom: calc(env(safe-area-inset-bottom) + 4px) !important; } }
-@media (max-width:600px) and (display-mode: standalone){ .bottom-nav{ padding-bottom: calc(env(safe-area-inset-bottom) + 4px) !important; } }
+/* Fix the footer to the very bottom of the screen; reserve space so content isn't hidden. */
+@media (max-width:600px){
+  .app{ padding-bottom: calc(54px + env(safe-area-inset-bottom)) !important; }
+  .bottom-nav{ position:fixed !important; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:402px; z-index:50; background:var(--surface) !important; padding:5px 4px calc(6px + env(safe-area-inset-bottom)) !important; box-shadow:0 -2px 10px rgba(0,0,0,0.06); }
+}
 </style>
 </head>
 <body>
@@ -3513,7 +3514,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v29';
+(function(){try{var b=document.createElement('div');b.textContent='FX v30';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
