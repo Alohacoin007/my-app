@@ -352,12 +352,14 @@ const STAKE_PERIODS = [
 // time elapsed since the stake started. 18% APY ≈ 1.5%/month ≈ 0.049%/day.
 const STAKE_APY = { ALPXS: 18.0, ETH: 4.5, SOL: 7.2, USDT: 9.8 };
 function stakeApyFor(sym){ return (STAKE_APY[sym]!=null?STAKE_APY[sym]:((STAKE_ASSETS[sym]&&STAKE_ASSETS[sym].apy)||5)); }
+// Interest is added once per full day at the daily rate (APY ÷ 365), so it
+// steps up once every 24h instead of ticking continuously.
 function stakeAccruedUsd(info, apy){
   if(!info||!info.usd||!info.since)return 0;
   var rate=(apy!=null?apy:5)/100;
   var ms=Date.now()-info.since; if(ms<0)ms=0;
-  var years=ms/(365*24*3600*1000);
-  return info.usd*rate*years;
+  var days=Math.floor(ms/(24*3600*1000));
+  return info.usd*rate*(days/365);
 }
 
 // Send screen — recent recipients + asset balances used in the Send flow
@@ -10619,9 +10621,9 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
   const [scrubIdx, setScrubIdx] = React.useState(null);
   const [switcherOpen, setSwitcherOpen] = React.useState(false);
   const [alertsOpen, setAlertsOpen] = React.useState(false);
-  // Tick so staking interest visibly accrues over time on this screen.
+  // Re-check once a minute so the daily interest step shows up when the day rolls over.
   const [, forceAccrue] = React.useState(0);
-  React.useEffect(() => { const iv = setInterval(() => forceAccrue((x) => x + 1), 2000); return () => clearInterval(iv); }, []);
+  React.useEffect(() => { const iv = setInterval(() => forceAccrue((x) => x + 1), 60000); return () => clearInterval(iv); }, []);
 
   const cryptoMeta = PORTFOLIO.assets.find((a) => a.sym === sym);
   const secMeta    = PORTFOLIO.securities.find((s) => s.sym === sym);
@@ -10943,7 +10945,7 @@ You will be notified on significant moves.`, { title: 'Alert active' });
                   <div>
                     <div style={{ fontSize: 10.5, color: RH.textDim, letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: 700 }}>Accrued</div>
                     <div style={{ marginTop: 4, fontSize: 16, fontWeight: 600, color: RH.green, fontVariantNumeric: 'tabular-nums' }}>
-                      +${accruedUsd.toFixed(accruedUsd < 1 ? 6 : 4)}
+                      +${accruedUsd.toFixed(2)}
                     </div>
                   </div>
                 </>
@@ -13185,7 +13187,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v27';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v28';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
