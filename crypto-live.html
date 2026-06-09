@@ -6456,7 +6456,7 @@ function ToastHost({ message }) {
 }
 
 // ─── Form helpers used by SubSubDetail bodies ───
-function AcctInput({ label, defaultValue = '', value, onChange, placeholder, type = 'text' }) {
+function AcctInput({ label, defaultValue = '', value, onChange, placeholder, type = 'text', inputRef }) {
   const controlled = onChange != null;
   return (
     <div style={{ padding: '12px 16px', fontFamily: 'Geist, Inter, system-ui' }}>
@@ -6465,7 +6465,7 @@ function AcctInput({ label, defaultValue = '', value, onChange, placeholder, typ
         fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2,
         textTransform: 'uppercase', fontWeight: 700, marginBottom: 6,
       }}>{label}</div>
-      <input type={type}
+      <input ref={inputRef} type={type}
         {...(controlled ? { value: value, onChange: (e) => onChange(e.target.value) } : { defaultValue })}
         placeholder={placeholder} style={{
         width: '100%', background: 'transparent', border: 'none',
@@ -6476,27 +6476,36 @@ function AcctInput({ label, defaultValue = '', value, onChange, placeholder, typ
     </div>
   );
 }
-// Mailing address — controlled + persisted to localStorage so edits actually save.
+// Mailing address — reads the live input values on save (works with typing AND
+// browser autofill, which doesn't fire React onChange) and persists them.
 function MailingAddressPanel({ onSaved }) {
   const KEY = 'alpexa.mailingAddress';
   const defaults = { street: '123 Market St, Apt 4B', city: 'San Francisco', state: 'CA', zip: '94105', country: 'United States' };
-  const [a, setA] = React.useState(() => {
+  const saved = React.useMemo(() => {
     try { return { ...defaults, ...(JSON.parse(localStorage.getItem(KEY) || '{}') || {}) }; } catch (e) { return defaults; }
-  });
-  const set = (k) => (v) => setA((p) => ({ ...p, [k]: v }));
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(a)); } catch (e) {} if (onSaved) onSaved(); };
+  }, []);
+  const r = {
+    street: React.useRef(null), city: React.useRef(null), state: React.useRef(null),
+    zip: React.useRef(null), country: React.useRef(null),
+  };
+  const save = () => {
+    const out = {};
+    Object.keys(r).forEach((k) => { out[k] = (r[k].current && r[k].current.value != null) ? r[k].current.value : saved[k]; });
+    try { localStorage.setItem(KEY, JSON.stringify(out)); } catch (e) {}
+    if (onSaved) onSaved();
+  };
   return (
     <>
       <AcctSection title="Mailing address">
-        <AcctInput label="Street"  value={a.street}  onChange={set('street')}/>
+        <AcctInput label="Street"  defaultValue={saved.street}  inputRef={r.street}/>
         <AcctDivider/>
-        <AcctInput label="City"    value={a.city}    onChange={set('city')}/>
+        <AcctInput label="City"    defaultValue={saved.city}    inputRef={r.city}/>
         <AcctDivider/>
-        <AcctInput label="State"   value={a.state}   onChange={set('state')}/>
+        <AcctInput label="State"   defaultValue={saved.state}   inputRef={r.state}/>
         <AcctDivider/>
-        <AcctInput label="ZIP"     value={a.zip}     onChange={set('zip')}/>
+        <AcctInput label="ZIP"     defaultValue={saved.zip}     inputRef={r.zip}/>
         <AcctDivider/>
-        <AcctInput label="Country" value={a.country} onChange={set('country')}/>
+        <AcctInput label="Country" defaultValue={saved.country} inputRef={r.country}/>
       </AcctSection>
       <AcctSaveButton onClick={save}/>
     </>
@@ -13300,7 +13309,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v50';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v51';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
