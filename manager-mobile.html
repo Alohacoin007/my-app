@@ -74,6 +74,25 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="alpexa-sync.js?v=6"></script>
 <script>
+  // ── Back-office PIN lock (demo-level: deters casual access; upgrade to real
+  //    admin login before production). ──
+  (function lockGate(){
+    var PIN='0070';
+    if(sessionStorage.getItem('alpexa.mgrUnlocked')==='1') return;
+    var ov=document.createElement('div');
+    ov.id='mgrLock';
+    ov.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#0F1B2D;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-family:Roboto,system-ui,-apple-system,sans-serif;padding:24px;text-align:center';
+    ov.innerHTML='<div style="font-size:21px;font-weight:800;letter-spacing:-.3px">Alpexa Manager</div>'+
+      '<div style="font-size:12.5px;opacity:.8;text-transform:uppercase;letter-spacing:.6px">Back office · enter PIN</div>'+
+      '<input id="mgrPin" type="password" inputmode="numeric" maxlength="8" placeholder="••••" style="width:170px;text-align:center;font-size:24px;letter-spacing:10px;padding:13px 10px;border-radius:14px;border:none;outline:none;background:#1A2740;color:#fff">'+
+      '<button id="mgrPinBtn" style="background:#1565C0;color:#fff;border:none;border-radius:14px;padding:13px 34px;font-size:15px;font-weight:700;cursor:pointer">Unlock</button>'+
+      '<div id="mgrPinErr" style="color:#ff8a8a;font-size:12.5px;height:14px"></div>';
+    document.body.appendChild(ov);
+    function tryUnlock(){ var el=document.getElementById('mgrPin'); if(el.value===PIN){ try{sessionStorage.setItem('alpexa.mgrUnlocked','1');}catch(e){} ov.remove(); } else { document.getElementById('mgrPinErr').textContent='Wrong PIN'; el.value=''; el.focus(); } }
+    ov.querySelector('#mgrPinBtn').onclick=tryUnlock;
+    ov.querySelector('#mgrPin').addEventListener('keydown',function(e){ if(e.key==='Enter')tryUnlock(); });
+    setTimeout(function(){ var el=document.getElementById('mgrPin'); if(el)el.focus(); },120);
+  })();
   function getJSON(k,d){try{var v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}}
   function setJSON(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
   function num(k,d){var v=parseFloat(localStorage.getItem(k));return isNaN(v)?d:v;}
