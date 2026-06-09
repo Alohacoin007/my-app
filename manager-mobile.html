@@ -192,7 +192,7 @@
       hold: settledStake? (ggr/settledStake*100):0, pending:R.filter(function(w){return w.status==='pending';}).length};
   }
 
-  var TABS=[['overview','Overview'],['approvals','Approvals'],['history','History'],['players','Players'],['online','Online'],['risk','Risk'],['bets','Open'],['config','Config']];
+  var TABS=[['overview','Overview'],['report','Report'],['approvals','Approvals'],['history','History'],['players','Players'],['online','Online'],['risk','Risk'],['bets','Open'],['config','Config']];
   var cur='overview';
   function renderTabs(){
     document.getElementById('tabs').innerHTML=TABS.map(function(t){return '<button class="tab '+(t[0]===cur?'on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join('');
@@ -204,6 +204,7 @@
     renderTabs();
     var c=document.getElementById('content'), h='';
     if(cur==='overview')h=viewOverview(f);
+    else if(cur==='report')h=viewReport();
     else if(cur==='approvals')h=viewApprovals();
     else if(cur==='history')h=viewHistory();
     else if(cur==='players')h=viewPlayers(f);
@@ -241,6 +242,43 @@
       '<div class="hint" style="margin:0 14px">'+(connected?'Aggregated across all customers · Supabase, real-time.':'Not connected to server.')+'</div>';
   }
 
+  var REPORT_RANGE='today';
+  function viewReport(){
+    if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Report</div><div class="card"><div class="empty">Not connected to server.</div></div>';
+    var now=Date.now(), cutoff=0, label='All time';
+    if(REPORT_RANGE==='today'){ var d=new Date(); d.setHours(0,0,0,0); cutoff=d.getTime(); label='Today'; }
+    else if(REPORT_RANGE==='7d'){ cutoff=now-7*86400e3; label='Last 7 days'; }
+    else if(REPORT_RANGE==='30d'){ cutoff=now-30*86400e3; label='Last 30 days'; }
+    var inRange=function(ts){ return !cutoff || (ts && ts>=cutoff); };
+    var R=SRV_REQS.filter(function(r){ return inRange(r.created_at?Date.parse(r.created_at):0); });
+    var sum=function(t){ return R.filter(function(r){return (r.type||'')===t && r.status==='approved';}).reduce(function(a,r){return a+(+r.amount||0);},0); };
+    var cnt=function(t){ return R.filter(function(r){return (r.type||'')===t && r.status==='approved';}).length; };
+    var dep=sum('deposit'), wd=sum('withdraw'), tf=sum('transfer'), net=dep-wd;
+    var pend=SRV_REQS.filter(function(r){return r.status==='pending';}).length;
+    var newCust=SRV_PLAYERS.filter(function(p){ return inRange(p.created_at?Date.parse(p.created_at):0); }).length;
+    var RANGES=[['today','Today'],['7d','7d'],['30d','30d'],['all','All']];
+    var h='<div style="display:flex;gap:6px;margin:14px 14px 12px">'+RANGES.map(function(x){
+      var on=REPORT_RANGE===x[0];
+      return '<button data-rr="'+x[0]+'" style="flex:1;background:'+(on?'var(--acc)':'#e8eef7')+';color:'+(on?'#fff':'var(--dim)')+';border-radius:10px;padding:9px 0;font:700 12.5px system-ui;border:none;cursor:pointer">'+x[1]+'</button>';
+    }).join('')+'</div>';
+    h+='<div class="sec">'+label+' · summary</div>'+
+      '<div class="kpis">'+
+        kpi('Deposits',k0(dep),cnt('deposit')+' approved','pos')+
+        kpi('Withdrawals',k0(wd),cnt('withdraw')+' approved','neg')+
+        kpi('Transfers',k0(tf),cnt('transfer')+' approved')+
+        kpi('Net cash',(net<0?'-':'')+k0(Math.abs(net)),'deposits − withdrawals',net>=0?'pos':'neg')+
+        kpi('New signups',newCust,'in period')+
+        kpi('Pending now',pend,'awaiting approval',pend>0?'neg':'')+
+      '</div>';
+    var byDay={};
+    R.forEach(function(r){ if(r.status!=='approved')return; var k=(r.created_at||'').slice(0,10); if(!k)return; byDay[k]=byDay[k]||{dep:0,wd:0}; if(r.type==='deposit')byDay[k].dep+=(+r.amount||0); else if(r.type==='withdraw')byDay[k].wd+=(+r.amount||0); });
+    var days=Object.keys(byDay).sort().reverse().slice(0,14);
+    if(days.length){ h+='<div class="sec">By day</div><div class="card">';
+      days.forEach(function(k){ var v=byDay[k]; h+='<div class="row"><span>'+k+'</span><span><b class="pos">+'+k0(v.dep)+'</b> &nbsp;<b class="neg">-'+k0(v.wd)+'</b></span></div>'; });
+      h+='</div>'; }
+    h+='<div class="hint" style="margin:0 14px">Approved cash flow. (Large scale → server-side daily aggregates, planned.)</div>';
+    return h;
+  }
   function viewApprovals(){
     var cust=customer();
     var all=reqs(), pend=all.filter(function(w){return w.status==='pending';}),
@@ -535,6 +573,7 @@
     document.querySelectorAll('[data-close]').forEach(function(b){b.onclick=function(){var p=(b.getAttribute('data-close')||'').split('|');sendCommand(p[0],p[1],p[2]);};});
     var os=document.getElementById('openSearch'); if(os){os.oninput=function(){OPEN_SEARCH=os.value;render();var n=document.getElementById('openSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
     document.querySelectorAll('[data-pcust]').forEach(function(b){b.onclick=function(){PLAYER_OPEN=b.getAttribute('data-pcust');PLAYER_FILTER='';cur='players';render();};});
+    document.querySelectorAll('[data-rr]').forEach(function(b){b.onclick=function(){REPORT_RANGE=b.getAttribute('data-rr');render();};});
     var g;
     if(g=document.getElementById('kycToggle'))g.onclick=function(){var k=localStorage.getItem('alpexa.kyc')||'pending';localStorage.setItem('alpexa.kyc',k==='verified'?'pending':'verified');render();};
     if(g=document.getElementById('rgSave'))g.onclick=function(){var st=getJSON('alpexaSettings',{});st.depositLimit=parseFloat(val('rgDep'))||0;st.lossLimit=parseFloat(val('rgLoss'))||0;var d=parseFloat(val('rgSE'))||0;st.selfExcludeUntil=d>0?Date.now()+d*86400000:0;setJSON('alpexaSettings',st);flash(g,'Saved ✓');render();};
