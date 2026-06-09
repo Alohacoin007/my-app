@@ -3449,6 +3449,12 @@ function App(){
       // ── Margin call (100%) + stop out (50%) ──
       // Include the static demo positions in the floating P&L / used margin too.
       ALPEXA_MARKET.POSITIONS.forEach(p=>{ floatPnl+=(p.pnl||0); const m=marketRef.current.state.find(s=>s.sym===p.sym); if(m)usedM+=ALPEXA_MARKET.getMarginUSD(m,p.vol||0,p.open||0,(levSet[m.cls]||100)); });
+      // Keep the server-switcher FX value in sync with live Equity (cash balance +
+      // floating P&L) so the switcher matches the balance card instead of showing
+      // only the cash balance.
+      try{const eqBal=(window.getBalances?window.getBalances():{})[accountRef.current]||0;
+        const sbo=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{};
+        sbo.fx=eqBal+floatPnl; localStorage.setItem('alpexa.serverBalances',JSON.stringify(sbo));}catch(e){}
       if(usedM>=0.01){
         const bal=(window.getBalances?window.getBalances():{})[accountRef.current]||0;
         const lvl=((bal+floatPnl)/usedM)*100;
@@ -3686,7 +3692,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v58';
+(function(){try{var b=document.createElement('div');b.textContent='FX v59';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
