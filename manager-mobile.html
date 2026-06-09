@@ -126,6 +126,7 @@
       var b=parseFloat(val('ed_bal_'+s)); if(isNaN(b))return;
       AlpexaSync.db.from('accounts').update({balance:Math.round(b*100)/100}).eq('acct_no',a.acct_no).then(function(){},function(){});
     });
+    try{ logAction('edit_customer', custId, 'profile · balances · KYC '+patch.kyc+' · status '+patch.status); }catch(e){}
     toast('Saved ✓ — synced'); PLAYER_EDIT=null; render(); setTimeout(pullPlayers,500);
   }
   var SRV_MAP={fx:'Alpexa Live (FX)',live:'Alpexa Live (FX)',stocks:'Alpexa Crypto',crypto:'Alpexa Crypto',demo:'Alpexa Sports',sports:'Alpexa Sports'};
@@ -154,6 +155,12 @@
   function pullOnline(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
     var cutoff=new Date(Date.now()-90000).toISOString();
     AlpexaSync.db.from('players').select('cust_id,name,email,last_seen,last_app').gt('last_seen',cutoff).order('last_seen',{ascending:false}).limit(300).then(function(r){ if(r&&r.data){ ONLINE=r.data; if(cur==='online'&&!busyEditing())render(); } },function(){}); }
+  // Audit log: record every back-office action (approval, edit, force-action).
+  var LOGS=[];
+  function logAction(action,target,detail){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('logs').insert({actor:'back-office',action:action,target_cust:target||'',detail:detail||''}).then(function(){ if(cur==='logs')pullLogs(); },function(){}); }
+  function pullLogs(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('logs').select('*').order('created_at',{ascending:false}).limit(100).then(function(r){ if(r&&r.data){ LOGS=r.data; if(cur==='logs'&&!busyEditing())render(); } },function(){}); }
   function srvToLocal(r){return {id:r.local_id,ts:r.created_at?Date.parse(r.created_at):Date.now(),
     type:r.type,server:r.server,amount:+r.amount||0,fee:+r.fee||0,net:+r.net||0,
     asset:r.asset,network:r.network,address:r.address,from:r.from_label,to:r.to_label,
@@ -192,7 +199,7 @@
       hold: settledStake? (ggr/settledStake*100):0, pending:R.filter(function(w){return w.status==='pending';}).length};
   }
 
-  var TABS=[['overview','Overview'],['report','Report'],['approvals','Approvals'],['history','History'],['players','Players'],['online','Online'],['risk','Risk'],['bets','Open'],['config','Config']];
+  var TABS=[['overview','Overview'],['report','Report'],['approvals','Approvals'],['history','History'],['players','Players'],['online','Online'],['risk','Risk'],['bets','Open'],['logs','Logs'],['config','Config']];
   var cur='overview';
   function renderTabs(){
     document.getElementById('tabs').innerHTML=TABS.map(function(t){return '<button class="tab '+(t[0]===cur?'on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join('');
@@ -211,6 +218,7 @@
     else if(cur==='online')h=viewOnline();
     else if(cur==='risk')h=viewRisk(f);
     else if(cur==='bets')h=viewBets();
+    else if(cur==='logs')h=viewLogs();
     else if(cur==='config')h=viewConfig();
     c.innerHTML=h; wire();
   }
@@ -509,11 +517,28 @@
   function sendCommand(custId,server,localId){
     if(!window.AlpexaSync||!AlpexaSync.db){ toast('Not connected to server',true); return; }
     if(!confirm('Force '+(server==='sports'?'void':'close')+' this item for '+custId+'?')) return;
+    try{ logAction(server==='sports'?'force_void':'force_close', custId, server+' · '+localId); }catch(e){}
     AlpexaSync.db.from('commands').insert({cust_id:custId,server:server,action:'close',local_id:localId,status:'pending'}).then(function(r){
       if(r&&r.error)toast('Error: '+r.error.message,true); else toast('Sent ✓ — applies on next customer sync');
     },function(){ toast('Send failed',true); });
   }
 
+  function actionLabel(a){ return ({approve:'✅ Approved',reject:'❌ Rejected',edit_customer:'✏️ Edited customer',force_close:'🛑 Force-closed',force_void:'🛑 Voided bet',edit_txn:'✏️ Edited transaction',delete_txn:'🗑 Deleted transaction'})[a]||a||'Action'; }
+  function viewLogs(){
+    if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Audit log</div><div class="card"><div class="empty">Not connected to server.</div></div>';
+    var h='<div class="sec">Audit log · recent '+LOGS.length+'</div>';
+    if(!LOGS.length){ h+='<div class="card"><div class="empty">No activity logged yet. Approve/edit something to see it here.</div></div>'; return h; }
+    h+='<div class="card">';
+    LOGS.forEach(function(l){
+      var ts=l.created_at?Date.parse(l.created_at):0;
+      var who=l.target_cust?(' · '+custName(l.target_cust)):'';
+      h+='<div class="row"><span><b>'+actionLabel(l.action)+'</b>'+who+
+        (l.detail?('<div class="req-meta" style="margin:2px 0 0">'+l.detail+'</div>'):'')+'</span>'+
+        '<span class="muted" style="font-size:11px;white-space:nowrap">'+ago(ts)+'</span></div>';
+    });
+    h+='</div><div class="hint" style="margin:0 14px">Every approval, edit and force-action is recorded. (Actor = back office; real admin name once login is added.)</div>';
+    return h;
+  }
   function cfgRow(label,id,val){return '<div class="lbl" style="margin-top:10px">'+label+'</div><input class="in" id="'+id+'" type="number" step="0.5" value="'+val+'">';}
   function viewConfig(){
     return '<div class="sec">Limits (#5)</div>'+
@@ -538,6 +563,7 @@
 
   function toast(msg,bad){var t=document.getElementById('mtoast');if(!t){t=document.createElement('div');t.id='mtoast';t.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99999;padding:10px 16px;border-radius:10px;font:600 13px system-ui;color:#fff;max-width:90%;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.25)';document.body.appendChild(t);}t.textContent=msg;t.style.background=bad?'#C62828':'#1B5E20';t.style.display='block';clearTimeout(window.__mt);window.__mt=setTimeout(function(){t.style.display='none';},3500);}
   function decide(id,status){
+    try{ var rq=findReq(id); logAction(status==='approved'?'approve':'reject', rq?rq.custId:'', (rq?(typeLabel(rq.type)+' '+usd(rq.amount)):'')+' (#'+id+')'); }catch(e){}
     // local copy (this device's own requests, if any)
     var loc=getJSON('alpexa.withdrawals',[]); for(var i=0;i<loc.length;i++){if(loc[i].id===id){loc[i].status=status;loc[i].decidedTs=Date.now();break;}} setJSON('alpexa.withdrawals',loc);
     // server cache (so the UI updates instantly) + server write (so the customer's app sees it)
@@ -599,6 +625,7 @@
   setInterval(function(){ if(!document.hidden){ pullServer(); pullPlayers();
     if(cur==='bets') pullOpenSummary();
     if(cur==='online') pullOnline();
+    if(cur==='logs') pullLogs();
     if(cur==='players' && PLAYER_OPEN) pullCustPos(PLAYER_OPEN);
   } }, 8000);
   render();
