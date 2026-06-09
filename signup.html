@@ -729,7 +729,13 @@ async function createOnServer(){
   function aN(p){return p+'-'+Math.floor(100000+Math.random()*900000);}
   data.custId=cust; data.accts={sports:aN('SP'),crypto:aN('CR'),fx:aN('FX')}; data.acctNum=data.accts.sports;
   if(!window._db) throw new Error('No server connection');
-  var r1=await window._db.from('players').insert({cust_id:cust,name:(data.firstName+' '+data.lastName).trim(),email:data.email}).select().single();
+  var fullName=(data.firstName+' '+data.lastName).trim();
+  var playerRow={cust_id:cust,name:fullName,email:data.email,
+    phone:data.phone||'',dob:data.dob||'',country:data.country||'',
+    server:data.server||'',leverage:data.leverage||'',currency:data.currency||''};
+  var r1=await window._db.from('players').insert(playerRow).select().single();
+  // Fallback: if the extended profile columns aren't there yet, save the core fields.
+  if(r1&&r1.error){ r1=await window._db.from('players').insert({cust_id:cust,name:fullName,email:data.email}).select().single(); }
   if(r1.error) throw r1.error;
   var rows=[{player_id:r1.data.id,server:'sports',acct_no:data.accts.sports,balance:0},{player_id:r1.data.id,server:'crypto',acct_no:data.accts.crypto,balance:0},{player_id:r1.data.id,server:'fx',acct_no:data.accts.fx,balance:0}];
   var r2=await window._db.from('accounts').insert(rows);

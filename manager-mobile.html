@@ -82,12 +82,16 @@
   // Requests pulled from the shared server (all customers). Filled by pullServer().
   var SRV_REQS=[];
   // Real customers + their accounts, pulled from Supabase (players/accounts tables).
-  var SRV_PLAYERS=[], SRV_ACCOUNTS=[], PLAYER_FILTER='';
+  var SRV_PLAYERS=[], SRV_ACCOUNTS=[], PLAYER_FILTER='', PLAYER_OPEN=null;
+  var SRV_MAP={fx:'Alpexa Live (FX)',live:'Alpexa Live (FX)',stocks:'Alpexa Crypto',crypto:'Alpexa Crypto',demo:'Alpexa Sports',sports:'Alpexa Sports'};
   function pullPlayers(){
     if(!window.AlpexaSync||!AlpexaSync.db) return;
-    AlpexaSync.db.from('players').select('id,cust_id,name,email,created_at').then(function(r){
+    AlpexaSync.db.from('players').select('id,cust_id,name,email,created_at,phone,dob,country,server,leverage,currency').then(function(r){
       if(r&&r.data){ SRV_PLAYERS=r.data; if(cur==='players'&&!busyEditing())render(); }
-    },function(){});
+    },function(){
+      // Older DB without the profile columns — fall back to the core fields.
+      AlpexaSync.db.from('players').select('id,cust_id,name,email,created_at').then(function(r2){ if(r2&&r2.data){SRV_PLAYERS=r2.data; if(cur==='players'&&!busyEditing())render();} },function(){});
+    });
     AlpexaSync.db.from('accounts').select('player_id,server,acct_no,balance').then(function(r){
       if(r&&r.data){ SRV_ACCOUNTS=r.data; if(cur==='players'&&!busyEditing())render(); }
     },function(){});
@@ -275,13 +279,23 @@
       var bv=function(s){ return m[s]? usd(+m[s].balance||0) : '—'; };
       var an=function(s){ return m[s]? m[s].acct_no : '—'; };
       var joined=p.created_at?new Date(p.created_at).toLocaleDateString():'';
+      var open=(PLAYER_OPEN===p.cust_id);
+      var esc=function(s){return String(s==null?'':s).replace(/"/g,'&quot;');};
       h+='<div class="card">'+
-        '<div class="row" style="border:none;padding:0 0 6px"><b>'+(p.name||p.cust_id||'—')+'</b><b class="'+(tot>=0?'pos':'neg')+'">'+usd(tot)+'</b></div>'+
+        '<div class="row" data-pl="'+esc(p.cust_id)+'" style="border:none;padding:0 0 6px;cursor:pointer"><b>'+(p.name||p.cust_id||'—')+' <span class="muted" style="font-weight:600;font-size:11px">'+(open?'▲':'▼')+'</span></b><b class="'+(tot>=0?'pos':'neg')+'">'+usd(tot)+'</b></div>'+
         '<div class="req-meta">'+(p.email||'')+(joined?(' · joined '+joined):'')+'</div>'+
         '<div class="row"><span>Live (FX)</span><b>'+bv('fx')+'<span class="muted" style="font-weight:500"> · '+an('fx')+'</span></b></div>'+
         '<div class="row"><span>Crypto</span><b>'+bv('crypto')+'<span class="muted" style="font-weight:500"> · '+an('crypto')+'</span></b></div>'+
         '<div class="row"><span>Sports</span><b>'+bv('sports')+'<span class="muted" style="font-weight:500"> · '+an('sports')+'</span></b></div>'+
-        '<div class="row" style="border:none;padding:6px 0 0"><span class="hint" style="margin:0">ID '+(p.cust_id||'—')+'</span><button class="save ghost" data-cust="'+(p.cust_id||'').replace(/"/g,'&quot;')+'" style="margin-top:0;padding:7px 12px">Transactions</button></div>'+
+        (open?(
+          '<div class="row"><span>Phone</span><b class="muted">'+(p.phone||'—')+'</b></div>'+
+          '<div class="row"><span>Date of birth</span><b class="muted">'+(p.dob||'—')+'</b></div>'+
+          '<div class="row"><span>Country</span><b class="muted">'+(p.country||'—')+'</b></div>'+
+          '<div class="row"><span>Signup server</span><b class="muted">'+(SRV_MAP[p.server]||p.server||'—')+'</b></div>'+
+          '<div class="row"><span>Leverage</span><b class="muted">'+(p.leverage||'—')+'</b></div>'+
+          '<div class="row"><span>Currency</span><b class="muted">'+(p.currency||'—')+'</b></div>'
+        ):'')+
+        '<div class="row" style="border:none;padding:6px 0 0"><span class="hint" style="margin:0">ID '+(p.cust_id||'—')+'</span><button class="save ghost" data-cust="'+esc(p.cust_id)+'" style="margin-top:0;padding:7px 12px">Transactions</button></div>'+
       '</div>';
     });
     return h;
@@ -383,6 +397,7 @@
     var hs=document.getElementById('histSearch'); if(hs){hs.oninput=function(){HIST_FILTER=hs.value;render();var n=document.getElementById('histSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
     var ps=document.getElementById('plSearch'); if(ps){ps.oninput=function(){PLAYER_FILTER=ps.value;render();var n=document.getElementById('plSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
     document.querySelectorAll('[data-cust]').forEach(function(b){b.onclick=function(){HIST_FILTER=b.getAttribute('data-cust');cur='history';render();};});
+    document.querySelectorAll('[data-pl]').forEach(function(b){b.onclick=function(){var id=b.getAttribute('data-pl');PLAYER_OPEN=(PLAYER_OPEN===id?null:id);render();};});
     var g;
     if(g=document.getElementById('kycToggle'))g.onclick=function(){var k=localStorage.getItem('alpexa.kyc')||'pending';localStorage.setItem('alpexa.kyc',k==='verified'?'pending':'verified');render();};
     if(g=document.getElementById('rgSave'))g.onclick=function(){var st=getJSON('alpexaSettings',{});st.depositLimit=parseFloat(val('rgDep'))||0;st.lossLimit=parseFloat(val('rgLoss'))||0;var d=parseFloat(val('rgSE'))||0;st.selfExcludeUntil=d>0?Date.now()+d*86400000:0;setJSON('alpexaSettings',st);flash(g,'Saved ✓');render();};
