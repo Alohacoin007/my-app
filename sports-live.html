@@ -1179,7 +1179,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.9</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.10</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -1810,7 +1810,7 @@
 
   // ---------- wallet (multi-server balances) ----------
   const SERVERS=[
-    {key:'live', name:'Alpexa Live', short:'Alpexa Live', desc:'FX · Stocks · Metals · Indices', ic:'green', tag:'FX Stock', tagcls:'live', bal:8420.50},
+    {key:'live', name:'Alpexa Live', short:'Alpexa Live', desc:'FX · Stocks · Metals · Indices', ic:'green', tag:'FX Stock', tagcls:'live', tags:[{t:'FX',cls:'live'},{t:'Stock',cls:'crypto'}], bal:8420.50},
     {key:'crypto', name:'Alpexa Crypto', short:'Alpexa Crypto', desc:'Global crypto spot', ic:'blue', tag:'CRYPTO', tagcls:'crypto', bal:3150.00},
     {key:'sports', name:'Alpexa Sports', short:'Alpexa Sports', desc:'Live sports betting', ic:'gray', tag:'SPORTS', tagcls:'sports', bal:10000.00},
     {key:'manager', name:'Alpexa Manager', short:'Alpexa Manager', desc:'Managed · Copy trading', ic:'purple', tag:'MANAGER', tagcls:'mgr', bal:12000.00, locked:true},
@@ -1904,7 +1904,7 @@
       <div class="srv-opt ${s.key===curSrvKey?'sel':''} ${s.locked?'locked':''}" data-key="${s.key}">
         <div class="srv-ic ${s.ic}">${srvIconSVG}</div>
         <div class="srv-body">
-          <div class="srv-nm">${s.name} <span class="srv-tag ${s.tagcls}">${s.tag}</span></div>
+          <div class="srv-nm">${s.name} ${(s.tags||[{t:s.tag,cls:s.tagcls}]).map(g=>`<span class="srv-tag ${g.cls}">${g.t}</span>`).join(' ')}</div>
           <div class="srv-bal">${s.locked?'':usd(s.bal)}</div>
         </div>
         ${s.locked?'<span class="srv-lockic"><svg viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 11V8a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8"/></svg></span>':'<span class="srv-check"></span>'}
