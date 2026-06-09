@@ -481,43 +481,68 @@
   }
   function barP(v,max){var p=Math.min(100,Math.round(v/Math.max(1,max)*100));var col=p>80?'var(--neg)':p>50?'var(--warn)':'var(--pos)';
     return '<div style="height:10px;background:#eef0f3;border-radius:6px;margin-top:8px;overflow:hidden"><div style="height:100%;width:'+p+'%;background:'+col+'"></div></div><div class="hint" style="margin-top:4px">'+p+'% of bankroll committed</div>';}
-  // Sports risk: all open sports bets (for exposure-by-event analysis).
-  var RISK_POS=[];
+  // Sports risk + hedging.
+  var RISK_POS=[], HEDGES=[];
+  function decOdds(am){ am=+am||0; return am>0?1+am/100:am<0?1+100/(-am):2; }
   function pullRisk(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
-    AlpexaSync.db.from('positions').select('*').eq('status','open').eq('server','sports').limit(1000).then(function(r){ if(r&&r.data){ RISK_POS=r.data; if(cur==='risk'&&!busyEditing())render(); } },function(){}); }
+    AlpexaSync.db.from('positions').select('*').eq('status','open').eq('server','sports').limit(1000).then(function(r){ if(r&&r.data){ RISK_POS=r.data; if(cur==='risk'&&!busyEditing())render(); } },function(){});
+    AlpexaSync.db.from('hedges').select('*').order('created_at',{ascending:false}).limit(500).then(function(r){ if(r&&r.data){ HEDGES=r.data; if(cur==='risk'&&!busyEditing())render(); } },function(){}); }
+  function recordHedge(game,pick,amount,odds){
+    if(!window.AlpexaSync||!AlpexaSync.db){ toast('Not connected to server',true); return; }
+    var book=prompt('Record hedge for "'+pick+'"\nRecommended lay-off: $'+Math.round(amount)+' at odds '+(+odds).toFixed(2)+'\n\nWhere did you place it? (e.g., Betfair):');
+    if(book===null) return;
+    AlpexaSync.db.from('hedges').insert({game:game,pick:pick,amount:Math.round(amount*100)/100,odds:Math.round((+odds||0)*100)/100,book:book||'manual'}).then(function(r){ if(r&&r.error)toast('Error: '+r.error.message,true); else { toast('Hedge recorded ✓'); setTimeout(pullRisk,300); } },function(){});
+    try{ logAction('hedge','',game+' · '+pick+' · $'+Math.round(amount)+' @ '+(book||'manual')); }catch(e){}
+  }
   function viewRisk(f){
     if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Risk</div><div class="card"><div class="empty">Not connected to server.</div></div>';
+    var esc=function(v){return String(v==null?'':v).replace(/"/g,'&quot;');};
     var pos=RISK_POS.slice();
     var singles=pos.filter(function(x){return (+x.size||1)<=1;});
     var parlays=pos.filter(function(x){return (+x.size||1)>1;});
     var games={};
     singles.forEach(function(x){ var g=x.game||'(unknown game)'; games[g]=games[g]||{stake:0,picks:{}}; games[g].stake+=(+x.stake||0);
-      var pk=x.pick||x.symbol||'?'; var p=games[g].picks[pk]=games[g].picks[pk]||{stake:0,payout:0,n:0}; p.stake+=(+x.stake||0); p.payout+=(+x.potential||0); p.n++; });
+      var pk=x.pick||x.symbol||'?'; var p=games[g].picks[pk]=games[g].picks[pk]||{stake:0,payout:0,n:0,decSum:0}; p.stake+=(+x.stake||0); p.payout+=(+x.potential||0); p.n++; p.decSum+=decOdds(x.odds); });
     var gameArr=Object.keys(games).map(function(g){ var G=games[g]; var worst=0, wp='';
       Object.keys(G.picks).forEach(function(pk){ var net=G.stake - G.picks[pk].payout; if(net<worst){worst=net;wp=pk;} });
       return {game:g, stake:G.stake, picks:G.picks, worst:worst, worstPick:wp}; }).sort(function(a,b){return a.worst-b.worst;});
     var totalLiab=0; gameArr.forEach(function(g){ if(g.worst<0) totalLiab+=g.worst; });
     var parlayLiab=parlays.reduce(function(a,x){return a+(+x.potential||0);},0);
     var limit=num('alpexa.riskLimit',20000);
+    // hedges grouped by game|pick
+    var hg={}; HEDGES.forEach(function(hh){ var k=(hh.game||'')+'|'+(hh.pick||''); hg[k]=hg[k]||{amt:0,recoup:0}; hg[k].amt+=(+hh.amount||0); hg[k].recoup+=((+hh.amount||0)*((+hh.odds||1)-1)); });
+    var totalHedged=HEDGES.reduce(function(a,hh){return a+(+hh.amount||0);},0);
     var h='<div class="sec">Risk · exposure by event</div>'+
       '<div class="kpis">'+
         kpi('Worst-case liability',(totalLiab<0?'-':'')+k0(Math.abs(totalLiab)),'if worst outcomes hit','neg')+
-        kpi('Open sports bets',pos.length,'singles '+singles.length+' · parlay '+parlays.length)+
+        kpi('Hedged so far',k0(totalHedged),HEDGES.length+' lay-offs','pos')+
       '</div>';
     if(!gameArr.length && !parlays.length){ h+='<div class="card"><div class="empty">No open sports bets. (Place bets in the app, keep it open ~15s.)</div></div>'; }
     gameArr.forEach(function(g){
-      var alert=g.worst <= -limit;
-      h+='<div class="sec">'+g.game+(alert?' 🔴 over limit':'')+'</div><div class="card">';
+      var over=g.worst <= -limit;
+      h+='<div class="sec">'+g.game+(over?' 🔴 over limit':'')+'</div><div class="card">';
       Object.keys(g.picks).forEach(function(pk){ var P=g.picks[pk]; var net=g.stake - P.payout;
         h+='<div class="row"><span><b>'+pk+'</b><div class="req-meta" style="margin:2px 0 0">'+P.n+' bet(s) · stake '+usd(P.stake)+' · payout '+usd(P.payout)+'</div></span>'+
           '<span class="'+(net<0?'neg':'pos')+'" style="font-weight:800">'+(net>=0?'+':'')+k0(net)+'</span></div>';
       });
-      h+='<div class="hint">Number = book P&L if that pick wins. Worst: <b>'+(g.worstPick||'—')+'</b> ('+k0(g.worst)+').</div></div>';
+      // hedge recommendation for the worst (most exposed) pick
+      if(g.worst<0 && g.worstPick){
+        var L=-g.worst; var P=g.picks[g.worstPick]; var dec=(P.decSum/P.n)||2; var H=L/Math.max(0.01,dec-1);
+        var k=g.game+'|'+g.worstPick; var hAmt=(hg[k]||{}).amt||0; var hRecoup=(hg[k]||{}).recoup||0; var netAfter=g.worst+hRecoup;
+        h+='<div style="margin-top:8px;padding:10px;background:#FFF6E6;border-radius:10px">'+
+          '<div class="lbl" style="color:var(--warn)">⚖️ Hedge · '+g.worstPick+'</div>'+
+          '<div class="row" style="padding:7px 0"><span>Lay off at odds '+dec.toFixed(2)+'</span><b>'+usd(H)+'</b></div>'+
+          (hAmt>0?('<div class="row" style="padding:7px 0"><span>Already hedged</span><b class="pos">'+usd(hAmt)+'</b></div>'+
+                   '<div class="row" style="padding:7px 0"><span>Net exposure now</span><b class="'+(netAfter<0?'neg':'pos')+'">'+k0(netAfter)+'</b></div>'):'')+
+          '<button class="save" data-hedge="'+esc(g.game)+'|'+esc(g.worstPick)+'|'+Math.round(H)+'|'+dec.toFixed(2)+'" style="width:100%;margin-top:6px">Record hedge ✓</button>'+
+        '</div>';
+      }
+      h+='</div>';
     });
     if(parlays.length){ h+='<div class="sec">Parlays / multi · '+parlays.length+'</div><div class="card">'+
       '<div class="row"><span>Combined potential liability</span><b class="neg">'+k0(parlayLiab)+'</b></div>'+
       '<div class="hint">Parlays span multiple games — shown as combined max payout.</div></div>'; }
-    h+='<div class="hint" style="margin:0 14px">🔴 alert when a game\'s worst-case exceeds '+usd(limit)+'. Hedge calculator → next step.</div>';
+    h+='<div class="hint" style="margin:0 14px">🔴 alert when a game\'s worst-case exceeds '+usd(limit)+'. Record a hedge after laying it off externally — net exposure updates.</div>';
     return h;
   }
 
@@ -654,6 +679,7 @@
     var os=document.getElementById('openSearch'); if(os){os.oninput=function(){OPEN_SEARCH=os.value;render();var n=document.getElementById('openSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
     document.querySelectorAll('[data-pcust]').forEach(function(b){b.onclick=function(){PLAYER_OPEN=b.getAttribute('data-pcust');PLAYER_FILTER='';cur='players';render();};});
     document.querySelectorAll('[data-rr]').forEach(function(b){b.onclick=function(){REPORT_RANGE=b.getAttribute('data-rr');render();};});
+    document.querySelectorAll('[data-hedge]').forEach(function(b){b.onclick=function(){var p=(b.getAttribute('data-hedge')||'').split('|');recordHedge(p[0],p[1],+p[2],+p[3]);};});
     var g;
     if(g=document.getElementById('kycToggle'))g.onclick=function(){var k=localStorage.getItem('alpexa.kyc')||'pending';localStorage.setItem('alpexa.kyc',k==='verified'?'pending':'verified');render();};
     if(g=document.getElementById('rgSave'))g.onclick=function(){var st=getJSON('alpexaSettings',{});st.depositLimit=parseFloat(val('rgDep'))||0;st.lossLimit=parseFloat(val('rgLoss'))||0;var d=parseFloat(val('rgSE'))||0;st.selfExcludeUntil=d>0?Date.now()+d*86400000:0;setJSON('alpexaSettings',st);flash(g,'Saved ✓');render();};
