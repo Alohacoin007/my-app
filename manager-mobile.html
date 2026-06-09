@@ -256,25 +256,35 @@
   }
 
   function viewPlayers(f){
-    var st=getJSON('alpexaSettings',{}); var kyc=localStorage.getItem('alpexa.kyc')||'pending'; var cust=customer();
-    var dl=(st.depositLimit||0), ll=(st.lossLimit||0), se=(st.selfExcludeUntil||0);
-    return '<div class="sec">Customers <span class="tag">1 / live demo</span></div>'+
-      '<div class="card"><div class="row" style="border:none;padding:0 0 8px"><b>'+cust.name+'</b><span class="badge '+(kyc==='verified'?'won':'cashed')+'">KYC '+kyc+'</span></div>'+
-        '<div class="row"><span>Customer ID · email</span><b class="muted">'+cust.id+' · '+cust.email+'</b></div>'+
-        '<div class="row"><span>Sports acct</span><b class="muted">'+cust.acct.sports+'</b></div>'+
-        '<div class="row"><span>Crypto acct</span><b class="muted">'+cust.acct.crypto+'</b></div>'+
-        '<div class="row"><span>FX acct</span><b class="muted">'+cust.acct.fx+'</b></div>'+
-        '<div class="row"><span>Sports balance</span><b>'+usd(sportsBal())+'</b></div>'+
-        '<div class="row"><span>Crypto balance</span><b>'+usd(cryptoBal())+'</b></div>'+
-        '<div class="row"><span>Open bets / liability</span><b>'+f.openCount+' · '+usd(f.liab)+'</b></div>'+
-        '<button class="save" id="kycToggle" style="width:100%">'+(kyc==='verified'?'Mark KYC pending':'Verify KYC ✓')+'</button></div>'+
-      '<div class="sec">Responsible gambling (#12)</div>'+
-      '<div class="card">'+
-        cfgRow('Deposit limit (USDT · 0 = none)','rgDep',dl)+
-        cfgRow('Loss limit (USDT · 0 = none)','rgLoss',ll)+
-        cfgRow('Self-exclude (days · 0 = none)','rgSE',(se>Date.now()?Math.ceil((se-Date.now())/86400000):0))+
-        '<button class="save" id="rgSave" style="width:100%">Save & enforce</button>'+
-        '<div class="hint">Applied to the player\'s app (deposit/loss caps & self-exclusion lock) on next open. Multi-player view needs the live server.</div></div>';
+    if(!window.AlpexaSync||!AlpexaSync.db){
+      return '<div class="sec">Customers</div><div class="card"><div class="empty">Not connected to server.</div></div>';
+    }
+    var byPlayer={};
+    SRV_ACCOUNTS.forEach(function(a){ (byPlayer[a.player_id]=byPlayer[a.player_id]||[]).push(a); });
+    var list=SRV_PLAYERS.slice().sort(function(a,b){return (b.created_at||'').localeCompare(a.created_at||'');});
+    var q=(PLAYER_FILTER||'').toLowerCase();
+    if(q) list=list.filter(function(p){ return (((p.name||'')+' '+(p.email||'')+' '+(p.cust_id||'')).toLowerCase().indexOf(q)>=0); });
+    var h='<div class="sec">Customers · '+SRV_PLAYERS.length+'</div>';
+    h+='<div class="card" style="padding:10px 12px"><input class="in" id="plSearch" placeholder="Search name, email, ID…" value="'+(PLAYER_FILTER||'').replace(/"/g,'&quot;')+'" style="margin-top:0"></div>';
+    if(!SRV_PLAYERS.length){ h+='<div class="card"><div class="empty">No customers yet (or loading…)</div></div>'; return h; }
+    if(!list.length){ h+='<div class="card"><div class="empty">No customers match.</div></div>'; return h; }
+    list.forEach(function(p){
+      var accs=byPlayer[p.id]||[]; var m={}; var tot=0; var hasBal=false;
+      accs.forEach(function(a){ m[a.server]=a; var b=+a.balance||0; tot+=b; if(b>0)hasBal=true; });
+      if(!hasBal) tot=custBalance(p.cust_id); // fallback until the app pushes real-time balances
+      var bv=function(s){ return m[s]? usd(+m[s].balance||0) : '—'; };
+      var an=function(s){ return m[s]? m[s].acct_no : '—'; };
+      var joined=p.created_at?new Date(p.created_at).toLocaleDateString():'';
+      h+='<div class="card">'+
+        '<div class="row" style="border:none;padding:0 0 6px"><b>'+(p.name||p.cust_id||'—')+'</b><b class="'+(tot>=0?'pos':'neg')+'">'+usd(tot)+'</b></div>'+
+        '<div class="req-meta">'+(p.email||'')+(joined?(' · joined '+joined):'')+'</div>'+
+        '<div class="row"><span>Live (FX)</span><b>'+bv('fx')+'<span class="muted" style="font-weight:500"> · '+an('fx')+'</span></b></div>'+
+        '<div class="row"><span>Crypto</span><b>'+bv('crypto')+'<span class="muted" style="font-weight:500"> · '+an('crypto')+'</span></b></div>'+
+        '<div class="row"><span>Sports</span><b>'+bv('sports')+'<span class="muted" style="font-weight:500"> · '+an('sports')+'</span></b></div>'+
+        '<div class="row" style="border:none;padding:6px 0 0"><span class="hint" style="margin:0">ID '+(p.cust_id||'—')+'</span><button class="save ghost" data-cust="'+(p.cust_id||'').replace(/"/g,'&quot;')+'" style="margin-top:0;padding:7px 12px">Transactions</button></div>'+
+      '</div>';
+    });
+    return h;
   }
 
   function barP(v,max){var p=Math.min(100,Math.round(v/Math.max(1,max)*100));var col=p>80?'var(--neg)':p>50?'var(--warn)':'var(--pos)';
@@ -371,6 +381,8 @@
     document.querySelectorAll('[data-del]').forEach(function(b){b.onclick=function(){editDelete(b.getAttribute('data-del'));};});
     document.querySelectorAll('[data-cancel]').forEach(function(b){b.onclick=function(){EDIT_ID=null;render();};});
     var hs=document.getElementById('histSearch'); if(hs){hs.oninput=function(){HIST_FILTER=hs.value;render();var n=document.getElementById('histSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
+    var ps=document.getElementById('plSearch'); if(ps){ps.oninput=function(){PLAYER_FILTER=ps.value;render();var n=document.getElementById('plSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
+    document.querySelectorAll('[data-cust]').forEach(function(b){b.onclick=function(){HIST_FILTER=b.getAttribute('data-cust');cur='history';render();};});
     var g;
     if(g=document.getElementById('kycToggle'))g.onclick=function(){var k=localStorage.getItem('alpexa.kyc')||'pending';localStorage.setItem('alpexa.kyc',k==='verified'?'pending':'verified');render();};
     if(g=document.getElementById('rgSave'))g.onclick=function(){var st=getJSON('alpexaSettings',{});st.depositLimit=parseFloat(val('rgDep'))||0;st.lossLimit=parseFloat(val('rgLoss'))||0;var d=parseFloat(val('rgSE'))||0;st.selfExcludeUntil=d>0?Date.now()+d*86400000:0;setJSON('alpexaSettings',st);flash(g,'Saved ✓');render();};
@@ -387,13 +399,13 @@
   }
 
   // Don't redraw while the operator is mid-edit or typing a search (would lose input).
-  function busyEditing(){ return cur==='history' && (EDIT_ID || (document.activeElement && document.activeElement.id==='histSearch')); }
+  function busyEditing(){ return (cur==='history' && (EDIT_ID || (document.activeElement && document.activeElement.id==='histSearch'))) || (cur==='players' && document.activeElement && document.activeElement.id==='plSearch'); }
   window.addEventListener('storage',function(e){ if(e.key&&e.key.indexOf('alpexa')===0 && !busyEditing()) render(); });
   setInterval(function(){ if(cur==='overview'||cur==='approvals'||cur==='risk'||cur==='bets') render(); }, 4000);
   // Pull every customer's requests from the shared server.
   function pullServer(){ if(!window.AlpexaSync||!AlpexaSync.db) return; AlpexaSync.pullAll().then(function(rows){ SRV_REQS=rows||[]; if(!busyEditing()) render(); }).catch(function(){}); }
-  pullServer();
-  setInterval(function(){ if(!document.hidden) pullServer(); }, 8000);
+  pullServer(); pullPlayers();
+  setInterval(function(){ if(!document.hidden){ pullServer(); pullPlayers(); } }, 8000);
   render();
 </script>
 </body>

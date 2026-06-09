@@ -1183,7 +1183,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.19</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.20</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -1828,7 +1828,11 @@
   let totalLost=0;   // cumulative net losses (for 5% cashback credit)
   const CASHBACK_RATE=0.05;
   function syncSportsBal(){sportsSrv().bal=balance;try{localStorage.setItem('alpexa.sportsBalance',String(balance));}catch(e){}
-    try{var o=Object.assign({crypto:10000,fx:25000,sports:50000},JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}'));o.sports=balance;localStorage.setItem('alpexa.serverBalances',JSON.stringify(o));}catch(e){}}
+    try{var o=Object.assign({crypto:10000,fx:25000,sports:50000},JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}'));o.sports=balance;localStorage.setItem('alpexa.serverBalances',JSON.stringify(o));}catch(e){}
+    // Push the sports balance to the server (throttled) for the back-office Players list.
+    try{ if(window.AlpexaSync&&AlpexaSync.db){ var meS=JSON.parse(localStorage.getItem('alpexa.me')||'null'); var acct=meS&&meS.accts&&meS.accts.sports; var now=Date.now(); window.__balPush=window.__balPush||{};
+      if(acct&&now-(window.__balPush.sports||0)>15000){ window.__balPush.sports=now;
+        AlpexaSync.db.from('accounts').update({balance:Math.round((+balance||0)*100)/100}).eq('acct_no',acct).then(function(){},function(){}); } } }catch(e){}}
   function saveCryptoBal(){try{const c=SERVERS.find(s=>s.key==='crypto');if(c){localStorage.setItem('alpexa.cryptoBalance',String(c.bal));var o={};try{o=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{};}catch(e){o={};}o.crypto=c.bal;localStorage.setItem('alpexa.serverBalances',JSON.stringify(o));}}catch(e){}}
   // The Crypto app's real wallet is cryptoHoldings (USDT cash). Adjust it too so a
   // Crypto↔Sports transfer survives re-opening the Crypto app (which recomputes its
