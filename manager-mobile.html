@@ -82,7 +82,21 @@
   // Requests pulled from the shared server (all customers). Filled by pullServer().
   var SRV_REQS=[];
   // Real customers + their accounts, pulled from Supabase (players/accounts tables).
-  var SRV_PLAYERS=[], SRV_ACCOUNTS=[], PLAYER_FILTER='', PLAYER_OPEN=null;
+  var SRV_PLAYERS=[], SRV_ACCOUNTS=[], PLAYER_FILTER='', PLAYER_OPEN=null, PLAYER_EDIT=null;
+  // Save edited customer profile + per-server balances back to Supabase.
+  function savePlayer(custId){
+    if(!window.AlpexaSync||!AlpexaSync.db){ toast('Not connected to server',true); return; }
+    var p=null; SRV_PLAYERS.forEach(function(x){ if(x.cust_id===custId)p=x; }); if(!p){ toast('Customer not found',true); return; }
+    var patch={ name:val('ed_name'), email:val('ed_email'), phone:val('ed_phone'), dob:val('ed_dob'), country:val('ed_country'), leverage:val('ed_lev'), currency:val('ed_cur') };
+    AlpexaSync.db.from('players').update(patch).eq('cust_id',custId).then(function(r){ if(r&&r.error)toast('Profile error: '+r.error.message,true); },function(){});
+    var accs=SRV_ACCOUNTS.filter(function(a){ return a.player_id===p.id; });
+    ['fx','crypto','sports'].forEach(function(s){
+      var a=null; accs.forEach(function(x){ if(x.server===s)a=x; }); if(!a)return;
+      var b=parseFloat(val('ed_bal_'+s)); if(isNaN(b))return;
+      AlpexaSync.db.from('accounts').update({balance:Math.round(b*100)/100}).eq('acct_no',a.acct_no).then(function(){},function(){});
+    });
+    toast('Saved ✓ — synced'); PLAYER_EDIT=null; render(); setTimeout(pullPlayers,500);
+  }
   var SRV_MAP={fx:'Alpexa Live (FX)',live:'Alpexa Live (FX)',stocks:'Alpexa Crypto',crypto:'Alpexa Crypto',demo:'Alpexa Sports',sports:'Alpexa Sports'};
   function pullPlayers(){
     if(!window.AlpexaSync||!AlpexaSync.db) return;
@@ -279,24 +293,43 @@
       var bv=function(s){ return m[s]? usd(+m[s].balance||0) : '—'; };
       var an=function(s){ return m[s]? m[s].acct_no : '—'; };
       var joined=p.created_at?new Date(p.created_at).toLocaleDateString():'';
-      var open=(PLAYER_OPEN===p.cust_id);
+      var cid=p.cust_id;
+      var open=(PLAYER_OPEN===cid);
+      var editing=(open && PLAYER_EDIT===cid);
       var esc=function(s){return String(s==null?'':s).replace(/"/g,'&quot;');};
+      var bn=function(s){ return m[s]?(+m[s].balance||0):0; };
       h+='<div class="card">'+
-        '<div class="row" data-pl="'+esc(p.cust_id)+'" style="border:none;padding:0 0 6px;cursor:pointer"><b>'+(p.name||p.cust_id||'—')+' <span class="muted" style="font-weight:600;font-size:11px">'+(open?'▲':'▼')+'</span></b><b class="'+(tot>=0?'pos':'neg')+'">'+usd(tot)+'</b></div>'+
-        '<div class="req-meta">'+(p.email||'')+(joined?(' · joined '+joined):'')+'</div>'+
-        '<div class="row"><span>Live (FX)</span><b>'+bv('fx')+'<span class="muted" style="font-weight:500"> · '+an('fx')+'</span></b></div>'+
-        '<div class="row"><span>Crypto</span><b>'+bv('crypto')+'<span class="muted" style="font-weight:500"> · '+an('crypto')+'</span></b></div>'+
-        '<div class="row"><span>Sports</span><b>'+bv('sports')+'<span class="muted" style="font-weight:500"> · '+an('sports')+'</span></b></div>'+
-        (open?(
-          '<div class="row"><span>Phone</span><b class="muted">'+(p.phone||'—')+'</b></div>'+
-          '<div class="row"><span>Date of birth</span><b class="muted">'+(p.dob||'—')+'</b></div>'+
-          '<div class="row"><span>Country</span><b class="muted">'+(p.country||'—')+'</b></div>'+
-          '<div class="row"><span>Signup server</span><b class="muted">'+(SRV_MAP[p.server]||p.server||'—')+'</b></div>'+
-          '<div class="row"><span>Leverage</span><b class="muted">'+(p.leverage||'—')+'</b></div>'+
-          '<div class="row"><span>Currency</span><b class="muted">'+(p.currency||'—')+'</b></div>'
-        ):'')+
-        '<div class="row" style="border:none;padding:6px 0 0"><span class="hint" style="margin:0">ID '+(p.cust_id||'—')+'</span><button class="save ghost" data-cust="'+esc(p.cust_id)+'" style="margin-top:0;padding:7px 12px">Transactions</button></div>'+
-      '</div>';
+        '<div class="row" data-pl="'+esc(cid)+'" style="border:none;padding:0 0 6px;cursor:pointer"><b>'+(p.name||cid||'—')+' <span class="muted" style="font-weight:600;font-size:11px">'+(open?'▲':'▼')+'</span></b><b class="'+(tot>=0?'pos':'neg')+'">'+usd(tot)+'</b></div>'+
+        '<div class="req-meta">'+(p.email||'')+(joined?(' · joined '+joined):'')+'</div>';
+      if(editing){
+        h+='<label class="lbl" style="margin-top:8px">Name</label><input class="in" id="ed_name" value="'+esc(p.name)+'">'+
+          '<label class="lbl" style="display:block;margin-top:8px">Email</label><input class="in" id="ed_email" value="'+esc(p.email)+'">'+
+          '<label class="lbl" style="display:block;margin-top:8px">Phone</label><input class="in" id="ed_phone" value="'+esc(p.phone)+'">'+
+          '<label class="lbl" style="display:block;margin-top:8px">Date of birth</label><input class="in" id="ed_dob" value="'+esc(p.dob)+'">'+
+          '<label class="lbl" style="display:block;margin-top:8px">Country</label><input class="in" id="ed_country" value="'+esc(p.country)+'">'+
+          '<label class="lbl" style="display:block;margin-top:8px">Leverage</label><input class="in" id="ed_lev" value="'+esc(p.leverage)+'">'+
+          '<label class="lbl" style="display:block;margin-top:8px">Currency</label><input class="in" id="ed_cur" value="'+esc(p.currency)+'">'+
+          '<label class="lbl" style="display:block;margin-top:8px">Live (FX) balance</label><input class="in" id="ed_bal_fx" type="number" step="0.01" value="'+bn('fx')+'">'+
+          '<label class="lbl" style="display:block;margin-top:8px">Crypto balance</label><input class="in" id="ed_bal_crypto" type="number" step="0.01" value="'+bn('crypto')+'">'+
+          '<label class="lbl" style="display:block;margin-top:8px">Sports balance</label><input class="in" id="ed_bal_sports" type="number" step="0.01" value="'+bn('sports')+'">'+
+          '<div class="btns"><button class="ok" data-savepl="'+esc(cid)+'">Save</button><button class="no" data-cancelpl="1">Cancel</button></div>'+
+          '<div class="hint">Balance changes apply when the customer re-opens that app.</div>';
+      } else {
+        h+='<div class="row"><span>Live (FX)</span><b>'+bv('fx')+'<span class="muted" style="font-weight:500"> · '+an('fx')+'</span></b></div>'+
+          '<div class="row"><span>Crypto</span><b>'+bv('crypto')+'<span class="muted" style="font-weight:500"> · '+an('crypto')+'</span></b></div>'+
+          '<div class="row"><span>Sports</span><b>'+bv('sports')+'<span class="muted" style="font-weight:500"> · '+an('sports')+'</span></b></div>';
+        if(open){
+          h+='<div class="row"><span>Phone</span><b class="muted">'+(p.phone||'—')+'</b></div>'+
+            '<div class="row"><span>Date of birth</span><b class="muted">'+(p.dob||'—')+'</b></div>'+
+            '<div class="row"><span>Country</span><b class="muted">'+(p.country||'—')+'</b></div>'+
+            '<div class="row"><span>Signup server</span><b class="muted">'+(SRV_MAP[p.server]||p.server||'—')+'</b></div>'+
+            '<div class="row"><span>Leverage</span><b class="muted">'+(p.leverage||'—')+'</b></div>'+
+            '<div class="row"><span>Currency</span><b class="muted">'+(p.currency||'—')+'</b></div>'+
+            '<button class="save ghost" data-editpl="'+esc(cid)+'" style="width:100%;margin-top:10px">Edit profile &amp; balances</button>';
+        }
+        h+='<div class="row" style="border:none;padding:6px 0 0"><span class="hint" style="margin:0">ID '+(cid||'—')+'</span><button class="save ghost" data-cust="'+esc(cid)+'" style="margin-top:0;padding:7px 12px">Transactions</button></div>';
+      }
+      h+='</div>';
     });
     return h;
   }
@@ -397,7 +430,10 @@
     var hs=document.getElementById('histSearch'); if(hs){hs.oninput=function(){HIST_FILTER=hs.value;render();var n=document.getElementById('histSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
     var ps=document.getElementById('plSearch'); if(ps){ps.oninput=function(){PLAYER_FILTER=ps.value;render();var n=document.getElementById('plSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
     document.querySelectorAll('[data-cust]').forEach(function(b){b.onclick=function(){HIST_FILTER=b.getAttribute('data-cust');cur='history';render();};});
-    document.querySelectorAll('[data-pl]').forEach(function(b){b.onclick=function(){var id=b.getAttribute('data-pl');PLAYER_OPEN=(PLAYER_OPEN===id?null:id);render();};});
+    document.querySelectorAll('[data-pl]').forEach(function(b){b.onclick=function(){var id=b.getAttribute('data-pl');PLAYER_OPEN=(PLAYER_OPEN===id?null:id);if(PLAYER_OPEN!==id)PLAYER_EDIT=null;render();};});
+    document.querySelectorAll('[data-editpl]').forEach(function(b){b.onclick=function(){PLAYER_EDIT=b.getAttribute('data-editpl');render();};});
+    document.querySelectorAll('[data-savepl]').forEach(function(b){b.onclick=function(){savePlayer(b.getAttribute('data-savepl'));};});
+    document.querySelectorAll('[data-cancelpl]').forEach(function(b){b.onclick=function(){PLAYER_EDIT=null;render();};});
     var g;
     if(g=document.getElementById('kycToggle'))g.onclick=function(){var k=localStorage.getItem('alpexa.kyc')||'pending';localStorage.setItem('alpexa.kyc',k==='verified'?'pending':'verified');render();};
     if(g=document.getElementById('rgSave'))g.onclick=function(){var st=getJSON('alpexaSettings',{});st.depositLimit=parseFloat(val('rgDep'))||0;st.lossLimit=parseFloat(val('rgLoss'))||0;var d=parseFloat(val('rgSE'))||0;st.selfExcludeUntil=d>0?Date.now()+d*86400000:0;setJSON('alpexaSettings',st);flash(g,'Saved ✓');render();};
@@ -414,7 +450,7 @@
   }
 
   // Don't redraw while the operator is mid-edit or typing a search (would lose input).
-  function busyEditing(){ return (cur==='history' && (EDIT_ID || (document.activeElement && document.activeElement.id==='histSearch'))) || (cur==='players' && document.activeElement && document.activeElement.id==='plSearch'); }
+  function busyEditing(){ return (cur==='history' && (EDIT_ID || (document.activeElement && document.activeElement.id==='histSearch'))) || (cur==='players' && (PLAYER_EDIT || (document.activeElement && document.activeElement.id==='plSearch'))); }
   window.addEventListener('storage',function(e){ if(e.key&&e.key.indexOf('alpexa')===0 && !busyEditing()) render(); });
   setInterval(function(){ if(cur==='overview'||cur==='approvals'||cur==='risk'||cur==='bets') render(); }, 4000);
   // Pull every customer's requests from the shared server.
