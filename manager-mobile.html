@@ -319,8 +319,12 @@
         '<div class="req-meta">👤 '+(w.custName||cust.name||cust.id)+' · '+(w.acctNo||cust.acct.sports)+(w.custId?(' · '+w.custId):'')+'</div>'+
         '<div class="req-meta">'+w.server+' · '+meta+' · '+ago(w.ts)+'</div>'+
         (t==='withdraw'?'<div class="req-meta">You receive (after fee): <b>'+usd(w.net)+'</b></div>':'')+
-        (w.address?('<div class="req-addr-lbl">'+(t==='withdraw'?'▶ Send to · user wallet':'Deposit address')+'</div><div class="req-addr" data-copy="'+w.address+'">'+w.address+'</div>'):'')+
-        '<div class="btns"><button class="ok" data-ok="'+w.id+'">Approve</button><button class="no" data-no="'+w.id+'">Reject</button></div></div>';
+        (w.address?('<div class="req-addr-lbl">'+(t==='withdraw'?'▶ Send '+usd(w.net)+' USDT to · user wallet':'Deposit address')+'</div><div class="req-addr" data-copy="'+w.address+'">'+w.address+'</div>'):'')+
+        (t==='withdraw'
+          ? '<input class="in" id="tx_'+w.id+'" spellcheck="false" autocomplete="off" placeholder="Paste tx hash (txid) after sending" style="margin-top:8px;font-family:ui-monospace,monospace;font-size:11.5px">'+
+            '<div class="btns"><button class="ok" data-paid="'+w.id+'">Mark Paid ✓</button><button class="no" data-no="'+w.id+'">Reject</button></div>'+
+            '<div class="hint">Send the USDT from your wallet/exchange to the address above, then paste the transaction hash and tap Mark Paid.</div></div>'
+          : '<div class="btns"><button class="ok" data-ok="'+w.id+'">Approve</button><button class="no" data-no="'+w.id+'">Reject</button></div></div>');
     });
     h+='<div class="sec">Recently processed</div><div class="card">';
     if(!done.length) h+='<div class="empty">Nothing processed yet.</div>';
@@ -361,6 +365,7 @@
           '<div class="row" style="border:none;padding:0 0 6px"><span class="badge '+(w.type||'')+'">'+typeLabel(w.type).toUpperCase()+'</span><span class="req-amt">'+usd(w.amount)+'</span></div>'+
           '<div class="req-meta">👤 '+(w.custName||'—')+' · '+(w.acctNo||'')+(w.custId?(' · '+w.custId):'')+'</div>'+
           '<div class="req-meta">'+(w.server||'')+' · '+meta+' · '+ago(w.ts)+'</div>'+
+          (w.txid?('<div class="req-meta">✅ Paid · <a href="https://etherscan.io/tx/'+w.txid+'" target="_blank" rel="noopener" style="color:var(--acc);font-weight:700">View on Etherscan ↗</a></div>'):'')+
           '<div class="row" style="border:none;padding:6px 0 0"><span>'+statusBadge(w.status)+'</span><button class="save ghost" data-edit="'+w.id+'" style="margin-top:0;padding:7px 14px">Edit</button></div>'+
         '</div>';
       }
@@ -597,12 +602,27 @@
       });
     } else { toast('⚠ Not connected to server',true); }
   }
+  // Manual payout: record the on-chain tx hash and approve the withdrawal.
+  function markPaid(id){
+    var el=document.getElementById('tx_'+id); var tx=el?(el.value||'').trim():'';
+    if(tx && !/^0x[0-9a-fA-F]{6,}$/.test(tx)){ if(!confirm('That doesn\'t look like a tx hash (0x…). Mark paid anyway?')) return; }
+    for(var j=0;j<SRV_REQS.length;j++){ if(SRV_REQS[j].local_id===id){ SRV_REQS[j].status='approved'; SRV_REQS[j].txid=tx; SRV_REQS[j].decided_at=new Date().toISOString(); break; } }
+    var loc=getJSON('alpexa.withdrawals',[]); for(var i=0;i<loc.length;i++){ if(loc[i].id===id){ loc[i].status='approved'; loc[i].txid=tx; loc[i].decidedTs=Date.now(); break; } } setJSON('alpexa.withdrawals',loc);
+    render();
+    try{ var rq=findReq(id); logAction('approve', rq?rq.custId:'', 'withdraw '+(rq?usd(rq.amount):'')+(tx?(' · tx '+tx.slice(0,12)+'…'):' (no txid)')); }catch(e){}
+    if(window.AlpexaSync&&AlpexaSync.db){
+      AlpexaSync.db.from('requests').update({status:'approved',txid:tx,decided_at:new Date().toISOString()}).eq('local_id',id).then(function(r){
+        if(r&&r.error)toast('Server error: '+r.error.message,true); else toast('Marked paid ✓ — synced'); pullServer();
+      },function(){ toast('Save failed',true); });
+    } else { toast('⚠ Not connected to server',true); }
+  }
   function copy(t){try{if(navigator.clipboard)navigator.clipboard.writeText(t);}catch(e){}}
   function flash(b,txt){if(!b)return;var o=b.textContent;b.textContent=txt||'Saved ✓';setTimeout(function(){b.textContent=o;},1200);}
   function val(id){var e=document.getElementById(id);return e?(e.value||'0'):'0';}
   function wire(){
     document.querySelectorAll('[data-ok]').forEach(function(b){b.onclick=function(){decide(b.getAttribute('data-ok'),'approved');};});
     document.querySelectorAll('[data-no]').forEach(function(b){b.onclick=function(){decide(b.getAttribute('data-no'),'rejected');};});
+    document.querySelectorAll('[data-paid]').forEach(function(b){b.onclick=function(){markPaid(b.getAttribute('data-paid'));};});
     document.querySelectorAll('[data-copy]').forEach(function(b){b.onclick=function(){copy(b.getAttribute('data-copy'));flash(b,'Copied!');};});
     document.querySelectorAll('[data-edit]').forEach(function(b){b.onclick=function(){EDIT_ID=b.getAttribute('data-edit');render();};});
     document.querySelectorAll('[data-save]').forEach(function(b){b.onclick=function(){editSave(b.getAttribute('data-save'));};});
