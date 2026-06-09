@@ -522,21 +522,21 @@
       var over=g.worst <= -limit;
       h+='<div class="sec">'+g.game+(over?' 🔴 over limit':'')+'</div><div class="card">';
       Object.keys(g.picks).forEach(function(pk){ var P=g.picks[pk]; var net=g.stake - P.payout;
-        h+='<div class="row"><span><b>'+pk+'</b><div class="req-meta" style="margin:2px 0 0">'+P.n+' bet(s) · stake '+usd(P.stake)+' · payout '+usd(P.payout)+'</div></span>'+
+        h+='<div class="row" style="border:none;padding:9px 0 4px"><span><b>'+pk+'</b><div class="req-meta" style="margin:2px 0 0">'+P.n+' bet(s) · stake '+usd(P.stake)+' · payout '+usd(P.payout)+'</div></span>'+
           '<span class="'+(net<0?'neg':'pos')+'" style="font-weight:800">'+(net>=0?'+':'')+k0(net)+'</span></div>';
+        // Hedge box appears under EVERY losing (red) pick, so any exposure can be covered.
+        if(net<0){
+          var L=-net; var dec=(P.decSum/P.n)||2; var H=L/Math.max(0.01,dec-1);
+          var k=g.game+'|'+pk; var hAmt=(hg[k]||{}).amt||0; var hRecoup=(hg[k]||{}).recoup||0; var netAfter=net+hRecoup;
+          h+='<div style="background:#FFF6E6;border-radius:9px;padding:10px 12px;margin:2px 0 10px">'+
+            '<div class="lbl" style="color:var(--warn);margin-bottom:4px">⚖️ To cover this '+k0(net)+' — place this bet:</div>'+
+            '<div style="font-size:14.5px;font-weight:700;line-height:1.55">Bet <span style="color:var(--acc)">'+usd(H)+'</span> on <b>'+pk+'</b> @ odds <b>'+dec.toFixed(2)+'</b></div>'+
+            '<div class="hint" style="margin:4px 0 0">If it wins, you win back ~'+usd(L)+' to cancel the loss. Exchange odds differ? amount = '+usd(L)+' ÷ (odds − 1).</div>'+
+            (hAmt>0?('<div class="row" style="border:none;padding:6px 0 0"><span>Already hedged '+usd(hAmt)+' → net</span><b class="'+(netAfter<0?'neg':'pos')+'">'+k0(netAfter)+'</b></div>'):'')+
+            '<button class="save" data-hedge="'+esc(g.game)+'|'+esc(pk)+'|'+Math.round(H*100)/100+'|'+dec.toFixed(2)+'" style="width:100%;margin-top:7px;padding:9px">Record hedge ✓</button>'+
+          '</div>';
+        }
       });
-      // hedge recommendation for the worst (most exposed) pick
-      if(g.worst<0 && g.worstPick){
-        var L=-g.worst; var P=g.picks[g.worstPick]; var dec=(P.decSum/P.n)||2; var H=L/Math.max(0.01,dec-1);
-        var k=g.game+'|'+g.worstPick; var hAmt=(hg[k]||{}).amt||0; var hRecoup=(hg[k]||{}).recoup||0; var netAfter=g.worst+hRecoup;
-        h+='<div style="margin-top:8px;padding:10px;background:#FFF6E6;border-radius:10px">'+
-          '<div class="lbl" style="color:var(--warn)">⚖️ Hedge · '+g.worstPick+'</div>'+
-          '<div class="row" style="padding:7px 0"><span>Lay off at odds '+dec.toFixed(2)+'</span><b>'+usd(H)+'</b></div>'+
-          (hAmt>0?('<div class="row" style="padding:7px 0"><span>Already hedged</span><b class="pos">'+usd(hAmt)+'</b></div>'+
-                   '<div class="row" style="padding:7px 0"><span>Net exposure now</span><b class="'+(netAfter<0?'neg':'pos')+'">'+k0(netAfter)+'</b></div>'):'')+
-          '<button class="save" data-hedge="'+esc(g.game)+'|'+esc(g.worstPick)+'|'+Math.round(H)+'|'+dec.toFixed(2)+'" style="width:100%;margin-top:6px">Record hedge ✓</button>'+
-        '</div>';
-      }
       h+='</div>';
     });
     if(parlays.length){ h+='<div class="sec">Parlays / multi · '+parlays.length+'</div><div class="card">'+
