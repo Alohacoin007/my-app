@@ -1183,7 +1183,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.21</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.22</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -2703,6 +2703,25 @@
     loadLive(false);
     setInterval(()=>{ if(!document.hidden) loadLive(true); }, 30000); // auto-refresh live scores
   })();
+</script>
+<script>
+/* Report open sports bets to the server for the back office. */
+(function(){
+  function meX(){try{var m=JSON.parse(localStorage.getItem('alpexa.me')||'null');return m&&m.accts?m:null;}catch(e){return null;}}
+  function push(){
+    if(!window.AlpexaSync||!AlpexaSync.db)return;
+    var m=meX(); if(!m||!m.accts.sports)return; var cust=m.custId, acct=m.accts.sports;
+    var items=[];
+    try{var ob=JSON.parse(localStorage.getItem('alpexa.openBets')||'[]')||[];
+      ob.forEach(function(b){ if(!b)return; var leg=(b.legs&&b.legs[0])?(b.legs[0].pk||b.legs[0].sel||''):''; var more=(b.legs&&b.legs.length>1)?(' +'+(b.legs.length-1)):'';
+        items.push({cust_id:cust,acct_no:acct,server:'sports',kind:'bet',local_id:String(b.id||''),symbol:(b.type||'Bet')+(leg?(' · '+leg+more):''),side:'',stake:+b.stake||0,potential:+b.potential||0,status:'open'});});
+    }catch(e){}
+    AlpexaSync.db.from('positions').delete().eq('cust_id',cust).eq('server','sports').then(function(){
+      if(items.length)AlpexaSync.db.from('positions').insert(items).then(function(){},function(){});
+    },function(){});
+  }
+  setTimeout(push,4000); setInterval(function(){if(!document.hidden)push();},15000);
+})();
 </script>
 </body>
 </html>

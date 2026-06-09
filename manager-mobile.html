@@ -83,6 +83,9 @@
   var SRV_REQS=[];
   // Real customers + their accounts, pulled from Supabase (players/accounts tables).
   var SRV_PLAYERS=[], SRV_ACCOUNTS=[], PLAYER_FILTER='', PLAYER_OPEN=null, PLAYER_EDIT=null;
+  var SRV_POSITIONS=[];
+  function pullPositions(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('positions').select('*').eq('status','open').then(function(r){ if(r&&r.data){ SRV_POSITIONS=r.data; if(cur==='bets'&&!busyEditing())render(); } },function(){}); }
   // Save edited customer profile + per-server balances back to Supabase.
   function savePlayer(custId){
     if(!window.AlpexaSync||!AlpexaSync.db){ toast('Not connected to server',true); return; }
@@ -156,7 +159,7 @@
       hold: settledStake? (ggr/settledStake*100):0, pending:R.filter(function(w){return w.status==='pending';}).length};
   }
 
-  var TABS=[['overview','Overview'],['approvals','Approvals'],['history','History'],['players','Players'],['risk','Risk'],['bets','Bets'],['config','Config']];
+  var TABS=[['overview','Overview'],['approvals','Approvals'],['history','History'],['players','Players'],['risk','Risk'],['bets','Open'],['config','Config']];
   var cur='overview';
   function renderTabs(){
     document.getElementById('tabs').innerHTML=TABS.map(function(t){return '<button class="tab '+(t[0]===cur?'on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join('');
@@ -372,20 +375,41 @@
     return h;
   }
 
+  // Open bets & trades across ALL customers (from the positions table).
   function viewBets(){
-    var cust=customer();
-    var feed=openB().map(function(b){return {b:b,st:'open'};}).concat(settB().map(function(b){return {b:b,st:b.result||'settled'};}));
-    var h='<div class="sec">Bet feed (#3)</div><div class="card">';
-    if(!feed.length) return h+'<div class="empty">No bets yet.</div></div>';
-    feed.slice(0,40).forEach(function(x){var b=x.b, st=x.st;
-      var leg=(b.legs&&b.legs[0])?(b.legs[0].pk||''):'';
-      var more=(b.legs&&b.legs.length>1)?(' +'+(b.legs.length-1)):'';
-      h+='<div class="row"><span><b>'+(b.type||'Bet')+'</b> · '+usd(b.stake)+
-          '<div class="req-meta" style="margin:2px 0 0">👤 '+cust.id+' · '+cust.acct.sports+'</div>'+
-          '<div class="req-meta" style="margin:1px 0 0">'+leg+more+'</div></span>'+
-        '<span class="badge '+(st==='open'?'open':st)+'">'+(st==='open'?'OPEN':String(st).toUpperCase())+(b.payout?(' '+usd(b.payout)):'')+'</span></div>';
+    if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Open bets &amp; trades</div><div class="card"><div class="empty">Not connected to server.</div></div>';
+    var pos=SRV_POSITIONS.slice();
+    var nameById={}; SRV_PLAYERS.forEach(function(p){nameById[p.cust_id]=p.name||p.cust_id;});
+    var totStake=pos.reduce(function(a,x){return a+(+x.stake||0);},0);
+    var totLiab=pos.reduce(function(a,x){return a+(+x.potential||0);},0);
+    var totPnl=pos.reduce(function(a,x){return a+(+x.pnl||0);},0);
+    var h='<div class="sec">Open bets &amp; trades · all customers</div>'+
+      '<div class="kpis">'+
+        kpi('Open items',pos.length,'live')+
+        kpi('Exposure',k0(totLiab||totStake),'payout / staked','neg')+
+      '</div>';
+    if(!pos.length){ h+='<div class="card"><div class="empty">No open bets or trades. (Customers must open their app ~15s to report.)</div></div>'; return h; }
+    var GROUP={fx:'FX positions',crypto:'Crypto holdings',sports:'Sports bets'};
+    ['fx','sports','crypto'].forEach(function(s){
+      var list=pos.filter(function(x){return x.server===s;}); if(!list.length)return;
+      h+='<div class="sec">'+GROUP[s]+' · '+list.length+'</div><div class="card">';
+      list.forEach(function(x){
+        var who=nameById[x.cust_id]||x.cust_id||'';
+        var right, cls='pos';
+        if(s==='fx'){ right=((+x.pnl>=0?'+':'')+usd(x.pnl||0)); cls=(+x.pnl<0?'neg':'pos'); }
+        else if(s==='sports'){ right='→ '+usd(x.potential||0); cls='open'; }
+        else { right=usd(x.stake||0); cls='muted'; }
+        var sub = s==='fx' ? ((x.side||'')+' '+(x.size||0)+' @ '+(x.open_price||0))
+                : s==='sports' ? ('Stake '+usd(x.stake||0))
+                : (x.kind==='stake'?'Staked':'Holding');
+        h+='<div class="row"><span><b>'+(x.symbol||'')+'</b>'+
+            '<div class="req-meta" style="margin:2px 0 0">👤 '+who+' · '+(x.acct_no||'')+'</div>'+
+            '<div class="req-meta" style="margin:1px 0 0">'+sub+'</div></span>'+
+          '<span class="'+cls+'" style="font-weight:800">'+right+'</span></div>';
+      });
+      h+='</div>';
     });
-    h+='</div><div class="hint" style="margin:0 14px">This account\'s tickets. With the server: every customer\'s bets live, with void/limit controls.</div>';
+    h+='<div class="hint" style="margin:0 14px">Live from customers\' apps (updates ~15s). Control (force close / void) — coming next.</div>';
     return h;
   }
 
@@ -466,8 +490,8 @@
   setInterval(function(){ if(cur==='overview'||cur==='approvals'||cur==='risk'||cur==='bets') render(); }, 4000);
   // Pull every customer's requests from the shared server.
   function pullServer(){ if(!window.AlpexaSync||!AlpexaSync.db) return; AlpexaSync.pullAll().then(function(rows){ SRV_REQS=rows||[]; if(!busyEditing()) render(); }).catch(function(){}); }
-  pullServer(); pullPlayers();
-  setInterval(function(){ if(!document.hidden){ pullServer(); pullPlayers(); } }, 8000);
+  pullServer(); pullPlayers(); pullPositions();
+  setInterval(function(){ if(!document.hidden){ pullServer(); pullPlayers(); pullPositions(); } }, 8000);
   render();
 </script>
 </body>

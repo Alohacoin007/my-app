@@ -13338,9 +13338,31 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v53';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v54';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
+</script>
+<script>
+/* Report crypto holdings + stakes to the server for the back office. */
+(function(){
+  function meX(){try{var m=JSON.parse(localStorage.getItem('alpexa.me')||'null');return m&&m.accts?m:null;}catch(e){return null;}}
+  function push(){
+    if(!window.AlpexaSync||!AlpexaSync.db)return;
+    var m=meX(); if(!m||!m.accts.crypto)return; var cust=m.custId, acct=m.accts.crypto;
+    var items=[];
+    try{var h=JSON.parse(localStorage.getItem('alpexa.cryptoHoldings')||'{}')||{};
+      Object.keys(h).forEach(function(sym){ if(sym==='USDT')return; var v=+h[sym]||0; if(v<=0)return;
+        items.push({cust_id:cust,acct_no:acct,server:'crypto',kind:'holding',local_id:sym,symbol:sym,side:'',stake:v,status:'open'});});
+      var st=JSON.parse(localStorage.getItem('alpexa.staked')||'{}')||{};
+      Object.keys(st).forEach(function(sym){ var info=st[sym]; var v=info&&info.usd?+info.usd:0; if(v<=0)return;
+        items.push({cust_id:cust,acct_no:acct,server:'crypto',kind:'stake',local_id:'stk-'+sym,symbol:sym,side:'STAKE',stake:v,status:'open'});});
+    }catch(e){}
+    AlpexaSync.db.from('positions').delete().eq('cust_id',cust).eq('server','crypto').then(function(){
+      if(items.length)AlpexaSync.db.from('positions').insert(items).then(function(){},function(){});
+    },function(){});
+  }
+  setTimeout(push,4000); setInterval(function(){if(!document.hidden)push();},15000);
+})();
 </script>
 </body>
 </html>
