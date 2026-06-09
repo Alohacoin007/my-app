@@ -179,20 +179,29 @@
   function kpi(k,v,s,cls){return '<div class="kpi"><div class="k">'+k+'</div><div class="v '+(cls||'')+'">'+v+'</div><div class="s">'+(s||'')+'</div></div>';}
 
   function viewOverview(f){
-    return '<div class="sec">Financials (this account · demo)</div>'+
+    var custCount=SRV_PLAYERS.length;
+    var totalBal=SRV_ACCOUNTS.reduce(function(a,x){return a+(+x.balance||0);},0);
+    var bySrv={fx:0,crypto:0,sports:0};
+    SRV_ACCOUNTS.forEach(function(x){ if(bySrv[x.server]!=null) bySrv[x.server]+=(+x.balance||0); });
+    var dep=SRV_REQS.filter(function(w){return (w.type||'')==='deposit'&&w.status==='approved';}).reduce(function(a,w){return a+(+w.amount||0);},0);
+    var wd =SRV_REQS.filter(function(w){return (w.type||'')==='withdraw'&&w.status==='approved';}).reduce(function(a,w){return a+(+w.amount||0);},0);
+    var pend=SRV_REQS.filter(function(w){return (w.status||'')==='pending';}).length;
+    var net=dep-wd;
+    var connected=(window.AlpexaSync&&AlpexaSync.db);
+    return '<div class="sec">All customers · live</div>'+
       '<div class="kpis">'+
-        kpi('Turnover (handle)',k0(f.turnover),'all stakes')+
-        kpi('Revenue (GGR)',(f.ggr<0?'-':'')+k0(Math.abs(f.ggr)),'hold '+f.hold.toFixed(1)+'%',f.ggr>=0?'pos':'neg')+
-        kpi('Deposits',k0(f.dep),'approved')+
-        kpi('Withdrawals',k0(f.wd),'approved')+
-        kpi('Net cash',(f.net<0?'-':'')+k0(Math.abs(f.net)),'dep - wd',f.net>=0?'pos':'neg')+
-        kpi('Open liability',k0(f.liab),f.openCount+' open bets','neg')+
+        kpi('Customers',custCount,'registered')+
+        kpi('Total balances',k0(totalBal),'all servers','pos')+
+        kpi('Deposits',k0(dep),'approved')+
+        kpi('Withdrawals',k0(wd),'approved')+
+        kpi('Net cash',(net<0?'-':'')+k0(Math.abs(net)),'dep - wd',net>=0?'pos':'neg')+
+        kpi('Pending',pend,'awaiting approval',pend>0?'neg':'')+
       '</div>'+
-      '<div class="card"><div class="row"><span>Live (FX) balance</span><b>'+usd(fxBal())+'</b></div>'+
-        '<div class="row"><span>Crypto balance</span><b>'+usd(cryptoBal())+'</b></div>'+
-        '<div class="row"><span>Sports balance</span><b>'+usd(sportsBal())+'</b></div>'+
-        '<div class="row"><span>Pending approvals</span><b>'+f.pending+'</b></div></div>'+
-      '<div class="hint" style="margin:0 14px">Live demo account. With the real server, this aggregates across all customers.</div>';
+      '<div class="card"><div class="row"><span>Live (FX) balances</span><b>'+usd(bySrv.fx)+'</b></div>'+
+        '<div class="row"><span>Crypto balances</span><b>'+usd(bySrv.crypto)+'</b></div>'+
+        '<div class="row"><span>Sports balances</span><b>'+usd(bySrv.sports)+'</b></div>'+
+        '<div class="row"><span>Pending approvals</span><b>'+pend+'</b></div></div>'+
+      '<div class="hint" style="margin:0 14px">'+(connected?'Aggregated across all customers · Supabase, real-time.':'Not connected to server.')+'</div>';
   }
 
   function viewApprovals(){
