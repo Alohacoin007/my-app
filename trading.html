@@ -142,6 +142,11 @@ input{font-family:inherit;outline:none;border:none;background:none;color:inherit
 /* On phones the device frame's status bar is gone, so the 56px header top
    padding is too tall — shrink it (keep notch clearance via safe-area). */
 @media (max-width:600px){ html,body{ min-height:0 !important; height:100dvh !important; overflow:hidden !important; margin:0 !important; background:#1B3955 !important; } }
+/* Installed (standalone) PWA has no Safari toolbar, so 100dvh can stop short of the
+   physical bottom and leak the navy app background under the footer. Use full 100vh
+   in standalone so the footer reaches the very bottom (like the Sports app). */
+.fx-mobile-shell{ height:100dvh; }
+@media (display-mode:standalone){ html,body{ height:100vh !important; } .fx-mobile-shell{ height:100vh; } }
 @media (max-width:600px){ .app-hdr, .chart-hdr{ padding-top: max(10px, env(safe-area-inset-top)) !important; } }
 /* Footer is an in-flow flex row at the bottom of the 100dvh column (same as
    desktop), so it stays pinned to the real visible bottom and never floats when
@@ -3677,7 +3682,7 @@ function Root(){
   // fill-container logic have a bounded parent (prevents infinite growth).
   if(isMobile){
     return(
-      <div style={{height:'100dvh',width:'100%',overflow:'hidden',background:'#1B3955'}}>
+      <div className="fx-mobile-shell" style={{width:'100%',overflow:'hidden',background:'#1B3955'}}>
         <App/>
       </div>
     );
@@ -3697,7 +3702,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v64';
+(function(){try{var b=document.createElement('div');b.textContent='FX v65';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
