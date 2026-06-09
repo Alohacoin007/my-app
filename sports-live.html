@@ -1179,7 +1179,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.6</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.7</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -2259,6 +2259,20 @@
     }
     return null;
   }
+  // Generic live commentary for REAL (ESPN-fed) games — no player pool needed and
+  // no score/odds changes. Pure flavour so a real live card still feels live.
+  function genericPlay(g){
+    const t=Math.random()<0.5?g.home:g.away;
+    const nm=t.ab||t.nm||'';
+    const L={
+      MLB:[`${nm} base hit`,'Strikeout swinging','Full count',`${nm} walks`,'Fly out to center','Ground out 6-3',`${nm} doubles to the gap`,'Pitching change',`${nm} steals second`,'Foul ball'],
+      NBA:[`${nm} bucket`,`${nm} misses the three`,'Turnover',`${nm} grabs the rebound`,'Trip to the line',`Timeout · ${nm}`,`Fast break · ${nm}`,'Shot clock violation',`${nm} and-one!`],
+      NFL:[`${nm} 1st down`,'Incomplete pass',`${nm} run up the middle`,'Punt','Sack!','Field goal is good',`${nm} 3rd & long`,'Flag on the play',`${nm} deep shot`,'Two-minute warning'],
+      NHL:[`${nm} shot on goal`,'Big save!',`Faceoff won by ${nm}`,`${nm} on the power play`,'Icing',`${nm} hit along the boards`,'Puck behind the net',`${nm} breakaway!`]
+    };
+    const arr=L[g.lg]||[`${nm} possession`,'Play under review',`${nm} on the attack`];
+    return {team:t.ab||'',txt:arr[Math.floor(Math.random()*arr.length)]};
+  }
   // shift moneyline + spread in response to a score
   function reactOddsToScore(g,scoredSide){
     g.core.ml.forEach(b=>{
@@ -2355,6 +2369,14 @@
           const np=nonScoringPlay(g,side);
           if(np)g.lastPlay={kind:'play',team:side.ab,txt:np,pts:0,seq:(g._seq=(g._seq||0)+1)};
         }
+      }
+    });
+    // Real (ESPN) live games: add commentary ONLY — never touch the real score or
+    // odds. The 30s loadLive refresh keeps the real score/time accurate.
+    GAMES.filter(g=>g.live && g.real).forEach(g=>{
+      if(Math.random()<0.55){
+        const np=genericPlay(g);
+        if(np)g.lastPlay={kind:'play',team:np.team,txt:np.txt,pts:0,seq:(g._seq=(g._seq||0)+1)};
       }
     });
     renderGames();if(!legsEl.dataset.props&&legs.length)drawLegs();calc();
