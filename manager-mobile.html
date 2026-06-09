@@ -81,6 +81,25 @@
   function ago(ts){if(!ts)return '';var s=Math.floor((Date.now()-ts)/1000);if(s<60)return s+'s ago';var m=(s/60|0);if(m<60)return m+'m ago';var h=(m/60|0);if(h<24)return h+'h ago';return (h/24|0)+'d ago';}
   // Requests pulled from the shared server (all customers). Filled by pullServer().
   var SRV_REQS=[];
+  // Real customers + their accounts, pulled from Supabase (players/accounts tables).
+  var SRV_PLAYERS=[], SRV_ACCOUNTS=[], PLAYER_FILTER='';
+  function pullPlayers(){
+    if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('players').select('id,cust_id,name,email,created_at').then(function(r){
+      if(r&&r.data){ SRV_PLAYERS=r.data; if(cur==='players'&&!busyEditing())render(); }
+    },function(){});
+    AlpexaSync.db.from('accounts').select('player_id,server,acct_no,balance').then(function(r){
+      if(r&&r.data){ SRV_ACCOUNTS=r.data; if(cur==='players'&&!busyEditing())render(); }
+    },function(){});
+  }
+  // Approximate balance for a customer = approved deposits − approved withdrawals.
+  // (Live balances live on the customer's device; this is the server-side proxy.)
+  function custBalance(custId){
+    var dep=0,wd=0;
+    SRV_REQS.forEach(function(r){ if(r.cust_id!==custId||r.status!=='approved')return;
+      if(r.type==='deposit')dep+=(+r.amount||0); else if(r.type==='withdraw')wd+=(+r.amount||0); });
+    return dep-wd;
+  }
   function srvToLocal(r){return {id:r.local_id,ts:r.created_at?Date.parse(r.created_at):Date.now(),
     type:r.type,server:r.server,amount:+r.amount||0,fee:+r.fee||0,net:+r.net||0,
     asset:r.asset,network:r.network,address:r.address,from:r.from_label,to:r.to_label,
