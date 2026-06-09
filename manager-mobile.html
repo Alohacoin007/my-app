@@ -88,6 +88,8 @@
   // exposure; per-customer = query only that customer's rows (on demand).
   var POS_TOP=[], POS_COUNT=0, POS_BY_CUST={}, OPEN_SEARCH='';
   function custName(id){ for(var i=0;i<SRV_PLAYERS.length;i++){ if(SRV_PLAYERS[i].cust_id===id) return SRV_PLAYERS[i].name||id; } return id; }
+  function badgeKyc(k){ k=k||'pending'; var c=k==='verified'?'won':k==='rejected'?'lost':'cashed'; return '<span class="badge '+c+'">KYC '+k+'</span>'; }
+  function badgeStatus(s){ s=s||'active'; var c=s==='blocked'?'lost':s==='limited'?'cashed':'won'; return '<span class="badge '+c+'">'+s+'</span>'; }
   function pullOpenSummary(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
     AlpexaSync.db.from('positions').select('id',{count:'exact',head:true}).eq('status','open').then(function(r){ if(r&&typeof r.count==='number'){ POS_COUNT=r.count; if(cur==='bets'&&!busyEditing())render(); } },function(){});
     AlpexaSync.db.from('positions').select('*').eq('status','open').order('potential',{ascending:false,nullsFirst:false}).limit(40).then(function(r){ if(r&&r.data){ POS_TOP=r.data; if(cur==='bets'&&!busyEditing())render(); } },function(){});
@@ -116,7 +118,7 @@
   function savePlayer(custId){
     if(!window.AlpexaSync||!AlpexaSync.db){ toast('Not connected to server',true); return; }
     var p=null; SRV_PLAYERS.forEach(function(x){ if(x.cust_id===custId)p=x; }); if(!p){ toast('Customer not found',true); return; }
-    var patch={ name:val('ed_name'), email:val('ed_email'), phone:val('ed_phone'), dob:val('ed_dob'), country:val('ed_country'), leverage:val('ed_lev'), currency:val('ed_cur') };
+    var patch={ name:val('ed_name'), email:val('ed_email'), phone:val('ed_phone'), dob:val('ed_dob'), country:val('ed_country'), leverage:val('ed_lev'), currency:val('ed_cur'), kyc:val('ed_kyc'), status:val('ed_status') };
     AlpexaSync.db.from('players').update(patch).eq('cust_id',custId).then(function(r){ if(r&&r.error)toast('Profile error: '+r.error.message,true); },function(){});
     var accs=SRV_ACCOUNTS.filter(function(a){ return a.player_id===p.id; });
     ['fx','crypto','sports'].forEach(function(s){
@@ -129,7 +131,7 @@
   var SRV_MAP={fx:'Alpexa Live (FX)',live:'Alpexa Live (FX)',stocks:'Alpexa Crypto',crypto:'Alpexa Crypto',demo:'Alpexa Sports',sports:'Alpexa Sports'};
   function pullPlayers(){
     if(!window.AlpexaSync||!AlpexaSync.db) return;
-    AlpexaSync.db.from('players').select('id,cust_id,name,email,created_at,phone,dob,country,server,leverage,currency').then(function(r){
+    AlpexaSync.db.from('players').select('id,cust_id,name,email,created_at,phone,dob,country,server,leverage,currency,kyc,status').then(function(r){
       if(r&&r.data){ SRV_PLAYERS=r.data; if(cur==='players'&&!busyEditing())render(); }
     },function(){
       // Older DB without the profile columns — fall back to the core fields.
@@ -344,9 +346,11 @@
       var editing=(open && PLAYER_EDIT===cid);
       var esc=function(s){return String(s==null?'':s).replace(/"/g,'&quot;');};
       var bn=function(s){ return m[s]?(+m[s].balance||0):0; };
+      var kyc=p.kyc||'pending', stt=p.status||'active';
       h+='<div class="card">'+
         '<div class="row" data-pl="'+esc(cid)+'" style="border:none;padding:0 0 6px;cursor:pointer"><b>'+(p.name||cid||'—')+' <span class="muted" style="font-weight:600;font-size:11px">'+(open?'▲':'▼')+'</span></b><b class="'+(tot>=0?'pos':'neg')+'">'+usd(tot)+'</b></div>'+
-        '<div class="req-meta">'+(p.email||'')+(joined?(' · joined '+joined):'')+'</div>';
+        '<div class="req-meta">'+(p.email||'')+(joined?(' · joined '+joined):'')+'</div>'+
+        '<div style="margin:5px 0 2px">'+badgeKyc(kyc)+' '+badgeStatus(stt)+'</div>';
       if(editing){
         h+='<label class="lbl" style="margin-top:8px">Name</label><input class="in" id="ed_name" value="'+esc(p.name)+'">'+
           '<label class="lbl" style="display:block;margin-top:8px">Email</label><input class="in" id="ed_email" value="'+esc(p.email)+'">'+
@@ -355,6 +359,10 @@
           '<label class="lbl" style="display:block;margin-top:8px">Country</label><input class="in" id="ed_country" value="'+esc(p.country)+'">'+
           '<label class="lbl" style="display:block;margin-top:8px">Leverage</label><input class="in" id="ed_lev" value="'+esc(p.leverage)+'">'+
           '<label class="lbl" style="display:block;margin-top:8px">Currency</label><input class="in" id="ed_cur" value="'+esc(p.currency)+'">'+
+          '<label class="lbl" style="display:block;margin-top:8px">KYC status</label>'+
+          '<select class="in" id="ed_kyc"><option value="pending"'+(kyc==='pending'?' selected':'')+'>pending</option><option value="verified"'+(kyc==='verified'?' selected':'')+'>verified</option><option value="rejected"'+(kyc==='rejected'?' selected':'')+'>rejected</option></select>'+
+          '<label class="lbl" style="display:block;margin-top:8px">Account status</label>'+
+          '<select class="in" id="ed_status"><option value="active"'+(stt==='active'?' selected':'')+'>active</option><option value="limited"'+(stt==='limited'?' selected':'')+'>limited</option><option value="blocked"'+(stt==='blocked'?' selected':'')+'>blocked</option></select>'+
           '<label class="lbl" style="display:block;margin-top:8px">Live (FX) balance</label><input class="in" id="ed_bal_fx" type="number" step="0.01" value="'+bn('fx')+'">'+
           '<label class="lbl" style="display:block;margin-top:8px">Crypto balance</label><input class="in" id="ed_bal_crypto" type="number" step="0.01" value="'+bn('crypto')+'">'+
           '<label class="lbl" style="display:block;margin-top:8px">Sports balance</label><input class="in" id="ed_bal_sports" type="number" step="0.01" value="'+bn('sports')+'">'+
