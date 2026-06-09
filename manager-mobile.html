@@ -481,28 +481,43 @@
   }
   function barP(v,max){var p=Math.min(100,Math.round(v/Math.max(1,max)*100));var col=p>80?'var(--neg)':p>50?'var(--warn)':'var(--pos)';
     return '<div style="height:10px;background:#eef0f3;border-radius:6px;margin-top:8px;overflow:hidden"><div style="height:100%;width:'+p+'%;background:'+col+'"></div></div><div class="hint" style="margin-top:4px">'+p+'% of bankroll committed</div>';}
+  // Sports risk: all open sports bets (for exposure-by-event analysis).
+  var RISK_POS=[];
+  function pullRisk(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('positions').select('*').eq('status','open').eq('server','sports').limit(1000).then(function(r){ if(r&&r.data){ RISK_POS=r.data; if(cur==='risk'&&!busyEditing())render(); } },function(){}); }
   function viewRisk(f){
-    var ob=openB(); var biggest=ob.reduce(function(m,b){return Math.max(m,b.potential||0);},0);
-    var maxBet=num('alpexa.maxBet',5000); var flags=[];
-    ob.forEach(function(b){ if((b.stake||0)>maxBet*0.8) flags.push('Large open bet '+usd(b.stake)+' — near max limit'); });
-    var pendWd=reqs().filter(function(w){return w.type==='withdraw'&&w.status==='pending';});
-    if(pendWd.length>=3) flags.push(pendWd.length+' withdrawals pending at once — review velocity');
-    var dep=reqs().filter(function(w){return w.type==='deposit'&&w.status==='approved';}).reduce(function(a,w){return a+(+w.amount||0);},0);
-    var wdAll=reqs().filter(function(w){return w.type==='withdraw';}).reduce(function(a,w){return a+(+w.amount||0);},0);
-    if(dep>0 && wdAll>dep*1.5 && f.turnover<dep*0.2) flags.push('Withdrawals far exceed deposits with low play — possible laundering pattern');
-    var h='<div class="sec">Exposure (#2)</div>'+
+    if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Risk</div><div class="card"><div class="empty">Not connected to server.</div></div>';
+    var pos=RISK_POS.slice();
+    var singles=pos.filter(function(x){return (+x.size||1)<=1;});
+    var parlays=pos.filter(function(x){return (+x.size||1)>1;});
+    var games={};
+    singles.forEach(function(x){ var g=x.game||'(unknown game)'; games[g]=games[g]||{stake:0,picks:{}}; games[g].stake+=(+x.stake||0);
+      var pk=x.pick||x.symbol||'?'; var p=games[g].picks[pk]=games[g].picks[pk]||{stake:0,payout:0,n:0}; p.stake+=(+x.stake||0); p.payout+=(+x.potential||0); p.n++; });
+    var gameArr=Object.keys(games).map(function(g){ var G=games[g]; var worst=0, wp='';
+      Object.keys(G.picks).forEach(function(pk){ var net=G.stake - G.picks[pk].payout; if(net<worst){worst=net;wp=pk;} });
+      return {game:g, stake:G.stake, picks:G.picks, worst:worst, worstPick:wp}; }).sort(function(a,b){return a.worst-b.worst;});
+    var totalLiab=0; gameArr.forEach(function(g){ if(g.worst<0) totalLiab+=g.worst; });
+    var parlayLiab=parlays.reduce(function(a,x){return a+(+x.potential||0);},0);
+    var limit=num('alpexa.riskLimit',20000);
+    var h='<div class="sec">Risk · exposure by event</div>'+
       '<div class="kpis">'+
-        kpi('Open liability',k0(f.liab),'if all open bets win','neg')+
-        kpi('Open bets',f.openCount,'live tickets')+
-        kpi('Biggest open',k0(biggest),'single ticket')+
-        kpi('Bankroll',k0(sportsBal()),'available')+
-      '</div>'+
-      '<div class="card"><div class="lbl">Liability vs bankroll</div>'+barP(f.liab,Math.max(f.liab,sportsBal()))+
-        '<div class="hint">When liability nears bankroll, that\'s your payout risk ceiling.</div></div>'+
-      '<div class="sec">Fraud & risk flags (#7)</div><div class="card">';
-    if(!flags.length) h+='<div class="empty">✅ No risk flags right now.</div>';
-    flags.forEach(function(fl){h+='<div class="flag"><span>⚠️</span><span>'+fl+'</span></div>';});
-    h+='</div>';
+        kpi('Worst-case liability',(totalLiab<0?'-':'')+k0(Math.abs(totalLiab)),'if worst outcomes hit','neg')+
+        kpi('Open sports bets',pos.length,'singles '+singles.length+' · parlay '+parlays.length)+
+      '</div>';
+    if(!gameArr.length && !parlays.length){ h+='<div class="card"><div class="empty">No open sports bets. (Place bets in the app, keep it open ~15s.)</div></div>'; }
+    gameArr.forEach(function(g){
+      var alert=g.worst <= -limit;
+      h+='<div class="sec">'+g.game+(alert?' 🔴 over limit':'')+'</div><div class="card">';
+      Object.keys(g.picks).forEach(function(pk){ var P=g.picks[pk]; var net=g.stake - P.payout;
+        h+='<div class="row"><span><b>'+pk+'</b><div class="req-meta" style="margin:2px 0 0">'+P.n+' bet(s) · stake '+usd(P.stake)+' · payout '+usd(P.payout)+'</div></span>'+
+          '<span class="'+(net<0?'neg':'pos')+'" style="font-weight:800">'+(net>=0?'+':'')+k0(net)+'</span></div>';
+      });
+      h+='<div class="hint">Number = book P&L if that pick wins. Worst: <b>'+(g.worstPick||'—')+'</b> ('+k0(g.worst)+').</div></div>';
+    });
+    if(parlays.length){ h+='<div class="sec">Parlays / multi · '+parlays.length+'</div><div class="card">'+
+      '<div class="row"><span>Combined potential liability</span><b class="neg">'+k0(parlayLiab)+'</b></div>'+
+      '<div class="hint">Parlays span multiple games — shown as combined max payout.</div></div>'; }
+    h+='<div class="hint" style="margin:0 14px">🔴 alert when a game\'s worst-case exceeds '+usd(limit)+'. Hedge calculator → next step.</div>';
     return h;
   }
 
@@ -665,6 +680,7 @@
     if(cur==='bets') pullOpenSummary();
     if(cur==='online') pullOnline();
     if(cur==='logs') pullLogs();
+    if(cur==='risk') pullRisk();
     if(cur==='players' && PLAYER_OPEN) pullCustPos(PLAYER_OPEN);
   } }, 8000);
   render();
