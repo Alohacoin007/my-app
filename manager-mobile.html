@@ -132,6 +132,7 @@
   function settB(){return getJSON('alpexa.settledBets',[]);}
   function sportsBal(){return num('alpexa.sportsBalance',0);}
   function cryptoBal(){return num('alpexa.cryptoBalance',3150);}
+  function fxBal(){try{var sb=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{};return +sb.fx||0;}catch(e){return 0;}}
   function CO_ADDR(){return localStorage.getItem('alpexa.companyAddr')||'0xeB25999eF152AFcb70A7C1867d85814B13369C3c';}
   // demo customer identity + 3 account numbers (generated once; real server issues these per user)
   function customer(){
@@ -187,8 +188,9 @@
         kpi('Net cash',(f.net<0?'-':'')+k0(Math.abs(f.net)),'dep - wd',f.net>=0?'pos':'neg')+
         kpi('Open liability',k0(f.liab),f.openCount+' open bets','neg')+
       '</div>'+
-      '<div class="card"><div class="row"><span>Sports balance</span><b>'+usd(sportsBal())+'</b></div>'+
+      '<div class="card"><div class="row"><span>Live (FX) balance</span><b>'+usd(fxBal())+'</b></div>'+
         '<div class="row"><span>Crypto balance</span><b>'+usd(cryptoBal())+'</b></div>'+
+        '<div class="row"><span>Sports balance</span><b>'+usd(sportsBal())+'</b></div>'+
         '<div class="row"><span>Pending approvals</span><b>'+f.pending+'</b></div></div>'+
       '<div class="hint" style="margin:0 14px">Live demo account. With the real server, this aggregates across all customers.</div>';
   }
