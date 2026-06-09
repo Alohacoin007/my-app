@@ -1191,6 +1191,7 @@ function ActionRow({ onAction }) {
 // change servers from any page (home already has one in its header).
 function ServerSwitcher({ cryptoBal }) {
   const [open, setOpen] = React.useState(false);
+  const [, bump] = React.useState(0);
   const ref = React.useRef(null);
   React.useEffect(() => {
     if (!open) return;
@@ -1198,11 +1199,18 @@ function ServerSwitcher({ cryptoBal }) {
     document.addEventListener('mousedown', h); document.addEventListener('touchstart', h);
     return () => { document.removeEventListener('mousedown', h); document.removeEventListener('touchstart', h); };
   }, [open]);
+  // Re-render in real time as the live crypto wallet total ticks.
+  React.useEffect(() => {
+    const h = () => bump((x) => x + 1);
+    window.addEventListener('alpexa-crypto-live', h);
+    return () => window.removeEventListener('alpexa-crypto-live', h);
+  }, []);
   let SB = { crypto: 10000, fx: 25000, sports: 50000 };
   try { SB = Object.assign(SB, JSON.parse(localStorage.getItem('alpexa.serverBalances') || '{}')); } catch (e) {}
-  // Use the live crypto wallet value passed in (state), so it updates instantly
-  // instead of lagging a render behind the persisted serverBalances.
-  if (typeof cryptoBal === 'number') SB.crypto = cryptoBal;
+  // Prefer the live wallet total (matches the home hero, updates every tick); fall
+  // back to the value passed in, then the persisted balance.
+  if (typeof window.__cryptoLiveUsd === 'number') SB.crypto = window.__cryptoLiveUsd;
+  else if (typeof cryptoBal === 'number') SB.crypto = cryptoBal;
   const money = (n) => '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const servers = [
     { id: 'crypto', label: 'Alpexa Crypto', desc: 'Crypto · securities', code: 'CR', bal: SB.crypto },
@@ -1380,6 +1388,20 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
     Object.values(staked).forEach((info) => { if (info && info.usd > 0) t += info.usd; });
     return t;
   })();
+  // Publish the live wallet total so the server switcher (here and, via persisted
+  // serverBalances, the FX/Sports apps) shows the same real-time crypto value as
+  // the hero instead of a static cost-basis number.
+  React.useEffect(() => {
+    window.__cryptoLiveUsd = heroLive;
+    try {
+      const sb = JSON.parse(localStorage.getItem('alpexa.serverBalances') || '{}') || {};
+      if (Math.abs((sb.crypto || 0) - heroLive) > 0.005) {
+        sb.crypto = heroLive;
+        localStorage.setItem('alpexa.serverBalances', JSON.stringify(sb));
+      }
+    } catch (e) {}
+    window.dispatchEvent(new Event('alpexa-crypto-live'));
+  }, [heroLive]);
 
   // Per-range seeded series. Last point uses live close so the chart's tip
   // moves with the tick.
@@ -13216,7 +13238,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v41';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v42';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
