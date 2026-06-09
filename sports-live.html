@@ -1183,7 +1183,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.20</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.21</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -2513,6 +2513,17 @@
   syncServerStatuses();
   setInterval(()=>{ if(!document.hidden) syncServerStatuses(); }, 15000);
   document.addEventListener('visibilitychange',()=>{ if(!document.hidden) syncServerStatuses(); });
+  // On load ONCE: adopt the server sports balance if the back office set it
+  // (server > 0 and differs). Runs once so it can't revert in-session bets.
+  (function adoptServerBalance(){
+    if(!window.AlpexaSync||!AlpexaSync.db) return;
+    try{ var me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); var acct=me&&me.accts&&me.accts.sports; if(!acct) return;
+      AlpexaSync.db.from('accounts').select('balance').eq('acct_no',acct).limit(1).then(function(r){
+        if(!r||!r.data||!r.data.length) return; var sv=+r.data[0].balance||0;
+        if(sv>0 && Math.abs(sv-balance)>0.01){ balance=sv; try{localStorage.setItem('alpexa.sportsBalance',String(balance));}catch(e){} updateWallet(); }
+      },function(){});
+    }catch(e){}
+  })();
   // settings initial application
   restartRealityCheck();
   applySelfExclusion();

@@ -3593,6 +3593,20 @@ function App(){
   const prevPnlRef=useRef(livePnl);
   const prevPnl=prevPnlRef.current;
   useEffect(()=>{prevPnlRef.current=livePnl;},[livePnl]);
+  // On load, adopt the server FX balance if the back office set it (server > 0 and
+  // differs from local). Protects owner $1M / fresh signup by ignoring 0.
+  useEffect(()=>{
+    if(!window.AlpexaSync||!AlpexaSync.db)return;
+    try{
+      const meId=JSON.parse(localStorage.getItem('alpexa.me')||'null');
+      const acct=meId&&meId.accts&&meId.accts.fx; if(!acct)return;
+      AlpexaSync.db.from('accounts').select('balance').eq('acct_no',acct).limit(1).then((r)=>{
+        if(!r||!r.data||!r.data.length)return;
+        const sv=+r.data[0].balance||0; const b=getBalances();
+        if(sv>0 && Math.abs(sv-(b.live||0))>0.01){ setBalances({...b,live:sv}); }
+      },()=>{});
+    }catch(e){}
+  },[]);
 
   return(
     <div className="app">
@@ -3711,7 +3725,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v69';
+(function(){try{var b=document.createElement('div');b.textContent='FX v70';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
