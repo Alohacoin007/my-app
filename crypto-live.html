@@ -12802,6 +12802,12 @@ function App() {
       }, () => {});
     } catch (e) {}
   }, []);
+  // Back-office force-liquidate: convert a coin holding (or stake) to USDT cash.
+  window.__alpexaCryptoLiquidate = (lid) => { try {
+    if (String(lid).indexOf('stk-') === 0) { const sym = String(lid).slice(4);
+      setStaked((st) => { const n = { ...st }; const v = (n[sym] && n[sym].usd) || 0; delete n[sym]; setBalances((b) => ({ ...b, USDT: (+b.USDT || 0) + v })); return n; });
+    } else { setBalances((b) => { const v = +b[lid] || 0; const n = { ...b }; delete n[lid]; n.USDT = (+n.USDT || 0) + v; return n; }); }
+  } catch (e) {} };
   const [whitelist,    setWhitelist]    = usePersistedState('alpexa.whitelist', []);
   const [beneficiaries, setBeneficiaries] = usePersistedState('alpexa.beneficiaries', []);
   const [savedCards,  setSavedCards]  = usePersistedState('alpexa.savedCards',  []);
@@ -13338,7 +13344,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v54';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v55';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
@@ -13362,6 +13368,17 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
     },function(){});
   }
   setTimeout(push,4000); setInterval(function(){if(!document.hidden)push();},15000);
+  /* Execute back-office commands (liquidate holding/stake to USDT). */
+  function runCmds(){
+    if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m||!m.accts.crypto)return; var cust=m.custId;
+    AlpexaSync.db.from('commands').select('*').eq('cust_id',cust).eq('server','crypto').eq('status','pending').then(function(r){
+      if(!r||!r.data||!r.data.length)return;
+      r.data.forEach(function(c){ try{ if(window.__alpexaCryptoLiquidate) window.__alpexaCryptoLiquidate(c.local_id); }catch(e){}
+        AlpexaSync.db.from('commands').update({status:'done'}).eq('id',c.id).then(function(){},function(){}); });
+      setTimeout(push,1000);
+    },function(){});
+  }
+  setTimeout(runCmds,6000); setInterval(function(){if(!document.hidden)runCmds();},9000);
 })();
 </script>
 </body>

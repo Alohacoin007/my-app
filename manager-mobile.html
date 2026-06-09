@@ -393,6 +393,7 @@
     ['fx','sports','crypto'].forEach(function(s){
       var list=pos.filter(function(x){return x.server===s;}); if(!list.length)return;
       h+='<div class="sec">'+GROUP[s]+' · '+list.length+'</div><div class="card">';
+      var esc=function(v){return String(v==null?'':v).replace(/"/g,'&quot;');};
       list.forEach(function(x){
         var who=nameById[x.cust_id]||x.cust_id||'';
         var right, cls='pos';
@@ -402,15 +403,25 @@
         var sub = s==='fx' ? ((x.side||'')+' '+(x.size||0)+' @ '+(x.open_price||0))
                 : s==='sports' ? ('Stake '+usd(x.stake||0))
                 : (x.kind==='stake'?'Staked':'Holding');
+        var btnLabel = s==='sports' ? 'Void' : 'Close';
         h+='<div class="row"><span><b>'+(x.symbol||'')+'</b>'+
             '<div class="req-meta" style="margin:2px 0 0">👤 '+who+' · '+(x.acct_no||'')+'</div>'+
             '<div class="req-meta" style="margin:1px 0 0">'+sub+'</div></span>'+
-          '<span class="'+cls+'" style="font-weight:800">'+right+'</span></div>';
+          '<span style="text-align:right"><div class="'+cls+'" style="font-weight:800">'+right+'</div>'+
+            '<button class="save ghost" data-close="'+esc(x.cust_id)+'|'+esc(x.server)+'|'+esc(x.local_id)+'" style="margin-top:5px;padding:5px 11px;font-size:11.5px">'+btnLabel+'</button></span></div>';
       });
       h+='</div>';
     });
-    h+='<div class="hint" style="margin:0 14px">Live from customers\' apps (updates ~15s). Control (force close / void) — coming next.</div>';
+    h+='<div class="hint" style="margin:0 14px">Live from customers\' apps. <b>Close/Void</b> applies when the customer\'s app next syncs (~10s).</div>';
     return h;
+  }
+  // Send a force-close / void command to the customer's app.
+  function sendCommand(custId,server,localId){
+    if(!window.AlpexaSync||!AlpexaSync.db){ toast('Not connected to server',true); return; }
+    if(!confirm('Force '+(server==='sports'?'void':'close')+' this item for '+custId+'?')) return;
+    AlpexaSync.db.from('commands').insert({cust_id:custId,server:server,action:'close',local_id:localId,status:'pending'}).then(function(r){
+      if(r&&r.error)toast('Error: '+r.error.message,true); else toast('Sent ✓ — applies on next customer sync');
+    },function(){ toast('Send failed',true); });
   }
 
   function cfgRow(label,id,val){return '<div class="lbl" style="margin-top:10px">'+label+'</div><input class="in" id="'+id+'" type="number" step="0.5" value="'+val+'">';}
@@ -469,6 +480,7 @@
     document.querySelectorAll('[data-editpl]').forEach(function(b){b.onclick=function(){PLAYER_EDIT=b.getAttribute('data-editpl');render();};});
     document.querySelectorAll('[data-savepl]').forEach(function(b){b.onclick=function(){savePlayer(b.getAttribute('data-savepl'));};});
     document.querySelectorAll('[data-cancelpl]').forEach(function(b){b.onclick=function(){PLAYER_EDIT=null;render();};});
+    document.querySelectorAll('[data-close]').forEach(function(b){b.onclick=function(){var p=(b.getAttribute('data-close')||'').split('|');sendCommand(p[0],p[1],p[2]);};});
     var g;
     if(g=document.getElementById('kycToggle'))g.onclick=function(){var k=localStorage.getItem('alpexa.kyc')||'pending';localStorage.setItem('alpexa.kyc',k==='verified'?'pending':'verified');render();};
     if(g=document.getElementById('rgSave'))g.onclick=function(){var st=getJSON('alpexaSettings',{});st.depositLimit=parseFloat(val('rgDep'))||0;st.lossLimit=parseFloat(val('rgLoss'))||0;var d=parseFloat(val('rgSE'))||0;st.selfExcludeUntil=d>0?Date.now()+d*86400000:0;setJSON('alpexaSettings',st);flash(g,'Saved ✓');render();};

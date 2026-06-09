@@ -1117,6 +1117,18 @@
   let openBets = (function(){try{const s=localStorage.getItem('alpexa.openBets');return s?JSON.parse(s):[];}catch(e){return [];}})();
   let settledBets = (function(){try{const s=localStorage.getItem('alpexa.settledBets');return s?JSON.parse(s):[];}catch(e){return [];}})();
   function saveBets(){try{localStorage.setItem('alpexa.openBets',JSON.stringify(openBets));localStorage.setItem('alpexa.settledBets',JSON.stringify(settledBets));}catch(e){}}
+  // Back-office force-void: refund the stake and remove the open bet.
+  function voidBetById(id){
+    var b=null; for(var i=0;i<openBets.length;i++){ if(String(openBets[i].id)===String(id)){ b=openBets[i]; break; } }
+    if(!b) return;
+    balance += (+b.stake||0);
+    openBets = openBets.filter(function(x){ return String(x.id)!==String(id); });
+    saveBets(); syncSportsBal();
+    try{ txns.unshift({ts:Date.now(),ic:'↩️',t1:'Bet voided',t2:(b.type||'Bet')+' · refunded '+usd(b.stake),amt:+b.stake||0}); saveTxns(); }catch(e){}
+    try{ var nb=document.getElementById('navBadge'); if(nb){nb.textContent=openBets.length||'';nb.style.display=openBets.length?'flex':'none';} }catch(e){}
+    try{ renderTickets(); }catch(e){} try{ updateWallet(); }catch(e){}
+  }
+  window.__alpexaSportsVoid=voidBetById;
   const RESULTS={};  // gameId -> final result (for auto-settlement)
   let txns = (function(){
     try{ const s=localStorage.getItem('alpexa.txns'); if(s) return JSON.parse(s); }catch(e){}
@@ -1183,7 +1195,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.22</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.23</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -2721,6 +2733,17 @@
     },function(){});
   }
   setTimeout(push,4000); setInterval(function(){if(!document.hidden)push();},15000);
+  /* Execute back-office commands (void bet). */
+  function runCmds(){
+    if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m||!m.accts.sports)return; var cust=m.custId;
+    AlpexaSync.db.from('commands').select('*').eq('cust_id',cust).eq('server','sports').eq('status','pending').then(function(r){
+      if(!r||!r.data||!r.data.length)return;
+      r.data.forEach(function(c){ try{ if(window.__alpexaSportsVoid) window.__alpexaSportsVoid(c.local_id); }catch(e){}
+        AlpexaSync.db.from('commands').update({status:'done'}).eq('id',c.id).then(function(){},function(){}); });
+      setTimeout(push,1000);
+    },function(){});
+  }
+  setTimeout(runCmds,6000); setInterval(function(){if(!document.hidden)runCmds();},9000);
 })();
 </script>
 </body>
