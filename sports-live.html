@@ -1195,7 +1195,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.23</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.24</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -2723,6 +2723,7 @@
   function push(){
     if(!window.AlpexaSync||!AlpexaSync.db)return;
     var m=meX(); if(!m||!m.accts.sports)return; var cust=m.custId, acct=m.accts.sports;
+    AlpexaSync.db.from('players').update({last_seen:new Date().toISOString(),last_app:'sports'}).eq('cust_id',cust).then(function(){},function(){});
     var items=[];
     try{var ob=JSON.parse(localStorage.getItem('alpexa.openBets')||'[]')||[];
       ob.forEach(function(b){ if(!b)return; var leg=(b.legs&&b.legs[0])?(b.legs[0].pk||b.legs[0].sel||''):''; var more=(b.legs&&b.legs.length>1)?(' +'+(b.legs.length-1)):'';

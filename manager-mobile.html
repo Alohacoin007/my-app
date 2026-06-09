@@ -146,6 +146,11 @@
       if(r.type==='deposit')dep+=(+r.amount||0); else if(r.type==='withdraw')wd+=(+r.amount||0); });
     return dep-wd;
   }
+  // Presence: customers whose app reported a heartbeat in the last 90 seconds.
+  var ONLINE=[];
+  function pullOnline(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    var cutoff=new Date(Date.now()-90000).toISOString();
+    AlpexaSync.db.from('players').select('cust_id,name,email,last_seen,last_app').gt('last_seen',cutoff).order('last_seen',{ascending:false}).limit(300).then(function(r){ if(r&&r.data){ ONLINE=r.data; if(cur==='online'&&!busyEditing())render(); } },function(){}); }
   function srvToLocal(r){return {id:r.local_id,ts:r.created_at?Date.parse(r.created_at):Date.now(),
     type:r.type,server:r.server,amount:+r.amount||0,fee:+r.fee||0,net:+r.net||0,
     asset:r.asset,network:r.network,address:r.address,from:r.from_label,to:r.to_label,
@@ -184,7 +189,7 @@
       hold: settledStake? (ggr/settledStake*100):0, pending:R.filter(function(w){return w.status==='pending';}).length};
   }
 
-  var TABS=[['overview','Overview'],['approvals','Approvals'],['history','History'],['players','Players'],['risk','Risk'],['bets','Open'],['config','Config']];
+  var TABS=[['overview','Overview'],['approvals','Approvals'],['history','History'],['players','Players'],['online','Online'],['risk','Risk'],['bets','Open'],['config','Config']];
   var cur='overview';
   function renderTabs(){
     document.getElementById('tabs').innerHTML=TABS.map(function(t){return '<button class="tab '+(t[0]===cur?'on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';}).join('');
@@ -199,6 +204,7 @@
     else if(cur==='approvals')h=viewApprovals();
     else if(cur==='history')h=viewHistory();
     else if(cur==='players')h=viewPlayers(f);
+    else if(cur==='online')h=viewOnline();
     else if(cur==='risk')h=viewRisk(f);
     else if(cur==='bets')h=viewBets();
     else if(cur==='config')h=viewConfig();
@@ -378,6 +384,22 @@
     return h;
   }
 
+  function viewOnline(){
+    if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Online now</div><div class="card"><div class="empty">Not connected to server.</div></div>';
+    var APP={fx:'Live (FX)',crypto:'Crypto',sports:'Sports'};
+    var h='<div class="sec">Online now · '+ONLINE.length+'</div>';
+    if(!ONLINE.length){ h+='<div class="card"><div class="empty">No customers online right now.<br>(Customers show here while their app is open.)</div></div>'; return h; }
+    h+='<div class="card">';
+    ONLINE.forEach(function(p){
+      var ts=p.last_seen?Date.parse(p.last_seen):0;
+      var app=APP[p.last_app]||p.last_app||'';
+      h+='<div class="row"><span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#22C55E;margin-right:8px;vertical-align:middle"></span><b>'+(p.name||p.cust_id||'—')+'</b>'+
+        '<div class="req-meta" style="margin:2px 0 0 17px">'+(app?app+' · ':'')+(p.cust_id||'')+' · '+ago(ts)+'</div></span>'+
+        '<button class="save ghost" data-pcust="'+(p.cust_id||'').replace(/"/g,'&quot;')+'" style="margin-top:0;padding:6px 12px">View</button></div>';
+    });
+    h+='</div><div class="hint" style="margin:0 14px">Online = active in the last 90 seconds · refreshes ~8s. Tap View to open the customer.</div>';
+    return h;
+  }
   function barP(v,max){var p=Math.min(100,Math.round(v/Math.max(1,max)*100));var col=p>80?'var(--neg)':p>50?'var(--warn)':'var(--pos)';
     return '<div style="height:10px;background:#eef0f3;border-radius:6px;margin-top:8px;overflow:hidden"><div style="height:100%;width:'+p+'%;background:'+col+'"></div></div><div class="hint" style="margin-top:4px">'+p+'% of bankroll committed</div>';}
   function viewRisk(f){
@@ -503,6 +525,7 @@
     document.querySelectorAll('[data-cancelpl]').forEach(function(b){b.onclick=function(){PLAYER_EDIT=null;render();};});
     document.querySelectorAll('[data-close]').forEach(function(b){b.onclick=function(){var p=(b.getAttribute('data-close')||'').split('|');sendCommand(p[0],p[1],p[2]);};});
     var os=document.getElementById('openSearch'); if(os){os.oninput=function(){OPEN_SEARCH=os.value;render();var n=document.getElementById('openSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
+    document.querySelectorAll('[data-pcust]').forEach(function(b){b.onclick=function(){PLAYER_OPEN=b.getAttribute('data-pcust');PLAYER_FILTER='';cur='players';render();};});
     var g;
     if(g=document.getElementById('kycToggle'))g.onclick=function(){var k=localStorage.getItem('alpexa.kyc')||'pending';localStorage.setItem('alpexa.kyc',k==='verified'?'pending':'verified');render();};
     if(g=document.getElementById('rgSave'))g.onclick=function(){var st=getJSON('alpexaSettings',{});st.depositLimit=parseFloat(val('rgDep'))||0;st.lossLimit=parseFloat(val('rgLoss'))||0;var d=parseFloat(val('rgSE'))||0;st.selfExcludeUntil=d>0?Date.now()+d*86400000:0;setJSON('alpexaSettings',st);flash(g,'Saved ✓');render();};
@@ -524,9 +547,10 @@
   setInterval(function(){ if(cur==='overview'||cur==='approvals'||cur==='risk'||cur==='bets') render(); }, 4000);
   // Pull every customer's requests from the shared server.
   function pullServer(){ if(!window.AlpexaSync||!AlpexaSync.db) return; AlpexaSync.pullAll().then(function(rows){ SRV_REQS=rows||[]; if(!busyEditing()) render(); }).catch(function(){}); }
-  pullServer(); pullPlayers(); pullOpenSummary();
+  pullServer(); pullPlayers(); pullOpenSummary(); pullOnline();
   setInterval(function(){ if(!document.hidden){ pullServer(); pullPlayers();
     if(cur==='bets') pullOpenSummary();
+    if(cur==='online') pullOnline();
     if(cur==='players' && PLAYER_OPEN) pullCustPos(PLAYER_OPEN);
   } }, 8000);
   render();
