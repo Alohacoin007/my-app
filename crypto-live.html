@@ -52,6 +52,19 @@
   }
   .alpexa-hide-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
   .alpexa-hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  /* Kill the browser autofill yellow highlight — paint the field with the app's
+     own surface color (set per theme via --alpexa-field-bg) instead. */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active,
+  textarea:-webkit-autofill,
+  select:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 1000px var(--alpexa-field-bg, #F6F7F9) inset !important;
+    -webkit-text-fill-color: var(--alpexa-field-fg, #0F1419) !important;
+    caret-color: var(--alpexa-field-fg, #0F1419);
+    transition: background-color 9999s ease-in-out 0s !important;
+  }
   @keyframes alpexa-movers-scroll {
     from { transform: translateX(0); }
     to   { transform: translateX(-50%); }
@@ -171,9 +184,20 @@ const LIGHT_PALETTE = {
 // Mutable palette object — all RH.x reads pick up whichever palette is active.
 // Toggled via the ThemeContext (Account → Appearance).
 const RH = { ...DARK_PALETTE };
+// Expose the active field background/text to CSS so the autofill override can
+// repaint over the browser's yellow highlight in the current theme.
+const syncFieldVars = () => {
+  try {
+    const root = document.documentElement;
+    root.style.setProperty('--alpexa-field-bg', RH.surface);
+    root.style.setProperty('--alpexa-field-fg', RH.text);
+  } catch (e) {}
+};
 const applyTheme = (mode) => {
   Object.assign(RH, mode === 'light' ? LIGHT_PALETTE : DARK_PALETTE);
+  syncFieldVars();
 };
+try { syncFieldVars(); } catch (e) {}
 
 // Deterministic per-user deposit address generator. Each Alpexa user gets a
 // unique address per network — funds sent there are auto-credited (in production
@@ -13276,7 +13300,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v49';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v50';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
