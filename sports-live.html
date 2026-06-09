@@ -1179,7 +1179,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.11</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.12</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -1879,8 +1879,11 @@
       if(type==='withdraw' && w.status==='rejected' && !w.refunded){ balance+=w.amount; w.refunded=true; changed=true; updateTxnByReq(w.id,{ic:'↩️',t2:`Rejected by admin · refunded`,amt:0}); }
       if(type==='deposit' && w.status==='approved' && !w.credited){ balance+=w.amount; w.credited=true; changed=true; updateTxnByReq(w.id,{ic:'⬇️',t2:`${w.asset||'USDT'} · Approved`}); }
       if(type==='deposit' && w.status==='rejected' && !w.handled){ w.handled=true; changed=true; updateTxnByReq(w.id,{ic:'⛔',t2:`${w.asset||'USDT'} · Rejected by admin`,amt:0}); }
-      if(type==='transfer' && w.status==='approved' && !w.done){ w.done=true; changed=true; if(w.toKey==='sports'){balance+=w.amount;} else { const cr=srvByKey(w.toKey||'crypto'); if(cr){ cr.bal+=w.amount; if((w.toKey||'crypto')==='crypto'){saveCryptoBal(); adjustCryptoUsdt(+w.amount); pushCryptoTx({type:'transfer',sym:'USDT',usd:w.amount,from:'sports',to:'crypto'});} } } updateTxnByReq(w.id,{t2:`${w.from||'Sports'} → ${w.to||'Crypto'} · Approved`}); }
-      if(type==='transfer' && w.status==='rejected' && !w.refunded){ w.refunded=true; changed=true; if((w.fromKey||'sports')==='sports'){balance+=w.amount;} else { const cr=srvByKey(w.fromKey); if(cr){ cr.bal+=w.amount; if(w.fromKey==='crypto'){saveCryptoBal(); adjustCryptoUsdt(+w.amount); pushCryptoTx({type:'transfer',sym:'USDT',usd:w.amount,from:'sports',to:'crypto'});} } } updateTxnByReq(w.id,{ic:'↩️',t2:`${w.from||'Sports'} → ${w.to||'Crypto'} · Rejected · refunded`,amt:0}); }
+      // Sports only credits/refunds ITS OWN balance. The Crypto leg (credit on
+      // approval, refund on reject) is owned by the Crypto app via Supabase, so we
+      // never touch crypto here — that previously caused double credits/debits.
+      if(type==='transfer' && w.status==='approved' && !w.done){ w.done=true; changed=true; if(w.toKey==='sports'){balance+=w.amount;} updateTxnByReq(w.id,{t2:`${w.from||'Sports'} → ${w.to||'Crypto'} · Approved`}); }
+      if(type==='transfer' && w.status==='rejected' && !w.refunded){ w.refunded=true; changed=true; if((w.fromKey||'sports')==='sports'){balance+=w.amount;} updateTxnByReq(w.id,{ic:'↩️',t2:`${w.from||'Sports'} → ${w.to||'Crypto'} · Rejected · refunded`,amt:0}); }
     });
     if(changed){ saveWithdrawals(all); syncSportsBal(); saveTxns(); }
   }
@@ -2087,7 +2090,7 @@
     if(v>balOf(tfFrom)){showToast('⚠️','Insufficient balance',`${from.short.replace('Alpexa ','')} is too low`);return;}
     // All server-to-server transfers require back-office approval (funds held until approved).
     if(tfFrom==='sports'){ balance-=v; syncSportsBal(); }
-    else { from.bal-=v; if(from.key==='crypto'){ saveCryptoBal(); adjustCryptoUsdt(-v); pushCryptoTx({type:'transfer',sym:'USDT',usd:v,from:'crypto',to:'sports'}); } }
+    else { from.bal-=v; if(from.key==='crypto') saveCryptoBal(); /* Crypto balance+history are owned by the Crypto app, which debits this from Supabase. */ }
     const fromNm=from.short.replace('Alpexa ',''), toNm=to.short.replace('Alpexa ','');
     const tid='tf_'+Date.now();
     const reqs=loadWithdrawals();

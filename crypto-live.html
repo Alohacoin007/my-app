@@ -12786,27 +12786,48 @@ function App() {
   React.useEffect(() => {
     if (!window.AlpexaSync || !AlpexaSync.db) return;
     let stop = false;
+    const srvN = (x) => { x = String(x || '').toLowerCase(); if (x.indexOf('crypto') >= 0 || x === 'cr') return 'crypto'; if (x.indexOf('sport') >= 0 || x === 'sp') return 'sports'; if (x.indexOf('fx') >= 0 || x.indexOf('live') >= 0) return 'fx'; return x; };
     const tick = () => {
-      // Credit transfers that OTHER apps sent to Crypto (idempotent across apps).
+      // (1) Incoming transfers OTHER apps sent TO Crypto: credit + record once.
       AlpexaSync.pullIncomingTransfers('crypto').then((legs) => {
         if (stop || !legs || !legs.length) return;
-        legs.forEach((l) => { setBalances((b) => ({ ...b, USDT: (b.USDT || 0) + l.amount })); });
+        legs.forEach((l) => {
+          setBalances((b) => ({ ...b, USDT: (b.USDT || 0) + l.amount }));
+          pushTx({ id: 'in-' + l.id, type: 'transfer', sym: 'USDT', usd: l.amount, from: l.from, to: 'crypto', approvedAt: Date.now() });
+        });
         if (typeof AudioFX !== 'undefined') { try { AudioFX.cash(); } catch (e) {} }
       }).catch(() => {});
       AlpexaSync.pullMine().then((rows) => {
         if (stop || !rows || !rows.length) return;
+        // (2) Status sync for requests THIS app initiated (approve/reject).
         const map = {}; rows.forEach((r) => { map[r.local_id] = r.status; });
         const list = txRef.current || [];
         const toApprove = list.filter((t) => map[t.id] === 'approved' && !t.approvedAt && !t.rejectedAt);
         const toReject  = list.filter((t) => map[t.id] === 'rejected'  && !t.rejectedAt && !t.approvedAt);
-        if (!toApprove.length && !toReject.length) return;
-        toApprove.forEach(applyApproval);
-        setTransactions((cur) => cur.map((x) => {
-          if (map[x.id] === 'approved' && !x.approvedAt) return { ...x, approvedAt: Date.now() };
-          if (map[x.id] === 'rejected' && !x.rejectedAt) return { ...x, rejectedAt: Date.now() };
-          return x;
-        }));
-        if (typeof AudioFX !== 'undefined' && toApprove.length) { try { AudioFX.cash(); } catch (e) {} }
+        if (toApprove.length || toReject.length) {
+          toApprove.forEach(applyApproval);
+          setTransactions((cur) => cur.map((x) => {
+            if (map[x.id] === 'approved' && !x.approvedAt) return { ...x, approvedAt: Date.now() };
+            if (map[x.id] === 'rejected' && !x.rejectedAt) return { ...x, rejectedAt: Date.now() };
+            return x;
+          }));
+          if (typeof AudioFX !== 'undefined' && toApprove.length) { try { AudioFX.cash(); } catch (e) {} }
+        }
+        // (3) Outgoing transfers FROM Crypto that ANOTHER app initiated (e.g. Sports
+        // pulling funds from Crypto): debit + record once. Skip ones we initiated.
+        let applied = {}; try { applied = JSON.parse(localStorage.getItem('alpexa.appliedTransfers') || '{}') || {}; } catch (e) {}
+        const localIds = {}; list.forEach((t) => { localIds[t.id] = 1; });
+        let changed = false;
+        rows.forEach((r) => {
+          if ((r.type || '') !== 'transfer' || (r.status || '') !== 'approved') return;
+          const amt = +r.amount || 0; if (!(amt > 0)) return;
+          if (srvN(r.from_label) !== 'crypto' || srvN(r.to_label) === 'crypto') return;
+          if (localIds[r.local_id] || applied[r.local_id + ':out']) return;
+          setBalances((b) => ({ ...b, USDT: Math.max(0, (b.USDT || 0) - amt) }));
+          pushTx({ id: 'out-' + r.local_id, type: 'transfer', sym: 'USDT', usd: amt, from: 'crypto', to: srvN(r.to_label), approvedAt: Date.now() });
+          applied[r.local_id + ':out'] = 1; changed = true;
+        });
+        if (changed) { try { localStorage.setItem('alpexa.appliedTransfers', JSON.stringify(applied)); } catch (e) {} }
       }).catch(() => {});
     };
     tick();
@@ -13238,7 +13259,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v43';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v44';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
