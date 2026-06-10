@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Alpexa Partners · Agent Portal</title>
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<meta name="theme-color" content="#16243F">
+<style>
+  :root{--acc:#16243F;--pos:#1e8e3e;--neg:#d93025;--dim:#5f6b7a;--line:#e7ebf0}
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,system-ui,'Roboto',sans-serif;background:#f2f4f7;color:#1c2430;min-height:100vh}
+  #wrap{max-width:430px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+  .hdr{background:var(--acc);color:#fff;padding:18px 16px 14px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:20}
+  .hdr b{font-size:16.5px}
+  .hdr .sub{font-size:11px;opacity:.75;margin-top:2px}
+  .hdr button{margin-left:auto;background:rgba(255,255,255,.14);color:#fff;border:none;border-radius:9px;padding:8px 12px;font:700 11.5px system-ui;cursor:pointer}
+  .sec{font:700 12px system-ui;color:var(--dim);letter-spacing:.4px;text-transform:uppercase;margin:16px 14px 8px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:14px;margin:0 12px 10px;padding:14px}
+  .row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #f1f3f6;font-size:13.5px}
+  .row:last-child{border-bottom:none}
+  .pos{color:var(--pos)} .neg{color:var(--neg)} .muted{color:var(--dim)}
+  .meta{font-size:11.5px;color:var(--dim)}
+  .in{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:12px;font-size:14px;margin-top:6px;outline:none}
+  .in:focus{border-color:var(--acc)}
+  .lbl{font:700 11px system-ui;color:var(--dim);letter-spacing:.4px;text-transform:uppercase}
+  .btn{width:100%;background:var(--acc);color:#fff;border:none;border-radius:11px;padding:13px;font:700 14px system-ui;cursor:pointer;margin-top:12px}
+  .empty{text-align:center;color:#9aa6b4;font-size:13px;padding:18px 0}
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 12px 10px}
+  .kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px}
+  .kpi .k{font:700 10.5px system-ui;color:var(--dim);text-transform:uppercase;letter-spacing:.4px}
+  .kpi .v{font:800 19px system-ui;margin-top:4px}
+  .kpi .s{font-size:10.5px;color:var(--dim);margin-top:2px}
+  .ranges{display:flex;gap:6px;margin:14px 12px 12px}
+  .ranges button{flex:1;background:#e8eef7;color:var(--dim);border-radius:10px;padding:9px 0;font:700 12.5px system-ui;border:none;cursor:pointer}
+  .ranges button.on{background:var(--acc);color:#fff}
+  .badge{font:700 9.5px system-ui;padding:3px 7px;border-radius:5px;letter-spacing:.3px}
+  .badge.won{background:#e6f4ea;color:#1e8e3e}.badge.lost{background:#fdecea;color:#d93025}.badge.open{background:#eef0f3;color:#5f6b7a}
+  .hint{font-size:11px;color:#9aa6b4;margin:8px 14px 16px;line-height:1.5}
+  .login{flex:1;display:flex;align-items:center;justify-content:center;padding:24px}
+  .login .card{width:100%;max-width:360px;margin:0;padding:24px 20px}
+  .err{color:var(--neg);font:700 12.5px system-ui;text-align:center;margin-top:10px;display:none}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div id="wrap"></div>
+<script>
+  var db=null; try{ db=window.supabase.createClient('https://grxnbgtfnaayeluenvqh.supabase.co','sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu'); }catch(e){}
+  var AGENT=null, LINKS=[], SETTLE=[], NAMES={}, RANGE='30d';
+  function usd(n){n=+n||0;return '$'+n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});}
+  function el(){return document.getElementById('wrap');}
+
+  function viewLogin(msg){
+    el().innerHTML='<div class="login"><div class="card">'+
+      '<div style="text-align:center;margin-bottom:18px"><div style="font:800 20px system-ui;color:var(--acc)">Alpexa Partners</div>'+
+      '<div class="meta" style="margin-top:4px">Agent commission portal</div></div>'+
+      '<label class="lbl">Agent code</label><input class="in" id="lgCode" placeholder="AG-1234" autocomplete="off">'+
+      '<label class="lbl" style="display:block;margin-top:12px">PIN</label><input class="in" id="lgPin" type="password" inputmode="numeric" placeholder="••••" autocomplete="off">'+
+      '<button class="btn" id="lgGo">Sign in</button>'+
+      '<div class="err" id="lgErr"></div></div></div>';
+    if(msg){ var e=document.getElementById('lgErr'); e.textContent=msg; e.style.display='block'; }
+    document.getElementById('lgGo').onclick=doLogin;
+    document.getElementById('lgPin').onkeydown=function(ev){ if(ev.key==='Enter')doLogin(); };
+  }
+  function doLogin(){
+    var code=(document.getElementById('lgCode').value||'').trim().toUpperCase();
+    var pin=(document.getElementById('lgPin').value||'').trim();
+    var err=document.getElementById('lgErr');
+    if(!db){ err.textContent='No server connection.'; err.style.display='block'; return; }
+    if(!code||!pin){ err.textContent='Enter your code and PIN.'; err.style.display='block'; return; }
+    db.from('agents').select('*').eq('code',code).limit(1).then(function(r){
+      var a=r&&r.data&&r.data[0];
+      if(!a||String(a.pin)!==pin){ err.textContent='Wrong code or PIN.'; err.style.display='block'; return; }
+      if(a.status&&a.status!=='active'){ err.textContent='This agent account is not active.'; err.style.display='block'; return; }
+      AGENT=a; try{ sessionStorage.setItem('alpexa.agent',code+'|'+pin); }catch(e){}
+      pull(); viewDash();
+    },function(){ err.textContent='Connection error — try again.'; err.style.display='block'; });
+  }
+  function logout(){ AGENT=null; try{ sessionStorage.removeItem('alpexa.agent'); }catch(e){} viewLogin(); }
+
+  function range(){ var now=Date.now(), lo=0, label='All time';
+    if(RANGE==='today'){ var d=new Date(); d.setHours(0,0,0,0); lo=d.getTime(); label='Today'; }
+    else if(RANGE==='7d'){ lo=now-7*86400e3; label='Last 7 days'; }
+    else if(RANGE==='30d'){ lo=now-30*86400e3; label='Last 30 days'; }
+    return {lo:lo,hi:Infinity,label:label}; }
+
+  function commission(){
+    var rg=range(), share={};
+    LINKS.forEach(function(l){ share[l.cust_id]=(+l.share||100)/100; });
+    var fxLots=0, sportsNet=0, cryptoFees=0, n=0, perCust={};
+    SETTLE.forEach(function(s){
+      var sh=share[s.cust_id]; if(sh==null)return;
+      var t=s.created_at?Date.parse(s.created_at):0; if(!(t>=rg.lo))return; n++;
+      perCust[s.cust_id]=perCust[s.cust_id]||0;
+      if(s.server==='fx'&&s.kind==='fx_close'){ fxLots+=(+s.stake||0)*sh; }
+      else if(s.server==='sports'&&String(s.kind||'').indexOf('bet_')===0){ var v=(-(+s.pnl||0))*sh; sportsNet+=v; perCust[s.cust_id]+=v; }
+      else if(s.kind==='crypto_fee'){ cryptoFees+=(+s.stake||0)*sh; }
+    });
+    var a=AGENT||{};
+    var cFx=fxLots*(+a.fx_per_lot||0), cSp=sportsNet*((+a.sports_net_pct||0)/100), cCr=cryptoFees*((+a.crypto_fee_pct||0)/100);
+    return {label:rg.label,lo:rg.lo,fxLots:fxLots,sportsNet:sportsNet,cryptoFees:cryptoFees,cFx:cFx,cSp:cSp,cCr:cCr,total:cFx+cSp+cCr,n:n,perCust:perCust};
+  }
+
+  function viewDash(){
+    if(!AGENT){ viewLogin(); return; }
+    var c=commission();
+    var KINDS={fx_close:'FX close',bet_won:'Bet won',bet_lost:'Bet lost',bet_cashout:'Cashout',bet_void:'Void'};
+    var h='<div class="hdr"><div><b>'+(AGENT.name||AGENT.code)+'</b><div class="sub">'+AGENT.code+' · Partner portal</div></div><button id="btnOut">Sign out</button></div>';
+    h+='<div class="ranges">'+[['today','Today'],['7d','7d'],['30d','30d'],['all','All']].map(function(x){
+      return '<button data-r="'+x[0]+'" class="'+(RANGE===x[0]?'on':'')+'">'+x[1]+'</button>'; }).join('')+'</div>';
+    h+='<div class="kpis">'+
+      kpi('My commission',usd(Math.max(0,c.total)),c.label+' · '+c.n+' trades',c.total>=0?'pos':'neg')+
+      kpi('FX',usd(c.cFx),(Math.round(c.fxLots*100)/100)+' lots × $'+(+AGENT.fx_per_lot||0),'pos')+
+      kpi('Sports',(c.cSp<0?'-':'')+usd(Math.abs(c.cSp)),'pool net × '+(+AGENT.sports_net_pct||0)+'%',c.cSp>=0?'pos':'neg')+
+      kpi('Crypto',usd(c.cCr),'fees × '+(+AGENT.crypto_fee_pct||0)+'%','pos')+
+    '</div>';
+    if(c.cSp<0) h+='<div class="hint" style="color:var(--neg)">Sports pool is negative this period (your customers won) — it carries over; payout is $0 until it recovers.</div>';
+    h+='<div class="sec">My customers · '+LINKS.length+'</div><div class="card">';
+    if(!LINKS.length) h+='<div class="empty">No customers linked yet.</div>';
+    LINKS.forEach(function(l){
+      var net=c.perCust[l.cust_id]||0;
+      h+='<div class="row"><span><b>'+(NAMES[l.cust_id]||l.cust_id)+'</b> <span class="muted">· '+l.cust_id+' · '+(+l.share||100)+'%</span></span>'+
+        '<b class="'+(net>=0?'pos':'neg')+'">'+(net<0?'-':'+')+usd(Math.abs(net))+'</b></div>';
+    });
+    h+='</div><div class="hint">Customer column = sports net result in period (your share). FX/crypto accrue per trade/fee.</div>';
+    var rg=range(), myIds={}; LINKS.forEach(function(l){ myIds[l.cust_id]=true; });
+    var trades=SETTLE.filter(function(s){ var t=s.created_at?Date.parse(s.created_at):0; return myIds[s.cust_id] && t>=rg.lo; }).slice(0,30);
+    h+='<div class="sec">Recent trades</div><div class="card">';
+    if(!trades.length) h+='<div class="empty">No trades in this period.</div>';
+    trades.forEach(function(s){ var p=+s.pnl||0; var bcls=(KINDS[s.kind]==='Void')?'open':(p>=0?'won':'lost');
+      h+='<div class="row"><span><span class="badge '+bcls+'">'+(KINDS[s.kind]||s.kind||'Trade').toUpperCase()+'</span> <b style="font-size:12.5px">'+(s.symbol||'')+'</b>'+
+        '<div class="meta" style="margin-top:2px">'+(NAMES[s.cust_id]||s.cust_id)+' · '+(s.server||'')+' · '+(s.created_at?new Date(s.created_at).toLocaleString():'')+'</div></span>'+
+        '<b class="'+(p>=0?'pos':'neg')+'">'+(p<0?'-':'+')+usd(Math.abs(p))+'</b></div>'; });
+    h+='</div><div class="hint">Read-only · refreshes every 10s · commissions are paid by Alpexa per your agreement.</div>';
+    el().innerHTML=h;
+    document.getElementById('btnOut').onclick=logout;
+    document.querySelectorAll('[data-r]').forEach(function(b){ b.onclick=function(){ RANGE=b.getAttribute('data-r'); viewDash(); }; });
+  }
+  function kpi(k,v,s,cls){ return '<div class="kpi"><div class="k">'+k+'</div><div class="v '+(cls||'')+'">'+v+'</div><div class="s">'+(s||'')+'</div></div>'; }
+
+  function pull(){
+    if(!db||!AGENT)return;
+    db.from('agent_links').select('*').eq('agent_code',AGENT.code).then(function(r){
+      if(r&&r.data){ LINKS=r.data;
+        var ids=LINKS.map(function(l){return l.cust_id;});
+        if(ids.length){ db.from('players').select('cust_id,name').in('cust_id',ids).then(function(r2){
+          if(r2&&r2.data){ r2.data.forEach(function(p){ NAMES[p.cust_id]=p.name; }); if(AGENT)viewDash(); } },function(){}); }
+        if(AGENT)viewDash(); }
+    },function(){});
+    db.from('settlements').select('*').order('created_at',{ascending:false}).limit(2000).then(function(r){
+      if(r&&r.data){ SETTLE=r.data; if(AGENT)viewDash(); } },function(){});
+    db.from('agents').select('*').eq('code',AGENT.code).limit(1).then(function(r){
+      if(r&&r.data&&r.data[0]){ AGENT=r.data[0]; } },function(){});
+  }
+  setInterval(function(){ if(!document.hidden && AGENT) pull(); },10000);
+
+  // Auto-restore session
+  (function(){
+    var s=null; try{ s=sessionStorage.getItem('alpexa.agent'); }catch(e){}
+    if(s&&db){ var p=s.split('|');
+      db.from('agents').select('*').eq('code',p[0]).limit(1).then(function(r){
+        var a=r&&r.data&&r.data[0];
+        if(a&&String(a.pin)===p[1]&&(!a.status||a.status==='active')){ AGENT=a; pull(); viewDash(); }
+        else viewLogin();
+      },function(){ viewLogin(); });
+    } else viewLogin();
+  })();
+</script>
+</body>
+</html>
