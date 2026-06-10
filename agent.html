@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<title>Alpexa Partners · Agent Portal</title>
+<title>Alpexa Suisse · Partner Portal</title>
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <meta name="theme-color" content="#ffffff">
@@ -49,14 +49,14 @@
 <div id="wrap"></div>
 <script>
   var db=null; try{ db=window.supabase.createClient('https://grxnbgtfnaayeluenvqh.supabase.co','sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu'); }catch(e){}
-  var AGENT=null, LINKS=[], SETTLE=[], NAMES={}, RANGE='30d';
+  var AGENT=null, LINKS=[], SETTLE=[], NAMES={}, RANGE='30d', SHOWR=false;
   function usd(n){n=+n||0;return '$'+n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});}
   function el(){return document.getElementById('wrap');}
 
   function viewLogin(msg){
     el().innerHTML='<div class="login"><div class="card">'+
-      '<div style="text-align:center;margin-bottom:18px"><div style="font:800 20px system-ui;color:var(--acc)">Alpexa Partners</div>'+
-      '<div class="meta" style="margin-top:4px">Agent commission portal</div></div>'+
+      '<div style="text-align:center;margin-bottom:18px"><div style="font:800 20px system-ui;color:var(--acc);letter-spacing:-.3px">ALPEXA SUISSE</div>'+
+      '<div class="meta" style="margin-top:4px">Partners · Agent commission portal</div></div>'+
       '<label class="lbl">Agent code or email</label><input class="in" id="lgCode" placeholder="AG-1234 or you@email.com" autocomplete="off">'+
       '<label class="lbl" style="display:block;margin-top:12px">PIN</label><input class="in" id="lgPin" type="password" inputmode="numeric" placeholder="••••" autocomplete="off">'+
       '<button class="btn" id="lgGo">Sign in</button>'+
@@ -115,9 +115,13 @@
     if(!AGENT){ viewLogin(); return; }
     var c=commission();
     var KINDS={fx_close:'FX close',bet_won:'Bet won',bet_lost:'Bet lost',bet_cashout:'Cashout',bet_void:'Void'};
-    var h='<div class="hdr"><div><b>'+(AGENT.name||AGENT.code)+'</b><div class="sub">'+AGENT.code+' · Partner portal</div></div><button id="btnOut">Sign out</button></div>';
-    h+='<div class="ranges">'+[['today','Today'],['7d','7d'],['30d','30d'],['all','All']].map(function(x){
-      return '<button data-r="'+x[0]+'" class="'+(RANGE===x[0]?'on':'')+'">'+x[1]+'</button>'; }).join('')+'</div>';
+    var h='<div class="hdr"><div><b>'+(AGENT.name||AGENT.code)+'</b><div class="sub">'+AGENT.code+' · Alpexa Suisse Partners</div></div><button id="btnOut">Sign out</button></div>';
+    h+='<div class="sec" style="display:flex;align-items:center;justify-content:space-between">Commission · '+c.label+
+      '<button id="btnRange" style="background:'+(SHOWR?'var(--acc)':'#fff')+';border:1px solid var(--line);border-radius:4px;padding:5px 11px;font:700 11px system-ui;color:'+(SHOWR?'#fff':'#1c2430')+';cursor:pointer">Period '+(SHOWR?'▴':'▾')+'</button></div>';
+    if(SHOWR){
+      h+='<div class="ranges" style="margin:0 12px 8px">'+[['today','Today'],['7d','7d'],['30d','30d'],['all','All']].map(function(x){
+        return '<button data-r="'+x[0]+'" class="'+(RANGE===x[0]?'on':'')+'">'+x[1]+'</button>'; }).join('')+'</div>';
+    }
     h+='<div class="kpis">'+
       kpi('My commission',usd(Math.max(0,c.total)),c.label+' · '+c.n+' trades',c.total>=0?'pos':'neg')+
       kpi('FX',usd(c.cFx),(Math.round(c.fxLots*100)/100)+' lots × $'+(+AGENT.fx_per_lot||0),'pos')+
@@ -144,6 +148,7 @@
     h+='</div><div class="hint">Read-only · refreshes every 10s · commissions are paid by Alpexa per your agreement.</div>';
     el().innerHTML=h;
     document.getElementById('btnOut').onclick=logout;
+    var br=document.getElementById('btnRange'); if(br) br.onclick=function(){ SHOWR=!SHOWR; viewDash(); };
     document.querySelectorAll('[data-r]').forEach(function(b){ b.onclick=function(){ RANGE=b.getAttribute('data-r'); viewDash(); }; });
   }
   function kpi(k,v,s,cls){ return '<div class="kpi"><div class="k">'+k+'</div><div class="v '+(cls||'')+'">'+v+'</div><div class="s">'+(s||'')+'</div></div>'; }
