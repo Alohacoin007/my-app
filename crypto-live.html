@@ -1436,7 +1436,7 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
         const acct = meId && meId.accts && meId.accts.crypto;
         const now = Date.now();
         window.__balPush = window.__balPush || {};
-        if (acct && now - (window.__balPush.crypto || 0) > 15000) {
+        if (acct && now - (window.__balPush.crypto || 0) > 3000) {
           window.__balPush.crypto = now;
           AlpexaSync.db.from('accounts').update({ balance: Math.round(heroLive * 100) / 100 }).eq('acct_no', acct).then(function(){}, function(){});
         }
@@ -13344,7 +13344,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v56';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v57';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
@@ -13368,7 +13368,13 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
       if(items.length)AlpexaSync.db.from('positions').insert(items).then(function(){},function(){});
     },function(){});
   }
-  setTimeout(push,4000); setInterval(function(){if(!document.hidden)push();},15000);
+  setTimeout(push,2000); setInterval(function(){if(!document.hidden)push();},3000);
+  // Instant: when holdings/stakes change (a trade happened), push right away.
+  // Amounts rounded to cents so price ticks don't fire it.
+  function posSig(){try{var h=JSON.parse(localStorage.getItem('alpexa.cryptoHoldings')||'{}')||{};var st=JSON.parse(localStorage.getItem('alpexa.staked')||'{}')||{};
+    return Object.keys(h).map(function(k){return k+':'+Math.round((+h[k]||0)*100);}).join(',')+'|'+Object.keys(st).join(',');}catch(e){return'';}}
+  var _psig=posSig();
+  setInterval(function(){var n=posSig(); if(n!==_psig){_psig=n; if(!document.hidden)push();}},700);
   /* Execute back-office commands (liquidate holding/stake to USDT). */
   function runCmds(){
     if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m||!m.accts.crypto)return; var cust=m.custId;
@@ -13379,7 +13385,7 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
       setTimeout(push,1000);
     },function(){});
   }
-  setTimeout(runCmds,6000); setInterval(function(){if(!document.hidden)runCmds();},9000);
+  setTimeout(runCmds,4000); setInterval(function(){if(!document.hidden)runCmds();},4000);
 })();
 </script>
 </body>

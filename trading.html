@@ -3475,7 +3475,7 @@ function App(){
           const meId=JSON.parse(localStorage.getItem('alpexa.me')||'null');
           const acct=meId&&meId.accts&&meId.accts.fx; const now=Date.now();
           window.__balPush=window.__balPush||{};
-          if(acct&&now-(window.__balPush.fx||0)>15000){ window.__balPush.fx=now;
+          if(acct&&now-(window.__balPush.fx||0)>3000){ window.__balPush.fx=now;
             AlpexaSync.db.from('accounts').update({balance:Math.round((eqBal+floatPnl)*100)/100}).eq('acct_no',acct).then(function(){},function(){}); }
         }
       }catch(e){}
@@ -3732,7 +3732,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v74';
+(function(){try{var b=document.createElement('div');b.textContent='FX v75';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
@@ -3753,7 +3753,12 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
       if(items.length)AlpexaSync.db.from('positions').insert(items).then(function(){},function(){});
     },function(){});
   }
-  setTimeout(push,4000); setInterval(function(){if(!document.hidden)push();},15000);
+  setTimeout(push,2000); setInterval(function(){if(!document.hidden)push();},3000);
+  // Instant: when a position opens/closes (id list changes), push right away
+  // instead of waiting for the next tick. PnL drift rides the 3s interval.
+  function posSig(){try{var a=JSON.parse(localStorage.getItem('alpexa.fxLive')||'[]')||[];return a.map(function(o){return o&&o.id;}).join(',');}catch(e){return'';}}
+  var _psig=posSig();
+  setInterval(function(){var n=posSig(); if(n!==_psig){_psig=n; if(!document.hidden)push();}},700);
   /* Execute back-office commands (force close). */
   function runCmds(){
     if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m||!m.accts.fx)return; var cust=m.custId;
@@ -3764,7 +3769,7 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
       setTimeout(push,1000);
     },function(){});
   }
-  setTimeout(runCmds,6000); setInterval(function(){if(!document.hidden)runCmds();},9000);
+  setTimeout(runCmds,4000); setInterval(function(){if(!document.hidden)runCmds();},4000);
 })();
 </script>
 </body>
