@@ -934,10 +934,56 @@
   // ── Agents (IB / affiliates): recruit customers, earn commission ──
   // FX: $ per lot (spread-markup rebate) · Crypto: % of trade fees ·
   // Sports: % of the agent's WHOLE customer pool NET loss (anti-hedge-abuse).
-  var SRV_AGENTS=[], SRV_ALINKS=[], AGENT_OPEN=null, AG_RANGE='all';
+  var SRV_AGENTS=[], SRV_ALINKS=[], SRV_APAY=[], AGENT_OPEN=null, AG_RANGE='all';
   function pullAgents(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
     AlpexaSync.db.from('agents').select('*').order('created_at',{ascending:false}).then(function(r){ if(r&&r.data){ SRV_AGENTS=r.data; if(cur==='agents'&&!busyEditing())render(); } },function(){});
-    AlpexaSync.db.from('agent_links').select('*').then(function(r){ if(r&&r.data){ SRV_ALINKS=r.data; if(cur==='agents'&&!busyEditing())render(); } },function(){}); }
+    AlpexaSync.db.from('agent_links').select('*').then(function(r){ if(r&&r.data){ SRV_ALINKS=r.data; if(cur==='agents'&&!busyEditing())render(); } },function(){});
+    AlpexaSync.db.from('agent_payouts').select('*').order('created_at',{ascending:false}).limit(200).then(function(r){ if(r&&r.data){ SRV_APAY=r.data; if(cur==='agents'&&!busyEditing())render(); } },function(){}); }
+  function agentName(code){ var n=code; SRV_AGENTS.forEach(function(a){ if(a.code===code&&a.name)n=a.name; }); return n; }
+  // Decide an agent payout. Crypto → pay with the connected wallet (or paste a
+  // txid); bank → mark paid after sending; internal → credit the agent's own
+  // crypto trading account instantly (no real money moves).
+  function apSet(id,patch,okMsg){
+    AlpexaSync.db.from('agent_payouts').update(Object.assign({decided_at:new Date().toISOString()},patch)).eq('id',id).then(function(r){
+      if(r&&r.error){ toast('Error: '+r.error.message,true); return; }
+      toast(okMsg||'Done ✓'); pullAgents();
+    },function(){ toast('Failed',true); });
+  }
+  function apFind(id){ var p=null; SRV_APAY.forEach(function(x){ if(String(x.id)===String(id))p=x; }); return p; }
+  function agentPayWallet(id){
+    var p=apFind(id); if(!p)return;
+    if(!WAL.acct){ toast('Connect a wallet in the Wallet tab first',true); return; }
+    if(WAL.chain && WAL.chain!=='0x1'){ toast('Switch your wallet to Ethereum Mainnet first',true); return; }
+    var amt=+p.amount||0, addr=(p.dest||'').trim();
+    if(!/^0x[0-9a-fA-F]{40}$/.test(addr)){ toast('Destination is not a valid 0x… address',true); return; }
+    if(!confirm('Send '+usd(amt)+' USDT commission to agent '+agentName(p.agent_code)+'\n'+addr+' ?\n\nThis is a REAL mainnet transaction.')) return;
+    var data='0xa9059cbb'+hexPad(addr)+Math.round(amt*1e6).toString(16).padStart(64,'0');
+    window.ethereum.request({method:'eth_sendTransaction',params:[{from:WAL.acct,to:USDT_CT,data:data}]})
+      .then(function(hash){ try{ logAction('agent_payout', p.agent_code, usd(amt)+' USDT · tx '+String(hash).slice(0,12)+'…'); }catch(e){}
+        apSet(id,{status:'approved',txid:String(hash)},'Paid ✓ '+String(hash).slice(0,10)+'…'); },
+            function(e){ toast('Cancelled / failed: '+String((e&&e.message)||'').slice(0,70),true); });
+  }
+  function agentPayManual(id){
+    var p=apFind(id); if(!p)return;
+    var tx=prompt('Mark '+usd(p.amount)+' ('+p.method+') as paid to '+agentName(p.agent_code)+'.\nOptional: paste the txid / bank reference:','');
+    if(tx===null) return;
+    try{ logAction('agent_payout', p.agent_code, usd(p.amount)+' '+p.method+(tx?(' · '+tx.slice(0,16)):'')); }catch(e){}
+    apSet(id,{status:'approved',txid:tx||''},'Marked paid ✓');
+  }
+  function agentPayInternal(id){
+    var p=apFind(id); if(!p)return;
+    var cid=(p.dest||'').trim().toUpperCase();
+    var pl=null; SRV_PLAYERS.forEach(function(x){ if((x.cust_id||'').toUpperCase()===cid)pl=x; });
+    if(!pl){ toast('No customer with ID '+cid,true); return; }
+    var acc=null; SRV_ACCOUNTS.forEach(function(a){ if(a.player_id===pl.id&&a.server==='crypto')acc=a; });
+    if(!acc){ toast('That customer has no crypto account',true); return; }
+    var nb=Math.round(((+acc.balance||0)+(+p.amount||0))*100)/100;
+    if(!confirm('Credit '+usd(p.amount)+' commission to '+(pl.name||cid)+'\'s crypto account?\nNew balance: '+usd(nb))) return;
+    AlpexaSync.db.from('accounts').update({balance:nb}).eq('acct_no',acc.acct_no).then(function(){},function(){});
+    AlpexaSync.db.from('commands').insert({cust_id:pl.cust_id,server:'crypto',action:'set_balance',local_id:String(nb),status:'pending'}).then(function(){},function(){});
+    try{ logAction('agent_payout', p.agent_code, usd(p.amount)+' → internal '+cid); }catch(e){}
+    apSet(id,{status:'approved',txid:'internal:'+cid},'Credited ✓ — reaches the app in ~4s');
+  }
   function agentCommission(code,lo,hi){
     var ag=null; SRV_AGENTS.forEach(function(a){ if(a.code===code)ag=a; }); ag=ag||{};
     var share={}; SRV_ALINKS.forEach(function(l){ if(l.agent_code===code) share[l.cust_id]=(+l.share||100)/100; });
@@ -962,6 +1008,25 @@
     var rg=agRange();
     var h='<div class="sec" style="display:flex;align-items:center;justify-content:space-between">Agents · '+SRV_AGENTS.length+
       '<button data-agnew="1" style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:5px 11px;font:700 11px system-ui;color:var(--ink);cursor:pointer">＋ New agent</button></div>';
+    // Pending commission payout requests from the partner portal.
+    var pendP=SRV_APAY.filter(function(p){ return p.status==='pending'; });
+    if(pendP.length){
+      var MNAME={crypto:'USDT (ERC-20)',bank:'Bank transfer',internal:'Trading account'};
+      h+='<div class="sec">Payout requests · '+pendP.length+'</div>';
+      pendP.forEach(function(p){
+        h+='<div class="card" style="padding:9px 12px">'+
+          '<div class="row" style="border:none;padding:0"><span><b style="font-size:12.5px">'+agentName(p.agent_code)+'</b> <span class="muted">· '+p.agent_code+'</span>'+
+          '<div class="req-meta" style="margin:2px 0 0">'+(MNAME[p.method]||p.method)+' · '+(p.created_at?ago(Date.parse(p.created_at)):'')+'</div></span>'+
+          '<b>'+usd(p.amount)+'</b></div>'+
+          '<div class="req-addr" data-copy="'+String(p.dest||'').replace(/"/g,'&quot;')+'" style="margin-top:6px">'+(p.dest||'—')+'</div>'+
+          '<div class="btns">'+
+            (p.method==='crypto'?'<button class="ok" data-apw="'+p.id+'">Pay ▸ wallet</button>':'')+
+            (p.method==='internal'?'<button class="ok" data-api="'+p.id+'">Credit ✓</button>':'')+
+            ((p.method==='bank'||p.method==='crypto')?'<button class="save ghost" data-apm="'+p.id+'" style="flex:1;margin-top:0">Mark paid</button>':'')+
+            '<button class="no" data-apr="'+p.id+'">Reject</button>'+
+          '</div></div>';
+      });
+    }
     if(!SRV_AGENTS.length){ h+='<div class="card"><div class="empty">No agents yet — tap ＋ New agent.<br>(If adding errors, run the agents SQL first.)</div></div>'; return h; }
     SRV_AGENTS.forEach(function(a){
       var code=a.code, open=(AGENT_OPEN===code);
@@ -1137,6 +1202,10 @@
     document.querySelectorAll('[data-agr]').forEach(function(b){b.onclick=function(){AG_RANGE=b.getAttribute('data-agr');render();};});
     document.querySelectorAll('[data-agopen]').forEach(function(b){b.onclick=function(){var c=b.getAttribute('data-agopen');AGENT_OPEN=(AGENT_OPEN===c?null:c);render();};});
     document.querySelectorAll('[data-agnew]').forEach(function(b){b.onclick=agentPopup;});
+    document.querySelectorAll('[data-apw]').forEach(function(b){b.onclick=function(){agentPayWallet(b.getAttribute('data-apw'));};});
+    document.querySelectorAll('[data-apm]').forEach(function(b){b.onclick=function(){agentPayManual(b.getAttribute('data-apm'));};});
+    document.querySelectorAll('[data-api]').forEach(function(b){b.onclick=function(){agentPayInternal(b.getAttribute('data-api'));};});
+    document.querySelectorAll('[data-apr]').forEach(function(b){b.onclick=function(){if(confirm('Reject this payout request?'))apSet(b.getAttribute('data-apr'),{status:'rejected'},'Rejected ✓');};});
     document.querySelectorAll('[data-psort]').forEach(function(b){b.onclick=function(){var s=b.getAttribute('data-psort');
       if(PLAYER_SORT===s){ PLAYER_DIR=-PLAYER_DIR; }
       else { PLAYER_SORT=s; PLAYER_DIR=(s==='name'?1:-1); } // name: A→Z · balance/joined: big/new first
@@ -1196,7 +1265,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v19';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v20';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>

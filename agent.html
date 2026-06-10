@@ -49,7 +49,8 @@
 <div id="wrap"></div>
 <script>
   var db=null; try{ db=window.supabase.createClient('https://grxnbgtfnaayeluenvqh.supabase.co','sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu'); }catch(e){}
-  var AGENT=null, LINKS=[], SETTLE=[], NAMES={}, RANGE='30d', SHOWR=false;
+  var AGENT=null, LINKS=[], SETTLE=[], NAMES={}, RANGE='30d', SHOWR=false, PAYOUTS=[], SHOWW=false;
+  var MIN_PAYOUT=50;
   function usd(n){n=+n||0;return '$'+n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});}
   function el(){return document.getElementById('wrap');}
 
@@ -94,8 +95,8 @@
     else if(RANGE==='30d'){ lo=now-30*86400e3; label='Last 30 days'; }
     return {lo:lo,hi:Infinity,label:label}; }
 
-  function commission(){
-    var rg=range(), share={};
+  function commission(allTime){
+    var rg=allTime?{lo:0,hi:Infinity,label:'All time'}:range(), share={};
     LINKS.forEach(function(l){ share[l.cust_id]=(+l.share||100)/100; });
     var fxLots=0, sportsNet=0, cryptoFees=0, n=0, perCust={};
     SETTLE.forEach(function(s){
@@ -129,6 +130,35 @@
       kpi('Crypto',usd(c.cCr),'fees × '+(+AGENT.crypto_fee_pct||0)+'%','pos')+
     '</div>';
     if(c.cSp<0) h+='<div class="hint" style="color:var(--neg)">Sports pool is negative this period (your customers won) — it carries over; payout is $0 until it recovers.</div>';
+    // ── Withdraw: available = lifetime commission − paid − pending requests ──
+    var ca=commission(true), paid=0, pendAmt=0;
+    PAYOUTS.forEach(function(p){ if(p.status==='approved')paid+=(+p.amount||0); else if(p.status==='pending')pendAmt+=(+p.amount||0); });
+    var avail=Math.max(0, Math.max(0,ca.total)-paid-pendAmt);
+    h+='<div class="sec">Withdraw</div><div class="card">'+
+      '<div class="row"><span>Available to withdraw</span><b class="pos">'+usd(avail)+'</b></div>'+
+      '<div class="row"><span>Paid out (lifetime)</span><b>'+usd(paid)+'</b></div>'+
+      (pendAmt>0?'<div class="row"><span>Pending requests</span><b class="muted">'+usd(pendAmt)+'</b></div>':'');
+    if(SHOWW){
+      h+='<label class="lbl" style="display:block;margin-top:10px">Amount (USD)</label><input class="in" id="wAmt" type="number" min="'+MIN_PAYOUT+'" placeholder="min $'+MIN_PAYOUT+'">'+
+        '<label class="lbl" style="display:block;margin-top:10px">Method</label>'+
+        '<select class="in" id="wMethod"><option value="crypto">Crypto · USDT (ERC-20)</option><option value="bank">Bank transfer</option><option value="internal">My trading account (instant)</option></select>'+
+        '<label class="lbl" style="display:block;margin-top:10px" id="wDestLbl">USDT address (0x…)</label><input class="in" id="wDest" placeholder="0x…" autocomplete="off">'+
+        '<button class="btn" id="wGo">Submit request</button>'+
+        '<button class="btn" id="wNo" style="background:#eef0f3;color:#5f6b7a;margin-top:8px">Cancel</button>'+
+        '<div class="err" id="wErr"></div>';
+    } else {
+      h+='<button class="btn" id="wOpen"'+(avail<MIN_PAYOUT?' style="background:#c8cfd8"':'')+'>Withdraw commission</button>'+
+        (avail<MIN_PAYOUT?'<div class="hint" style="margin:8px 0 0">Minimum withdrawal is $'+MIN_PAYOUT+'.</div>':'');
+    }
+    h+='</div>';
+    h+='<div class="sec">My payouts · '+PAYOUTS.length+'</div><div class="card">';
+    if(!PAYOUTS.length) h+='<div class="empty">No payout requests yet.</div>';
+    PAYOUTS.slice(0,10).forEach(function(p){ var st=p.status==='approved'?'won':p.status==='rejected'?'lost':'open';
+      var M={crypto:'USDT',bank:'Bank',internal:'Trading acct'};
+      h+='<div class="row"><span><b>'+usd(p.amount)+'</b> <span class="muted">· '+(M[p.method]||p.method)+' · '+(p.created_at?new Date(p.created_at).toLocaleDateString():'')+'</span>'+
+        (p.txid?('<div class="meta"><a href="https://etherscan.io/tx/'+p.txid+'" target="_blank" rel="noopener" style="color:#1F2A37;font-weight:700">tx ↗</a></div>'):'')+'</span>'+
+        '<span class="badge '+st+'">'+(p.status||'pending').toUpperCase()+'</span></div>'; });
+    h+='</div>';
     h+='<div class="sec">My customers · '+LINKS.length+'</div><div class="card">';
     if(!LINKS.length) h+='<div class="empty">No customers linked yet.</div>';
     LINKS.forEach(function(l){
@@ -150,6 +180,28 @@
     document.getElementById('btnOut').onclick=logout;
     var br=document.getElementById('btnRange'); if(br) br.onclick=function(){ SHOWR=!SHOWR; viewDash(); };
     document.querySelectorAll('[data-r]').forEach(function(b){ b.onclick=function(){ RANGE=b.getAttribute('data-r'); viewDash(); }; });
+    var wo=document.getElementById('wOpen'); if(wo) wo.onclick=function(){ if(avail>=MIN_PAYOUT){ SHOWW=true; viewDash(); } };
+    var wn=document.getElementById('wNo'); if(wn) wn.onclick=function(){ SHOWW=false; viewDash(); };
+    var wm=document.getElementById('wMethod'); if(wm) wm.onchange=function(){
+      var L={crypto:'USDT address (0x…)',bank:'Bank name · holder · account no.',internal:'Your customer ID (P-1234)'};
+      var P={crypto:'0x…',bank:'e.g. Chase · John Doe · 1234567',internal:'P-1234'};
+      document.getElementById('wDestLbl').textContent=L[this.value]||'Destination';
+      document.getElementById('wDest').placeholder=P[this.value]||''; };
+    var wg=document.getElementById('wGo'); if(wg) wg.onclick=function(){ submitPayout(avail); };
+  }
+  function submitPayout(avail){
+    var err=document.getElementById('wErr'); var show=function(m){ err.textContent=m; err.style.display='block'; };
+    var amt=Math.round((parseFloat(document.getElementById('wAmt').value)||0)*100)/100;
+    var m=document.getElementById('wMethod').value, dest=(document.getElementById('wDest').value||'').trim();
+    if(!(amt>=MIN_PAYOUT)) return show('Minimum withdrawal is $'+MIN_PAYOUT+'.');
+    if(amt>avail) return show('Amount exceeds your available balance ('+usd(avail)+').');
+    if(m==='crypto' && !/^0x[0-9a-fA-F]{40}$/.test(dest)) return show('Enter a valid 0x… USDT (ERC-20) address.');
+    if(m==='bank' && dest.length<8) return show('Enter bank name · account holder · account number.');
+    if(m==='internal' && !/^P-/i.test(dest)) return show('Enter your customer ID (looks like P-1234).');
+    db.from('agent_payouts').insert({agent_code:AGENT.code,amount:amt,method:m,dest:dest,status:'pending'}).then(function(r){
+      if(r&&r.error) return show('Server error: '+r.error.message+' (payouts SQL not run yet?)');
+      SHOWW=false; pull(); viewDash();
+    },function(){ show('Connection error — try again.'); });
   }
   function kpi(k,v,s,cls){ return '<div class="kpi"><div class="k">'+k+'</div><div class="v '+(cls||'')+'">'+v+'</div><div class="s">'+(s||'')+'</div></div>'; }
 
@@ -159,11 +211,13 @@
       if(r&&r.data){ LINKS=r.data;
         var ids=LINKS.map(function(l){return l.cust_id;});
         if(ids.length){ db.from('players').select('cust_id,name').in('cust_id',ids).then(function(r2){
-          if(r2&&r2.data){ r2.data.forEach(function(p){ NAMES[p.cust_id]=p.name; }); if(AGENT)viewDash(); } },function(){}); }
-        if(AGENT)viewDash(); }
+          if(r2&&r2.data){ r2.data.forEach(function(p){ NAMES[p.cust_id]=p.name; }); if(AGENT&&!SHOWW)viewDash(); } },function(){}); }
+        if(AGENT&&!SHOWW)viewDash(); }
     },function(){});
     db.from('settlements').select('*').order('created_at',{ascending:false}).limit(2000).then(function(r){
-      if(r&&r.data){ SETTLE=r.data; if(AGENT)viewDash(); } },function(){});
+      if(r&&r.data){ SETTLE=r.data; if(AGENT&&!SHOWW)viewDash(); } },function(){});
+    db.from('agent_payouts').select('*').eq('agent_code',AGENT.code).order('created_at',{ascending:false}).limit(50).then(function(r){
+      if(r&&r.data){ PAYOUTS=r.data; if(AGENT&&!SHOWW)viewDash(); } },function(){});
     db.from('agents').select('*').eq('code',AGENT.code).limit(1).then(function(r){
       if(r&&r.data&&r.data[0]){ AGENT=r.data[0]; } },function(){});
   }
