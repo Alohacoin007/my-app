@@ -387,11 +387,11 @@
       var feeS=R.filter(function(r){return r.status==='approved' && (r.server||'')===s;}).reduce(function(a,r){return a+(+r.fee||0);},0);
       var netS=lossS-winS+feeS;
       h+='<div class="row"><span><b>'+ap[1]+'</b>'+
-        '<div class="req-meta" style="margin:2px 0 0">lost +'+k0(lossS)+' · won -'+k0(winS)+' · fees +'+k0(feeS)+' · '+nS+' trades</div></span>'+
+        '<div class="req-meta" style="margin:2px 0 0">we keep +'+k0(lossS)+' · we pay -'+k0(winS)+' · fees +'+k0(feeS)+' · '+nS+' trades</div></span>'+
         '<b class="'+(netS>=0?'pos':'neg')+'">'+(netS<0?'-':'+')+k0(Math.abs(netS))+'</b></div>';
     });
     h+='</div>';
-    h+='<div class="hint" style="margin:0 14px 10px">Green = customer won (we pay) · Red = customer lost (we keep). See the <b>History</b> tab for each individual trade.</div>';
+    h+='<div class="hint" style="margin:0 14px 10px">Customers lose → we profit (<b style="color:var(--pos)">green</b>) · customers win → we pay (<b style="color:var(--neg)">red</b>). Each individual trade: <b>History</b> tab.</div>';
     var sDay={};
     S.forEach(function(s){ var k=(s.created_at||'').slice(0,10); if(!k)return; sDay[k]=(sDay[k]||0)+(-(+s.pnl||0)); });
     var sDays=Object.keys(sDay).sort().reverse().slice(0,14);
@@ -1039,7 +1039,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v15';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v16';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
