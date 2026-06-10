@@ -259,13 +259,14 @@
       hold: settledStake? (ggr/settledStake*100):0, pending:R.filter(function(w){return w.status==='pending';}).length};
   }
 
-  var TABS=[['overview','Overview','dashboard'],['report','Report','monitoring'],['approvals','Approvals','task_alt'],['history','History','receipt_long'],['players','Players','group'],['online','Online','sensors'],['risk','Risk','gpp_maybe'],['bets','Open','candlestick_chart'],['agents','Agents','handshake'],['logs','Logs','list_alt'],['config','Config','settings']];
+  var TABS=[['overview','Overview','dashboard'],['report','Report','monitoring'],['approvals','Approvals','task_alt'],['wallet','Wallet','account_balance_wallet'],['history','History','receipt_long'],['players','Players','group'],['online','Online','sensors'],['risk','Risk','gpp_maybe'],['bets','Open','candlestick_chart'],['agents','Agents','handshake'],['logs','Logs','list_alt'],['config','Config','settings']];
   var cur='overview';
   function renderTabs(){
     document.getElementById('tabs').innerHTML=TABS.map(function(t){return '<button class="tab '+(t[0]===cur?'on':'')+'" data-t="'+t[0]+'"><span class="msi">'+(t[2]||'circle')+'</span><span>'+t[1]+'</span></button>';}).join('');
     document.querySelectorAll('.tab').forEach(function(b){b.onclick=function(){cur=b.getAttribute('data-t');
       if(cur==='history'||cur==='report'){pullSettle();pullServer();}
       if(cur==='agents'){pullAgents();pullSettle();}
+      if(cur==='wallet'){pullWallet(true);}
       render();};});
   }
   function render(){
@@ -281,6 +282,7 @@
     else if(cur==='online')h=viewOnline();
     else if(cur==='risk')h=viewRisk(f);
     else if(cur==='bets')h=viewBets();
+    else if(cur==='wallet')h=viewWallet();
     else if(cur==='agents')h=viewAgents();
     else if(cur==='logs')h=viewLogs();
     else if(cur==='config')h=viewConfig();
@@ -797,6 +799,138 @@
     return h;
   }
   function cfgRow(label,id,val){return '<div class="lbl" style="margin-top:10px">'+label+'</div><input class="in" id="'+id+'" type="number" step="0.5" value="'+val+'">';}
+  // ── Treasury wallet: company custody address on Ethereum mainnet.
+  // Read-only data (balances, USDT transfers) comes straight from public RPC —
+  // works on any phone, no wallet extension needed. Signing (payouts) uses the
+  // injected wallet (MetaMask / Coinbase; Ledger connects through MetaMask).
+  var USDT_CT='0xdac17f958d2ee523a2206206994597c13d831ec7';
+  var RPCS=['https://ethereum-rpc.publicnode.com','https://eth.llamarpc.com','https://cloudflare-eth.com'];
+  var WAL={eth:null,usdt:null,ins:[],outs:[],lastPull:0,pulling:false,acct:null,acctEth:null,acctUsdt:null,chain:null,err:''};
+  function hexPad(a){ return String(a).replace('0x','').toLowerCase().padStart(64,'0'); }
+  function rpc(method,params,i){ i=i||0;
+    return fetch(RPCS[i],{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:method,params:params||[]})})
+      .then(function(r){return r.json();})
+      .then(function(j){ if(j&&j.result!==undefined&&j.result!==null) return j.result; throw new Error((j&&j.error&&j.error.message)||'rpc error'); })
+      .catch(function(e){ if(i+1<RPCS.length) return rpc(method,params,i+1); throw e; });
+  }
+  function fromWei(h){ try{ return Number(BigInt(h))/1e18; }catch(e){ return parseInt(h,16)/1e18; } }
+  function fromU6(h){ try{ return Number(BigInt(h))/1e6; }catch(e){ return parseInt(h,16)/1e6; } }
+  function pullWallet(force){
+    if(WAL.pulling) return; var now=Date.now();
+    if(!force && now-WAL.lastPull<12000) return;
+    WAL.pulling=true; WAL.lastPull=now;
+    var co=CO_ADDR();
+    var TT='0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+    Promise.all([
+      rpc('eth_getBalance',[co,'latest']),
+      rpc('eth_call',[{to:USDT_CT,data:'0x70a08231'+hexPad(co)},'latest']),
+      rpc('eth_blockNumber',[])
+    ]).then(function(r){
+      WAL.eth=fromWei(r[0]); WAL.usdt=fromU6(r[1]); WAL.err='';
+      var latest=parseInt(r[2],16), from='0x'+Math.max(0,latest-25000).toString(16); // ≈ last 3½ days
+      return Promise.all([
+        rpc('eth_getLogs',[{address:USDT_CT,fromBlock:from,toBlock:'latest',topics:[TT,null,'0x'+hexPad(co)]}]).catch(function(){return [];}),
+        rpc('eth_getLogs',[{address:USDT_CT,fromBlock:from,toBlock:'latest',topics:[TT,'0x'+hexPad(co),null]}]).catch(function(){return [];})
+      ]);
+    }).then(function(r){
+      var map=function(list,dir){ return list.map(function(x){ return {dir:dir,amt:fromU6(x.data),from:'0x'+x.topics[1].slice(26),to:'0x'+x.topics[2].slice(26),tx:x.transactionHash,blk:parseInt(x.blockNumber,16)}; }); };
+      WAL.ins=map(r[0]||[],'in').reverse().slice(0,15); WAL.outs=map(r[1]||[],'out').reverse().slice(0,15);
+      WAL.pulling=false; if(cur==='wallet'&&!busyEditing())render();
+    }).catch(function(e){ WAL.err=String((e&&e.message)||e); WAL.pulling=false; if(cur==='wallet')render(); });
+  }
+  function walletConnect(){
+    if(!window.ethereum){ toast('No wallet found — install MetaMask, or open this page inside the MetaMask app browser',true); return; }
+    window.ethereum.request({method:'eth_requestAccounts'}).then(function(a){
+      WAL.acct=(a&&a[0])||null;
+      return window.ethereum.request({method:'eth_chainId'});
+    }).then(function(c){ WAL.chain=c; render(); pullAcct(); },
+            function(){ toast('Connect cancelled',true); });
+  }
+  function pullAcct(){ if(!WAL.acct)return;
+    Promise.all([ rpc('eth_getBalance',[WAL.acct,'latest']), rpc('eth_call',[{to:USDT_CT,data:'0x70a08231'+hexPad(WAL.acct)},'latest']) ])
+    .then(function(r){ WAL.acctEth=fromWei(r[0]); WAL.acctUsdt=fromU6(r[1]); if(cur==='wallet'&&!busyEditing())render(); },function(){});
+  }
+  function payWithWallet(id){
+    var w=findReq(id); if(!w){ toast('Request not found',true); return; }
+    if(!WAL.acct){ toast('Connect a wallet first',true); return; }
+    if(WAL.chain && WAL.chain!=='0x1'){ toast('Switch your wallet to Ethereum Mainnet first',true); return; }
+    var amt=+(w.net||w.amount)||0, addr=(w.address||'').trim();
+    if(!(amt>0)){ toast('Bad amount',true); return; }
+    if(!/^0x[0-9a-fA-F]{40}$/.test(addr)){ toast('Customer address is not a valid 0x… address',true); return; }
+    if(!confirm('Send '+usd(amt)+' USDT to\n'+addr+'\n\nfrom '+WAL.acct+' ?\n\nThis is a REAL mainnet transaction.')) return;
+    var units=Math.round(amt*1e6);
+    var data='0xa9059cbb'+hexPad(addr)+units.toString(16).padStart(64,'0');
+    window.ethereum.request({method:'eth_sendTransaction',params:[{from:WAL.acct,to:USDT_CT,data:data}]})
+      .then(function(hash){ markPaid(id,hash); toast('Sent ✓ '+String(hash).slice(0,12)+'…'); setTimeout(pullAcct,4000); setTimeout(function(){pullWallet(true);},8000); },
+            function(e){ toast('Cancelled / failed: '+String((e&&e.message)||'').slice(0,70),true); });
+  }
+  function shortAddr(a){ a=String(a||''); return a.slice(0,6)+'…'+a.slice(-4); }
+  function viewWallet(){
+    var co=CO_ADDR();
+    var pendWd=reqs().filter(function(w){ return w.status==='pending' && (w.type||'withdraw')==='withdraw'; });
+    var pendDp=reqs().filter(function(w){ return w.status==='pending' && w.type==='deposit'; });
+    // Auto-match: incoming USDT vs pending deposit requests (same amount ±1 cent).
+    var matchOf=function(t){ var m=null; pendDp.forEach(function(d){ if(Math.abs((+d.amount||0)-t.amt)<=0.01) m=m||d; }); return m; };
+    var liab=SRV_ACCOUNTS.reduce(function(a,x){ return a+(+x.balance||0); },0);
+    var cover=(WAL.usdt!=null&&liab>0)?(WAL.usdt/liab*100):null;
+    var h='<div class="sec" style="display:flex;align-items:center;justify-content:space-between">Treasury · company wallet'+
+      '<button data-wrefresh="1" style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:5px 10px;font:700 11px system-ui;color:var(--ink);cursor:pointer">↻</button></div>';
+    if(WAL.err) h+='<div class="card" style="border-color:#f1b0b7"><div class="req-meta" style="color:var(--neg)">Chain read error: '+WAL.err+' — tap ↻ to retry.</div></div>';
+    h+='<div class="kpis">'+
+      kpi('USDT (treasury)',WAL.usdt==null?'…':usd(WAL.usdt),'company custody','pos')+
+      kpi('ETH (for gas)',WAL.eth==null?'…':(Math.round(WAL.eth*10000)/10000)+' ETH','pays network fees')+
+      kpi('Customer balances',usd(liab),'what we owe customers')+
+      kpi('Coverage',cover==null?'—':(Math.round(cover*10)/10)+'%','treasury ÷ liabilities',cover!=null?(cover>=100?'pos':'neg'):'')+
+    '</div>';
+    h+='<div class="card"><div class="lbl">Company deposit address (ERC-20)</div>'+
+      '<div class="req-addr" data-copy="'+co+'" style="margin-top:6px">'+co+'</div>'+
+      '<div class="hint">All customer deposits land here (centralized custody). Tap to copy · <a href="https://etherscan.io/address/'+co+'" target="_blank" rel="noopener" style="color:var(--acc);font-weight:700">Etherscan ↗</a></div></div>';
+    // Signing wallet
+    h+='<div class="sec">Payout wallet</div><div class="card">';
+    if(!WAL.acct){
+      h+='<button data-wconnect="1" style="width:100%;background:var(--acc);color:#fff;border:none;border-radius:4px;padding:11px;font:700 13px system-ui;cursor:pointer">Connect wallet (MetaMask / Coinbase)</button>'+
+        '<div class="hint">Ledger user? Plug it in, then in MetaMask choose <b>Connect hardware wallet → Ledger</b> — signing stays on the device. Phone: open this page inside the MetaMask app browser.</div>';
+    } else {
+      h+='<div class="row"><span>Connected</span><b class="mono" style="font-size:12px">'+shortAddr(WAL.acct)+'</b></div>'+
+        '<div class="row"><span>USDT</span><b>'+(WAL.acctUsdt==null?'…':usd(WAL.acctUsdt))+'</b></div>'+
+        '<div class="row"><span>ETH (gas)</span><b>'+(WAL.acctEth==null?'…':(Math.round(WAL.acctEth*10000)/10000)+' ETH')+'</b></div>'+
+        ((WAL.chain&&WAL.chain!=='0x1')?'<div class="req-meta" style="color:var(--neg)">⚠ Wallet is not on Ethereum Mainnet — switch network in the wallet.</div>':'')+
+        '<button data-wdisc="1" class="save ghost" style="width:100%;margin-top:8px;padding:8px">Disconnect</button>';
+    }
+    h+='</div>';
+    // Pending withdrawals → one-click pay
+    h+='<div class="sec">Withdrawals to pay · '+pendWd.length+'</div>';
+    if(!pendWd.length){ h+='<div class="card"><div class="empty">No pending withdrawals 👍</div></div>'; }
+    pendWd.forEach(function(w){
+      var ok=WAL.acct && /^0x[0-9a-fA-F]{40}$/.test((w.address||'').trim());
+      h+='<div class="card" style="padding:9px 12px"><div class="row" style="border:none;padding:0">'+
+        '<span style="min-width:0"><b style="font-size:12.5px">'+(w.custName||w.custId||'—')+'</b>'+
+        '<div class="req-meta" style="margin:2px 0 0">'+shortAddr(w.address)+' · net '+usd(w.net||w.amount)+'</div></span>'+
+        '<button data-wpay="'+w.id+'" style="background:'+(ok?'var(--pos)':'#c8cfd8')+';color:#fff;border:none;border-radius:4px;padding:8px 14px;font:700 12px system-ui;cursor:pointer;white-space:nowrap" '+(ok?'':'disabled')+'>Pay ▸</button></div></div>';
+    });
+    if(pendWd.length && !WAL.acct) h+='<div class="hint" style="margin:0 14px 8px">Connect a wallet above to enable Pay.</div>';
+    // Incoming with auto-match
+    h+='<div class="sec">Incoming (last ~3 days) · '+WAL.ins.length+'</div>';
+    if(!WAL.ins.length){ h+='<div class="card"><div class="empty">'+(WAL.usdt==null?'Loading chain data…':'No incoming USDT in the window.')+'</div></div>'; }
+    else{ h+='<div class="card">';
+      WAL.ins.forEach(function(t){ var m=matchOf(t);
+        h+='<div class="row"><span style="min-width:0"><b class="pos">+'+usd(t.amt)+'</b>'+
+          '<div class="req-meta" style="margin:2px 0 0">from '+shortAddr(t.from)+' · <a href="https://etherscan.io/tx/'+t.tx+'" target="_blank" rel="noopener" style="color:var(--acc)">tx ↗</a>'+
+          (m?(' · matches <b>'+(m.custName||m.custId)+'</b> deposit'):'')+'</div></span>'+
+          (m?('<button data-ok="'+m.id+'" style="background:var(--pos);color:#fff;border:none;border-radius:4px;padding:7px 12px;font:700 11.5px system-ui;cursor:pointer;white-space:nowrap">Credit ✓</button>'):'')+
+        '</div>'; });
+      h+='</div>'; }
+    // Outgoing
+    h+='<div class="sec">Outgoing (last ~3 days) · '+WAL.outs.length+'</div>';
+    if(!WAL.outs.length){ h+='<div class="card"><div class="empty">No outgoing USDT in the window.</div></div>'; }
+    else{ h+='<div class="card">';
+      WAL.outs.forEach(function(t){
+        h+='<div class="row"><span style="min-width:0"><b class="neg">-'+usd(t.amt)+'</b>'+
+          '<div class="req-meta" style="margin:2px 0 0">to '+shortAddr(t.to)+' · <a href="https://etherscan.io/tx/'+t.tx+'" target="_blank" rel="noopener" style="color:var(--acc)">tx ↗</a></div></span></div>'; });
+      h+='</div>'; }
+    h+='<div class="hint" style="margin:0 14px 10px">Live from Ethereum mainnet (refreshes ~12s on this tab). "Credit ✓" approves the matched deposit request — the customer\'s app balance updates in seconds.</div>';
+    return h;
+  }
   // ── Agents (IB / affiliates): recruit customers, earn commission ──
   // FX: $ per lot (spread-markup rebate) · Crypto: % of trade fees ·
   // Sports: % of the agent's WHOLE customer pool NET loss (anti-hedge-abuse).
@@ -960,8 +1094,8 @@
     } else { toast('⚠ Not connected to server',true); }
   }
   // Manual payout: record the on-chain tx hash and approve the withdrawal.
-  function markPaid(id){
-    var el=document.getElementById('tx_'+id); var tx=el?(el.value||'').trim():'';
+  function markPaid(id, txOverride){
+    var el=document.getElementById('tx_'+id); var tx=(txOverride!=null)?String(txOverride):(el?(el.value||'').trim():'');
     if(tx && !/^0x[0-9a-fA-F]{6,}$/.test(tx)){ if(!confirm('That doesn\'t look like a tx hash (0x…). Mark paid anyway?')) return; }
     for(var j=0;j<SRV_REQS.length;j++){ if(SRV_REQS[j].local_id===id){ SRV_REQS[j].status='approved'; SRV_REQS[j].txid=tx; SRV_REQS[j].decided_at=new Date().toISOString(); break; } }
     var loc=getJSON('alpexa.withdrawals',[]); for(var i=0;i<loc.length;i++){ if(loc[i].id===id){ loc[i].status='approved'; loc[i].txid=tx; loc[i].decidedTs=Date.now(); break; } } setJSON('alpexa.withdrawals',loc);
@@ -1020,6 +1154,10 @@
     document.querySelectorAll('[data-rr]').forEach(function(b){b.onclick=function(){REPORT_RANGE=b.getAttribute('data-rr');render();};});
     document.querySelectorAll('[data-rfil]').forEach(function(b){b.onclick=function(){REPORT_SHOWF=!REPORT_SHOWF;render();};});
     document.querySelectorAll('[data-pfil]').forEach(function(b){b.onclick=function(){PLAYERS_SHOWF=!PLAYERS_SHOWF;render();};});
+    document.querySelectorAll('[data-wrefresh]').forEach(function(b){b.onclick=function(){toast('Refreshing chain…');pullWallet(true);pullAcct();};});
+    document.querySelectorAll('[data-wconnect]').forEach(function(b){b.onclick=walletConnect;});
+    document.querySelectorAll('[data-wdisc]').forEach(function(b){b.onclick=function(){WAL.acct=null;WAL.acctEth=null;WAL.acctUsdt=null;render();};});
+    document.querySelectorAll('[data-wpay]').forEach(function(b){b.onclick=function(){payWithWallet(b.getAttribute('data-wpay'));};});
     var rf=document.getElementById('rpFrom'); if(rf) rf.onchange=function(){ REPORT_FROM=this.value; render(); };
     var rt=document.getElementById('rpTo'); if(rt) rt.onchange=function(){ REPORT_TO=this.value; render(); };
     document.querySelectorAll('[data-hedge]').forEach(function(b){b.onclick=function(){var p=(b.getAttribute('data-hedge')||'').split('|');recordHedge(p[0],p[1],+p[2],+p[3]);};});
@@ -1051,13 +1189,14 @@
     if(cur==='online') pullOnline();
     if(cur==='report'||cur==='history') pullSettle();
     if(cur==='agents'){ pullAgents(); pullSettle(); }
+    if(cur==='wallet'){ pullWallet(); }
     if(cur==='logs') pullLogs();
     if(cur==='risk') pullRisk();
     if(cur==='players' && PLAYER_OPEN){ pullCustPos(PLAYER_OPEN); pullSettle(); }
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v18';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v19';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
