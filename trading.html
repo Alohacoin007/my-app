@@ -2843,6 +2843,11 @@ const ACCOUNTS=[
   {id:'crypto', name:'Alpexa Crypto', url:'crypto.alpexa.com:443', tag:'CRYPTO', acct:'BNX-2841759',  type:'Crypto', balance:'$5,000.00',color:'#F59E0B'},
   {id:'sports', name:'Alpexa Sports', url:'sports.alpexa.com:443', tag:'SPORTS', acct:'SP-194820',    type:'Sports',     balance:'$500.00',color:'#7C3AED'},
 ];
+// Logged-in customers see their REAL account numbers (issued at signup, same as
+// the back office); the hardcoded ones above are only the logged-out fallback.
+try{const _me=JSON.parse(localStorage.getItem('alpexa.me')||'null');
+  if(_me&&_me.accts){const _map={live:_me.accts.fx,crypto:_me.accts.crypto,sports:_me.accts.sports};
+    ACCOUNTS.forEach(a=>{ if(_map[a.id]) a.acct=_map[a.id]; });}}catch(e){}
 
 function AccountSheet({open,current,onPick,onClose}){
   const [,force]=useState(0);
@@ -3727,7 +3732,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v73';
+(function(){try{var b=document.createElement('div');b.textContent='FX v74';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
