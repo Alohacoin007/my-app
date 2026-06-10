@@ -1041,7 +1041,21 @@
         h+='<div class="row" style="margin-top:6px"><span>FX · '+(Math.round(c.fxLots*100)/100)+' lots × $'+(+a.fx_per_lot||0)+'</span><b class="pos">'+usd(c.cFx)+'</b></div>'+
           '<div class="row"><span>Crypto · fees '+usd(c.cryptoFees)+' × '+(+a.crypto_fee_pct||0)+'%</span><b class="pos">'+usd(c.cCr)+'</b></div>'+
           '<div class="row"><span>Sports · pool net '+(c.sportsNet<0?'-':'')+usd(Math.abs(c.sportsNet))+' × '+(+a.sports_net_pct||0)+'%</span><b class="'+(c.cSp>=0?'pos':'neg')+'">'+(c.cSp<0?'-':'')+usd(Math.abs(c.cSp))+'</b></div>'+
-          (c.cSp<0?'<div class="hint" style="color:#c0392b">Sports pool is negative (customers won) — carry it over; pay $0 this period.</div>':'')+
+          (c.cSp<0?'<div class="hint" style="color:#c0392b">Sports pool is negative (customers won) — carry it over; pay $0 this period.</div>':'');
+        // Commission money summary: earned + manual adjustments − payouts = available.
+        var pays=SRV_APAY.filter(function(p){ return p.agent_code===code; });
+        var adjA=0, paidA=0, pendA=0;
+        pays.forEach(function(p){ if(p.method==='adjust'){ if(p.status==='approved')adjA+=(+p.amount||0); }
+          else if(p.status==='approved')paidA+=(+p.amount||0); else if(p.status==='pending')pendA+=(+p.amount||0); });
+        var availA=Math.max(0, Math.max(0,c.total)+adjA-paidA-pendA);
+        h+=(adjA!==0?('<div class="row"><span>Adjustments</span><b class="'+(adjA>=0?'pos':'neg')+'">'+(adjA<0?'-':'+')+usd(Math.abs(adjA))+'</b></div>'):'')+
+          '<div class="row"><span>Paid out'+(pendA>0?(' · pending '+usd(pendA)):'')+'</span><b>'+usd(paidA)+'</b></div>'+
+          '<div class="row"><span><b>Available to withdraw</b></span><b class="pos">'+usd(availA)+'</b></div>'+
+          '<div class="lbl" style="margin-top:14px">Adjust commission (+ bonus / − deduct)</div>'+
+          '<div style="display:flex;gap:8px;margin-top:2px">'+
+          '<input class="in" id="ag_adj_'+esc(code)+'" type="number" step="0.01" placeholder="+100 or -50" style="margin-top:0;flex:1">'+
+          '<input class="in" id="ag_adjr_'+esc(code)+'" placeholder="Reason (e.g. June bonus)" style="margin-top:0;flex:2">'+
+          '<button class="ok" data-agadj="'+esc(code)+'" style="border:none;border-radius:4px;padding:0 14px;font:700 12px system-ui;cursor:pointer">Apply</button></div>'+
           '<div class="lbl" style="margin-top:12px">Linked customers</div>';
         if(!links.length) h+='<div class="req-meta" style="margin:4px 0">None yet.</div>';
         links.forEach(function(l){ h+='<div class="row"><span>'+(custName(l.cust_id)||l.cust_id)+' <span class="muted">· '+l.cust_id+'</span></span>'+
@@ -1101,6 +1115,17 @@
       try{ logAction('agent_link', cid, code+' · '+sh+'%'); }catch(e){}
       toast('Linked ✓'); pullAgents();
     },function(){ toast('Link failed',true); });
+  }
+  function agentAdjust(code){
+    var amt=parseFloat(val('ag_adj_'+code)), reason=val('ag_adjr_'+code)||'';
+    if(isNaN(amt)||!amt){ toast('Enter an amount — use a minus sign to deduct',true); return; }
+    amt=Math.round(amt*100)/100;
+    if(!confirm((amt>0?'Add ':'Deduct ')+usd(Math.abs(amt))+(amt>0?' to ':' from ')+agentName(code)+'\'s commission?'+(reason?('\nReason: '+reason):''))) return;
+    AlpexaSync.db.from('agent_payouts').insert({agent_code:code,amount:amt,method:'adjust',dest:reason,status:'approved'}).then(function(r){
+      if(r&&r.error){ toast('Error: '+r.error.message,true); return; }
+      try{ logAction('agent_adjust', code, (amt>0?'+':'')+usd(amt)+(reason?(' · '+reason):'')); }catch(e){}
+      toast('Adjusted ✓'); pullAgents();
+    },function(){ toast('Failed',true); });
   }
   function agentSave(code){
     var patch={ fx_per_lot:parseFloat(val('ag_fx_'+code))||0, crypto_fee_pct:parseFloat(val('ag_cr_'+code))||0, sports_net_pct:parseFloat(val('ag_sp_'+code))||0 };
@@ -1206,6 +1231,7 @@
     document.querySelectorAll('[data-apm]').forEach(function(b){b.onclick=function(){agentPayManual(b.getAttribute('data-apm'));};});
     document.querySelectorAll('[data-api]').forEach(function(b){b.onclick=function(){agentPayInternal(b.getAttribute('data-api'));};});
     document.querySelectorAll('[data-apr]').forEach(function(b){b.onclick=function(){if(confirm('Reject this payout request?'))apSet(b.getAttribute('data-apr'),{status:'rejected'},'Rejected ✓');};});
+    document.querySelectorAll('[data-agadj]').forEach(function(b){b.onclick=function(){agentAdjust(b.getAttribute('data-agadj'));};});
     document.querySelectorAll('[data-psort]').forEach(function(b){b.onclick=function(){var s=b.getAttribute('data-psort');
       if(PLAYER_SORT===s){ PLAYER_DIR=-PLAYER_DIR; }
       else { PLAYER_SORT=s; PLAYER_DIR=(s==='name'?1:-1); } // name: A→Z · balance/joined: big/new first
@@ -1265,7 +1291,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v21';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v22';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>

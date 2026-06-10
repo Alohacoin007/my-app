@@ -131,11 +131,13 @@
     '</div>';
     if(c.cSp<0) h+='<div class="hint" style="color:var(--neg)">Sports pool is negative this period (your customers won) — it carries over; payout is $0 until it recovers.</div>';
     // ── Withdraw: available = lifetime commission − paid − pending requests ──
-    var ca=commission(true), paid=0, pendAmt=0;
-    PAYOUTS.forEach(function(p){ if(p.status==='approved')paid+=(+p.amount||0); else if(p.status==='pending')pendAmt+=(+p.amount||0); });
-    var avail=Math.max(0, Math.max(0,ca.total)-paid-pendAmt);
+    var ca=commission(true), paid=0, pendAmt=0, adj=0;
+    PAYOUTS.forEach(function(p){ if(p.method==='adjust'){ if(p.status==='approved')adj+=(+p.amount||0); }
+      else if(p.status==='approved')paid+=(+p.amount||0); else if(p.status==='pending')pendAmt+=(+p.amount||0); });
+    var avail=Math.max(0, Math.max(0,ca.total)+adj-paid-pendAmt);
     h+='<div class="sec">Withdraw</div><div class="card">'+
       '<div class="row"><span>Available to withdraw</span><b class="pos">'+usd(avail)+'</b></div>'+
+      (adj!==0?'<div class="row"><span>Adjustments</span><b class="'+(adj>=0?'pos':'neg')+'">'+(adj<0?'-':'+')+usd(Math.abs(adj))+'</b></div>':'')+
       '<div class="row"><span>Paid out (lifetime)</span><b>'+usd(paid)+'</b></div>'+
       (pendAmt>0?'<div class="row"><span>Pending requests</span><b class="muted">'+usd(pendAmt)+'</b></div>':'');
     if(SHOWW){
@@ -154,8 +156,9 @@
     h+='<div class="sec">My payouts · '+PAYOUTS.length+'</div><div class="card">';
     if(!PAYOUTS.length) h+='<div class="empty">No payout requests yet.</div>';
     PAYOUTS.slice(0,10).forEach(function(p){ var st=p.status==='approved'?'won':p.status==='rejected'?'lost':'open';
-      var M={crypto:'USDT',bank:'Bank',internal:'Trading acct'};
-      h+='<div class="row"><span><b>'+usd(p.amount)+'</b> <span class="muted">· '+(M[p.method]||p.method)+' · '+(p.created_at?new Date(p.created_at).toLocaleDateString():'')+'</span>'+
+      var M={crypto:'USDT',bank:'Bank',internal:'Trading acct',adjust:'Adjustment'};
+      var amtTxt=(p.method==='adjust')?(((+p.amount||0)<0?'-':'+')+usd(Math.abs(+p.amount||0))):usd(p.amount);
+      h+='<div class="row"><span><b class="'+(p.method==='adjust'?((+p.amount||0)>=0?'pos':'neg'):'')+'">'+amtTxt+'</b> <span class="muted">· '+(M[p.method]||p.method)+(p.method==='adjust'&&p.dest?(' · '+p.dest):'')+' · '+(p.created_at?new Date(p.created_at).toLocaleDateString():'')+'</span>'+
         (p.txid?('<div class="meta"><a href="https://etherscan.io/tx/'+p.txid+'" target="_blank" rel="noopener" style="color:#1F2A37;font-weight:700">tx ↗</a></div>'):'')+'</span>'+
         '<span class="badge '+st+'">'+(p.status||'pending').toUpperCase()+'</span></div>'; });
     h+='</div>';
