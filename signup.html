@@ -487,14 +487,7 @@ function step2(){
     <div class="otp-help">Code expires in <span class="mono" id="otpTimer" style="color:#2196F3;font-weight:600">02:59</span></div>
     <button class="otp-resend" id="resendBtn" onclick="resendOTP()" disabled>Resend code (30s)</button>
     <div id="otpError" style="text-align:center;font-size:12.5px;color:#e53935;margin-top:14px;font-weight:600;display:none;"></div>
-    <div style="text-align:center;margin-top:16px;">
-      <button onclick="revealCode()" style="background:#e3f2fd;color:#1565c0;border:none;padding:8px 16px;border-radius:18px;font-size:11.5px;font-weight:600;font-family:'Roboto',sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:5px;">
-        <span class="msi" style="font-size:14px">visibility</span>Show test code (demo)
-      </button>
-    </div>
-    <div id="codeReveal" style="text-align:center;font-size:14px;color:#757575;margin-top:10px;display:none;">
-      Your code: <b class="mono" id="codeRevealNum" style="font-size:18px;color:#212121;letter-spacing:4px;"></b>
-    </div>
+    <div style="text-align:center;font-size:12px;color:#9e9e9e;margin-top:14px;line-height:1.6;">📧 6-digit code sent to your email.<br>Check your inbox (and spam folder).</div>
   `;
 }
 function revealCode(){
@@ -671,20 +664,41 @@ function otpKey(e, i){
   }
 }
 function resendOTP(){
-  data.otpSent = generateOTP();
   data.otp = '';
   document.querySelectorAll('.otp-cell').forEach(c => { c.value = ''; c.classList.remove('filled'); });
   const errEl = document.getElementById('otpError');
   if (errEl) errEl.style.display = 'none';
-  showToast('New code sent: ' + data.otpSent);
-  console.log('[ALPEXA OTP] New code:', data.otpSent);
   startResendTimer();
   startOTPTimer();
+  sendEmailOtp();
 }
 function generateOTP(){
   let c = '';
   for (let i = 0; i < 6; i++) c += Math.floor(Math.random() * 10);
   return c;
+}
+// Send a REAL 6-digit verification code to the email via Supabase Auth.
+async function sendEmailOtp(){
+  try{
+    if(!window._db){ showToast('No server connection.'); return; }
+    showToast('Sending a code to ' + data.email + '…');
+    const r = await window._db.auth.signInWithOtp({ email: data.email, options: { shouldCreateUser: true } });
+    if(r && r.error){ showToast('Could not send code: ' + r.error.message); }
+    else { showToast('6-digit code sent to ' + data.email); }
+  }catch(e){ showToast('Could not send code. Tap Resend.'); }
+}
+// Verify the code the user typed against the real email OTP.
+async function verifyEmailCode(){
+  const errEl = document.getElementById('otpError');
+  const showErr = (m)=>{ if(errEl){ errEl.textContent=m; errEl.style.display='block'; }
+    document.querySelectorAll('.otp-cell').forEach(c=>{ c.style.borderColor='#e53935'; c.style.animation='shake 0.3s'; setTimeout(()=>{c.style.animation='';c.style.borderColor='';},400); }); };
+  try{
+    if(!window._db){ showErr('No server connection.'); return; }
+    const r = await window._db.auth.verifyOtp({ email: data.email, token: data.otp, type: 'email' });
+    if(r && r.error){ showErr('Incorrect or expired code. Check your email and try again.'); return; }
+    if(errEl) errEl.style.display='none';
+    cur = 3; renderStep();
+  }catch(e){ showErr('Verification failed. Please try again.'); }
 }
 let resendTimer = null;
 function startResendTimer(){
@@ -730,15 +744,13 @@ async function createOnServer(){
   data.custId=cust; data.accts={sports:aN('SP'),crypto:aN('CR'),fx:aN('FX')}; data.acctNum=data.accts.sports;
   if(!window._db) throw new Error('No server connection');
   var fullName=(data.firstName+' '+data.lastName).trim();
-  // 1) Create the REAL authentication account (email + password) via Supabase Auth.
-  var au=await window._db.auth.signUp({ email:data.email, password:data.password });
-  if(au && au.error){
-    var em=(au.error.message||'').toLowerCase();
-    if(em.indexOf('already')>=0 || em.indexOf('registered')>=0 || em.indexOf('exists')>=0)
-      throw new Error('This email is already registered. Please log in instead.');
-    throw new Error(au.error.message||'Sign-up failed');
-  }
-  var authId=(au && au.data && au.data.user) ? au.data.user.id : null;
+  // The auth user was already created AND email-verified at the OTP step.
+  // Now set the password on it, then read its id.
+  var up=await window._db.auth.updateUser({ password:data.password });
+  if(up && up.error) throw new Error(up.error.message||'Could not set your password');
+  var who=await window._db.auth.getUser();
+  var authId=(who && who.data && who.data.user) ? who.data.user.id : null;
+  if(!authId) throw new Error('Your email is not verified yet — go back and enter the code.');
   // 2) Save the profile, linked to that auth user.
   var playerRow={cust_id:cust,name:fullName,email:data.email,auth_id:authId,
     phone:data.phone||'',dob:data.dob||'',country:data.country||'',
@@ -769,30 +781,14 @@ function nextStep(){
   else if (cur === 1) {
     if (!validPersonal()) return;
     cur = 2;
-    data.otpSent = generateOTP();
     renderStep();
-    showToast('Code sent to ' + data.email + ': ' + data.otpSent);
-    console.log('[ALPEXA OTP] Verification code:', data.otpSent);
     startOTPTimer();
     startResendTimer();
+    sendEmailOtp();
   }
   else if (cur === 2) {
     if (data.otp.length !== 6) return;
-    if (data.otp !== data.otpSent) {
-      const errEl = document.getElementById('otpError');
-      if (errEl) {
-        errEl.textContent = 'Incorrect code. Please check your email and try again.';
-        errEl.style.display = 'block';
-      }
-      // Shake the cells
-      document.querySelectorAll('.otp-cell').forEach(c => {
-        c.style.borderColor = '#e53935';
-        c.style.animation = 'shake 0.3s';
-        setTimeout(() => { c.style.animation = ''; c.style.borderColor = ''; }, 400);
-      });
-      return;
-    }
-    cur = 3; renderStep();
+    verifyEmailCode();
   }
   else if (cur === 3) {
     if (!validSecurity()) return;
