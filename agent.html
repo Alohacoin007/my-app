@@ -72,8 +72,10 @@
     if(!db){ err.textContent='No server connection.'; err.style.display='block'; return; }
     if(!code||!pin){ err.textContent='Enter your code and PIN.'; err.style.display='block'; return; }
     db.from('agents').select('*').eq('code',code).limit(1).then(function(r){
+      if(r&&r.error){ err.textContent='Server error: '+r.error.message+' (agents SQL not run yet?)'; err.style.display='block'; return; }
       var a=r&&r.data&&r.data[0];
-      if(!a||String(a.pin)!==pin){ err.textContent='Wrong code or PIN.'; err.style.display='block'; return; }
+      if(!a){ err.textContent='No agent with code '+code+' — check the code in Back Office 1 → Agents.'; err.style.display='block'; return; }
+      if(String(a.pin)!==pin){ err.textContent='Wrong PIN for '+code+'.'; err.style.display='block'; return; }
       if(a.status&&a.status!=='active'){ err.textContent='This agent account is not active.'; err.style.display='block'; return; }
       AGENT=a; try{ sessionStorage.setItem('alpexa.agent',code+'|'+pin); }catch(e){}
       pull(); viewDash();
