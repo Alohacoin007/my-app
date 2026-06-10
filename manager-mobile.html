@@ -753,7 +753,7 @@
   // ── Agents (IB / affiliates): recruit customers, earn commission ──
   // FX: $ per lot (spread-markup rebate) · Crypto: % of trade fees ·
   // Sports: % of the agent's WHOLE customer pool NET loss (anti-hedge-abuse).
-  var SRV_AGENTS=[], SRV_ALINKS=[], AGENT_OPEN=null, AG_RANGE='30d';
+  var SRV_AGENTS=[], SRV_ALINKS=[], AGENT_OPEN=null, AG_RANGE='all';
   function pullAgents(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
     AlpexaSync.db.from('agents').select('*').order('created_at',{ascending:false}).then(function(r){ if(r&&r.data){ SRV_AGENTS=r.data; if(cur==='agents'&&!busyEditing())render(); } },function(){});
     AlpexaSync.db.from('agent_links').select('*').then(function(r){ if(r&&r.data){ SRV_ALINKS=r.data; if(cur==='agents'&&!busyEditing())render(); } },function(){}); }
@@ -779,17 +779,9 @@
   function viewAgents(){
     if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Agents</div><div class="card"><div class="empty">Not connected to server.</div></div>';
     var rg=agRange();
-    var h='<div style="display:flex;gap:6px;margin:14px 14px 12px">'+[['today','Today'],['7d','7d'],['30d','30d'],['all','All']].map(function(x){
-      var on=AG_RANGE===x[0];
-      return '<button data-agr="'+x[0]+'" style="flex:1;background:'+(on?'var(--acc)':'#e8eef7')+';color:'+(on?'#fff':'var(--dim)')+';border-radius:4px;padding:9px 0;font:700 12.5px system-ui;border:none;cursor:pointer">'+x[1]+'</button>';
-    }).join('')+'</div>';
-    h+='<div class="sec">New agent</div><div class="card">'+
-      '<label class="lbl">Name</label><input class="in" id="ag_name" placeholder="Agent name">'+
-      '<label class="lbl" style="display:block;margin-top:8px">Email</label><input class="in" id="ag_email" placeholder="agent@email.com">'+
-      '<button class="ok" data-agadd="1" style="width:100%;margin-top:10px;border:none;border-radius:4px;padding:11px;font:700 13px system-ui;cursor:pointer">+ Add agent</button>'+
-      '<div class="hint">Code &amp; PIN are generated automatically. Default rates: FX $5/lot · Crypto 20% of fees · Sports 30% of pool net loss.</div></div>';
-    h+='<div class="sec">Agents · '+SRV_AGENTS.length+' · '+rg.label+'</div>';
-    if(!SRV_AGENTS.length){ h+='<div class="card"><div class="empty">No agents yet — add one above.<br>(If this errors, run the agents SQL first.)</div></div>'; return h; }
+    var h='<div class="sec" style="display:flex;align-items:center;justify-content:space-between">Agents · '+SRV_AGENTS.length+
+      '<button data-agnew="1" style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:5px 11px;font:700 11px system-ui;color:var(--ink);cursor:pointer">＋ New agent</button></div>';
+    if(!SRV_AGENTS.length){ h+='<div class="card"><div class="empty">No agents yet — tap ＋ New agent.<br>(If adding errors, run the agents SQL first.)</div></div>'; return h; }
     SRV_AGENTS.forEach(function(a){
       var code=a.code, open=(AGENT_OPEN===code);
       var links=SRV_ALINKS.filter(function(l){ return l.agent_code===code; });
@@ -824,13 +816,32 @@
     h+='<div class="hint" style="margin:0 14px 10px">Agents sign in at <b>agent.html</b> with their code + PIN to see their own commission. Crypto fee recording: coming with the crypto P&amp;L upgrade.</div>';
     return h;
   }
-  function agentAdd(){
-    var nm=val('ag_name'), em=val('ag_email');
+  // "+ New agent" → small popup (survives the 3s re-render since it lives on <body>).
+  function agentPopup(){
+    if(document.getElementById('agPop')) return;
+    var ov=document.createElement('div');
+    ov.id='agPop';
+    ov.style.cssText='position:fixed;inset:0;z-index:1500;background:rgba(15,27,45,.45);display:flex;align-items:center;justify-content:center;padding:24px';
+    ov.innerHTML='<div style="background:#fff;border:1px solid #E6EAF0;border-radius:4px;width:100%;max-width:340px;padding:16px" onclick="event.stopPropagation()">'+
+      '<div style="font:800 14px system-ui;margin-bottom:10px">New agent</div>'+
+      '<label class="lbl">Name</label><input class="in" id="agp_name" placeholder="Agent name" autocomplete="off">'+
+      '<label class="lbl" style="display:block;margin-top:8px">Email</label><input class="in" id="agp_email" placeholder="agent@email.com" autocomplete="off">'+
+      '<div class="btns"><button class="ok" id="agp_ok">Add</button><button class="no" id="agp_no">Cancel</button></div>'+
+      '<div class="hint">Code &amp; PIN auto-generated · default rates: FX $5/lot · Crypto 20% of fees · Sports 30% of pool net loss.</div></div>';
+    ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+    document.body.appendChild(ov);
+    document.getElementById('agp_no').onclick=function(){ ov.remove(); };
+    document.getElementById('agp_ok').onclick=function(){ agentAdd(ov); };
+    setTimeout(function(){ var n=document.getElementById('agp_name'); if(n)n.focus(); },50);
+  }
+  function agentAdd(ov){
+    var nm=(document.getElementById('agp_name').value||'').trim(), em=(document.getElementById('agp_email').value||'').trim();
     if(!nm){ toast('Enter the agent\'s name',true); return; }
     var code='AG-'+Math.floor(1000+Math.random()*9000), pin=String(Math.floor(1000+Math.random()*9000));
     AlpexaSync.db.from('agents').insert({code:code,name:nm,email:em,pin:pin,status:'active',fx_per_lot:5,crypto_fee_pct:20,sports_net_pct:30}).then(function(r){
       if(r&&r.error){ toast('Error: '+r.error.message+' (run the agents SQL?)',true); return; }
       try{ logAction('agent_add', code, nm); }catch(e){}
+      if(ov)ov.remove();
       toast('Agent added ✓ '+code+' · PIN '+pin); AGENT_OPEN=code; pullAgents();
     },function(){ toast('Add failed',true); });
   }
@@ -942,7 +953,7 @@
     document.querySelectorAll('[data-delpl]').forEach(function(b){b.onclick=function(){deletePlayer(b.getAttribute('data-delpl'));};});
     document.querySelectorAll('[data-agr]').forEach(function(b){b.onclick=function(){AG_RANGE=b.getAttribute('data-agr');render();};});
     document.querySelectorAll('[data-agopen]').forEach(function(b){b.onclick=function(){var c=b.getAttribute('data-agopen');AGENT_OPEN=(AGENT_OPEN===c?null:c);render();};});
-    document.querySelectorAll('[data-agadd]').forEach(function(b){b.onclick=agentAdd;});
+    document.querySelectorAll('[data-agnew]').forEach(function(b){b.onclick=agentPopup;});
     document.querySelectorAll('[data-aglink]').forEach(function(b){b.onclick=function(){agentLink(b.getAttribute('data-aglink'));};});
     document.querySelectorAll('[data-agsave]').forEach(function(b){b.onclick=function(){agentSave(b.getAttribute('data-agsave'));};});
     document.querySelectorAll('[data-agdel]').forEach(function(b){b.onclick=function(){agentDel(b.getAttribute('data-agdel'));};});
@@ -989,7 +1000,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v8';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v9';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
