@@ -148,6 +148,30 @@
     try{ logAction('edit_customer', custId, 'profile · balances · KYC '+patch.kyc+' · status '+patch.status); }catch(e){}
     toast('Saved ✓ — synced'); PLAYER_EDIT=null; render(); setTimeout(pullPlayers,500);
   }
+  // Permanently remove a customer: profile + all accounts + open positions.
+  // Transaction history (requests) and audit logs are kept on purpose.
+  // Note: the auth login (email/password) lives in auth.users and is removed
+  // separately via the Supabase dashboard or the admin backend (M4).
+  function deletePlayer(custId){
+    if(!window.AlpexaSync||!AlpexaSync.db){ toast('Not connected to server',true); return; }
+    var p=null; SRV_PLAYERS.forEach(function(x){ if(x.cust_id===custId)p=x; });
+    if(!p){ toast('Customer not found',true); return; }
+    var nm=p.name||custId;
+    if(!confirm('Delete '+nm+' ('+custId+')?\n\nThis removes their profile, all 3 accounts and open positions. This cannot be undone.')) return;
+    if(!confirm('Last chance — really delete '+nm+' permanently?')) return;
+    var db=AlpexaSync.db;
+    db.from('positions').delete().eq('cust_id',custId).then(function(){},function(){});
+    db.from('commands').delete().eq('cust_id',custId).then(function(){},function(){});
+    db.from('accounts').delete().eq('player_id',p.id).then(function(){
+      db.from('players').delete().eq('cust_id',custId).then(function(r){
+        if(r&&r.error){ toast('Delete failed: '+r.error.message+' (run the delete SQL)',true); return; }
+        try{ logAction('delete_customer', custId, 'removed profile + accounts + positions ('+nm+')'); }catch(e){}
+        SRV_PLAYERS=SRV_PLAYERS.filter(function(x){ return x.cust_id!==custId; });
+        PLAYER_EDIT=null; PLAYER_OPEN=null;
+        toast('Deleted ✓'); render(); setTimeout(pullPlayers,500);
+      },function(){ toast('Delete failed (check connection / SQL)',true); });
+    },function(){ toast('Could not delete accounts',true); });
+  }
   var SRV_MAP={fx:'Alpexa Live (FX)',live:'Alpexa Live (FX)',stocks:'Alpexa Crypto',crypto:'Alpexa Crypto',demo:'Alpexa Sports',sports:'Alpexa Sports'};
   function pullPlayers(){
     if(!window.AlpexaSync||!AlpexaSync.db) return;
@@ -437,7 +461,9 @@
           '<label class="lbl" style="display:block;margin-top:8px">Crypto balance</label><input class="in" id="ed_bal_crypto" type="number" step="0.01" value="'+bn('crypto')+'">'+
           '<label class="lbl" style="display:block;margin-top:8px">Sports balance</label><input class="in" id="ed_bal_sports" type="number" step="0.01" value="'+bn('sports')+'">'+
           '<div class="btns"><button class="ok" data-savepl="'+esc(cid)+'">Save</button><button class="no" data-cancelpl="1">Cancel</button></div>'+
-          '<div class="hint">Balance changes apply when the customer re-opens that app.</div>';
+          '<div class="hint">Balance changes apply when the customer re-opens that app.</div>'+
+          '<button data-delpl="'+esc(cid)+'" style="width:100%;margin-top:16px;padding:11px;border:1px solid #f1b0b7;background:#fdecea;color:#c0392b;border-radius:9px;font-weight:700;font-size:13px;cursor:pointer">🗑 Delete account</button>'+
+          '<div class="hint" style="color:#c0392b">Permanently removes profile, accounts &amp; positions. Login email stays until removed in Supabase.</div>';
       } else {
         h+='<div class="row"><span>Live (FX)</span><b>'+bv('fx')+'<span class="muted" style="font-weight:500"> · '+an('fx')+'</span></b></div>'+
           '<div class="row"><span>Crypto</span><b>'+bv('crypto')+'<span class="muted" style="font-weight:500"> · '+an('crypto')+'</span></b></div>'+
@@ -675,6 +701,7 @@
     document.querySelectorAll('[data-editpl]').forEach(function(b){b.onclick=function(){PLAYER_EDIT=b.getAttribute('data-editpl');render();};});
     document.querySelectorAll('[data-savepl]').forEach(function(b){b.onclick=function(){savePlayer(b.getAttribute('data-savepl'));};});
     document.querySelectorAll('[data-cancelpl]').forEach(function(b){b.onclick=function(){PLAYER_EDIT=null;render();};});
+    document.querySelectorAll('[data-delpl]').forEach(function(b){b.onclick=function(){deletePlayer(b.getAttribute('data-delpl'));};});
     document.querySelectorAll('[data-close]').forEach(function(b){b.onclick=function(){var p=(b.getAttribute('data-close')||'').split('|');sendCommand(p[0],p[1],p[2]);};});
     var os=document.getElementById('openSearch'); if(os){os.oninput=function(){OPEN_SEARCH=os.value;render();var n=document.getElementById('openSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
     document.querySelectorAll('[data-pcust]').forEach(function(b){b.onclick=function(){PLAYER_OPEN=b.getAttribute('data-pcust');PLAYER_FILTER='';cur='players';render();};});
