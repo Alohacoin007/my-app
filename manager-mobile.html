@@ -622,7 +622,7 @@
   function barP(v,max){var p=Math.min(100,Math.round(v/Math.max(1,max)*100));var col=p>80?'var(--neg)':p>50?'var(--warn)':'var(--pos)';
     return '<div style="height:10px;background:#eef0f3;border-radius:4px;margin-top:8px;overflow:hidden"><div style="height:100%;width:'+p+'%;background:'+col+'"></div></div><div class="hint" style="margin-top:4px">'+p+'% of bankroll committed</div>';}
   // Sports risk + hedging.
-  var RISK_POS=[], HEDGES=[];
+  var RISK_POS=[], HEDGES=[], RISK_OPEN=null;
   function decOdds(am){ am=+am||0; return am>0?1+am/100:am<0?1+100/(-am):2; }
   function pullRisk(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
     AlpexaSync.db.from('positions').select('*').eq('status','open').eq('server','sports').limit(1000).then(function(r){ if(r&&r.data){ RISK_POS=r.data; if(cur==='risk'&&!busyEditing())render(); } },function(){});
@@ -658,9 +658,15 @@
         kpi('Hedged so far',k0(totalHedged),HEDGES.length+' lay-offs','pos')+
       '</div>';
     if(!gameArr.length && !parlays.length){ h+='<div class="card"><div class="empty">No open sports bets. (Place bets in the app, keep it open ~15s.)</div></div>'; }
+    if(gameArr.length){ h+='<div class="sec">Events · '+gameArr.length+'</div>'; }
     gameArr.forEach(function(g){
-      var over=g.worst <= -limit;
-      h+='<div class="sec">'+g.game+(over?' 🔴 over limit':'')+'</div><div class="card">';
+      var over=g.worst <= -limit, open=(RISK_OPEN===g.game);
+      // One line per event: name + worst-case. Details (picks + hedge calc) on expand.
+      h+='<div class="card" style="padding:9px 12px">'+
+        '<div class="row" data-rg="'+esc(g.game)+'" style="border:none;padding:0;cursor:pointer">'+
+        '<span style="display:flex;align-items:center;gap:6px;min-width:0"><span class="muted" style="font-size:10px">'+(open?'▾':'▸')+'</span><b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+g.game+'</b>'+(over?'<span style="font-size:10px">🔴</span>':'')+'</span>'+
+        '<b class="'+(g.worst<0?'neg':'pos')+'" style="white-space:nowrap;padding-left:8px">'+(g.worst>=0?'+':'')+k0(g.worst)+'</b></div>';
+      if(!open){ h+='</div>'; return; }
       Object.keys(g.picks).forEach(function(pk){ var P=g.picks[pk]; var net=g.stake - P.payout;
         h+='<div class="row" style="border:none;padding:9px 0 4px"><span><b>'+pk+'</b><div class="req-meta" style="margin:2px 0 0">'+P.n+' bet(s) · stake '+usd(P.stake)+' · payout '+usd(P.payout)+'</div></span>'+
           '<span class="'+(net<0?'neg':'pos')+'" style="font-weight:800">'+(net>=0?'+':'')+k0(net)+'</span></div>';
@@ -949,6 +955,7 @@
     var rf=document.getElementById('rpFrom'); if(rf) rf.onchange=function(){ REPORT_FROM=this.value; render(); };
     var rt=document.getElementById('rpTo'); if(rt) rt.onchange=function(){ REPORT_TO=this.value; render(); };
     document.querySelectorAll('[data-hedge]').forEach(function(b){b.onclick=function(){var p=(b.getAttribute('data-hedge')||'').split('|');recordHedge(p[0],p[1],+p[2],+p[3]);};});
+    document.querySelectorAll('[data-rg]').forEach(function(b){b.onclick=function(){var g=b.getAttribute('data-rg');RISK_OPEN=(RISK_OPEN===g?null:g);render();};});
     var g;
     if(g=document.getElementById('kycToggle'))g.onclick=function(){var k=localStorage.getItem('alpexa.kyc')||'pending';localStorage.setItem('alpexa.kyc',k==='verified'?'pending':'verified');render();};
     if(g=document.getElementById('rgSave'))g.onclick=function(){var st=getJSON('alpexaSettings',{});st.depositLimit=parseFloat(val('rgDep'))||0;st.lossLimit=parseFloat(val('rgLoss'))||0;var d=parseFloat(val('rgSE'))||0;st.selfExcludeUntil=d>0?Date.now()+d*86400000:0;setJSON('alpexaSettings',st);flash(g,'Saved ✓');render();};
@@ -982,7 +989,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v7';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v8';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
