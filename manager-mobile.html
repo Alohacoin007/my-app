@@ -395,7 +395,9 @@
     var sDay={};
     S.forEach(function(s){ var k=(s.created_at||'').slice(0,10); if(!k)return; sDay[k]=(sDay[k]||0)+(-(+s.pnl||0)); });
     var sDays=Object.keys(sDay).sort().reverse().slice(0,14);
-    if(sDays.length){ h+='<div class="sec">Company P&amp;L by day</div><div class="card">';
+    // Only worth showing when the period spans multiple days — a single day
+    // just repeats the Company P&L KPI above.
+    if(sDays.length>1){ h+='<div class="sec">Company P&amp;L by day</div><div class="card">';
       sDays.forEach(function(k){ var v=sDay[k]; h+='<div class="row"><span>'+k+'</span><b class="'+(v>=0?'pos':'neg')+'">'+(v<0?'-':'+')+k0(Math.abs(v))+'</b></div>'; });
       h+='</div>'; }
     h+='<div class="hint" style="margin:0 14px 10px">Trade results are recorded from app version FX v76 / Sports v1.2.27 onward (older trades aren\'t included). Crypto spot P&amp;L: planned.</div>';
@@ -1037,7 +1039,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v12';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v13';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
