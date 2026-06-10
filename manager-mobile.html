@@ -375,19 +375,7 @@
         '<b class="'+(netS>=0?'pos':'neg')+'">'+(netS<0?'-':'+')+k0(Math.abs(netS))+'</b></div>';
     });
     h+='</div>';
-    // Trade-by-trade list for the selected period (customer P&L view).
-    var KINDS={fx_close:'FX close',bet_won:'Bet won',bet_lost:'Bet lost',bet_cashout:'Cashout',bet_void:'Void'};
-    h+='<div class="sec">Settled trades · '+S.length+'</div>';
-    if(!S.length){ h+='<div class="card"><div class="empty">No settled trades in this period.</div></div>'; }
-    else{ h+='<div class="card">';
-      S.slice(0,60).forEach(function(x){ var p=+x.pnl||0; var who=custName(x.cust_id)||x.cust_id||'—';
-        var when=x.created_at?new Date(x.created_at).toLocaleString():'';
-        h+='<div class="row"><span><b>'+(x.symbol||KINDS[x.kind]||x.kind||'Trade')+'</b> <span class="muted" style="font-size:10.5px">'+(KINDS[x.kind]||x.kind||'')+'</span>'+
-          '<div class="req-meta" style="margin:2px 0 0">👤 '+who+' · '+(x.server||'')+' · '+when+'</div></span>'+
-          '<b class="'+(p>=0?'pos':'neg')+'">'+(p<0?'-':'+')+k0(Math.abs(p))+'</b></div>'; });
-      if(S.length>60) h+='<div class="hint">Showing latest 60 of '+S.length+'.</div>';
-      h+='</div>'; }
-    h+='<div class="hint" style="margin:0 14px 10px">Green = customer won (we pay) · Red = customer lost (we keep).</div>';
+    h+='<div class="hint" style="margin:0 14px 10px">Green = customer won (we pay) · Red = customer lost (we keep). See the <b>History</b> tab for each individual trade.</div>';
     var sDay={};
     S.forEach(function(s){ var k=(s.created_at||'').slice(0,10); if(!k)return; sDay[k]=(sDay[k]||0)+(-(+s.pnl||0)); });
     var sDays=Object.keys(sDay).sort().reverse().slice(0,14);
