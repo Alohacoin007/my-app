@@ -306,7 +306,7 @@
   // Finished trades reported by the apps (FX closes, bet results) → company P&L.
   var SRV_SETTLE=[];
   function pullSettle(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
-    AlpexaSync.db.from('settlements').select('*').order('created_at',{ascending:false}).limit(2000).then(function(r){ if(r&&r.data){ SRV_SETTLE=r.data; if((cur==='report'||cur==='players')&&!busyEditing())render(); } },function(){}); }
+    AlpexaSync.db.from('settlements').select('*').order('created_at',{ascending:false}).limit(2000).then(function(r){ if(r&&r.data){ SRV_SETTLE=r.data; if((cur==='report'||cur==='players'||cur==='history')&&!busyEditing())render(); } },function(){}); }
   function viewReport(){
     if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Report</div><div class="card"><div class="empty">Not connected to server.</div></div>';
     var now=Date.now(), cutoff=0, hi=Infinity, label='All time';
@@ -438,14 +438,30 @@
   function typeLabel(t){return t==='deposit'?'Deposit':t==='transfer'?'Transfer':t==='withdraw'?'Withdraw':(t||'—');}
   function findReq(id){var all=reqs();for(var i=0;i<all.length;i++){if(all[i].id===id)return all[i];}return null;}
   function viewHistory(){
-    var all=reqs().slice().sort(function(a,b){return (b.ts||0)-(a.ts||0);});
+    // Money moves (deposits/withdrawals/transfers) + settled trades, one timeline.
+    var KINDS3={fx_close:'FX close',bet_won:'Bet won',bet_lost:'Bet lost',bet_cashout:'Cashout',bet_void:'Void'};
+    var trades=SRV_SETTLE.map(function(x){ return {_trade:true, ts:x.created_at?Date.parse(x.created_at):0,
+      custId:x.cust_id||'', custName:custName(x.cust_id)||'', acctNo:x.acct_no||'', server:x.server||'',
+      symbol:x.symbol||'', kindL:KINDS3[x.kind]||x.kind||'Trade', stake:+x.stake||0, pnl:+x.pnl||0}; });
+    var all=reqs().slice().concat(trades).sort(function(a,b){return (b.ts||0)-(a.ts||0);});
     var q=(HIST_FILTER||'').toLowerCase();
-    if(q){ all=all.filter(function(w){return (((w.custName||'')+' '+(w.acctNo||'')+' '+(w.custId||'')+' '+(w.type||'')+' '+(w.server||'')+' '+(w.status||'')+' '+w.amount).toLowerCase().indexOf(q)>=0);}); }
+    if(q){ all=all.filter(function(w){
+      if(w._trade) return ((w.custName+' '+w.custId+' '+w.acctNo+' '+w.server+' '+w.symbol+' '+w.kindL+' trade').toLowerCase().indexOf(q)>=0);
+      return (((w.custName||'')+' '+(w.acctNo||'')+' '+(w.custId||'')+' '+(w.type||'')+' '+(w.server||'')+' '+(w.status||'')+' '+w.amount).toLowerCase().indexOf(q)>=0);}); }
     var h='<div class="sec">Transaction history · all customers</div>';
-    h+='<div class="card" style="padding:10px 12px"><input class="in" id="histSearch" placeholder="Search name, account, type, status…" value="'+(HIST_FILTER||'').replace(/"/g,'&quot;')+'" style="margin-top:0"></div>';
-    h+='<div class="hint" style="margin:-4px 14px 8px">'+all.length+' transaction(s). Tap Edit to fix mistakes — changes sync to the customer’s app.</div>';
+    h+='<div class="card" style="padding:10px 12px"><input class="in" id="histSearch" placeholder="Search name, account, type, trade…" value="'+(HIST_FILTER||'').replace(/"/g,'&quot;')+'" style="margin-top:0"></div>';
+    h+='<div class="hint" style="margin:-4px 14px 8px">'+all.length+' item(s) — deposits, withdrawals, transfers &amp; trades together. Tap Edit to fix money moves.</div>';
     if(!all.length){ h+='<div class="card"><div class="empty">No transactions found.</div></div>'; return h; }
-    all.forEach(function(w){
+    all.slice(0,150).forEach(function(w){
+      if(w._trade){
+        var p=w.pnl, bcls=w.kindL==='Void'?'open':(p>=0?'won':'lost');
+        h+='<div class="card">'+
+          '<div class="row" style="border:none;padding:0 0 6px"><span class="badge '+bcls+'">'+w.kindL.toUpperCase()+'</span><span class="req-amt '+(p>=0?'pos':'neg')+'">'+(p<0?'-':'+')+usd(Math.abs(p))+'</span></div>'+
+          '<div class="req-meta">👤 '+(w.custName||w.custId||'—')+(w.acctNo?(' · '+w.acctNo):'')+'</div>'+
+          '<div class="req-meta">'+w.server+' · '+(w.symbol||'')+' · stake '+usd(w.stake)+' · '+ago(w.ts)+'</div>'+
+        '</div>';
+        return;
+      }
       var meta=w.type==='transfer'?((w.from||'?')+' → '+(w.to||'?')):((w.asset||'')+(w.network?' ('+w.network+')':''));
       if(EDIT_ID===w.id){
         h+='<div class="card" style="border:2px solid var(--acc)">'+
@@ -817,7 +833,7 @@
   setInterval(function(){ if(!document.hidden){ pullServer(); pullPlayers();
     if(cur==='bets') pullOpenSummary();
     if(cur==='online') pullOnline();
-    if(cur==='report') pullSettle();
+    if(cur==='report'||cur==='history') pullSettle();
     if(cur==='logs') pullLogs();
     if(cur==='risk') pullRisk();
     if(cur==='players' && PLAYER_OPEN){ pullCustPos(PLAYER_OPEN); pullSettle(); }
