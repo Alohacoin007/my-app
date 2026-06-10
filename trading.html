@@ -3735,7 +3735,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v76';
+(function(){try{var b=document.createElement('div');b.textContent='FX v77';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
@@ -3771,7 +3771,10 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
     if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m||!m.accts.fx)return; var cust=m.custId;
     AlpexaSync.db.from('commands').select('*').eq('cust_id',cust).eq('server','fx').eq('status','pending').then(function(r){
       if(!r||!r.data||!r.data.length)return;
-      r.data.forEach(function(c){ try{ if(window.__alpexaFXClose) window.__alpexaFXClose(c.local_id); }catch(e){}
+      r.data.forEach(function(c){ try{
+        if(c.action==='set_balance'){ var t=parseFloat(c.local_id);
+          if(!isNaN(t)&&window.getBalances&&window.addBalance){ var b=window.getBalances(); window.addBalance('live', t-(+b.live||0)); } }
+        else if(window.__alpexaFXClose) window.__alpexaFXClose(c.local_id); }catch(e){}
         AlpexaSync.db.from('commands').update({status:'done'}).eq('id',c.id).then(function(){},function(){}); });
       setTimeout(push,1000);
     },function(){});

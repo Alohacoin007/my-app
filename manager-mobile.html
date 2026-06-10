@@ -141,8 +141,18 @@
     var accs=SRV_ACCOUNTS.filter(function(a){ return a.player_id===p.id; });
     ['fx','crypto','sports'].forEach(function(s){
       var a=null; accs.forEach(function(x){ if(x.server===s)a=x; }); if(!a)return;
-      var b=parseFloat(val('ed_bal_'+s)); if(isNaN(b))return;
-      AlpexaSync.db.from('accounts').update({balance:Math.round(b*100)/100}).eq('acct_no',a.acct_no).then(function(){},function(){});
+      var b=parseFloat(val('ed_bal_'+s)); if(isNaN(b))return; b=Math.round(b*100)/100;
+      var oldB=+a.balance||0;
+      AlpexaSync.db.from('accounts').update({balance:b}).eq('acct_no',a.acct_no).then(function(){},function(){});
+      if(Math.abs(b-oldB)>0.009){
+        // Also send a set_balance command so an OPEN app applies it within ~4s
+        // instead of overwriting our edit with its own pushed balance.
+        AlpexaSync.db.from('commands').insert({cust_id:custId,server:s,action:'set_balance',local_id:String(b),status:'pending'}).then(function(){},function(){});
+        if(s==='fx' && b<oldB){
+          var hasPos=(POS_BY_CUST[custId]||[]).some(function(x){ return x.server==='fx'; });
+          if(hasPos) toast('⚠️ FX lowered with open positions — stop-out may liquidate them',true);
+        }
+      }
     });
     try{ logAction('edit_customer', custId, 'profile · balances · KYC '+patch.kyc+' · status '+patch.status); }catch(e){}
     toast('Saved ✓ — synced'); PLAYER_EDIT=null; render(); setTimeout(pullPlayers,500);
@@ -337,6 +347,19 @@
         kpi('Fees earned','+'+k0(fees),'deposit/withdraw fees','pos')+
         kpi('Company P&L',(coPnl<0?'-':'+')+k0(Math.abs(coPnl)),nTrades+' settled trades',coPnl>=0?'pos':'neg')+
       '</div>';
+    // Per-app breakdown of the same numbers.
+    var APPS=[['fx','Alpexa Live (FX)'],['crypto','Alpexa Crypto'],['sports','Alpexa Sports']];
+    h+='<div class="sec">Company P&amp;L · by app</div><div class="card">';
+    APPS.forEach(function(ap){
+      var s=ap[0], lossS=0, winS=0, nS=0;
+      S.forEach(function(x){ if((x.server||'')!==s)return; nS++; var p=+x.pnl||0; if(p>0)winS+=p; else lossS+=-p; });
+      var feeS=R.filter(function(r){return r.status==='approved' && (r.server||'')===s;}).reduce(function(a,r){return a+(+r.fee||0);},0);
+      var netS=lossS-winS+feeS;
+      h+='<div class="row"><span><b>'+ap[1]+'</b>'+
+        '<div class="req-meta" style="margin:2px 0 0">lost +'+k0(lossS)+' · won -'+k0(winS)+' · fees +'+k0(feeS)+' · '+nS+' trades</div></span>'+
+        '<b class="'+(netS>=0?'pos':'neg')+'">'+(netS<0?'-':'+')+k0(Math.abs(netS))+'</b></div>';
+    });
+    h+='</div>';
     var sDay={};
     S.forEach(function(s){ var k=(s.created_at||'').slice(0,10); if(!k)return; sDay[k]=(sDay[k]||0)+(-(+s.pnl||0)); });
     var sDays=Object.keys(sDay).sort().reverse().slice(0,14);
@@ -484,7 +507,7 @@
           '<label class="lbl" style="display:block;margin-top:8px">Crypto balance</label><input class="in" id="ed_bal_crypto" type="number" step="0.01" value="'+bn('crypto')+'">'+
           '<label class="lbl" style="display:block;margin-top:8px">Sports balance</label><input class="in" id="ed_bal_sports" type="number" step="0.01" value="'+bn('sports')+'">'+
           '<div class="btns"><button class="ok" data-savepl="'+esc(cid)+'">Save</button><button class="no" data-cancelpl="1">Cancel</button></div>'+
-          '<div class="hint">Balance changes apply when the customer re-opens that app.</div>'+
+          '<div class="hint">Balance changes reach the app within ~4s (even while it\'s open). Crypto: coins/stakes are kept — only USDT cash is adjusted.</div>'+
           '<button data-delpl="'+esc(cid)+'" style="width:100%;margin-top:16px;padding:11px;border:1px solid #f1b0b7;background:#fdecea;color:#c0392b;border-radius:9px;font-weight:700;font-size:13px;cursor:pointer">🗑 Delete account</button>'+
           '<div class="hint" style="color:#c0392b">Permanently removes profile, accounts &amp; positions. Login email stays until removed in Supabase.</div>';
       } else {

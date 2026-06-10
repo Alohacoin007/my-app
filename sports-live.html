@@ -1130,6 +1130,11 @@
     try{ renderTickets(); }catch(e){} try{ updateWallet(); }catch(e){}
   }
   window.__alpexaSportsVoid=voidBetById;
+  // Back-office balance edit: set the cash balance directly (open-bet stakes
+  // are already out of the balance, so they're unaffected).
+  window.__alpexaSportsSetBal=function(t){ t=+t; if(!(t>=0))return;
+    balance=Math.round(t*100)/100; syncSportsBal();
+    try{ updateWallet(); }catch(e){} try{ renderTickets(); }catch(e){} };
   const RESULTS={};  // gameId -> final result (for auto-settlement)
   let txns = (function(){
     try{ const s=localStorage.getItem('alpexa.txns'); if(s) return JSON.parse(s); }catch(e){}
@@ -1196,7 +1201,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.27</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.28</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -2751,7 +2756,9 @@
     if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m||!m.accts.sports)return; var cust=m.custId;
     AlpexaSync.db.from('commands').select('*').eq('cust_id',cust).eq('server','sports').eq('status','pending').then(function(r){
       if(!r||!r.data||!r.data.length)return;
-      r.data.forEach(function(c){ try{ if(window.__alpexaSportsVoid) window.__alpexaSportsVoid(c.local_id); }catch(e){}
+      r.data.forEach(function(c){ try{
+        if(c.action==='set_balance'){ if(window.__alpexaSportsSetBal) window.__alpexaSportsSetBal(parseFloat(c.local_id)); }
+        else if(window.__alpexaSportsVoid) window.__alpexaSportsVoid(c.local_id); }catch(e){}
         AlpexaSync.db.from('commands').update({status:'done'}).eq('id',c.id).then(function(){},function(){}); });
       setTimeout(push,1000);
     },function(){});
