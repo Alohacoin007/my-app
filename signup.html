@@ -275,7 +275,7 @@ const COUNTRIES = [
   { code:'OT', flag:'🌐',     name:'Other…',          dial:''     },
 ];
 
-const STEPS = ['Account Type','Personal Info','Verify Email','Security','Complete'];
+const STEPS = ['Account Type','Personal Info','Security','Complete'];
 var _db=null; try{ _db=window.supabase.createClient('https://grxnbgtfnaayeluenvqh.supabase.co','sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu'); window._db=_db; }catch(e){ console.error('Supabase init failed',e); }
 window.addEventListener('load',function(){
   function banner(txt,bg){var b=document.getElementById('alpconn');if(!b){b=document.createElement('div');b.id='alpconn';b.style.cssText='position:fixed;left:0;right:0;top:0;z-index:99999;padding:9px 12px;font:700 12px system-ui,sans-serif;text-align:center;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.2)';document.body.appendChild(b);}b.textContent=txt;b.style.background=bg;}
@@ -331,9 +331,8 @@ function renderStep(){
   const foot = document.getElementById('foot');
   if (cur === 0)      { body.innerHTML = step0(); foot.innerHTML = footBtns('Continue', true, 0); }
   else if (cur === 1) { body.innerHTML = step1(); foot.innerHTML = footBtns('Continue', validPersonal(), 1); }
-  else if (cur === 2) { body.innerHTML = step2(); foot.innerHTML = footBtns('Verify', data.otp.length === 6, 2); setTimeout(()=>document.querySelector('.otp-cell')?.focus(),50); }
-  else if (cur === 3) { body.innerHTML = step3(); foot.innerHTML = footBtns('Create Account', validSecurity(), 3); }
-  else if (cur === 4) { body.innerHTML = step4(); foot.innerHTML = `
+  else if (cur === 2) { body.innerHTML = step3(); foot.innerHTML = footBtns('Create Account', validSecurity(), 3); }
+  else if (cur === 3) { body.innerHTML = step4(); foot.innerHTML = `
     <button class="primary-btn" onclick="goToApp()"><span class="msi" style="font-size:18px">login</span> Open my app</button>
     <button class="secondary-btn" onclick="goBack()">Back to login</button>`; }
 }
@@ -626,7 +625,7 @@ function setField(k,v){
   data[k]=v;
   const foot = document.getElementById('foot');
   if (cur === 1) foot.innerHTML = footBtns('Continue', validPersonal(), 1);
-  if (cur === 3) foot.innerHTML = footBtns('Create Account', validSecurity(), 3);
+  if (cur === 2) foot.innerHTML = footBtns('Create Account', validSecurity(), 3);
 }
 function toggleTerm(k){ data[k] = !data[k]; renderStep(); }
 
@@ -744,13 +743,26 @@ async function createOnServer(){
   data.custId=cust; data.accts={sports:aN('SP'),crypto:aN('CR'),fx:aN('FX')}; data.acctNum=data.accts.sports;
   if(!window._db) throw new Error('No server connection');
   var fullName=(data.firstName+' '+data.lastName).trim();
-  // The auth user was already created AND email-verified at the OTP step.
-  // Now set the password on it, then read its id.
-  var up=await window._db.auth.updateUser({ password:data.password });
-  if(up && up.error) throw new Error(up.error.message||'Could not set your password');
-  var who=await window._db.auth.getUser();
-  var authId=(who && who.data && who.data.user) ? who.data.user.id : null;
-  if(!authId) throw new Error('Your email is not verified yet — go back and enter the code.');
+  // Create the auth user with email + password. "Confirm email" is OFF on the
+  // server, so this succeeds immediately for ANY email — no emailed code needed
+  // (early-access / demo signup). We'll re-enable real email verification once
+  // the custom domain is set up in Resend.
+  var au=await window._db.auth.signUp({ email:data.email, password:data.password });
+  var authId=null;
+  if(au && au.error){
+    var em=(au.error.message||'').toLowerCase();
+    if(em.indexOf('already')!==-1 || em.indexOf('registered')!==-1 || em.indexOf('exists')!==-1){
+      // Email already has an account — sign in to recover its id.
+      var si=await window._db.auth.signInWithPassword({ email:data.email, password:data.password });
+      if(si && si.error) throw new Error('This email is already registered. Please go to Login, or use a different email.');
+      authId=(si.data && si.data.user) ? si.data.user.id : null;
+    } else {
+      throw new Error(au.error.message||'Could not create your account');
+    }
+  } else {
+    authId=(au.data && au.data.user) ? au.data.user.id : null;
+  }
+  if(!authId) throw new Error('Could not create your account. Please try again.');
   // 2) Save the profile, linked to that auth user.
   var playerRow={cust_id:cust,name:fullName,email:data.email,auth_id:authId,
     phone:data.phone||'',dob:data.dob||'',country:data.country||'',
@@ -782,26 +794,19 @@ function nextStep(){
     if (!validPersonal()) return;
     cur = 2;
     renderStep();
-    startOTPTimer();
-    startResendTimer();
-    sendEmailOtp();
   }
   else if (cur === 2) {
-    if (data.otp.length !== 6) return;
-    verifyEmailCode();
-  }
-  else if (cur === 3) {
     if (!validSecurity()) return;
-    // Simulate API call
+    // Create the account on the server.
     const foot = document.getElementById('foot');
     foot.innerHTML = `<button class="primary-btn" disabled><div style="width:18px;height:18px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite"></div> Creating account…</button>
       <style>@keyframes spin{to{transform:rotate(360deg)}}</style>`;
-    createOnServer().then(function(){ cur = 4; renderStep(); })
-      .catch(function(err){ var m=(err&&err.message)||String(err); alert('Could not create your account:\n\n'+m); cur=3; renderStep(); });
+    createOnServer().then(function(){ cur = 3; renderStep(); })
+      .catch(function(err){ var m=(err&&err.message)||String(err); alert('Could not create your account:\n\n'+m); cur=2; renderStep(); });
   }
 }
 function goBack(){
-  if (cur === 0 || cur === 4) { window.location.href = 'login.html'; return; }
+  if (cur === 0 || cur === 3) { window.location.href = 'login.html'; return; }
   cur = Math.max(0, cur - 1); renderStep();
 }
 function goToApp(){
