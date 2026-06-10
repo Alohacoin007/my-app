@@ -421,7 +421,7 @@
   }
 
   // ── History: full transaction log for ALL customers, with edit/fix ──
-  var HIST_FILTER='', EDIT_ID=null;
+  var HIST_FILTER='', EDIT_ID=null, HIST_SERVER='all', HIST_FROM='', HIST_TO='';
   function statusBadge(s){var cls=s==='approved'?'won':s==='rejected'?'lost':'open';var t=s==='approved'?'Approved':s==='rejected'?'Rejected':'Pending';return '<span class="badge '+cls+'">'+t+'</span>';}
   function typeLabel(t){return t==='deposit'?'Deposit':t==='transfer'?'Transfer':t==='withdraw'?'Withdraw':(t||'—');}
   function findReq(id){var all=reqs();for(var i=0;i<all.length;i++){if(all[i].id===id)return all[i];}return null;}
@@ -432,12 +432,27 @@
       custId:x.cust_id||'', custName:custName(x.cust_id)||'', acctNo:x.acct_no||'', server:x.server||'',
       symbol:x.symbol||'', kindL:KINDS3[x.kind]||x.kind||'Trade', stake:+x.stake||0, pnl:+x.pnl||0}; });
     var all=reqs().slice().concat(trades).sort(function(a,b){return (b.ts||0)-(a.ts||0);});
+    // App filter (fx / crypto / sports) + custom date range.
+    if(HIST_SERVER!=='all'){ all=all.filter(function(w){ return (w.server||'')===HIST_SERVER; }); }
+    var lo=HIST_FROM?(new Date(HIST_FROM+'T00:00:00').getTime()||0):0;
+    var hiH=HIST_TO?(new Date(HIST_TO+'T23:59:59').getTime()||Infinity):Infinity;
+    if(lo||hiH<Infinity){ all=all.filter(function(w){ var t=+w.ts||0; return t>=lo && t<=hiH; }); }
     var q=(HIST_FILTER||'').toLowerCase();
     if(q){ all=all.filter(function(w){
       if(w._trade) return ((w.custName+' '+w.custId+' '+w.acctNo+' '+w.server+' '+w.symbol+' '+w.kindL+' trade').toLowerCase().indexOf(q)>=0);
       return (((w.custName||'')+' '+(w.acctNo||'')+' '+(w.custId||'')+' '+(w.type||'')+' '+(w.server||'')+' '+(w.status||'')+' '+w.amount).toLowerCase().indexOf(q)>=0);}); }
     var h='<div class="sec">Transaction history · all customers</div>';
-    h+='<div class="card" style="padding:10px 12px"><input class="in" id="histSearch" placeholder="Search name, account, type, trade…" value="'+(HIST_FILTER||'').replace(/"/g,'&quot;')+'" style="margin-top:0"></div>';
+    h+='<div class="card" style="padding:10px 12px"><input class="in" id="histSearch" placeholder="Search name, account, type, trade…" value="'+(HIST_FILTER||'').replace(/"/g,'&quot;')+'" style="margin-top:0">'+
+      '<div style="display:flex;gap:6px;margin-top:8px">'+[['all','All'],['fx','FX'],['crypto','Crypto'],['sports','Sports']].map(function(x){
+        var on=HIST_SERVER===x[0];
+        return '<button data-hs="'+x[0]+'" style="flex:1;background:'+(on?'var(--acc)':'#e8eef7')+';color:'+(on?'#fff':'var(--dim)')+';border-radius:9px;padding:8px 0;font:700 12px system-ui;border:none;cursor:pointer">'+x[1]+'</button>';
+      }).join('')+'</div>'+
+      '<div style="display:flex;gap:8px;align-items:center;margin-top:8px">'+
+        '<input type="date" class="in" id="hsFrom" value="'+HIST_FROM+'" style="margin-top:0;flex:1">'+
+        '<span class="muted" style="font-weight:700">→</span>'+
+        '<input type="date" class="in" id="hsTo" value="'+HIST_TO+'" style="margin-top:0;flex:1">'+
+        ((HIST_FROM||HIST_TO)?'<button data-hsclear="1" style="background:#fdecea;color:#c0392b;border:none;border-radius:9px;padding:8px 10px;font:700 11.5px system-ui;cursor:pointer">✕</button>':'')+
+      '</div></div>';
     h+='<div class="hint" style="margin:-4px 14px 8px">'+all.length+' item(s) — deposits, withdrawals, transfers &amp; trades together. Tap Edit to fix money moves.</div>';
     if(!all.length){ h+='<div class="card"><div class="empty">No transactions found.</div></div>'; return h; }
     all.slice(0,150).forEach(function(w){
@@ -782,6 +797,10 @@
     document.querySelectorAll('[data-del]').forEach(function(b){b.onclick=function(){editDelete(b.getAttribute('data-del'));};});
     document.querySelectorAll('[data-cancel]').forEach(function(b){b.onclick=function(){EDIT_ID=null;render();};});
     var hs=document.getElementById('histSearch'); if(hs){hs.oninput=function(){HIST_FILTER=hs.value;render();var n=document.getElementById('histSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
+    document.querySelectorAll('[data-hs]').forEach(function(b){b.onclick=function(){HIST_SERVER=b.getAttribute('data-hs');render();};});
+    var hf=document.getElementById('hsFrom'); if(hf) hf.onchange=function(){ HIST_FROM=this.value; render(); };
+    var ht=document.getElementById('hsTo'); if(ht) ht.onchange=function(){ HIST_TO=this.value; render(); };
+    document.querySelectorAll('[data-hsclear]').forEach(function(b){b.onclick=function(){HIST_FROM='';HIST_TO='';render();};});
     var ps=document.getElementById('plSearch'); if(ps){ps.oninput=function(){PLAYER_FILTER=ps.value;render();var n=document.getElementById('plSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
     document.querySelectorAll('[data-cust]').forEach(function(b){b.onclick=function(){HIST_FILTER=b.getAttribute('data-cust');cur='history';render();};});
     document.querySelectorAll('[data-pl]').forEach(function(b){b.onclick=function(){var id=b.getAttribute('data-pl');PLAYER_OPEN=(PLAYER_OPEN===id?null:id);if(PLAYER_OPEN!==id)PLAYER_EDIT=null;render();};});
@@ -812,7 +831,7 @@
   }
 
   // Don't redraw while the operator is mid-edit or typing a search (would lose input).
-  function busyEditing(){ return (cur==='history' && (EDIT_ID || (document.activeElement && document.activeElement.id==='histSearch'))) || (cur==='players' && (PLAYER_EDIT || (document.activeElement && document.activeElement.id==='plSearch'))) || (cur==='bets' && document.activeElement && document.activeElement.id==='openSearch') || (cur==='report' && document.activeElement && (document.activeElement.id==='rpFrom'||document.activeElement.id==='rpTo')); }
+  function busyEditing(){ return (cur==='history' && (EDIT_ID || (document.activeElement && (document.activeElement.id==='histSearch'||document.activeElement.id==='hsFrom'||document.activeElement.id==='hsTo')))) || (cur==='players' && (PLAYER_EDIT || (document.activeElement && document.activeElement.id==='plSearch'))) || (cur==='bets' && document.activeElement && document.activeElement.id==='openSearch') || (cur==='report' && document.activeElement && (document.activeElement.id==='rpFrom'||document.activeElement.id==='rpTo')); }
   window.addEventListener('storage',function(e){ if(e.key&&e.key.indexOf('alpexa')===0 && !busyEditing()) render(); });
   setInterval(function(){ if(cur==='overview'||cur==='approvals'||cur==='risk'||cur==='bets') render(); }, 4000);
   // Pull every customer's requests from the shared server.
@@ -828,7 +847,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v2';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v3';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
