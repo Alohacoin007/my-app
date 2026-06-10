@@ -3577,6 +3577,9 @@ function App(){
         // (and equity stays continuous as the floating P&L drops off).
         try{window.addBalance&&window.addBalance(accountRef.current,order.pnl||0);}catch(e){}
         try{window.broadcastPositionClose&&window.broadcastPositionClose(order.id, closePrice, order.pnl||0);}catch(e){}
+        // Record the realized result on the server so the back office can
+        // report company P&L (customer loss = company gain) by period.
+        try{window.__alpexaSettle&&window.__alpexaSettle({server:'fx',kind:'fx_close',local_id:order.id,symbol:order.sym,stake:order.vol,pnl:order.pnl||0,detail:order.side+' '+order.vol+' @ '+order.open+' → '+closePrice});}catch(e){}
         if(window.ALPEXA_SFX)window.ALPEXA_SFX.closed();
       }
       return prev.filter(o=>o.id!==id);
@@ -3732,7 +3735,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v75';
+(function(){try{var b=document.createElement('div');b.textContent='FX v76';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
@@ -3740,6 +3743,10 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
 /* Report open FX positions to the server so the back office can see them live. */
 (function(){
   function meX(){try{var m=JSON.parse(localStorage.getItem('alpexa.me')||'null');return m&&m.accts?m:null;}catch(e){return null;}}
+  // Record one finished trade (close/settle) on the server for company P&L.
+  window.__alpexaSettle=function(rec){ try{ if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m)return;
+    AlpexaSync.db.from('settlements').insert({cust_id:m.custId,acct_no:(m.accts&&m.accts[rec.server])||'',server:rec.server||'',kind:rec.kind||'',local_id:String(rec.local_id||''),symbol:rec.symbol||'',stake:Math.round((+rec.stake||0)*100)/100,pnl:Math.round((+rec.pnl||0)*100)/100,detail:rec.detail||''}).then(function(){},function(){});
+  }catch(e){} };
   function push(){
     if(!window.AlpexaSync||!AlpexaSync.db)return;
     var m=meX(); if(!m||!m.accts.fx)return; var cust=m.custId, acct=m.accts.fx;

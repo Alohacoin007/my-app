@@ -293,6 +293,10 @@
   }
 
   var REPORT_RANGE='today';
+  // Finished trades reported by the apps (FX closes, bet results) → company P&L.
+  var SRV_SETTLE=[];
+  function pullSettle(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('settlements').select('*').order('created_at',{ascending:false}).limit(2000).then(function(r){ if(r&&r.data){ SRV_SETTLE=r.data; if(cur==='report'&&!busyEditing())render(); } },function(){}); }
   function viewReport(){
     if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Report</div><div class="card"><div class="empty">Not connected to server.</div></div>';
     var now=Date.now(), cutoff=0, label='All time';
@@ -320,6 +324,26 @@
         kpi('New signups',newCust,'in period')+
         kpi('Pending now',pend,'awaiting approval',pend>0?'neg':'')+
       '</div>';
+    // ── Company P&L: customer losses are our gain, customer wins are our cost ──
+    var S=SRV_SETTLE.filter(function(s){ return inRange(s.created_at?Date.parse(s.created_at):0); });
+    var custWin=0, custLoss=0, nTrades=S.length;
+    S.forEach(function(s){ var p=+s.pnl||0; if(p>0)custWin+=p; else custLoss+=-p; });
+    var fees=R.filter(function(r){return r.status==='approved';}).reduce(function(a,r){return a+(+r.fee||0);},0);
+    var coPnl=custLoss-custWin+fees;
+    h+='<div class="sec">'+label+' · company P&amp;L</div>'+
+      '<div class="kpis">'+
+        kpi('Customer losses','+'+k0(custLoss),'we keep','pos')+
+        kpi('Customer wins','-'+k0(custWin),'we pay out','neg')+
+        kpi('Fees earned','+'+k0(fees),'deposit/withdraw fees','pos')+
+        kpi('Company P&L',(coPnl<0?'-':'+')+k0(Math.abs(coPnl)),nTrades+' settled trades',coPnl>=0?'pos':'neg')+
+      '</div>';
+    var sDay={};
+    S.forEach(function(s){ var k=(s.created_at||'').slice(0,10); if(!k)return; sDay[k]=(sDay[k]||0)+(-(+s.pnl||0)); });
+    var sDays=Object.keys(sDay).sort().reverse().slice(0,14);
+    if(sDays.length){ h+='<div class="sec">Company P&amp;L by day</div><div class="card">';
+      sDays.forEach(function(k){ var v=sDay[k]; h+='<div class="row"><span>'+k+'</span><b class="'+(v>=0?'pos':'neg')+'">'+(v<0?'-':'+')+k0(Math.abs(v))+'</b></div>'; });
+      h+='</div>'; }
+    h+='<div class="hint" style="margin:0 14px 10px">Trade results are recorded from app version FX v76 / Sports v1.2.27 onward (older trades aren\'t included). Crypto spot P&amp;L: planned.</div>';
     var byDay={};
     R.forEach(function(r){ if(r.status!=='approved')return; var k=(r.created_at||'').slice(0,10); if(!k)return; byDay[k]=byDay[k]||{dep:0,wd:0}; if(r.type==='deposit')byDay[k].dep+=(+r.amount||0); else if(r.type==='withdraw')byDay[k].wd+=(+r.amount||0); });
     var days=Object.keys(byDay).sort().reverse().slice(0,14);
@@ -727,10 +751,11 @@
   setInterval(function(){ if(cur==='overview'||cur==='approvals'||cur==='risk'||cur==='bets') render(); }, 4000);
   // Pull every customer's requests from the shared server.
   function pullServer(){ if(!window.AlpexaSync||!AlpexaSync.db) return; AlpexaSync.pullAll().then(function(rows){ SRV_REQS=rows||[]; if(!busyEditing()) render(); }).catch(function(){}); }
-  pullServer(); pullPlayers(); pullOpenSummary(); pullOnline();
+  pullServer(); pullPlayers(); pullOpenSummary(); pullOnline(); pullSettle();
   setInterval(function(){ if(!document.hidden){ pullServer(); pullPlayers();
     if(cur==='bets') pullOpenSummary();
     if(cur==='online') pullOnline();
+    if(cur==='report') pullSettle();
     if(cur==='logs') pullLogs();
     if(cur==='risk') pullRisk();
     if(cur==='players' && PLAYER_OPEN) pullCustPos(PLAYER_OPEN);

@@ -1124,6 +1124,7 @@
     balance += (+b.stake||0);
     openBets = openBets.filter(function(x){ return String(x.id)!==String(id); });
     saveBets(); syncSportsBal();
+    try{window.__alpexaSettle&&window.__alpexaSettle({server:'sports',kind:'bet_void',local_id:b.id,symbol:b.type||'Bet',stake:b.stake,pnl:0,detail:'stake refunded'});}catch(e){}
     try{ txns.unshift({ts:Date.now(),ic:'↩️',t1:'Bet voided',t2:(b.type||'Bet')+' · refunded '+usd(b.stake),amt:+b.stake||0}); saveTxns(); }catch(e){}
     try{ var nb=document.getElementById('navBadge'); if(nb){nb.textContent=openBets.length||'';nb.style.display=openBets.length?'flex':'none';} }catch(e){}
     try{ renderTickets(); }catch(e){} try{ updateWallet(); }catch(e){}
@@ -1195,7 +1196,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.26</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.27</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -1752,6 +1753,7 @@
     const payAmt=Math.round(b.cashout*frac*100)/100, stakePart=b.stake*frac;
     balance+=payAmt; playTapSound();
     txns.unshift({ts:Date.now(),ic:'💵',t1:'Cashout',t2:(partial?'Partial '+Math.round(frac*100)+'% · ':'')+b.type+' · Just now',amt:+payAmt});
+    try{window.__alpexaSettle&&window.__alpexaSettle({server:'sports',kind:'bet_cashout',local_id:b.id,symbol:b.type||'Bet',stake:stakePart,pnl:payAmt-stakePart,detail:(partial?'partial '+Math.round(frac*100)+'%':'full')});}catch(e){}
     const loss=stakePart-payAmt;
     if(loss>0){ totalLost+=loss; const back=Math.round(loss*CASHBACK_RATE*100)/100;
       if(back>0){credit+=back; txns.unshift({ts:Date.now(),ic:'🎁',t1:'Cashback Credit',t2:`5% of ${usd(loss)} loss · Just now`,amt:+back});} }
@@ -1812,11 +1814,13 @@
       if(anyLost){
         settledBets.unshift({id:'st'+b.id,type:b.type,cls:b.cls,stake:b.stake,result:'lost',payout:0,legs:(b.legs||[]).map(l=>({pk:l.sel||l.pk,gm:l.game||l.gm,am:l.am,st:'l'}))});
         txns.unshift({ts:Date.now(),ic:'❌',t1:'Bet lost',t2:`${b.type} · ${usd(b.stake)} stake`,amt:0});
+        try{window.__alpexaSettle&&window.__alpexaSettle({server:'sports',kind:'bet_lost',local_id:b.id,symbol:b.type||'Bet',stake:b.stake,pnl:-(+b.stake||0),detail:((b.legs&&b.legs[0])||{}).gm||''});}catch(e){}
       } else {
         const payout=Math.round(b.stake*decMul*100)/100; balance+=payout;
         settledBets.unshift({id:'st'+b.id,type:b.type,cls:b.cls,stake:b.stake,result:'won',payout:payout,legs:(b.legs||[]).map(l=>({pk:l.sel||l.pk,gm:l.game||l.gm,am:l.am,st:'w'}))});
         txns.unshift({ts:Date.now(),ic:'🏆',t1:'Bet Won',t2:`${b.type} · +${usd(payout)}`,amt:+payout});
         try{notify('🏆','Bet won!',`${b.type} · +${usd(payout)}`,'betResults');}catch(e){}
+        try{window.__alpexaSettle&&window.__alpexaSettle({server:'sports',kind:'bet_won',local_id:b.id,symbol:b.type||'Bet',stake:b.stake,pnl:payout-(+b.stake||0),detail:'payout '+payout});}catch(e){}
       }
     });
     if(changed){ openBets=still; syncSportsBal();
@@ -2720,6 +2724,10 @@
 /* Report open sports bets to the server for the back office. */
 (function(){
   function meX(){try{var m=JSON.parse(localStorage.getItem('alpexa.me')||'null');return m&&m.accts?m:null;}catch(e){return null;}}
+  // Record one finished bet (win/loss/cashout/void) on the server for company P&L.
+  window.__alpexaSettle=function(rec){ try{ if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m)return;
+    AlpexaSync.db.from('settlements').insert({cust_id:m.custId,acct_no:(m.accts&&m.accts[rec.server])||'',server:rec.server||'',kind:rec.kind||'',local_id:String(rec.local_id||''),symbol:rec.symbol||'',stake:Math.round((+rec.stake||0)*100)/100,pnl:Math.round((+rec.pnl||0)*100)/100,detail:rec.detail||''}).then(function(){},function(){});
+  }catch(e){} };
   function push(){
     if(!window.AlpexaSync||!AlpexaSync.db)return;
     var m=meX(); if(!m||!m.accts.sports)return; var cust=m.custId, acct=m.accts.sports;
