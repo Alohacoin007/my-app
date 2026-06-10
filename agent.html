@@ -57,7 +57,7 @@
     el().innerHTML='<div class="login"><div class="card">'+
       '<div style="text-align:center;margin-bottom:18px"><div style="font:800 20px system-ui;color:var(--acc)">Alpexa Partners</div>'+
       '<div class="meta" style="margin-top:4px">Agent commission portal</div></div>'+
-      '<label class="lbl">Agent code</label><input class="in" id="lgCode" placeholder="AG-1234" autocomplete="off">'+
+      '<label class="lbl">Agent code or email</label><input class="in" id="lgCode" placeholder="AG-1234 or you@email.com" autocomplete="off">'+
       '<label class="lbl" style="display:block;margin-top:12px">PIN</label><input class="in" id="lgPin" type="password" inputmode="numeric" placeholder="••••" autocomplete="off">'+
       '<button class="btn" id="lgGo">Sign in</button>'+
       '<div class="err" id="lgErr"></div></div></div>';
@@ -66,15 +66,20 @@
     document.getElementById('lgPin').onkeydown=function(ev){ if(ev.key==='Enter')doLogin(); };
   }
   function doLogin(){
-    var code=(document.getElementById('lgCode').value||'').trim().toUpperCase();
+    var raw=(document.getElementById('lgCode').value||'').trim();
     var pin=(document.getElementById('lgPin').value||'').trim();
     var err=document.getElementById('lgErr');
     if(!db){ err.textContent='No server connection.'; err.style.display='block'; return; }
-    if(!code||!pin){ err.textContent='Enter your code and PIN.'; err.style.display='block'; return; }
-    db.from('agents').select('*').eq('code',code).limit(1).then(function(r){
+    if(!raw||!pin){ err.textContent='Enter your code (or email) and PIN.'; err.style.display='block'; return; }
+    // Sign in with the AG-xxxx code or the agent's email — whichever was typed.
+    var isEmail=raw.indexOf('@')>=0, code=raw.toUpperCase();
+    var q=isEmail ? db.from('agents').select('*').ilike('email',raw).limit(1)
+                  : db.from('agents').select('*').eq('code',code).limit(1);
+    q.then(function(r){
       if(r&&r.error){ err.textContent='Server error: '+r.error.message+' (agents SQL not run yet?)'; err.style.display='block'; return; }
       var a=r&&r.data&&r.data[0];
-      if(!a){ err.textContent='No agent with code '+code+' — check the code in Back Office 1 → Agents.'; err.style.display='block'; return; }
+      if(!a){ err.textContent=(isEmail?('No agent with email '+raw):('No agent with code '+code))+' — check Back Office 1 → Agents.'; err.style.display='block'; return; }
+      code=a.code;
       if(String(a.pin)!==pin){ err.textContent='Wrong PIN for '+code+'.'; err.style.display='block'; return; }
       if(a.status&&a.status!=='active'){ err.textContent='This agent account is not active.'; err.style.display='block'; return; }
       AGENT=a; try{ sessionStorage.setItem('alpexa.agent',code+'|'+pin); }catch(e){}
