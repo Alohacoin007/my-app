@@ -109,7 +109,7 @@
   var SRV_REQS=[];
   // Real customers + their accounts, pulled from Supabase (players/accounts tables).
   var SRV_PLAYERS=[], SRV_ACCOUNTS=[], PLAYER_FILTER='', PLAYER_OPEN=null, PLAYER_EDIT=null;
-  var PLAYER_SORT='joined', PLAYER_DIR=-1; // default: newest first · tap a sort chip again to flip
+  var PLAYER_SORT='joined', PLAYER_DIR=-1, PLAYERS_SHOWF=false; // default: newest first · tap a sort chip again to flip
   // Scalable positions access: never pull ALL rows. Summary = count + top-N by
   // exposure; per-customer = query only that customer's rows (on demand).
   var POS_TOP=[], POS_COUNT=0, POS_BY_CUST={}, OPEN_SEARCH='';
@@ -554,13 +554,17 @@
     var list=SRV_PLAYERS.slice().sort(function(a,b){ return cmp(a,b)*PLAYER_DIR; });
     var q=(PLAYER_FILTER||'').toLowerCase();
     if(q) list=list.filter(function(p){ return (((p.name||'')+' '+(p.email||'')+' '+(p.cust_id||'')).toLowerCase().indexOf(q)>=0); });
-    var h='<div class="sec">Customers · '+SRV_PLAYERS.length+'</div>';
-    var arrow=PLAYER_DIR===1?' ↑':' ↓';
-    h+='<div class="card" style="padding:10px 12px"><input class="in" id="plSearch" placeholder="Search name, email, ID…" value="'+(PLAYER_FILTER||'').replace(/"/g,'&quot;')+'" style="margin-top:0">'+
-      '<div style="display:flex;gap:6px;margin-top:8px">'+[['name','Name'],['bal','Balance'],['joined','Joined']].map(function(x){
-        var on=PLAYER_SORT===x[0];
-        return '<button data-psort="'+x[0]+'" style="flex:1;background:'+(on?'var(--acc)':'#F1F3F6')+';color:'+(on?'#fff':'var(--dim)')+';border:none;border-radius:4px;padding:7px 0;font:700 11.5px system-ui;cursor:pointer">'+x[1]+(on?arrow:'')+'</button>';
-      }).join('')+'</div></div>';
+    var filtersOn=(PLAYER_FILTER||PLAYER_SORT!=='joined'||PLAYER_DIR!==-1);
+    var h='<div class="sec" style="display:flex;align-items:center;justify-content:space-between">Customers · '+SRV_PLAYERS.length+
+      '<button data-pfil="1" style="background:'+(PLAYERS_SHOWF?'var(--acc)':'#fff')+';border:1px solid var(--line);border-radius:4px;padding:5px 11px;font:700 11px system-ui;color:'+(PLAYERS_SHOWF?'#fff':'var(--ink)')+';cursor:pointer">Filter'+(PLAYERS_SHOWF?' ▴':(filtersOn?' ●':' ▾'))+'</button></div>';
+    if(PLAYERS_SHOWF){
+      var arrow=PLAYER_DIR===1?' ↑':' ↓';
+      h+='<div class="card" style="padding:10px 12px"><input class="in" id="plSearch" placeholder="Search name, email, ID…" value="'+(PLAYER_FILTER||'').replace(/"/g,'&quot;')+'" style="margin-top:0">'+
+        '<div style="display:flex;gap:6px;margin-top:8px">'+[['name','Name'],['bal','Balance'],['joined','Joined']].map(function(x){
+          var on=PLAYER_SORT===x[0];
+          return '<button data-psort="'+x[0]+'" style="flex:1;background:'+(on?'var(--acc)':'#F1F3F6')+';color:'+(on?'#fff':'var(--dim)')+';border:none;border-radius:4px;padding:7px 0;font:700 11.5px system-ui;cursor:pointer">'+x[1]+(on?arrow:'')+'</button>';
+        }).join('')+'</div></div>';
+    }
     if(!SRV_PLAYERS.length){ h+='<div class="card"><div class="empty">No customers yet (or loading…)</div></div>'; return h; }
     if(!list.length){ h+='<div class="card"><div class="empty">No customers match.</div></div>'; return h; }
     list.forEach(function(p){
@@ -1002,6 +1006,7 @@
     document.querySelectorAll('[data-pcust]').forEach(function(b){b.onclick=function(){PLAYER_OPEN=b.getAttribute('data-pcust');PLAYER_FILTER='';cur='players';render();};});
     document.querySelectorAll('[data-rr]').forEach(function(b){b.onclick=function(){REPORT_RANGE=b.getAttribute('data-rr');render();};});
     document.querySelectorAll('[data-rfil]').forEach(function(b){b.onclick=function(){REPORT_SHOWF=!REPORT_SHOWF;render();};});
+    document.querySelectorAll('[data-pfil]').forEach(function(b){b.onclick=function(){PLAYERS_SHOWF=!PLAYERS_SHOWF;render();};});
     var rf=document.getElementById('rpFrom'); if(rf) rf.onchange=function(){ REPORT_FROM=this.value; render(); };
     var rt=document.getElementById('rpTo'); if(rt) rt.onchange=function(){ REPORT_TO=this.value; render(); };
     document.querySelectorAll('[data-hedge]').forEach(function(b){b.onclick=function(){var p=(b.getAttribute('data-hedge')||'').split('|');recordHedge(p[0],p[1],+p[2],+p[3]);};});
@@ -1039,7 +1044,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v16';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v17';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
