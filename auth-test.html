@@ -14,7 +14,7 @@
   input{width:100%;box-sizing:border-box;background:#0B1322;border:1px solid #283247;border-radius:10px;padding:12px;color:#fff;font-size:14px}
   .btns{display:flex;gap:10px;margin-top:16px}
   button{flex:1;border:none;border-radius:11px;padding:13px;font-size:14px;font-weight:700;cursor:pointer}
-  .up{background:#0052FF;color:#fff}.in{background:#1B2740;color:#cdd7e4}.out{background:#3a2330;color:#ff9aa9}
+  .up{background:#0052FF;color:#fff}.in{background:#1B2740;color:#cdd7e4}
   pre{text-align:left;background:#0B1322;border:1px solid #283247;border-radius:11px;padding:13px;margin-top:16px;font-size:12px;color:#bcd0ea;white-space:pre-wrap;word-break:break-all;min-height:40px}
   .st{font-weight:800;text-align:center;margin-top:12px;font-size:14.5px}
   .ok{color:#5ED27A}.bad{color:#ff8a8a}
@@ -25,41 +25,42 @@
     <h1>🔐 진짜 로그인(Auth) 테스트</h1>
     <p class="sub">아무 이메일/비번으로 가입·로그인이 진짜 되는지 확인</p>
     <label>이메일</label>
-    <input id="email" type="email" placeholder="test@example.com" autocomplete="off">
+    <input id="email" type="email" placeholder="test1@test.com" autocomplete="off" value="test1@test.com">
     <label>비밀번호 (6자 이상)</label>
-    <input id="pw" type="password" placeholder="••••••" autocomplete="off">
+    <input id="pw" type="password" placeholder="••••••" autocomplete="off" value="123456">
     <div class="btns">
       <button class="up" id="bSignup">가입</button>
       <button class="in" id="bLogin">로그인</button>
-      <button class="out" id="bWho">내정보</button>
     </div>
     <div class="st" id="st"></div>
     <pre id="out">대기 중…</pre>
   </div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  var URL='https://grxnbgtfnaayeluenvqh.supabase.co';
+  var BASE='https://grxnbgtfnaayeluenvqh.supabase.co/auth/v1';
   var KEY='sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu';
-  var sb=window.supabase.createClient(URL,KEY);
   var st=document.getElementById('st'), out=document.getElementById('out');
-  function show(ok,msg,data){ st.className='st '+(ok?'ok':'bad'); st.textContent=msg; out.textContent=data?JSON.stringify(data,null,2):''; }
+  function show(ok,msg,data){ st.className='st '+(ok?'ok':'bad'); st.textContent=msg; out.textContent=(typeof data==='string')?data:JSON.stringify(data,null,2); }
   function v(id){return document.getElementById(id).value.trim();}
+  async function call(path, body){
+    var r=await fetch(BASE+path,{ method:'POST', headers:{ 'apikey':KEY, 'Content-Type':'application/json' }, body:JSON.stringify(body) });
+    var j=null; try{ j=await r.json(); }catch(e){ j={raw:await r.text()}; }
+    return { status:r.status, j:j };
+  }
   document.getElementById('bSignup').onclick=async function(){
-    out.textContent='가입 중…';
-    var r=await sb.auth.signUp({ email:v('email'), password:v('pw') });
-    if(r.error) return show(false,'❌ 가입 실패',r.error);
-    show(true,'✅ 가입 성공!', { user:r.data.user, note:'이메일확인이 켜져있으면 메일을 확인해야 로그인됨' });
+    out.textContent='가입 중…'; st.textContent='';
+    try{
+      var res=await call('/signup',{ email:v('email'), password:v('pw') });
+      if(res.status>=200 && res.status<300) show(true,'✅ 가입 성공!', res.j);
+      else show(false,'❌ 가입 실패 ('+res.status+')', res.j);
+    }catch(e){ show(false,'❌ 네트워크 오류', String(e&&e.message||e)); }
   };
   document.getElementById('bLogin').onclick=async function(){
-    out.textContent='로그인 중…';
-    var r=await sb.auth.signInWithPassword({ email:v('email'), password:v('pw') });
-    if(r.error) return show(false,'❌ 로그인 실패',r.error);
-    show(true,'✅ 로그인 성공!', { user_id:r.data.user.id, email:r.data.user.email });
-  };
-  document.getElementById('bWho').onclick=async function(){
-    var r=await sb.auth.getUser();
-    if(r.error||!r.data.user) return show(false,'로그인 안 된 상태',r.error||{});
-    show(true,'현재 로그인됨', { user_id:r.data.user.id, email:r.data.user.email });
+    out.textContent='로그인 중…'; st.textContent='';
+    try{
+      var res=await call('/token?grant_type=password',{ email:v('email'), password:v('pw') });
+      if(res.status>=200 && res.status<300) show(true,'✅ 로그인 성공!', { user:res.j.user&&{id:res.j.user.id,email:res.j.user.email}, hasToken:!!res.j.access_token });
+      else show(false,'❌ 로그인 실패 ('+res.status+')', res.j);
+    }catch(e){ show(false,'❌ 네트워크 오류', String(e&&e.message||e)); }
   };
 </script>
 </body>
