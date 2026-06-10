@@ -314,7 +314,7 @@
       '<div class="hint" style="margin:0 14px">'+(connected?'Aggregated across all customers · Supabase, real-time.':'Not connected to server.')+'</div>';
   }
 
-  var REPORT_RANGE='today', REPORT_FROM='', REPORT_TO='';
+  var REPORT_RANGE='today', REPORT_FROM='', REPORT_TO='', REPORT_SHOWF=false;
   // Finished trades reported by the apps (FX closes, bet results) → company P&L.
   var SRV_SETTLE=[];
   function pullSettle(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
@@ -340,17 +340,21 @@
     var dep=sum('deposit'), wd=sum('withdraw'), tf=sum('transfer'), net=dep-wd;
     var pend=SRV_REQS.filter(function(r){return r.status==='pending';}).length;
     var newCust=SRV_PLAYERS.filter(function(p){ return inRange(p.created_at?Date.parse(p.created_at):0); }).length;
-    var RANGES=[['today','Today'],['7d','7d'],['30d','30d'],['all','All'],['custom','📅']];
-    var h='<div style="display:flex;gap:6px;margin:14px 14px 12px">'+RANGES.map(function(x){
-      var on=REPORT_RANGE===x[0];
-      return '<button data-rr="'+x[0]+'" style="flex:1;background:'+(on?'var(--acc)':'#e8eef7')+';color:'+(on?'#fff':'var(--dim)')+';border-radius:4px;padding:9px 0;font:700 12.5px system-ui;border:none;cursor:pointer">'+x[1]+'</button>';
-    }).join('')+'</div>';
-    if(REPORT_RANGE==='custom'){
-      h+='<div class="card" style="padding:10px 12px;display:flex;gap:8px;align-items:center">'+
-        '<input type="date" class="in" id="rpFrom" value="'+REPORT_FROM+'" style="margin-top:0;flex:1">'+
-        '<span class="muted" style="font-weight:700">→</span>'+
-        '<input type="date" class="in" id="rpTo" value="'+REPORT_TO+'" style="margin-top:0;flex:1">'+
-      '</div>';
+    var h='<div class="sec" style="display:flex;align-items:center;justify-content:space-between">Report · '+label+
+      '<button data-rfil="1" style="background:'+(REPORT_SHOWF?'var(--acc)':'#fff')+';border:1px solid var(--line);border-radius:4px;padding:5px 11px;font:700 11px system-ui;color:'+(REPORT_SHOWF?'#fff':'var(--ink)')+';cursor:pointer">Period '+(REPORT_SHOWF?'▴':'▾')+'</button></div>';
+    if(REPORT_SHOWF){
+      var RANGES=[['today','Today'],['7d','7d'],['30d','30d'],['all','All'],['custom','Custom']];
+      h+='<div style="display:flex;gap:6px;margin:0 12px 8px">'+RANGES.map(function(x){
+        var on=REPORT_RANGE===x[0];
+        return '<button data-rr="'+x[0]+'" style="flex:1;background:'+(on?'var(--acc)':'#F1F3F6')+';color:'+(on?'#fff':'var(--dim)')+';border-radius:4px;padding:8px 0;font:700 11.5px system-ui;border:none;cursor:pointer">'+x[1]+'</button>';
+      }).join('')+'</div>';
+      if(REPORT_RANGE==='custom'){
+        h+='<div class="card" style="padding:10px 12px;display:flex;gap:8px;align-items:center">'+
+          '<input type="date" class="in" id="rpFrom" value="'+REPORT_FROM+'" style="margin-top:0;flex:1">'+
+          '<span class="muted" style="font-weight:700">→</span>'+
+          '<input type="date" class="in" id="rpTo" value="'+REPORT_TO+'" style="margin-top:0;flex:1">'+
+        '</div>';
+      }
     }
     h+='<div class="sec">'+label+' · summary</div>'+
       '<div class="kpis">'+
@@ -995,6 +999,7 @@
     var os=document.getElementById('openSearch'); if(os){os.oninput=function(){OPEN_SEARCH=os.value;render();var n=document.getElementById('openSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
     document.querySelectorAll('[data-pcust]').forEach(function(b){b.onclick=function(){PLAYER_OPEN=b.getAttribute('data-pcust');PLAYER_FILTER='';cur='players';render();};});
     document.querySelectorAll('[data-rr]').forEach(function(b){b.onclick=function(){REPORT_RANGE=b.getAttribute('data-rr');render();};});
+    document.querySelectorAll('[data-rfil]').forEach(function(b){b.onclick=function(){REPORT_SHOWF=!REPORT_SHOWF;render();};});
     var rf=document.getElementById('rpFrom'); if(rf) rf.onchange=function(){ REPORT_FROM=this.value; render(); };
     var rt=document.getElementById('rpTo'); if(rt) rt.onchange=function(){ REPORT_TO=this.value; render(); };
     document.querySelectorAll('[data-hedge]').forEach(function(b){b.onclick=function(){var p=(b.getAttribute('data-hedge')||'').split('|');recordHedge(p[0],p[1],+p[2],+p[3]);};});
@@ -1032,7 +1037,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v11';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v12';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
