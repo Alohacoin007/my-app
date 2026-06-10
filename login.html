@@ -216,26 +216,42 @@ async function doLogin(){
   const fail=(m)=>{document.getElementById('spinner').style.display='none';document.getElementById('signinTxt').style.display='inline';document.getElementById('signinBtn').style.opacity='1';showErr(m);};
   try{
     if(!window._db) throw new Error('No server connection — check your internet.');
-    let player=null;
-    if(login.indexOf('@')>=0){
-      const pr=await window._db.from('players').select('id,cust_id,name,email').ilike('email',login).limit(1);
-      if(pr.error) throw pr.error;
-      if(pr.data&&pr.data.length) player=pr.data[0];
-    } else {
+    // 1) Resolve the email to authenticate with (allow account-number login).
+    let email=login;
+    if(login.indexOf('@')<0){
       const ac=await window._db.from('accounts').select('player_id').ilike('acct_no',login.toUpperCase()).limit(1);
       if(ac.error) throw ac.error;
-      if(ac.data&&ac.data.length){
-        const pr=await window._db.from('players').select('id,cust_id,name,email').eq('id',ac.data[0].player_id).single();
-        if(pr.error) throw pr.error; player=pr.data;
-      }
+      if(!ac.data||!ac.data.length){ fail('Account not found. Check it, or tap "Open an Account".'); return; }
+      const pe=await window._db.from('players').select('email').eq('id',ac.data[0].player_id).single();
+      if(pe.error||!pe.data||!pe.data.email){ fail('Account not found.'); return; }
+      email=pe.data.email;
     }
-    if(!player){ fail('Account not found. Check it, or tap "Open an Account".'); return; }
+    // 2) REAL password check via Supabase Auth.
+    const au=await window._db.auth.signInWithPassword({ email:email, password:pw });
+    if(au && au.error){
+      const m=(au.error.message||'').toLowerCase();
+      if(m.indexOf('invalid')>=0||m.indexOf('credential')>=0){ fail('Wrong email or password.'); return; }
+      if(m.indexOf('confirm')>=0){ fail('Please confirm your email first (check your inbox).'); return; }
+      fail(au.error.message||'Login failed.'); return;
+    }
+    const authId=(au&&au.data&&au.data.user)?au.data.user.id:null;
+    // 3) Load the linked profile (by auth link first, then email).
+    let player=null;
+    if(authId){
+      const p1=await window._db.from('players').select('id,cust_id,name,email').eq('auth_id',authId).limit(1);
+      if(!p1.error&&p1.data&&p1.data.length) player=p1.data[0];
+    }
+    if(!player){
+      const p2=await window._db.from('players').select('id,cust_id,name,email').ilike('email',email).limit(1);
+      if(!p2.error&&p2.data&&p2.data.length) player=p2.data[0];
+    }
+    if(!player){ fail('Signed in, but no profile found. Contact support.'); return; }
     const accs=await window._db.from('accounts').select('server,acct_no').eq('player_id',player.id);
     if(accs.error) throw accs.error;
     const accts={sports:'',crypto:'',fx:''};
     (accs.data||[]).forEach(a=>{ if(a.server) accts[a.server]=a.acct_no; });
     // Restore identity on THIS device so the apps show the right account.
-    localStorage.setItem('alpexa.me', JSON.stringify({custId:player.cust_id,name:player.name,email:player.email,accts:accts}));
+    localStorage.setItem('alpexa.me', JSON.stringify({custId:player.cust_id,name:player.name,email:player.email,authId:authId,accts:accts}));
     document.getElementById('sucSub').innerHTML=`${SERVERS[selServer].name}<br>Signed in as ${player.name||player.cust_id}`;
     document.getElementById('successScreen').style.display='flex';
     const dest=selServer===1?'crypto-live.html':selServer===2?'sports-live.html':'trading.html';
