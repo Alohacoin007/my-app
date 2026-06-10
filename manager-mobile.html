@@ -306,7 +306,7 @@
   // Finished trades reported by the apps (FX closes, bet results) → company P&L.
   var SRV_SETTLE=[];
   function pullSettle(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
-    AlpexaSync.db.from('settlements').select('*').order('created_at',{ascending:false}).limit(2000).then(function(r){ if(r&&r.data){ SRV_SETTLE=r.data; if(cur==='report'&&!busyEditing())render(); } },function(){}); }
+    AlpexaSync.db.from('settlements').select('*').order('created_at',{ascending:false}).limit(2000).then(function(r){ if(r&&r.data){ SRV_SETTLE=r.data; if((cur==='report'||cur==='players')&&!busyEditing())render(); } },function(){}); }
   function viewReport(){
     if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Report</div><div class="card"><div class="empty">Not connected to server.</div></div>';
     var now=Date.now(), cutoff=0, hi=Infinity, label='All time';
@@ -375,6 +375,19 @@
         '<b class="'+(netS>=0?'pos':'neg')+'">'+(netS<0?'-':'+')+k0(Math.abs(netS))+'</b></div>';
     });
     h+='</div>';
+    // Trade-by-trade list for the selected period (customer P&L view).
+    var KINDS={fx_close:'FX close',bet_won:'Bet won',bet_lost:'Bet lost',bet_cashout:'Cashout',bet_void:'Void'};
+    h+='<div class="sec">Settled trades · '+S.length+'</div>';
+    if(!S.length){ h+='<div class="card"><div class="empty">No settled trades in this period.</div></div>'; }
+    else{ h+='<div class="card">';
+      S.slice(0,60).forEach(function(x){ var p=+x.pnl||0; var who=custName(x.cust_id)||x.cust_id||'—';
+        var when=x.created_at?new Date(x.created_at).toLocaleString():'';
+        h+='<div class="row"><span><b>'+(x.symbol||KINDS[x.kind]||x.kind||'Trade')+'</b> <span class="muted" style="font-size:10.5px">'+(KINDS[x.kind]||x.kind||'')+'</span>'+
+          '<div class="req-meta" style="margin:2px 0 0">👤 '+who+' · '+(x.server||'')+' · '+when+'</div></span>'+
+          '<b class="'+(p>=0?'pos':'neg')+'">'+(p<0?'-':'+')+k0(Math.abs(p))+'</b></div>'; });
+      if(S.length>60) h+='<div class="hint">Showing latest 60 of '+S.length+'.</div>';
+      h+='</div>'; }
+    h+='<div class="hint" style="margin:0 14px 10px">Green = customer won (we pay) · Red = customer lost (we keep).</div>';
     var sDay={};
     S.forEach(function(s){ var k=(s.created_at||'').slice(0,10); if(!k)return; sDay[k]=(sDay[k]||0)+(-(+s.pnl||0)); });
     var sDays=Object.keys(sDay).sort().reverse().slice(0,14);
@@ -541,6 +554,15 @@
           h+='<div class="lbl" style="margin-top:12px">Open positions ('+op.length+')</div>';
           if(!op.length){ h+='<div class="req-meta" style="margin:4px 0">None open.</div>'; }
           op.forEach(function(x){ h+=posRowHTML(x); });
+          var KINDS2={fx_close:'FX close',bet_won:'Bet won',bet_lost:'Bet lost',bet_cashout:'Cashout',bet_void:'Void'};
+          var tr=SRV_SETTLE.filter(function(x){ return x.cust_id===cid; }).slice(0,15);
+          h+='<div class="lbl" style="margin-top:12px">Recent trades ('+tr.length+')</div>';
+          if(!tr.length){ h+='<div class="req-meta" style="margin:4px 0">No settled trades yet.</div>'; }
+          tr.forEach(function(x){ var p=+x.pnl||0;
+            var when=x.created_at?new Date(x.created_at).toLocaleString():'';
+            h+='<div class="row"><span><b>'+(x.symbol||KINDS2[x.kind]||x.kind||'Trade')+'</b> <span class="muted" style="font-size:10.5px">'+(KINDS2[x.kind]||x.kind||'')+'</span>'+
+              '<div class="req-meta" style="margin:2px 0 0">'+(x.server||'')+' · '+when+'</div></span>'+
+              '<b class="'+(p>=0?'pos':'neg')+'">'+(p<0?'-':'+')+usd(Math.abs(p))+'</b></div>'; });
           h+='<button class="save ghost" data-editpl="'+esc(cid)+'" style="width:100%;margin-top:10px">Edit profile &amp; balances</button>';
         }
         h+='<div class="row" style="border:none;padding:6px 0 0"><span class="hint" style="margin:0">ID '+(cid||'—')+'</span><button class="save ghost" data-cust="'+esc(cid)+'" style="margin-top:0;padding:7px 12px">Transactions</button></div>';
@@ -798,7 +820,7 @@
     if(cur==='report') pullSettle();
     if(cur==='logs') pullLogs();
     if(cur==='risk') pullRisk();
-    if(cur==='players' && PLAYER_OPEN) pullCustPos(PLAYER_OPEN);
+    if(cur==='players' && PLAYER_OPEN){ pullCustPos(PLAYER_OPEN); pullSettle(); }
   } }, 3000);
   render();
 </script>
