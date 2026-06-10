@@ -730,19 +730,29 @@ async function createOnServer(){
   data.custId=cust; data.accts={sports:aN('SP'),crypto:aN('CR'),fx:aN('FX')}; data.acctNum=data.accts.sports;
   if(!window._db) throw new Error('No server connection');
   var fullName=(data.firstName+' '+data.lastName).trim();
-  var playerRow={cust_id:cust,name:fullName,email:data.email,
+  // 1) Create the REAL authentication account (email + password) via Supabase Auth.
+  var au=await window._db.auth.signUp({ email:data.email, password:data.password });
+  if(au && au.error){
+    var em=(au.error.message||'').toLowerCase();
+    if(em.indexOf('already')>=0 || em.indexOf('registered')>=0 || em.indexOf('exists')>=0)
+      throw new Error('This email is already registered. Please log in instead.');
+    throw new Error(au.error.message||'Sign-up failed');
+  }
+  var authId=(au && au.data && au.data.user) ? au.data.user.id : null;
+  // 2) Save the profile, linked to that auth user.
+  var playerRow={cust_id:cust,name:fullName,email:data.email,auth_id:authId,
     phone:data.phone||'',dob:data.dob||'',country:data.country||'',
     server:data.server||'',leverage:data.leverage||'',currency:data.currency||''};
   var r1=await window._db.from('players').insert(playerRow).select().single();
-  // Fallback: if the extended profile columns aren't there yet, save the core fields.
-  if(r1&&r1.error){ r1=await window._db.from('players').insert({cust_id:cust,name:fullName,email:data.email}).select().single(); }
+  // Fallback: if extended columns aren't there yet, save the core fields.
+  if(r1&&r1.error){ r1=await window._db.from('players').insert({cust_id:cust,name:fullName,email:data.email,auth_id:authId}).select().single(); }
   if(r1.error) throw r1.error;
   var rows=[{player_id:r1.data.id,server:'sports',acct_no:data.accts.sports,balance:0},{player_id:r1.data.id,server:'crypto',acct_no:data.accts.crypto,balance:0},{player_id:r1.data.id,server:'fx',acct_no:data.accts.fx,balance:0}];
   var r2=await window._db.from('accounts').insert(rows);
   if(r2.error) throw r2.error;
   // Remember who this is on the device so the apps can tag their transactions.
   try{ localStorage.setItem('alpexa.me', JSON.stringify({
-    custId:cust, name:(data.firstName+' '+data.lastName).trim(), email:data.email,
+    custId:cust, name:fullName, email:data.email, authId:authId,
     accts:data.accts })); }catch(e){}
   // Remember the chosen server so Login defaults back to it.
   try{ localStorage.setItem('alpexa.lastServer', data.server==='demo'?'sports':data.server==='stocks'?'crypto':'fx'); }catch(e){}
@@ -791,7 +801,7 @@ function nextStep(){
     foot.innerHTML = `<button class="primary-btn" disabled><div style="width:18px;height:18px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite"></div> Creating account…</button>
       <style>@keyframes spin{to{transform:rotate(360deg)}}</style>`;
     createOnServer().then(function(){ cur = 4; renderStep(); })
-      .catch(function(err){ var m=(err&&err.message)||String(err); alert('Could not create the account on the server:\n\n'+m+'\n\nFix: in Supabase run the table SQL (players, accounts).'); cur=3; renderStep(); });
+      .catch(function(err){ var m=(err&&err.message)||String(err); alert('Could not create your account:\n\n'+m); cur=3; renderStep(); });
   }
 }
 function goBack(){
