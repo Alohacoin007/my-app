@@ -112,7 +112,7 @@
   var PLAYER_SORT='joined', PLAYER_DIR=-1, PLAYERS_SHOWF=false; // default: newest first · tap a sort chip again to flip
   // Scalable positions access: never pull ALL rows. Summary = count + top-N by
   // exposure; per-customer = query only that customer's rows (on demand).
-  var POS_TOP=[], POS_COUNT=0, POS_BY_CUST={}, OPEN_SEARCH='';
+  var POS_TOP=[], POS_COUNT=0, POS_BY_CUST={}, OPEN_SEARCH='', OPEN_SERVER='all', OPEN_SHOWF=false;
   function custName(id){ for(var i=0;i<SRV_PLAYERS.length;i++){ if(SRV_PLAYERS[i].cust_id===id) return SRV_PLAYERS[i].name||id; } return id; }
   function badgeKyc(k){ k=k||'pending'; var c=k==='verified'?'won':k==='rejected'?'lost':'cashed'; return '<span class="badge '+c+'">KYC '+k+'</span>'; }
   function badgeStatus(s){ s=s||'active'; var c=s==='blocked'?'lost':s==='limited'?'cashed':'won'; return '<span class="badge '+c+'">'+s+'</span>'; }
@@ -732,19 +732,29 @@
   // never pulls the whole table).
   function viewBets(){
     if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Open bets &amp; trades</div><div class="card"><div class="empty">Not connected to server.</div></div>';
-    var h='<div class="sec">Open bets &amp; trades · all customers</div>'+
-      '<div class="kpis">'+
+    var APPN={all:'All apps',fx:'FX',crypto:'Crypto',sports:'Sports'};
+    var srvOK=function(x){ return OPEN_SERVER==='all' || (x.server||'')===OPEN_SERVER; };
+    var filtersOn=(OPEN_SEARCH||OPEN_SERVER!=='all');
+    var h='<div class="sec" style="display:flex;align-items:center;justify-content:space-between">Open · '+APPN[OPEN_SERVER]+
+      '<button data-ofil="1" style="background:'+(OPEN_SHOWF?'var(--acc)':'#fff')+';border:1px solid var(--line);border-radius:4px;padding:5px 11px;font:700 11px system-ui;color:'+(OPEN_SHOWF?'#fff':'var(--ink)')+';cursor:pointer">Filter'+(OPEN_SHOWF?' ▴':(filtersOn?' ●':' ▾'))+'</button></div>';
+    if(OPEN_SHOWF){
+      h+='<div class="card" style="padding:10px 12px"><input class="in" id="openSearch" placeholder="Search a customer (name / ID)…" value="'+(OPEN_SEARCH||'').replace(/"/g,'&quot;')+'" style="margin-top:0">'+
+        '<div style="display:flex;gap:6px;margin-top:8px">'+[['all','All'],['fx','FX'],['crypto','Crypto'],['sports','Sports']].map(function(x){
+          var on=OPEN_SERVER===x[0];
+          return '<button data-os="'+x[0]+'" style="flex:1;background:'+(on?'var(--acc)':'#F1F3F6')+';color:'+(on?'#fff':'var(--dim)')+';border:none;border-radius:4px;padding:8px 0;font:700 12px system-ui;cursor:pointer">'+x[1]+'</button>';
+        }).join('')+'</div></div>';
+    }
+    h+='<div class="kpis">'+
         kpi('Open items',POS_COUNT,'live, all customers')+
-        kpi('Showing','top '+POS_TOP.length,'by exposure')+
+        kpi('Showing','top '+POS_TOP.filter(srvOK).length,'by exposure')+
       '</div>';
-    h+='<div class="card" style="padding:10px 12px"><input class="in" id="openSearch" placeholder="Search a customer (name / ID)…" value="'+(OPEN_SEARCH||'').replace(/"/g,'&quot;')+'" style="margin-top:0"></div>';
     if(OPEN_SEARCH){
       var q=OPEN_SEARCH.toLowerCase();
       var matches=SRV_PLAYERS.filter(function(p){ return (((p.name||'')+' '+(p.cust_id||'')+' '+(p.email||'')).toLowerCase().indexOf(q)>=0); }).slice(0,10);
       if(!matches.length){ h+='<div class="card"><div class="empty">No customer matches.</div></div>'; return h; }
       matches.forEach(function(p){
         if(POS_BY_CUST[p.cust_id]===undefined){ POS_BY_CUST[p.cust_id]=[]; pullCustPos(p.cust_id); }
-        var list=POS_BY_CUST[p.cust_id]||[];
+        var list=(POS_BY_CUST[p.cust_id]||[]).filter(srvOK);
         h+='<div class="sec">'+(p.name||p.cust_id)+' · '+list.length+' open</div><div class="card">';
         if(!list.length) h+='<div class="empty">No open positions.</div>';
         list.forEach(function(x){ h+=posRowHTML(x); });
@@ -753,10 +763,11 @@
       return h;
     }
     h+='<div class="sec">Highest exposure</div><div class="card">';
-    if(!POS_TOP.length) h+='<div class="empty">No open bets or trades. (Customers open their app ~15s to report.)</div>';
-    POS_TOP.forEach(function(x){ h+=posRowHTML(x); });
+    var top=POS_TOP.filter(srvOK);
+    if(!top.length) h+='<div class="empty">No open bets or trades. (Customers open their app ~15s to report.)</div>';
+    top.forEach(function(x){ h+=posRowHTML(x); });
     h+='</div>';
-    h+='<div class="hint" style="margin:0 14px">Search a customer to see <b>all</b> their open positions. Close/Void applies on the customer\'s next sync (~4s). Exact all-customer totals = server aggregate (coming).</div>';
+    h+='<div class="hint" style="margin:0 14px">Tap <b>Filter</b> to pick an app or search a customer. Close/Void applies on the customer\'s next sync (~4s).</div>';
     return h;
   }
   // Send a force-close / void command to the customer's app.
@@ -1003,6 +1014,8 @@
       AlpexaSync.db.from('agent_links').delete().eq('id',b.getAttribute('data-aglinkdel')).then(function(){ toast('Unlinked ✓'); pullAgents(); },function(){ toast('Failed',true); });};});
     document.querySelectorAll('[data-close]').forEach(function(b){b.onclick=function(){var p=(b.getAttribute('data-close')||'').split('|');sendCommand(p[0],p[1],p[2]);};});
     var os=document.getElementById('openSearch'); if(os){os.oninput=function(){OPEN_SEARCH=os.value;render();var n=document.getElementById('openSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
+    document.querySelectorAll('[data-ofil]').forEach(function(b){b.onclick=function(){OPEN_SHOWF=!OPEN_SHOWF;render();};});
+    document.querySelectorAll('[data-os]').forEach(function(b){b.onclick=function(){OPEN_SERVER=b.getAttribute('data-os');render();};});
     document.querySelectorAll('[data-pcust]').forEach(function(b){b.onclick=function(){PLAYER_OPEN=b.getAttribute('data-pcust');PLAYER_FILTER='';cur='players';render();};});
     document.querySelectorAll('[data-rr]').forEach(function(b){b.onclick=function(){REPORT_RANGE=b.getAttribute('data-rr');render();};});
     document.querySelectorAll('[data-rfil]').forEach(function(b){b.onclick=function(){REPORT_SHOWF=!REPORT_SHOWF;render();};});
@@ -1044,7 +1057,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v17';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v18';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
