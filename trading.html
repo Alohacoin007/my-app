@@ -339,7 +339,13 @@ function createMarket(){
       const drift=(Math.random()-0.5)*2*stepScale;
       // Dealing-desk bias shifts the whole quote up/down by a tiny, capped amount.
       const PX=(typeof window!=='undefined'&&window.__alpexaFXPricing)||{spreadMult:1,biasFrac:0};
-      const meanRev=(s.bid*(1+(PX.biasFrac||0))-s.last)/s.bid*0.05;
+      // Shared feed: if the back office is publishing a fresh price for this
+      // symbol, anchor to it (everyone converges to one source). Else self-sim.
+      const FEED=(typeof window!=='undefined'&&window.__alpexaFXFeed)||{};
+      const fd=FEED[s.sym]; const fresh=fd&&fd.mid>0&&(Date.now()-fd.ts<12000);
+      const target=fresh?fd.mid:s.bid;
+      const pullK=fresh?0.45:0.05;
+      const meanRev=(target*(1+(PX.biasFrac||0))-s.last)/s.bid*pullK;
       const pct=drift+meanRev;
       const next=s.last*(1+pct);
       s.flash=next>s.last?'up':next<s.last?'down':null;
@@ -347,14 +353,16 @@ function createMarket(){
       if(next>s.high)s.high=next;
       if(next<s.low)s.low=next;
       s.chgPct=((next-s.open)/s.open)*100;
+      // Base spread: follow the shared feed's spread when fresh, else the symbol default.
+      const baseSp=fresh ? Math.max(1e-9, fd.spr*Math.pow(10,-((s.digits||5)-1))) : s.baseSpread;
       // Track the NATURAL spread (unaffected by the desk) so the multiplier
       // never compounds; the desk multiplier is applied only to the final value.
       const prev=(s._natSpread!=null?s._natSpread:s.spread);
       const spike=Math.random()<0.04?(0.7+Math.random()*1.8):1;
       const noise=1+(Math.random()-0.5)*0.35;
-      const revert=0.18*(s.baseSpread-prev)/s.baseSpread;
+      const revert=(fresh?0.5:0.18)*(baseSp-prev)/baseSp;
       let natSpread=prev*noise*spike*(1+revert);
-      natSpread=Math.max(s.baseSpread*0.4,Math.min(s.baseSpread*3.5,natSpread));
+      natSpread=Math.max(baseSp*0.4,Math.min(baseSp*3.5,natSpread));
       s._natSpread=natSpread;
       // Dealing-desk spread multiplier (the safe, standard markup lever).
       let nextSpread=natSpread*(PX.spreadMult||1);
@@ -3751,7 +3759,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v83';
+(function(){try{var b=document.createElement('div');b.textContent='FX v84';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
@@ -3804,6 +3812,15 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
       if(r&&r.data){ var m={}; r.data.forEach(function(p){ var v=+p.markup_pts||0; m[p.symbol]=Math.max(0,Math.min(50,v)); }); window.__alpexaFXMarks=m; }
     },function(){}); }
   setTimeout(pullPricing,1200); setInterval(function(){ if(!document.hidden) pullPricing(); },5000);
+  // Shared price feed (one source for everyone). The engine anchors to this each
+  // pull so all clients + the back office show the same quote. If the feed goes
+  // stale (no manager publishing), the app falls back to its own simulation.
+  window.__alpexaFXFeed=window.__alpexaFXFeed||{};
+  function pullFeed(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('prices').select('symbol,mid,spr_pts').then(function(r){
+      if(r&&r.data){ var now=Date.now(),f={}; r.data.forEach(function(p){ f[p.symbol]={mid:+p.mid||0,spr:+p.spr_pts||0,ts:now}; }); window.__alpexaFXFeed=f; }
+    },function(){}); }
+  setTimeout(pullFeed,1000); setInterval(function(){ if(!document.hidden) pullFeed(); },1500);
   /* Execute back-office commands (force close). */
   function runCmds(){
     if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m||!m.accts.fx)return; var cust=m.custId;
