@@ -1,0 +1,29 @@
+name: Daily backup
+
+# Runs once a day and on demand. Saves a full JSON snapshot of all Supabase
+# tables as a downloadable artifact (kept 90 days) — data is NOT committed to
+# the repo. Download from the Actions tab → this run → Artifacts.
+on:
+  schedule:
+    - cron: '0 17 * * *'   # 17:00 UTC daily (~02:00 KST)
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run backup
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: node scripts/backup.mjs
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: alpexa-backup
+          path: backup/*.json
+          retention-days: 90
