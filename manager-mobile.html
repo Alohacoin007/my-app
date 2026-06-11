@@ -1106,7 +1106,10 @@
     if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Pricing</div><div class="card"><div class="empty">Not connected to server.</div></div>';
     var APPS=[['fx','FX'],['crypto','Crypto'],['sports','Sports']];
     var h='<div class="sec" style="display:flex;align-items:center;justify-content:space-between">Pricing · dealing desk'+
-      '<span style="display:inline-flex;align-items:center;gap:4px;font:700 10px system-ui;color:var(--pos)"><span style="width:7px;height:7px;border-radius:50%;background:var(--pos);display:inline-block"></span>LIVE</span></div>';
+      '<span style="display:flex;align-items:center;gap:8px">'+
+      '<button data-prefresh="1" style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:5px 10px;font:700 10.5px system-ui;cursor:pointer;color:var(--ink)">↻ Refresh</button>'+
+      '<span style="display:inline-flex;align-items:center;gap:4px;font:700 10px system-ui;color:var(--pos)"><span style="width:7px;height:7px;border-radius:50%;background:var(--pos);display:inline-block"></span>LIVE</span>'+
+      '</span></div>';
     h+='<div style="display:flex;gap:6px;margin:0 12px 10px">'+APPS.map(function(x){
       var on=PRICE_APP===x[0];
       return '<button data-papp="'+x[0]+'" style="flex:1;background:'+(on?'var(--acc)':'#F1F3F6')+';color:'+(on?'#fff':'var(--dim)')+';border:none;border-radius:4px;padding:9px 0;font:700 12.5px system-ui;cursor:pointer">'+x[1]+'</button>';
@@ -1193,6 +1196,7 @@
     render();
     AlpexaSync.db.from('pricing_marks').upsert({symbol:sym,markup_pts:nx,updated_at:new Date().toISOString()},{onConflict:'symbol'}).then(function(r){
       if(r&&r.error)toast('Error: '+r.error.message+' (run the pricing_marks SQL?)',true);
+      else toast(sym+' markup '+(nx>0?'+':'')+nx.toFixed(1)+'pt saved · live on apps in ~5s ✓');
     },function(){});
   }
   function pricingResetAll(){
@@ -1552,6 +1556,7 @@
     document.querySelectorAll('[data-papp]').forEach(function(b){b.onclick=function(){PRICE_APP=b.getAttribute('data-papp');render();};});
     document.querySelectorAll('[data-pcls]').forEach(function(b){b.onclick=function(){PRICE_CLS=b.getAttribute('data-pcls');render();};});
     document.querySelectorAll('[data-pmk]').forEach(function(b){b.onclick=function(){var p=(b.getAttribute('data-pmk')||'').split('|');pricingMark(p[0],p[1]);};});
+    var _prf=document.querySelector('[data-prefresh]'); if(_prf)_prf.onclick=function(){ pullLivePrices(); pullPricing(); toast('Live prices & markups refreshed ✓'); };
     document.querySelectorAll('[data-preset]').forEach(function(b){b.onclick=pricingResetAll;});
     document.querySelectorAll('[data-spsave]').forEach(function(b){b.onclick=function(){saveSportsMargin();};});
     document.querySelectorAll('[data-spreset]').forEach(function(b){b.onclick=function(){saveSportsMargin(0);};});
@@ -1654,7 +1659,7 @@
   })();
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v64';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v65';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
