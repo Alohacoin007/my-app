@@ -1201,7 +1201,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.35</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.36</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -2663,6 +2663,13 @@
       if (!res.ok) throw new Error('odds HTTP '+res.status);
       const data = await res.json();
       bumpOdds(3); // h2h+spreads+totals = ~3 credits per request
+      // Report the REAL account-wide quota (from the API's own headers) to the
+      // back office so the owner sees when a paid plan is needed.
+      try{ var rem=res.headers.get('x-requests-remaining'), usd=res.headers.get('x-requests-used');
+        if(rem!=null && window.AlpexaSync && AlpexaSync.db){
+          AlpexaSync.db.from('api_usage').upsert({provider:'odds_api',remaining:Math.round(+rem),used:Math.round(+usd||0),updated_at:new Date().toISOString()},{onConflict:'provider'}).then(function(){},function(){});
+        }
+      }catch(e){}
       try{ localStorage.setItem(cacheKey, JSON.stringify({ t:Date.now(), data })); }catch(e){}
       return data;
     }

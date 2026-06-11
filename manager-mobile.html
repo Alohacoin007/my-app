@@ -327,7 +327,29 @@
         '<div class="row"><span>Crypto balances</span><b>'+usd(bySrv.crypto)+'</b></div>'+
         '<div class="row"><span>Sports balances</span><b>'+usd(bySrv.sports)+'</b></div>'+
         '<div class="row"><span>Pending approvals</span><b>'+pend+'</b></div></div>'+
+      apiUsageCard()+
       '<div class="hint" style="margin:0 14px">'+(connected?'Aggregated across all customers · Supabase, real-time.':'Not connected to server.')+'</div>';
+  }
+  // Live quota for the sports odds data provider (The Odds API, free ~500/mo).
+  var API_USAGE=null;
+  function pullApiUsage(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('api_usage').select('*').then(function(r){ if(r&&r.data){ var m={}; r.data.forEach(function(x){ m[x.provider]=x; }); API_USAGE=m; if(cur==='overview'&&!busyEditing())render(); } },function(){}); }
+  function apiUsageCard(){
+    var u=API_USAGE&&API_USAGE.odds_api; if(!u) return '';
+    var rem=+u.remaining||0, used=+u.used||0, total=rem+used;
+    var low=rem<=50, warn=rem<=150;
+    var when=u.updated_at?ago(Date.parse(u.updated_at)):'';
+    var bar=total>0?Math.max(2,Math.round(rem/total*100)):0;
+    var col=low?'var(--neg)':warn?'var(--warn)':'var(--pos)';
+    var h='<div class="sec">Data feeds</div><div class="card"'+(low?' style="border-color:#f1b0b7"':'')+'>'+
+      '<div class="row" style="border:none;padding:0 0 4px"><span><b>Sports odds API</b><div class="req-meta" style="margin:2px 0 0">The Odds API · updated '+when+'</div></span>'+
+      '<b style="color:'+col+'">'+rem.toLocaleString()+' left</b></div>'+
+      '<div style="height:8px;background:#eef0f3;border-radius:4px;overflow:hidden;margin-top:4px"><div style="height:100%;width:'+bar+'%;background:'+col+'"></div></div>'+
+      '<div class="req-meta" style="margin-top:5px">'+used.toLocaleString()+' used of '+total.toLocaleString()+' this month</div>'+
+      (low?'<div class="hint" style="color:var(--neg);font-weight:700;margin:6px 0 0">⚠ Almost out — upgrade The Odds API to a paid plan to keep live sports data flowing.</div>'
+          :warn?'<div class="hint" style="color:var(--warn);margin:6px 0 0">Getting low — plan a paid upgrade soon.</div>':'')+
+      '</div>';
+    return h;
   }
 
   var REPORT_RANGE='today', REPORT_FROM='', REPORT_TO='', REPORT_SHOWF=false;
@@ -1486,10 +1508,11 @@
   setInterval(function(){ if(cur==='overview'||cur==='approvals'||cur==='risk'||cur==='bets') render(); }, 4000);
   // Pull every customer's requests from the shared server.
   function pullServer(){ if(!window.AlpexaSync||!AlpexaSync.db) return; AlpexaSync.pullAll().then(function(rows){ SRV_REQS=rows||[]; if(!busyEditing()) render(); }).catch(function(){}); }
-  pullServer(); pullPlayers(); pullOpenSummary(); pullOnline(); pullSettle(); pullAgents(); pullPricing();
+  pullServer(); pullPlayers(); pullOpenSummary(); pullOnline(); pullSettle(); pullAgents(); pullPricing(); pullApiUsage();
   setInterval(function(){ if(!document.hidden){ pullServer(); pullPlayers();
     if(cur==='bets') pullOpenSummary();
     if(cur==='online') pullOnline();
+    if(cur==='overview') pullApiUsage();
     if(cur==='report'||cur==='history') pullSettle();
     if(cur==='agents'){ pullAgents(); pullSettle(); }
     if(cur==='wallet'){ pullWallet(); }
@@ -1499,7 +1522,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v47';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v48';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
