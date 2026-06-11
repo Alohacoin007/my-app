@@ -507,7 +507,7 @@
   function viewHistory(){
     // Money moves (deposits/withdrawals/transfers) + settled trades, one timeline.
     var KINDS3={fx_close:'FX close',bet_won:'Bet won',bet_lost:'Bet lost',bet_cashout:'Cashout',bet_void:'Void',crypto_fee:'Fee'};
-    var trades=SRV_SETTLE.map(function(x){ return {_trade:true, id:'t'+x.id, sid:x.id, kind:x.kind, ts:x.created_at?Date.parse(x.created_at):0,
+    var trades=SRV_SETTLE.map(function(x){ return {_trade:true, id:'t'+x.id, sid:x.id, kind:x.kind, ticket:x.ticket||'', ts:x.created_at?Date.parse(x.created_at):0,
       custId:x.cust_id||'', custName:custName(x.cust_id)||'', acctNo:x.acct_no||'', server:x.server||'',
       symbol:x.symbol||'', kindL:KINDS3[x.kind]||x.kind||'Trade', stake:+x.stake||0, pnl:(x.kind==='crypto_fee'?-(+x.stake||0):(+x.pnl||0))}; });
     var all=reqs().slice().concat(trades).sort(function(a,b){return (b.ts||0)-(a.ts||0);});
@@ -550,7 +550,8 @@
           '<b class="'+(p>=0?'pos':'neg')+'" style="white-space:nowrap;padding-left:8px">'+(p<0?'-':'+')+usd(Math.abs(p))+'</b></div>';
         if(open){
           h+='<div class="req-meta" style="margin-top:6px">👤 '+(w.custName||w.custId||'—')+(w.acctNo?(' · '+w.acctNo):'')+(w.custId?(' · '+w.custId):'')+'</div>'+
-          '<div class="req-meta">'+w.server+' · '+(w.symbol||'')+' · stake '+usd(w.stake)+' · '+ago(w.ts)+'</div>';
+          (w.ticket?'<div class="req-meta" style="font-family:ui-monospace,monospace">🎫 '+w.ticket+'</div>':'')+
+          '<div class="req-meta">'+w.server+' · '+(w.symbol||'')+' · stake '+usd(w.stake)+' · '+(w.ts?new Date(w.ts).toLocaleString():'')+'</div>';
           if(TRADE_EDIT===w.sid){
             h+='<label class="lbl" style="display:block;margin-top:8px">P&amp;L (USD) — customer view (+ = customer won)</label>'+
               '<input class="in" id="tEdPnl" type="number" step="0.01" value="'+(+w.pnl||0)+'">'+
@@ -701,7 +702,7 @@
           tr.forEach(function(x){ var p=(x.kind==='crypto_fee')?-(+x.stake||0):(+x.pnl||0);
             var when=x.created_at?new Date(x.created_at).toLocaleString():'';
             h+='<div class="row"><span><b>'+(x.symbol||KINDS2[x.kind]||x.kind||'Trade')+'</b> <span class="muted" style="font-size:10.5px">'+(KINDS2[x.kind]||x.kind||'')+'</span>'+
-              '<div class="req-meta" style="margin:2px 0 0">'+(x.server||'')+' · '+when+'</div></span>'+
+              '<div class="req-meta" style="margin:2px 0 0">'+(x.ticket?(x.ticket+' · '):'')+(x.server||'')+' · '+when+'</div></span>'+
               '<b class="'+(p>=0?'pos':'neg')+'">'+(p<0?'-':'+')+usd(Math.abs(p))+'</b></div>'; });
           h+='<button class="save ghost" data-editpl="'+esc(cid)+'" style="width:100%;margin-top:10px">Edit profile &amp; balances</button>';
         }
@@ -1577,7 +1578,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v50';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v51';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
