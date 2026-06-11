@@ -362,14 +362,14 @@ function createMarket(){
       if(next>s.high)s.high=next;
       if(next<s.low)s.low=next;
       s.chgPct=((next-s.open)/s.open)*100;
-      // Base spread: follow the shared feed's spread when fresh, else the symbol default.
-      const baseSp=fresh ? Math.max(1e-9, fd.spr*Math.pow(10,-((s.digits||5)-1))) : s.baseSpread;
+      // Base spread = the symbol's natural spread.
+      const baseSp=s.baseSpread;
       // Track the NATURAL spread (unaffected by the desk) so the multiplier
       // never compounds; the desk multiplier is applied only to the final value.
       const prev=(s._natSpread!=null?s._natSpread:s.spread);
       const spike=Math.random()<0.04?(0.7+Math.random()*1.8):1;
       const noise=1+(Math.random()-0.5)*0.35;
-      const revert=(fresh?0.5:0.18)*(baseSp-prev)/baseSp;
+      const revert=0.18*(baseSp-prev)/baseSp;
       let natSpread=prev*noise*spike*(1+revert);
       natSpread=Math.max(baseSp*0.4,Math.min(baseSp*3.5,natSpread));
       s._natSpread=natSpread;
@@ -3801,7 +3801,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v88';
+(function(){try{var b=document.createElement('div');b.textContent='FX v89';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
