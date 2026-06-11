@@ -480,14 +480,34 @@
   }
 
   // ── History: full transaction log for ALL customers, with edit/fix ──
-  var HIST_FILTER='', EDIT_ID=null, HIST_SERVER='all', HIST_FROM='', HIST_TO='', HIST_SHOWF=false, HIST_OPEN=null;
+  var HIST_FILTER='', EDIT_ID=null, HIST_SERVER='all', HIST_FROM='', HIST_TO='', HIST_SHOWF=false, HIST_OPEN=null, TRADE_EDIT=null;
+  // Delete or correct a settled-trade ledger record (e.g. wrong P&L from a bug).
+  function tradeDelete(sid){
+    if(!confirm('Delete this trade record? It will be removed from company P&L and agent commissions.\n\n(Customer balance is NOT changed — adjust it in Players if needed.)')) return;
+    AlpexaSync.db.from('settlements').delete().eq('id',sid).then(function(r){
+      if(r&&r.error){ toast('Delete failed: '+r.error.message+' (run the settlements delete SQL)',true); return; }
+      SRV_SETTLE=SRV_SETTLE.filter(function(x){ return String(x.id)!==String(sid); });
+      try{ logAction('delete_trade', '', 'settlement #'+sid); }catch(e){}
+      toast('Trade record deleted ✓'); render();
+    },function(){ toast('Delete failed',true); });
+  }
+  function tradeSavePnl(sid){
+    var v=parseFloat(val('tEdPnl')); if(isNaN(v)){ toast('Enter a number',true); return; }
+    v=Math.round(v*100)/100;
+    AlpexaSync.db.from('settlements').update({pnl:v}).eq('id',sid).then(function(r){
+      if(r&&r.error){ toast('Error: '+r.error.message,true); return; }
+      SRV_SETTLE.forEach(function(x){ if(String(x.id)===String(sid))x.pnl=v; });
+      try{ logAction('edit_trade', '', 'settlement #'+sid+' → pnl '+v); }catch(e){}
+      TRADE_EDIT=null; toast('P&L updated ✓'); render();
+    },function(){ toast('Save failed',true); });
+  }
   function statusBadge(s){var cls=s==='approved'?'won':s==='rejected'?'lost':'open';var t=s==='approved'?'Approved':s==='rejected'?'Rejected':'Pending';return '<span class="badge '+cls+'">'+t+'</span>';}
   function typeLabel(t){return t==='deposit'?'Deposit':t==='transfer'?'Transfer':t==='withdraw'?'Withdraw':(t||'—');}
   function findReq(id){var all=reqs();for(var i=0;i<all.length;i++){if(all[i].id===id)return all[i];}return null;}
   function viewHistory(){
     // Money moves (deposits/withdrawals/transfers) + settled trades, one timeline.
     var KINDS3={fx_close:'FX close',bet_won:'Bet won',bet_lost:'Bet lost',bet_cashout:'Cashout',bet_void:'Void',crypto_fee:'Fee'};
-    var trades=SRV_SETTLE.map(function(x){ return {_trade:true, id:'t'+x.id, ts:x.created_at?Date.parse(x.created_at):0,
+    var trades=SRV_SETTLE.map(function(x){ return {_trade:true, id:'t'+x.id, sid:x.id, kind:x.kind, ts:x.created_at?Date.parse(x.created_at):0,
       custId:x.cust_id||'', custName:custName(x.cust_id)||'', acctNo:x.acct_no||'', server:x.server||'',
       symbol:x.symbol||'', kindL:KINDS3[x.kind]||x.kind||'Trade', stake:+x.stake||0, pnl:(x.kind==='crypto_fee'?-(+x.stake||0):(+x.pnl||0))}; });
     var all=reqs().slice().concat(trades).sort(function(a,b){return (b.ts||0)-(a.ts||0);});
@@ -531,6 +551,14 @@
         if(open){
           h+='<div class="req-meta" style="margin-top:6px">👤 '+(w.custName||w.custId||'—')+(w.acctNo?(' · '+w.acctNo):'')+(w.custId?(' · '+w.custId):'')+'</div>'+
           '<div class="req-meta">'+w.server+' · '+(w.symbol||'')+' · stake '+usd(w.stake)+' · '+ago(w.ts)+'</div>';
+          if(TRADE_EDIT===w.sid){
+            h+='<label class="lbl" style="display:block;margin-top:8px">P&amp;L (USD) — customer view (+ = customer won)</label>'+
+              '<input class="in" id="tEdPnl" type="number" step="0.01" value="'+(+w.pnl||0)+'">'+
+              '<div class="btns"><button class="ok" data-tsave="'+w.sid+'">Save</button><button class="no" data-tcancel="1">Cancel</button></div>';
+          } else {
+            h+='<div class="btns"><button class="save ghost" data-tedit="'+w.sid+'">✏️ Edit P&amp;L</button><button class="no" data-tdel="'+w.sid+'">🗑 Delete record</button></div>';
+          }
+          h+='<div class="hint" style="color:#c0392b">Edits the LEDGER only (company P&amp;L / agent commission). Customer balance is separate — adjust it in Players if needed.</div>';
         }
         h+='</div>';
         return;
@@ -1459,7 +1487,11 @@
     document.querySelectorAll('[data-hsclear]').forEach(function(b){b.onclick=function(){HIST_FROM='';HIST_TO='';render();};});
     document.querySelectorAll('[data-hrefresh]').forEach(function(b){b.onclick=function(){toast('Refreshing…');pullSettle();pullServer();pullPlayers();};});
     document.querySelectorAll('[data-hfil]').forEach(function(b){b.onclick=function(){HIST_SHOWF=!HIST_SHOWF;render();};});
-    document.querySelectorAll('[data-hopen]').forEach(function(b){b.onclick=function(){var k=b.getAttribute('data-hopen');HIST_OPEN=(HIST_OPEN===k?null:k);render();};});
+    document.querySelectorAll('[data-hopen]').forEach(function(b){b.onclick=function(){var k=b.getAttribute('data-hopen');HIST_OPEN=(HIST_OPEN===k?null:k);TRADE_EDIT=null;render();};});
+    document.querySelectorAll('[data-tedit]').forEach(function(b){b.onclick=function(){TRADE_EDIT=b.getAttribute('data-tedit');render();};});
+    document.querySelectorAll('[data-tcancel]').forEach(function(b){b.onclick=function(){TRADE_EDIT=null;render();};});
+    document.querySelectorAll('[data-tsave]').forEach(function(b){b.onclick=function(){tradeSavePnl(b.getAttribute('data-tsave'));};});
+    document.querySelectorAll('[data-tdel]').forEach(function(b){b.onclick=function(){tradeDelete(b.getAttribute('data-tdel'));};});
     var ps=document.getElementById('plSearch'); if(ps){ps.oninput=function(){PLAYER_FILTER=ps.value;render();var n=document.getElementById('plSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
     document.querySelectorAll('[data-cust]').forEach(function(b){b.onclick=function(){HIST_FILTER=b.getAttribute('data-cust');cur='history';render();};});
     document.querySelectorAll('[data-pl]').forEach(function(b){b.onclick=function(){var id=b.getAttribute('data-pl');PLAYER_OPEN=(PLAYER_OPEN===id?null:id);if(PLAYER_OPEN!==id)PLAYER_EDIT=null;else{pullCustPos(id);pullSettle();}render();};});
@@ -1525,7 +1557,7 @@
   }
 
   // Don't redraw while the operator is mid-edit or typing a search (would lose input).
-  function busyEditing(){ return (cur==='history' && (EDIT_ID || (document.activeElement && (document.activeElement.id==='histSearch'||document.activeElement.id==='hsFrom'||document.activeElement.id==='hsTo')))) || (cur==='players' && (PLAYER_EDIT || (document.activeElement && document.activeElement.id==='plSearch'))) || (cur==='bets' && document.activeElement && document.activeElement.id==='openSearch') || (cur==='report' && document.activeElement && (document.activeElement.id==='rpFrom'||document.activeElement.id==='rpTo')) || (cur==='agents' && document.activeElement && String(document.activeElement.id||'').indexOf('ag_')===0) || (cur==='pricing' && document.activeElement && (document.activeElement.id==='prSearch'||document.activeElement.id==='sp_m')); }
+  function busyEditing(){ return (cur==='history' && (EDIT_ID || TRADE_EDIT || (document.activeElement && (document.activeElement.id==='histSearch'||document.activeElement.id==='hsFrom'||document.activeElement.id==='hsTo'||document.activeElement.id==='tEdPnl')))) || (cur==='players' && (PLAYER_EDIT || (document.activeElement && document.activeElement.id==='plSearch'))) || (cur==='bets' && document.activeElement && document.activeElement.id==='openSearch') || (cur==='report' && document.activeElement && (document.activeElement.id==='rpFrom'||document.activeElement.id==='rpTo')) || (cur==='agents' && document.activeElement && String(document.activeElement.id||'').indexOf('ag_')===0) || (cur==='pricing' && document.activeElement && (document.activeElement.id==='prSearch'||document.activeElement.id==='sp_m')); }
   window.addEventListener('storage',function(e){ if(e.key&&e.key.indexOf('alpexa')===0 && !busyEditing()) render(); });
   setInterval(function(){ if(cur==='overview'||cur==='approvals'||cur==='risk'||cur==='bets') render(); }, 4000);
   // Pull every customer's requests from the shared server.
@@ -1545,7 +1577,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v49';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v50';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
