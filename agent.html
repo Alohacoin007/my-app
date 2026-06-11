@@ -120,7 +120,7 @@
   function viewDash(){
     if(!AGENT){ viewLogin(); return; }
     var c=commission();
-    var KINDS={fx_close:'FX close',bet_won:'Bet won',bet_lost:'Bet lost',bet_cashout:'Cashout',bet_void:'Void'};
+    var KINDS={fx_close:'FX close',bet_won:'Bet won',bet_lost:'Bet lost',bet_cashout:'Cashout',bet_void:'Void',crypto_fee:'Fee'};
     var h='<div class="hdr"><div><b>'+(AGENT.name||AGENT.code)+'</b><div class="sub">'+AGENT.code+' · Alpexa Suisse Partners</div></div><button id="btnOut">Sign out</button></div>';
     h+='<div class="sec" style="display:flex;align-items:center;justify-content:space-between">Commission · '+c.label+
       '<button id="btnRange" style="background:'+(SHOWR?'var(--acc)':'#fff')+';border:1px solid var(--line);border-radius:4px;padding:5px 11px;font:700 11px system-ui;color:'+(SHOWR?'#fff':'#1c2430')+';cursor:pointer">Period '+(SHOWR?'▴':'▾')+'</button></div>';
@@ -183,7 +183,7 @@
     h+=secToggle('tr','Recent trades · '+trades.length,TG.tr);
     if(TG.tr){ h+='<div class="card">';
       if(!trades.length) h+='<div class="empty">No trades in this period.</div>';
-      trades.forEach(function(s){ var p=+s.pnl||0; var bcls=(KINDS[s.kind]==='Void')?'open':(p>=0?'won':'lost');
+      trades.forEach(function(s){ var p=(s.kind==='crypto_fee')?-(+s.stake||0):(+s.pnl||0); var bcls=(KINDS[s.kind]==='Void')?'open':(p>=0?'won':'lost');
         h+='<div class="row"><span><span class="badge '+bcls+'">'+(KINDS[s.kind]||s.kind||'Trade').toUpperCase()+'</span> <b style="font-size:12.5px">'+(s.symbol||'')+'</b>'+
           '<div class="meta" style="margin-top:2px">'+(NAMES[s.cust_id]||s.cust_id)+' · '+(s.server||'')+' · '+(s.created_at?new Date(s.created_at).toLocaleString():'')+'</div></span>'+
           '<b class="'+(p>=0?'pos':'neg')+'">'+(p<0?'-':'+')+usd(Math.abs(p))+'</b></div>'; });

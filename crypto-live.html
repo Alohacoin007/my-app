@@ -13035,6 +13035,8 @@ function App() {
         USDT:      (b.USDT || 0) + net,
       }));
       pushTx({ type: 'sell', sym: assetId, usd: usdAmount, net });
+      // Record the trade fee on the server — company revenue + agent commission base.
+      try{window.__alpexaSettle&&window.__alpexaSettle({server:'crypto',kind:'crypto_fee',local_id:'sf-'+Date.now(),symbol:assetId,stake:Math.min(FEE,usdAmount),pnl:0,detail:'sell fee'});}catch(e){}
       flashAsset(assetId);
     } else {
       setPendingOrders((p) => [
@@ -13084,6 +13086,9 @@ function App() {
       [toSym]:   (b[toSym] || 0) + toUsd,
     }));
     pushTx({ type: 'swap', sym: fromSym, usd: fromUsd, to: toSym, toUsd });
+    // Record the swap fee (already deducted inside toUsd) for company P&L.
+    try{var swFee=Math.max(0,Math.round((fromUsd-toUsd)*100)/100);
+      if(swFee>0&&window.__alpexaSettle)window.__alpexaSettle({server:'crypto',kind:'crypto_fee',local_id:'sw-'+Date.now(),symbol:fromSym+'→'+toSym,stake:swFee,pnl:0,detail:'swap fee+slippage'});}catch(e){}
     flashAsset(toSym);
   };
   // Liquidate every non-stable position into USDT in a single atomic move.
@@ -13357,7 +13362,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v61';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v62';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
@@ -13365,6 +13370,10 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
 /* Report crypto holdings + stakes to the server for the back office. */
 (function(){
   function meX(){try{var m=JSON.parse(localStorage.getItem('alpexa.me')||'null');return m&&m.accts?m:null;}catch(e){return null;}}
+  // Record one finished event (trade fee etc.) on the server for company P&L.
+  window.__alpexaSettle=function(rec){ try{ if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m)return;
+    AlpexaSync.db.from('settlements').insert({cust_id:m.custId,acct_no:(m.accts&&m.accts[rec.server])||'',server:rec.server||'',kind:rec.kind||'',local_id:String(rec.local_id||''),symbol:rec.symbol||'',stake:Math.round((+rec.stake||0)*100)/100,pnl:Math.round((+rec.pnl||0)*100)/100,detail:rec.detail||''}).then(function(){},function(){});
+  }catch(e){} };
   function push(){
     if(!window.AlpexaSync||!AlpexaSync.db)return;
     var m=meX(); if(!m||!m.accts.crypto)return; var cust=m.custId, acct=m.accts.crypto;
