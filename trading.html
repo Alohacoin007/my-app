@@ -54,6 +54,8 @@ setTimeout(function(){
 <script>
 /* Restore identity from the URL (#alpexa=...) so a home-screen install can inherit the account created in Safari (iOS isolates their storage) - no re-login. */
 (function(){try{var m=(location.hash||"").match(/alpexa=([^&]+)/);if(m){var id=JSON.parse(decodeURIComponent(atob(m[1])));if(id&&id.accts){localStorage.setItem("alpexa.me",JSON.stringify(id));}}}catch(e){}})();
+/* Login gate (real service): no anonymous guest trading. Require a logged-in identity (email or authId); guests/empty go to login. */
+(function(){try{var m=JSON.parse(localStorage.getItem("alpexa.me")||"null");if(!(m&&m.accts&&(m.email||m.authId))){location.replace("login.html");}}catch(e){location.replace("login.html");}})();
 </script>
 <script src="alpexa-sync.js?v=6"></script>
 <script>
@@ -3817,7 +3819,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v99';
+(function(){try{var b=document.createElement('div');b.textContent='FX v100';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>

@@ -579,6 +579,8 @@
 <script>
 /* Restore identity from the URL (#alpexa=...) so a home-screen install can inherit the account created in Safari (iOS isolates their storage) - no re-login. */
 (function(){try{var m=(location.hash||"").match(/alpexa=([^&]+)/);if(m){var id=JSON.parse(decodeURIComponent(atob(m[1])));if(id&&id.accts){localStorage.setItem("alpexa.me",JSON.stringify(id));}}}catch(e){}})();
+/* Login gate (real service): no anonymous guest trading. Require a logged-in identity (email or authId); guests/empty go to login. */
+(function(){try{var m=JSON.parse(localStorage.getItem("alpexa.me")||"null");if(!(m&&m.accts&&(m.email||m.authId))){location.replace("login.html");}}catch(e){location.replace("login.html");}})();
 </script>
 <script src="alpexa-sync.js?v=6"></script>
 <script>
@@ -1201,7 +1203,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.41</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.42</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
