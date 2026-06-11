@@ -1003,13 +1003,15 @@
       var clist=CRYPTO_INSTR.filter(function(r){ return !q2||((r[0]+' '+r[1]).toLowerCase().indexOf(q2)>=0); });
       h+='<div class="card" style="padding:9px 12px"><input class="in" id="prSearch" placeholder="Search coin…" value="'+(PRICE_FILTER||'').replace(/"/g,'&quot;')+'" style="margin-top:0"></div>';
       h+='<div class="card" style="padding:3px 8px">'+
-        '<div class="row" style="padding:5px 0;border-bottom:1px solid var(--line)"><span class="lbl" style="width:46px;text-align:center">Coin</span><span class="lbl" style="flex:1;text-align:center">Buy</span><span class="lbl" style="flex:1;text-align:center">Sell</span><span class="lbl" style="width:74px;text-align:center">Mk%</span></div>';
+        '<div class="row" style="padding:5px 0;border-bottom:1px solid var(--line)"><span class="lbl" style="width:46px;text-align:center">Coin</span><span class="lbl" style="flex:1;text-align:center">Buy</span><span class="lbl" style="width:42px;text-align:center">Spr</span><span class="lbl" style="flex:1;text-align:center">Sell</span><span class="lbl" style="width:74px;text-align:center">Mk%</span></div>';
       clist.forEach(function(r){
         var sym=r[0], px=CRYPTO_LIVE[sym]||r[2], dg=r[3], mk=+PRICE_MARKS[sym]||0, up=CRYPTO_DIR[sym]>=0;
         var buy=px*(1+mk/100), sell=px*(1-mk/100);
+        var sprPct=(buy>0?((buy-sell)/buy*100):0);                          // round-trip spread %
         h+='<div class="row" style="align-items:center;padding:6px 0">'+
           '<span style="width:46px;text-align:center;overflow:hidden"><b style="font-size:11px">'+sym+'</b></span>'+
           '<span style="flex:1;text-align:center;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+buy.toFixed(dg)+'</b></span>'+
+          '<span style="width:42px;text-align:center;font-variant-numeric:tabular-nums;font-size:10px;font-weight:700;color:'+(mk>0?'var(--neg)':'var(--dim)')+'">'+sprPct.toFixed(1)+'%</span>'+
           '<span style="flex:1;text-align:center;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+sell.toFixed(dg)+'</b></span>'+
           '<span style="width:74px;display:flex;gap:3px;justify-content:center;align-items:center">'+
             '<button data-pmk="'+sym+'|-" style="width:19px;height:19px;border:1px solid var(--line);background:#fff;border-radius:4px;font:700 12px system-ui;cursor:pointer;color:var(--ink)">−</button>'+
@@ -1481,7 +1483,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v42';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v43';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
