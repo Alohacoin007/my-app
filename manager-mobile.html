@@ -953,8 +953,19 @@
     ['SOLUSD','Solana / USD','CRYPTO',172.40,2,20.0],['SPX500','S&P 500 Index','INDEX',5430.0,1,4.0],
     ['NAS100','Nasdaq 100','INDEX',19250.0,1,5.0],['US30','Dow Jones 30','INDEX',38900.0,1,6.0]
   ];
-  var PRICE_LIVE={}, PRICE_SPR={}, PRICE_DIR={}; // mid · floating base spread(pts) · tick direction
+  // Crypto instruments (plain coin symbols matching the Crypto app).
+  var CRYPTO_INSTR=[
+    ['BTC','Bitcoin',76988.90,2],['ETH','Ethereum',2116.51,2],['SOL','Solana',86.26,2],
+    ['BNB','BNB',612.40,2],['XRP','XRP',0.6234,4],['ADA','Cardano',0.4523,4],
+    ['AVAX','Avalanche',36.50,2],['DOT','Polkadot',6.82,3],['LINK','Chainlink',9.60,3],
+    ['DOGE','Dogecoin',0.1542,4],['TON','Toncoin',5.42,3],['MATIC','Polygon',0.582,4]
+  ];
+  var SPORTS_MARGIN=0; // house margin % applied to all odds (loaded from server)
+  var PRICE_LIVE={}, PRICE_SPR={}, PRICE_DIR={}, CRYPTO_LIVE={}, CRYPTO_DIR={};
   FX_INSTR.forEach(function(r){ PRICE_LIVE[r[0]]=r[3]; PRICE_SPR[r[0]]=r[5]; PRICE_DIR[r[0]]=1; });
+  CRYPTO_INSTR.forEach(function(r){ CRYPTO_LIVE[r[0]]=r[2]; CRYPTO_DIR[r[0]]=1; });
+  function cryptoTick(){ CRYPTO_INSTR.forEach(function(r){ var cur=CRYPTO_LIVE[r[0]]||r[2];
+    var nx=cur*(1+(Math.random()-0.5)*2*0.0009 + (r[2]-cur)/r[2]*0.03); CRYPTO_DIR[r[0]]=nx>=cur?1:-1; CRYPTO_LIVE[r[0]]=nx; }); }
   function priceTick(){ FX_INSTR.forEach(function(r){
     var cur=PRICE_LIVE[r[0]]||r[3];
     var step=(r[2]==='CRYPTO'?0.0008:r[2]==='STOCK'||r[2]==='INDEX'?0.0004:0.00015);
@@ -973,9 +984,11 @@
     AlpexaSync.db.from('prices').upsert(rows,{onConflict:'symbol'}).then(function(){},function(){});
   }
   setInterval(function(){ if(document.hidden) return; priceTick(); publishPrices();
-    if(cur==='pricing'&&PRICE_APP==='fx'&&!busyEditing()) render(); },1500);
+    if(cur==='pricing'&&PRICE_APP==='crypto') cryptoTick();
+    if(cur==='pricing'&&PRICE_APP!=='sports'&&!busyEditing()) render(); },1500);
   function pullPricing(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
-    AlpexaSync.db.from('pricing_marks').select('*').then(function(r){ if(r&&r.data){ var m={}; r.data.forEach(function(p){ m[p.symbol]=+p.markup_pts||0; }); PRICE_MARKS=m; if(cur==='pricing'&&!busyEditing())render(); } },function(){}); }
+    AlpexaSync.db.from('pricing_marks').select('*').then(function(r){ if(r&&r.data){ var m={}; r.data.forEach(function(p){ m[p.symbol]=+p.markup_pts||0; }); PRICE_MARKS=m; if(cur==='pricing'&&!busyEditing())render(); } },function(){});
+    AlpexaSync.db.from('pricing').select('*').eq('server','sports').limit(1).then(function(r){ var p=r&&r.data&&r.data[0]; if(p){ SPORTS_MARGIN=+p.spread_mult||0; if(cur==='pricing'&&PRICE_APP==='sports'&&!busyEditing())render(); } },function(){}); }
   function viewPricing(){
     if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Pricing</div><div class="card"><div class="empty">Not connected to server.</div></div>';
     var APPS=[['fx','FX'],['crypto','Crypto'],['sports','Sports']];
@@ -985,8 +998,45 @@
       var on=PRICE_APP===x[0];
       return '<button data-papp="'+x[0]+'" style="flex:1;background:'+(on?'var(--acc)':'#F1F3F6')+';color:'+(on?'#fff':'var(--dim)')+';border:none;border-radius:4px;padding:9px 0;font:700 12.5px system-ui;cursor:pointer">'+x[1]+'</button>';
     }).join('')+'</div>';
-    if(PRICE_APP!=='fx'){
-      h+='<div class="card"><div class="empty">'+(PRICE_APP==='crypto'?'Crypto':'Sports')+' pricing — coming next.<br>FX &amp; instruments are live below.</div></div>';
+    if(PRICE_APP==='crypto'){
+      var q2=(PRICE_FILTER||'').toLowerCase();
+      var clist=CRYPTO_INSTR.filter(function(r){ return !q2||((r[0]+' '+r[1]).toLowerCase().indexOf(q2)>=0); });
+      h+='<div class="card" style="padding:9px 12px"><input class="in" id="prSearch" placeholder="Search coin…" value="'+(PRICE_FILTER||'').replace(/"/g,'&quot;')+'" style="margin-top:0"></div>';
+      h+='<div class="card" style="padding:3px 8px">'+
+        '<div class="row" style="padding:5px 0;border-bottom:1px solid var(--line)"><span class="lbl" style="width:50px">Coin</span><span style="flex:1"></span><span class="lbl" style="width:64px;text-align:right">Buy</span><span class="lbl" style="width:64px;text-align:right">Sell</span><span style="flex:1"></span><span class="lbl" style="width:60px;text-align:right">Mk%</span></div>';
+      clist.forEach(function(r){
+        var sym=r[0], px=CRYPTO_LIVE[sym]||r[2], dg=r[3], mk=+PRICE_MARKS[sym]||0, up=CRYPTO_DIR[sym]>=0;
+        var buy=px*(1+mk/100), sell=px*(1-mk/100);
+        h+='<div class="row" style="align-items:center;padding:6px 0">'+
+          '<span style="width:50px;min-width:50px;overflow:hidden"><b style="font-size:11.5px">'+sym+'</b><div class="req-meta" style="margin:0;font-size:9px">'+r[1]+'</div></span>'+
+          '<span style="flex:1"></span>'+
+          '<span style="width:64px;text-align:right;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+buy.toFixed(dg)+'</b></span>'+
+          '<span style="width:64px;text-align:right;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+sell.toFixed(dg)+'</b></span>'+
+          '<span style="flex:1"></span>'+
+          '<span style="width:60px;display:flex;gap:2px;justify-content:flex-end;align-items:center">'+
+            '<button data-pmk="'+sym+'|-" style="width:19px;height:19px;border:1px solid var(--line);background:#fff;border-radius:4px;font:700 12px system-ui;cursor:pointer;color:var(--ink)">−</button>'+
+            '<span style="font-variant-numeric:tabular-nums;font-size:9.5px;color:'+(mk>0?'var(--neg)':'var(--dim)')+';min-width:22px;text-align:center">'+mk.toFixed(1)+'</span>'+
+            '<button data-pmk="'+sym+'|+" style="width:19px;height:19px;border:1px solid var(--line);background:#fff;border-radius:4px;font:700 12px system-ui;cursor:pointer;color:var(--ink)">+</button>'+
+          '</span></div>';
+      });
+      h+='</div>';
+      h+='<div class="card"><div class="row" style="border:none;padding:2px 0"><span class="lbl">Reset</span><button data-preset="1" style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:6px 12px;font:700 11px system-ui;cursor:pointer;color:var(--ink)">↻ Reset all</button></div></div>';
+      h+='<div class="hint" style="margin:0 14px">Markup % = how much worse than mid the customer buys/sells (your spread). Applies in ~5s. Recorded as company fee revenue.</div>';
+      return h;
+    }
+    if(PRICE_APP==='sports'){
+      var m=Math.max(0,Math.min(15,+SPORTS_MARGIN||0));
+      h+='<div class="card">'+
+        '<div class="lbl">House margin · '+m.toFixed(1)+'%</div>'+
+        '<input type="range" id="sp_m" min="0" max="15" step="0.5" value="'+m+'" style="width:100%;margin:8px 0" oninput="document.getElementById(\'sp_m_v\').textContent=(+this.value).toFixed(1)+\'%\'">'+
+        '<div class="req-meta">Lowers every payout by this margin (the bookmaker edge). <b id="sp_m_v">'+m.toFixed(1)+'%</b> · 0% = fair odds, 15% = max.</div>'+
+        '<div class="btns"><button class="ok" data-spsave="1">Apply to all Sports clients</button><button class="no" data-spreset="1">Reset to 0%</button></div>'+
+        '<div class="hint">Applies within ~5s on every customer\'s Sports app.</div></div>';
+      h+='<div class="sec">Odds preview</div><div class="card">';
+      [['Even',2.00],['Favourite',1.50],['Underdog',3.50],['Longshot',6.00]].forEach(function(o){
+        var adj=1+(o[1]-1)*(1-m/100);
+        h+='<div class="row"><span>'+o[0]+' · '+o[1].toFixed(2)+'</span><b class="'+(m>0?'neg':'pos')+'">→ '+adj.toFixed(2)+'</b></div>'; });
+      h+='</div><div class="hint" style="margin:0 14px">Higher margin = lower payouts = more house edge on every bet.</div>';
       return h;
     }
     var totalMk=0; Object.keys(PRICE_MARKS).forEach(function(k){ totalMk+=+PRICE_MARKS[k]||0; });
@@ -1036,11 +1086,20 @@
     },function(){});
   }
   function pricingResetAll(){
-    if(!confirm('Reset ALL symbol markups to 0?')) return;
+    if(!confirm('Reset ALL markups to 0?')) return;
     var syms=Object.keys(PRICE_MARKS); PRICE_MARKS={}; render();
     syms.forEach(function(s){ AlpexaSync.db.from('pricing_marks').upsert({symbol:s,markup_pts:0,updated_at:new Date().toISOString()},{onConflict:'symbol'}).then(function(){},function(){}); });
-    try{ logAction('pricing_reset','','all FX markups → 0'); }catch(e){}
+    try{ logAction('pricing_reset','','all markups → 0'); }catch(e){}
     toast('All markups reset ✓');
+  }
+  function saveSportsMargin(mOv){
+    var m=(mOv!=null)?mOv:parseFloat(val('sp_m')); if(!isFinite(m))m=0; m=Math.max(0,Math.min(15,m));
+    SPORTS_MARGIN=m;
+    AlpexaSync.db.from('pricing').upsert({server:'sports',spread_mult:m,bias_bps:0,updated_at:new Date().toISOString()},{onConflict:'server'}).then(function(r){
+      if(r&&r.error){ toast('Error: '+r.error.message+' (run the pricing SQL?)',true); return; }
+      try{ logAction('pricing_sports','','house margin '+m.toFixed(1)+'%'); }catch(e){}
+      toast('Sports margin applied ✓ — clients update in ~5s'); render();
+    },function(){ toast('Save failed',true); });
   }
   // ── Agents (IB / affiliates): recruit customers, earn commission ──
   // FX: $ per lot (spread-markup rebate) · Crypto: % of trade fees ·
@@ -1358,6 +1417,8 @@
     document.querySelectorAll('[data-pcls]').forEach(function(b){b.onclick=function(){PRICE_CLS=b.getAttribute('data-pcls');render();};});
     document.querySelectorAll('[data-pmk]').forEach(function(b){b.onclick=function(){var p=(b.getAttribute('data-pmk')||'').split('|');pricingMark(p[0],p[1]);};});
     document.querySelectorAll('[data-preset]').forEach(function(b){b.onclick=pricingResetAll;});
+    document.querySelectorAll('[data-spsave]').forEach(function(b){b.onclick=function(){saveSportsMargin();};});
+    document.querySelectorAll('[data-spreset]').forEach(function(b){b.onclick=function(){saveSportsMargin(0);};});
     var prs=document.getElementById('prSearch'); if(prs){prs.oninput=function(){PRICE_FILTER=prs.value;render();var n=document.getElementById('prSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
     document.querySelectorAll('[data-agnew]').forEach(function(b){b.onclick=agentPopup;});
     document.querySelectorAll('[data-apw]').forEach(function(b){b.onclick=function(){agentPayWallet(b.getAttribute('data-apw'));};});
@@ -1407,7 +1468,7 @@
   }
 
   // Don't redraw while the operator is mid-edit or typing a search (would lose input).
-  function busyEditing(){ return (cur==='history' && (EDIT_ID || (document.activeElement && (document.activeElement.id==='histSearch'||document.activeElement.id==='hsFrom'||document.activeElement.id==='hsTo')))) || (cur==='players' && (PLAYER_EDIT || (document.activeElement && document.activeElement.id==='plSearch'))) || (cur==='bets' && document.activeElement && document.activeElement.id==='openSearch') || (cur==='report' && document.activeElement && (document.activeElement.id==='rpFrom'||document.activeElement.id==='rpTo')) || (cur==='agents' && document.activeElement && String(document.activeElement.id||'').indexOf('ag_')===0) || (cur==='pricing' && document.activeElement && document.activeElement.id==='prSearch'); }
+  function busyEditing(){ return (cur==='history' && (EDIT_ID || (document.activeElement && (document.activeElement.id==='histSearch'||document.activeElement.id==='hsFrom'||document.activeElement.id==='hsTo')))) || (cur==='players' && (PLAYER_EDIT || (document.activeElement && document.activeElement.id==='plSearch'))) || (cur==='bets' && document.activeElement && document.activeElement.id==='openSearch') || (cur==='report' && document.activeElement && (document.activeElement.id==='rpFrom'||document.activeElement.id==='rpTo')) || (cur==='agents' && document.activeElement && String(document.activeElement.id||'').indexOf('ag_')===0) || (cur==='pricing' && document.activeElement && (document.activeElement.id==='prSearch'||document.activeElement.id==='sp_m')); }
   window.addEventListener('storage',function(e){ if(e.key&&e.key.indexOf('alpexa')===0 && !busyEditing()) render(); });
   setInterval(function(){ if(cur==='overview'||cur==='approvals'||cur==='risk'||cur==='bets') render(); }, 4000);
   // Pull every customer's requests from the shared server.
@@ -1425,7 +1486,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v40';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v41';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>

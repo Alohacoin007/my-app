@@ -1201,7 +1201,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.31</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.32</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -1433,7 +1433,8 @@
     return (a>0?'+':'')+a;
   };
   const usd=n=>'$'+(Math.round(n*100)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
-  const dec=a=>a>0?1+a/100:1+100/(-a);
+  // Decimal odds with the back-office house margin baked in (lowers payouts).
+  const dec=a=>{ var d=a>0?1+a/100:1+100/(-a); var m=Math.max(0,Math.min(15,+(window.__alpexaSportsMargin||0)))/100; return 1+(d-1)*(1-m); };
   const toAm=d=>Math.round(d>=2?(d-1)*100:-100/(d-1));
   // relative time: turns a timestamp into "Just now / 5m ago / 2h ago"
   function ago(ts){
@@ -2756,6 +2757,13 @@
     AlpexaSync.db.from('players').update({last_seen:new Date().toISOString(),last_app:'sports'}).eq('cust_id',m.custId).then(function(){},function(){}); }
   setTimeout(beat,1500); setInterval(beat,8000);
   document.addEventListener('visibilitychange',function(){ if(!document.hidden) beat(); });
+  // Dealing-desk: house margin % set in the back office (lowers all payouts).
+  window.__alpexaSportsMargin=window.__alpexaSportsMargin||0;
+  function pullSportsMargin(){ if(!window.AlpexaSync||!AlpexaSync.db)return;
+    AlpexaSync.db.from('pricing').select('spread_mult').eq('server','sports').limit(1).then(function(r){
+      var p=r&&r.data&&r.data[0]; if(p){ window.__alpexaSportsMargin=Math.max(0,Math.min(15,+p.spread_mult||0)); }
+    },function(){}); }
+  setTimeout(pullSportsMargin,1300); setInterval(function(){ if(!document.hidden) pullSportsMargin(); },5000);
   /* Execute back-office commands (void bet). */
   function runCmds(){
     if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m||!m.accts.sports)return; var cust=m.custId;

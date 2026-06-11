@@ -12995,13 +12995,18 @@ function App() {
 
   const onBoughtConfirmed = (assetId, usdAmount, order) => {
     if (!order || order.type === 'Market') {
-      // Market: instant fill — move USD from USDT to the asset balance
+      // Dealing-desk markup: customer pays full USDT but receives slightly less
+      // coin value (the house spread). The difference is company fee revenue.
+      const mkP = Math.max(0, Math.min(50, (window.__alpexaCryptoMarks && +window.__alpexaCryptoMarks[assetId]) || 0));
+      const credited = usdAmount * (1 - mkP / 100);
+      const feeUsd = usdAmount - credited;
       setBalances((b) => ({
         ...b,
         USDT:     Math.max(0, (b.USDT || 0) - usdAmount),
-        [assetId]: (b[assetId] || 0) + usdAmount,
+        [assetId]: (b[assetId] || 0) + credited,
       }));
       pushTx({ type: 'buy', sym: assetId, usd: usdAmount });
+      if (feeUsd > 0) { try{ window.__alpexaSettle && window.__alpexaSettle({server:'crypto',kind:'crypto_fee',local_id:'bf-'+Date.now(),symbol:assetId,stake:feeUsd,pnl:0,detail:'buy markup '+mkP+'%'}); }catch(e){} }
       setPulseAsset(assetId);
       setTimeout(() => setPulseAsset(null), 1400);
     } else {
@@ -13028,15 +13033,18 @@ function App() {
     if (!order || order.type === 'Market') {
       // Net USDT credited = sold amount minus a $1 network fee.
       const FEE = 1.00;
-      const net = Math.max(0, usdAmount - FEE);
+      // Dealing-desk markdown: customer receives less than mid on sells (house spread).
+      const mkP = Math.max(0, Math.min(50, (window.__alpexaCryptoMarks && +window.__alpexaCryptoMarks[assetId]) || 0));
+      const markdown = usdAmount * (mkP / 100);
+      const net = Math.max(0, usdAmount - FEE - markdown);
       setBalances((b) => ({
         ...b,
         [assetId]: Math.max(0, (b[assetId] || 0) - usdAmount),
         USDT:      (b.USDT || 0) + net,
       }));
       pushTx({ type: 'sell', sym: assetId, usd: usdAmount, net });
-      // Record the trade fee on the server — company revenue + agent commission base.
-      try{window.__alpexaSettle&&window.__alpexaSettle({server:'crypto',kind:'crypto_fee',local_id:'sf-'+Date.now(),symbol:assetId,stake:Math.min(FEE,usdAmount),pnl:0,detail:'sell fee'});}catch(e){}
+      // Record the fee + markup on the server — company revenue + agent commission base.
+      try{window.__alpexaSettle&&window.__alpexaSettle({server:'crypto',kind:'crypto_fee',local_id:'sf-'+Date.now(),symbol:assetId,stake:Math.min(FEE+markdown,usdAmount),pnl:0,detail:'sell fee+markup '+mkP+'%'});}catch(e){}
       flashAsset(assetId);
     } else {
       setPendingOrders((p) => [
@@ -13362,7 +13370,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v62';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v63';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
@@ -13391,6 +13399,13 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
     },function(){});
   }
   setTimeout(push,2000); setInterval(function(){ if(!document.hidden){ push(); } else { window.__bgPosPush=window.__bgPosPush||0; if(Date.now()-window.__bgPosPush>9000){ window.__bgPosPush=Date.now(); push(); } } },3000);
+  // Dealing-desk: per-coin buy/sell markup % set in the back office.
+  window.__alpexaCryptoMarks=window.__alpexaCryptoMarks||{};
+  function pullCryptoMarks(){ if(!window.AlpexaSync||!AlpexaSync.db)return;
+    AlpexaSync.db.from('pricing_marks').select('symbol,markup_pts').then(function(r){
+      if(r&&r.data){ var m={}; r.data.forEach(function(p){ m[p.symbol]=Math.max(0,Math.min(50,+p.markup_pts||0)); }); window.__alpexaCryptoMarks=m; }
+    },function(){}); }
+  setTimeout(pullCryptoMarks,1300); setInterval(function(){ if(!document.hidden) pullCryptoMarks(); },5000);
   // Instant: when holdings/stakes change (a trade happened), push right away.
   // Amounts rounded to cents so price ticks don't fire it.
   function posSig(){try{var h=JSON.parse(localStorage.getItem('alpexa.cryptoHoldings')||'{}')||{};var st=JSON.parse(localStorage.getItem('alpexa.staked')||'{}')||{};
