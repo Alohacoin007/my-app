@@ -259,11 +259,23 @@
       hold: settledStake? (ggr/settledStake*100):0, pending:R.filter(function(w){return w.status==='pending';}).length};
   }
 
-  var TABS=[['overview','Overview','dashboard'],['report','Report','monitoring'],['approvals','Approvals','task_alt'],['wallet','Wallet','account_balance_wallet'],['pricing','Pricing','tune'],['history','History','receipt_long'],['players','Players','group'],['online','Online','sensors'],['risk','Risk','gpp_maybe'],['bets','Open','candlestick_chart'],['agents','Agents','handshake'],['logs','Logs','list_alt'],['config','Config','settings']];
+  // Core tabs (always visible) vs the rest, tucked behind a "More" toggle so the
+  // day-to-day back office stays simple. Nothing is removed — just hidden.
+  var TABS_CORE=[['overview','Overview','dashboard'],['approvals','Approvals','task_alt'],['players','Players','group'],['wallet','Wallet','account_balance_wallet'],['history','History','receipt_long'],['online','Online','sensors']];
+  var TABS_MORE=[['report','Report','monitoring'],['pricing','Pricing','tune'],['risk','Risk','gpp_maybe'],['bets','Open','candlestick_chart'],['agents','Agents','handshake'],['logs','Logs','list_alt'],['config','Config','settings']];
+  var TABS=TABS_CORE.concat(TABS_MORE);
+  var SHOW_MORE=false;
   var cur='overview';
   function renderTabs(){
-    document.getElementById('tabs').innerHTML=TABS.map(function(t){return '<button class="tab '+(t[0]===cur?'on':'')+'" data-t="'+t[0]+'"><span class="msi">'+(t[2]||'circle')+'</span><span>'+t[1]+'</span></button>';}).join('');
-    document.querySelectorAll('.tab').forEach(function(b){b.onclick=function(){cur=b.getAttribute('data-t');
+    // Always show More-tab when its panel is open, so the current selection is visible.
+    var inMore=TABS_MORE.some(function(t){return t[0]===cur;});
+    var list=TABS_CORE.slice();
+    if(SHOW_MORE||inMore) list=list.concat(TABS_MORE);
+    var html=list.map(function(t){return '<button class="tab '+(t[0]===cur?'on':'')+'" data-t="'+t[0]+'"><span class="msi">'+(t[2]||'circle')+'</span><span>'+t[1]+'</span></button>';}).join('');
+    html+='<button class="tab" data-more="1" style="margin-top:auto"><span class="msi">'+((SHOW_MORE||inMore)?'expand_less':'more_horiz')+'</span><span>'+((SHOW_MORE||inMore)?'Less':'More')+'</span></button>';
+    document.getElementById('tabs').innerHTML=html;
+    document.querySelectorAll('.tab[data-more]').forEach(function(b){b.onclick=function(){SHOW_MORE=!SHOW_MORE;renderTabs();};});
+    document.querySelectorAll('.tab[data-t]').forEach(function(b){b.onclick=function(){cur=b.getAttribute('data-t');
       if(cur==='history'||cur==='report'){pullSettle();pullServer();}
       if(cur==='agents'){pullAgents();pullSettle();}
       if(cur==='wallet'){pullWallet(true);}
@@ -1483,7 +1495,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v43';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v44';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
