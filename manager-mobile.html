@@ -718,10 +718,13 @@
           var myAg=SRV_ALINKS.filter(function(l){ return l.cust_id===cid; });
           var agTxt = myAg.length ? myAg.map(function(l){ return agentName(l.agent_code)+' ('+l.agent_code+(myAg.length>1?(' · '+(+l.share||100)+'%'):'')+')'; }).join(', ') : 'None (direct)';
           h+='<div class="row"><span>Agent</span><b class="'+(myAg.length?'':'muted')+'" style="text-align:right">'+agTxt+'</b></div>';
-          // Reuse the proven POS_TOP feed (same as the Open tab); match this
-          // customer by cust_id OR any of their account numbers (cust_id drift-safe).
+          // Direct per-customer query (NOT the capped POS_TOP) so positions show
+          // even when the server has many other open positions. Matches by cust_id
+          // OR any of this customer's account numbers (cust_id drift-safe).
           var myAccts=[an('fx'),an('crypto'),an('sports')].filter(function(a){ return a&&a!=='—'; });
-          var op=POS_TOP.filter(function(x){ return x.cust_id===cid || myAccts.indexOf(x.acct_no)>=0; });
+          if(POS_BY_CUST[cid]===undefined){ POS_BY_CUST[cid]=[]; pullCustPos(cid,myAccts); }
+          var op=(POS_BY_CUST[cid]&&POS_BY_CUST[cid].length)?POS_BY_CUST[cid]
+                 :POS_TOP.filter(function(x){ return x.cust_id===cid || myAccts.indexOf(x.acct_no)>=0; });
           h+='<div class="lbl" style="margin-top:12px">Open positions ('+op.length+')</div>';
           if(!op.length){ h+='<div class="req-meta" style="margin:4px 0">None open.</div>'; }
           op.forEach(function(x){ h+=posRowHTML(x); });
@@ -1525,7 +1528,7 @@
     document.querySelectorAll('[data-tdel]').forEach(function(b){b.onclick=function(){tradeDelete(b.getAttribute('data-tdel'));};});
     var ps=document.getElementById('plSearch'); if(ps){ps.oninput=function(){PLAYER_FILTER=ps.value;render();var n=document.getElementById('plSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
     document.querySelectorAll('[data-cust]').forEach(function(b){b.onclick=function(){HIST_FILTER=b.getAttribute('data-cust');cur='history';render();};});
-    document.querySelectorAll('[data-pl]').forEach(function(b){b.onclick=function(){var id=b.getAttribute('data-pl');PLAYER_OPEN=(PLAYER_OPEN===id?null:id);if(PLAYER_OPEN!==id)PLAYER_EDIT=null;else{pullOpenSummary();pullSettle();}render();};});
+    document.querySelectorAll('[data-pl]').forEach(function(b){b.onclick=function(){var id=b.getAttribute('data-pl');PLAYER_OPEN=(PLAYER_OPEN===id?null:id);if(PLAYER_OPEN!==id)PLAYER_EDIT=null;else{pullOpenSummary();pullSettle();POS_BY_CUST[id]=undefined;pullCustPos(id);}render();};});
     document.querySelectorAll('[data-editpl]').forEach(function(b){b.onclick=function(){PLAYER_EDIT=b.getAttribute('data-editpl');render();};});
     document.querySelectorAll('[data-savepl]').forEach(function(b){b.onclick=function(){savePlayer(b.getAttribute('data-savepl'));};});
     document.querySelectorAll('[data-halt]').forEach(function(b){b.onclick=function(){setHalt(b.getAttribute('data-halt'));};});
@@ -1597,6 +1600,7 @@
   pullServer(); pullPlayers(); pullOpenSummary(); pullOnline(); pullSettle(); pullAgents(); pullPricing(); pullApiUsage(); pullControls();
   setInterval(function(){ if(!document.hidden){ pullServer(); pullPlayers();
     if(cur==='bets') pullOpenSummary();
+    if(cur==='players'&&PLAYER_OPEN){ pullCustPos(PLAYER_OPEN); pullSettle(); }
     if(cur==='online') pullOnline();
     if(cur==='overview') pullApiUsage();
     if(cur==='config') pullControls();
@@ -1609,7 +1613,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v61';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v62';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
