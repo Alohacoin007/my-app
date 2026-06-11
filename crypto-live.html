@@ -466,6 +466,24 @@ window.__cryptoLiveMap = window.__cryptoLiveMap || {};
   connectBinance(); connectCoinbase();
 })();
 
+// Real coin chart history from Binance klines (free, no key). Maps each range to
+// a Binance interval+limit and returns the close prices as the line series. Coins
+// Binance doesn't list (ALPXS, stables) return null → the chart keeps simulating.
+function alpexaFetchChart(sym, range){
+  try{
+    var base = (typeof BINANCE_SYM!=='undefined') && BINANCE_SYM[sym];
+    if(!base) return Promise.resolve(null);
+    var M = {'1m':{i:'1s',n:60},'5m':{i:'1s',n:300},'30m':{i:'1m',n:30},
+             '1h':{i:'1m',n:60},'4h':{i:'5m',n:48},'1D':{i:'15m',n:96},'1W':{i:'2h',n:84}};
+    var m = M[range]||M['1D'];
+    var url='https://api.binance.com/api/v3/klines?symbol='+base.toUpperCase()+'USDT&interval='+m.i+'&limit='+m.n;
+    return fetch(url).then(function(r){return r.json();}).then(function(j){
+      if(!Array.isArray(j)||!j.length) return null;
+      return j.map(function(k){return +k[4];}).filter(function(v){return isFinite(v)&&v>0;}); // close price
+    }).catch(function(){return null;});
+  }catch(e){ return Promise.resolve(null); }
+}
+
 // Send screen — recent recipients + asset balances used in the Send flow
 const RECENT_RECIPIENTS = [
   { id: 'a', handle: '@alex_kim',  name: 'Alex Kim',     initials: 'AK', color: '#627EEA' },
@@ -10846,7 +10864,8 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
     return makeChartSeries(open, close, n, (meta.seed || 100) + range.charCodeAt(0));
   }, [range, sym, open, close]);
   const usingReal = !!(realSeries && realSeries.length > 3);
-  const series    = usingReal ? realSeries : synthSeries;
+  // Append the live aggregator price so the chart tip tracks the market in real time.
+  const series    = usingReal ? realSeries.concat([close]) : synthSeries;
   const baseline  = usingReal ? series[0] : open;
   const scrubPrice = scrubIdx !== null && series[scrubIdx] != null ? series[scrubIdx] : close;
   const chartChange = scrubPrice - baseline;
@@ -13448,7 +13467,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v71';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v72';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
