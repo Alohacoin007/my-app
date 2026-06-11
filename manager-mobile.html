@@ -1072,7 +1072,8 @@
           '<span style="flex:1"><label class="lbl">FX $/lot</label><input class="in" id="ag_fx_'+esc(code)+'" type="number" step="0.5" value="'+(+a.fx_per_lot||0)+'" style="margin-top:2px"></span>'+
           '<span style="flex:1"><label class="lbl">Crypto %</label><input class="in" id="ag_cr_'+esc(code)+'" type="number" step="1" value="'+(+a.crypto_fee_pct||0)+'" style="margin-top:2px"></span>'+
           '<span style="flex:1"><label class="lbl">Sports %</label><input class="in" id="ag_sp_'+esc(code)+'" type="number" step="1" value="'+(+a.sports_net_pct||0)+'" style="margin-top:2px"></span></div>'+
-          '<div class="btns"><button class="ok" data-agsave="'+esc(code)+'">Save rates</button><button class="no" data-agdel="'+esc(code)+'">Delete agent</button></div>';
+          '<div class="btns"><button class="ok" data-agsave="'+esc(code)+'">Save rates</button><button class="save ghost" data-agpin="'+esc(code)+'" style="flex:1;margin-top:0">Reset PIN</button></div>'+
+          '<button class="no" data-agdel="'+esc(code)+'" style="width:100%;margin-top:8px">Delete agent</button>';
       }
       h+='</div>';
     });
@@ -1121,6 +1122,15 @@
       try{ logAction('agent_link', canon, code+' · '+sh+'%'); }catch(e){}
       toast('Linked ✓'); pullAgents();
     },function(){ toast('Link failed',true); });
+  }
+  function agentResetPin(code){
+    var pin=String(Math.floor(1000+Math.random()*9000));
+    if(!confirm('Reset PIN for '+agentName(code)+' ('+code+')?\nThe new PIN will be '+pin+' — give it to the agent.')) return;
+    AlpexaSync.db.from('agents').update({pin:pin}).eq('code',code).then(function(r){
+      if(r&&r.error){ toast('Error: '+r.error.message,true); return; }
+      try{ logAction('agent_pin_reset', code, 'new PIN issued'); }catch(e){}
+      toast('New PIN for '+code+': '+pin); pullAgents();
+    },function(){ toast('Failed',true); });
   }
   function agentAdjust(code){
     var amt=parseFloat(val('ag_adj_'+code)), reason=val('ag_adjr_'+code)||'';
@@ -1238,6 +1248,7 @@
     document.querySelectorAll('[data-api]').forEach(function(b){b.onclick=function(){agentPayInternal(b.getAttribute('data-api'));};});
     document.querySelectorAll('[data-apr]').forEach(function(b){b.onclick=function(){if(confirm('Reject this payout request?'))apSet(b.getAttribute('data-apr'),{status:'rejected'},'Rejected ✓');};});
     document.querySelectorAll('[data-agadj]').forEach(function(b){b.onclick=function(){agentAdjust(b.getAttribute('data-agadj'));};});
+    document.querySelectorAll('[data-agpin]').forEach(function(b){b.onclick=function(){agentResetPin(b.getAttribute('data-agpin'));};});
     document.querySelectorAll('[data-psort]').forEach(function(b){b.onclick=function(){var s=b.getAttribute('data-psort');
       if(PLAYER_SORT===s){ PLAYER_DIR=-PLAYER_DIR; }
       else { PLAYER_SORT=s; PLAYER_DIR=(s==='name'?1:-1); } // name: A→Z · balance/joined: big/new first
@@ -1297,7 +1308,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v25';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v26';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
