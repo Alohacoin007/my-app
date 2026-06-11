@@ -51,6 +51,11 @@
   var db=null; try{ db=window.supabase.createClient('https://grxnbgtfnaayeluenvqh.supabase.co','sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu'); }catch(e){}
   var AGENT=null, LINKS=[], SETTLE=[], NAMES={}, RANGE='30d', SHOWR=false, PAYOUTS=[], SHOWW=false;
   var MIN_PAYOUT=50;
+  var TG={pay:false,cust:false,tr:false}; // collapsed sections — keep the portal minimal
+  function secToggle(id,label,open){
+    return '<div class="sec" data-tg="'+id+'" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:8px 0;margin:4px 12px 2px;border-bottom:1px solid var(--line)">'+label+
+      '<span style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:3px 9px;font:700 10px system-ui;color:#1c2430">'+(open?'▴':'▾')+'</span></div>';
+  }
   function usd(n){n=+n||0;return '$'+n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});}
   function el(){return document.getElementById('wrap');}
 
@@ -153,33 +158,38 @@
         (avail<MIN_PAYOUT?'<div class="hint" style="margin:8px 0 0">Minimum withdrawal is $'+MIN_PAYOUT+'.</div>':'');
     }
     h+='</div>';
-    h+='<div class="sec">My payouts · '+PAYOUTS.length+'</div><div class="card">';
-    if(!PAYOUTS.length) h+='<div class="empty">No payout requests yet.</div>';
-    PAYOUTS.slice(0,10).forEach(function(p){ var st=p.status==='approved'?'won':p.status==='rejected'?'lost':'open';
-      var M={crypto:'USDT',bank:'Bank',internal:'Trading acct',adjust:'Adjustment'};
-      var amtTxt=(p.method==='adjust')?(((+p.amount||0)<0?'-':'+')+usd(Math.abs(+p.amount||0))):usd(p.amount);
-      h+='<div class="row"><span><b class="'+(p.method==='adjust'?((+p.amount||0)>=0?'pos':'neg'):'')+'">'+amtTxt+'</b> <span class="muted">· '+(M[p.method]||p.method)+(p.method==='adjust'&&p.dest?(' · '+p.dest):'')+' · '+(p.created_at?new Date(p.created_at).toLocaleDateString():'')+'</span>'+
-        (p.txid?('<div class="meta"><a href="https://etherscan.io/tx/'+p.txid+'" target="_blank" rel="noopener" style="color:#1F2A37;font-weight:700">tx ↗</a></div>'):'')+'</span>'+
-        '<span class="badge '+st+'">'+(p.status||'pending').toUpperCase()+'</span></div>'; });
-    h+='</div>';
-    h+='<div class="sec">My customers · '+LINKS.length+'</div><div class="card">';
-    if(!LINKS.length) h+='<div class="empty">No customers linked yet.</div>';
-    LINKS.forEach(function(l){
-      var net=c.perCust[l.cust_id]||0;
-      h+='<div class="row"><span><b>'+(NAMES[l.cust_id]||l.cust_id)+'</b> <span class="muted">· '+l.cust_id+' · '+(+l.share||100)+'%</span></span>'+
-        '<b class="'+(net>=0?'pos':'neg')+'">'+(net<0?'-':'+')+usd(Math.abs(net))+'</b></div>';
-    });
-    h+='</div><div class="hint">Customer column = sports net result in period (your share). FX/crypto accrue per trade/fee.</div>';
+    // Everything below stays hidden until tapped — agents land on a minimal view.
+    h+=secToggle('pay','My payouts · '+PAYOUTS.length,TG.pay);
+    if(TG.pay){ h+='<div class="card">';
+      if(!PAYOUTS.length) h+='<div class="empty">No payout requests yet.</div>';
+      PAYOUTS.slice(0,10).forEach(function(p){ var st=p.status==='approved'?'won':p.status==='rejected'?'lost':'open';
+        var M={crypto:'USDT',bank:'Bank',internal:'Trading acct',adjust:'Adjustment'};
+        var amtTxt=(p.method==='adjust')?(((+p.amount||0)<0?'-':'+')+usd(Math.abs(+p.amount||0))):usd(p.amount);
+        h+='<div class="row"><span><b class="'+(p.method==='adjust'?((+p.amount||0)>=0?'pos':'neg'):'')+'">'+amtTxt+'</b> <span class="muted">· '+(M[p.method]||p.method)+(p.method==='adjust'&&p.dest?(' · '+p.dest):'')+' · '+(p.created_at?new Date(p.created_at).toLocaleDateString():'')+'</span>'+
+          (p.txid?('<div class="meta"><a href="https://etherscan.io/tx/'+p.txid+'" target="_blank" rel="noopener" style="color:#1F2A37;font-weight:700">tx ↗</a></div>'):'')+'</span>'+
+          '<span class="badge '+st+'">'+(p.status||'pending').toUpperCase()+'</span></div>'; });
+      h+='</div>'; }
+    h+=secToggle('cust','My customers · '+LINKS.length,TG.cust);
+    if(TG.cust){ h+='<div class="card">';
+      if(!LINKS.length) h+='<div class="empty">No customers linked yet.</div>';
+      LINKS.forEach(function(l){
+        var net=c.perCust[l.cust_id]||0;
+        h+='<div class="row"><span><b>'+(NAMES[l.cust_id]||l.cust_id)+'</b> <span class="muted">· '+l.cust_id+' · '+(+l.share||100)+'%</span></span>'+
+          '<b class="'+(net>=0?'pos':'neg')+'">'+(net<0?'-':'+')+usd(Math.abs(net))+'</b></div>';
+      });
+      h+='</div>'; }
     var rg=range(), myIds={}; LINKS.forEach(function(l){ myIds[l.cust_id]=true; });
     var trades=SETTLE.filter(function(s){ var t=s.created_at?Date.parse(s.created_at):0; return myIds[s.cust_id] && t>=rg.lo; }).slice(0,30);
-    h+='<div class="sec">Recent trades</div><div class="card">';
-    if(!trades.length) h+='<div class="empty">No trades in this period.</div>';
-    trades.forEach(function(s){ var p=+s.pnl||0; var bcls=(KINDS[s.kind]==='Void')?'open':(p>=0?'won':'lost');
-      h+='<div class="row"><span><span class="badge '+bcls+'">'+(KINDS[s.kind]||s.kind||'Trade').toUpperCase()+'</span> <b style="font-size:12.5px">'+(s.symbol||'')+'</b>'+
-        '<div class="meta" style="margin-top:2px">'+(NAMES[s.cust_id]||s.cust_id)+' · '+(s.server||'')+' · '+(s.created_at?new Date(s.created_at).toLocaleString():'')+'</div></span>'+
-        '<b class="'+(p>=0?'pos':'neg')+'">'+(p<0?'-':'+')+usd(Math.abs(p))+'</b></div>'; });
-    h+='</div><div class="hint">Read-only · refreshes every 10s · commissions are paid by Alpexa per your agreement.</div>';
+    h+=secToggle('tr','Recent trades · '+trades.length,TG.tr);
+    if(TG.tr){ h+='<div class="card">';
+      if(!trades.length) h+='<div class="empty">No trades in this period.</div>';
+      trades.forEach(function(s){ var p=+s.pnl||0; var bcls=(KINDS[s.kind]==='Void')?'open':(p>=0?'won':'lost');
+        h+='<div class="row"><span><span class="badge '+bcls+'">'+(KINDS[s.kind]||s.kind||'Trade').toUpperCase()+'</span> <b style="font-size:12.5px">'+(s.symbol||'')+'</b>'+
+          '<div class="meta" style="margin-top:2px">'+(NAMES[s.cust_id]||s.cust_id)+' · '+(s.server||'')+' · '+(s.created_at?new Date(s.created_at).toLocaleString():'')+'</div></span>'+
+          '<b class="'+(p>=0?'pos':'neg')+'">'+(p<0?'-':'+')+usd(Math.abs(p))+'</b></div>'; });
+      h+='</div>'; }
     el().innerHTML=h;
+    document.querySelectorAll('[data-tg]').forEach(function(b){ b.onclick=function(){ var k=b.getAttribute('data-tg'); TG[k]=!TG[k]; viewDash(); }; });
     document.getElementById('btnOut').onclick=logout;
     var br=document.getElementById('btnRange'); if(br) br.onclick=function(){ SHOWR=!SHOWR; viewDash(); };
     document.querySelectorAll('[data-r]').forEach(function(b){ b.onclick=function(){ RANGE=b.getAttribute('data-r'); SHOWR=false; viewDash(); }; });
