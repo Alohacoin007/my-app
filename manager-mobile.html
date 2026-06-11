@@ -635,6 +635,10 @@
             '<div class="row"><span>Signup server</span><b class="muted">'+(SRV_MAP[p.server]||p.server||'—')+'</b></div>'+
             '<div class="row"><span>Leverage</span><b class="muted">'+(p.leverage||'—')+'</b></div>'+
             '<div class="row"><span>Currency</span><b class="muted">'+(p.currency||'—')+'</b></div>';
+          // Which agent(s) introduced this customer (referral / manual link).
+          var myAg=SRV_ALINKS.filter(function(l){ return l.cust_id===cid; });
+          var agTxt = myAg.length ? myAg.map(function(l){ return agentName(l.agent_code)+' ('+l.agent_code+(myAg.length>1?(' · '+(+l.share||100)+'%'):'')+')'; }).join(', ') : 'None (direct)';
+          h+='<div class="row"><span>Agent</span><b class="'+(myAg.length?'':'muted')+'" style="text-align:right">'+agTxt+'</b></div>';
           if(POS_BY_CUST[cid]===undefined){ POS_BY_CUST[cid]=[]; pullCustPos(cid); }
           var op=POS_BY_CUST[cid]||[];
           h+='<div class="lbl" style="margin-top:12px">Open positions ('+op.length+')</div>';
@@ -1495,7 +1499,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v46';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v47';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
