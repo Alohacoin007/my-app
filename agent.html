@@ -158,6 +158,11 @@
         (avail<MIN_PAYOUT?'<div class="hint" style="margin:8px 0 0">Minimum withdrawal is $'+MIN_PAYOUT+'.</div>':'');
     }
     h+='</div>';
+    // Shareable signup link — customers who join through it auto-link to me.
+    var refUrl=location.href.replace(/[^\/]*(\?.*)?(#.*)?$/,'')+'signup.html?ref='+AGENT.code;
+    h+='<div class="sec">My referral link</div><div class="card">'+
+      '<div id="refLink" style="font-family:ui-monospace,monospace;font-size:11px;word-break:break-all;color:#1c2430;background:#F1F3F6;border-radius:4px;padding:8px 10px;cursor:pointer">'+refUrl+'</div>'+
+      '<button class="btn" id="refCopy" style="margin-top:8px;padding:10px">Copy link</button></div>';
     // Everything below stays hidden until tapped — agents land on a minimal view.
     h+=secToggle('pay','My payouts · '+PAYOUTS.length,TG.pay);
     if(TG.pay){ h+='<div class="card">';
@@ -190,6 +195,9 @@
       h+='</div>'; }
     el().innerHTML=h;
     document.querySelectorAll('[data-tg]').forEach(function(b){ b.onclick=function(){ var k=b.getAttribute('data-tg'); TG[k]=!TG[k]; viewDash(); }; });
+    var doCopy=function(){ try{ navigator.clipboard.writeText(refUrl); var bb=document.getElementById('refCopy'); if(bb){ bb.textContent='Copied ✓'; setTimeout(function(){ if(bb)bb.textContent='Copy link'; },1500); } }catch(e){} };
+    var rc=document.getElementById('refCopy'); if(rc) rc.onclick=doCopy;
+    var rl=document.getElementById('refLink'); if(rl) rl.onclick=doCopy;
     document.getElementById('btnOut').onclick=logout;
     var br=document.getElementById('btnRange'); if(br) br.onclick=function(){ SHOWR=!SHOWR; viewDash(); };
     document.querySelectorAll('[data-r]').forEach(function(b){ b.onclick=function(){ RANGE=b.getAttribute('data-r'); SHOWR=false; viewDash(); }; });

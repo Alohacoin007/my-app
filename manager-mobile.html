@@ -1041,6 +1041,10 @@
         '<b class="'+(c.total>=0?'pos':'neg')+'">'+(c.total<0?'-':'')+usd(Math.abs(c.total))+'</b></div>'+
         '<div class="req-meta">'+code+' · PIN '+(a.pin||'—')+' · '+(a.email||'')+' · '+links.length+' customer(s) · '+c.n+' trades</div>';
       if(open){
+        // Shareable signup link — new customers auto-link to this agent.
+        var refUrl=location.href.replace(/[^\/]*(\?.*)?(#.*)?$/,'')+'signup.html?ref='+code;
+        h+='<div class="lbl" style="margin-top:10px">Referral link · tap to copy &amp; send to customers</div>'+
+          '<div class="req-addr" data-copy="'+esc(refUrl)+'">'+refUrl+'</div>';
         h+='<div class="row" style="margin-top:6px"><span>FX · '+(Math.round(c.fxLots*100)/100)+' lots × $'+(+a.fx_per_lot||0)+'</span><b class="pos">'+usd(c.cFx)+'</b></div>'+
           '<div class="row"><span>Crypto · fees '+usd(c.cryptoFees)+' × '+(+a.crypto_fee_pct||0)+'%</span><b class="pos">'+usd(c.cCr)+'</b></div>'+
           '<div class="row"><span>Sports · pool net '+(c.sportsNet<0?'-':'')+usd(Math.abs(c.sportsNet))+' × '+(+a.sports_net_pct||0)+'%</span><b class="'+(c.cSp>=0?'pos':'neg')+'">'+(c.cSp<0?'-':'')+usd(Math.abs(c.cSp))+'</b></div>'+
@@ -1308,7 +1312,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v26';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v27';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
