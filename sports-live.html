@@ -1201,7 +1201,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.32</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.33</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -1607,7 +1607,7 @@
       // same market = mutually exclusive: drop other pick from this market first
       legs=legs.filter(l=>!(l.gid===gid&&l.market===market));
       const g=GAMES.find(x=>x.id===gid);
-      legs.push({uid,gid,market,sel,am,game:g.away.ab+' @ '+g.home.ab,stake:20});
+      legs.push({uid,gid,market,sel,am,game:g.away.ab+' @ '+g.home.ab,tm:g.time,live:!!g.live,stake:20});
     }
     // update bar count + sgp availability, but keep props view intact
     const n=legs.length;document.getElementById('barCount').textContent=n;
@@ -1620,7 +1620,7 @@
   function toggle(gid,market,sel,am){
     const uid=gid+'|'+sel,i=legs.findIndex(l=>l.uid===uid);
     if(i>-1)legs.splice(i,1);
-    else{const g=GAMES.find(x=>x.id===gid);legs.push({uid,gid,market,sel,am,game:g.away.ab+' @ '+g.home.ab,stake:20});}
+    else{const g=GAMES.find(x=>x.id===gid);legs.push({uid,gid,market,sel,am,game:g.away.ab+' @ '+g.home.ab,tm:g.time,live:!!g.live,stake:20});}
     renderGames();syncSlip();
   }
 
@@ -1694,7 +1694,7 @@
     openBets.unshift({id:'b'+Date.now(),type:betType,
       cls:mode,stake:stake,potential:pot,cashout:baseCash,
       d0:d0,baseCash:baseCash,
-      legs:legs.map(l=>({pk:l.sel,gm:l.game,am:l.am,am0:l.am,st:'o'}))});
+      legs:legs.map(l=>({pk:l.sel,gm:l.game,am:l.am,am0:l.am,tm:l.tm,live:l.live,st:'o'}))});
     // deduct stake + log activity
     balance-=stake; syncSportsBal();
     txns.unshift({ts:Date.now(),ic:'🎫',t1:'Bet placed',t2:`${betType}${legCount>1?' · '+legCount+' legs':''} · Just now`,amt:-stake});
@@ -1714,7 +1714,7 @@
     document.querySelector('#betSeg .s.active').classList.remove('active');s.classList.add('active');seg=s.dataset.seg;renderTickets();};
   function ticketHTML(b,isOpen){
     const legsH=b.legs.map(l=>`<div class="tleg ${l.st}"><div class="left"><span class="dot"></span>
-      <div class="info"><div class="pk">${l.pk}</div><div class="gm">${l.gm}</div></div></div>
+      <div class="info"><div class="pk">${l.pk}</div><div class="gm">${l.gm}${l.tm?` <span style="opacity:.7">· ${l.live?'🔴 ':'🕒 '}${l.tm}</span>`:''}</div></div></div>
       <span class="odd">${fmtAm(l.am)}</span></div>`).join('');
     const head=`<div class="th"><span class="badge ${b.cls}">${b.type}${b.legs.length>1?' '+b.legs.length+'legs':''}</span>
       <span class="res ${isOpen?'open':b.result}">${isOpen?'Open':b.result==='won'?'Won':b.result==='cashed'?'Cashed Out':'Lost'}</span></div>`;
