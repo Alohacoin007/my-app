@@ -1611,9 +1611,37 @@
     if(cur==='risk') pullRisk();
     if(cur==='players' && PLAYER_OPEN){ pullOpenSummary(); pullSettle(); }
   } }, 3000);
+  // M4-3: Supabase Realtime — the server pushes row changes to the back office
+  // the instant they happen (positions, players, requests, settlements, accounts,
+  // controls) instead of waiting for the poll above. The polling stays as a safety
+  // net in case Realtime isn't enabled on a table. Debounced so a burst of rows
+  // triggers a single refresh. Shows a small "● Live" badge once connected.
+  (function(){
+    if(!window.AlpexaSync||!AlpexaSync.db||!AlpexaSync.db.channel) return;
+    var t={};
+    function deb(key,fn){ clearTimeout(t[key]); t[key]=setTimeout(function(){ if(!document.hidden) fn(); },250); }
+    function onPos(){ deb('pos',function(){ pullOpenSummary(); if(cur==='players'&&PLAYER_OPEN) pullCustPos(PLAYER_OPEN); }); }
+    function onPlayers(){ deb('ply',function(){ pullPlayers(); pullOnline(); }); }
+    function onReq(){ deb('req',function(){ pullServer(); }); }
+    function onSettle(){ deb('set',function(){ pullSettle(); }); }
+    function onAcct(){ deb('acc',function(){ pullPlayers(); }); }
+    function onCtrl(){ deb('ctl',function(){ pullControls(); }); }
+    try{
+      AlpexaSync.db.channel('mgr-rt')
+        .on('postgres_changes',{event:'*',schema:'public',table:'positions'},onPos)
+        .on('postgres_changes',{event:'*',schema:'public',table:'players'},onPlayers)
+        .on('postgres_changes',{event:'*',schema:'public',table:'requests'},onReq)
+        .on('postgres_changes',{event:'*',schema:'public',table:'settlements'},onSettle)
+        .on('postgres_changes',{event:'*',schema:'public',table:'accounts'},onAcct)
+        .on('postgres_changes',{event:'*',schema:'public',table:'controls'},onCtrl)
+        .subscribe(function(status){
+          try{ if(status==='SUBSCRIBED'){ var L=document.getElementById('rtLive'); if(!L){ L=document.createElement('div'); L.id='rtLive'; L.textContent='● Live'; L.style.cssText='position:fixed;right:8px;top:8px;z-index:2147483646;background:#0a7d33;color:#fff;font:700 10px system-ui;padding:3px 8px;border-radius:10px;opacity:.9'; document.body.appendChild(L); } } }catch(e){}
+        });
+    }catch(e){}
+  })();
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v62';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v63';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
