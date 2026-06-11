@@ -1459,9 +1459,53 @@
       toast(v==='1'?'🛑 Trading HALTED — apps update in ~5s':'▶ Trading resumed'); render();
     },function(){ toast('Failed',true); });
   }
+  // ── Admin authentication (Stage A for RLS) ──
+  // The back office signs in as a real Supabase admin account so AlpexaSync's
+  // queries carry an admin JWT — this is what keeps full access AFTER RLS is
+  // locked. PIN still gates local access. Nothing breaks while RLS is open.
+  var ADMIN_AUTH={loaded:false,email:null,uid:null,isAdmin:false};
+  function pullAdminAuth(){
+    if(!window.AlpexaSync||!AlpexaSync.db||!AlpexaSync.db.auth) return;
+    AlpexaSync.db.auth.getUser().then(function(r){
+      var u=r&&r.data&&r.data.user;
+      ADMIN_AUTH.uid=u?u.id:null; ADMIN_AUTH.email=u?u.email:null; ADMIN_AUTH.loaded=true;
+      if(!u){ ADMIN_AUTH.isAdmin=false; if(cur==='config')render(); return; }
+      AlpexaSync.db.rpc('is_admin').then(function(rr){
+        ADMIN_AUTH.isAdmin=!!(rr&&rr.data===true); if(cur==='config')render();
+      },function(){ ADMIN_AUTH.isAdmin=false; if(cur==='config')render(); });
+    },function(){});
+  }
+  function adminSignIn(){
+    var email=(val('adminEmail')||'').trim(), pw=val('adminPw')||'';
+    if(!email||!pw){ toast('Enter admin email and password',true); return; }
+    toast('Signing in…');
+    AlpexaSync.db.auth.signInWithPassword({email:email,password:pw}).then(function(r){
+      if(r&&r.error){ toast('Login failed: '+r.error.message,true); return; }
+      toast('Signed in ✓ — checking admin'); pullAdminAuth(); setTimeout(pullAdminAuth,900);
+    },function(){ toast('Login error',true); });
+  }
+  function adminSignOut(){
+    if(!confirm('Sign the back office out of the admin account?')) return;
+    AlpexaSync.db.auth.signOut().then(function(){ ADMIN_AUTH={loaded:true,email:null,uid:null,isAdmin:false}; toast('Signed out'); render(); },function(){});
+  }
   function viewConfig(){
+    var aa=ADMIN_AUTH;
+    var adminCard='<div class="sec">Admin account</div>'+
+      '<div class="card"'+(aa.uid&&!aa.isAdmin?' style="border-color:#f1b0b7;background:#fff6f6"':'')+'>'+
+      (aa.uid
+        ? '<div class="row" style="border:none;padding:0 0 6px"><span><b>Signed in</b><div class="req-meta" style="margin:2px 0 0">'+(aa.email||'')+'</div></span><b class="'+(aa.isAdmin?'pos':'neg')+'">'+(aa.isAdmin?'ADMIN ✓':'NOT ADMIN')+'</b></div>'+
+          (aa.isAdmin
+            ? '<div class="hint">Authenticated as an admin — full access stays after RLS is locked.</div>'
+            : '<div class="hint" style="color:#c0392b">This account isn\'t in the admins table. Run the admins SQL with this email, then Sign out &amp; back in.</div>')+
+          '<button class="save ghost" id="adminOut" style="margin-top:6px;width:100%">Sign out</button>'
+        : '<div class="lbl">Sign in as the admin account (do this before RLS lockdown)</div>'+
+          '<input class="in" id="adminEmail" placeholder="admin email" autocomplete="off" spellcheck="false">'+
+          '<input class="in" id="adminPw" type="password" placeholder="password" style="margin-top:6px">'+
+          '<button class="save" id="adminIn" style="margin-top:6px;width:100%">Sign in</button>'+
+          '<div class="hint">Establishes the Supabase admin session this back office uses. PIN still gates local access; RLS is still open so nothing changes yet.</div>'
+      )+'</div>';
     var halted=(CONTROLS&&CONTROLS.trading_halt==='1');
-    return '<div class="sec">Emergency</div>'+
+    return adminCard+'<div class="sec">Emergency</div>'+
       '<div class="card"'+(halted?' style="border-color:#f1b0b7;background:#fff6f6"':'')+'>'+
         '<div class="row" style="border:none;padding:0 0 6px"><span><b>🛑 Halt all trading</b>'+
         '<div class="req-meta" style="margin:2px 0 0">Instantly blocks NEW orders/bets in all 3 apps. Open positions &amp; withdrawals are unaffected.</div></span>'+
@@ -1597,6 +1641,8 @@
     var g;
     if(g=document.getElementById('kycToggle'))g.onclick=function(){var k=localStorage.getItem('alpexa.kyc')||'pending';localStorage.setItem('alpexa.kyc',k==='verified'?'pending':'verified');render();};
     if(g=document.getElementById('rgSave'))g.onclick=function(){var st=getJSON('alpexaSettings',{});st.depositLimit=parseFloat(val('rgDep'))||0;st.lossLimit=parseFloat(val('rgLoss'))||0;var d=parseFloat(val('rgSE'))||0;st.selfExcludeUntil=d>0?Date.now()+d*86400000:0;setJSON('alpexaSettings',st);flash(g,'Saved ✓');render();};
+    if(g=document.getElementById('adminIn'))g.onclick=function(){adminSignIn();};
+    if(g=document.getElementById('adminOut'))g.onclick=function(){adminSignOut();};
     if(g=document.getElementById('saveLimits'))g.onclick=function(){localStorage.setItem('alpexa.maxBet',val('cfgMaxBet'));localStorage.setItem('alpexa.maxDeposit',val('cfgMaxDep'));localStorage.setItem('alpexa.maxWithdraw',val('cfgMaxWd'));flash(g);};
     if(g=document.getElementById('saveMargin'))g.onclick=function(){localStorage.setItem('alpexa.margin',val('cfgMargin'));flash(g);};
     if(g=document.getElementById('savePromo'))g.onclick=function(){localStorage.setItem('alpexa.cashback',val('cfgCashback'));flash(g);};
@@ -1615,7 +1661,7 @@
   setInterval(function(){ if(cur==='overview'||cur==='approvals'||cur==='risk'||cur==='bets') render(); }, 4000);
   // Pull every customer's requests from the shared server.
   function pullServer(){ if(!window.AlpexaSync||!AlpexaSync.db) return; AlpexaSync.pullAll().then(function(rows){ SRV_REQS=rows||[]; if(!busyEditing()) render(); }).catch(function(){}); }
-  pullServer(); pullPlayers(); pullOpenSummary(); pullOnline(); pullSettle(); pullAgents(); pullPricing(); pullLivePrices(); pullApiUsage(); pullControls();
+  pullServer(); pullPlayers(); pullOpenSummary(); pullOnline(); pullSettle(); pullAgents(); pullPricing(); pullLivePrices(); pullApiUsage(); pullControls(); pullAdminAuth();
   setInterval(function(){ if(!document.hidden){ pullServer(); pullPlayers();
     if(cur==='bets') pullOpenSummary();
     if(cur==='players'&&PLAYER_OPEN){ pullCustPos(PLAYER_OPEN); pullSettle(); }
@@ -1659,7 +1705,7 @@
   })();
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v65';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v66';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
