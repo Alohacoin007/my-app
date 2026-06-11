@@ -121,8 +121,16 @@
     AlpexaSync.db.from('positions').select('*').eq('status','open').limit(60).then(function(r){ if(r&&r.data){ POS_TOP=r.data; if((cur==='bets'||cur==='overview')&&!busyEditing())render(); } },function(){});
     AlpexaSync.db.from('positions').select('pnl').eq('status','open').limit(2000).then(function(r){ if(r&&r.data){ OPEN_PNL=r.data.reduce(function(a,x){return a+(+x.pnl||0);},0); if(cur==='overview'&&!busyEditing())render(); } },function(){});
   }
-  function pullCustPos(custId){ if(!window.AlpexaSync||!AlpexaSync.db||!custId) return;
-    AlpexaSync.db.from('positions').select('*').eq('status','open').eq('cust_id',custId).limit(200).then(function(r){ if(r&&r.data){ POS_BY_CUST[custId]=r.data; if(!busyEditing())render(); } },function(){}); }
+  function acctsOf(cid){ var pid=null; SRV_PLAYERS.forEach(function(p){ if(p.cust_id===cid)pid=p.id; }); if(pid==null)return []; return SRV_ACCOUNTS.filter(function(a){return a.player_id===pid;}).map(function(a){return a.acct_no;}).filter(Boolean); }
+  function pullCustPos(custId, acctNos){ if(!window.AlpexaSync||!AlpexaSync.db||!custId) return;
+    if(!acctNos) acctNos=acctsOf(custId);
+    // Match by cust_id OR any of the customer's account numbers, so positions
+    // still show even if an old position has a drifted cust_id.
+    var accs=(acctNos||[]).filter(function(a){ return a && a!=='—'; });
+    var q=AlpexaSync.db.from('positions').select('*').eq('status','open');
+    if(accs.length){ q=q.or('cust_id.eq.'+custId+',acct_no.in.('+accs.join(',')+')'); }
+    else { q=q.eq('cust_id',custId); }
+    q.limit(200).then(function(r){ if(r&&r.data){ POS_BY_CUST[custId]=r.data; if(!busyEditing())render(); } },function(){}); }
   // Shared renderer for one open position/bet/holding (with Close/Void control).
   function posRowHTML(x){
     var s=x.server, who=custName(x.cust_id)||x.cust_id||'';
@@ -710,7 +718,7 @@
           var myAg=SRV_ALINKS.filter(function(l){ return l.cust_id===cid; });
           var agTxt = myAg.length ? myAg.map(function(l){ return agentName(l.agent_code)+' ('+l.agent_code+(myAg.length>1?(' · '+(+l.share||100)+'%'):'')+')'; }).join(', ') : 'None (direct)';
           h+='<div class="row"><span>Agent</span><b class="'+(myAg.length?'':'muted')+'" style="text-align:right">'+agTxt+'</b></div>';
-          if(POS_BY_CUST[cid]===undefined){ POS_BY_CUST[cid]=[]; pullCustPos(cid); }
+          if(POS_BY_CUST[cid]===undefined){ POS_BY_CUST[cid]=[]; pullCustPos(cid, [an('fx'),an('crypto'),an('sports')]); }
           var op=POS_BY_CUST[cid]||[];
           h+='<div class="lbl" style="margin-top:12px">Open positions ('+op.length+')</div>';
           if(!op.length){ h+='<div class="req-meta" style="margin:4px 0">None open.</div>'; }
@@ -1599,7 +1607,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v59';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v60';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
