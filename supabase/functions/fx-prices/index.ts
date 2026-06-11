@@ -56,6 +56,40 @@ Deno.serve(async (req) => {
   const SB_URL = Deno.env.get("SUPABASE_URL");
   const SB_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY");
   if (!POLY) return json({ ok: false, error: "POLYGON_KEY not set" }, 500);
+
+  // ── Candle history mode: ?candles=EURUSD&tf=M15 → real OHLC bars from Polygon ──
+  // Used by the trading chart (FX only). Returns bars; never touches the DB.
+  const candlesSym = url.searchParams.get("candles");
+  if (candlesSym) {
+    const tf = url.searchParams.get("tf") || "M15";
+    const MAP: Record<string, [number, string]> = {
+      M1: [1, "minute"], M5: [5, "minute"], M15: [15, "minute"],
+      H1: [1, "hour"], H4: [4, "hour"], D1: [1, "day"], W1: [1, "week"],
+    };
+    const [mult, span] = MAP[tf] || [15, "minute"];
+    const unitMs: Record<string, number> =
+      { minute: 60000, hour: 3600000, day: 86400000, week: 604800000 };
+    const n = 120;
+    const to = Date.now();
+    const from = to - n * mult * (unitMs[span] || 60000) * 3; // 3x buffer for closed-market gaps
+    const sym = candlesSym.replace(/[^A-Za-z]/g, "").toUpperCase();
+    const aggUrl =
+      `https://api.polygon.io/v2/aggs/ticker/C:${sym}/range/${mult}/${span}/${from}/${to}?adjusted=true&sort=asc&limit=5000&apiKey=${POLY}`;
+    try {
+      const r = await fetch(aggUrl);
+      const j = await r.json();
+      if (!r.ok) return json({ ok: false, error: "polygon " + r.status, detail: j }, 502);
+      const results: any[] = Array.isArray(j.results) ? j.results : [];
+      const candles = results
+        .map((x) => ({ t: x.t, o: x.o, h: x.h, l: x.l, c: x.c, v: x.v || 0 }))
+        .filter((c) => isFinite(c.c) && c.c > 0)
+        .slice(-n);
+      return json({ ok: true, symbol: sym, tf, candles });
+    } catch (e) {
+      return json({ ok: false, error: "polygon candles failed: " + String(e) }, 502);
+    }
+  }
+
   if (!SB_URL || !SB_KEY) return json({ ok: false, error: "Supabase env missing" }, 500);
 
   // One call returns every forex ticker Polygon tracks.

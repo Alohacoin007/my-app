@@ -842,6 +842,28 @@ function fxCandles(sym,tf,livePrice){
   try{ localStorage.setItem(key,JSON.stringify({c:arr})); }catch(e){}
   return arr.map(k=>({o:k.o,h:k.h,l:k.l,c:k.c,v:k.v}));
 }
+// Real chart history from our server (Polygon → fx-prices Edge Function). FX only;
+// key stays server-side. We seed the time-based candle store with REAL bars, then
+// the engine builds the current candle forward from the (also real) live feed.
+const FX_FN_URL='https://grxnbgtfnaayeluenvqh.supabase.co/functions/v1/fx-prices';
+function fetchRealCandles(sym,tf){
+  try{
+    const o=(window.ALPEXA_MARKET&&ALPEXA_MARKET.SYMBOLS||[]).find(x=>x.sym===sym);
+    if(!o||o.cls!=='FX'||typeof fetch!=='function')return; // only FX has a paid real feed
+    const ckey=sym+'|'+tf; window.__alpexaFXCReq=window.__alpexaFXCReq||{};
+    if(window.__alpexaFXCReq[ckey])return; window.__alpexaFXCReq[ckey]=1;
+    fetch(FX_FN_URL+'?candles='+encodeURIComponent(sym)+'&tf='+encodeURIComponent(tf))
+      .then(r=>r.json()).then(j=>{
+        if(!j||!j.ok||!Array.isArray(j.candles)||!j.candles.length){ window.__alpexaFXCReq[ckey]=0; return; }
+        const ms=tfMs(tf), cap=(TF_CONFIG[tf]||TF_CONFIG.M15).n||80;
+        let arr=j.candles.map(k=>({o:+k.o,h:+k.h,l:+k.l,c:+k.c,v:+k.v||0.5,b:Math.floor((+k.t)/ms)}))
+                         .filter(k=>isFinite(k.c)&&k.c>0);
+        if(!arr.length){ window.__alpexaFXCReq[ckey]=0; return; }
+        if(arr.length>cap) arr=arr.slice(arr.length-cap);
+        try{ localStorage.setItem('alpexa.fxc.'+sym+'.'+tf, JSON.stringify({c:arr,real:1})); }catch(e){}
+      }).catch(()=>{ window.__alpexaFXCReq[ckey]=0; });
+  }catch(e){}
+}
 // Twelve Data helpers for real chart history
 const TD_KEY_CHART='6fef3bc69c2842a2b4a127969f766eb0';
 const TD_INTERVAL={M1:'1min',M5:'5min',M15:'15min',H1:'1h',H4:'4h',D1:'1day',W1:'1week'};
@@ -859,20 +881,12 @@ function Chart({series,sym,tf,digits=5,showMA=true,showVol=true,showBB=false,sho
   const [realMap,setRealMap]=useState({});
   const realKey=sym+'|'+tf;
   useEffect(()=>{
-    return; // disabled: external history mixed with our simulated live price caused spikes; use the local time-based candle engine instead
-    if(!fillContainer||!sym||!tf||typeof fetch!=='function')return;
-    if(realMap[realKey])return;
-    const iv=TD_INTERVAL[tf]||'5min';const n=(candleCount&&candleCount>0)?candleCount:80;
-    let cancelled=false;
-    fetch('https://api.twelvedata.com/time_series?symbol='+encodeURIComponent(tdSymbolFor(sym))+'&interval='+iv+'&outputsize='+n+'&order=ASC&apikey='+TD_KEY_CHART)
-      .then(r=>r.json()).then(j=>{ if(cancelled)return;
-        if(j&&j.values&&j.values.length){
-          const candles=j.values.map(v=>({o:+v.open,h:+v.high,l:+v.low,c:+v.close,v:+(v.volume||0)||0.5})).filter(c=>isFinite(c.c)&&c.c>0);
-          if(candles.length)setRealMap(m=>({...m,[realKey]:candles}));
-        }
-      }).catch(()=>{});
-    return ()=>{cancelled=true;};
-  },[sym,tf,fillContainer,candleCount]);
+    // Seed the FX candle store with REAL Polygon history (via our server). The
+    // time-based engine below then builds the live candle forward from the real
+    // feed — past + live are both real now, so they line up (no more spikes).
+    if(!fillContainer||!sym||!tf)return;
+    fetchRealCandles(sym,tf);
+  },[sym,tf,fillContainer]);
   const liveSeries=useMemo(()=>{
     const livePx=series&&series.length?series[series.length-1].c:null;
     // Main chart: time-based persistent candles (broker-style). Past candles
@@ -3843,7 +3857,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v102';
+(function(){try{var b=document.createElement('div');b.textContent='FX v103';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
