@@ -118,7 +118,7 @@
   function badgeStatus(s){ s=s||'active'; var c=s==='blocked'?'lost':s==='limited'?'cashed':'won'; return '<span class="badge '+c+'">'+s+'</span>'; }
   function pullOpenSummary(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
     AlpexaSync.db.from('positions').select('id',{count:'exact',head:true}).eq('status','open').then(function(r){ if(r&&typeof r.count==='number'){ POS_COUNT=r.count; if(cur==='bets'&&!busyEditing())render(); } },function(){});
-    AlpexaSync.db.from('positions').select('*').eq('status','open').order('id',{ascending:false}).limit(60).then(function(r){ if(r&&r.data){ POS_TOP=r.data; if((cur==='bets'||cur==='overview')&&!busyEditing())render(); } },function(){});
+    AlpexaSync.db.from('positions').select('*').eq('status','open').limit(60).then(function(r){ if(r&&r.data){ POS_TOP=r.data; if((cur==='bets'||cur==='overview')&&!busyEditing())render(); } },function(){});
     AlpexaSync.db.from('positions').select('pnl').eq('status','open').limit(2000).then(function(r){ if(r&&r.data){ OPEN_PNL=r.data.reduce(function(a,x){return a+(+x.pnl||0);},0); if(cur==='overview'&&!busyEditing())render(); } },function(){});
   }
   function pullCustPos(custId){ if(!window.AlpexaSync||!AlpexaSync.db||!custId) return;
@@ -141,16 +141,16 @@
       '<div class="req-meta" style="margin:1px 0 0">'+sub+'</div></span>'+
       '<span style="text-align:right"><div class="'+cls+'" style="font-weight:800">'+right+'</div>'+
         '<button class="save ghost" data-close="'+esc(x.cust_id)+'|'+esc(x.server)+'|'+esc(x.local_id)+'" style="margin-top:5px;padding:5px 11px;font-size:11.5px">'+label+'</button>'+
-        (x.id!=null?'<button data-posdel="'+esc(x.id)+'" title="Force-remove a ghost position (app no longer has it)" style="margin:5px 0 0 5px;padding:5px 9px;font-size:11.5px;border:1px solid #f1b0b7;background:#fdecea;color:#c0392b;border-radius:4px;cursor:pointer">🗑</button>':'')+
+        '<button data-posdel="'+esc(x.cust_id)+'|'+esc(x.server)+'|'+esc(x.local_id)+'" title="Force-remove a ghost position (app no longer has it)" style="margin:5px 0 0 5px;padding:5px 9px;font-size:11.5px;border:1px solid #f1b0b7;background:#fdecea;color:#c0392b;border-radius:4px;cursor:pointer">🗑</button>'+
       '</span></div>';
   }
   // Force-remove a position row directly from the server (ghost cleanup — used
   // when the customer's app no longer has it but a stale row lingers here).
-  function posForceDelete(rowId){
+  function posForceDelete(cid,srv,lid){
     if(!confirm('Force-remove this position record from the server?\n\nUse only for GHOST positions (the app no longer shows it). This does NOT close a real open position.')) return;
-    AlpexaSync.db.from('positions').delete().eq('id',rowId).then(function(r){
+    AlpexaSync.db.from('positions').delete().eq('cust_id',cid).eq('server',srv).eq('local_id',lid).then(function(r){
       if(r&&r.error){ toast('Error: '+r.error.message,true); return; }
-      try{ logAction('force_del_position','','position row #'+rowId); }catch(e){}
+      try{ logAction('force_del_position',cid,srv+' · '+lid); }catch(e){}
       toast('Ghost position removed ✓'); pullOpenSummary();
       if(PLAYER_OPEN){ POS_BY_CUST[PLAYER_OPEN]=undefined; pullCustPos(PLAYER_OPEN); }
       render();
@@ -1547,7 +1547,7 @@
     document.querySelectorAll('[data-aglinkdel]').forEach(function(b){b.onclick=function(){
       AlpexaSync.db.from('agent_links').delete().eq('id',b.getAttribute('data-aglinkdel')).then(function(){ toast('Unlinked ✓'); pullAgents(); },function(){ toast('Failed',true); });};});
     document.querySelectorAll('[data-close]').forEach(function(b){b.onclick=function(){var p=(b.getAttribute('data-close')||'').split('|');sendCommand(p[0],p[1],p[2]);};});
-    document.querySelectorAll('[data-posdel]').forEach(function(b){b.onclick=function(){posForceDelete(b.getAttribute('data-posdel'));};});
+    document.querySelectorAll('[data-posdel]').forEach(function(b){b.onclick=function(){var p=(b.getAttribute('data-posdel')||'').split('|');posForceDelete(p[0],p[1],p[2]);};});
     var os=document.getElementById('openSearch'); if(os){os.oninput=function(){OPEN_SEARCH=os.value;render();var n=document.getElementById('openSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
     document.querySelectorAll('[data-ofil]').forEach(function(b){b.onclick=function(){OPEN_SHOWF=!OPEN_SHOWF;render();};});
     document.querySelectorAll('[data-os]').forEach(function(b){b.onclick=function(){OPEN_SERVER=b.getAttribute('data-os');render();};});
@@ -1599,7 +1599,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v57';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v58';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
