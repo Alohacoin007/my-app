@@ -117,7 +117,7 @@
   function badgeKyc(k){ k=k||'pending'; var c=k==='verified'?'won':k==='rejected'?'lost':'cashed'; return '<span class="badge '+c+'">KYC '+k+'</span>'; }
   function badgeStatus(s){ s=s||'active'; var c=s==='blocked'?'lost':s==='limited'?'cashed':'won'; return '<span class="badge '+c+'">'+s+'</span>'; }
   function pullOpenSummary(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
-    AlpexaSync.db.from('positions').select('id',{count:'exact',head:true}).eq('status','open').then(function(r){ if(r&&typeof r.count==='number'){ POS_COUNT=r.count; if(cur==='bets'&&!busyEditing())render(); } },function(){});
+    AlpexaSync.db.from('positions').select('cust_id',{count:'exact',head:true}).eq('status','open').then(function(r){ if(r&&typeof r.count==='number'){ POS_COUNT=r.count; if(cur==='bets'&&!busyEditing())render(); } },function(){});
     AlpexaSync.db.from('positions').select('*').eq('status','open').limit(60).then(function(r){ if(r&&r.data){ POS_TOP=r.data; if((cur==='bets'||cur==='overview')&&!busyEditing())render(); } },function(){});
     AlpexaSync.db.from('positions').select('pnl').eq('status','open').limit(2000).then(function(r){ if(r&&r.data){ OPEN_PNL=r.data.reduce(function(a,x){return a+(+x.pnl||0);},0); if(cur==='overview'&&!busyEditing())render(); } },function(){});
   }
@@ -1599,7 +1599,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v58';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v59';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
