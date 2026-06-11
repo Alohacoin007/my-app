@@ -1201,7 +1201,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.30</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.31</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -2746,7 +2746,7 @@
       if(items.length)AlpexaSync.db.from('positions').insert(items).then(function(){},function(){});
     },function(){});
   }
-  setTimeout(push,2000); setInterval(function(){if(!document.hidden)push();},3000);
+  setTimeout(push,2000); setInterval(function(){ if(!document.hidden){ push(); } else { window.__bgPosPush=window.__bgPosPush||0; if(Date.now()-window.__bgPosPush>9000){ window.__bgPosPush=Date.now(); push(); } } },3000);
   // Instant: when a bet is placed/settled (id list changes), push right away.
   function posSig(){try{var a=JSON.parse(localStorage.getItem('alpexa.openBets')||'[]')||[];return a.map(function(b){return b&&b.id;}).join(',');}catch(e){return'';}}
   var _psig=posSig();
