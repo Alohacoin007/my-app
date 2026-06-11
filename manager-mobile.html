@@ -953,12 +953,19 @@
     ['SOLUSD','Solana / USD','CRYPTO',172.40,2,20.0],['SPX500','S&P 500 Index','INDEX',5430.0,1,4.0],
     ['NAS100','Nasdaq 100','INDEX',19250.0,1,5.0],['US30','Dow Jones 30','INDEX',38900.0,1,6.0]
   ];
-  var PRICE_LIVE={}; // sym -> live bid (lightweight ticker so quotes feel alive)
-  FX_INSTR.forEach(function(r){ PRICE_LIVE[r[0]]=r[3]; });
-  function priceTick(){ FX_INSTR.forEach(function(r){ var cur=PRICE_LIVE[r[0]]||r[3];
+  var PRICE_LIVE={}, PRICE_SPR={}, PRICE_DIR={}; // mid · floating base spread(pts) · tick direction
+  FX_INSTR.forEach(function(r){ PRICE_LIVE[r[0]]=r[3]; PRICE_SPR[r[0]]=r[5]; PRICE_DIR[r[0]]=1; });
+  function priceTick(){ FX_INSTR.forEach(function(r){
+    var cur=PRICE_LIVE[r[0]]||r[3];
     var step=(r[2]==='CRYPTO'?0.0008:r[2]==='STOCK'||r[2]==='INDEX'?0.0004:0.00015);
-    var nx=cur*(1+(Math.random()-0.5)*2*step + (r[3]-cur)/r[3]*0.04); PRICE_LIVE[r[0]]=nx; }); }
-  setInterval(function(){ if(cur==='pricing'&&PRICE_APP==='fx'){ priceTick(); if(!busyEditing())render(); } },1600);
+    var nx=cur*(1+(Math.random()-0.5)*2*step + (r[3]-cur)/r[3]*0.04);
+    PRICE_DIR[r[0]]=nx>=cur?1:-1; PRICE_LIVE[r[0]]=nx;
+    // Floating base spread jitter around the symbol's typical spread (like real life).
+    var sp=PRICE_SPR[r[0]]||r[5]; var spike=Math.random()<0.06?(1+Math.random()*1.5):1;
+    sp=sp*(1+(Math.random()-0.5)*0.25)*spike + (r[5]-sp)*0.18;
+    PRICE_SPR[r[0]]=Math.max(r[5]*0.5,Math.min(r[5]*3,sp));
+  }); }
+  setInterval(function(){ if(cur==='pricing'&&PRICE_APP==='fx'){ priceTick(); if(!busyEditing())render(); } },1200);
   function pullPricing(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
     AlpexaSync.db.from('pricing_marks').select('*').then(function(r){ if(r&&r.data){ var m={}; r.data.forEach(function(p){ m[p.symbol]=+p.markup_pts||0; }); PRICE_MARKS=m; if(cur==='pricing'&&!busyEditing())render(); } },function(){}); }
   function viewPricing(){
@@ -982,19 +989,24 @@
     var q=(PRICE_FILTER||'').toLowerCase();
     var list=FX_INSTR.filter(function(r){ return (PRICE_CLS==='ALL'||r[2]===PRICE_CLS) && (!q||((r[0]+' '+r[1]).toLowerCase().indexOf(q)>=0)); });
     h+='<div class="card" style="padding:4px 12px">'+
-      '<div class="row" style="padding:6px 0;border-bottom:1px solid var(--line)"><span class="lbl" style="flex:1">Symbol</span><span class="lbl" style="width:78px;text-align:right">Bid</span><span class="lbl" style="width:96px;text-align:right">Markup</span></div>';
+      '<div class="row" style="padding:6px 0;border-bottom:1px solid var(--line)"><span class="lbl" style="flex:1">Symbol</span><span class="lbl" style="width:66px;text-align:right">Bid</span><span class="lbl" style="width:66px;text-align:right">Ask</span><span class="lbl" style="width:40px;text-align:right">Spr</span><span class="lbl" style="width:74px;text-align:right">Markup</span></div>';
     if(!list.length) h+='<div class="empty">No instruments match.</div>';
     list.forEach(function(r){
-      var sym=r[0], bid=PRICE_LIVE[sym]||r[3], dg=r[4], sprPt=r[5], mk=+PRICE_MARKS[sym]||0;
-      var up=bid>=r[3];
-      h+='<div class="row" style="align-items:center">'+
+      var sym=r[0], mid=PRICE_LIVE[sym]||r[3], dg=r[4], mk=+PRICE_MARKS[sym]||0, up=PRICE_DIR[sym]>=0;
+      var liveSprPt=PRICE_SPR[sym]||r[5], totSprPt=liveSprPt+mk;          // total spread the customer sees
+      var pip=Math.pow(10,-(dg-1));                                       // value of 1 point
+      var half=(liveSprPt*pip)/2, mkAbs=mk*pip;                            // mid ± half spread, markup loads the ask
+      var bid=mid-half, ask=mid+half+mkAbs;
+      h+='<div class="row" style="align-items:center;padding:7px 0">'+
         '<span style="flex:1;min-width:0"><b style="font-size:12.5px">'+sym+'</b> <span class="badge" style="background:#EEF2F7;color:var(--dim)">'+r[2]+'</span>'+
-        '<div class="req-meta" style="margin:1px 0 0">'+r[1]+' · spr '+(sprPt+mk).toFixed(1)+'pt</div></span>'+
-        '<span style="width:78px;text-align:right;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:12.5px">'+bid.toFixed(dg)+'</b></span>'+
-        '<span style="width:96px;display:flex;gap:3px;justify-content:flex-end;align-items:center">'+
-          '<span style="font-variant-numeric:tabular-nums;font-size:11.5px;color:'+(mk>0?'var(--neg)':mk<0?'var(--pos)':'var(--dim)')+';min-width:30px;text-align:right">'+(mk>0?'+':'')+mk.toFixed(1)+'</span>'+
-          '<button data-pmk="'+sym+'|-" style="width:24px;height:24px;border:1px solid var(--line);background:#fff;border-radius:4px;font:700 13px system-ui;cursor:pointer;color:var(--ink)">−</button>'+
-          '<button data-pmk="'+sym+'|+" style="width:24px;height:24px;border:1px solid var(--line);background:#fff;border-radius:4px;font:700 13px system-ui;cursor:pointer;color:var(--ink)">+</button>'+
+        '<div class="req-meta" style="margin:1px 0 0">'+r[1]+'</div></span>'+
+        '<span style="width:66px;text-align:right;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:12px">'+bid.toFixed(dg)+'</b></span>'+
+        '<span style="width:66px;text-align:right;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:12px">'+ask.toFixed(dg)+'</b></span>'+
+        '<span style="width:40px;text-align:right;font-variant-numeric:tabular-nums;font-size:11.5px;color:'+(mk>0?'var(--neg)':'var(--dim)')+'">'+totSprPt.toFixed(1)+'</span>'+
+        '<span style="width:74px;display:flex;gap:3px;justify-content:flex-end;align-items:center">'+
+          '<button data-pmk="'+sym+'|-" style="width:22px;height:22px;border:1px solid var(--line);background:#fff;border-radius:4px;font:700 13px system-ui;cursor:pointer;color:var(--ink)">−</button>'+
+          '<span style="font-variant-numeric:tabular-nums;font-size:11px;color:'+(mk>0?'var(--neg)':'var(--dim)')+';min-width:26px;text-align:center">'+(mk>0?'+':'')+mk.toFixed(1)+'</span>'+
+          '<button data-pmk="'+sym+'|+" style="width:22px;height:22px;border:1px solid var(--line);background:#fff;border-radius:4px;font:700 13px system-ui;cursor:pointer;color:var(--ink)">+</button>'+
         '</span></div>';
     });
     h+='</div>';
@@ -1403,7 +1415,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v29';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v30';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
