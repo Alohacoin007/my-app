@@ -335,30 +335,26 @@ function createMarket(){
       // Market closed (stocks after hours, FX on weekends) → hold the real price
       // steady. Crypto trades 24/7 so it always moves.
       if(!symOpen(s)){ s.flash=null; s.spreadFlash=null; return; }
-      const stepScale=s.cls==='CRYPTO'?0.0008:s.cls==='STOCK'?0.0006:0.0002;
+      // Realistic, calm volatility (real FX barely moves second-to-second).
+      const stepScale=s.cls==='CRYPTO'?0.00035:s.cls==='STOCK'?0.00020:0.00004;
       const drift=(Math.random()-0.5)*2*stepScale;
       // Dealing-desk bias shifts the whole quote up/down by a tiny, capped amount.
       const PX=(typeof window!=='undefined'&&window.__alpexaFXPricing)||{spreadMult:1,biasFrac:0};
       // Shared feed: if the back office is publishing a fresh price for this
       // symbol, anchor to it (everyone converges to one source). Else self-sim.
-      const FEED=(typeof window!=='undefined'&&window.__alpexaFXFeed)||{};
-      const fd=FEED[s.sym];
-      // Only trust the shared feed if it's fresh AND within 10% of the symbol's
-      // natural level (guards against a glitched feed value pulling the price wild).
-      const fresh=fd&&fd.mid>0&&(Date.now()-fd.ts<12000)&&Math.abs(fd.mid-s.bid)/s.bid<0.10;
-      const target=fresh?fd.mid:s.bid;
-      // Gentle convergence so the quote drifts toward the feed instead of lurching.
-      const pullK=fresh?0.10:0.05;
-      const meanRev=(target*(1+(PX.biasFrac||0))-s.last)/s.bid*pullK;
+      // Price mean-reverts to the symbol's true reference level (s.bid). The
+      // shared feed is published for later server use, but we DON'T chase it on
+      // every tick — that caused the wild oscillation. Same base on all devices
+      // keeps quotes naturally aligned anyway.
+      const target=s.bid;
+      const meanRev=(target*(1+(PX.biasFrac||0))-s.last)/s.bid*0.06;
       const pct=drift+meanRev;
       let next=s.last*(1+pct);
-      // Safety clamp: no single update may jump more than a small % — prevents
-      // bad entry prices and huge P&L swings even if a price source glitches.
-      const maxStep=s.last*(s.cls==='CRYPTO'?0.01:s.cls==='STOCK'||s.cls==='INDEX'?0.006:0.003);
+      // Safety clamp: tiny max move per tick (a few pips), so no glitch can spike.
+      const maxStep=s.last*(s.cls==='CRYPTO'?0.003:s.cls==='STOCK'||s.cls==='INDEX'?0.0015:0.0006);
       if(next>s.last+maxStep)next=s.last+maxStep; else if(next<s.last-maxStep)next=s.last-maxStep;
-      // Hard band around the symbol's TRUE reference level so the price can never
-      // wander far (real FX barely moves intraday). Keeps P&L realistic & bounded.
-      const bandPct=(s.cls==='CRYPTO'?0.04:s.cls==='STOCK'||s.cls==='INDEX'?0.025:0.008);
+      // Hard band around the reference so the price stays in a realistic range.
+      const bandPct=(s.cls==='CRYPTO'?0.02:s.cls==='STOCK'||s.cls==='INDEX'?0.012:0.0025);
       const loB=s.bid*(1-bandPct), hiB=s.bid*(1+bandPct);
       if(next<loB)next=loB; else if(next>hiB)next=hiB;
       s.flash=next>s.last?'up':next<s.last?'down':null;
@@ -3805,7 +3801,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v87';
+(function(){try{var b=document.createElement('div');b.textContent='FX v88';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
