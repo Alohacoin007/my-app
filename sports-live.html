@@ -186,6 +186,8 @@
   .bet .ln{position:absolute;top:7px;left:0;right:0;text-align:center;font-size:10px;color:var(--dim);font-weight:700;line-height:1}
   .bet .pr{position:absolute;bottom:7px;left:0;right:0;text-align:center;font-size:13px;font-weight:700;line-height:1}
   .bet .pr.pos{color:var(--pos)}
+  .bet.sus{opacity:.5;cursor:not-allowed;background:var(--surface-2)}
+  .bet.sus .pr{font-size:13px}
   .bet.sel{background:var(--accent);border-color:var(--accent);box-shadow:0 1px 2px rgba(26,115,232,.4)}
   .bet.sel .ln,.bet.sel .pr{color:var(--accent-d)}
   .more-mkt{display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;border-top:1px solid var(--line);font-size:12px;font-weight:700;color:var(--accent);cursor:pointer}
@@ -1203,7 +1205,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.43</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.44</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -1503,6 +1505,8 @@
     return games.map(g=>{
       const cell=(arr,key,i)=>{const b=arr[i];if(!b)return '<div></div>';
         const on=legs.some(l=>l.uid===g.id+'|'+b.sel);
+        // Live betting is suspended (pre-match only) — show odds but locked.
+        if(g.live&&!window.__alpexaLiveBetting) return `<div class="bet sus" title="Live betting unavailable"><span class="ln">${b.ln||'&nbsp;'}</span><span class="pr">🔒</span></div>`;
         return `<div class="bet${on?' sel':''}" data-game="${g.id}" data-market="${key}" data-sel="${b.sel}" data-am="${b.am}">
           <span class="ln">${b.ln||'&nbsp;'}</span><span class="pr ${b.am>0?'pos':''}">${fmtAm(b.am)}</span></div>`;};
       const row=(t,i)=>`<div class="mrow"><div class="tcell"><span class="bd">${t.ab}</span><span class="tinfo"><span class="nm">${t.nm}</span>${t.sc!==undefined?`<span class="sc${g.live?' live':''}">${t.sc}</span>`:''}</span></div>
@@ -1607,8 +1611,9 @@
     if(i>-1){legs.splice(i,1);}
     else{
       // same market = mutually exclusive: drop other pick from this market first
-      legs=legs.filter(l=>!(l.gid===gid&&l.market===market));
       const g=GAMES.find(x=>x.id===gid);
+      if(g&&g.live&&!window.__alpexaLiveBetting){ showToast('🔒','Live betting unavailable','Pre-match betting only for now'); return; }
+      legs=legs.filter(l=>!(l.gid===gid&&l.market===market));
       legs.push({uid,gid,market,sel,am,game:g.away.ab+' @ '+g.home.ab,tm:g.time,live:!!g.live,stake:20});
     }
     // update bar count + sgp availability, but keep props view intact
@@ -1622,7 +1627,9 @@
   function toggle(gid,market,sel,am){
     const uid=gid+'|'+sel,i=legs.findIndex(l=>l.uid===uid);
     if(i>-1)legs.splice(i,1);
-    else{const g=GAMES.find(x=>x.id===gid);legs.push({uid,gid,market,sel,am,game:g.away.ab+' @ '+g.home.ab,tm:g.time,live:!!g.live,stake:20});}
+    else{const g=GAMES.find(x=>x.id===gid);
+      if(g&&g.live&&!window.__alpexaLiveBetting){ showToast('🔒','Live betting unavailable','Pre-match betting only for now'); return; }
+      legs.push({uid,gid,market,sel,am,game:g.away.ab+' @ '+g.home.ab,tm:g.time,live:!!g.live,stake:20});}
     renderGames();syncSlip();
   }
 
