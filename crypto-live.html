@@ -400,6 +400,49 @@ function stakeAccruedUsd(info, apy){
   return info.usd*rate*(days/365);
 }
 
+// ── Real-time crypto prices via Binance WebSocket (free, millisecond stream) ──
+// We stream live trade prices + 24h change and write them straight into the
+// MARKET / WATCHLIST base prices. useLiveTick re-anchors to the new base each
+// render, so the whole app tracks the real market. ALPXS + stablecoins stay
+// as-is (no exchange feed). Auto-reconnects; degrades to the simulation if the
+// socket can't open (e.g. offline).
+const BINANCE_SYM = { BTC:'btc',ETH:'eth',SOL:'sol',BNB:'bnb',XRP:'xrp',ADA:'ada',
+  AVAX:'avax',DOT:'dot',TON:'ton',NEAR:'near',APT:'apt',TRX:'trx',ATOM:'atom',
+  LINK:'link',AAVE:'aave',UNI:'uni',MKR:'mkr',DOGE:'doge',SHIB:'shib',PEPE:'pepe',
+  BONK:'bonk',WIF:'wif',WLD:'wld',RNDR:'render',FET:'fet',TAO:'tao' };
+window.__cryptoLiveMap = window.__cryptoLiveMap || {};
+(function(){
+  var REV = {};                                            // BTCUSDT -> BTC
+  Object.keys(BINANCE_SYM).forEach(function(k){ REV[BINANCE_SYM[k].toUpperCase()+'USDT']=k; });
+  var map = window.__cryptoLiveMap, lastApply = 0;
+  function applyLive(){
+    for(var i=0;i<MARKET.length;i++){ var e=MARKET[i], d=map[e.sym]; if(d){ if(d.price>0)e.price=d.price; if(typeof d.chg==='number')e.chg=d.chg; } }
+    for(var j=0;j<WATCHLIST.length;j++){ var w=WATCHLIST[j], d2=map[w.sym]; if(d2){ if(d2.price>0)w.price=d2.price; if(typeof d2.chg==='number')w.chg=d2.chg; } }
+    window.__alpexaCryptoFeedLive=true;
+  }
+  function connect(){
+    if(typeof WebSocket==='undefined')return;
+    var bases = Object.keys(BINANCE_SYM).map(function(k){return BINANCE_SYM[k];});
+    var streams = bases.map(function(s){return s+'usdt@trade';})
+                  .concat(bases.map(function(s){return s+'usdt@ticker';})).join('/');
+    var ws;
+    try{ ws=new WebSocket('wss://stream.binance.com:9443/stream?streams='+streams); }catch(e){ return; }
+    ws.onmessage=function(ev){
+      try{
+        var msg=JSON.parse(ev.data), d=msg&&msg.data; if(!d||!d.s)return;
+        var sym=REV[d.s]; if(!sym)return;
+        var rec=map[sym]||(map[sym]={});
+        if(d.e==='trade'){ var p=+d.p; if(p>0)rec.price=p; }
+        else if(d.e==='24hrTicker'){ var c=+d.c; if(c>0&&!(rec.price>0))rec.price=c; var P=+d.P; if(isFinite(P))rec.chg=P; }
+        var now=Date.now(); if(now-lastApply>300){ lastApply=now; applyLive(); }
+      }catch(e){}
+    };
+    ws.onclose=function(){ window.__alpexaCryptoFeedLive=false; setTimeout(connect,3000); };
+    ws.onerror=function(){ try{ws.close();}catch(e){} };
+  }
+  connect();
+})();
+
 // Send screen — recent recipients + asset balances used in the Send flow
 const RECENT_RECIPIENTS = [
   { id: 'a', handle: '@alex_kim',  name: 'Alex Kim',     initials: 'AK', color: '#627EEA' },
@@ -13382,7 +13425,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v69';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v70';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
