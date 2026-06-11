@@ -400,47 +400,70 @@ function stakeAccruedUsd(info, apy){
   return info.usd*rate*(days/365);
 }
 
-// ── Real-time crypto prices via Binance WebSocket (free, millisecond stream) ──
-// We stream live trade prices + 24h change and write them straight into the
-// MARKET / WATCHLIST base prices. useLiveTick re-anchors to the new base each
-// render, so the whole app tracks the real market. ALPXS + stablecoins stay
-// as-is (no exchange feed). Auto-reconnects; degrades to the simulation if the
-// socket can't open (e.g. offline).
+// ── Real-time crypto price AGGREGATOR (Binance + Coinbase, free) ──
+// Each exchange streams live trades over WebSocket. Per coin we keep each
+// exchange's latest price+timestamp, then publish the MEDIAN of the sources that
+// updated recently (rejects a single bad/laggy print) — and if one exchange goes
+// down we transparently fall back to the others. The aggregate is written into
+// MARKET/WATCHLIST base prices; useLiveTick re-anchors so the whole app tracks
+// the real market. ALPXS + stablecoins have no feed (kept as-is). Easy to add
+// more exchanges later (Kraken/Bybit) — just register another source.
 const BINANCE_SYM = { BTC:'btc',ETH:'eth',SOL:'sol',BNB:'bnb',XRP:'xrp',ADA:'ada',
   AVAX:'avax',DOT:'dot',TON:'ton',NEAR:'near',APT:'apt',TRX:'trx',ATOM:'atom',
   LINK:'link',AAVE:'aave',UNI:'uni',MKR:'mkr',DOGE:'doge',SHIB:'shib',PEPE:'pepe',
   BONK:'bonk',WIF:'wif',WLD:'wld',RNDR:'render',FET:'fet',TAO:'tao' };
+// Coinbase product ids for the coins it reliably lists (others stay Binance-only).
+const COINBASE_MAP = { BTC:'BTC-USD',ETH:'ETH-USD',SOL:'SOL-USD',XRP:'XRP-USD',
+  ADA:'ADA-USD',AVAX:'AVAX-USD',DOT:'DOT-USD',LINK:'LINK-USD',DOGE:'DOGE-USD',
+  NEAR:'NEAR-USD',APT:'APT-USD',ATOM:'ATOM-USD',UNI:'UNI-USD',AAVE:'AAVE-USD',
+  MKR:'MKR-USD',SHIB:'SHIB-USD',RNDR:'RENDER-USD',FET:'FET-USD' };
 window.__cryptoLiveMap = window.__cryptoLiveMap || {};
 (function(){
-  var REV = {};                                            // BTCUSDT -> BTC
-  Object.keys(BINANCE_SYM).forEach(function(k){ REV[BINANCE_SYM[k].toUpperCase()+'USDT']=k; });
-  var map = window.__cryptoLiveMap, lastApply = 0;
+  var map = window.__cryptoLiveMap;            // sym -> {price, chg, ts, srcs:n}
+  var SRC = {};                                // sym -> { binance:{p,ts}, coinbase:{p,ts} }
+  var CHG = {};                                // sym -> 24h % change (Binance ticker)
+  var FRESH_MS = 6000, lastApply = 0;
+  function median(a){ a.sort(function(x,y){return x-y;}); var n=a.length; return n%2 ? a[(n-1)/2] : (a[n/2-1]+a[n/2])/2; }
+  function aggregate(sym){
+    var s=SRC[sym]; if(!s)return; var now=Date.now(), vals=[];
+    Object.keys(s).forEach(function(k){ var q=s[k]; if(q&&q.p>0&&(now-q.ts)<FRESH_MS) vals.push(q.p); });
+    if(!vals.length)return;
+    var rec=map[sym]||(map[sym]={}); rec.price=median(vals); rec.srcs=vals.length;
+    if(CHG[sym]!=null) rec.chg=CHG[sym]; rec.ts=now;
+  }
+  function setSrc(src,sym,p){ if(!(+p>0))return; var s=SRC[sym]||(SRC[sym]={}); s[src]={p:+p,ts:Date.now()}; aggregate(sym);
+    var now=Date.now(); if(now-lastApply>300){ lastApply=now; applyLive(); } }
   function applyLive(){
     for(var i=0;i<MARKET.length;i++){ var e=MARKET[i], d=map[e.sym]; if(d){ if(d.price>0)e.price=d.price; if(typeof d.chg==='number')e.chg=d.chg; } }
     for(var j=0;j<WATCHLIST.length;j++){ var w=WATCHLIST[j], d2=map[w.sym]; if(d2){ if(d2.price>0)w.price=d2.price; if(typeof d2.chg==='number')w.chg=d2.chg; } }
     window.__alpexaCryptoFeedLive=true;
   }
-  function connect(){
+  // ── Source 1: Binance (widest coverage + 24h change) ──
+  var BREV={}; Object.keys(BINANCE_SYM).forEach(function(k){ BREV[BINANCE_SYM[k].toUpperCase()+'USDT']=k; });
+  function connectBinance(){
     if(typeof WebSocket==='undefined')return;
-    var bases = Object.keys(BINANCE_SYM).map(function(k){return BINANCE_SYM[k];});
-    var streams = bases.map(function(s){return s+'usdt@trade';})
-                  .concat(bases.map(function(s){return s+'usdt@ticker';})).join('/');
-    var ws;
-    try{ ws=new WebSocket('wss://stream.binance.com:9443/stream?streams='+streams); }catch(e){ return; }
-    ws.onmessage=function(ev){
-      try{
-        var msg=JSON.parse(ev.data), d=msg&&msg.data; if(!d||!d.s)return;
-        var sym=REV[d.s]; if(!sym)return;
-        var rec=map[sym]||(map[sym]={});
-        if(d.e==='trade'){ var p=+d.p; if(p>0)rec.price=p; }
-        else if(d.e==='24hrTicker'){ var c=+d.c; if(c>0&&!(rec.price>0))rec.price=c; var P=+d.P; if(isFinite(P))rec.chg=P; }
-        var now=Date.now(); if(now-lastApply>300){ lastApply=now; applyLive(); }
-      }catch(e){}
-    };
-    ws.onclose=function(){ window.__alpexaCryptoFeedLive=false; setTimeout(connect,3000); };
+    var bases=Object.keys(BINANCE_SYM).map(function(k){return BINANCE_SYM[k];});
+    var streams=bases.map(function(s){return s+'usdt@trade';}).concat(bases.map(function(s){return s+'usdt@ticker';})).join('/');
+    var ws; try{ ws=new WebSocket('wss://stream.binance.com:9443/stream?streams='+streams); }catch(e){ return; }
+    ws.onmessage=function(ev){ try{ var msg=JSON.parse(ev.data), d=msg&&msg.data; if(!d||!d.s)return;
+      var sym=BREV[d.s]; if(!sym)return;
+      if(d.e==='trade'){ setSrc('binance',sym,+d.p); }
+      else if(d.e==='24hrTicker'){ var P=+d.P; if(isFinite(P))CHG[sym]=P; setSrc('binance',sym,+d.c); }
+    }catch(e){} };
+    ws.onclose=function(){ setTimeout(connectBinance,3000); };
     ws.onerror=function(){ try{ws.close();}catch(e){} };
   }
-  connect();
+  // ── Source 2: Coinbase (majors; redundancy + outlier check) ──
+  var CREV={}; Object.keys(COINBASE_MAP).forEach(function(k){ CREV[COINBASE_MAP[k]]=k; });
+  function connectCoinbase(){
+    if(typeof WebSocket==='undefined')return;
+    var ws; try{ ws=new WebSocket('wss://ws-feed.exchange.coinbase.com'); }catch(e){ return; }
+    ws.onopen=function(){ try{ ws.send(JSON.stringify({type:'subscribe',product_ids:Object.values(COINBASE_MAP),channels:['ticker']})); }catch(e){} };
+    ws.onmessage=function(ev){ try{ var d=JSON.parse(ev.data); if(d&&d.type==='ticker'&&d.product_id){ var sym=CREV[d.product_id]; if(sym)setSrc('coinbase',sym,+d.price); } }catch(e){} };
+    ws.onclose=function(){ setTimeout(connectCoinbase,3000); };
+    ws.onerror=function(){ try{ws.close();}catch(e){} };
+  }
+  connectBinance(); connectCoinbase();
 })();
 
 // Send screen — recent recipients + asset balances used in the Send flow
@@ -13425,7 +13448,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v70';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v71';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
