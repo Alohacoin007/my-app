@@ -1201,7 +1201,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.39</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.40</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -2763,8 +2763,10 @@
   var _psig=posSig();
   setInterval(function(){var n=posSig(); if(n!==_psig){_psig=n; if(!document.hidden)push();}},700);
   // Lightweight presence heartbeat — runs even in the background.
-  function beat(){ if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m||!m.custId)return;
-    AlpexaSync.db.from('players').update({last_seen:new Date().toISOString(),last_app:'sports'}).eq('cust_id',m.custId).then(function(){},function(){}); }
+  function beat(){ if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m)return;
+    var patch={last_seen:new Date().toISOString(),last_app:'sports'};
+    if(m.email) AlpexaSync.db.from('players').update(patch).ilike('email',m.email).then(function(){},function(){});
+    else if(m.custId) AlpexaSync.db.from('players').update(patch).eq('cust_id',m.custId).then(function(){},function(){}); }
   setTimeout(beat,1500); setInterval(beat,8000);
   document.addEventListener('visibilitychange',function(){ if(!document.hidden) beat(); });
   // Dealing-desk: house margin % set in the back office (lowers all payouts).

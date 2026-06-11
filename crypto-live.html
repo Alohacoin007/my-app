@@ -13429,8 +13429,10 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
   var _psig=posSig();
   setInterval(function(){var n=posSig(); if(n!==_psig){_psig=n; if(!document.hidden)push();}},700);
   // Lightweight presence heartbeat — runs even in the background.
-  function beat(){ if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m||!m.custId)return;
-    AlpexaSync.db.from('players').update({last_seen:new Date().toISOString(),last_app:'crypto'}).eq('cust_id',m.custId).then(function(){},function(){}); }
+  function beat(){ if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m)return;
+    var patch={last_seen:new Date().toISOString(),last_app:'crypto'};
+    if(m.email) AlpexaSync.db.from('players').update(patch).ilike('email',m.email).then(function(){},function(){});
+    else if(m.custId) AlpexaSync.db.from('players').update(patch).eq('cust_id',m.custId).then(function(){},function(){}); }
   setTimeout(beat,1500); setInterval(beat,8000);
   document.addEventListener('visibilitychange',function(){ if(!document.hidden) beat(); });
   /* Execute back-office commands (liquidate holding/stake to USDT). */
