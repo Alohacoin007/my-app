@@ -1656,7 +1656,7 @@
   }
 
   // Don't redraw while the operator is mid-edit or typing a search (would lose input).
-  function busyEditing(){ return (cur==='history' && (EDIT_ID || TRADE_EDIT || (document.activeElement && (document.activeElement.id==='histSearch'||document.activeElement.id==='hsFrom'||document.activeElement.id==='hsTo'||document.activeElement.id==='tEdPnl'||document.activeElement.id==='tEdDetail')))) || (cur==='players' && (PLAYER_EDIT || (document.activeElement && document.activeElement.id==='plSearch'))) || (cur==='bets' && document.activeElement && document.activeElement.id==='openSearch') || (cur==='report' && document.activeElement && (document.activeElement.id==='rpFrom'||document.activeElement.id==='rpTo')) || (cur==='agents' && document.activeElement && String(document.activeElement.id||'').indexOf('ag_')===0) || (cur==='pricing' && document.activeElement && (document.activeElement.id==='prSearch'||document.activeElement.id==='sp_m')); }
+  function busyEditing(){ var ae=document.activeElement; if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.tagName==='SELECT')) return true; return (cur==='history' && (EDIT_ID || TRADE_EDIT || (document.activeElement && (document.activeElement.id==='histSearch'||document.activeElement.id==='hsFrom'||document.activeElement.id==='hsTo'||document.activeElement.id==='tEdPnl'||document.activeElement.id==='tEdDetail')))) || (cur==='players' && (PLAYER_EDIT || (document.activeElement && document.activeElement.id==='plSearch'))) || (cur==='bets' && document.activeElement && document.activeElement.id==='openSearch') || (cur==='report' && document.activeElement && (document.activeElement.id==='rpFrom'||document.activeElement.id==='rpTo')) || (cur==='agents' && document.activeElement && String(document.activeElement.id||'').indexOf('ag_')===0) || (cur==='pricing' && document.activeElement && (document.activeElement.id==='prSearch'||document.activeElement.id==='sp_m')); }
   window.addEventListener('storage',function(e){ if(e.key&&e.key.indexOf('alpexa')===0 && !busyEditing()) render(); });
   setInterval(function(){ if(cur==='overview'||cur==='approvals'||cur==='risk'||cur==='bets') render(); }, 4000);
   // Pull every customer's requests from the shared server.
@@ -1705,7 +1705,7 @@
   })();
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v66';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v67';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
