@@ -1201,7 +1201,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.40</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.41</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -2740,6 +2740,26 @@
 /* Report open sports bets to the server for the back office. */
 (function(){
   function meX(){try{var m=JSON.parse(localStorage.getItem('alpexa.me')||'null');return m&&m.accts?m:null;}catch(e){return null;}}
+  // M4-1: Identity auto-refresh. On every load, pull THIS user's current cust_id +
+  // account numbers from the server and rewrite alpexa.me. This kills cust_id drift
+  // structurally (no re-login needed) so positions/online/P&L always line up.
+  function refreshMe(){ try{
+    if(!window.AlpexaSync||!AlpexaSync.db)return;
+    var m; try{m=JSON.parse(localStorage.getItem('alpexa.me')||'null');}catch(e){return;}
+    if(!m||(!m.authId&&!m.email))return;
+    var q=AlpexaSync.db.from('players').select('id,cust_id,name,email,auth_id');
+    if(m.authId) q=q.eq('auth_id',m.authId); else q=q.ilike('email',m.email);
+    q.limit(1).then(function(r){
+      var p=r&&r.data&&r.data[0]; if(!p)return;
+      AlpexaSync.db.from('accounts').select('server,acct_no').eq('player_id',p.id).then(function(r2){
+        var accts={}; (r2&&r2.data||[]).forEach(function(a){ accts[a.server]=a.acct_no; });
+        if(!accts.fx&&!accts.crypto&&!accts.sports)return; // never wipe identity if accounts are missing
+        var merged=Object.assign({},m,{custId:p.cust_id,name:p.name||m.name,email:p.email||m.email,authId:p.auth_id||m.authId,accts:accts});
+        localStorage.setItem('alpexa.me',JSON.stringify(merged));
+      },function(){});
+    },function(){});
+  }catch(e){} }
+  setTimeout(refreshMe,800);
   // Record one finished bet (win/loss/cashout/void) on the server for company P&L.
   window.__alpexaSettle=function(rec){ try{ if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m)return;
     AlpexaSync.db.from('settlements').insert({cust_id:m.custId,acct_no:(m.accts&&m.accts[rec.server])||'',server:rec.server||'',kind:rec.kind||'',local_id:String(rec.local_id||''),ticket:String(rec.ticket||''),symbol:rec.symbol||'',stake:Math.round((+rec.stake||0)*100)/100,pnl:Math.round((+rec.pnl||0)*100)/100,detail:rec.detail||''}).then(function(){},function(){});
