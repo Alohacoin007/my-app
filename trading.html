@@ -342,12 +342,20 @@ function createMarket(){
       // Shared feed: if the back office is publishing a fresh price for this
       // symbol, anchor to it (everyone converges to one source). Else self-sim.
       const FEED=(typeof window!=='undefined'&&window.__alpexaFXFeed)||{};
-      const fd=FEED[s.sym]; const fresh=fd&&fd.mid>0&&(Date.now()-fd.ts<12000);
+      const fd=FEED[s.sym];
+      // Only trust the shared feed if it's fresh AND within 10% of the symbol's
+      // natural level (guards against a glitched feed value pulling the price wild).
+      const fresh=fd&&fd.mid>0&&(Date.now()-fd.ts<12000)&&Math.abs(fd.mid-s.bid)/s.bid<0.10;
       const target=fresh?fd.mid:s.bid;
-      const pullK=fresh?0.45:0.05;
+      // Gentle convergence so the quote drifts toward the feed instead of lurching.
+      const pullK=fresh?0.10:0.05;
       const meanRev=(target*(1+(PX.biasFrac||0))-s.last)/s.bid*pullK;
       const pct=drift+meanRev;
-      const next=s.last*(1+pct);
+      let next=s.last*(1+pct);
+      // Safety clamp: no single update may jump more than a small % — prevents
+      // bad entry prices and huge P&L swings even if a price source glitches.
+      const maxStep=s.last*(s.cls==='CRYPTO'?0.01:s.cls==='STOCK'||s.cls==='INDEX'?0.006:0.003);
+      if(next>s.last+maxStep)next=s.last+maxStep; else if(next<s.last-maxStep)next=s.last-maxStep;
       s.flash=next>s.last?'up':next<s.last?'down':null;
       s.last=next;
       if(next>s.high)s.high=next;
@@ -3792,7 +3800,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v85';
+(function(){try{var b=document.createElement('div');b.textContent='FX v86';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
