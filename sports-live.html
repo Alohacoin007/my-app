@@ -1201,7 +1201,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.37</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.38</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -1692,7 +1692,8 @@
     // baseline decimal-odds product at placement (for live cashout calc)
     const d0=legs.reduce((a,l)=>a*dec(l.am),1);
     const baseCash=Math.round(stake*0.92*100)/100;
-    openBets.unshift({id:'b'+Date.now(),type:betType,
+    var spTicket; try{var _k='alpexa.seq.sp',_n=parseInt(localStorage.getItem(_k)||'100000',10)+1;localStorage.setItem(_k,String(_n));spTicket='SP-'+_n;}catch(e){spTicket='SP-'+Math.floor(100000+Math.random()*900000);}
+    openBets.unshift({id:'b'+Date.now(),type:betType,ticket:spTicket,placedTs:Date.now(),
       cls:mode,stake:stake,potential:pot,cashout:baseCash,
       d0:d0,baseCash:baseCash,
       legs:legs.map(l=>({pk:l.sel,sel:l.sel,gid:l.gid,market:l.market,gm:l.game,am:l.am,am0:l.am,dec0:dec(l.am),tm:l.tm,live:l.live,st:'o'}))});
@@ -1718,7 +1719,8 @@
       <div class="info"><div class="pk">${l.pk}</div><div class="gm">${l.gm}${l.tm?` <span style="opacity:.7">· ${l.live?'🔴 ':'🕒 '}${l.tm}</span>`:''}</div></div></div>
       <span class="odd">${fmtAm(l.am)}</span></div>`).join('');
     const head=`<div class="th"><span class="badge ${b.cls}">${b.type}${b.legs.length>1?' '+b.legs.length+'legs':''}</span>
-      <span class="res ${isOpen?'open':b.result}">${isOpen?'Open':b.result==='won'?'Won':b.result==='cashed'?'Cashed Out':'Lost'}</span></div>`;
+      <span class="res ${isOpen?'open':b.result}">${isOpen?'Open':b.result==='won'?'Won':b.result==='cashed'?'Cashed Out':'Lost'}</span></div>`+
+      ((b.ticket||b.placedTs)?`<div style="font-family:ui-monospace,monospace;font-size:9.5px;color:var(--dim);padding:0 2px 4px">${b.ticket||''}${b.ticket&&b.placedTs?' · ':''}${b.placedTs?new Date(b.placedTs).toLocaleString():''}</div>`:'');
     let foot;
     if(isOpen){foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b>Est. ${usd(b.potential)}</b></div>
       <div class="cash-btns"><button class="cashout half" data-cashhalf="${b.id}">50%<span>${usd(b.cashout/2)}</span></button><button class="cashout" data-cash="${b.id}">Cash Out ${usd(b.cashout)}<span>Settle now</span></button></div></div>`;}
