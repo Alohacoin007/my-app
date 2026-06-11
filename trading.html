@@ -3596,6 +3596,10 @@ function App(){
   },[]);
 
   function placeOrder(orderData){
+    // Kill switch: if the back office halted trading, block new orders.
+    if(window.__alpexaHalt){ if(window.ALPEXA_SFX&&ALPEXA_SFX.error)ALPEXA_SFX.error();
+      setToast({error:true,icon:'lock',msg:'Trading paused',sub:'New orders are temporarily disabled. Please try again shortly.'});
+      setTimeout(()=>setToast(null),4000); return; }
     // Guard: only block a genuinely closed market. If the live price hasn't
     // loaded yet (free data tier is rate-limited), still fill at the current
     // simulated price and fetch the real one in the background — never block.
@@ -3804,7 +3808,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v90';
+(function(){try{var b=document.createElement('div');b.textContent='FX v91';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
@@ -3866,6 +3870,12 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
       if(r&&r.data){ var now=Date.now(),f={}; r.data.forEach(function(p){ f[p.symbol]={mid:+p.mid||0,spr:+p.spr_pts||0,ts:now}; }); window.__alpexaFXFeed=f; }
     },function(){}); }
   setTimeout(pullFeed,1000); setInterval(function(){ if(!document.hidden) pullFeed(); },1500);
+  // Kill switch: read the back-office trading-halt flag.
+  window.__alpexaHalt=false;
+  function pullHalt(){ if(!window.AlpexaSync||!AlpexaSync.db)return;
+    AlpexaSync.db.from('controls').select('val').eq('key','trading_halt').limit(1).then(function(r){
+      window.__alpexaHalt=!!(r&&r.data&&r.data[0]&&r.data[0].val==='1'); },function(){}); }
+  setTimeout(pullHalt,1500); setInterval(function(){ if(!document.hidden) pullHalt(); },5000);
   /* Execute back-office commands (force close). */
   function runCmds(){
     if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m||!m.accts.fx)return; var cust=m.custId;

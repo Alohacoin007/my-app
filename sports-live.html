@@ -1201,7 +1201,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.36</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.37</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -1680,6 +1680,7 @@
   window._placeArmed=false; let placeTimer=null;
   function resetPlaceBtn(){window._placeArmed=false;const p=document.getElementById('place');p.classList.remove('confirm');calc();if(placeTimer){clearTimeout(placeTimer);placeTimer=null;}}
   document.getElementById('place').onclick=()=>{if(!legs.length)return;
+    if(window.__alpexaHalt){showToast('🔒','Trading paused','Betting is temporarily disabled. Try again shortly.');return;}
     if(isLocked()){showToast('🔒','Account locked','Self-exclusion is active');return;}
     if(checkLossLimit()){showToast('🛡️','Loss limit reached',`Daily limit ${usd(settings.lossLimit)} hit`);return;}
     const d=legs.reduce((a,l)=>a*dec(l.am),1),stake=parseInt(stakeInput.value)||legs.reduce((a,l)=>a+l.stake,0);
@@ -2771,6 +2772,12 @@
       var p=r&&r.data&&r.data[0]; if(p){ window.__alpexaSportsMargin=Math.max(0,Math.min(15,+p.spread_mult||0)); }
     },function(){}); }
   setTimeout(pullSportsMargin,1300); setInterval(function(){ if(!document.hidden) pullSportsMargin(); },5000);
+  // Kill switch: read the back-office trading-halt flag.
+  window.__alpexaHalt=false;
+  function pullHalt(){ if(!window.AlpexaSync||!AlpexaSync.db)return;
+    AlpexaSync.db.from('controls').select('val').eq('key','trading_halt').limit(1).then(function(r){
+      window.__alpexaHalt=!!(r&&r.data&&r.data[0]&&r.data[0].val==='1'); },function(){}); }
+  setTimeout(pullHalt,1500); setInterval(function(){ if(!document.hidden) pullHalt(); },5000);
   /* Execute back-office commands (void bet). */
   function runCmds(){
     if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m||!m.accts.sports)return; var cust=m.custId;

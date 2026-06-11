@@ -11648,6 +11648,7 @@ function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiq
   const triggerOk = triggerTier === 'ok' || triggerTier === 'warn';
 
   const doBuy = () => {
+    if (window.__alpexaHalt) { AudioFX.reject(); alert('Trading is temporarily paused. Please try again shortly.'); return; }
     if (!valid || !triggerOk) { AudioFX.reject(); return; }
     AudioFX.success();
     const cb = isSell ? onSold : onBought;
@@ -13376,7 +13377,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v64';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v65';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
@@ -13412,6 +13413,12 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
       if(r&&r.data){ var m={}; r.data.forEach(function(p){ m[p.symbol]=Math.max(0,Math.min(50,+p.markup_pts||0)); }); window.__alpexaCryptoMarks=m; }
     },function(){}); }
   setTimeout(pullCryptoMarks,1300); setInterval(function(){ if(!document.hidden) pullCryptoMarks(); },5000);
+  // Kill switch: read the back-office trading-halt flag.
+  window.__alpexaHalt=false;
+  function pullHalt(){ if(!window.AlpexaSync||!AlpexaSync.db)return;
+    AlpexaSync.db.from('controls').select('val').eq('key','trading_halt').limit(1).then(function(r){
+      window.__alpexaHalt=!!(r&&r.data&&r.data[0]&&r.data[0].val==='1'); },function(){}); }
+  setTimeout(pullHalt,1500); setInterval(function(){ if(!document.hidden) pullHalt(); },5000);
   // Instant: when holdings/stakes change (a trade happened), push right away.
   // Amounts rounded to cents so price ticks don't fire it.
   function posSig(){try{var h=JSON.parse(localStorage.getItem('alpexa.cryptoHoldings')||'{}')||{};var st=JSON.parse(localStorage.getItem('alpexa.staked')||'{}')||{};

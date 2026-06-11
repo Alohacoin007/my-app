@@ -1367,8 +1367,29 @@
       },function(){ toast('Delete failed',true); });
     },function(){ toast('Delete failed',true); });
   }
+  // Global controls shared with all apps (e.g. the trading-halt kill switch).
+  var CONTROLS={};
+  function pullControls(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('controls').select('*').then(function(r){ if(r&&r.data){ var m={}; r.data.forEach(function(x){ m[x.key]=x.val; }); CONTROLS=m; if(cur==='config'&&!busyEditing())render(); } },function(){}); }
+  function setHalt(v){
+    if(v==='1' && !confirm('HALT all trading now? New orders/bets get blocked in every app.')) return;
+    if(v==='0' && !confirm('Resume trading? Customers can place orders again.')) return;
+    AlpexaSync.db.from('controls').upsert({key:'trading_halt',val:v,updated_at:new Date().toISOString()},{onConflict:'key'}).then(function(r){
+      if(r&&r.error){ toast('Error: '+r.error.message+' (run the controls SQL?)',true); return; }
+      CONTROLS.trading_halt=v; try{ logAction(v==='1'?'trading_halt':'trading_resume','',''); }catch(e){}
+      toast(v==='1'?'🛑 Trading HALTED — apps update in ~5s':'▶ Trading resumed'); render();
+    },function(){ toast('Failed',true); });
+  }
   function viewConfig(){
-    return '<div class="sec">Limits (#5)</div>'+
+    var halted=(CONTROLS&&CONTROLS.trading_halt==='1');
+    return '<div class="sec">Emergency</div>'+
+      '<div class="card"'+(halted?' style="border-color:#f1b0b7;background:#fff6f6"':'')+'>'+
+        '<div class="row" style="border:none;padding:0 0 6px"><span><b>🛑 Halt all trading</b>'+
+        '<div class="req-meta" style="margin:2px 0 0">Instantly blocks NEW orders/bets in all 3 apps. Open positions &amp; withdrawals are unaffected.</div></span>'+
+        '<b class="'+(halted?'neg':'pos')+'">'+(halted?'HALTED':'LIVE')+'</b></div>'+
+        '<button class="'+(halted?'ok':'no')+'" data-halt="'+(halted?'0':'1')+'" style="width:100%">'+(halted?'▶ Resume trading':'🛑 HALT all trading now')+'</button>'+
+        '<div class="hint">Use the moment something looks wrong (bad prices, abuse). Takes effect on every app within ~5s.</div></div>'+
+      '<div class="sec">Limits (#5)</div>'+
       '<div class="card">'+cfgRow('Max bet (USDT)','cfgMaxBet',num('alpexa.maxBet',5000))+cfgRow('Max deposit (USDT)','cfgMaxDep',num('alpexa.maxDeposit',50000))+cfgRow('Max withdrawal (USDT)','cfgMaxWd',num('alpexa.maxWithdraw',50000))+
         '<button class="save" id="saveLimits">Save limits</button><div class="hint">Per-request caps (demo — wired to app next).</div></div>'+
       '<div class="sec">Lines / margin (#9)</div>'+
@@ -1444,6 +1465,7 @@
     document.querySelectorAll('[data-pl]').forEach(function(b){b.onclick=function(){var id=b.getAttribute('data-pl');PLAYER_OPEN=(PLAYER_OPEN===id?null:id);if(PLAYER_OPEN!==id)PLAYER_EDIT=null;else{pullCustPos(id);pullSettle();}render();};});
     document.querySelectorAll('[data-editpl]').forEach(function(b){b.onclick=function(){PLAYER_EDIT=b.getAttribute('data-editpl');render();};});
     document.querySelectorAll('[data-savepl]').forEach(function(b){b.onclick=function(){savePlayer(b.getAttribute('data-savepl'));};});
+    document.querySelectorAll('[data-halt]').forEach(function(b){b.onclick=function(){setHalt(b.getAttribute('data-halt'));};});
     document.querySelectorAll('[data-cancelpl]').forEach(function(b){b.onclick=function(){PLAYER_EDIT=null;render();};});
     document.querySelectorAll('[data-delpl]').forEach(function(b){b.onclick=function(){deletePlayer(b.getAttribute('data-delpl'));};});
     document.querySelectorAll('[data-agr]').forEach(function(b){b.onclick=function(){AG_RANGE=b.getAttribute('data-agr');render();};});
@@ -1508,11 +1530,12 @@
   setInterval(function(){ if(cur==='overview'||cur==='approvals'||cur==='risk'||cur==='bets') render(); }, 4000);
   // Pull every customer's requests from the shared server.
   function pullServer(){ if(!window.AlpexaSync||!AlpexaSync.db) return; AlpexaSync.pullAll().then(function(rows){ SRV_REQS=rows||[]; if(!busyEditing()) render(); }).catch(function(){}); }
-  pullServer(); pullPlayers(); pullOpenSummary(); pullOnline(); pullSettle(); pullAgents(); pullPricing(); pullApiUsage();
+  pullServer(); pullPlayers(); pullOpenSummary(); pullOnline(); pullSettle(); pullAgents(); pullPricing(); pullApiUsage(); pullControls();
   setInterval(function(){ if(!document.hidden){ pullServer(); pullPlayers();
     if(cur==='bets') pullOpenSummary();
     if(cur==='online') pullOnline();
     if(cur==='overview') pullApiUsage();
+    if(cur==='config') pullControls();
     if(cur==='report'||cur==='history') pullSettle();
     if(cur==='agents'){ pullAgents(); pullSettle(); }
     if(cur==='wallet'){ pullWallet(); }
@@ -1522,7 +1545,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v48';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v49';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
