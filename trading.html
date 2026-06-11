@@ -782,6 +782,42 @@ function genTfSeries(sym,tf,currentPrice){
   if(arr.length){const last=arr[arr.length-1];last.c=currentPrice;last.h=Math.max(last.h,currentPrice);last.l=Math.min(last.l,currentPrice);}
   return arr;
 }
+// ── Time-based candle engine (broker-style) ──────────────────────────────────
+// Real wall-clock buckets per timeframe; PAST candles are frozen, only the
+// current one tracks the live price; persisted so reload keeps history. This is
+// the stepping stone to server-stored candles (swap the source later).
+function tfMs(tf){ const c=TF_CONFIG[tf]||TF_CONFIG.M15; const step=c.step||1;
+  const unit=c.label==='min'?60000:c.label==='h'?3600000:c.label==='d'?86400000:c.label==='w'?604800000:60000;
+  return step*unit; }
+function fxCandles(sym,tf,livePrice){
+  const cfg=TF_CONFIG[tf]||TF_CONFIG.M15, ms=tfMs(tf), cap=cfg.n||80, key='alpexa.fxc.'+sym+'.'+tf;
+  if(!(livePrice>0)) return genTfSeries(sym,tf,livePrice||1);
+  let store=null; try{ store=JSON.parse(localStorage.getItem(key)||'null'); }catch(e){}
+  const nowB=Math.floor(Date.now()/ms);
+  let arr;
+  if(!store||!store.c||!store.c.length||(nowB-store.c[store.c.length-1].b)>cap){
+    // First load (or huge gap): seed a deterministic history ending at "now".
+    const seeded=genTfSeries(sym,tf,livePrice);
+    arr=seeded.map((k,i)=>({o:k.o,h:k.h,l:k.l,c:k.c,v:k.v,b:nowB-(seeded.length-1-i)}));
+  } else {
+    arr=store.c;
+    const last=arr[arr.length-1];
+    if(nowB>last.b){
+      // Open new candle(s) for each elapsed bucket; open = previous close.
+      let prev=last.c;
+      for(let bb=last.b+1; bb<=nowB; bb++){
+        arr.push({o:prev,h:Math.max(prev,livePrice),l:Math.min(prev,livePrice),c:livePrice,v:0.3+Math.random()*0.5,b:bb});
+        prev=livePrice;
+      }
+    }
+  }
+  // Update the CURRENT (last) candle with the live price.
+  const cur=arr[arr.length-1];
+  cur.c=livePrice; if(livePrice>cur.h)cur.h=livePrice; if(livePrice<cur.l)cur.l=livePrice;
+  if(arr.length>cap) arr=arr.slice(arr.length-cap);
+  try{ localStorage.setItem(key,JSON.stringify({c:arr})); }catch(e){}
+  return arr.map(k=>({o:k.o,h:k.h,l:k.l,c:k.c,v:k.v}));
+}
 // Twelve Data helpers for real chart history
 const TD_KEY_CHART='6fef3bc69c2842a2b4a127969f766eb0';
 const TD_INTERVAL={M1:'1min',M5:'5min',M15:'15min',H1:'1h',H4:'4h',D1:'1day',W1:'1week'};
@@ -799,6 +835,7 @@ function Chart({series,sym,tf,digits=5,showMA=true,showVol=true,showBB=false,sho
   const [realMap,setRealMap]=useState({});
   const realKey=sym+'|'+tf;
   useEffect(()=>{
+    return; // disabled: external history mixed with our simulated live price caused spikes; use the local time-based candle engine instead
     if(!fillContainer||!sym||!tf||typeof fetch!=='function')return;
     if(realMap[realKey])return;
     const iv=TD_INTERVAL[tf]||'5min';const n=(candleCount&&candleCount>0)?candleCount:80;
@@ -813,15 +850,11 @@ function Chart({series,sym,tf,digits=5,showMA=true,showVol=true,showBB=false,sho
     return ()=>{cancelled=true;};
   },[sym,tf,fillContainer,candleCount]);
   const liveSeries=useMemo(()=>{
-    if(realMap[realKey]&&realMap[realKey].length){
-      const full=realMap[realKey].slice();
-      // keep the last candle tracking the live price so the chart + price label move
-      const livePx=series&&series.length?series[series.length-1].c:null;
-      if(livePx!=null&&isFinite(livePx)){
-        const last={...full[full.length-1]};
-        last.c=livePx; if(livePx>last.h)last.h=livePx; if(livePx<last.l)last.l=livePx;
-        full[full.length-1]=last;
-      }
+    const livePx=series&&series.length?series[series.length-1].c:null;
+    // Main chart: time-based persistent candles (broker-style). Past candles
+    // frozen, current one tracks the live price, survives reloads.
+    if(fillContainer&&sym&&tf&&livePx!=null&&isFinite(livePx)){
+      const full=fxCandles(sym,tf,livePx);
       if(candleCount&&full.length>candleCount)return full.slice(full.length-candleCount);
       return full;
     }
@@ -831,7 +864,7 @@ function Chart({series,sym,tf,digits=5,showMA=true,showVol=true,showBB=false,sho
       if(candleCount&&full.length>candleCount)return full.slice(full.length-candleCount);
       return full;
     }return series;
-  },[sym,tf,candleCount,realMap[realKey],series&&series[series.length-1]&&series[series.length-1].c]);
+  },[sym,tf,candleCount,fillContainer,series&&series[series.length-1]&&series[series.length-1].c]);
   useEffect(()=>{const ro=new ResizeObserver(entries=>{for(const e of entries){setW(e.contentRect.width);if(fillContainer&&e.contentRect.height>0)setH(e.contentRect.height);}});if(wrapRef.current)ro.observe(wrapRef.current);return()=>ro.disconnect();},[fillContainer]);
   useEffect(()=>{if(!fillContainer)setH(height);},[height,fillContainer]);
   useEffect(()=>{if(!ref.current||!liveSeries||!liveSeries.length)return;draw();},[liveSeries,w,h,showMA,showVol,showBB,showRSI,showMACD,hover,accent,tf]);
@@ -3759,7 +3792,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v84';
+(function(){try{var b=document.createElement('div');b.textContent='FX v85';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
