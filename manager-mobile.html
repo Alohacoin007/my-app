@@ -1066,15 +1066,25 @@
   CRYPTO_INSTR.forEach(function(r){ CRYPTO_LIVE[r[0]]=r[2]; CRYPTO_DIR[r[0]]=1; });
   function cryptoTick(){ CRYPTO_INSTR.forEach(function(r){ var cur=CRYPTO_LIVE[r[0]]||r[2];
     var nx=cur*(1+(Math.random()-0.5)*2*0.0009 + (r[2]-cur)/r[2]*0.03); CRYPTO_DIR[r[0]]=nx>=cur?1:-1; CRYPTO_LIVE[r[0]]=nx; }); }
+  // Real server feed (Polygon → prices table) for the dealing desk. FX/metals
+  // come from here as-is; stocks/indices/crypto (no paid feed) keep simulating.
+  var LIVE_FEED={};
+  function pullLivePrices(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('prices').select('symbol,mid,spr_pts').then(function(r){
+      if(r&&r.data){ var f={}; r.data.forEach(function(p){ f[p.symbol]={mid:+p.mid||0,spr:+p.spr_pts||0}; }); LIVE_FEED=f;
+        if(cur==='pricing'&&PRICE_APP==='fx'&&!busyEditing())render(); } },function(){}); }
   function priceTick(){ FX_INSTR.forEach(function(r){
-    var cur=PRICE_LIVE[r[0]]||r[3];
+    var sym=r[0], lf=LIVE_FEED[sym];
+    if(lf && lf.mid>0){ // REAL feed — show it exactly, markup is added in viewPricing
+      PRICE_DIR[sym]=(lf.mid>=(PRICE_LIVE[sym]||r[3]))?1:-1; PRICE_LIVE[sym]=lf.mid; if(lf.spr>0)PRICE_SPR[sym]=lf.spr; return; }
+    // No real feed for this symbol (stocks/indices/crypto) — simulate.
+    var cur=PRICE_LIVE[sym]||r[3];
     var step=(r[2]==='CRYPTO'?0.0008:r[2]==='STOCK'||r[2]==='INDEX'?0.0004:0.00015);
     var nx=cur*(1+(Math.random()-0.5)*2*step + (r[3]-cur)/r[3]*0.04);
-    PRICE_DIR[r[0]]=nx>=cur?1:-1; PRICE_LIVE[r[0]]=nx;
-    // Floating base spread jitter around the symbol's typical spread (like real life).
-    var sp=PRICE_SPR[r[0]]||r[5]; var spike=Math.random()<0.06?(1+Math.random()*1.5):1;
+    PRICE_DIR[sym]=nx>=cur?1:-1; PRICE_LIVE[sym]=nx;
+    var sp=PRICE_SPR[sym]||r[5]; var spike=Math.random()<0.06?(1+Math.random()*1.5):1;
     sp=sp*(1+(Math.random()-0.5)*0.25)*spike + (r[5]-sp)*0.18;
-    PRICE_SPR[r[0]]=Math.max(r[5]*0.5,Math.min(r[5]*3,sp));
+    PRICE_SPR[sym]=Math.max(r[5]*0.5,Math.min(r[5]*3,sp));
   }); }
   // Publish the FX price feed so EVERY client shows the same quote (the
   // stepping-stone to a real server-side feed). Runs in the background while a
@@ -1083,7 +1093,10 @@
     var rows=FX_INSTR.map(function(r){ return {symbol:r[0], mid:Math.round((PRICE_LIVE[r[0]]||r[3])*1e6)/1e6, spr_pts:Math.round((PRICE_SPR[r[0]]||r[5])*100)/100, updated_at:new Date().toISOString()}; });
     AlpexaSync.db.from('prices').upsert(rows,{onConflict:'symbol'}).then(function(){},function(){});
   }
-  setInterval(function(){ if(document.hidden) return; priceTick(); publishPrices();
+  // NOTE: publishPrices() is intentionally NOT called anymore — the fx-prices
+  // Edge Function (Polygon) now owns the prices table. We only READ it here, so
+  // the manager can never overwrite the real market feed with a simulation.
+  setInterval(function(){ if(document.hidden) return; pullLivePrices(); priceTick();
     if(cur==='pricing'&&PRICE_APP==='crypto') cryptoTick();
     if(cur==='pricing'&&PRICE_APP!=='sports'&&!busyEditing()) render(); },1500);
   function pullPricing(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
@@ -1597,7 +1610,7 @@
   setInterval(function(){ if(cur==='overview'||cur==='approvals'||cur==='risk'||cur==='bets') render(); }, 4000);
   // Pull every customer's requests from the shared server.
   function pullServer(){ if(!window.AlpexaSync||!AlpexaSync.db) return; AlpexaSync.pullAll().then(function(rows){ SRV_REQS=rows||[]; if(!busyEditing()) render(); }).catch(function(){}); }
-  pullServer(); pullPlayers(); pullOpenSummary(); pullOnline(); pullSettle(); pullAgents(); pullPricing(); pullApiUsage(); pullControls();
+  pullServer(); pullPlayers(); pullOpenSummary(); pullOnline(); pullSettle(); pullAgents(); pullPricing(); pullLivePrices(); pullApiUsage(); pullControls();
   setInterval(function(){ if(!document.hidden){ pullServer(); pullPlayers();
     if(cur==='bets') pullOpenSummary();
     if(cur==='players'&&PLAYER_OPEN){ pullCustPos(PLAYER_OPEN); pullSettle(); }
@@ -1641,7 +1654,7 @@
   })();
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v63';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v64';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
