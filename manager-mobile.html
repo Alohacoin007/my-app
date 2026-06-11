@@ -1106,13 +1106,16 @@
     },function(){ toast('Add failed',true); });
   }
   function agentLink(code){
-    var cid=val('ag_lc_'+code), sh=parseFloat(val('ag_ls_'+code)); if(isNaN(sh)||sh<=0||sh>100)sh=100;
+    var cid=(val('ag_lc_'+code)||'').trim().toUpperCase(), sh=parseFloat(val('ag_ls_'+code)); if(isNaN(sh)||sh<=0||sh>100)sh=100;
     if(!cid){ toast('Enter a customer ID',true); return; }
-    var known=false; SRV_PLAYERS.forEach(function(p){ if(p.cust_id===cid)known=true; });
-    if(!known){ toast('No customer with ID '+cid,true); return; }
-    AlpexaSync.db.from('agent_links').insert({agent_code:code,cust_id:cid,share:sh}).then(function(r){
+    // Case-insensitive match → store the canonical ID from the server.
+    var canon=null; SRV_PLAYERS.forEach(function(p){ if((p.cust_id||'').toUpperCase()===cid)canon=p.cust_id; });
+    if(!canon){ toast('No customer with ID '+cid+' — check the Players tab',true); return; }
+    var dup=false; SRV_ALINKS.forEach(function(l){ if(l.agent_code===code && l.cust_id===canon)dup=true; });
+    if(dup){ toast('Already linked to this agent',true); return; }
+    AlpexaSync.db.from('agent_links').insert({agent_code:code,cust_id:canon,share:sh}).then(function(r){
       if(r&&r.error){ toast('Error: '+r.error.message,true); return; }
-      try{ logAction('agent_link', cid, code+' · '+sh+'%'); }catch(e){}
+      try{ logAction('agent_link', canon, code+' · '+sh+'%'); }catch(e){}
       toast('Linked ✓'); pullAgents();
     },function(){ toast('Link failed',true); });
   }
@@ -1291,7 +1294,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v23';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v24';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
