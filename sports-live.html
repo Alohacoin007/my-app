@@ -1203,7 +1203,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.42</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.43</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -2646,37 +2646,22 @@
       throw (lastE || new Error('failed'));
     }
     // ---- Real bookmaker odds (The Odds API) -------------------------------
-    const ODDS_API_KEY = '57b7ab69c0f6937e770ce21a04c58358';
     const ODDS_SPORT = { NFL:'americanfootball_nfl', NBA:'basketball_nba', MLB:'baseball_mlb', NHL:'icehockey_nhl' };
     function nick(name){ return String(name||'').trim().toLowerCase().split(/\s+/).pop(); }
-    // ----- The Odds API quota guard: ration ~500 credits/month -----
-    function _ym(){ const d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1); }
-    function oddsBudget(){ try{ let b=JSON.parse(localStorage.getItem('alpexa.oddsBudget')||'null'); if(!b||b.ym!==_ym()){ b={ym:_ym(),used:0}; localStorage.setItem('alpexa.oddsBudget',JSON.stringify(b)); } return b; }catch(e){ return {ym:_ym(),used:0}; } }
-    function bumpOdds(n){ try{ const b=oddsBudget(); b.used+=(n||1); localStorage.setItem('alpexa.oddsBudget',JSON.stringify(b)); }catch(e){} }
-    const ODDS_MONTHLY_CAP=480; // leave margin under 500
+    // Odds come from OUR server now: the sports-odds Edge Function polls The Odds
+    // API (key kept server-side) and stores the raw odds in the sports_odds table.
+    // The app just READS that table — no API key in the client, no per-client quota
+    // burn. Cached ~20s in memory so a refresh burst is one read.
+    const _oddsCache = {};
     async function fetchOdds(sportKey){
-      const cacheKey = 'alpexa.odds.'+sportKey;
-      // cache for 24h -> at most ~1 fetch per league per day
-      try{ const c=JSON.parse(localStorage.getItem(cacheKey)||'null'); if(c && (Date.now()-c.t)<24*3600*1000) return c.data; }catch(e){}
-      // monthly budget guard: if near cap, reuse last cached odds (even if stale) instead of spending credits
-      if(oddsBudget().used >= ODDS_MONTHLY_CAP){
-        try{ const c=JSON.parse(localStorage.getItem(cacheKey)||'null'); if(c) return c.data; }catch(e){}
-        throw new Error('odds budget reached');
-      }
-      const url = 'https://api.the-odds-api.com/v4/sports/'+sportKey+'/odds/?apiKey='+ODDS_API_KEY+'&regions=us&markets=h2h,spreads,totals&oddsFormat=american';
-      const res = await fetch(url, { cache:'no-store' });
-      if (!res.ok) throw new Error('odds HTTP '+res.status);
-      const data = await res.json();
-      bumpOdds(3); // h2h+spreads+totals = ~3 credits per request
-      // Report the REAL account-wide quota (from the API's own headers) to the
-      // back office so the owner sees when a paid plan is needed.
-      try{ var rem=res.headers.get('x-requests-remaining'), usd=res.headers.get('x-requests-used');
-        if(rem!=null && window.AlpexaSync && AlpexaSync.db){
-          AlpexaSync.db.from('api_usage').upsert({provider:'odds_api',remaining:Math.round(+rem),used:Math.round(+usd||0),updated_at:new Date().toISOString()},{onConflict:'provider'}).then(function(){},function(){});
-        }
-      }catch(e){}
-      try{ localStorage.setItem(cacheKey, JSON.stringify({ t:Date.now(), data })); }catch(e){}
-      return data;
+      try{ const c=_oddsCache[sportKey]; if(c && (Date.now()-c.t)<20000) return c.data; }catch(e){}
+      if(!(window.AlpexaSync && AlpexaSync.db)) return [];
+      try{
+        const r = await AlpexaSync.db.from('sports_odds').select('data').eq('sport',sportKey).limit(1);
+        const data = (r && r.data && r.data[0] && r.data[0].data) ? r.data[0].data : [];
+        _oddsCache[sportKey] = { t:Date.now(), data };
+        return data;
+      }catch(e){ return []; }
     }
     function oddsToCore(ev, home, away){
       if(!ev.bookmakers||!ev.bookmakers.length) return null;
