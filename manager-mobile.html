@@ -259,7 +259,7 @@
       hold: settledStake? (ggr/settledStake*100):0, pending:R.filter(function(w){return w.status==='pending';}).length};
   }
 
-  var TABS=[['overview','Overview','dashboard'],['report','Report','monitoring'],['approvals','Approvals','task_alt'],['wallet','Wallet','account_balance_wallet'],['history','History','receipt_long'],['players','Players','group'],['online','Online','sensors'],['risk','Risk','gpp_maybe'],['bets','Open','candlestick_chart'],['agents','Agents','handshake'],['logs','Logs','list_alt'],['config','Config','settings']];
+  var TABS=[['overview','Overview','dashboard'],['report','Report','monitoring'],['approvals','Approvals','task_alt'],['wallet','Wallet','account_balance_wallet'],['pricing','Pricing','tune'],['history','History','receipt_long'],['players','Players','group'],['online','Online','sensors'],['risk','Risk','gpp_maybe'],['bets','Open','candlestick_chart'],['agents','Agents','handshake'],['logs','Logs','list_alt'],['config','Config','settings']];
   var cur='overview';
   function renderTabs(){
     document.getElementById('tabs').innerHTML=TABS.map(function(t){return '<button class="tab '+(t[0]===cur?'on':'')+'" data-t="'+t[0]+'"><span class="msi">'+(t[2]||'circle')+'</span><span>'+t[1]+'</span></button>';}).join('');
@@ -267,6 +267,7 @@
       if(cur==='history'||cur==='report'){pullSettle();pullServer();}
       if(cur==='agents'){pullAgents();pullSettle();}
       if(cur==='wallet'){pullWallet(true);}
+      if(cur==='pricing'){pullPricing();}
       render();};});
   }
   function render(){
@@ -283,6 +284,7 @@
     else if(cur==='risk')h=viewRisk(f);
     else if(cur==='bets')h=viewBets();
     else if(cur==='wallet')h=viewWallet();
+    else if(cur==='pricing')h=viewPricing();
     else if(cur==='agents')h=viewAgents();
     else if(cur==='logs')h=viewLogs();
     else if(cur==='config')h=viewConfig();
@@ -934,6 +936,52 @@
     h+='<div class="hint" style="margin:0 14px 10px">Live from Ethereum mainnet (refreshes ~12s on this tab). "Credit ✓" approves the matched deposit request — the customer\'s app balance updates in seconds.</div>';
     return h;
   }
+  // ── Pricing (dealing desk): widen spreads / nudge the quote per server ──
+  var PRICING={fx:{spread_mult:1,bias_bps:0}}, PRICE_APP='fx';
+  function pullPricing(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('pricing').select('*').then(function(r){ if(r&&r.data){ r.data.forEach(function(p){ PRICING[p.server]={spread_mult:+p.spread_mult||1,bias_bps:+p.bias_bps||0}; }); if(cur==='pricing'&&!busyEditing())render(); } },function(){}); }
+  // Reference majors so the owner can preview the spread effect in pips.
+  var FX_REF=[['EURUSD',0.8,5],['GBPUSD',1.0,5],['USDJPY',1.2,3],['XAUUSD',18,2],['AUDUSD',1.2,5],['USDCAD',1.2,5]];
+  function viewPricing(){
+    if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Pricing</div><div class="card"><div class="empty">Not connected to server.</div></div>';
+    var APPS=[['fx','FX'],['crypto','Crypto'],['sports','Sports']];
+    var h='<div class="sec">Pricing · dealing desk</div>';
+    h+='<div style="display:flex;gap:6px;margin:0 12px 10px">'+APPS.map(function(x){
+      var on=PRICE_APP===x[0];
+      return '<button data-papp="'+x[0]+'" style="flex:1;background:'+(on?'var(--acc)':'#F1F3F6')+';color:'+(on?'#fff':'var(--dim)')+';border:none;border-radius:4px;padding:9px 0;font:700 12.5px system-ui;cursor:pointer">'+x[1]+'</button>';
+    }).join('')+'</div>';
+    if(PRICE_APP!=='fx'){
+      h+='<div class="card"><div class="empty">'+(PRICE_APP==='crypto'?'Crypto':'Sports')+' pricing — coming next.<br>FX is live below.</div></div>';
+      return h;
+    }
+    var P=PRICING.fx||{spread_mult:1,bias_bps:0};
+    var sm=+P.spread_mult||1, bb=+P.bias_bps||0;
+    h+='<div class="card">'+
+      '<div class="lbl">Spread multiplier · ×'+sm.toFixed(1)+'</div>'+
+      '<input type="range" id="pr_sm" min="0.5" max="5" step="0.1" value="'+sm+'" style="width:100%;margin:8px 0" oninput="document.getElementById(\'pr_sm_v\').textContent=\'×\'+(+this.value).toFixed(1)">'+
+      '<div class="req-meta">Wider spread = more margin per trade. Current: <b id="pr_sm_v">×'+sm.toFixed(1)+'</b> · ×1 = normal, ×5 = max.</div>'+
+      '<div class="lbl" style="margin-top:14px">Price bias · '+(bb>0?'+':'')+bb+' bps</div>'+
+      '<input type="range" id="pr_bb" min="-30" max="30" step="1" value="'+bb+'" style="width:100%;margin:8px 0" oninput="document.getElementById(\'pr_bb_v\').textContent=((+this.value>0?\'+\':\'\')+(+this.value))+\' bps\'">'+
+      '<div class="req-meta">Nudges the whole quote up/down (±30 bps = ±0.30% max). <b id="pr_bb_v">'+(bb>0?'+':'')+bb+' bps</b></div>'+
+      '<div class="hint" style="color:var(--warn)">⚠ Bias moves live prices — it changes open-position P&amp;L and can trigger stop-outs. Use small values.</div>'+
+      '<div class="btns"><button class="ok" data-psave="1">Apply to all FX clients</button><button class="no" data-preset="1">Reset to normal</button></div>'+
+      '<div class="hint">Applies within ~5s on every customer\'s FX app.</div></div>';
+    h+='<div class="sec">Spread preview (majors)</div><div class="card">';
+    FX_REF.forEach(function(r){ var basePip=r[1], adj=basePip*sm;
+      h+='<div class="row"><span>'+r[0]+'</span><b>'+basePip.toFixed(1)+' → <span class="'+(sm>1?'neg':'pos')+'">'+adj.toFixed(1)+'</span> pips</b></div>'; });
+    h+='</div><div class="hint" style="margin:0 14px">Preview uses typical base spreads; live spreads still float around these.</div>';
+    return h;
+  }
+  function savePricing(smOv,bbOv){
+    var sm=(smOv!=null)?smOv:parseFloat(val('pr_sm')); if(!(sm>0))sm=1; sm=Math.max(0.5,Math.min(5,sm));
+    var bb=(bbOv!=null)?bbOv:parseFloat(val('pr_bb')); if(!isFinite(bb))bb=0; bb=Math.max(-30,Math.min(30,bb));
+    PRICING.fx={spread_mult:sm,bias_bps:bb};
+    AlpexaSync.db.from('pricing').upsert({server:'fx',spread_mult:sm,bias_bps:bb,updated_at:new Date().toISOString()},{onConflict:'server'}).then(function(r){
+      if(r&&r.error){ toast('Error: '+r.error.message+' (run the pricing SQL?)',true); return; }
+      try{ logAction('pricing_fx', '', 'spread ×'+sm.toFixed(1)+' · bias '+bb+'bps'); }catch(e){}
+      toast('Pricing applied ✓ — clients update in ~5s'); render();
+    },function(){ toast('Save failed',true); });
+  }
   // ── Agents (IB / affiliates): recruit customers, earn commission ──
   // FX: $ per lot (spread-markup rebate) · Crypto: % of trade fees ·
   // Sports: % of the agent's WHOLE customer pool NET loss (anti-hedge-abuse).
@@ -1246,6 +1294,9 @@
     document.querySelectorAll('[data-delpl]').forEach(function(b){b.onclick=function(){deletePlayer(b.getAttribute('data-delpl'));};});
     document.querySelectorAll('[data-agr]').forEach(function(b){b.onclick=function(){AG_RANGE=b.getAttribute('data-agr');render();};});
     document.querySelectorAll('[data-agopen]').forEach(function(b){b.onclick=function(){var c=b.getAttribute('data-agopen');AGENT_OPEN=(AGENT_OPEN===c?null:c);render();};});
+    document.querySelectorAll('[data-papp]').forEach(function(b){b.onclick=function(){PRICE_APP=b.getAttribute('data-papp');render();};});
+    document.querySelectorAll('[data-psave]').forEach(function(b){b.onclick=savePricing;});
+    document.querySelectorAll('[data-preset]').forEach(function(b){b.onclick=function(){savePricing(1,0);};});
     document.querySelectorAll('[data-agnew]').forEach(function(b){b.onclick=agentPopup;});
     document.querySelectorAll('[data-apw]').forEach(function(b){b.onclick=function(){agentPayWallet(b.getAttribute('data-apw'));};});
     document.querySelectorAll('[data-apm]').forEach(function(b){b.onclick=function(){agentPayManual(b.getAttribute('data-apm'));};});
@@ -1294,12 +1345,12 @@
   }
 
   // Don't redraw while the operator is mid-edit or typing a search (would lose input).
-  function busyEditing(){ return (cur==='history' && (EDIT_ID || (document.activeElement && (document.activeElement.id==='histSearch'||document.activeElement.id==='hsFrom'||document.activeElement.id==='hsTo')))) || (cur==='players' && (PLAYER_EDIT || (document.activeElement && document.activeElement.id==='plSearch'))) || (cur==='bets' && document.activeElement && document.activeElement.id==='openSearch') || (cur==='report' && document.activeElement && (document.activeElement.id==='rpFrom'||document.activeElement.id==='rpTo')) || (cur==='agents' && document.activeElement && String(document.activeElement.id||'').indexOf('ag_')===0); }
+  function busyEditing(){ return (cur==='history' && (EDIT_ID || (document.activeElement && (document.activeElement.id==='histSearch'||document.activeElement.id==='hsFrom'||document.activeElement.id==='hsTo')))) || (cur==='players' && (PLAYER_EDIT || (document.activeElement && document.activeElement.id==='plSearch'))) || (cur==='bets' && document.activeElement && document.activeElement.id==='openSearch') || (cur==='report' && document.activeElement && (document.activeElement.id==='rpFrom'||document.activeElement.id==='rpTo')) || (cur==='agents' && document.activeElement && String(document.activeElement.id||'').indexOf('ag_')===0) || (cur==='pricing' && document.activeElement && (document.activeElement.id==='pr_sm'||document.activeElement.id==='pr_bb')); }
   window.addEventListener('storage',function(e){ if(e.key&&e.key.indexOf('alpexa')===0 && !busyEditing()) render(); });
   setInterval(function(){ if(cur==='overview'||cur==='approvals'||cur==='risk'||cur==='bets') render(); }, 4000);
   // Pull every customer's requests from the shared server.
   function pullServer(){ if(!window.AlpexaSync||!AlpexaSync.db) return; AlpexaSync.pullAll().then(function(rows){ SRV_REQS=rows||[]; if(!busyEditing()) render(); }).catch(function(){}); }
-  pullServer(); pullPlayers(); pullOpenSummary(); pullOnline(); pullSettle(); pullAgents();
+  pullServer(); pullPlayers(); pullOpenSummary(); pullOnline(); pullSettle(); pullAgents(); pullPricing();
   setInterval(function(){ if(!document.hidden){ pullServer(); pullPlayers();
     if(cur==='bets') pullOpenSummary();
     if(cur==='online') pullOnline();
@@ -1312,7 +1363,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v27';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v28';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
