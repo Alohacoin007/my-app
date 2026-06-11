@@ -428,6 +428,8 @@ function genSeries(base,n){
   return arr;
 }
 function fmt(n,digits){return n.toLocaleString('en-US',{minimumFractionDigits:digits,maximumFractionDigits:digits});}
+// Sequential ticket / deal number per app (e.g. FX-100237). Stored per device.
+function alpexaTicket(prefix){ try{var k='alpexa.seq.'+prefix.toLowerCase(),n=parseInt(localStorage.getItem(k)||'100000',10)+1;localStorage.setItem(k,String(n));return prefix+'-'+n;}catch(e){return prefix+'-'+Math.floor(100000+Math.random()*900000);} }
 function getLotSize(s){if(s.sym==='XAUUSD')return 100;if(s.sym==='XAGUSD')return 5000;if(s.cls==='FX')return 100000;return 1;}
 function isUsdBaseFx(s){return s.cls==='FX'&&/^USD/.test(s.sym)&&!/^USD$/.test(s.sym);}
 // USD value of one unit of a currency code. For cross pairs (e.g. EURJPY) the
@@ -1765,7 +1767,7 @@ function PosCard({p,onClose,onModify}){
   return(
     <div style={{background:'var(--surface)',marginBottom:6,padding:'12px 14px',position:'relative',animation:fresh?'newOrder 1.5s ease':'none',borderLeft:fresh?'3px solid '+(p.side==='BUY'?'#2E6FB0':'#E04141'):'3px solid transparent'}}>
       {fresh&&<div style={{position:'absolute',top:8,right:10,fontSize:8.5,fontWeight:800,padding:'2px 6px',borderRadius:3,background:'#1B3955',color:'#fff',letterSpacing:0.5,animation:'pulse 1.2s ease infinite'}}>NEW</div>}
-      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:9}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
         <span style={{fontSize:9,fontWeight:800,padding:'2px 6px',borderRadius:3,background:p.side==='BUY'?'rgba(46,111,176,0.16)':'rgba(224,65,65,0.16)',color:p.side==='BUY'?'#2E6FB0':'#E04141'}}>{p.side}</span>
         <span style={{fontSize:14,fontWeight:700,color:'var(--ink)'}}>{p.sym}</span>
         <span className="mono" style={{fontSize:11,color:'var(--text-3)'}}>{ALPEXA_MARKET.fmtVol(cls,p.vol)} {ALPEXA_MARKET.getUnitLabel(cls)}</span>
@@ -1773,6 +1775,7 @@ function PosCard({p,onClose,onModify}){
         {!p.placedAt&&<span style={{flex:1}}/>}
         <span className="mono" style={{fontSize:15,fontWeight:700,color:up?'#2E6FB0':'#E04141'}}>{up?'+':''}${p.pnl.toFixed(2)}</span>
       </div>
+      {(p.ticket||p.placedTs)&&<div className="mono" style={{fontSize:9,color:'var(--text-3)',marginBottom:8}}>{p.ticket||''}{p.ticket&&p.placedTs?' · ':''}{p.placedTs?new Date(p.placedTs).toLocaleString():''}</div>}
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr',background:'var(--bg)',borderRadius:3,padding:'6px 0',marginBottom:9,border:'1px solid var(--line-2)'}}>
         <Meta lbl="OPEN" val={fmtPx(p.open)}/><Meta lbl="CUR" val={fmtPx(curPx)} color={curColor}/><Meta lbl="SL" val={p.sl?fmtPx(p.sl):'—'}/><Meta lbl="TP" val={p.tp?fmtPx(p.tp):'—'}/><Meta lbl="SWAP" val={p.swap!==undefined?(p.swap>=0?'+':'')+p.swap.toFixed(2):'0.00'}/>
       </div>
@@ -3616,7 +3619,7 @@ function App(){
     const now=new Date();
     const time=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
     if(orderData.otype&&orderData.otype!=='MARKET'){
-      const newPending={id,...orderData,status:'PENDING',placedAt:time};
+      const newPending={id,...orderData,status:'PENDING',placedAt:time,placedTs:Date.now(),ticket:alpexaTicket('FX')};
       setPendingOrders(prev=>[newPending,...prev]);
       setToast({side:orderData.side,sym:orderData.sym,vol:orderData.vol,price:orderData.trigger,pending:true,otype:orderData.otype});
       setTimeout(()=>setToast(null),3200);
@@ -3624,7 +3627,7 @@ function App(){
       setTab('HIST');setPosTab('PEND');return;
     }
     const fillPx=sObj?applySlippage(sObj,orderData.side,orderData.open,'MARKET'):orderData.open;
-    const newOrder={id,...orderData,open:fillPx,status:'OPEN',placedAt:time,pnl:0,fresh:true};
+    const newOrder={id,...orderData,open:fillPx,status:'OPEN',placedAt:time,placedTs:Date.now(),ticket:alpexaTicket('FX'),pnl:0,fresh:true};
     setLiveOrders(prev=>[newOrder,...prev]);
     try{window.broadcastPositionOpen&&window.broadcastPositionOpen(newOrder, account);}catch(e){}
     setToast({side:orderData.side,sym:orderData.sym,vol:orderData.vol,price:fillPx});
@@ -3809,7 +3812,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v92';
+(function(){try{var b=document.createElement('div');b.textContent='FX v93';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
