@@ -24,14 +24,15 @@ const cors = {
 // skipped (the app falls back to its own simulation for those).
 const WANT = [
   "EURUSD","GBPUSD","USDJPY","AUDUSD","USDCHF","USDCAD","NZDUSD",
-  "EURJPY","EURGBP","GBPJPY","EURAUD","AUDJPY","EURCHF",
-  "USDKRW","USDCNH","USDSGD","USDMXN","XAUUSD",
+  "EURJPY","EURGBP","GBPJPY","EURAUD","AUDJPY","CHFJPY","EURCHF",
+  "USDKRW","USDCNH","USDSGD","USDMXN","XAUUSD","XAGUSD",
 ];
 
 // Pip size per symbol so the spread can be reported in points.
 function pip(sym: string): number {
   if (sym.endsWith("JPY")) return 0.01;
   if (sym === "XAUUSD") return 0.01;
+  if (sym === "XAGUSD") return 0.001;
   return 0.0001;
 }
 
