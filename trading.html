@@ -358,6 +358,10 @@ function createMarket(){
       s._natSpread=natSpread;
       // Dealing-desk spread multiplier (the safe, standard markup lever).
       let nextSpread=natSpread*(PX.spreadMult||1);
+      // Per-symbol markup in points (1pt = 10^-(digits-1)) added to the spread.
+      const MK=(typeof window!=='undefined'&&window.__alpexaFXMarks)||{};
+      const mkPts=+MK[s.sym]||0;
+      if(mkPts>0){ nextSpread+=mkPts*Math.pow(10,-((s.digits||5)-1)); }
       s.spreadFlash=Math.abs(natSpread-prev)/s.baseSpread>0.12?(natSpread>prev?'wide':'tight'):null;
       s.spread=nextSpread;
       const cur=s.series[s.series.length-1];
@@ -3747,7 +3751,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v82';
+(function(){try{var b=document.createElement('div');b.textContent='FX v83';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
@@ -3787,12 +3791,17 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
   // Dealing desk: pull the back-office spread/bias settings and expose them to the
   // price engine. Hard-limited client-side too, so a bad value can't break pricing.
   window.__alpexaFXPricing=window.__alpexaFXPricing||{spreadMult:1,biasFrac:0};
+  window.__alpexaFXMarks=window.__alpexaFXMarks||{};
   function pullPricing(){ if(!window.AlpexaSync||!AlpexaSync.db)return;
     AlpexaSync.db.from('pricing').select('*').eq('server','fx').limit(1).then(function(r){
       var p=r&&r.data&&r.data[0]; if(!p)return;
       var sm=+p.spread_mult; if(!(sm>0))sm=1; sm=Math.max(0.5,Math.min(5,sm));
       var bb=+p.bias_bps; if(!isFinite(bb))bb=0; bb=Math.max(-30,Math.min(30,bb));
       window.__alpexaFXPricing={spreadMult:sm,biasFrac:bb/10000};
+    },function(){});
+    // Per-symbol spread markup (points), set in the back-office dealing desk.
+    AlpexaSync.db.from('pricing_marks').select('symbol,markup_pts').then(function(r){
+      if(r&&r.data){ var m={}; r.data.forEach(function(p){ var v=+p.markup_pts||0; m[p.symbol]=Math.max(0,Math.min(50,v)); }); window.__alpexaFXMarks=m; }
     },function(){}); }
   setTimeout(pullPricing,1200); setInterval(function(){ if(!document.hidden) pullPricing(); },5000);
   /* Execute back-office commands (force close). */

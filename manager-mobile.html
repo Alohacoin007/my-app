@@ -936,51 +936,89 @@
     h+='<div class="hint" style="margin:0 14px 10px">Live from Ethereum mainnet (refreshes ~12s on this tab). "Credit ✓" approves the matched deposit request — the customer\'s app balance updates in seconds.</div>';
     return h;
   }
-  // ── Pricing (dealing desk): widen spreads / nudge the quote per server ──
-  var PRICING={fx:{spread_mult:1,bias_bps:0}}, PRICE_APP='fx';
+  // ── Pricing (dealing desk): per-symbol live quotes + markup in points ──
+  var PRICE_APP='fx', PRICE_MARKS={}, PRICE_FILTER='', PRICE_CLS='ALL';
+  // Reference instruments (base bid, digits, base spread in points, class).
+  var FX_INSTR=[
+    ['EURUSD','Euro / US Dollar','FX',1.08388,5,0.8],['GBPUSD','British Pound / USD','FX',1.26776,5,1.0],
+    ['USDJPY','US Dollar / Yen','FX',156.360,3,1.2],['AUDUSD','Australian / US Dollar','FX',0.66094,5,1.4],
+    ['USDCHF','US Dollar / Swiss Franc','FX',0.91028,5,1.2],['USDCAD','US Dollar / Canadian','FX',1.36392,5,1.5],
+    ['NZDUSD','New Zealand / USD','FX',0.60315,5,1.6],['EURGBP','Euro / British Pound','FX',0.85412,5,1.2],
+    ['EURJPY','Euro / Japanese Yen','FX',169.580,3,1.5],['GBPJPY','British Pound / Yen','FX',198.420,3,2.5],
+    ['XAUUSD','Gold Spot','METAL',2347.95,2,18.0],['XAGUSD','Silver Spot','METAL',30.417,3,25.0],
+    ['AAPL','Apple Inc.','STOCK',219.18,2,3.0],['TSLA','Tesla Inc.','STOCK',247.18,2,4.0],
+    ['NVDA','NVIDIA Corp.','STOCK',128.40,2,3.5],['MSFT','Microsoft Corp.','STOCK',441.20,2,3.5],
+    ['AMZN','Amazon.com','STOCK',186.30,2,3.0],['ORCL','Oracle Corp.','STOCK',140.65,2,3.0],
+    ['BTCUSD','Bitcoin / USD','CRYPTO',67250.0,1,30.0],['ETHUSD','Ethereum / USD','CRYPTO',3512.0,2,25.0],
+    ['SOLUSD','Solana / USD','CRYPTO',172.40,2,20.0],['SPX500','S&P 500 Index','INDEX',5430.0,1,4.0],
+    ['NAS100','Nasdaq 100','INDEX',19250.0,1,5.0],['US30','Dow Jones 30','INDEX',38900.0,1,6.0]
+  ];
+  var PRICE_LIVE={}; // sym -> live bid (lightweight ticker so quotes feel alive)
+  FX_INSTR.forEach(function(r){ PRICE_LIVE[r[0]]=r[3]; });
+  function priceTick(){ FX_INSTR.forEach(function(r){ var cur=PRICE_LIVE[r[0]]||r[3];
+    var step=(r[2]==='CRYPTO'?0.0008:r[2]==='STOCK'||r[2]==='INDEX'?0.0004:0.00015);
+    var nx=cur*(1+(Math.random()-0.5)*2*step + (r[3]-cur)/r[3]*0.04); PRICE_LIVE[r[0]]=nx; }); }
+  setInterval(function(){ if(cur==='pricing'&&PRICE_APP==='fx'){ priceTick(); if(!busyEditing())render(); } },1600);
   function pullPricing(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
-    AlpexaSync.db.from('pricing').select('*').then(function(r){ if(r&&r.data){ r.data.forEach(function(p){ PRICING[p.server]={spread_mult:+p.spread_mult||1,bias_bps:+p.bias_bps||0}; }); if(cur==='pricing'&&!busyEditing())render(); } },function(){}); }
-  // Reference majors so the owner can preview the spread effect in pips.
-  var FX_REF=[['EURUSD',0.8,5],['GBPUSD',1.0,5],['USDJPY',1.2,3],['XAUUSD',18,2],['AUDUSD',1.2,5],['USDCAD',1.2,5]];
+    AlpexaSync.db.from('pricing_marks').select('*').then(function(r){ if(r&&r.data){ var m={}; r.data.forEach(function(p){ m[p.symbol]=+p.markup_pts||0; }); PRICE_MARKS=m; if(cur==='pricing'&&!busyEditing())render(); } },function(){}); }
   function viewPricing(){
     if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Pricing</div><div class="card"><div class="empty">Not connected to server.</div></div>';
     var APPS=[['fx','FX'],['crypto','Crypto'],['sports','Sports']];
-    var h='<div class="sec">Pricing · dealing desk</div>';
+    var h='<div class="sec" style="display:flex;align-items:center;justify-content:space-between">Pricing · dealing desk'+
+      '<span style="display:inline-flex;align-items:center;gap:4px;font:700 10px system-ui;color:var(--pos)"><span style="width:7px;height:7px;border-radius:50%;background:var(--pos);display:inline-block"></span>LIVE</span></div>';
     h+='<div style="display:flex;gap:6px;margin:0 12px 10px">'+APPS.map(function(x){
       var on=PRICE_APP===x[0];
       return '<button data-papp="'+x[0]+'" style="flex:1;background:'+(on?'var(--acc)':'#F1F3F6')+';color:'+(on?'#fff':'var(--dim)')+';border:none;border-radius:4px;padding:9px 0;font:700 12.5px system-ui;cursor:pointer">'+x[1]+'</button>';
     }).join('')+'</div>';
     if(PRICE_APP!=='fx'){
-      h+='<div class="card"><div class="empty">'+(PRICE_APP==='crypto'?'Crypto':'Sports')+' pricing — coming next.<br>FX is live below.</div></div>';
+      h+='<div class="card"><div class="empty">'+(PRICE_APP==='crypto'?'Crypto':'Sports')+' pricing — coming next.<br>FX &amp; instruments are live below.</div></div>';
       return h;
     }
-    var P=PRICING.fx||{spread_mult:1,bias_bps:0};
-    var sm=+P.spread_mult||1, bb=+P.bias_bps||0;
-    h+='<div class="card">'+
-      '<div class="lbl">Spread multiplier · ×'+sm.toFixed(1)+'</div>'+
-      '<input type="range" id="pr_sm" min="0.5" max="5" step="0.1" value="'+sm+'" style="width:100%;margin:8px 0" oninput="document.getElementById(\'pr_sm_v\').textContent=\'×\'+(+this.value).toFixed(1)">'+
-      '<div class="req-meta">Wider spread = more margin per trade. Current: <b id="pr_sm_v">×'+sm.toFixed(1)+'</b> · ×1 = normal, ×5 = max.</div>'+
-      '<div class="lbl" style="margin-top:14px">Price bias · '+(bb>0?'+':'')+bb+' bps</div>'+
-      '<input type="range" id="pr_bb" min="-30" max="30" step="1" value="'+bb+'" style="width:100%;margin:8px 0" oninput="document.getElementById(\'pr_bb_v\').textContent=((+this.value>0?\'+\':\'\')+(+this.value))+\' bps\'">'+
-      '<div class="req-meta">Nudges the whole quote up/down (±30 bps = ±0.30% max). <b id="pr_bb_v">'+(bb>0?'+':'')+bb+' bps</b></div>'+
-      '<div class="hint" style="color:var(--warn)">⚠ Bias moves live prices — it changes open-position P&amp;L and can trigger stop-outs. Use small values.</div>'+
-      '<div class="btns"><button class="ok" data-psave="1">Apply to all FX clients</button><button class="no" data-preset="1">Reset to normal</button></div>'+
-      '<div class="hint">Applies within ~5s on every customer\'s FX app.</div></div>';
-    h+='<div class="sec">Spread preview (majors)</div><div class="card">';
-    FX_REF.forEach(function(r){ var basePip=r[1], adj=basePip*sm;
-      h+='<div class="row"><span>'+r[0]+'</span><b>'+basePip.toFixed(1)+' → <span class="'+(sm>1?'neg':'pos')+'">'+adj.toFixed(1)+'</span> pips</b></div>'; });
-    h+='</div><div class="hint" style="margin:0 14px">Preview uses typical base spreads; live spreads still float around these.</div>';
+    var totalMk=0; Object.keys(PRICE_MARKS).forEach(function(k){ totalMk+=+PRICE_MARKS[k]||0; });
+    h+='<div class="card" style="padding:9px 12px"><input class="in" id="prSearch" placeholder="Search symbol…" value="'+(PRICE_FILTER||'').replace(/"/g,'&quot;')+'" style="margin-top:0">'+
+      '<div style="display:flex;gap:5px;margin-top:8px;flex-wrap:wrap">'+['ALL','FX','STOCK','CRYPTO','INDEX','METAL'].map(function(c){
+        var on=PRICE_CLS===c; return '<button data-pcls="'+c+'" style="flex:1;min-width:54px;background:'+(on?'var(--acc)':'#F1F3F6')+';color:'+(on?'#fff':'var(--dim)')+';border:none;border-radius:4px;padding:6px 0;font:700 10.5px system-ui;cursor:pointer">'+c+'</button>';
+      }).join('')+'</div></div>';
+    var q=(PRICE_FILTER||'').toLowerCase();
+    var list=FX_INSTR.filter(function(r){ return (PRICE_CLS==='ALL'||r[2]===PRICE_CLS) && (!q||((r[0]+' '+r[1]).toLowerCase().indexOf(q)>=0)); });
+    h+='<div class="card" style="padding:4px 12px">'+
+      '<div class="row" style="padding:6px 0;border-bottom:1px solid var(--line)"><span class="lbl" style="flex:1">Symbol</span><span class="lbl" style="width:78px;text-align:right">Bid</span><span class="lbl" style="width:96px;text-align:right">Markup</span></div>';
+    if(!list.length) h+='<div class="empty">No instruments match.</div>';
+    list.forEach(function(r){
+      var sym=r[0], bid=PRICE_LIVE[sym]||r[3], dg=r[4], sprPt=r[5], mk=+PRICE_MARKS[sym]||0;
+      var up=bid>=r[3];
+      h+='<div class="row" style="align-items:center">'+
+        '<span style="flex:1;min-width:0"><b style="font-size:12.5px">'+sym+'</b> <span class="badge" style="background:#EEF2F7;color:var(--dim)">'+r[2]+'</span>'+
+        '<div class="req-meta" style="margin:1px 0 0">'+r[1]+' · spr '+(sprPt+mk).toFixed(1)+'pt</div></span>'+
+        '<span style="width:78px;text-align:right;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:12.5px">'+bid.toFixed(dg)+'</b></span>'+
+        '<span style="width:96px;display:flex;gap:3px;justify-content:flex-end;align-items:center">'+
+          '<span style="font-variant-numeric:tabular-nums;font-size:11.5px;color:'+(mk>0?'var(--neg)':mk<0?'var(--pos)':'var(--dim)')+';min-width:30px;text-align:right">'+(mk>0?'+':'')+mk.toFixed(1)+'</span>'+
+          '<button data-pmk="'+sym+'|-" style="width:24px;height:24px;border:1px solid var(--line);background:#fff;border-radius:4px;font:700 13px system-ui;cursor:pointer;color:var(--ink)">−</button>'+
+          '<button data-pmk="'+sym+'|+" style="width:24px;height:24px;border:1px solid var(--line);background:#fff;border-radius:4px;font:700 13px system-ui;cursor:pointer;color:var(--ink)">+</button>'+
+        '</span></div>';
+    });
+    h+='</div>';
+    h+='<div class="card"><div class="row" style="border:none;padding:2px 0"><span class="lbl">Total markup added</span>'+
+      '<span style="display:flex;align-items:center;gap:10px"><b class="'+(totalMk>0?'neg':'pos')+'">'+(totalMk>0?'+':'')+totalMk.toFixed(1)+' pt</b>'+
+      '<button data-preset="1" style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:6px 12px;font:700 11px system-ui;cursor:pointer;color:var(--ink)">↻ Reset all</button></span></div></div>';
+    h+='<div class="hint" style="margin:0 14px">Markup widens that symbol\'s spread — applies to every customer\'s FX app within ~5s. − / + steps 0.1pt.</div>';
     return h;
   }
-  function savePricing(smOv,bbOv){
-    var sm=(smOv!=null)?smOv:parseFloat(val('pr_sm')); if(!(sm>0))sm=1; sm=Math.max(0.5,Math.min(5,sm));
-    var bb=(bbOv!=null)?bbOv:parseFloat(val('pr_bb')); if(!isFinite(bb))bb=0; bb=Math.max(-30,Math.min(30,bb));
-    PRICING.fx={spread_mult:sm,bias_bps:bb};
-    AlpexaSync.db.from('pricing').upsert({server:'fx',spread_mult:sm,bias_bps:bb,updated_at:new Date().toISOString()},{onConflict:'server'}).then(function(r){
-      if(r&&r.error){ toast('Error: '+r.error.message+' (run the pricing SQL?)',true); return; }
-      try{ logAction('pricing_fx', '', 'spread ×'+sm.toFixed(1)+' · bias '+bb+'bps'); }catch(e){}
-      toast('Pricing applied ✓ — clients update in ~5s'); render();
-    },function(){ toast('Save failed',true); });
+  function pricingMark(sym,dir){
+    var cur=+PRICE_MARKS[sym]||0; var nx=Math.round((cur+(dir==='+'?0.1:-0.1))*10)/10;
+    nx=Math.max(0,Math.min(50,nx)); PRICE_MARKS[sym]=nx;
+    if(cur===nx){ render(); return; }
+    render();
+    AlpexaSync.db.from('pricing_marks').upsert({symbol:sym,markup_pts:nx,updated_at:new Date().toISOString()},{onConflict:'symbol'}).then(function(r){
+      if(r&&r.error)toast('Error: '+r.error.message+' (run the pricing_marks SQL?)',true);
+    },function(){});
+  }
+  function pricingResetAll(){
+    if(!confirm('Reset ALL symbol markups to 0?')) return;
+    var syms=Object.keys(PRICE_MARKS); PRICE_MARKS={}; render();
+    syms.forEach(function(s){ AlpexaSync.db.from('pricing_marks').upsert({symbol:s,markup_pts:0,updated_at:new Date().toISOString()},{onConflict:'symbol'}).then(function(){},function(){}); });
+    try{ logAction('pricing_reset','','all FX markups → 0'); }catch(e){}
+    toast('All markups reset ✓');
   }
   // ── Agents (IB / affiliates): recruit customers, earn commission ──
   // FX: $ per lot (spread-markup rebate) · Crypto: % of trade fees ·
@@ -1295,8 +1333,10 @@
     document.querySelectorAll('[data-agr]').forEach(function(b){b.onclick=function(){AG_RANGE=b.getAttribute('data-agr');render();};});
     document.querySelectorAll('[data-agopen]').forEach(function(b){b.onclick=function(){var c=b.getAttribute('data-agopen');AGENT_OPEN=(AGENT_OPEN===c?null:c);render();};});
     document.querySelectorAll('[data-papp]').forEach(function(b){b.onclick=function(){PRICE_APP=b.getAttribute('data-papp');render();};});
-    document.querySelectorAll('[data-psave]').forEach(function(b){b.onclick=savePricing;});
-    document.querySelectorAll('[data-preset]').forEach(function(b){b.onclick=function(){savePricing(1,0);};});
+    document.querySelectorAll('[data-pcls]').forEach(function(b){b.onclick=function(){PRICE_CLS=b.getAttribute('data-pcls');render();};});
+    document.querySelectorAll('[data-pmk]').forEach(function(b){b.onclick=function(){var p=(b.getAttribute('data-pmk')||'').split('|');pricingMark(p[0],p[1]);};});
+    document.querySelectorAll('[data-preset]').forEach(function(b){b.onclick=pricingResetAll;});
+    var prs=document.getElementById('prSearch'); if(prs){prs.oninput=function(){PRICE_FILTER=prs.value;render();var n=document.getElementById('prSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
     document.querySelectorAll('[data-agnew]').forEach(function(b){b.onclick=agentPopup;});
     document.querySelectorAll('[data-apw]').forEach(function(b){b.onclick=function(){agentPayWallet(b.getAttribute('data-apw'));};});
     document.querySelectorAll('[data-apm]').forEach(function(b){b.onclick=function(){agentPayManual(b.getAttribute('data-apm'));};});
@@ -1345,7 +1385,7 @@
   }
 
   // Don't redraw while the operator is mid-edit or typing a search (would lose input).
-  function busyEditing(){ return (cur==='history' && (EDIT_ID || (document.activeElement && (document.activeElement.id==='histSearch'||document.activeElement.id==='hsFrom'||document.activeElement.id==='hsTo')))) || (cur==='players' && (PLAYER_EDIT || (document.activeElement && document.activeElement.id==='plSearch'))) || (cur==='bets' && document.activeElement && document.activeElement.id==='openSearch') || (cur==='report' && document.activeElement && (document.activeElement.id==='rpFrom'||document.activeElement.id==='rpTo')) || (cur==='agents' && document.activeElement && String(document.activeElement.id||'').indexOf('ag_')===0) || (cur==='pricing' && document.activeElement && (document.activeElement.id==='pr_sm'||document.activeElement.id==='pr_bb')); }
+  function busyEditing(){ return (cur==='history' && (EDIT_ID || (document.activeElement && (document.activeElement.id==='histSearch'||document.activeElement.id==='hsFrom'||document.activeElement.id==='hsTo')))) || (cur==='players' && (PLAYER_EDIT || (document.activeElement && document.activeElement.id==='plSearch'))) || (cur==='bets' && document.activeElement && document.activeElement.id==='openSearch') || (cur==='report' && document.activeElement && (document.activeElement.id==='rpFrom'||document.activeElement.id==='rpTo')) || (cur==='agents' && document.activeElement && String(document.activeElement.id||'').indexOf('ag_')===0) || (cur==='pricing' && document.activeElement && document.activeElement.id==='prSearch'); }
   window.addEventListener('storage',function(e){ if(e.key&&e.key.indexOf('alpexa')===0 && !busyEditing()) render(); });
   setInterval(function(){ if(cur==='overview'||cur==='approvals'||cur==='risk'||cur==='bets') render(); }, 4000);
   // Pull every customer's requests from the shared server.
@@ -1363,7 +1403,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v28';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v29';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
