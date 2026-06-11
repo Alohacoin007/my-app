@@ -3491,9 +3491,17 @@ function App(){
   // TRUSTED source; the simulation drifts smoothly between updates. No API key in
   // the client. Symbols the feed doesn't carry (stocks/indices) keep simulating.
   useEffect(()=>{
+    window.__alpexaFXPrev=window.__alpexaFXPrev||{};
+    window.__alpexaFastMkt=window.__alpexaFastMkt||{};
     function applyFeed(){ if(document.hidden) return;
       const f=window.__alpexaFXFeed||{}; const o={}; let any=false;
-      Object.keys(f).forEach((sym)=>{ const px=+(f[sym]&&f[sym].mid)||0; if(px>0){ o[sym]=px; any=true; } });
+      Object.keys(f).forEach((sym)=>{ const px=+(f[sym]&&f[sym].mid)||0; if(px>0){
+        // Fast-market: if the real feed just jumped sharply, flag this symbol so
+        // new orders are briefly rejected (anti latency-arbitrage on spikes).
+        const prev=window.__alpexaFXPrev[sym];
+        if(prev>0 && Math.abs(px-prev)/prev > 0.0025){ window.__alpexaFastMkt[sym]=Date.now()+5000; }
+        window.__alpexaFXPrev[sym]=px;
+        o[sym]=px; any=true; } });
       if(any){ marketRef.current.applyReal(o,true); force(x=>x+1); }
     }
     function pull(s){ if(!s) return; const f=window.__alpexaFXFeed||{}; const px=+(f[s.sym]&&f[s.sym].mid)||0;
@@ -3615,6 +3623,16 @@ function App(){
         setTimeout(()=>setToast(null),4000); return; }
       if(!sObj.real&&pullRef.current){ pullRef.current(sObj); }
     }
+    // ── Arbitrage defense (FX market orders) ──
+    // Fast market: the real feed just spiked → reject so nobody can lock in a
+    // stale price right before our quote catches up (latency-arb on news moves).
+    if(sObj && sObj.cls==='FX' && (!orderData.otype || orderData.otype==='MARKET')){
+      if(window.__alpexaFastMkt && Date.now() < (window.__alpexaFastMkt[sObj.sym]||0)){
+        if(window.ALPEXA_SFX&&ALPEXA_SFX.error)ALPEXA_SFX.error();
+        setToast({error:true,icon:'bolt',msg:'Price moving fast',sub:sObj.sym+' just moved sharply — re-check the price and try again.'});
+        setTimeout(()=>setToast(null),3500); return;
+      }
+    }
     const id=Date.now();
     const now=new Date();
     const time=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
@@ -3626,7 +3644,20 @@ function App(){
       if(window.ALPEXA_SFX)window.ALPEXA_SFX.pendingPlaced();
       setTab('HIST');setPosTab('PEND');return;
     }
-    const fillPx=sObj?applySlippage(sObj,orderData.side,orderData.open,'MARKET'):orderData.open;
+    // Last-look: fill FX at the feed-ANCHORED price (sObj.bid), not the wiggling
+    // sim 'last' — so a trader can't exploit a momentary sim dip/spike. If the
+    // anchored price diverged from what the user saw by >0.3% (above sim noise),
+    // requote instead of silently filling at a very different price.
+    let fillBase=orderData.open;
+    if(sObj && sObj.cls==='FX' && sObj.bid>0){
+      fillBase = orderData.side==='BUY' ? (sObj.bid + (sObj.spread||0)) : sObj.bid;
+      if(orderData.open>0 && Math.abs(fillBase-orderData.open)/orderData.open > 0.003){
+        if(window.ALPEXA_SFX&&ALPEXA_SFX.error)ALPEXA_SFX.error();
+        setToast({error:true,icon:'autorenew',msg:'Requote',sub:sObj.sym+' price changed — please confirm at the new price.'});
+        setTimeout(()=>setToast(null),3500); return;
+      }
+    }
+    const fillPx=sObj?applySlippage(sObj,orderData.side,fillBase,'MARKET'):fillBase;
     const newOrder={id,...orderData,open:fillPx,status:'OPEN',placedAt:time,placedTs:Date.now(),ticket:alpexaTicket('FX'),pnl:0,fresh:true};
     setLiveOrders(prev=>[newOrder,...prev]);
     try{window.broadcastPositionOpen&&window.broadcastPositionOpen(newOrder, account);}catch(e){}
@@ -3812,7 +3843,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v101';
+(function(){try{var b=document.createElement('div');b.textContent='FX v102';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
@@ -3879,7 +3910,7 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
   function pullPricing(){ if(!window.AlpexaSync||!AlpexaSync.db)return;
     AlpexaSync.db.from('pricing').select('*').eq('server','fx').limit(1).then(function(r){
       var p=r&&r.data&&r.data[0]; if(!p)return;
-      var sm=+p.spread_mult; if(!(sm>0))sm=1; sm=Math.max(0.5,Math.min(5,sm));
+      var sm=+p.spread_mult; if(!(sm>0))sm=1; sm=Math.max(1,Math.min(5,sm)); // floor 1x: never tighter than the realistic base spread (anti-arb moat)
       var bb=+p.bias_bps; if(!isFinite(bb))bb=0; bb=Math.max(-30,Math.min(30,bb));
       window.__alpexaFXPricing={spreadMult:sm,biasFrac:bb/10000};
     },function(){});
