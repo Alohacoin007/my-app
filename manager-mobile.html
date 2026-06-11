@@ -1003,19 +1003,17 @@
       var clist=CRYPTO_INSTR.filter(function(r){ return !q2||((r[0]+' '+r[1]).toLowerCase().indexOf(q2)>=0); });
       h+='<div class="card" style="padding:9px 12px"><input class="in" id="prSearch" placeholder="Search coin…" value="'+(PRICE_FILTER||'').replace(/"/g,'&quot;')+'" style="margin-top:0"></div>';
       h+='<div class="card" style="padding:3px 8px">'+
-        '<div class="row" style="padding:5px 0;border-bottom:1px solid var(--line)"><span class="lbl" style="width:50px">Coin</span><span style="flex:1"></span><span class="lbl" style="width:64px;text-align:right">Buy</span><span class="lbl" style="width:64px;text-align:right">Sell</span><span style="flex:1"></span><span class="lbl" style="width:60px;text-align:right">Mk%</span></div>';
+        '<div class="row" style="padding:5px 0;border-bottom:1px solid var(--line)"><span class="lbl" style="width:46px;text-align:center">Coin</span><span class="lbl" style="flex:1;text-align:center">Buy</span><span class="lbl" style="flex:1;text-align:center">Sell</span><span class="lbl" style="width:74px;text-align:center">Mk%</span></div>';
       clist.forEach(function(r){
         var sym=r[0], px=CRYPTO_LIVE[sym]||r[2], dg=r[3], mk=+PRICE_MARKS[sym]||0, up=CRYPTO_DIR[sym]>=0;
         var buy=px*(1+mk/100), sell=px*(1-mk/100);
         h+='<div class="row" style="align-items:center;padding:6px 0">'+
-          '<span style="width:50px;min-width:50px;overflow:hidden"><b style="font-size:11.5px">'+sym+'</b><div class="req-meta" style="margin:0;font-size:9px">'+r[1]+'</div></span>'+
-          '<span style="flex:1"></span>'+
-          '<span style="width:64px;text-align:right;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+buy.toFixed(dg)+'</b></span>'+
-          '<span style="width:64px;text-align:right;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+sell.toFixed(dg)+'</b></span>'+
-          '<span style="flex:1"></span>'+
-          '<span style="width:60px;display:flex;gap:2px;justify-content:flex-end;align-items:center">'+
+          '<span style="width:46px;text-align:center;overflow:hidden"><b style="font-size:11px">'+sym+'</b></span>'+
+          '<span style="flex:1;text-align:center;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+buy.toFixed(dg)+'</b></span>'+
+          '<span style="flex:1;text-align:center;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+sell.toFixed(dg)+'</b></span>'+
+          '<span style="width:74px;display:flex;gap:3px;justify-content:center;align-items:center">'+
             '<button data-pmk="'+sym+'|-" style="width:19px;height:19px;border:1px solid var(--line);background:#fff;border-radius:4px;font:700 12px system-ui;cursor:pointer;color:var(--ink)">−</button>'+
-            '<span style="font-variant-numeric:tabular-nums;font-size:9.5px;color:'+(mk>0?'var(--neg)':'var(--dim)')+';min-width:22px;text-align:center">'+mk.toFixed(1)+'</span>'+
+            '<span style="font-variant-numeric:tabular-nums;font-size:9.5px;color:'+(mk>0?'var(--neg)':'var(--dim)')+';min-width:20px;text-align:center">'+mk.toFixed(1)+'</span>'+
             '<button data-pmk="'+sym+'|+" style="width:19px;height:19px;border:1px solid var(--line);background:#fff;border-radius:4px;font:700 12px system-ui;cursor:pointer;color:var(--ink)">+</button>'+
           '</span></div>';
       });
@@ -1047,7 +1045,7 @@
     var q=(PRICE_FILTER||'').toLowerCase();
     var list=FX_INSTR.filter(function(r){ return (PRICE_CLS==='ALL'||r[2]===PRICE_CLS) && (!q||((r[0]+' '+r[1]).toLowerCase().indexOf(q)>=0)); });
     h+='<div class="card" style="padding:3px 8px">'+
-      '<div class="row" style="padding:5px 0;border-bottom:1px solid var(--line)"><span class="lbl" style="width:50px">Symbol</span><span style="flex:1"></span><span class="lbl" style="width:54px;text-align:right">Bid</span><span class="lbl" style="width:32px;text-align:center">Spr</span><span class="lbl" style="width:54px;text-align:right">Ask</span><span style="flex:1"></span><span class="lbl" style="width:58px;text-align:right">Mk</span></div>';
+      '<div class="row" style="padding:5px 0;border-bottom:1px solid var(--line)"><span class="lbl" style="width:46px;text-align:center">Sym</span><span class="lbl" style="flex:1;text-align:center">Bid</span><span class="lbl" style="width:30px;text-align:center">Spr</span><span class="lbl" style="flex:1;text-align:center">Ask</span><span class="lbl" style="width:74px;text-align:center">Mk</span></div>';
     if(!list.length) h+='<div class="empty">No instruments match.</div>';
     list.forEach(function(r){
       var sym=r[0], mid=PRICE_LIVE[sym]||r[3], dg=r[4], mk=+PRICE_MARKS[sym]||0, up=PRICE_DIR[sym]>=0;
@@ -1056,14 +1054,11 @@
       var half=(liveSprPt*pip)/2, mkAbs=mk*pip;                            // mid ± half spread, markup loads the ask
       var bid=mid-half, ask=mid+half+mkAbs;
       h+='<div class="row" style="align-items:center;padding:6px 0">'+
-        '<span style="width:50px;min-width:50px;overflow:hidden"><b style="font-size:11.5px">'+sym+'</b>'+
-        '<div class="req-meta" style="margin:0;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+r[2]+'</div></span>'+
-        '<span style="flex:1"></span>'+
-        '<span style="width:54px;text-align:right;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+bid.toFixed(dg)+'</b></span>'+
-        '<span style="width:32px;text-align:center;font-variant-numeric:tabular-nums;font-size:10px;font-weight:700;color:'+(mk>0?'var(--neg)':'var(--dim)')+'">'+totSprPt.toFixed(1)+'</span>'+
-        '<span style="width:54px;text-align:right;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+ask.toFixed(dg)+'</b></span>'+
-        '<span style="flex:1"></span>'+
-        '<span style="width:58px;display:flex;gap:2px;justify-content:flex-end;align-items:center">'+
+        '<span style="width:46px;text-align:center;overflow:hidden"><b style="font-size:10px">'+sym+'</b></span>'+
+        '<span style="flex:1;text-align:center;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+bid.toFixed(dg)+'</b></span>'+
+        '<span style="width:30px;text-align:center;font-variant-numeric:tabular-nums;font-size:10px;font-weight:700;color:'+(mk>0?'var(--neg)':'var(--dim)')+'">'+totSprPt.toFixed(1)+'</span>'+
+        '<span style="flex:1;text-align:center;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+ask.toFixed(dg)+'</b></span>'+
+        '<span style="width:74px;display:flex;gap:3px;justify-content:center;align-items:center">'+
           '<button data-pmk="'+sym+'|-" style="width:19px;height:19px;border:1px solid var(--line);background:#fff;border-radius:4px;font:700 12px system-ui;cursor:pointer;color:var(--ink)">−</button>'+
           '<span style="font-variant-numeric:tabular-nums;font-size:9.5px;color:'+(mk>0?'var(--neg)':'var(--dim)')+';min-width:18px;text-align:center">'+(mk>0?'+':'')+mk.toFixed(1)+'</span>'+
           '<button data-pmk="'+sym+'|+" style="width:19px;height:19px;border:1px solid var(--line);background:#fff;border-radius:4px;font:700 12px system-ui;cursor:pointer;color:var(--ink)">+</button>'+
@@ -1486,7 +1481,7 @@
   } }, 3000);
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v41';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v42';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
