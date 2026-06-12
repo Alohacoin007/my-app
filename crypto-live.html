@@ -9413,9 +9413,12 @@ function AccountSubPageContent({ subPage, setSubSub, transactions = [], setTrans
     return (
       <>
         <AcctSection title="Profile">
+          <AcctRow label="Account number" value={(() => { try { const m = JSON.parse(localStorage.getItem('alpexa.me') || 'null'); return (m && m.accts && m.accts.crypto) || '—'; } catch (_) { return '—'; } })()}
+            onClick={() => { try { const m = JSON.parse(localStorage.getItem('alpexa.me') || 'null'); const a = m && m.accts && m.accts.crypto; if (a) { try { navigator.clipboard && navigator.clipboard.writeText(a); } catch (e) {} alert('Account number copied:\n' + a + '\n\nShare this (or your email) so others can send you USDT.'); } } catch (_) {} }}/>
+          <AcctDivider/>
           <AcctRow label="Legal name" value={React.useContext(IdentityContext).name} onClick={go('personal-name')}/>
           <AcctDivider/>
-          <AcctRow label="Email" value={React.useContext(IdentityContext).email} onClick={go('personal-email')}/>
+          <AcctRow label="Email" value={(() => { try { const m = JSON.parse(localStorage.getItem('alpexa.me') || 'null'); return (m && m.email) || 'admin@alpexa-suisse.com'; } catch (_) { return 'admin@alpexa-suisse.com'; } })()} onClick={go('personal-email')}/>
           <AcctDivider/>
           <AcctRow label="Phone" value={(() => {
             try {
@@ -13488,7 +13491,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v78';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v79';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
