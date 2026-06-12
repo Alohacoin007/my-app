@@ -2591,6 +2591,7 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
   const [amount,setAmount]=useState('');
   const [method,setMethod]=useState(presetMethod||(kind==='deposit'?'card':kind==='withdraw'?'bank':'live'));
   const [destAcct,setDestAcct]=useState('stocks');
+  const [wAddr,setWAddr]=useState('');  // USDT (ERC-20) withdrawal destination
   const [reportType,setReportType]=useState('monthly');
   const [reportFormat,setReportFormat]=useState('pdf');
   const [step,setStep]=useState('form');
@@ -2598,6 +2599,9 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
   const t=TITLES[kind];
   function submit(){
     if(kind!=='report'&&!amount)return;
+    // Crypto (USDT) withdrawal must have a valid 0x… address (else the back office can't pay it).
+    if(kind==='withdraw'&&(method==='wallet'||method==='crypto')&&!/^0x[0-9a-fA-F]{40}$/.test((wAddr||'').trim())){
+      alert('Enter a valid USDT (ERC-20) wallet address (0x…).'); return; }
     setStep('processing');
     setTimeout(()=>{
       setStep('done');
@@ -2610,7 +2614,7 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
         const reqId='fx-'+Date.now()+'-'+Math.random().toString(36).slice(2,6);
         // Pending until the back office approves — balance changes on approval.
         try{pushFundingHistory({id:reqId,kind,method,amount:amt,currency:'USD',ref:REF_PREFIX[kind]+Math.floor(10000000+Math.random()*89999999),note,account:(account||'live'),destAcct:(kind==='transfer'?destAcct:undefined),status:'pending'});}catch(e){}
-        try{window.AlpexaSync&&AlpexaSync.pushRequest({id:reqId,type:kind,server:'FX',amount:amt,asset:'USD',network:method,from:(kind==='transfer'?'FX':''),to:(kind==='transfer'?(destAcct||'crypto'):'')});}catch(e){}
+        try{window.AlpexaSync&&AlpexaSync.pushRequest({id:reqId,type:kind,server:'FX',amount:amt,asset:'USD',network:method,address:((method==='wallet'||method==='crypto')?(wAddr||'').trim():''),from:(kind==='transfer'?'FX':''),to:(kind==='transfer'?(destAcct||'crypto'):'')});}catch(e){}
         try{ window.alpexaNotify&&alpexaNotify({type:kind,pref:(kind==='withdraw'?'withdrawal':'deposit'),title:(kind==='deposit'?'Deposit':kind==='withdraw'?'Withdrawal':'Transfer')+' requested · $'+amt.toLocaleString()+' · pending approval'}); }catch(e){}
       }
     },1300);
@@ -2750,7 +2754,7 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
                   <SheetLabel>Destination Wallet</SheetLabel>
                   <div style={{background:'var(--bg)',borderRadius:9,padding:'12px',marginBottom:14}}>
                     <div style={{fontSize:10,fontWeight:700,color:'var(--text-3)',letterSpacing:0.5,textTransform:'uppercase',marginBottom:5}}>USDT Address (ERC-20)</div>
-                    <input placeholder="0x..." defaultValue="0x4f8B2c3D9E1f5a8E4Bf3c5d7e2A4F8B6c3D9E1f5" style={{width:'100%',padding:'10px 12px',border:'1px solid var(--line-2)',borderRadius:6,background:'#fff',fontFamily:'JetBrains Mono, monospace',fontSize:11,outline:'none',marginBottom:10}}/>
+                    <input placeholder="0x..." value={wAddr} onChange={e=>setWAddr(e.target.value)} spellCheck={false} autoComplete="off" style={{width:'100%',padding:'10px 12px',border:'1px solid var(--line-2)',borderRadius:6,background:'#fff',fontFamily:'JetBrains Mono, monospace',fontSize:11,outline:'none',marginBottom:10}}/>
                     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
                       <div>
                         <div style={{fontSize:10,fontWeight:700,color:'var(--text-3)',letterSpacing:0.5,textTransform:'uppercase',marginBottom:5}}>Network</div>
@@ -3858,7 +3862,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){try{var b=document.createElement('div');b.textContent='FX v104';
+(function(){try{var b=document.createElement('div');b.textContent='FX v105';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
