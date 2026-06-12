@@ -18,8 +18,10 @@ const STOCKS = [
   "AAPL","TSLA","NVDA","MSFT","GOOGL","META","AMZN","NFLX","AMD","JPM",
   "IONQ","RGTI","QBTS","QUBT","ARQQ","TSM","INTC","QCOM","AVGO","ASML",
   "MU","TXN","AMAT","LRCX","KLAC","PLTR","SMCI","ANET","CRWD","ARM",
-  "ORCL","NOW","CRM","SNOW","ADBE",
+  "ORCL","NOW","CRM","SNOW","ADBE","SPACEX",
 ];
+// App symbol → real Finnhub ticker (when they differ). SpaceX trades as SPCX.
+const FINNHUB_TICKER: Record<string, string> = { SPACEX: "SPCX" };
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -47,7 +49,8 @@ Deno.serve(async (req) => {
   const rows: { symbol: string; mid: number; spr_pts: number }[] = [];
   const results = await Promise.all(list.map(async (sym) => {
     try {
-      const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${sym}&token=${KEY}`);
+      const ticker = FINNHUB_TICKER[sym] || sym;   // fetch by real ticker, store under app symbol
+      const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${KEY}`);
       const j = await r.json();
       const c = +j?.c || 0;
       return { sym, c, ok: r.ok };
