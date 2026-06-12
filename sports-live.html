@@ -584,7 +584,7 @@
 /* Login gate (real service): no anonymous guest trading. Require a logged-in identity (email or authId); guests/empty go to login. */
 (function(){try{var m=JSON.parse(localStorage.getItem("alpexa.me")||"null");if(!(m&&m.accts&&(m.email||m.authId))){location.replace("login.html");}}catch(e){location.replace("login.html");}})();
 </script>
-<script src="alpexa-sync.js?v=6"></script>
+<script src="alpexa-sync.js?v=7"></script>
 <script>
 (function(){try{var k='alpexa.serverBalances';var o={};try{o=JSON.parse(localStorage.getItem(k)||'{}')||{};}catch(e){o={};}
   var ch=false;
@@ -1205,7 +1205,7 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.45</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.46</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -1709,6 +1709,7 @@
     // deduct stake + log activity
     balance-=stake; syncSportsBal();
     txns.unshift({ts:Date.now(),ic:'🎫',t1:'Bet placed',t2:`${betType}${legCount>1?' · '+legCount+' legs':''} · Just now`,amt:-stake});
+    try{window.AlpexaSync&&AlpexaSync.logActivity({server:'sports',kind:'bet',symbol:betType,amount:stake,ticket:spTicket,detail:((legs&&legs[0]&&(legs[0].game||legs[0].gm))||'')+(legCount>1?(' +'+(legCount-1)+' legs'):'')});}catch(e){}
     notify('🎫','Bet placed',`${betType} · ${usd(stake)} stake`,'betResults');
     legs=[];renderGames();syncSlip();closeSheet();renderTickets();updateWallet();
     document.getElementById('navBadge').textContent=openBets.length;

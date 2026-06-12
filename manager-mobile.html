@@ -80,7 +80,7 @@
   <div id="content"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="alpexa-sync.js?v=6"></script>
+<script src="alpexa-sync.js?v=7"></script>
 <script>
   // ── Back-office PIN lock (demo-level: deters casual access; upgrade to real
   //    admin login before production). ──
@@ -404,6 +404,10 @@
   var SRV_PAYMENTS=[];
   function pullPayments(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
     AlpexaSync.db.from('payments').select('*').order('created_at',{ascending:false}).limit(500).then(function(r){ if(r&&r.data){ SRV_PAYMENTS=r.data; if((cur==='players'||cur==='history')&&!busyEditing())render(); } },function(){}); }
+  // Full activity log: every buy/sell/stake/bet/trade each customer makes.
+  var SRV_ACTIVITY=[];
+  function pullActivity(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('activity').select('*').order('created_at',{ascending:false}).limit(1500).then(function(r){ if(r&&r.data){ SRV_ACTIVITY=r.data; if((cur==='players'||cur==='history')&&!busyEditing())render(); } },function(){}); }
   function viewReport(){
     if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Report</div><div class="card"><div class="empty">Not connected to server.</div></div>';
     var now=Date.now(), cutoff=0, hi=Infinity, label='All time';
@@ -778,6 +782,16 @@
             h+='<div class="row"><span><b>'+(out?'Sent':'Received')+'</b> <span class="muted" style="font-size:10.5px">'+(p.asset||'USDT')+' · '+(p.status||'')+'</span>'+
               '<div class="req-meta" style="margin:2px 0 0">'+(out?('to '+(p.to_acct||'')):('from '+(p.from_name||p.from_cust||'')))+' · '+when+'</div></span>'+
               '<b class="'+(out?'neg':'pos')+'">'+(out?'-':'+')+usd(+p.amount||0)+'</b></div>'; });
+          // Full activity log: buys, sells, stakes, bets, FX opens for this customer.
+          var ACTLBL={buy:'Buy',sell:'Sell',stake:'Stake',unstake:'Unstake',bet:'Bet',trade_open:'FX open',send:'Send',receive:'Receive',deposit:'Deposit',withdraw:'Withdraw',swap:'Swap'};
+          var APPIC={crypto:'🪙',fx:'📈',sports:'🏈'};
+          var acts=SRV_ACTIVITY.filter(function(x){ return x.cust_id===cid; }).slice(0,25);
+          h+='<div class="lbl" style="margin-top:12px">Activity ('+acts.length+')</div>';
+          if(!acts.length){ h+='<div class="req-meta" style="margin:4px 0">No activity recorded yet.</div>'; }
+          acts.forEach(function(x){ var when=x.created_at?new Date(x.created_at).toLocaleString():'';
+            h+='<div class="row"><span style="min-width:0"><b>'+(APPIC[x.server]||'')+' '+(ACTLBL[x.kind]||x.kind||'—')+'</b> <span class="muted" style="font-size:10.5px">'+(x.symbol||'')+'</span>'+
+              '<div class="req-meta" style="margin:2px 0 0">'+(x.ticket?(x.ticket+' · '):'')+(x.detail||'')+' · '+when+'</div></span>'+
+              '<b class="muted">'+(x.amount?usd(+x.amount):'')+'</b></div>'; });
           h+='<button class="save ghost" data-editpl="'+esc(cid)+'" style="width:100%;margin-top:10px">Edit profile &amp; balances</button>';
         }
         h+='<div class="row" style="border:none;padding:6px 0 0"><span class="hint" style="margin:0">ID '+(cid||'—')+'</span><button class="save ghost" data-cust="'+esc(cid)+'" style="margin-top:0;padding:7px 12px">Transactions</button></div>';
@@ -1703,10 +1717,10 @@
   setInterval(function(){ if(cur==='overview'||cur==='approvals'||cur==='risk'||cur==='bets') render(); }, 4000);
   // Pull every customer's requests from the shared server.
   function pullServer(){ if(!window.AlpexaSync||!AlpexaSync.db) return; AlpexaSync.pullAll().then(function(rows){ SRV_REQS=rows||[]; if(!busyEditing()) render(); }).catch(function(){}); }
-  pullServer(); pullPlayers(); pullOpenSummary(); pullOnline(); pullSettle(); pullPayments(); pullAgents(); pullPricing(); pullLivePrices(); pullApiUsage(); pullControls(); pullAdminAuth();
+  pullServer(); pullPlayers(); pullOpenSummary(); pullOnline(); pullSettle(); pullPayments(); pullActivity(); pullAgents(); pullPricing(); pullLivePrices(); pullApiUsage(); pullControls(); pullAdminAuth();
   setInterval(function(){ if(!document.hidden){ pullServer(); pullPlayers();
     if(cur==='bets') pullOpenSummary();
-    if(cur==='players'&&PLAYER_OPEN){ pullCustPos(PLAYER_OPEN); pullSettle(); pullPayments(); }
+    if(cur==='players'&&PLAYER_OPEN){ pullCustPos(PLAYER_OPEN); pullSettle(); pullPayments(); pullActivity(); }
     if(cur==='online') pullOnline();
     if(cur==='overview') pullApiUsage();
     if(cur==='config') pullControls();
@@ -1747,7 +1761,7 @@
   })();
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v72';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v73';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>

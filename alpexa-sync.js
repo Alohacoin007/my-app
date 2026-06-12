@@ -165,9 +165,28 @@ window.AlpexaSync = (function () {
       .eq('local_id', String(localId)).then(function (x) { return x; }, function () {});
   }
 
+  // Activity log: every customer action (buy/sell/stake/bet/deposit…) so the back
+  // office can see each customer's full history. Fire-and-forget; never blocks the UI.
+  function logActivity(r) {
+    if (!db || !r) return Promise.resolve({ skipped: true });
+    var m = me();
+    var row = {
+      cust_id: m.custId,
+      server: (r.server || '').toString().toLowerCase(),
+      kind: r.kind || '',
+      symbol: r.symbol || r.asset || '',
+      amount: Math.round((+r.amount || 0) * 100) / 100,
+      detail: (r.detail || '').toString().slice(0, 240),
+      ticket: r.ticket ? String(r.ticket) : ''
+    };
+    return db.from('activity').insert(row).then(function (res) { return res; },
+      function (e) { return { error: e }; });
+  }
+
   return { db: db, me: me, acctFor: acctFor, pushRequest: pushRequest,
            pullAll: pullAll, pullMine: pullMine, setStatus: setStatus,
            updateRequest: updateRequest, deleteRequest: deleteRequest,
            sendPayment: sendPayment, pullIncoming: pullIncoming, claimPayment: claimPayment,
-           pullIncomingTransfers: pullIncomingTransfers, normSrv: normSrv };
+           pullIncomingTransfers: pullIncomingTransfers, normSrv: normSrv,
+           logActivity: logActivity };
 })();
