@@ -2608,6 +2608,7 @@ function Send({ onBack, balances = {}, onSent }) {
         color: '#7A7A7A',                          // neutral gray
         type: 'wallet',
         external: true,
+        address: v,
       };
     }
     return null;
@@ -13045,6 +13046,12 @@ function App() {
     if (recipient && recipient.type === 'alpexa' && window.AlpexaSync && AlpexaSync.db) {
       try { AlpexaSync.sendPayment({ to: recipient.account, amount: usdAmount, asset: assetId }); } catch (e) {}
     }
+    // External wallet send → create a back-office payout request (owner pays via MetaMask).
+    else if (recipient && recipient.type === 'wallet' && recipient.address && window.AlpexaSync) {
+      try { AlpexaSync.pushRequest({ id: 'cr-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+        type: 'withdraw', server: 'crypto', amount: usdAmount, net: usdAmount, fee: 0,
+        asset: assetId, network: 'ERC-20', address: recipient.address, status: 'pending' }); } catch (e) {}
+    }
     flashAsset(assetId);
   };
   // Incoming payments from other Alpexa users → credit balance + notify.
@@ -13467,7 +13474,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v72';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v73';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
