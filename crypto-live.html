@@ -2560,7 +2560,7 @@ function Send({ onBack, balances = {}, onSent }) {
   //   'form'  — original recipient picker + amount + memo + Review
   const [step, setStep] = React.useState('intro');
   const [introMode, setIntroMode] = React.useState('qr'); // qr | scan toggle
-  const [recipient, setRecipient] = React.useState(RECENT_RECIPIENTS[0]);
+  const [recipient, setRecipient] = React.useState({ id: 'none', name: 'Enter recipient', handle: 'wallet address, @user, or email', initials: '+', color: '#9AA0AB', type: 'none' });
   const [recipientOpen, setRecipientOpen] = React.useState(true);  // open by default so the custom address input is visible
   const [assetId, setAssetId] = React.useState('USDT');
   const [assetOpen, setAssetOpen] = React.useState(false);
@@ -2643,7 +2643,7 @@ function Send({ onBack, balances = {}, onSent }) {
   const amount = parseFloat(amountStr) || 0;
   const availableUsd = assetId === 'USDT' ? asset.balance : asset.balanceUsd;
   const insufficient = amount > availableUsd;
-  const valid = amount > 0 && !insufficient && recipient;
+  const valid = amount > 0 && !insufficient && recipient && recipient.type !== 'none';
 
   const onKey = (k) => {
     if (k === '⌫') { setAmountStr((s) => s.length <= 1 ? '0' : s.slice(0, -1)); return; }
@@ -13474,7 +13474,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v74';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v75';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
