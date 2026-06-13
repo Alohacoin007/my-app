@@ -51,6 +51,9 @@ body{font-family:'Roboto',sans-serif;background:#fff;display:flex;justify-conten
 .save-pw-txt{font-size:14px;color:#424242;}
 .signin-btn{width:100%;height:50px;background:#2196F3;border:none;border-radius:6px;color:#fff;font-size:16px;font-weight:500;cursor:pointer;font-family:'Roboto',sans-serif;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:24px;}
 .signin-btn:active{background:#1976d2;}
+.bio-btn{width:100%;height:50px;background:#fff;border:1.5px solid #2196F3;border-radius:6px;color:#2196F3;font-size:16px;font-weight:600;cursor:pointer;font-family:'Roboto',sans-serif;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px;}
+.bio-btn:active{background:#e3f2fd;}
+.bio-btn svg{width:22px;height:22px;stroke:#2196F3;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
 .spinner{width:20px;height:20px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none;}
 @keyframes spin{to{transform:rotate(360deg)}}
 .error-bar{background:#ffebee;border-radius:6px;padding:10px 14px;font-size:13px;color:#c62828;margin-bottom:20px;display:none;align-items:center;gap:8px;}
@@ -108,6 +111,20 @@ input:-webkit-autofill:active{
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>try{window._db=window.supabase.createClient('https://grxnbgtfnaayeluenvqh.supabase.co','sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu');}catch(e){console.error('supabase init',e);}</script>
+<script>
+/* Stay-signed-in: if this device is already logged in, skip the login form and
+   go straight to the app the user last used. Add ?switch=1 to force the form
+   (used by "다른 계정으로 로그인"). */
+(function(){try{
+  if(/[?&]switch=1/.test(location.search)) return;
+  var m=JSON.parse(localStorage.getItem('alpexa.me')||'null');
+  if(m&&m.accts&&(m.email||m.authId)){
+    var ls=(localStorage.getItem('alpexa.lastServer')||'').toLowerCase();
+    var dest= ls==='crypto'?'crypto-live.html': ls==='sports'?'sports-live.html':'trading.html';
+    location.replace(dest);
+  }
+}catch(e){}})();
+</script>
 </head>
 <body>
 <div id="wrap">
@@ -152,6 +169,10 @@ input:-webkit-autofill:active{
         <span id="signinTxt">Sign In</span>
         <div class="spinner" id="spinner"></div>
       </button>
+      <button class="bio-btn" id="bioBtn" style="display:none" onclick="quickLogin()">
+        <svg viewBox="0 0 24 24"><path d="M2 7V5a3 3 0 0 1 3-3h2M22 7V5a3 3 0 0 0-3-3h-2M2 17v2a3 3 0 0 0 3 3h2M22 17v2a3 3 0 0 1-3 3h-2"/><path d="M8.5 11a3.5 3.5 0 0 1 7 0v1"/><path d="M8.5 12.5v.5a3.5 3.5 0 0 0 7 0"/><path d="M12 11v3"/></svg>
+        <span id="bioTxt">Face ID로 로그인</span>
+      </button>
     </div>
     <div class="bottom-links">
       <div class="link-row">
@@ -159,6 +180,7 @@ input:-webkit-autofill:active{
         <span class="link-sep">·</span>
         <button class="link-btn" onclick="showToast('Password reset email has been sent')">Forgot password?</button>
       </div>
+      <button class="demo-btn" onclick="try{localStorage.removeItem('alpexa.cred');localStorage.removeItem('alpexa.bio');}catch(e){};document.getElementById('bioBtn').style.display='none';document.getElementById('loginInput').value='';document.getElementById('pwInput').value='';showToast('이 기기의 저장된 로그인을 지웠어요');">Sign in to a different account</button>
     </div>
   </div>
   <div id="qrForm" style="display:none">
@@ -259,6 +281,14 @@ async function doLogin(){
       } }catch(e){}
     // Restore identity on THIS device so the apps show the right account.
     localStorage.setItem('alpexa.me', JSON.stringify({custId:player.cust_id,name:player.name,email:player.email,authId:authId,accts:accts}));
+    // Remember which app to land on next time (stay-signed-in auto-pass uses this).
+    try{ localStorage.setItem('alpexa.lastServer', selServer===1?'crypto':selServer===2?'sports':'fx'); }catch(e){}
+    // If "Save password" is on, keep the login on THIS device so it can be
+    // pre-filled and used by Face ID / fingerprint quick login next time.
+    try{
+      if(savePw){ localStorage.setItem('alpexa.cred', btoa(unescape(encodeURIComponent(JSON.stringify({login:login,pw:pw,server:selServer}))))); }
+      else { localStorage.removeItem('alpexa.cred'); }
+    }catch(e){}
     document.getElementById('sucSub').innerHTML=`${SERVERS[selServer].name}<br>Signed in as ${player.name||player.cust_id}`;
     document.getElementById('successScreen').style.display='flex';
     const dest=selServer===1?'crypto-live.html':selServer===2?'sports-live.html':'trading.html';
@@ -274,6 +304,77 @@ function showToast(msg){const el=document.getElementById('toast');el.textContent
 buildQR();
 // Default the server to the one chosen at signup (so login lands on the same app).
 try{ var _ls=localStorage.getItem('alpexa.lastServer'); var _idx={fx:0,live:0,crypto:1,sports:2}[_ls]; if(_idx!=null) selectServer(_idx); }catch(e){}
+
+/* ── Saved login + Face ID / fingerprint quick login ──────────────────────── */
+function getSavedCred(){ try{ var s=localStorage.getItem('alpexa.cred'); if(!s) return null; return JSON.parse(decodeURIComponent(escape(atob(s)))); }catch(e){ return null; } }
+function b64uToBuf(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var bin=atob(s),b=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++)b[i]=bin.charCodeAt(i); return b.buffer; }
+function bufToB64u(buf){ var b=new Uint8Array(buf),s=''; for(var i=0;i<b.length;i++)s+=String.fromCharCode(b[i]); return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function randBytes(n){ var a=new Uint8Array(n); (window.crypto||{}).getRandomValues&&window.crypto.getRandomValues(a); return a; }
+
+// Register a device passkey (triggers Face ID/fingerprint to set up). Stores its id.
+async function bioRegister(label){
+  if(!(window.PublicKeyCredential&&navigator.credentials)) throw new Error('no-webauthn');
+  var cred=await navigator.credentials.create({ publicKey:{
+    challenge: randBytes(32),
+    rp:{ name:'Alpexa Suisse', id: location.hostname },
+    user:{ id: randBytes(16), name: label||'alpexa user', displayName: label||'Alpexa' },
+    pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+    authenticatorSelection:{ authenticatorAttachment:'platform', userVerification:'required', residentKey:'preferred' },
+    timeout:60000, attestation:'none'
+  }});
+  if(!cred) throw new Error('no-cred');
+  try{ localStorage.setItem('alpexa.bio', bufToB64u(cred.rawId)); }catch(e){}
+  return cred;
+}
+// Ask the device to verify with Face ID/fingerprint (uses the registered passkey).
+async function bioVerify(){
+  if(!(window.PublicKeyCredential&&navigator.credentials)) throw new Error('no-webauthn');
+  var id=localStorage.getItem('alpexa.bio');
+  var pk={ challenge: randBytes(32), timeout:60000, userVerification:'required', rpId: location.hostname };
+  if(id) pk.allowCredentials=[{ type:'public-key', id: b64uToBuf(id) }];
+  var a=await navigator.credentials.get({ publicKey: pk });
+  if(!a) throw new Error('cancelled');
+  return a;
+}
+
+async function quickLogin(){
+  var cred=getSavedCred();
+  if(!cred){ showErr('저장된 로그인이 없어. 먼저 한 번 로그인해 주세요.'); return; }
+  var btn=document.getElementById('bioBtn'); var txt=document.getElementById('bioTxt');
+  var old=txt.textContent; txt.textContent='확인 중…'; btn.style.opacity='0.7';
+  try{
+    if(!localStorage.getItem('alpexa.bio')){ await bioRegister(cred.login); } // first time: set up Face ID
+    await bioVerify();                                                        // unlock with Face ID
+  }catch(e){
+    btn.style.opacity='1'; txt.textContent=old;
+    var msg=(e&&e.message)||'';
+    if(msg==='no-webauthn'){ showErr('이 기기는 Face ID 로그인을 지원하지 않아요.'); document.getElementById('bioBtn').style.display='none'; return; }
+    if(/cancel|not allowed|NotAllowed/i.test(msg)){ return; } // user cancelled — stay silent
+    showErr('Face ID 확인 실패. 비밀번호로 로그인해 주세요.'); return;
+  }
+  // Biometric OK → fill saved login and sign in.
+  document.getElementById('loginInput').value=cred.login||'';
+  document.getElementById('pwInput').value=cred.pw||'';
+  if(cred.server!=null) selectServer(cred.server);
+  txt.textContent=old; btn.style.opacity='1';
+  doLogin();
+}
+
+// On load: pre-fill the saved login + server, and offer the Face ID button.
+(async function(){
+  try{
+    var cred=getSavedCred();
+    if(cred){
+      if(cred.login) document.getElementById('loginInput').value=cred.login;
+      if(cred.pw)    document.getElementById('pwInput').value=cred.pw;
+      if(cred.server!=null) selectServer(cred.server);
+      // Show Face ID button only if the platform supports a built-in authenticator.
+      var ok=false;
+      try{ if(window.PublicKeyCredential&&PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable){ ok=await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable(); } }catch(e){ ok=false; }
+      if(ok){ document.getElementById('bioBtn').style.display='flex'; }
+    }
+  }catch(e){}
+})();
 </script>
 </body>
 </html>
