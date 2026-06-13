@@ -502,13 +502,13 @@ function getPrefs(){try{const raw=localStorage.getItem('alpexa.prefs');if(raw)re
 function setPref(key,value){const cur=getPrefs();cur[key]=value;try{localStorage.setItem('alpexa.prefs',JSON.stringify(cur));}catch(e){}window.dispatchEvent(new CustomEvent('alpexa-prefs-change',{detail:{key,value}}));}
 window.getPrefs=getPrefs;window.setPref=setPref;
 // ── Funding (deposit/withdraw/transfer) history ──
-const FUNDING_SEED=[
-  {id:'F-08471293-04',ts:Date.now()-2*86400000,kind:'deposit',method:'bank',amount:5000,currency:'USD',status:'completed',ref:'DEP-ALX-08471293',note:'Bank Wire · UBS'},
-  {id:'F-08471293-03',ts:Date.now()-7*86400000,kind:'transfer',method:'live',amount:1500,currency:'USD',status:'completed',ref:'TRF-ALX-21084712',note:'Live → Crypto'},
-  {id:'F-08471293-02',ts:Date.now()-12*86400000,kind:'withdraw',method:'bank',amount:800,currency:'USD',status:'completed',ref:'WTH-ALX-08471293',note:'KEB Hana •••• 4982'},
-  {id:'F-08471293-01',ts:Date.now()-22*86400000,kind:'deposit',method:'card',amount:2000,currency:'USD',status:'completed',ref:'DEP-ALX-08471290',note:'Visa •••• 1942'},
-];
-function getFundingHistory(){try{const raw=localStorage.getItem('alpexa.funding');if(raw){const arr=JSON.parse(raw);if(Array.isArray(arr))return arr;}}catch(e){}return [...FUNDING_SEED];}
+// Real service: no fake demo funding history. Real records come from actual
+// deposits / withdrawals / transfers.
+const FUNDING_SEED=[];
+function getFundingHistory(){try{const raw=localStorage.getItem('alpexa.funding');if(raw){const arr=JSON.parse(raw);if(Array.isArray(arr)){
+  // One-time cleanup: strip the old hard-coded demo seed records if any got baked in.
+  return arr.filter(function(r){ return !(r&&r.id&&String(r.id).indexOf('F-08471293-')===0); });
+}}}catch(e){}return [...FUNDING_SEED];}
 function pushFundingHistory(rec){
   const user = (function(){try{const raw=localStorage.getItem('alpexa_current_user');return raw?JSON.parse(raw):null;}catch(e){return null;}})();
   const cid = (user && user.clientId) || 'c026';
@@ -3867,7 +3867,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){var V='FX v115';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='FX v116';try{console.log('Alpexa '+V);}catch(e){}
 try{ if(!/[?&]ver=1/.test(location.search)) return; var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
