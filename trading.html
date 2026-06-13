@@ -3428,7 +3428,9 @@ function App(){
       });
       if(changed){ try{localStorage.setItem('alpexa.funding',JSON.stringify(hist));}catch(e){} window.dispatchEvent(new Event('alpexa-balance-change')); }
       // Credit transfers that OTHER apps sent to FX (idempotent across apps).
-      AlpexaSync.pullIncomingTransfers('live').then(legs=>{ legs.forEach(l=>{ window.addBalance('live', l.amount); window.alpexaNotify&&alpexaNotify({type:'approved',pref:'deposit',title:'Transfer received · $'+(+l.amount).toLocaleString()+' → FX'}); }); }).catch(()=>{});
+      AlpexaSync.pullIncomingTransfers('live').then(legs=>{ legs.forEach(l=>{ window.addBalance('live', l.amount);
+        try{ window.pushFundingHistory && window.pushFundingHistory({ id:'TRF-IN-'+l.id, kind:'transfer', method:'Internal transfer', amount:+l.amount||0, currency:'USD', note:'Received'+(l.from?(' from '+String(l.from).toUpperCase()):'')+' → FX', account:'live', status:'approved' }); }catch(e){}
+        window.alpexaNotify&&alpexaNotify({type:'approved',pref:'deposit',title:'Transfer received · $'+(+l.amount).toLocaleString()+' → FX'}); }); }).catch(()=>{});
     }).catch(()=>{}); };
     tick(); const iv=setInterval(()=>{if(!document.hidden)tick();},15000);
     const vis=()=>{if(!document.hidden)tick();}; document.addEventListener('visibilitychange',vis);
@@ -3865,7 +3867,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){var V='FX v114';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='FX v115';try{console.log('Alpexa '+V);}catch(e){}
 try{ if(!/[?&]ver=1/.test(location.search)) return; var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
