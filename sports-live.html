@@ -584,7 +584,7 @@
 /* Login gate (real service): no anonymous guest trading. Require a logged-in identity (email or authId); guests/empty go to login. */
 (function(){try{var m=JSON.parse(localStorage.getItem("alpexa.me")||"null");if(!(m&&m.accts&&(m.email||m.authId))){location.replace("login.html");}}catch(e){location.replace("login.html");}})();
 </script>
-<script src="alpexa-sync.js?v=7"></script>
+<script src="alpexa-sync.js?v=8"></script>
 <!-- Test-only balance seed ($10k default) removed for live service: real opening
      balances come from signup (Sports $500 / Crypto $100 / FX $100). -->
 </head>
@@ -1189,7 +1189,7 @@
       <div class="s-sec"><div class="s-sec-title">Account</div><div class="s-card">
         <button id="signOutBtn" style="width:100%;padding:15px 0;border:none;background:transparent;color:#e5484d;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Sign out</button>
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.58</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.59</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -2047,7 +2047,7 @@
   let credit=0.00; // real mode — no demo welcome credit
   let totalLost=0;   // cumulative net losses (for 5% cashback credit)
   const CASHBACK_RATE=0.05;
-  function syncSportsBal(){sportsSrv().bal=balance;try{localStorage.setItem('alpexa.sportsBalance',String(balance));}catch(e){}
+  function syncSportsBal(){window.__sbLocalTs=Date.now();sportsSrv().bal=balance;try{localStorage.setItem('alpexa.sportsBalance',String(balance));}catch(e){}
     try{var o=Object.assign({crypto:10000,fx:25000,sports:50000},JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}'));o.sports=balance;localStorage.setItem('alpexa.serverBalances',JSON.stringify(o));}catch(e){}
     // Push the sports balance to the server (throttled) for the back-office Players list.
     try{ if(window.AlpexaSync&&AlpexaSync.db){ var meS=JSON.parse(localStorage.getItem('alpexa.me')||'null'); var acct=meS&&meS.accts&&meS.accts.sports; var now=Date.now(); window.__balPush=window.__balPush||{};
@@ -2733,17 +2733,27 @@
   syncServerStatuses();
   setInterval(()=>{ if(!document.hidden) syncServerStatuses(); }, 15000);
   document.addEventListener('visibilitychange',()=>{ if(!document.hidden) syncServerStatuses(); });
-  // On load ONCE: adopt the server sports balance if the back office set it
-  // (server > 0 and differs). Runs once so it can't revert in-session bets.
-  (function adoptServerBalance(){
-    if(!window.AlpexaSync||!AlpexaSync.db) return;
-    try{ var me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); var acct=me&&me.accts&&me.accts.sports; if(!acct) return;
-      AlpexaSync.db.from('accounts').select('balance').eq('acct_no',acct).limit(1).then(function(r){
-        if(!r||!r.data||!r.data.length) return; var sv=+r.data[0].balance||0;
-        if(sv>0 && Math.abs(sv-balance)>0.01){ balance=sv; try{localStorage.setItem('alpexa.sportsBalance',String(balance));}catch(e){} updateWallet(); }
-      },function(){});
-    }catch(e){}
-  })();
+  // Server-authoritative balances: pull all 3 server balances on load / focus /
+  // every 10s and adopt them, so every device matches the server without re-login.
+  // Skip adopting the sports balance for ~7s after a local change (so a just-placed
+  // bet isn't briefly reverted before its own push lands on the server).
+  function syncBalancesFromServer(){
+    if(!(window.AlpexaSync&&AlpexaSync.pullBalances)) return;
+    AlpexaSync.pullBalances().then(function(b){
+      if(!b) return;
+      try{ var o=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{};
+        if(b.fx!=null)o.fx=b.fx; if(b.crypto!=null)o.crypto=b.crypto; if(b.sports!=null)o.sports=b.sports;
+        localStorage.setItem('alpexa.serverBalances',JSON.stringify(o)); }catch(e){}
+      if(b.sports!=null && Math.abs(b.sports-balance)>0.01 && (Date.now()-(window.__sbLocalTs||0))>7000){
+        balance=b.sports; try{localStorage.setItem('alpexa.sportsBalance',String(balance));}catch(e){}
+      }
+      try{ refreshSrvBalances&&refreshSrvBalances(); }catch(e){}
+      try{ updateWallet(); }catch(e){}
+    }).catch(function(){});
+  }
+  syncBalancesFromServer();
+  setInterval(function(){ if(!document.hidden) syncBalancesFromServer(); }, 10000);
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden) syncBalancesFromServer(); });
   // settings initial application
   restartRealityCheck();
   applySelfExclusion();

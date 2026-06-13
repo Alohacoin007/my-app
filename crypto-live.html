@@ -114,7 +114,7 @@
 /* Login gate (real service): no anonymous guest trading. Require a logged-in identity (email or authId); guests/empty go to login. */
 (function(){try{var m=JSON.parse(localStorage.getItem("alpexa.me")||"null");if(!(m&&m.accts&&(m.email||m.authId))){location.replace("login.html");}}catch(e){location.replace("login.html");}})();
 </script>
-<script src="alpexa-sync.js?v=7"></script>
+<script src="alpexa-sync.js?v=8"></script>
 <!-- Test-only balance seeds removed for live service: real opening balances come
      from signup (Sports $500 / Crypto $100 / FX $100); no $10k default or owner $1M seeding. -->
 </head>
@@ -13489,7 +13489,28 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){var V='Crypto v87';try{console.log('Alpexa '+V);}catch(e){}
+// Server-authoritative balances: keep the cross-app balances (server-switcher
+// dropdown) in sync with the server on load / focus / every 10s. Crypto's own
+// home total is holdings-based (full holdings sync comes next); this makes the
+// dropdown + other-server numbers correct on refresh without re-login.
+(function(){
+  function syncBalances(){
+    if(!(window.AlpexaSync&&AlpexaSync.pullBalances)) return;
+    AlpexaSync.pullBalances().then(function(b){
+      if(!b) return;
+      try{ var o=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{};
+        if(b.fx!=null)o.fx=b.fx; if(b.sports!=null)o.sports=b.sports; if(b.crypto!=null)o.crypto=b.crypto;
+        localStorage.setItem('alpexa.serverBalances',JSON.stringify(o));
+        window.dispatchEvent(new Event('alpexa-balance-change')); }catch(e){}
+    }).catch(function(){});
+  }
+  setTimeout(syncBalances,1200);
+  setInterval(function(){ if(!document.hidden) syncBalances(); },10000);
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden) syncBalances(); });
+})();
+</script>
+<script>
+(function(){var V='Crypto v88';try{console.log('Alpexa '+V);}catch(e){}
 try{ if(!/[?&]ver=1/.test(location.search)) return; var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();

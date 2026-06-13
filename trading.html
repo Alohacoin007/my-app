@@ -60,7 +60,7 @@ setTimeout(function(){
 /* Login gate (real service): no anonymous guest trading. Require a logged-in identity (email or authId); guests/empty go to login. */
 (function(){try{var m=JSON.parse(localStorage.getItem("alpexa.me")||"null");if(!(m&&m.accts&&(m.email||m.authId))){location.replace("login.html");}}catch(e){location.replace("login.html");}})();
 </script>
-<script src="alpexa-sync.js?v=7"></script>
+<script src="alpexa-sync.js?v=8"></script>
 <!-- Test-only balance seeds removed for live service: real opening balances come
      from signup (Sports $500 / Crypto $100 / FX $100); no $10k default or owner $1M seeding. -->
 <script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js" onload="window.__alpexaProgress&&window.__alpexaProgress('React loaded')" onerror="window.__alpexaCDNFail&&window.__alpexaCDNFail('React')"></script>
@@ -569,7 +569,7 @@ window.broadcastPositionClose = broadcastPositionClose;
 
 const DEFAULT_BALANCES={live:10000,crypto:10000,sports:10000};
 function getBalances(){try{const raw=localStorage.getItem('alpexa.balances');if(raw){const obj=JSON.parse(raw);return {...DEFAULT_BALANCES,...obj};}}catch(e){}return {...DEFAULT_BALANCES};}
-function setBalances(obj){try{localStorage.setItem('alpexa.balances',JSON.stringify(obj));}catch(e){}window.dispatchEvent(new Event('alpexa-balance-change'));}
+function setBalances(obj){window.__fxLocalTs=Date.now();try{localStorage.setItem('alpexa.balances',JSON.stringify(obj));}catch(e){}window.dispatchEvent(new Event('alpexa-balance-change'));}
 function addBalance(acctId,delta){const b=getBalances();b[acctId]=Math.max(0,(b[acctId]||0)+delta);setBalances(b);}
 function fmtBalance(n){return '$'+(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
 window.getBalances=getBalances;window.addBalance=addBalance;window.fmtBalance=fmtBalance;
@@ -3869,8 +3869,32 @@ const root=ReactDOM.createRoot(document.getElementById('root'));
 root.render(<Root/>);
 </script>
 <script>
+// Server-authoritative balances: pull the user's real per-server balances on load
+// / focus / every 10s and adopt them, so every device matches without re-login.
+// serverBalances (the dropdown) always follows the server; the FX cash balance is
+// only adopted when FLAT (no open positions, so equity==cash) and not mid-change.
+(function(){
+  function fxFlat(){ try{ return (JSON.parse(localStorage.getItem('alpexa.fxLive')||'[]')||[]).filter(function(o){return o&&(+o.vol)>0;}).length===0; }catch(e){ return true; } }
+  function syncBalances(){
+    if(!(window.AlpexaSync&&AlpexaSync.pullBalances)) return;
+    AlpexaSync.pullBalances().then(function(b){
+      if(!b) return; var changed=false;
+      try{ var o=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{};
+        if(b.crypto!=null){o.crypto=b.crypto;} if(b.sports!=null){o.sports=b.sports;} if(b.fx!=null && fxFlat()){o.fx=b.fx;}
+        localStorage.setItem('alpexa.serverBalances',JSON.stringify(o)); changed=true; }catch(e){}
+      try{ if(b.fx!=null && fxFlat() && (Date.now()-(window.__fxLocalTs||0))>7000 && window.getBalances){
+        var bal=window.getBalances(); if(Math.abs((+bal.live||0)-b.fx)>0.01){ bal.live=b.fx; localStorage.setItem('alpexa.balances',JSON.stringify(bal)); changed=true; } } }catch(e){}
+      if(changed){ try{ window.dispatchEvent(new Event('alpexa-balance-change')); }catch(e){} }
+    }).catch(function(){});
+  }
+  setTimeout(syncBalances,1200);
+  setInterval(function(){ if(!document.hidden) syncBalances(); },10000);
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden) syncBalances(); });
+})();
+</script>
+<script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){var V='FX v117';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='FX v118';try{console.log('Alpexa '+V);}catch(e){}
 try{ if(!/[?&]ver=1/.test(location.search)) return; var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();

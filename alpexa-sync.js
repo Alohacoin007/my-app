@@ -165,6 +165,23 @@ window.AlpexaSync = (function () {
       .eq('local_id', String(localId)).then(function (x) { return x; }, function () {});
   }
 
+  // Server-authoritative balances: fetch THIS user's current per-server balances
+  // straight from the accounts table. Apps poll this (on load / focus / timer) so
+  // every device converges to the server's value — no logout/login needed.
+  function pullBalances() {
+    if (!db) return Promise.resolve(null);
+    var m = me(); var a = m.accts || {};
+    var nums = [a.fx, a.crypto, a.sports].filter(Boolean).map(function (x) { return String(x).toUpperCase(); });
+    if (!nums.length) return Promise.resolve(null);
+    return db.from('accounts').select('server,acct_no,balance').in('acct_no', nums)
+      .then(function (r) {
+        if (!r || !r.data) return null;
+        var out = {};
+        r.data.forEach(function (x) { if (x && x.server) out[x.server] = +x.balance || 0; });
+        return out; // e.g. { fx: 100, crypto: 100, sports: 500 }
+      }, function () { return null; });
+  }
+
   // Activity log: every customer action (buy/sell/stake/bet/deposit…) so the back
   // office can see each customer's full history. Fire-and-forget; never blocks the UI.
   function logActivity(r) {
@@ -188,5 +205,5 @@ window.AlpexaSync = (function () {
            updateRequest: updateRequest, deleteRequest: deleteRequest,
            sendPayment: sendPayment, pullIncoming: pullIncoming, claimPayment: claimPayment,
            pullIncomingTransfers: pullIncomingTransfers, normSrv: normSrv,
-           logActivity: logActivity };
+           logActivity: logActivity, pullBalances: pullBalances };
 })();
