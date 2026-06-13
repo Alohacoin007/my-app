@@ -2868,9 +2868,9 @@ function Account({openPositions=0,onNavigate}){
         <ActionBtn icon="assessment" label={tr("Report")} active={sheet==='report'} onClick={()=>setSheet('report')}/>
       </div>
       <Section title="Account">
-        <Row label="Name" val="Christian Kang"/>
-        <Row label="Email" val="zbnyme@gmail.com"/>
-        <Row label="Account #" val="ALX-08471293" mono/>
+        <Row label="Name" val={(()=>{try{return (JSON.parse(localStorage.getItem('alpexa.me')||'null')||{}).name||'Account holder';}catch(e){return 'Account holder';}})()}/>
+        <Row label="Email" val={(()=>{try{return (JSON.parse(localStorage.getItem('alpexa.me')||'null')||{}).email||'—';}catch(e){return '—';}})()}/>
+        <Row label="Account #" val={(()=>{try{return ((JSON.parse(localStorage.getItem('alpexa.me')||'null')||{}).accts||{}).fx||'—';}catch(e){return '—';}})()} mono/>
         <Row label="Server" val="alpexa-fx-04"/>
         <Row label="Leverage" val={`FX 1:${lev.FX} · Stocks 1:${lev.STOCK}`} chev onClick={()=>setSheet('leverage')}/>
         <Row label="Currency" val={getPrefs().currency||'USD'} chev onClick={()=>setSheet('currency')}/>
@@ -3291,7 +3291,7 @@ function AppMenu({indicators,setIndicators,liveOrders,closedHistory,onClose}){
               <div style={{height:6,marginTop:8,borderTop:'1px solid var(--line)'}}/>
               <MenuItem icon="logout" label="Sign Out" danger onClick={()=>{ if(!confirm('Sign out of ALPEXA?')) return;
                 try { if (window.AlpexaSync && AlpexaSync.db && AlpexaSync.db.auth) AlpexaSync.db.auth.signOut(); } catch (e) {}
-                try { ['alpexa.me','alpexa.serverBalances','alpexa.balances','alpexa.cryptoHoldings','alpexa.staked','alpexa.sportsBalance','alpexa.cryptoBalance','alpexa.fxLive','alpexa.openBets','alpexa.settledBets','alpexa.withdrawals','alpexa.transactions','alpexa.appliedTransfers','alpexa.customer','alpexa.openDeposit','alpexa.ownerFunded'].forEach(function(k){ localStorage.removeItem(k); }); } catch (e) {}
+                try { ['alpexa.me','alpexa.userName','alpexa.userEmail'].forEach(function(k){ localStorage.removeItem(k); }); } catch (e) {}
                 try { window.location.replace('login.html?switch=1'); } catch (e) { window.location.href='login.html?switch=1'; } }}/>
             </>
           )}
@@ -3865,7 +3865,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){var V='FX v113';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='FX v114';try{console.log('Alpexa '+V);}catch(e){}
 try{ if(!/[?&]ver=1/.test(location.search)) return; var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();

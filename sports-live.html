@@ -1188,15 +1188,17 @@
       <div class="s-sec"><div class="s-sec-title">Account</div><div class="s-card">
         <button id="signOutBtn" style="width:100%;padding:15px 0;border:none;background:transparent;color:#e5484d;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Sign out</button>
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.50</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.51</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
   // Real sign-out: end the server session, wipe this device's identity + cached
-  // money, then go to the login page. Saved Face ID / quick-login is KEPT.
+  // then go to the login page. We do NOT wipe bets/balances/history here — the
+  // same person logging back in keeps them (login re-adopts the server balances);
+  // a DIFFERENT person's login clears them in login.html. Face ID is KEPT.
   function doSignOut(){
     try{ if(window.AlpexaSync && AlpexaSync.db && AlpexaSync.db.auth) AlpexaSync.db.auth.signOut(); }catch(e){}
-    try{ ['alpexa.me','alpexa.serverBalances','alpexa.balances','alpexa.cryptoHoldings','alpexa.staked','alpexa.sportsBalance','alpexa.cryptoBalance','alpexa.fxLive','alpexa.openBets','alpexa.settledBets','alpexa.withdrawals','alpexa.transactions','alpexa.appliedTransfers','alpexa.customer','alpexa.openDeposit','alpexa.ownerFunded'].forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
+    try{ ['alpexa.me','alpexa.userName','alpexa.userEmail'].forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
     try{ window.location.replace('login.html?switch=1'); }catch(e){ window.location.href='login.html?switch=1'; }
   }
   function bindSettings(){
