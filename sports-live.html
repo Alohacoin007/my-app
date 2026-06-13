@@ -1189,7 +1189,7 @@
       <div class="s-sec"><div class="s-sec-title">Account</div><div class="s-card">
         <button id="signOutBtn" style="width:100%;padding:15px 0;border:none;background:transparent;color:#e5484d;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Sign out</button>
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.59</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.60</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -2105,7 +2105,7 @@
       }
       if(type==='withdraw' && w.status==='approved' && !w.notified){ w.notified=true; changed=true; updateTxnByReq(w.id,{t2:`${w.asset||'USDT'} · Sent`}); }
       if(type==='withdraw' && w.status==='rejected' && !w.refunded){ balance+=w.amount; w.refunded=true; changed=true; updateTxnByReq(w.id,{ic:'↩️',t2:`Rejected by admin · refunded`,amt:0}); }
-      if(type==='deposit' && w.status==='approved' && !w.credited){ balance+=w.amount; w.credited=true; changed=true; updateTxnByReq(w.id,{ic:'⬇️',t2:`${w.asset||'USDT'} · Approved`}); }
+      if(type==='deposit' && w.status==='approved' && !w.credited){ /* SERVER credits sports deposits now → don't double-credit; balance is adopted from the server by syncBalancesFromServer */ w.credited=true; changed=true; updateTxnByReq(w.id,{ic:'⬇️',t2:`${w.asset||'USDT'} · Approved`}); }
       if(type==='deposit' && w.status==='rejected' && !w.handled){ w.handled=true; changed=true; updateTxnByReq(w.id,{ic:'⛔',t2:`${w.asset||'USDT'} · Rejected by admin`,amt:0}); }
       // Sports only credits/refunds ITS OWN balance. The Crypto leg (credit on
       // approval, refund on reject) is owned by the Crypto app via Supabase, so we
