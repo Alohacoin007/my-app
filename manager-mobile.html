@@ -1515,6 +1515,15 @@
       toast(v==='1'?'🛑 Trading HALTED — apps update in ~5s':'▶ Trading resumed'); render();
     },function(){ toast('Failed',true); });
   }
+  function setLiveBetting(v){
+    if(v==='1' && !confirm('Turn LIVE (in-play) betting ON?\nGames auto-suspend on each score change (~15s) and when odds are stale — anti-arbitrage.')) return;
+    if(v==='0' && !confirm('Turn live betting OFF? Customers can only bet pre-match.')) return;
+    AlpexaSync.db.from('controls').upsert({key:'live_betting',val:v,updated_at:new Date().toISOString()},{onConflict:'key'}).then(function(r){
+      if(r&&r.error){ toast('Error: '+r.error.message+' (run the controls SQL?)',true); return; }
+      CONTROLS.live_betting=v; try{ logAction(v==='1'?'live_betting_on':'live_betting_off','',''); }catch(e){}
+      toast(v==='1'?'🟢 Live betting ON — apps update in ~5s':'⚪ Live betting OFF'); render();
+    },function(){ toast('Failed',true); });
+  }
   // ── Admin authentication (Stage A for RLS) ──
   // The back office signs in as a real Supabase admin account so AlpexaSync's
   // queries carry an admin JWT — this is what keeps full access AFTER RLS is
@@ -1568,6 +1577,15 @@
         '<b class="'+(halted?'neg':'pos')+'">'+(halted?'HALTED':'LIVE')+'</b></div>'+
         '<button class="'+(halted?'ok':'no')+'" data-halt="'+(halted?'0':'1')+'" style="width:100%">'+(halted?'▶ Resume trading':'🛑 HALT all trading now')+'</button>'+
         '<div class="hint">Use the moment something looks wrong (bad prices, abuse). Takes effect on every app within ~5s.</div></div>'+
+      (function(){ var lb=(CONTROLS&&CONTROLS.live_betting==='1');
+        return '<div class="sec">Sports · Live (in-play) betting</div>'+
+        '<div class="card">'+
+          '<div class="row" style="border:none;padding:0 0 6px"><span><b>'+(lb?'🟢 Live betting ON':'⚪ Live betting OFF')+'</b>'+
+          '<div class="req-meta" style="margin:2px 0 0">When ON, customers can bet on in-progress games. Anti-arbitrage: each game auto-suspends ~15s on every score change, and when our odds go stale.</div></span>'+
+          '<b class="'+(lb?'pos':'neg')+'">'+(lb?'ON':'OFF')+'</b></div>'+
+          '<button class="'+(lb?'no':'ok')+'" data-live="'+(lb?'0':'1')+'" style="width:100%">'+(lb?'⚪ Turn live betting OFF':'🟢 Turn live betting ON')+'</button>'+
+          '<div class="hint">Pre-match betting always works. This switch only controls in-play. Updates apps within ~5s.</div></div>';
+      })()+
       '<div class="sec">Limits (#5)</div>'+
       '<div class="card">'+cfgRow('Max bet (USDT)','cfgMaxBet',num('alpexa.maxBet',5000))+cfgRow('Max deposit (USDT)','cfgMaxDep',num('alpexa.maxDeposit',50000))+cfgRow('Max withdrawal (USDT)','cfgMaxWd',num('alpexa.maxWithdraw',50000))+
         '<button class="save" id="saveLimits">Save limits</button><div class="hint">Per-request caps (demo — wired to app next).</div></div>'+
@@ -1649,6 +1667,7 @@
     document.querySelectorAll('[data-editpl]').forEach(function(b){b.onclick=function(){PLAYER_EDIT=b.getAttribute('data-editpl');render();};});
     document.querySelectorAll('[data-savepl]').forEach(function(b){b.onclick=function(){savePlayer(b.getAttribute('data-savepl'));};});
     document.querySelectorAll('[data-halt]').forEach(function(b){b.onclick=function(){setHalt(b.getAttribute('data-halt'));};});
+    document.querySelectorAll('[data-live]').forEach(function(b){b.onclick=function(){setLiveBetting(b.getAttribute('data-live'));};});
     document.querySelectorAll('[data-cancelpl]').forEach(function(b){b.onclick=function(){PLAYER_EDIT=null;render();};});
     document.querySelectorAll('[data-delpl]').forEach(function(b){b.onclick=function(){deletePlayer(b.getAttribute('data-delpl'));};});
     document.querySelectorAll('[data-agr]').forEach(function(b){b.onclick=function(){AG_RANGE=b.getAttribute('data-agr');render();};});
@@ -1761,7 +1780,7 @@
   })();
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v74';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v75';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>

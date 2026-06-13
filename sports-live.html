@@ -1189,7 +1189,7 @@
       <div class="s-sec"><div class="s-sec-title">Account</div><div class="s-card">
         <button id="signOutBtn" style="width:100%;padding:15px 0;border:none;background:transparent;color:#e5484d;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Sign out</button>
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.55</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.56</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -1548,8 +1548,9 @@
     return games.map(g=>{
       const cell=(arr,key,i)=>{const b=arr[i];if(!b)return '<div></div>';
         const on=legs.some(l=>l.uid===g.id+'|'+b.sel);
-        // Live betting is suspended (pre-match only) — show odds but locked.
-        if(g.live&&!window.__alpexaLiveBetting) return `<div class="bet sus" title="Live betting unavailable"><span class="ln">${b.ln||'&nbsp;'}</span><span class="pr">🔒</span></div>`;
+        // Live betting: locked unless the master switch is on AND the game isn't
+        // suspended (score just changed) AND odds are fresh — anti-arbitrage.
+        if(g.live&&!liveOK(g)) return `<div class="bet sus" title="${liveReason(g)}"><span class="ln">${b.ln||'&nbsp;'}</span><span class="pr">🔒</span></div>`;
         return `<div class="bet${on?' sel':''}" data-game="${g.id}" data-market="${key}" data-sel="${b.sel}" data-am="${b.am}">
           <span class="ln">${b.ln||'&nbsp;'}</span><span class="pr ${b.am>0?'pos':''}">${fmtAm(b.am)}</span></div>`;};
       const row=(t,i)=>`<div class="mrow"><div class="tcell"><span class="bd">${t.ab}</span><span class="tinfo"><span class="nm">${t.nm}</span>${t.sc!==undefined?`<span class="sc${g.live?' live':''}">${t.sc}</span>`:''}</span></div>
@@ -1584,6 +1585,22 @@
   }
   // sort: pinned games first (stable for ties)
   const sortByPin=(a,b)=>(pinnedGames.has(b.id)?1:0)-(pinnedGames.has(a.id)?1:0);
+  // ── Live (in-play) betting gate — anti-arbitrage. A live bet is allowed only
+  // when ALL hold: master switch on, the game isn't suspended (its score just
+  // changed → ~15s lockout), and our odds aren't stale. Pre-match is unaffected.
+  function liveOK(g){
+    if(!g||!g.live) return true;
+    if(!window.__alpexaLiveBetting) return false;
+    if(g.suspendUntil && Date.now()<g.suspendUntil) return false;
+    if(window.__alpexaOddsStale) return false;
+    return true;
+  }
+  function liveReason(g){
+    if(!window.__alpexaLiveBetting) return 'Live betting unavailable';
+    if(g&&g.suspendUntil&&Date.now()<g.suspendUntil) return 'Suspended — score just changed';
+    if(window.__alpexaOddsStale) return 'Odds updating — try again';
+    return 'Live betting unavailable';
+  }
   function renderGames(){
     const base=(gameQuery?GAMES.filter(matchGame):GAMES.filter(g=>g.lg===curSport)).slice().sort(sortByPin);
     const emptyMsg=gameQuery?`No games match "${gameQuery}"`:'No upcoming games';
@@ -1655,7 +1672,7 @@
     else{
       // same market = mutually exclusive: drop other pick from this market first
       const g=GAMES.find(x=>x.id===gid);
-      if(g&&g.live&&!window.__alpexaLiveBetting){ showToast('🔒','Live betting unavailable','Pre-match betting only for now'); return; }
+      if(g&&g.live&&!liveOK(g)){ showToast('🔒','Live betting',liveReason(g)); return; }
       legs=legs.filter(l=>!(l.gid===gid&&l.market===market));
       legs.push({uid,gid,market,sel,am,game:g.away.ab+' @ '+g.home.ab,tm:g.time,kt:g.kickoff||'',live:!!g.live,stake:20});
     }
@@ -1671,7 +1688,7 @@
     const uid=gid+'|'+sel,i=legs.findIndex(l=>l.uid===uid);
     if(i>-1)legs.splice(i,1);
     else{const g=GAMES.find(x=>x.id===gid);
-      if(g&&g.live&&!window.__alpexaLiveBetting){ showToast('🔒','Live betting unavailable','Pre-match betting only for now'); return; }
+      if(g&&g.live&&!liveOK(g)){ showToast('🔒','Live betting',liveReason(g)); return; }
       legs.push({uid,gid,market,sel,am,game:g.away.ab+' @ '+g.home.ab,tm:g.time,kt:g.kickoff||'',live:!!g.live,stake:20});}
     renderGames();syncSlip();
   }
@@ -2864,11 +2881,37 @@
       return matched;
     }
 
+    // ── Anti-arbitrage state ───────────────────────────────────────────────
+    const SUSPEND_MS = 15000;    // lock a game's live betting for 15s after a score change
+    const ODDS_STALE_MS = 90000; // if our odds haven't refreshed in 90s, suspend ALL live betting
+    const _lastScore = {};       // gid -> "home-away" (to detect changes)
+    const _suspend = {};         // gid -> suspendUntil (survives GAMES replacement)
+    window.__alpexaOddsTs = window.__alpexaOddsTs || 0;
+    function _scoreSig(g){ return (g&&g.home&&g.away)?((g.home.sc||0)+'-'+(g.away.sc||0)):''; }
+    function refreshOddsStale(){ window.__alpexaOddsStale = (Date.now() - (window.__alpexaOddsTs||0)) > ODDS_STALE_MS; }
+    setInterval(refreshOddsStale, 3000);
+    // Carry suspensions across refreshes and SUSPEND a game the instant its score
+    // changes (the #1 arbitrage window — betting old odds right after a goal/point).
+    function applySuspensions(games){
+      games.forEach(g=>{
+        const prevSuspend = _suspend[g.id];
+        if(prevSuspend && prevSuspend>Date.now()) g.suspendUntil = prevSuspend;
+        if(g.live){
+          const cur=_scoreSig(g), prev=_lastScore[g.id];
+          if(prev!==undefined && cur!==prev){ g.suspendUntil = Date.now()+SUSPEND_MS; }
+          _lastScore[g.id]=cur;
+          if(g.suspendUntil) _suspend[g.id]=g.suspendUntil;
+        }
+      });
+    }
+
     async function loadLive(isRefresh){
       try{
         const results = await Promise.all(LEAGUES.map(L => fetchLeague(L).catch(()=>[])));
         const all = [].concat.apply([], results);
-        try{ await applyRealOdds(all); }catch(e){}
+        try{ const mm=await applyRealOdds(all); if(mm>=0) window.__alpexaOddsTs=Date.now(); }catch(e){}
+        refreshOddsStale();
+        applySuspensions(all);
         // REAL games only — replace whatever is showing (may be empty off-season).
         GAMES.length = 0;
         all.forEach(g => GAMES.push(g));
@@ -2884,10 +2927,35 @@
         }
       }
     }
+    // FAST live-score watcher: poll only leagues that have a live game every ~9s so a
+    // score change suspends betting within seconds (ESPN is free — no quota cost).
+    async function watchLiveScores(){
+      try{
+        const liveLgs = Array.from(new Set(GAMES.filter(g=>g.live).map(g=>g.lg)));
+        if(!liveLgs.length) return;
+        const Ls = LEAGUES.filter(L=>liveLgs.indexOf(L.lg)>=0);
+        const res = await Promise.all(Ls.map(L=>fetchLeague(L).catch(()=>[])));
+        const fresh = [].concat.apply([], res);
+        let changed=false;
+        fresh.forEach(ng=>{
+          const g=GAMES.find(x=>x.id===ng.id); if(!g)return;
+          const cur=_scoreSig(ng), prev=_scoreSig(g);
+          if(g.home&&ng.home) g.home.sc=ng.home.sc; if(g.away&&ng.away) g.away.sc=ng.away.sc;
+          g.time=ng.time; g.state=ng.state; g.live=ng.live;
+          if(cur!==prev){ g.suspendUntil=Date.now()+SUSPEND_MS; _suspend[g.id]=g.suspendUntil; changed=true; }
+          _lastScore[g.id]=cur;
+        });
+        if(changed && typeof renderGames==='function') renderGames();
+      }catch(e){}
+    }
     // Clear the built-in sample games immediately so customers only ever see REAL ones.
     try{ GAMES.length=0; if(typeof renderGames==='function') renderGames(); }catch(e){}
     loadLive(false);
-    setInterval(()=>{ if(!document.hidden) loadLive(true); }, 30000); // auto-refresh live scores
+    setInterval(()=>{ if(!document.hidden) loadLive(true); }, 30000);   // full refresh + odds
+    setInterval(()=>{ if(!document.hidden) watchLiveScores(); }, 9000); // fast score-suspend
+    // re-render when a suspension lapses so the 🔒 clears on its own
+    setInterval(()=>{ if(!document.hidden && window.__alpexaLiveBetting && typeof renderGames==='function'){
+      var anyLive=GAMES.some(g=>g.live&&g.suspendUntil); if(anyLive) renderGames(); } }, 4000);
   })();
 </script>
 <script>
@@ -2951,6 +3019,12 @@
     AlpexaSync.db.from('controls').select('val').eq('key','trading_halt').limit(1).then(function(r){
       window.__alpexaHalt=!!(r&&r.data&&r.data[0]&&r.data[0].val==='1'); },function(){}); }
   setTimeout(pullHalt,1500); setInterval(function(){ if(!document.hidden) pullHalt(); },5000);
+  // Live (in-play) betting master switch — set in the back office. Default OFF.
+  window.__alpexaLiveBetting = window.__alpexaLiveBetting || false;
+  function pullLiveBetting(){ if(!window.AlpexaSync||!AlpexaSync.db)return;
+    AlpexaSync.db.from('controls').select('val').eq('key','live_betting').limit(1).then(function(r){
+      window.__alpexaLiveBetting=!!(r&&r.data&&r.data[0]&&r.data[0].val==='1'); },function(){}); }
+  setTimeout(pullLiveBetting,1500); setInterval(function(){ if(!document.hidden) pullLiveBetting(); },5000);
   /* Execute back-office commands (void bet). */
   function runCmds(){
     if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m||!m.accts.sports)return; var cust=m.custId;
