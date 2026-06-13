@@ -201,6 +201,22 @@ const applyTheme = (mode) => {
 };
 try { syncFieldVars(); } catch (e) {}
 
+// Real sign-out: end the server session, wipe this device's identity + cached
+// money so nothing bleeds into the next account, then go to the login page.
+// Saved Face ID / quick-login credentials are KEPT so the user can sign back in
+// fast (the login page's "Sign in to a different account" clears those).
+function doSignOut() {
+  try { if (window.AlpexaSync && AlpexaSync.db && AlpexaSync.db.auth) AlpexaSync.db.auth.signOut(); } catch (e) {}
+  try {
+    ['alpexa.me','alpexa.serverBalances','alpexa.balances','alpexa.cryptoHoldings',
+     'alpexa.staked','alpexa.sportsBalance','alpexa.cryptoBalance','alpexa.fxLive',
+     'alpexa.openBets','alpexa.settledBets','alpexa.withdrawals','alpexa.transactions',
+     'alpexa.appliedTransfers','alpexa.customer','alpexa.openDeposit','alpexa.ownerFunded']
+      .forEach(function (k) { localStorage.removeItem(k); });
+  } catch (e) {}
+  try { window.location.replace('login.html?switch=1'); } catch (e) { window.location.href = 'login.html?switch=1'; }
+}
+
 // Deterministic per-user deposit address generator. Each Alpexa user gets a
 // unique address per network — funds sent there are auto-credited (in production
 // monitored by Alpexa's deposit pipeline that sweeps into the company's master
@@ -9128,7 +9144,7 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
             <AcctRow label="First sign-in" value="Apr 12, 2025" chevron={false}/>
           </AcctSection>
           {isPhone ? null : (
-            <button onClick={() => flashAndClose('Device signed out')} style={{
+            <button onClick={() => doSignOut()} style={{
               marginTop: 8, width: '100%', padding: '14px 0', borderRadius: 999,
               background: RH.red, color: '#fff', border: 'none',
               fontSize: 14, fontWeight: 700, cursor: 'pointer',
@@ -9942,9 +9958,9 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
             }}>
               <div style={{ fontSize: 22, fontWeight: 700, color: RH.text, letterSpacing: -0.4 }}>Sign out of Alpexa?</div>
               <div style={{ marginTop: 10, fontSize: 13.5, color: RH.textDim, lineHeight: 1.55 }}>
-                You'll need to enter your password and 2FA code next time you sign in.
+                You can sign back in quickly with Face ID or your password.
               </div>
-              <button onClick={() => setSubPage(null)} style={{
+              <button onClick={() => doSignOut()} style={{
                 marginTop: 26, padding: '14px 28px', borderRadius: 999,
                 background: RH.red, color: '#fff', border: 'none',
                 fontSize: 14, fontWeight: 700, letterSpacing: 0.2, cursor: 'pointer',
@@ -13495,7 +13511,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){try{var b=document.createElement('div');b.textContent='Crypto v82';
+(function(){try{var b=document.createElement('div');b.textContent='Crypto v83';
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
