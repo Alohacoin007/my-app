@@ -117,6 +117,9 @@ input:-webkit-autofill:active{
    (used by "다른 계정으로 로그인"). */
 (function(){try{
   if(/[?&]switch=1/.test(location.search)) return;
+  // Skip auto-pass when arriving from a password-reset email (recovery link) so
+  // the user can set a new password instead of being bounced into the app.
+  if(/(type=recovery|access_token|error_description)/.test(location.hash)) return;
   var m=JSON.parse(localStorage.getItem('alpexa.me')||'null');
   if(m&&m.accts&&(m.email||m.authId)){
     var ls=(localStorage.getItem('alpexa.lastServer')||'').toLowerCase();
@@ -178,7 +181,7 @@ input:-webkit-autofill:active{
       <div class="link-row">
         <button class="link-btn" onclick="location.href='signup.html'">Open an Account</button>
         <span class="link-sep">·</span>
-        <button class="link-btn" onclick="showToast('Password reset email has been sent')">Forgot password?</button>
+        <button class="link-btn" onclick="doForgot()">Forgot password?</button>
       </div>
       <button class="demo-btn" onclick="try{localStorage.removeItem('alpexa.cred');localStorage.removeItem('alpexa.bio');}catch(e){};document.getElementById('bioBtn').style.display='none';document.getElementById('loginInput').value='';document.getElementById('pwInput').value='';showToast('이 기기의 저장된 로그인을 지웠어요');">Sign in to a different account</button>
     </div>
@@ -208,6 +211,15 @@ input:-webkit-autofill:active{
   <div class="suc-title">Login Successful</div>
   <div class="suc-sub" id="sucSub"></div>
   <button class="suc-btn" onclick="window.location.href='trading.html'">Start Trading →</button>
+</div>
+<div id="resetScreen" class="success-screen" style="display:none">
+  <div class="suc-title" style="margin-bottom:8px">Set a new password</div>
+  <div class="suc-sub" id="resetSub" style="margin-bottom:20px">Choose a new password for your account.</div>
+  <div class="field" style="width:100%;max-width:320px">
+    <label class="field-label">New password</label>
+    <div class="field-inner"><input id="resetPw" type="password" placeholder="New password (at least 6 characters)"></div>
+  </div>
+  <button class="suc-btn" style="max-width:320px" onclick="doReset()">Update password</button>
 </div>
 <div id="toast"></div>
 <script>
@@ -314,6 +326,53 @@ function buildQR(){const p=[1,1,1,1,1,1,1,0,1,0,0,0,0,0,1,0,1,0,1,1,1,0,1,1,1,0,
 function startQR(){buildQR();qrSec=60;document.getElementById('qrTimer').textContent=qrSec;qrInterval=setInterval(()=>{qrSec--;const el=document.getElementById('qrTimer');if(el)el.textContent=qrSec;if(qrSec<=0){buildQR();qrSec=60;}},1000);}
 function stopQR(){clearInterval(qrInterval);}
 function showToast(msg){const el=document.getElementById('toast');el.textContent=msg;el.style.display='block';setTimeout(()=>{el.style.display='none';},2200);}
+
+/* ── Forgot password: send a REAL reset email, then let the user set a new one ── */
+async function doForgot(){
+  var login=(document.getElementById('loginInput').value||'').trim();
+  if(!login){ showErr('Enter your account number or email first, then tap "Forgot password?".'); return; }
+  if(!window._db){ showErr('No server connection — check your internet.'); return; }
+  var email=login;
+  try{
+    if(login.indexOf('@')<0){
+      // Account-number login: resolve to the email via the security-definer RPC.
+      var r=await window._db.rpc('login_email',{p_login:login.toUpperCase()});
+      if(r&&!r.error&&r.data){ email=r.data; }
+      else { showErr('Account not found. Enter the email you signed up with.'); return; }
+    }
+    var redirectTo=location.origin+location.pathname;
+    var rr=await window._db.auth.resetPasswordForEmail(email,{ redirectTo:redirectTo });
+    if(rr&&rr.error){ showErr(rr.error.message||'Could not send the reset email.'); return; }
+    clearErr();
+    showToast('Reset email sent to '+email+' — check your inbox');
+  }catch(e){ showErr('Could not send the reset email. Please try again.'); }
+}
+function openResetSheet(){
+  try{ document.getElementById('resetScreen').style.display='flex'; setTimeout(function(){var el=document.getElementById('resetPw'); if(el)el.focus();},150); }catch(e){}
+}
+async function doReset(){
+  var pw=(document.getElementById('resetPw').value||'');
+  if(pw.length<6){ showToast('Password must be at least 6 characters'); return; }
+  if(!window._db){ showToast('No server connection'); return; }
+  try{
+    var r=await window._db.auth.updateUser({ password:pw });
+    if(r&&r.error){ showToast(r.error.message||'Could not update password'); return; }
+    // Clear the recovery token from the URL and send them to a clean sign-in.
+    try{ history.replaceState(null,'',location.pathname); }catch(e){}
+    try{ await window._db.auth.signOut(); }catch(e){}
+    document.getElementById('resetScreen').style.display='none';
+    showToast('Password updated — please sign in');
+  }catch(e){ showToast('Could not update password. Try again.'); }
+}
+// When the user opens the reset link from their email, Supabase establishes a
+// recovery session — show the "set new password" screen.
+try{
+  if(window._db&&window._db.auth&&window._db.auth.onAuthStateChange){
+    window._db.auth.onAuthStateChange(function(event){ if(event==='PASSWORD_RECOVERY'){ openResetSheet(); } });
+  }
+  if(/type=recovery/.test(location.hash)){ setTimeout(openResetSheet,400); }
+}catch(e){}
+
 buildQR();
 // Default the server to the one chosen at signup (so login lands on the same app).
 try{ var _ls=localStorage.getItem('alpexa.lastServer'); var _idx={fx:0,live:0,crypto:1,sports:2}[_ls]; if(_idx!=null) selectServer(_idx); }catch(e){}
