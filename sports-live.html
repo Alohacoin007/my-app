@@ -1189,7 +1189,7 @@
       <div class="s-sec"><div class="s-sec-title">Account</div><div class="s-card">
         <button id="signOutBtn" style="width:100%;padding:15px 0;border:none;background:transparent;color:#e5484d;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Sign out</button>
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.56</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.57</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -1447,8 +1447,10 @@
   // Format a kickoff timestamp (UTC ISO) into a short local label like "Sat 5:30 PM".
   function fmtKick(ts){
     try{ const d=new Date(ts); if(isNaN(d.getTime())) return '';
-      const opt={weekday:'short',hour:'numeric',minute:'2-digit',hour12:true}; const z=curTZ(); if(z)opt.timeZone=z;
-      return d.toLocaleString(undefined,opt);
+      const z=curTZ();
+      const dOpt={weekday:'short',month:'short',day:'numeric'}; if(z)dOpt.timeZone=z;
+      const tOpt={hour:'numeric',minute:'2-digit',hour12:true}; if(z)tOpt.timeZone=z;
+      return d.toLocaleDateString(undefined,dOpt)+' · '+d.toLocaleTimeString(undefined,tOpt);
     }catch(e){ return ''; }
   }
   // Display label for a game's time: scheduled real games show their kickoff in the
