@@ -4757,7 +4757,7 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
   const feeFor = (m) => {
     const amt = parseFloat(amountStr) || 0;
     if (m === 'card') return amt * 0.025;
-    if (m === 'wire') return 15;
+    if (m === 'wire') return 0;   // bank/wire deposits are FREE (consistent with FX/Sports)
     return 0;
   };
 
@@ -4855,8 +4855,8 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
       { id: 'card', label: 'Credit / Debit Card',
         sub: 'Instant · 2.5% fee',
         icon: <><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10 H21"/></> },
-      { id: 'wire', label: 'Wire Transfer',
-        sub: '$15 fee · Same day',
+      { id: 'wire', label: 'Wire / Bank Transfer',
+        sub: 'Free · Same day',
         icon: <><path d="M5 12 H19 M14 7 L19 12 L14 17"/></> },
     ];
     return (
@@ -6684,7 +6684,7 @@ const HELP_ARTICLES = {
     { q: 'How long does a deposit take?',
       a: `It depends on the method:\n\n• Debit card — instant, available to trade immediately.\n• ACH bank transfer — instantly available to trade up to $1,000; full settlement in 4–5 business days for withdrawals.\n• Wire transfer — typically arrives within 1 business hour during banking hours; available immediately upon receipt.\n\nFirst-time deposits may take longer while we verify your funding source.` },
     { q: 'Are there deposit fees?',
-      a: `ACH and wire deposits are free. Debit card deposits carry a 1.5% fee (you'll see the exact charge before confirming).\n\nReturn fees ($15) apply if a deposit is reversed by your bank for insufficient funds or other issues — please make sure your linked account has the balance available.` },
+      a: `Bank / wire deposits are free. Debit card deposits carry a 2.5% fee (you'll see the exact charge before confirming).\n\nReturn fees ($15) apply if a deposit is reversed by your bank for insufficient funds or other issues — please make sure your linked account has the balance available.` },
     { q: 'Can I deposit crypto from another exchange?',
       a: `Yes. Go to Receive → External, choose the asset, and copy the deposit address. Double-check the network (e.g., Ethereum ERC-20 vs Solana SPL) — sending on the wrong network may result in permanent loss.\n\nAlways send a small test amount first for new addresses. Most crypto deposits credit after 3–12 network confirmations (usually 5–30 minutes for major chains).` },
     { q: 'Why was my withdrawal flagged for review?',
@@ -6746,7 +6746,7 @@ const HELP_ARTICLES = {
     { q: 'Are there fees to hold crypto?',
       a: `No. Alpexa charges zero custody, storage, or wallet fees regardless of balance size. You only pay when you transact.` },
     { q: 'What are the deposit and withdrawal fees?',
-      a: `Deposits — ACH and wire: free. Debit card: 1.5%.\n\nWithdrawals — ACH: free, 1–3 business days. Debit card: 1.5%, instant. Wire: $25 flat, same business day.\n\nCrypto network fees vary by chain and network congestion; the exact fee is shown before you confirm.` },
+      a: `Deposits — bank / wire: free. Debit card: 2.5%.\n\nWithdrawals — ACH: free, 1–3 business days. Debit card: 1.5%, instant. Wire: $25 flat, same business day.\n\nCrypto network fees vary by chain and network congestion; the exact fee is shown before you confirm.` },
     { q: 'How do tier upgrades work?',
       a: `Tiers (Bronze → Silver → Gold → Platinum) are based on your 30-day trading volume and ALPXS balance. Higher tiers unlock lower fees, faster support, and bonus APY on staking.\n\nTiers are recalculated daily. You can check your current tier and progress in Account → Rewards → Loyalty tier.` },
     { q: 'Are there any hidden fees?',
@@ -13525,7 +13525,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){var V='Crypto v92';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='Crypto v93';try{console.log('Alpexa '+V);}catch(e){}
 try{ if(!/[?&]ver=1/.test(location.search)) return; var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
