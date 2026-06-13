@@ -1189,7 +1189,7 @@
       <div class="s-sec"><div class="s-sec-title">Account</div><div class="s-card">
         <button id="signOutBtn" style="width:100%;padding:15px 0;border:none;background:transparent;color:#e5484d;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Sign out</button>
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.54</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.55</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -2727,7 +2727,6 @@
   // Loads today's real games + scores and swaps them into GAMES, then
   // re-renders. Anything missing/failing falls back to the demo games.
   (function(){
-    const DEMO = GAMES.slice();
     let firstErr = '';
     // On-screen status badge so we can see what happened without the console.
     const badge = document.createElement('div');
@@ -2869,24 +2868,24 @@
       try{
         const results = await Promise.all(LEAGUES.map(L => fetchLeague(L).catch(()=>[])));
         const all = [].concat.apply([], results);
-        let oddsMatched = 0;
-        try{ oddsMatched = await applyRealOdds(all); }catch(e){}
-        if (all.length >= 1){
-          GAMES.length = 0;
-          all.forEach(g => GAMES.push(g));
-          if (typeof renderGames === 'function') renderGames();
-          try{ settleBets(); }catch(e){}
-          if(!isRefresh){ try{ if(badge&&badge.parentNode) badge.remove(); }catch(e){} }
-        } else if(!isRefresh){
-          setBadge('⚠️ 실시간 실패 → 데모 표시 · ' + (firstErr || '경기 없음/차단됨'), '#b00020');
-        }
+        try{ await applyRealOdds(all); }catch(e){}
+        // REAL games only — replace whatever is showing (may be empty off-season).
+        GAMES.length = 0;
+        all.forEach(g => GAMES.push(g));
+        if (typeof renderGames === 'function') renderGames();
+        try{ settleBets(); }catch(e){}
+        if(!isRefresh){ try{ if(badge&&badge.parentNode) badge.remove(); }catch(e){} }
       }catch(e){
+        // Hard failure: show no games (this is a real service — never fake demo games).
         if(!isRefresh){
-          setBadge('⚠️ 실시간 오류 → 데모 표시 · ' + (firstErr || (e && e.message) || 'error'), '#b00020');
-          try{ GAMES.length=0; DEMO.forEach(g=>GAMES.push(g)); if(typeof renderGames==='function') renderGames(); }catch(_){}
+          try{ GAMES.length=0; if(typeof renderGames==='function') renderGames(); }catch(_){}
+          setBadge('⚠️ Live games unavailable right now — pull down to refresh', '#b00020');
+          setTimeout(function(){ try{ if(badge&&badge.parentNode) badge.remove(); }catch(_){} }, 4000);
         }
       }
     }
+    // Clear the built-in sample games immediately so customers only ever see REAL ones.
+    try{ GAMES.length=0; if(typeof renderGames==='function') renderGames(); }catch(e){}
     loadLive(false);
     setInterval(()=>{ if(!document.hidden) loadLive(true); }, 30000); // auto-refresh live scores
   })();
