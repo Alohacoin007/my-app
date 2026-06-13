@@ -260,11 +260,11 @@ async function doLogin(){
     // 3) Load the linked profile (by auth link first, then email).
     let player=null;
     if(authId){
-      const p1=await window._db.from('players').select('id,cust_id,name,email').eq('auth_id',authId).limit(1);
+      const p1=await window._db.from('players').select('id,cust_id,name,email').eq('auth_id',authId).order('created_at',{ascending:true}).limit(1);
       if(!p1.error&&p1.data&&p1.data.length) player=p1.data[0];
     }
     if(!player){
-      const p2=await window._db.from('players').select('id,cust_id,name,email').ilike('email',email).limit(1);
+      const p2=await window._db.from('players').select('id,cust_id,name,email').ilike('email',email).order('created_at',{ascending:true}).limit(1);
       if(!p2.error&&p2.data&&p2.data.length) player=p2.data[0];
     }
     if(!player){ fail('Signed in, but no profile found. Contact support.'); return; }
