@@ -1189,7 +1189,7 @@
       <div class="s-sec"><div class="s-sec-title">Account</div><div class="s-card">
         <button id="signOutBtn" style="width:100%;padding:15px 0;border:none;background:transparent;color:#e5484d;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Sign out</button>
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.57</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.58</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -1451,6 +1451,14 @@
       const dOpt={weekday:'short',month:'short',day:'numeric'}; if(z)dOpt.timeZone=z;
       const tOpt={hour:'numeric',minute:'2-digit',hour12:true}; if(z)tOpt.timeZone=z;
       return d.toLocaleDateString(undefined,dOpt)+' · '+d.toLocaleTimeString(undefined,tOpt);
+    }catch(e){ return ''; }
+  }
+  // Full date+time stamp (e.g. bet placed time) in the chosen time zone — so it
+  // matches the game times instead of the device's raw zone.
+  function fmtStamp(ts){
+    try{ const d=new Date(ts); if(isNaN(d.getTime())) return '';
+      const o={year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit',hour12:true};
+      const z=curTZ(); if(z)o.timeZone=z; return d.toLocaleString(undefined,o);
     }catch(e){ return ''; }
   }
   // Display label for a game's time: scheduled real games show their kickoff in the
@@ -1792,7 +1800,7 @@
       <span class="odd">${fmtAm(l.am)}</span></div>`).join('');
     const head=`<div class="th"><span class="badge ${b.cls}">${b.type}${b.legs.length>1?' '+b.legs.length+'legs':''}</span>
       <span class="res ${isOpen?'open':b.result}">${isOpen?'Open':b.result==='won'?'Won':b.result==='cashed'?'Cashed Out':'Lost'}</span></div>`+
-      ((b.ticket||b.placedTs)?`<div style="font-family:ui-monospace,monospace;font-size:9.5px;color:var(--dim);padding:0 2px 4px">${b.ticket||''}${b.ticket&&b.placedTs?' · ':''}${b.placedTs?new Date(b.placedTs).toLocaleString():''}</div>`:'');
+      ((b.ticket||b.placedTs)?`<div style="font-family:ui-monospace,monospace;font-size:9.5px;color:var(--dim);padding:0 2px 4px">${b.ticket||''}${b.ticket&&b.placedTs?' · ':''}${b.placedTs?fmtStamp(b.placedTs):''}</div>`:'');
     let foot;
     if(isOpen && b.viewOnly){foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b>Est. ${usd(b.potential)}</b></div>
       <div style="font-size:10.5px;color:var(--dim);padding:2px 2px 0">🔄 Open on another device</div></div>`;}
