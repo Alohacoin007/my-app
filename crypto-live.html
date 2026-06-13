@@ -12915,17 +12915,6 @@ function App() {
       const stk = Object.values(staked).reduce((a, s) => a + ((s && s.usd) || 0), 0);
       return { ...b, USDT: Math.max(0, Math.round((t - coins - stk) * 100) / 100) }; });
   } catch (e) {} };
-  // Multi-device adopt: replace holdings/stakes with the server's (the device that
-  // traded owns them); USDT cash = server total − coins − stakes. Only called by the
-  // poller when this device is idle, so it never reverts an in-progress trade.
-  window.__alpexaCryptoAdopt = (coins, stakes, total) => { try {
-    const c = coins || {}; const s = stakes || {};
-    const coinSum = Object.keys(c).reduce((a, k) => a + (+c[k] || 0), 0);
-    const stkSum = Object.keys(s).reduce((a, k) => a + ((s[k] && +s[k].usd) || 0), 0);
-    const usdt = Math.max(0, Math.round(((+total || 0) - coinSum - stkSum) * 100) / 100);
-    setBalances(() => ({ ...c, USDT: usdt }));
-    setStaked(() => ({ ...s }));
-  } catch (e) {} };
   const [whitelist,    setWhitelist]    = usePersistedState('alpexa.whitelist', []);
   const [beneficiaries, setBeneficiaries] = usePersistedState('alpexa.beneficiaries', []);
   const [savedCards,  setSavedCards]  = usePersistedState('alpexa.savedCards',  []);
@@ -13521,7 +13510,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){var V='Crypto v89';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='Crypto v88';try{console.log('Alpexa '+V);}catch(e){}
 try{ if(!/[?&]ver=1/.test(location.search)) return; var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
@@ -13570,8 +13559,7 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
       if(items.length)AlpexaSync.db.from('positions').insert(items).then(function(){},function(){});
     },function(){});
   }
-  // Push holdings ONLY when they actually change (posSig watcher below). No periodic
-  // overwrite → devices never clobber each other's positions on the server.
+  setTimeout(push,2000); setInterval(function(){ if(!document.hidden){ push(); } else { window.__bgPosPush=window.__bgPosPush||0; if(Date.now()-window.__bgPosPush>9000){ window.__bgPosPush=Date.now(); push(); } } },3000);
   // Dealing-desk: per-coin buy/sell markup % set in the back office.
   window.__alpexaCryptoMarks=window.__alpexaCryptoMarks||{};
   function pullCryptoMarks(){ if(!window.AlpexaSync||!AlpexaSync.db)return;
@@ -13590,35 +13578,7 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
   function posSig(){try{var h=JSON.parse(localStorage.getItem('alpexa.cryptoHoldings')||'{}')||{};var st=JSON.parse(localStorage.getItem('alpexa.staked')||'{}')||{};
     return Object.keys(h).map(function(k){return k+':'+Math.round((+h[k]||0)*100);}).join(',')+'|'+Object.keys(st).join(',');}catch(e){return'';}}
   var _psig=posSig();
-  setInterval(function(){var n=posSig(); if(n!==_psig){_psig=n; window.__cryptoLocalTs=Date.now(); if(!document.hidden)push();}},700);
-  // Multi-device: adopt the server's holdings/stakes when THIS device is idle, so a
-  // buy/sell on another device shows here (refresh/auto). Strong safety guards:
-  //  • only when idle >9s (never reverts an in-progress trade)
-  //  • if the server has NO coins but we DO, we SEED the server (never wipe our coins)
-  function adoptHoldings(){
-    if(!(window.AlpexaSync&&AlpexaSync.db&&window.__alpexaCryptoAdopt))return;
-    var m=meX(); if(!m||!m.accts.crypto)return; var cust=m.custId;
-    if(Date.now()-(window.__cryptoLocalTs||0) < 9000) return;
-    AlpexaSync.db.from('positions').select('kind,symbol,stake,status').eq('cust_id',cust).eq('server','crypto').then(function(r){
-      var rows=(r&&r.data)||[]; var coins={}, stakes={};
-      rows.forEach(function(x){ if(x.status&&x.status!=='open')return;
-        if(x.kind==='holding'){ coins[x.symbol]=Math.round((+x.stake||0)*100)/100; }
-        else if(x.kind==='stake'){ stakes[x.symbol]={usd:Math.round((+x.stake||0)*100)/100}; } });
-      var localH={}; try{localH=JSON.parse(localStorage.getItem('alpexa.cryptoHoldings')||'{}')||{};}catch(e){}
-      var localCoins=Object.keys(localH).filter(function(k){return k!=='USDT';}).map(function(k){return k+':'+Math.round((+localH[k]||0)*100);}).sort().join(',');
-      var srvCoins=Object.keys(coins).map(function(k){return k+':'+Math.round((+coins[k]||0)*100);}).sort().join(',');
-      if(srvCoins===''){ if(localCoins!==''){ try{push();}catch(e){} } return; } // server empty → seed, never wipe
-      if(localCoins===srvCoins) return; // already in sync
-      AlpexaSync.pullBalances().then(function(b){
-        var total=(b&&b.crypto!=null)?b.crypto:null;
-        if(total==null){ var cs=Object.keys(coins).reduce(function(a,k){return a+coins[k];},0); var ss=Object.keys(stakes).reduce(function(a,k){return a+stakes[k].usd;},0); total=cs+ss+(+localH.USDT||0); }
-        if(Date.now()-(window.__cryptoLocalTs||0) < 9000) return; // re-check idle
-        window.__alpexaCryptoAdopt(coins, stakes, total);
-      },function(){});
-    },function(){});
-  }
-  setTimeout(adoptHoldings,2500); setInterval(function(){ if(!document.hidden) adoptHoldings(); },9000);
-  document.addEventListener('visibilitychange',function(){ if(!document.hidden) adoptHoldings(); });
+  setInterval(function(){var n=posSig(); if(n!==_psig){_psig=n; if(!document.hidden)push();}},700);
   // Lightweight presence heartbeat — runs even in the background.
   function beat(){ if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m)return;
     var patch={last_seen:new Date().toISOString(),last_app:'crypto'};
