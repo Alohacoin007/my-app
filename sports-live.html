@@ -1188,7 +1188,7 @@
       <div class="s-sec"><div class="s-sec-title">Account</div><div class="s-card">
         <button id="signOutBtn" style="width:100%;padding:15px 0;border:none;background:transparent;color:#e5484d;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Sign out</button>
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.49</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.50</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -1452,6 +1452,16 @@
   // chosen time zone (so changing the setting updates instantly); live games keep
   // their game clock; demo games keep their static label.
   function gameTimeLabel(g){ if(g&&!g.live&&g.kickoff){ const f=fmtKick(g.kickoff); if(f)return f; } return g?g.time:''; }
+  // Ticket leg time: scheduled legs reformat their kickoff into the chosen zone
+  // (using the saved timestamp, or the matching game still in the list for older
+  // tickets). Live legs keep their snapshot clock.
+  function legTimeLabel(l){
+    if(!l) return '';
+    if(l.live) return l.tm;
+    if(l.kt){ const f=fmtKick(l.kt); if(f) return f; }
+    try{ const g=(typeof GAMES!=='undefined'?GAMES:[]).find(x=>x.id===l.gid); if(g&&g.kickoff){ const f=fmtKick(g.kickoff); if(f) return f; } }catch(e){}
+    return l.tm;
+  }
   // Synthesized SFX (Web Audio — no files needed)
   let _alpexaActx=null;
   function _actx(){ _alpexaActx=_alpexaActx||new (window.AudioContext||window.webkitAudioContext)(); if(_alpexaActx.state==='suspended')_alpexaActx.resume(); return _alpexaActx; }
@@ -1644,7 +1654,7 @@
       const g=GAMES.find(x=>x.id===gid);
       if(g&&g.live&&!window.__alpexaLiveBetting){ showToast('🔒','Live betting unavailable','Pre-match betting only for now'); return; }
       legs=legs.filter(l=>!(l.gid===gid&&l.market===market));
-      legs.push({uid,gid,market,sel,am,game:g.away.ab+' @ '+g.home.ab,tm:g.time,live:!!g.live,stake:20});
+      legs.push({uid,gid,market,sel,am,game:g.away.ab+' @ '+g.home.ab,tm:g.time,kt:g.kickoff||'',live:!!g.live,stake:20});
     }
     // update bar count + sgp availability, but keep props view intact
     const n=legs.length;document.getElementById('barCount').textContent=n;
@@ -1659,7 +1669,7 @@
     if(i>-1)legs.splice(i,1);
     else{const g=GAMES.find(x=>x.id===gid);
       if(g&&g.live&&!window.__alpexaLiveBetting){ showToast('🔒','Live betting unavailable','Pre-match betting only for now'); return; }
-      legs.push({uid,gid,market,sel,am,game:g.away.ab+' @ '+g.home.ab,tm:g.time,live:!!g.live,stake:20});}
+      legs.push({uid,gid,market,sel,am,game:g.away.ab+' @ '+g.home.ab,tm:g.time,kt:g.kickoff||'',live:!!g.live,stake:20});}
     renderGames();syncSlip();
   }
 
@@ -1735,7 +1745,7 @@
     openBets.unshift({id:'b'+Date.now(),type:betType,ticket:spTicket,placedTs:Date.now(),
       cls:mode,stake:stake,potential:pot,cashout:baseCash,
       d0:d0,baseCash:baseCash,
-      legs:legs.map(l=>({pk:l.sel,sel:l.sel,gid:l.gid,market:l.market,gm:l.game,am:l.am,am0:l.am,dec0:dec(l.am),tm:l.tm,live:l.live,st:'o'}))});
+      legs:legs.map(l=>({pk:l.sel,sel:l.sel,gid:l.gid,market:l.market,gm:l.game,am:l.am,am0:l.am,dec0:dec(l.am),tm:l.tm,kt:l.kt||'',live:l.live,st:'o'}))});
     // deduct stake + log activity
     balance-=stake; syncSportsBal();
     txns.unshift({ts:Date.now(),ic:'🎫',t1:'Bet placed',t2:`${betType}${legCount>1?' · '+legCount+' legs':''} · Just now`,amt:-stake});
@@ -1756,7 +1766,7 @@
     document.querySelector('#betSeg .s.active').classList.remove('active');s.classList.add('active');seg=s.dataset.seg;renderTickets();};
   function ticketHTML(b,isOpen){
     const legsH=b.legs.map(l=>`<div class="tleg ${l.st}"><div class="left"><span class="dot"></span>
-      <div class="info"><div class="pk">${l.pk}</div><div class="gm">${l.gm}${l.tm?` <span style="opacity:.7">· ${l.live?'🔴 ':'🕒 '}${l.tm}</span>`:''}</div></div></div>
+      <div class="info"><div class="pk">${l.pk}</div><div class="gm">${l.gm}${l.tm?` <span style="opacity:.7">· ${l.live?'🔴 ':'🕒 '}${legTimeLabel(l)}</span>`:''}</div></div></div>
       <span class="odd">${fmtAm(l.am)}</span></div>`).join('');
     const head=`<div class="th"><span class="badge ${b.cls}">${b.type}${b.legs.length>1?' '+b.legs.length+'legs':''}</span>
       <span class="res ${isOpen?'open':b.result}">${isOpen?'Open':b.result==='won'?'Won':b.result==='cashed'?'Cashed Out':'Lost'}</span></div>`+
