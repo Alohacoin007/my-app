@@ -1165,8 +1165,9 @@
     const oddsLbl=ODDS_OPTS.find(o=>o.v===settings.oddsFormat)?.lbl||'American';
     const seActive=settings.selfExcludeUntil&&settings.selfExcludeUntil>Date.now();
     const html=`
-      <div class="s-sec"><div class="s-sec-title">Odds</div><div class="s-card">
-        ${actionRow('odds','Display Format','How odds are shown',`<span class="v" id="vOdds">${oddsLbl}</span>`)}
+      <div class="s-sec"><div class="s-sec-title">Display</div><div class="s-card">
+        ${actionRow('odds','Odds format','How odds are shown',`<span class="v" id="vOdds">${oddsLbl}</span>`)}
+        ${actionRow('tz','Time zone','Game start times',`<span class="v" id="vTz">${tzLabel()}</span>`)}
       </div></div>
       <div class="s-sec"><div class="s-sec-title">Notifications</div><div class="s-card">
         ${toggleRow('liveStart','Live game start','When tracked games begin')}
@@ -1187,7 +1188,7 @@
       <div class="s-sec"><div class="s-sec-title">Account</div><div class="s-card">
         <button id="signOutBtn" style="width:100%;padding:15px 0;border:none;background:transparent;color:#e5484d;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Sign out</button>
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.48</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.49</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -1215,6 +1216,7 @@
   }
   function handleSettingAction(act){
     if(act==='odds')openSSheet('Odds Display',renderOddsSheet,bindOddsSheet);
+    else if(act==='tz')openSSheet('Time zone',renderTzSheet,bindTzSheet);
     else if(act==='depLimit')openSSheet('Deposit Limit (Daily)',()=>renderLimitSheet('depositLimit'),()=>bindLimitSheet('depositLimit'));
     else if(act==='lossLimit')openSSheet('Loss Limit (Daily)',()=>renderLimitSheet('lossLimit'),()=>bindLimitSheet('lossLimit'));
     else if(act==='reality')openSSheet('Reality Check',renderRCSheet,bindRCSheet);
@@ -1245,6 +1247,19 @@
       settings.oddsFormat=b.dataset.setOdds;saveSettings();
       document.getElementById('vOdds').textContent=ODDS_OPTS.find(o=>o.v===settings.oddsFormat).lbl;
       renderGames();calc();renderTickets();
+      closeSSheet();
+    });
+  }
+  function renderTzSheet(){
+    let dev=''; try{ dev=Intl.DateTimeFormat().resolvedOptions().timeZone||''; }catch(e){}
+    return TZ_OPTS.map(o=>`<button class="s-opt ${ (settings.timezone||'auto')===o.v?'sel':''}" data-set-tz="${o.v}">
+      <div class="s-opt-l">${o.lbl}${o.v==='auto'&&dev?`<span class="s-opt-sub">Detected: ${dev}</span>`:''}</div><span class="s-opt-radio"></span></button>`).join('');
+  }
+  function bindTzSheet(){
+    document.querySelectorAll('[data-set-tz]').forEach(b=>b.onclick=()=>{
+      settings.timezone=b.dataset.setTz;saveSettings();
+      const v=document.getElementById('vTz'); if(v)v.textContent=tzLabel();
+      renderGames();
       closeSSheet();
     });
   }
@@ -1401,6 +1416,7 @@
   // ===== SETTINGS state =====
   const DEFAULT_SETTINGS={
     oddsFormat:'american',
+    timezone:'auto',
     notifications:{liveStart:true,betResults:true,deposits:true,promos:false,sound:true},
     depositLimit:0,lossLimit:0,realityCheckMin:0,selfExcludeUntil:0,language:'en'
   };
@@ -1413,6 +1429,29 @@
     }catch(_){return {...DEFAULT_SETTINGS};}
   })();
   function saveSettings(){try{localStorage.setItem('alpexaSettings',JSON.stringify(settings));}catch(_){}}
+  // Time zone for game start times. 'auto' = the device's own zone (current location).
+  const TZ_OPTS=[
+    {v:'auto',                lbl:'Automatic (your device)'},
+    {v:'America/New_York',    lbl:'US Eastern (ET)'},
+    {v:'America/Chicago',     lbl:'US Central (CT)'},
+    {v:'America/Denver',      lbl:'US Mountain (MT)'},
+    {v:'America/Los_Angeles', lbl:'US Pacific (PT)'},
+    {v:'Asia/Seoul',          lbl:'Korea (KST)'},
+    {v:'Europe/London',       lbl:'London (UK)'},
+  ];
+  function tzLabel(){ const o=TZ_OPTS.find(x=>x.v===(settings.timezone||'auto')); return o?o.lbl:'Automatic (your device)'; }
+  function curTZ(){ const v=settings.timezone||'auto'; return v==='auto'?undefined:v; }
+  // Format a kickoff timestamp (UTC ISO) into a short local label like "Sat 5:30 PM".
+  function fmtKick(ts){
+    try{ const d=new Date(ts); if(isNaN(d.getTime())) return '';
+      const opt={weekday:'short',hour:'numeric',minute:'2-digit',hour12:true}; const z=curTZ(); if(z)opt.timeZone=z;
+      return d.toLocaleString(undefined,opt);
+    }catch(e){ return ''; }
+  }
+  // Display label for a game's time: scheduled real games show their kickoff in the
+  // chosen time zone (so changing the setting updates instantly); live games keep
+  // their game clock; demo games keep their static label.
+  function gameTimeLabel(g){ if(g&&!g.live&&g.kickoff){ const f=fmtKick(g.kickoff); if(f)return f; } return g?g.time:''; }
   // Synthesized SFX (Web Audio — no files needed)
   let _alpexaActx=null;
   function _actx(){ _alpexaActx=_alpexaActx||new (window.AudioContext||window.webkitAudioContext)(); if(_alpexaActx.state==='suspended')_alpexaActx.resume(); return _alpexaActx; }
@@ -1518,7 +1557,7 @@
       const isPinned=pinnedGames.has(g.id);
       const pinBtn=`<button class="pin-btn${isPinned?' pinned':''}" data-pin="${g.id}" title="${isPinned?'Unpin':'Pin to top'}">★</button>`;
       return `<div class="card${isPinned?' pinned':''}"><div class="ch"><span class="lg">${({NBA:'🏀',NFL:'🏈',MLB:'⚾',NHL:'🏒'})[g.lg]||'🏈'} ${g.lg}</span>
-        <div class="ch-r"><span class="st${g.live?' live':''}">${g.live?'LIVE '+g.time:g.time}</span>${pinBtn}</div></div>
+        <div class="ch-r"><span class="st${g.live?' live':''}">${g.live?'LIVE '+g.time:gameTimeLabel(g)}</span>${pinBtn}</div></div>
         <div class="matrix">${row(g.away,1)}${row(g.home,0)}</div>
         ${playHTML}
         ${pc>0?`<div class="more-mkt" data-expand="${g.id}">+ More Markets <span class="cnt">(${pc})</span></div>`:''}</div>`;
@@ -2618,8 +2657,10 @@
           const hs=parseInt(hc.score,10), as=parseInt(ac.score,10);
           if(!isNaN(hs)) home.sc=hs; if(!isNaN(as)) away.sc=as;
         }
-        const time = (st.shortDetail || st.description || '').trim() || 'TBD';
-        return { id:lg+'_'+ev.id, lg, state:state, live: state==='in', real: true, time, home, away, core: mkCore(home, away, ev), props: [] };
+        const kickoff = comp.date || ev.date || '';
+        let time = (st.shortDetail || st.description || '').trim() || 'TBD';
+        if(state==='pre' && kickoff){ const f=fmtKick(kickoff); if(f) time=f; }
+        return { id:lg+'_'+ev.id, lg, state:state, live: state==='in', real: true, kickoff:(state==='pre'?kickoff:''), time, home, away, core: mkCore(home, away, ev), props: [] };
       }catch(e){ return null; }
     }
     async function fetchJson(url){
