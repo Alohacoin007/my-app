@@ -1205,11 +1205,23 @@
       <div class="s-sec"><div class="s-sec-title">Language</div><div class="s-card">
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.46</div>`;
+      <div class="s-sec"><div class="s-sec-title">Account</div><div class="s-card">
+        <button id="signOutBtn" style="width:100%;padding:15px 0;border:none;background:transparent;color:#e5484d;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Sign out</button>
+      </div></div>
+      <div class="s-foot">Alpexa Sports v1.2.47</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
+  // Real sign-out: end the server session, wipe this device's identity + cached
+  // money, then go to the login page. Saved Face ID / quick-login is KEPT.
+  function doSignOut(){
+    try{ if(window.AlpexaSync && AlpexaSync.db && AlpexaSync.db.auth) AlpexaSync.db.auth.signOut(); }catch(e){}
+    try{ ['alpexa.me','alpexa.serverBalances','alpexa.balances','alpexa.cryptoHoldings','alpexa.staked','alpexa.sportsBalance','alpexa.cryptoBalance','alpexa.fxLive','alpexa.openBets','alpexa.settledBets','alpexa.withdrawals','alpexa.transactions','alpexa.appliedTransfers','alpexa.customer','alpexa.openDeposit','alpexa.ownerFunded'].forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
+    try{ window.location.replace('login.html?switch=1'); }catch(e){ window.location.href='login.html?switch=1'; }
+  }
   function bindSettings(){
+    var _so=document.getElementById('signOutBtn');
+    if(_so) _so.onclick=function(){ if(confirm('Sign out of Alpexa?')) doSignOut(); };
     document.querySelectorAll('#settingsBody [data-toggle]').forEach(row=>{
       row.onclick=()=>{
         const k=row.dataset.toggle;
