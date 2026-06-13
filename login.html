@@ -268,10 +268,11 @@ async function doLogin(){
       if(!p2.error&&p2.data&&p2.data.length) player=p2.data[0];
     }
     if(!player){ fail('Signed in, but no profile found. Contact support.'); return; }
-    const accs=await window._db.from('accounts').select('server,acct_no').eq('player_id',player.id);
+    const accs=await window._db.from('accounts').select('server,acct_no,balance').eq('player_id',player.id);
     if(accs.error) throw accs.error;
     const accts={sports:'',crypto:'',fx:''};
-    (accs.data||[]).forEach(a=>{ if(a.server) accts[a.server]=a.acct_no; });
+    const bals={sports:0,crypto:0,fx:0};
+    (accs.data||[]).forEach(a=>{ if(a.server){ accts[a.server]=a.acct_no; bals[a.server]=+a.balance||0; } });
     // If a DIFFERENT customer signs in on this device, wipe the previous
     // account's cached money data so balances/positions don't bleed across
     // accounts (the app then re-adopts this account's real balance from server).
@@ -279,6 +280,18 @@ async function doLogin(){
       if(!_prev||_prev.custId!==player.cust_id){
         ['alpexa.serverBalances','alpexa.balances','alpexa.cryptoHoldings','alpexa.staked','alpexa.sportsBalance','alpexa.cryptoBalance','alpexa.fxLive','alpexa.openBets','alpexa.settledBets','alpexa.withdrawals','alpexa.transactions','alpexa.appliedTransfers','alpexa.customer','alpexa.openDeposit','alpexa.ownerFunded'].forEach(function(k){ localStorage.removeItem(k); });
       } }catch(e){}
+    // Adopt the SERVER's balances as the source of truth on login. This stops the
+    // app from pushing stale device caches back up (which is how a fresh $100/$500
+    // account could get overwritten). serverBalances/balances/sportsBalance always
+    // follow the server; crypto per-coin holdings are only seeded from the server
+    // total when this device has no existing breakdown (fresh / different customer).
+    try{
+      localStorage.setItem('alpexa.serverBalances', JSON.stringify({fx:bals.fx,crypto:bals.crypto,sports:bals.sports}));
+      localStorage.setItem('alpexa.balances', JSON.stringify({live:bals.fx,crypto:bals.crypto,sports:bals.sports}));
+      localStorage.setItem('alpexa.sportsBalance', String(bals.sports));
+      var _hadH=false; try{var _h=JSON.parse(localStorage.getItem('alpexa.cryptoHoldings')||'null'); _hadH=_h&&Object.keys(_h).length>0;}catch(e){}
+      if(!_hadH){ localStorage.setItem('alpexa.cryptoHoldings', JSON.stringify({USDT:bals.crypto})); }
+    }catch(e){}
     // Restore identity on THIS device so the apps show the right account.
     localStorage.setItem('alpexa.me', JSON.stringify({custId:player.cust_id,name:player.name,email:player.email,authId:authId,accts:accts}));
     // Remember which app to land on next time (stay-signed-in auto-pass uses this).

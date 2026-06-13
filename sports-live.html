@@ -585,14 +585,8 @@
 (function(){try{var m=JSON.parse(localStorage.getItem("alpexa.me")||"null");if(!(m&&m.accts&&(m.email||m.authId))){location.replace("login.html");}}catch(e){location.replace("login.html");}})();
 </script>
 <script src="alpexa-sync.js?v=7"></script>
-<script>
-(function(){try{var k='alpexa.serverBalances';var o={};try{o=JSON.parse(localStorage.getItem(k)||'{}')||{};}catch(e){o={};}
-  var ch=false;
-  if(!(o.crypto>0)){o.crypto=10000;ch=true;}
-  if(!(o.fx>0)){o.fx=10000;ch=true;}
-  if(!(o.sports>0)){o.sports=10000;ch=true;}
-  if(ch)localStorage.setItem(k,JSON.stringify(o));}catch(e){}})();
-</script>
+<!-- Test-only balance seed ($10k default) removed for live service: real opening
+     balances come from signup (Sports $500 / Crypto $100 / FX $100). -->
 </head>
 <body class="m-parlay">
   <div class="phone">
@@ -955,22 +949,7 @@
       localStorage.setItem('alpexa.dataVersion',ALPEXA_DATA_VERSION);
     }
   }catch(e){}
-  // Owner test account: $1,000,000 per server.
-  (function(){try{
-  var OWNER='zbnyme@gmail.com';
-  var me=null;try{me=JSON.parse(localStorage.getItem('alpexa.me')||'null');}catch(e){}
-  if(me&&me.email&&String(me.email).trim().toLowerCase()===OWNER){
-    // Owner test account: seed $1,000,000 ONCE. After that, trades/transfers
-    // persist (live-like) so the balance stays consistent across server switches.
-    if(localStorage.getItem('alpexa.ownerFunded')!=='1M'){
-      localStorage.setItem('alpexa.serverBalances',JSON.stringify({crypto:1000000,fx:1000000,sports:1000000}));
-      localStorage.setItem('alpexa.sportsBalance','1000000');
-      localStorage.setItem('alpexa.balances',JSON.stringify({live:1000000,crypto:1000000,sports:1000000}));
-      localStorage.setItem('alpexa.cryptoHoldings',JSON.stringify({USDT:1000000}));
-      localStorage.setItem('alpexa.ownerFunded','1M');
-    }
-  }
-}catch(e){}})();
+  // Owner $1,000,000 test seed removed for live service (uses real signup balances).
 
   // ---------- i18n (core UI strings) ----------
   const I18N={
@@ -1208,7 +1187,7 @@
       <div class="s-sec"><div class="s-sec-title">Account</div><div class="s-card">
         <button id="signOutBtn" style="width:100%;padding:15px 0;border:none;background:transparent;color:#e5484d;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Sign out</button>
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.47</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.48</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
