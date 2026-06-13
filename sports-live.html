@@ -1189,7 +1189,7 @@
       <div class="s-sec"><div class="s-sec-title">Account</div><div class="s-card">
         <button id="signOutBtn" style="width:100%;padding:15px 0;border:none;background:transparent;color:#e5484d;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Sign out</button>
       </div></div>
-      <div class="s-foot">Alpexa Sports v1.2.52</div>`;
+      <div class="s-foot">Alpexa Sports v1.2.53</div>`;
     document.getElementById('settingsBody').innerHTML=html;
     bindSettings();
   }
@@ -1775,8 +1775,8 @@
       <span class="res ${isOpen?'open':b.result}">${isOpen?'Open':b.result==='won'?'Won':b.result==='cashed'?'Cashed Out':'Lost'}</span></div>`+
       ((b.ticket||b.placedTs)?`<div style="font-family:ui-monospace,monospace;font-size:9.5px;color:var(--dim);padding:0 2px 4px">${b.ticket||''}${b.ticket&&b.placedTs?' · ':''}${b.placedTs?new Date(b.placedTs).toLocaleString():''}</div>`:'');
     let foot;
-    if(isOpen && b.synced){foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b>Est. ${usd(b.potential)}</b></div>
-      <div style="font-size:10.5px;color:var(--dim);padding:2px 2px 0">🔄 Synced from another device · cash out on the device you placed it</div></div>`;}
+    if(isOpen && b.viewOnly){foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b>Est. ${usd(b.potential)}</b></div>
+      <div style="font-size:10.5px;color:var(--dim);padding:2px 2px 0">🔄 Open on another device</div></div>`;}
     else if(isOpen){foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b>Est. ${usd(b.potential)}</b></div>
       <div class="cash-btns"><button class="cashout half" data-cashhalf="${b.id}">50%<span>${usd(b.cashout/2)}</span></button><button class="cashout" data-cash="${b.id}">Cash Out ${usd(b.cashout)}<span>Settle now</span></button></div></div>`;}
     else if(b.result==='cashed'){foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b class="c">Cashed ${usd(b.payout)}</b></div></div>`;}
@@ -1811,11 +1811,16 @@
     const btn=e.target.closest('[data-cash]');
     if(btn)doCashout(btn.dataset.cash);
   });
-  function doCashout(id,frac){
+  async function doCashout(id,frac){
     const b=openBets.find(x=>x.id===id);if(!b)return;
-    if(b.synced){ showToast('🔄','Open on another device','Cash out where you placed it'); return; }
+    if(b.viewOnly){ showToast('🔄','Not available here','Open this bet on the device that placed it'); return; }
     frac=(frac&&frac>0&&frac<1)?frac:1; const partial=frac<1;
     const payAmt=Math.round(b.cashout*frac*100)/100, stakePart=b.stake*frac;
+    // CLAIM the server row first so the same bet can't be cashed out twice across
+    // devices. If we didn't get it, someone already settled/cashed it elsewhere.
+    const got=await claimIfShared(b);
+    if(!got){ openBets=openBets.filter(x=>x.id!==id); renderTickets(); updateWallet();
+      showToast('🔄','Already settled','This bet was settled on another device'); return; }
     balance+=payAmt; playTapSound();
     txns.unshift({ts:Date.now(),ic:'💵',t1:'Cashout',t2:(partial?'Partial '+Math.round(frac*100)+'% · ':'')+b.type+' · Just now',amt:+payAmt});
     try{window.__alpexaSettle&&window.__alpexaSettle({server:'sports',kind:'bet_cashout',local_id:b.id,ticket:b.ticket,symbol:b.type||'Bet',stake:stakePart,pnl:payAmt-stakePart,detail:(partial?'partial '+Math.round(frac*100)+'%':'full')});}catch(e){}
@@ -1827,10 +1832,12 @@
       b.cashout=Math.round((b.cashout-payAmt)*100)/100;
       if(b.potential) b.potential=Math.round(b.potential*(1-frac)*100)/100;
       if(b.baseCash) b.baseCash=Math.round(b.baseCash*(1-frac)*100)/100;
+      // the bet is still open (smaller) → put the updated row back on the server
+      try{ delete _pushedBets[b.id]; insertBetRow(b); }catch(e){}
     } else {
       settledBets.unshift({ id:'c'+b.id, type:b.type, cls:b.cls, stake:b.stake, result:'cashed', payout:payAmt, legs:(b.legs||[]).map(l=>({pk:l.pk||l.sel,gm:l.gm||l.game,am:l.am,st:'c'})) });
       openBets=openBets.filter(x=>x.id!==id);
-      try{deleteServerBet(id);}catch(e){}
+      // server row already removed by the claim above
     }
     const nb=document.getElementById('navBadge');
     if(nb){nb.textContent=openBets.length||'';nb.style.display=openBets.length?'flex':'none';}
@@ -1868,34 +1875,40 @@
       const my=side==='home'?hs:as, op=side==='home'?as:hs, diff=(my+line)-op;
       if(diff===0)return 'push'; return diff>0?'won':'lost'; }
     return null; }
-  function settleBets(){
-    if(!openBets.length)return; let changed=false; const still=[];
+  async function settleBets(){
+    if(!openBets.length)return;
+    // Find bets that are fully graded (all legs have final results).
+    const ready=[];
     openBets.forEach(b=>{
-      // Bets synced FROM another device are display-only here — never settle them
-      // (the device that placed them, which has the full legs, settles & removes
-      // the server row; we just drop the display when it leaves the server).
-      if(b.synced){ still.push(b); return; }
+      if(b.viewOnly) return;                 // legacy display-only row, can't grade
       let allDone=true, anyLost=false, decMul=1;
       (b.legs||[]).forEach(l=>{ const r=RESULTS[l.gid]; if(!r||!r.completed){allDone=false;return;}
         const res=gradeLeg(l,r); if(res===null){allDone=false;return;}
         if(res==='lost')anyLost=true; else if(res==='won')decMul*=(+l.dec0||dec(l.am0||l.am)); });
-      if(!allDone){still.push(b);return;}
+      if(allDone) ready.push({b,anyLost,decMul});
+    });
+    if(!ready.length) return;
+    let changed=false;
+    for(const it of ready){
+      const b=it.b;
+      // CLAIM so only ONE device credits this bet (prevents double payout).
+      const won = await claimIfShared(b);
+      openBets = openBets.filter(x=>x.id!==b.id);   // resolved somewhere → drop locally
       changed=true;
-      if(anyLost){
+      if(!won) continue;                            // another device already credited it
+      if(it.anyLost){
         settledBets.unshift({id:'st'+b.id,type:b.type,cls:b.cls,stake:b.stake,result:'lost',payout:0,legs:(b.legs||[]).map(l=>({pk:l.sel||l.pk,gm:l.game||l.gm,am:l.am,st:'l'}))});
         txns.unshift({ts:Date.now(),ic:'❌',t1:'Bet lost',t2:`${b.type} · ${usd(b.stake)} stake`,amt:0});
         try{window.__alpexaSettle&&window.__alpexaSettle({server:'sports',kind:'bet_lost',local_id:b.id,ticket:b.ticket,symbol:b.type||'Bet',stake:b.stake,pnl:-(+b.stake||0),detail:((b.legs&&b.legs[0])||{}).gm||''});}catch(e){}
-        try{deleteServerBet(b.id);}catch(e){}
       } else {
-        const payout=Math.round(b.stake*decMul*100)/100; balance+=payout;
+        const payout=Math.round(b.stake*it.decMul*100)/100; balance+=payout;
         settledBets.unshift({id:'st'+b.id,type:b.type,cls:b.cls,stake:b.stake,result:'won',payout:payout,legs:(b.legs||[]).map(l=>({pk:l.sel||l.pk,gm:l.game||l.gm,am:l.am,st:'w'}))});
         txns.unshift({ts:Date.now(),ic:'🏆',t1:'Bet Won',t2:`${b.type} · +${usd(payout)}`,amt:+payout});
         try{notify('🏆','Bet won!',`${b.type} · +${usd(payout)}`,'betResults');}catch(e){}
         try{window.__alpexaSettle&&window.__alpexaSettle({server:'sports',kind:'bet_won',local_id:b.id,ticket:b.ticket,symbol:b.type||'Bet',stake:b.stake,pnl:payout-(+b.stake||0),detail:'payout '+payout});}catch(e){}
-        try{deleteServerBet(b.id);}catch(e){}
       }
-    });
-    if(changed){ openBets=still; syncSportsBal();
+    }
+    if(changed){ syncSportsBal();
       const nb=document.getElementById('navBadge'); if(nb){nb.textContent=openBets.length||'';nb.style.display=openBets.length?'flex':'none';}
       renderTickets(); updateWallet(); }
   }
@@ -1907,58 +1920,87 @@
   // No delete-all anywhere → bets never disappear or resurrect across devices.
   function meCust(){ try{ return (JSON.parse(localStorage.getItem('alpexa.me')||'null')||{}).custId||null; }catch(e){ return null; } }
   function meSportsAcct(){ try{ return ((JSON.parse(localStorage.getItem('alpexa.me')||'null')||{}).accts||{}).sports||''; }catch(e){ return ''; } }
-  const _pushedBets={}; // local_id -> true (this session; reset on reload)
+  const _pushedBets={}; // local_id -> true (rows we put on the server)
+  // Atomically "claim" a bet by deleting its server row. Returns true ONLY if THIS
+  // device actually removed it — so two devices can't both credit the same bet.
+  async function claimServerBet(id){
+    if(!(window.AlpexaSync&&AlpexaSync.db)) return true; const cust=meCust(); if(!cust) return true;
+    try{ const r=await AlpexaSync.db.from('positions').delete().eq('cust_id',cust).eq('server','sports').eq('local_id',String(id)).select();
+      delete _pushedBets[id]; return !!(r&&r.data&&r.data.length); }
+    catch(e){ return true; }
+  }
+  // Claim only if the bet is shared on the server; a purely-local bet (never
+  // synced) needs no claim and is always settle-able here.
+  async function claimIfShared(b){
+    const shared = b && (b.fromServer || _pushedBets[b.id]);
+    if(!shared) return true;
+    return await claimServerBet(b.id);
+  }
   function betToRow(b){
     const cust=meCust(), acct=meSportsAcct(); if(!cust) return null;
     const L=(b.legs&&b.legs[0])||{}; const pick=L.pk||L.sel||''; const game=L.gm||L.game||'';
     const odds=+L.am||0; const nlegs=(b.legs&&b.legs.length)||1; const more=nlegs>1?(' +'+(nlegs-1)):'';
+    // meta = the FULL bet so ANY device can rebuild it (legs/odds) and compute
+    // cashout + settle identically — that's what makes cash-out work everywhere.
+    const meta={ type:b.type, cls:b.cls, stake:+b.stake||0, potential:+b.potential||0,
+      baseCash:+b.baseCash||0, d0:+b.d0||0, cashout:+b.cashout||0,
+      ticket:b.ticket||'', placedTs:b.placedTs||0, legs:b.legs||[] };
     return { cust_id:cust, acct_no:acct, server:'sports', kind:'bet', local_id:String(b.id||''),
       symbol:(b.type||'Bet')+(pick?(' · '+pick+more):''), side:'', stake:+b.stake||0,
-      potential:+b.potential||0, status:'open', game:game, pick:pick, odds:odds, size:nlegs };
+      potential:+b.potential||0, status:'open', game:game, pick:pick, odds:odds, size:nlegs, meta:meta };
+  }
+  function insertBetRow(b){
+    if(!(window.AlpexaSync&&AlpexaSync.db)) return; const cust=meCust(); if(!cust) return;
+    const row=betToRow(b); if(!row) return;
+    // delete-then-insert by THIS bet's id only (idempotent, never touches others)
+    AlpexaSync.db.from('positions').delete().eq('cust_id',cust).eq('server','sports').eq('local_id',String(b.id)).then(function(){
+      AlpexaSync.db.from('positions').insert(row).then(function(res){ if(!(res&&res.error))_pushedBets[b.id]=true; },function(){});
+    },function(){});
   }
   function syncOwnBets(){
     if(!(window.AlpexaSync&&AlpexaSync.db)) return; const cust=meCust(); if(!cust) return;
     openBets.forEach(function(b){
-      if(!b||b.synced||_pushedBets[b.id]) return;   // skip synced (others') + already-pushed
-      const row=betToRow(b); if(!row) return;
-      // delete-then-insert by THIS bet's id only (idempotent, never touches others)
-      AlpexaSync.db.from('positions').delete().eq('cust_id',cust).eq('server','sports').eq('local_id',String(b.id)).then(function(){
-        AlpexaSync.db.from('positions').insert(row).then(function(res){ if(!(res&&res.error))_pushedBets[b.id]=true; },function(){});
-      },function(){});
+      // Only the device that has the bet locally (and hasn't pulled it) inserts it.
+      // Pulled bets (fromServer) already live on the server — don't re-insert.
+      if(!b||b.fromServer||_pushedBets[b.id]) return;
+      insertBetRow(b);
     });
   }
-  function deleteServerBet(id){
-    if(!(window.AlpexaSync&&AlpexaSync.db)) return; const cust=meCust(); if(!cust) return;
-    AlpexaSync.db.from('positions').delete().eq('cust_id',cust).eq('server','sports').eq('local_id',String(id)).then(function(){},function(){});
-    delete _pushedBets[id];
-  }
+  function deleteServerBet(id){ claimServerBet(id); }
   function pullServerBets(){
     if(!(window.AlpexaSync&&AlpexaSync.db)) return; const cust=meCust(); if(!cust) return;
-    AlpexaSync.db.from('positions').select('local_id,symbol,stake,potential,game,pick,odds,size,status')
+    AlpexaSync.db.from('positions').select('local_id,symbol,stake,potential,game,pick,odds,size,status,meta')
       .eq('cust_id',cust).eq('server','sports').eq('kind','bet').eq('status','open')
       .then(function(r){
         const rows=(r&&r.data)||[]; const onServer={}; rows.forEach(function(x){ onServer[String(x.local_id)]=x; });
         const have={}; openBets.forEach(function(b){ have[String(b.id)]=true; });
         let changed=false;
-        // add server bets we don't have locally as read-only "synced" display bets
         rows.forEach(function(x){
           const id=String(x.local_id); if(have[id]) return;
-          const nlegs=+x.size||1;
-          openBets.push({ id:id, type:(x.symbol||'Bet'), cls:'', ticket:'', placedTs:0,
-            stake:+x.stake||0, potential:+x.potential||0, cashout:0,
-            legs:[{pk:(x.pick||x.symbol||'Selection'), sel:(x.pick||''), gm:(x.game||''), am:+x.odds||0, st:'o'}],
-            synced:true });
+          const m=x.meta&&typeof x.meta==='object'?x.meta:null;
+          if(m && m.legs && m.legs.length){
+            // FULL bet rebuilt from meta → behaves like any open bet (cash out works)
+            openBets.push({ id:id, type:m.type||x.symbol||'Bet', cls:m.cls||'', ticket:m.ticket||'',
+              placedTs:m.placedTs||0, stake:+m.stake||+x.stake||0, potential:+m.potential||+x.potential||0,
+              baseCash:+m.baseCash||0, d0:+m.d0||0, cashout:+m.cashout||0, legs:m.legs, fromServer:true });
+          } else {
+            // Legacy row without meta → minimal view-only display.
+            openBets.push({ id:id, type:(x.symbol||'Bet'), cls:'', ticket:'', placedTs:0,
+              stake:+x.stake||0, potential:+x.potential||0, cashout:0,
+              legs:[{pk:(x.pick||x.symbol||'Selection'), sel:(x.pick||''), gm:(x.game||''), am:+x.odds||0, st:'o'}],
+              fromServer:true, viewOnly:true });
+          }
           changed=true;
         });
-        // drop synced bets that are no longer on the server (their origin settled them)
-        for(let i=openBets.length-1;i>=0;i--){ if(openBets[i].synced && !onServer[String(openBets[i].id)]){ openBets.splice(i,1); changed=true; } }
+        // drop pulled bets no longer on the server (settled/cashed somewhere)
+        for(let i=openBets.length-1;i>=0;i--){ if(openBets[i].fromServer && !onServer[String(openBets[i].id)]){ openBets.splice(i,1); changed=true; } }
         if(changed){ try{renderTickets();}catch(e){} try{updateWallet();}catch(e){}
           const nb=document.getElementById('navBadge'); if(nb){nb.textContent=openBets.length||'';nb.style.display=openBets.length?'flex':'none';} }
       },function(){});
   }
   // Push own bets the instant they change; pull everyone-else's view on a timer.
   let _betSig='';
-  function _curBetSig(){ return openBets.filter(function(b){return !b.synced;}).map(function(b){return b.id;}).join(','); }
+  function _curBetSig(){ return openBets.filter(function(b){return !b.fromServer;}).map(function(b){return b.id;}).join(','); }
   setInterval(function(){ const s=_curBetSig(); if(s!==_betSig){ _betSig=s; syncOwnBets(); } }, 800);
   setTimeout(syncOwnBets, 1500); setTimeout(pullServerBets, 1800);
   setInterval(function(){ if(!document.hidden){ syncOwnBets(); pullServerBets(); } }, 6000);
