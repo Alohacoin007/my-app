@@ -339,6 +339,17 @@ function cryptoQtySig(list){
       .join('|');
   }catch(e){ return ''; }
 }
+// Signature of staked positions (principal+period+since) — detects a real
+// stake/unstake vs. nothing, for the multi-device stake sync.
+function cryptoStakeSig(obj){
+  try{
+    return Object.keys(obj||{})
+      .filter(function(k){ return obj[k] && (+obj[k].usd||0) > 0.005; })
+      .map(function(k){ var s=obj[k]; return k+':'+(+s.usd).toFixed(2)+':'+(s.period||'flexible')+':'+(s.since||0); })
+      .sort()
+      .join('|');
+  }catch(e){ return ''; }
+}
 const CATEGORIES = [
   { id: 'All',     label: 'All' },
   { id: 'L1',      label: 'Layer 1' },
@@ -13211,6 +13222,59 @@ function App() {
     setTimeout(tick, 2000);
     return () => { stop = true; clearInterval(iv); document.removeEventListener('visibilitychange', vis); };
   }, []);
+  // ── STAKES: same server-owns-it pattern as holdings, for staked positions ──
+  // WRITE staked snapshot (principal+period+since) on a genuine stake/unstake.
+  const stakeSyncRef = React.useRef({ prev: null, first: true, srvSig: null });
+  React.useEffect(() => {
+    if (!window.AlpexaSync || !AlpexaSync.db) return;
+    const acct = cryptoAcctRef.current; if (!acct) return;
+    const sig = cryptoStakeSig(staked);
+    const seen = {}; Object.keys(staked).forEach((k) => { if (staked[k] && (+staked[k].usd || 0) > 0.005) seen[k] = true; });
+    if (stakeSyncRef.current.first) { stakeSyncRef.current.first = false; stakeSyncRef.current.prev = seen; stakeSyncRef.current.srvSig = sig; return; }
+    if (sig === stakeSyncRef.current.srvSig) { stakeSyncRef.current.prev = seen; return; } // no real change (incl. adopt echo)
+    window.__cbLocalTs = Date.now();
+    const tmr = setTimeout(() => {
+      try {
+        const now = new Date().toISOString();
+        const out = [];
+        Object.keys(staked).forEach((k) => { const s = staked[k]; out.push({ acct_no: acct, asset: k, usd: Math.max(0, +(s && s.usd) || 0), period: (s && s.period) || 'flexible', since: (s && s.since) || 0, updated_at: now }); });
+        const prev = stakeSyncRef.current.prev;
+        if (prev) Object.keys(prev).forEach((k) => { if (!seen[k]) out.push({ acct_no: acct, asset: k, usd: 0, period: 'flexible', since: 0, updated_at: now }); });
+        stakeSyncRef.current.prev = seen;
+        stakeSyncRef.current.srvSig = sig;
+        window.__cbLocalTs = Date.now();
+        if (out.length) AlpexaSync.db.from('crypto_stakes').upsert(out, { onConflict: 'acct_no,asset' }).then(function () {}, function () {});
+      } catch (e) {}
+    }, 1200);
+    return () => clearTimeout(tmr);
+  }, [staked]);
+  // ADOPT staked positions from the server when idle and they changed elsewhere.
+  React.useEffect(() => {
+    if (!window.AlpexaSync || !AlpexaSync.db) return;
+    let stop = false;
+    const tick = () => {
+      try {
+        if (document.hidden) return;
+        const acct = cryptoAcctRef.current; if (!acct) return;
+        if (Date.now() - (window.__cbLocalTs || 0) < 7000) return; // device busy
+        AlpexaSync.db.from('crypto_stakes').select('asset,usd,period,since').eq('acct_no', acct).then((sr) => {
+          if (stop || !sr || sr.error || !sr.data) return;
+          const next = {};
+          sr.data.forEach((r) => { const usd = +r.usd || 0; if (usd > 0.005) next[r.asset] = { usd: usd, period: r.period || 'flexible', since: +r.since || 0 }; });
+          const sig = cryptoStakeSig(next);
+          if (sig === stakeSyncRef.current.srvSig) return; // unchanged
+          stakeSyncRef.current.srvSig = sig;
+          const seen = {}; Object.keys(next).forEach((k) => { seen[k] = true; });
+          stakeSyncRef.current.prev = seen;
+          setStaked(next);
+        }, function () {});
+      } catch (e) {}
+    };
+    const iv = setInterval(() => { if (!document.hidden) tick(); }, 8000);
+    const vis = () => { if (!document.hidden) tick(); }; document.addEventListener('visibilitychange', vis);
+    setTimeout(tick, 2200);
+    return () => { stop = true; clearInterval(iv); document.removeEventListener('visibilitychange', vis); };
+  }, []);
   // Move USD from balance → staked. Stores period alongside USD so the
   // Dashboard can render the lock-period chip.
   const onStakeConfirmed = (assetId, usdAmount, period = 'flexible') => {
@@ -13633,7 +13697,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){var V='Crypto v106';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='Crypto v107';try{console.log('Alpexa '+V);}catch(e){}
 try{ if(!/[?&]ver=1/.test(location.search)) return; var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
