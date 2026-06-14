@@ -13144,6 +13144,11 @@ function App() {
     if (sig === holdingsSyncRef.current.srvSig) { holdingsSyncRef.current.prev = seen; return; } // no real change (incl. adopt echo)
     // Genuine local change → mark busy NOW so adopt can't revert it mid-debounce.
     window.__cbLocalTs = Date.now();
+    window.__cbDbg = window.__cbDbg || {};
+    window.__cbDbg.acct = acct;
+    window.__cbDbg.localSig = String(sig).slice(0, 48);
+    window.__cbDbg.srvSig = String(holdingsSyncRef.current.srvSig).slice(0, 48);
+    window.__cbDbg.note = 'write scheduled ' + new Date().toLocaleTimeString();
     const tmr = setTimeout(() => {
       try {
         const now = new Date().toISOString();
@@ -13153,8 +13158,12 @@ function App() {
         holdingsSyncRef.current.prev = seen;
         holdingsSyncRef.current.srvSig = sig; // this device is now the source of truth
         window.__cbLocalTs = Date.now();
-        AlpexaSync.db.from('crypto_holdings').upsert(out, { onConflict: 'acct_no,asset' }).then(function () {}, function () {});
-      } catch (e) {}
+        window.__cbDbg.note = 'writing ' + out.map((r) => r.asset).join(',') + ' @ ' + new Date().toLocaleTimeString();
+        AlpexaSync.db.from('crypto_holdings').upsert(out, { onConflict: 'acct_no,asset' }).then(
+          function (res) { window.__cbDbg.write = (res && res.error) ? ('ERR ' + (res.error.message || res.error.code || res.error)) : ('OK ' + new Date().toLocaleTimeString()); },
+          function (e) { window.__cbDbg.write = 'REJECT ' + (e && (e.message || e.code) || e); }
+        );
+      } catch (e) { window.__cbDbg.write = 'THROW ' + (e && e.message || e); }
     }, 1200);
     return () => clearTimeout(tmr);
   }, [balances]);
@@ -13171,9 +13180,13 @@ function App() {
         const acct = cryptoAcctRef.current; if (!acct) return;
         if (Date.now() - (window.__cbLocalTs || 0) < 7000) return; // device busy — don't interrupt
         AlpexaSync.db.from('crypto_holdings').select('asset,qty').eq('acct_no', acct).then((hr) => {
-          if (stop || !hr || !hr.data) return;
+          window.__cbDbg = window.__cbDbg || {};
+          if (stop || !hr) return;
+          if (hr.error) { window.__cbDbg.adopt = 'SELECT ERR ' + (hr.error.message || hr.error.code); return; }
+          if (!hr.data) return;
           const data = hr.data;
           const sig = cryptoQtySig(data);
+          window.__cbDbg.adopt = 'read ' + data.map((d) => d.asset).join(',') + ' @ ' + new Date().toLocaleTimeString();
           if (sig === holdingsSyncRef.current.srvSig) return; // server unchanged
           if (!data.length) { holdingsSyncRef.current.srvSig = ''; return; } // server empty — enable writes, nothing to adopt
           const next = {};
@@ -13186,8 +13199,9 @@ function App() {
           holdingsSyncRef.current.srvSig = sig;
           const adopted = {}; Object.keys(next).forEach((k) => { adopted[k] = true; });
           holdingsSyncRef.current.prev = adopted;
+          window.__cbDbg.adopt = 'ADOPTED ' + Object.keys(next).join(',') + ' @ ' + new Date().toLocaleTimeString();
           setBalances(next);
-        }, () => {});
+        }, function (e) { window.__cbDbg = window.__cbDbg || {}; window.__cbDbg.adopt = 'SELECT REJECT ' + (e && (e.message || e.code) || e); });
       } catch (e) {}
     };
     const iv = setInterval(() => { if (!document.hidden) tick(); }, 8000);
@@ -13617,10 +13631,24 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){var V='Crypto v101';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='Crypto v102';try{console.log('Alpexa '+V);}catch(e){}
 try{ if(!/[?&]ver=1/.test(location.search)) return; var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
+// Holdings-sync debug overlay (only with ?dbg=1) — shows live write/adopt status.
+(function(){ try{ if(!/[?&]dbg=1/.test(location.search)) return;
+  var d=document.createElement('div');
+  d.style.cssText='position:fixed;left:6px;right:6px;bottom:env(safe-area-inset-bottom,6px);z-index:2147483647;background:rgba(8,14,28,.94);color:#9fe;font:600 10px/1.5 ui-monospace,monospace;padding:8px 10px;border-radius:10px;white-space:pre-wrap;word-break:break-all;box-shadow:0 4px 16px rgba(0,0,0,.5)';
+  document.body.appendChild(d);
+  setInterval(function(){ var g=window.__cbDbg||{};
+    d.textContent='SYNC DEBUG\nacct: '+(g.acct||'?')
+      +'\nlocalSig: '+(g.localSig||'-')
+      +'\nsrvSig:   '+(g.srvSig||'-')
+      +'\nnote:  '+(g.note||'-')
+      +'\nWRITE: '+(g.write||'(none yet)')
+      +'\nADOPT: '+(g.adopt||'(none yet)');
+  },700);
+}catch(e){} })();
 </script>
 <script>
 /* Report crypto holdings + stakes to the server for the back office. */
