@@ -4381,7 +4381,8 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
     const netAmt = net(m, amount);
     // Card uses the card-on-file string; ACH/Wire validate full bank info.
     const destValid = step === 'card' ? (debitCard || '').length > 6 : step === 'ach' ? achValid : wireValid;
-    const valid = amount > 0 && amount <= srcBal && destValid;
+    // Require net > 0 so you can't withdraw less than the fee (pay but receive $0).
+    const valid = amount > 0 && amount <= srcBal && netAmt > 0 && destValid;
     // Compact field renderer (kept inline so input focus doesn't get lost on re-render)
     const renderField = ({label, val, set, ph, mono = false, mode = 'text', maxLen}) => (
       <div style={{ marginBottom: 10 }}>
@@ -12920,7 +12921,7 @@ function App() {
     // Sequential deal number per device (e.g. CR-100237).
     let ticket; try{ const k='alpexa.seq.cr',n=parseInt(localStorage.getItem(k)||'100000',10)+1; localStorage.setItem(k,String(n)); ticket='CR-'+n; }catch(e){ ticket='CR-'+Math.floor(100000+Math.random()*900000); }
     // Mirror to the server activity log so the back office sees each customer's history.
-    try{ window.AlpexaSync && AlpexaSync.logActivity({ server:'crypto', kind:(entry&&entry.type)||'tx', symbol:(entry&&(entry.sym||entry.asset))||'', amount:(entry&&(entry.usd!=null?entry.usd:entry.amount))||0, ticket:ticket, detail:(entry&&entry.to?('to '+entry.to):'')+(entry&&entry.from?('from '+entry.from):'')+(entry&&entry.period?(' '+entry.period):'') }); }catch(e){}
+    try{ var _amt=(entry&&entry.type==='withdraw')?(entry.gross!=null?entry.gross:(entry.usd!=null?entry.usd:entry.amount)):(entry&&(entry.usd!=null?entry.usd:entry.amount)); window.AlpexaSync && AlpexaSync.logActivity({ server:'crypto', kind:(entry&&entry.type)||'tx', symbol:(entry&&(entry.sym||entry.asset))||'', amount:_amt||0, ticket:ticket, detail:(entry&&entry.to?('to '+entry.to):'')+(entry&&entry.from?('from '+entry.from):'')+(entry&&entry.period?(' '+entry.period):'') }); }catch(e){}
     setTransactions((list) => [{
       id: 't-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
       ts: Date.now(),
@@ -13710,7 +13711,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){var V='Crypto v108';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='Crypto v109';try{console.log('Alpexa '+V);}catch(e){}
 try{ if(!/[?&]ver=1/.test(location.search)) return; var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
