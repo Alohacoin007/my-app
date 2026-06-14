@@ -328,6 +328,17 @@ function cryptoPriceOf(sym){
   }catch(e){}
   return 1;
 }
+// Stable signature of a holdings set BY QUANTITY — lets us detect a real trade
+// (qty changed) vs. mere price drift (qty unchanged). Dust is ignored.
+function cryptoQtySig(list){
+  try{
+    return (list||[])
+      .filter(function(r){ return Math.abs(+r.qty||0) > 1e-9; })
+      .map(function(r){ return r.asset+':'+(+r.qty).toFixed(8); })
+      .sort()
+      .join('|');
+  }catch(e){ return ''; }
+}
 const CATEGORIES = [
   { id: 'All',     label: 'All' },
   { id: 'L1',      label: 'Layer 1' },
@@ -12924,7 +12935,8 @@ function App() {
         // coin holdings or stakes (a back-office edit must not destroy them).
         if (sv > 0 && Math.abs(sv - local) > 0.01) {
           const others = local - (+balances.USDT || 0);
-          window.__cbSkipWrite = true; // total-only adjust — don't echo to server holdings
+          // Writes are gated on the first server sync (srvSig), so this mount-time
+          // total adjust can't clobber server holdings; adopt overrides it shortly.
           setBalances({ ...balances, USDT: Math.max(0, Math.round((sv - others) * 100) / 100) });
         }
       }, () => {});
@@ -13127,38 +13139,44 @@ function App() {
   //     show on every device and the money total is always the server's.
   const cryptoAcctRef = React.useRef(null);
   React.useEffect(() => { try { const me = JSON.parse(localStorage.getItem('alpexa.me') || 'null'); cryptoAcctRef.current = (me && me.accts && me.accts.crypto) || null; } catch (e) {} }, []);
-  const holdingsSyncRef = React.useRef({ prev: null, first: true });
+  const holdingsSyncRef = React.useRef({ prev: null, first: true, srvSig: null });
+  // WRITE: when this device's holdings genuinely change (trade/deposit), push the
+  // qty snapshot to the server. We compare a QUANTITY signature (not USD value),
+  // so price drift never triggers a write; and we never write before the first
+  // server sync (srvSig===null), so a stale page-load can't clobber another
+  // device's newer data.
   React.useEffect(() => {
     if (!window.AlpexaSync || !AlpexaSync.db) return;
     const acct = cryptoAcctRef.current; if (!acct) return;
+    const rows = []; const seen = {};
+    Object.keys(balances).forEach((sym) => {
+      const usd = +balances[sym] || 0; const px = cryptoPriceOf(sym);
+      seen[sym] = true; rows.push({ acct_no: acct, asset: sym, qty: px > 0 ? usd / px : 0 });
+    });
+    const sig = cryptoQtySig(rows);
+    if (holdingsSyncRef.current.first) { holdingsSyncRef.current.first = false; holdingsSyncRef.current.prev = seen; return; }
+    if (holdingsSyncRef.current.srvSig == null) { holdingsSyncRef.current.prev = seen; return; } // wait for first server sync
+    if (sig === holdingsSyncRef.current.srvSig) { holdingsSyncRef.current.prev = seen; return; } // no real change (incl. adopt echo)
+    // Genuine local change → mark busy NOW so adopt can't revert it mid-debounce.
+    window.__cbLocalTs = Date.now();
     const tmr = setTimeout(() => {
       try {
-        const seen = {};
-        Object.keys(balances).forEach((sym) => { seen[sym] = true; });
-        // First render = state hydrated from localStorage, NOT a user change.
-        // Record the snapshot but don't write (avoids load-time clobber).
-        if (holdingsSyncRef.current.first) { holdingsSyncRef.current.first = false; holdingsSyncRef.current.prev = seen; return; }
-        // This balances change was an adopt() echo — don't write it back.
-        if (window.__cbSkipWrite) { window.__cbSkipWrite = false; holdingsSyncRef.current.prev = seen; return; }
-        // Genuine local user change → record + write qty snapshot.
-        window.__cbLocalTs = Date.now();
         const now = new Date().toISOString();
-        const rows = [];
-        Object.keys(balances).forEach((sym) => {
-          const usd = +balances[sym] || 0; const px = cryptoPriceOf(sym);
-          rows.push({ acct_no: acct, asset: sym, qty: px > 0 ? usd / px : 0, updated_at: now });
-        });
+        const out = rows.map((r) => ({ acct_no: r.acct_no, asset: r.asset, qty: r.qty, updated_at: now }));
         const prev = holdingsSyncRef.current.prev;
-        if (prev) Object.keys(prev).forEach((sym) => { if (!seen[sym]) rows.push({ acct_no: acct, asset: sym, qty: 0, updated_at: now }); });
+        if (prev) Object.keys(prev).forEach((sym) => { if (!seen[sym]) out.push({ acct_no: acct, asset: sym, qty: 0, updated_at: now }); });
         holdingsSyncRef.current.prev = seen;
-        if (rows.length) AlpexaSync.db.from('crypto_holdings').upsert(rows, { onConflict: 'acct_no,asset' }).then(function () {}, function () {});
+        holdingsSyncRef.current.srvSig = sig; // this device is now the source of truth
+        window.__cbLocalTs = Date.now();
+        AlpexaSync.db.from('crypto_holdings').upsert(out, { onConflict: 'acct_no,asset' }).then(function () {}, function () {});
       } catch (e) {}
-    }, 1500);
+    }, 1200);
     return () => clearTimeout(tmr);
   }, [balances]);
-  // ADOPT: pull the server holdings (qty per asset) when this device is idle
-  // (>7s since a local change) and they differ from what's shown. Server
-  // holdings are the single source of truth for composition AND total.
+  // ADOPT: pull server holdings (qty per asset) when idle and the server qty
+  // signature changed (a real trade happened elsewhere). Server holdings are the
+  // single source of truth for composition AND total. value = qty × price; USDT
+  // qty = cash dollars. No rounding so the qty round-trips exactly (no drift).
   React.useEffect(() => {
     if (!window.AlpexaSync || !AlpexaSync.db) return;
     let stop = false;
@@ -13168,32 +13186,28 @@ function App() {
         const acct = cryptoAcctRef.current; if (!acct) return;
         if (Date.now() - (window.__cbLocalTs || 0) < 7000) return; // device busy — don't interrupt
         AlpexaSync.db.from('crypto_holdings').select('asset,qty').eq('acct_no', acct).then((hr) => {
-          if (stop || !hr || !hr.data || !hr.data.length) return;
-          // SERVER HOLDINGS ARE THE TRUTH for both composition AND total. Do NOT
-          // read accounts.balance here — it is overwritten every 3s by the live
-          // hero push (with the daily-change sim), and anchoring to it created a
-          // runaway feedback loop. value = qty × price (USDT qty = cash dollars).
+          if (stop || !hr || !hr.data) return;
+          const data = hr.data;
+          const sig = cryptoQtySig(data);
+          if (sig === holdingsSyncRef.current.srvSig) return; // server unchanged
+          if (!data.length) { holdingsSyncRef.current.srvSig = ''; return; } // server empty — enable writes, nothing to adopt
           const next = {};
-          hr.data.forEach((h) => {
+          data.forEach((h) => {
             const q = +h.qty || 0;
             const v = (h.asset === 'USDT') ? q : q * cryptoPriceOf(h.asset);
-            if (h.asset === 'USDT' || v > 0.01) next[h.asset] = Math.round(v * 100) / 100;
+            if (h.asset === 'USDT' || Math.abs(v) > 0.005) next[h.asset] = v;
           });
           if (next.USDT == null) next.USDT = 0;
-          // Only adopt if the composition materially differs from what's shown
-          // (asset set changed, or any value off by > $0.50) — avoids churn.
-          const cur = balances; let diff = false;
-          const keys = {}; Object.keys(cur).forEach((k) => { if ((+cur[k] || 0) > 0.01 || k === 'USDT') keys[k] = true; }); Object.keys(next).forEach((k) => { keys[k] = true; });
-          Object.keys(keys).forEach((k) => { if (Math.abs((+cur[k] || 0) - (+next[k] || 0)) > 0.5) diff = true; });
-          // Full replace (not merge) so coins sold on another device disappear
-          // here too. balances only holds coins + USDT, so this is safe.
-          if (diff) { window.__cbSkipWrite = true; setBalances(next); }
+          holdingsSyncRef.current.srvSig = sig;
+          const adopted = {}; Object.keys(next).forEach((k) => { adopted[k] = true; });
+          holdingsSyncRef.current.prev = adopted;
+          setBalances(next);
         }, () => {});
       } catch (e) {}
     };
     const iv = setInterval(() => { if (!document.hidden) tick(); }, 8000);
     const vis = () => { if (!document.hidden) tick(); }; document.addEventListener('visibilitychange', vis);
-    setTimeout(tick, 2500);
+    setTimeout(tick, 2000);
     return () => { stop = true; clearInterval(iv); document.removeEventListener('visibilitychange', vis); };
   }, []);
   // Move USD from balance → staked. Stores period alongside USD so the
@@ -13618,7 +13632,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){var V='Crypto v99';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='Crypto v100';try{console.log('Alpexa '+V);}catch(e){}
 try{ if(!/[?&]ver=1/.test(location.search)) return; var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
