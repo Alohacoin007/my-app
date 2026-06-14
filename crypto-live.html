@@ -13012,6 +13012,15 @@ function App() {
 
   // Apply the balance change for a request the back office just approved.
   const txRef = React.useRef(transactions); txRef.current = transactions;
+  // Holds the holdings-adopt tick so we can force an immediate pull right after a
+  // server-side deposit/withdraw, closing the brief window where the app might
+  // overwrite the freshly-credited cash with a stale snapshot.
+  const adoptHoldingsRef = React.useRef(null);
+  const forceCryptoAdopt = React.useCallback(() => {
+    [800, 2500].forEach((ms) => setTimeout(() => {
+      try { window.__cbLocalTs = 0; if (adoptHoldingsRef.current) adoptHoldingsRef.current(); } catch (e) {}
+    }, ms));
+  }, []);
   const applyApproval = React.useCallback((t) => {
     if (t.type === 'deposit') {
       // Crypto deposits are credited SERVER-SIDE (DB trigger → crypto_holdings
@@ -13019,10 +13028,13 @@ function App() {
       // device. The app just adopts the new holdings, so we do NOT credit USDT
       // here (that would double-count).
       setServerBalances((s) => ({ ...s, [t.dest]: (s[t.dest] || 0) + t.usd }));
+      if (t.dest === 'crypto') forceCryptoAdopt();
     } else if (t.type === 'withdraw') {
       const g = t.gross || t.usd;
-      if (t.source === 'crypto') setBalances((b) => ({ ...b, USDT: Math.max(0, (b.USDT || 0) - g) }));
+      // Crypto withdrawals are debited SERVER-SIDE (DB trigger → crypto_holdings
+      // USDT) on approval — works app-closed/multi-device. Don't debit here.
       setServerBalances((s) => ({ ...s, [t.source]: Math.max(0, (s[t.source] || 0) - g) }));
+      if (t.source === 'crypto') forceCryptoAdopt();
     } else if (t.type === 'transfer') {
       // Debit only the crypto source leg; the destination app credits itself
       // (incoming transfers to crypto are applied via pullIncomingTransfers).
@@ -13217,6 +13229,7 @@ function App() {
         }, function () {});
       } catch (e) {}
     };
+    adoptHoldingsRef.current = tick; // expose for forceCryptoAdopt() after deposits/withdrawals
     const iv = setInterval(() => { if (!document.hidden) tick(); }, 8000);
     const vis = () => { if (!document.hidden) tick(); }; document.addEventListener('visibilitychange', vis);
     setTimeout(tick, 2000);
@@ -13697,7 +13710,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){var V='Crypto v107';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='Crypto v108';try{console.log('Alpexa '+V);}catch(e){}
 try{ if(!/[?&]ver=1/.test(location.search)) return; var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
