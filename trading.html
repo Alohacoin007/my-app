@@ -3419,9 +3419,14 @@ function App(){
       hist.forEach(h=>{ if(!h.id) return; const r=map[h.id]; if(!r||!r.status||r.status===h.status) return;
         if(r.status==='approved' && h.status!=='approved'){
           const amt=+h.amount||0;
-          if(h.kind==='deposit') window.addBalance(h.account||'live', amt);
-          else if(h.kind==='withdraw') window.addBalance(h.account||'live', -amt);
-          else if(h.kind==='transfer'){ window.addBalance(h.account||'live', -amt); } // debit source; the destination app credits itself
+          // SERVER-OWNS-BALANCE: deposits/withdrawals are applied by DB triggers
+          // (apply_fx_deposit/withdraw_balance) and adopted from the server — do
+          // NOT change the balance locally (would double-count, esp. app-closed).
+          // Transfers have no trigger, so post the FX leg to the ledger (delta).
+          if(h.kind==='transfer' && (h.account||'live')==='live'){
+            try{ var meT=JSON.parse(localStorage.getItem('alpexa.me')||'null'); var fxA=meT&&meT.accts&&meT.accts.fx;
+              if(fxA&&window.AlpexaSync&&AlpexaSync.db) AlpexaSync.db.from('ledger').insert({acct_no:fxA,cust_id:(meT.custId||''),server:'fx',kind:'transfer',amount:-amt,ref:'trf-'+h.id}).then(function(){},function(){}); }catch(e){}
+          }
         }
         if(r.status==='approved'||r.status==='rejected'){
           const lbl=(h.kind==='deposit'?'Deposit':h.kind==='withdraw'?'Withdrawal':'Transfer')+' $'+(+h.amount||0).toLocaleString();
@@ -3431,7 +3436,11 @@ function App(){
       });
       if(changed){ try{localStorage.setItem('alpexa.funding',JSON.stringify(hist));}catch(e){} window.dispatchEvent(new Event('alpexa-balance-change')); }
       // Credit transfers that OTHER apps sent to FX (idempotent across apps).
-      AlpexaSync.pullIncomingTransfers('live').then(legs=>{ legs.forEach(l=>{ window.addBalance('live', l.amount);
+      AlpexaSync.pullIncomingTransfers('live').then(legs=>{ legs.forEach(l=>{
+        // SERVER-OWNS-BALANCE: credit the incoming transfer via the ledger (delta)
+        // so accounts.balance is the source of truth; the app adopts it below.
+        try{ var meI=JSON.parse(localStorage.getItem('alpexa.me')||'null'); var fxI=meI&&meI.accts&&meI.accts.fx;
+          if(fxI&&window.AlpexaSync&&AlpexaSync.db) AlpexaSync.db.from('ledger').insert({acct_no:fxI,cust_id:(meI.custId||''),server:'fx',kind:'transfer',amount:+l.amount||0,ref:'trfin-'+l.id}).then(function(){},function(){}); }catch(e){}
         try{ window.pushFundingHistory && window.pushFundingHistory({ id:'TRF-IN-'+l.id, kind:'transfer', method:'Internal transfer', amount:+l.amount||0, currency:'USD', note:'Received'+(l.from?(' from '+String(l.from).toUpperCase()):'')+' → FX', account:'live', status:'approved' }); }catch(e){}
         window.alpexaNotify&&alpexaNotify({type:'approved',pref:'deposit',title:'Transfer received · $'+(+l.amount).toLocaleString()+' → FX'}); }); }).catch(()=>{});
     }).catch(()=>{}); };
@@ -3577,14 +3586,10 @@ function App(){
       try{const eqBal=(window.getBalances?window.getBalances():{})[accountRef.current]||0;
         const sbo=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{};
         sbo.fx=eqBal+floatPnl; localStorage.setItem('alpexa.serverBalances',JSON.stringify(sbo));
-        // Push live equity to the server (throttled) for the back-office Players list.
-        if(window.AlpexaSync&&AlpexaSync.db){
-          const meId=JSON.parse(localStorage.getItem('alpexa.me')||'null');
-          const acct=meId&&meId.accts&&meId.accts.fx; const now=Date.now();
-          window.__balPush=window.__balPush||{};
-          if(acct&&now-(window.__balPush.fx||0)>3000){ window.__balPush.fx=now;
-            AlpexaSync.db.from('accounts').update({balance:Math.round((eqBal+floatPnl)*100)/100}).eq('acct_no',acct).then(function(){},function(){}); }
-        }
+        // SERVER-OWNS-BALANCE: do NOT push the full equity here. accounts.balance
+        // is owned by the DB triggers (deposit/withdraw/settlement) + ledger and
+        // adopted below. Pushing the absolute equity clobbered those server-side
+        // changes. (Cash = accounts.balance; equity = cash + floating P&L locally.)
       }catch(e){}
       if(usedM>=0.01){
         const bal=(window.getBalances?window.getBalances():{})[accountRef.current]||0;
@@ -3880,9 +3885,12 @@ root.render(<Root/>);
     AlpexaSync.pullBalances().then(function(b){
       if(!b) return; var changed=false;
       try{ var o=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{};
-        if(b.crypto!=null){o.crypto=b.crypto;} if(b.sports!=null){o.sports=b.sports;} if(b.fx!=null && fxFlat()){o.fx=b.fx;}
+        if(b.crypto!=null){o.crypto=b.crypto;} if(b.sports!=null){o.sports=b.sports;} if(b.fx!=null){o.fx=b.fx;}
         localStorage.setItem('alpexa.serverBalances',JSON.stringify(o)); changed=true; }catch(e){}
-      try{ if(b.fx!=null && fxFlat() && (Date.now()-(window.__fxLocalTs||0))>7000 && window.getBalances){
+      // accounts.balance is now CASH (server-owned), so adopt it even with open
+      // positions (equity = this cash + local floating P&L). Idle-gated so we
+      // don't fight a fresh local change.
+      try{ if(b.fx!=null && (Date.now()-(window.__fxLocalTs||0))>7000 && window.getBalances){
         var bal=window.getBalances(); if(Math.abs((+bal.live||0)-b.fx)>0.01){ bal.live=b.fx; localStorage.setItem('alpexa.balances',JSON.stringify(bal)); changed=true; } } }catch(e){}
       if(changed){ try{ window.dispatchEvent(new Event('alpexa-balance-change')); }catch(e){} }
     }).catch(function(){});
@@ -3894,7 +3902,7 @@ root.render(<Root/>);
 </script>
 <script>
 // Tiny version stamp so we can tell at a glance if the NEW design loaded.
-(function(){var V='FX v118';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='FX v119';try{console.log('Alpexa '+V);}catch(e){}
 try{ if(!/[?&]ver=1/.test(location.search)) return; var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
