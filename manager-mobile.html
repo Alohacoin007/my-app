@@ -80,7 +80,7 @@
   <div id="content"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="alpexa-sync.js?v=8"></script>
+<script src="alpexa-sync.js?v=9"></script>
 <script>
   // ── Back-office PIN lock (demo-level: deters casual access; upgrade to real
   //    admin login before production). ──
@@ -622,7 +622,7 @@
               '<input class="in" id="tEdDetail" value="'+String(w.detail||'').replace(/"/g,'&quot;')+'">'+
               '<div class="btns"><button class="ok" data-tsave="'+w.sid+'">Save</button><button class="no" data-tcancel="1">Cancel</button></div>';
           } else {
-            h+='<div class="btns"><button class="save ghost" data-tedit="'+w.sid+'">✏️ Edit</button><button class="no" data-tdel="'+w.sid+'">🗑 Delete record</button></div>';
+            h+='<div class="btns"><button class="save ghost" data-tedit="'+w.sid+'">✏️ Edit</button><button class="no" data-tdel="'+w.sid+'">Void record</button></div>';
           }
           h+='<div class="hint" style="color:#c0392b">Edits the LEDGER only (company P&amp;L / agent commission). Customer balance is separate — adjust it in Players if needed.</div>';
         }
@@ -669,11 +669,12 @@
     else toast('Saved locally (offline)',true);
   }
   function editDelete(id){
-    if(!confirm('Delete this transaction permanently?'))return;
-    for(var j=SRV_REQS.length-1;j>=0;j--){if(SRV_REQS[j].local_id===id)SRV_REQS.splice(j,1);}
-    var loc=getJSON('alpexa.withdrawals',[]).filter(function(w){return w.id!==id;}); setJSON('alpexa.withdrawals',loc);
+    // VOID (soft) — keeps the record for the audit trail; excluded from totals.
+    if(!confirm('Void this transaction?\n\nIt is KEPT for records (marked voided) and excluded from cash totals — not permanently deleted.'))return;
+    for(var j=0;j<SRV_REQS.length;j++){if(SRV_REQS[j].local_id===id)SRV_REQS[j].status='voided';}
+    var loc=getJSON('alpexa.withdrawals',[]); for(var i=0;i<loc.length;i++){if(loc[i].id===id)loc[i].status='voided';} setJSON('alpexa.withdrawals',loc);
     EDIT_ID=null; render();
-    if(window.AlpexaSync&&AlpexaSync.db){ AlpexaSync.deleteRequest(id).then(function(res){ if(res&&res.error)toast('Server error: '+res.error.message,true); else toast('Deleted ✓'); pullServer(); }); }
+    if(window.AlpexaSync&&AlpexaSync.db){ AlpexaSync.deleteRequest(id).then(function(res){ if(res&&res.error)toast('Server error: '+res.error.message,true); else toast('Voided ✓ — kept for records'); pullServer(); }); }
   }
 
   function viewPlayers(f){
@@ -1794,7 +1795,7 @@
   })();
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v83';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v84';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>

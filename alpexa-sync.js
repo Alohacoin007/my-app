@@ -115,11 +115,13 @@ window.AlpexaSync = (function () {
             function (e) { return { error: e }; });
   }
 
-  // Back office: permanently remove a request.
+  // Back office: VOID a request (soft-delete). We never hard-delete deposit/
+  // withdraw/transfer records — they're the audit trail. Mark status='voided'
+  // so it's kept and excluded from approved-cash totals, but recoverable.
   function deleteRequest(localId) {
     if (!db) return Promise.resolve({ skipped: true });
-    return db.from('requests').delete().eq('local_id', String(localId)).select()
-      .then(function (res) { if (res && res.error) console.warn('deleteRequest', res.error.message); return res; },
+    return db.from('requests').update({ status: 'voided', decided_at: new Date().toISOString() }).eq('local_id', String(localId)).select()
+      .then(function (res) { if (res && res.error) console.warn('voidRequest', res.error.message); return res; },
             function (e) { return { error: e }; });
   }
 
