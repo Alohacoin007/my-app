@@ -200,20 +200,17 @@
     var p=null; SRV_PLAYERS.forEach(function(x){ if(x.cust_id===custId)p=x; });
     if(!p){ toast('Customer not found',true); return; }
     var nm=p.name||custId;
-    if(!confirm('Delete '+nm+' ('+custId+')?\n\nThis removes their profile, all 3 accounts and open positions. This cannot be undone.')) return;
-    if(!confirm('Last chance — really delete '+nm+' permanently?')) return;
-    var db=AlpexaSync.db;
-    db.from('positions').delete().eq('cust_id',custId).then(function(){},function(){});
-    db.from('commands').delete().eq('cust_id',custId).then(function(){},function(){});
-    db.from('accounts').delete().eq('player_id',p.id).then(function(){
-      db.from('players').delete().eq('cust_id',custId).then(function(r){
-        if(r&&r.error){ toast('Delete failed: '+r.error.message+' (run the delete SQL)',true); return; }
-        try{ logAction('delete_customer', custId, 'removed profile + accounts + positions ('+nm+')'); }catch(e){}
-        SRV_PLAYERS=SRV_PLAYERS.filter(function(x){ return x.cust_id!==custId; });
-        PLAYER_EDIT=null; PLAYER_OPEN=null;
-        toast('Deleted ✓'); render(); setTimeout(pullPlayers,500);
-      },function(){ toast('Delete failed (check connection / SQL)',true); });
-    },function(){ toast('Could not delete accounts',true); });
+    // SOFT-DELETE: never hard-delete a customer (regulatory record-keeping +
+    // recovery). Mark the profile CLOSED; all data — accounts, positions,
+    // requests, settlements, activity — is kept and fully restorable.
+    if(!confirm('Close '+nm+' ('+custId+')?\n\nMarks the account CLOSED. Their data is KEPT and can be restored anytime. Nothing is deleted.')) return;
+    AlpexaSync.db.from('players').update({status:'closed'}).eq('cust_id',custId).then(function(r){
+      if(r&&r.error){ toast('Close failed: '+r.error.message,true); return; }
+      try{ logAction('close_customer', custId, 'marked CLOSED (soft-delete, data kept) ('+nm+')'); }catch(e){}
+      SRV_PLAYERS.forEach(function(x){ if(x.cust_id===custId) x.status='closed'; });
+      PLAYER_EDIT=null; PLAYER_OPEN=null;
+      toast('Closed ✓ — data kept, restorable'); render(); setTimeout(pullPlayers,500);
+    },function(){ toast('Close failed (check connection)',true); });
   }
   var SRV_MAP={fx:'Alpexa Live (FX)',live:'Alpexa Live (FX)',stocks:'Alpexa Crypto',crypto:'Alpexa Crypto',demo:'Alpexa Sports',sports:'Alpexa Sports'};
   function pullPlayers(){
@@ -737,7 +734,7 @@
           '<label class="lbl" style="display:block;margin-top:8px">Sports balance</label><input class="in" id="ed_bal_sports" type="number" step="0.01" value="'+bn('sports')+'">'+
           '<div class="btns"><button class="ok" data-savepl="'+esc(cid)+'">Save</button><button class="no" data-cancelpl="1">Cancel</button></div>'+
           '<div class="hint">Balance changes reach the app within ~4s (even while it\'s open). Crypto: coins/stakes are kept — only USDT cash is adjusted.</div>'+
-          '<button data-delpl="'+esc(cid)+'" style="width:100%;margin-top:16px;padding:11px;border:1px solid #f1b0b7;background:#fdecea;color:#c0392b;border-radius:4px;font-weight:700;font-size:13px;cursor:pointer">🗑 Delete account</button>'+
+          '<button data-delpl="'+esc(cid)+'" style="width:100%;margin-top:16px;padding:11px;border:1px solid #e0a96d;background:#fff4e6;color:#b45309;border-radius:4px;font-weight:700;font-size:13px;cursor:pointer">🔒 Close account (keeps data)</button>'+
           '<div class="hint" style="color:#c0392b">Permanently removes profile, accounts &amp; positions. Login email stays until removed in Supabase.</div>';
       } else if(open){
         h+='<div class="row"><span>Live (FX)</span><b>'+bv('fx')+'<span class="muted" style="font-weight:500"> · '+an('fx')+'</span></b></div>'+
@@ -1780,7 +1777,7 @@
   })();
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v81';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v82';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
