@@ -12465,52 +12465,119 @@ const ModalContext = React.createContext({
 
 // In-app modal — replaces native alert() / confirm() with a sheet styled to RH.
 
-// ─── TwoFAFullScreen — Withdraw-style hero gradient page for 2FA ────
+// ─── TwoFAFullScreen — REAL TOTP 2FA (Supabase MFA) before a withdrawal ────
+// Modes: loading → (verify | prompt). prompt → enroll. enroll/verify → done.
 function TwoFAFullScreen({ item, onClose }) {
+  const mfa = (window.AlpexaSync && AlpexaSync.db && AlpexaSync.db.auth && AlpexaSync.db.auth.mfa) ? AlpexaSync.db.auth.mfa : null;
+  const [mode, setMode] = React.useState('loading'); // loading|verify|prompt|enroll
+  const [factorId, setFactorId] = React.useState(null);
+  const [challengeId, setChallengeId] = React.useState(null);
+  const [enroll, setEnroll] = React.useState(null); // {qr, secret}
   const [digits, setDigits] = React.useState(['', '', '', '', '', '']);
-  const [error,  setError]  = React.useState(false);
+  const [error,  setError]  = React.useState('');
+  const [busy,   setBusy]   = React.useState(false);
   const inputsRef = React.useRef([]);
+  const clearDigits = () => setDigits(['', '', '', '', '', '']);
+  const focusFirst = () => setTimeout(() => { if (inputsRef.current[0]) inputsRef.current[0].focus(); }, 150);
+
+  // Detect an enrolled, verified authenticator on mount.
   React.useEffect(() => {
-    if (typeof AudioFX !== 'undefined') AudioFX.prompt();
-    setTimeout(() => { if (inputsRef.current[0]) inputsRef.current[0].focus(); }, 200);
+    let alive = true;
+    (async () => {
+      if (!mfa) { if (alive) setMode('prompt'); return; }
+      try {
+        const r = await mfa.listFactors();
+        if (!alive) return;
+        const totp = (r && r.data && (r.data.totp || ((r.data.all || []).filter((f) => f.factor_type === 'totp')))) || [];
+        const verified = totp.find((f) => f.status === 'verified');
+        if (verified) {
+          setFactorId(verified.id);
+          try { const c = await mfa.challenge({ factorId: verified.id }); if (c && c.data) setChallengeId(c.data.id); } catch (e) {}
+          if (alive) { setMode('verify'); focusFirst(); }
+        } else if (alive) { setMode('prompt'); }
+      } catch (e) { if (alive) setMode('prompt'); }
+    })();
+    return () => { alive = false; };
   }, []);
 
   const handleDigit = (idx, val) => {
     const digit = (val || '').replace(/\D/g, '').slice(-1);
-    setError(false);
+    setError('');
     setDigits((arr) => { const next = [...arr]; next[idx] = digit; return next; });
     if (digit && idx < 5 && inputsRef.current[idx + 1]) inputsRef.current[idx + 1].focus();
   };
   const handleKeyDown = (idx, e) => {
-    if (e.key === 'Backspace' && !digits[idx] && idx > 0 && inputsRef.current[idx - 1]) {
-      inputsRef.current[idx - 1].focus();
-    }
+    if (e.key === 'Backspace' && !digits[idx] && idx > 0 && inputsRef.current[idx - 1]) inputsRef.current[idx - 1].focus();
   };
   const handlePaste = (e) => {
     const text = (e.clipboardData || window.clipboardData).getData('text');
     const nums = (text || '').replace(/\D/g, '').slice(0, 6);
     if (!nums) return;
     e.preventDefault();
-    const arr = ['', '', '', '', '', ''];
-    nums.split('').forEach((c, i) => { arr[i] = c; });
+    const arr = ['', '', '', '', '', '']; nums.split('').forEach((c, i) => { arr[i] = c; });
     setDigits(arr);
-    const last = Math.min(nums.length, 5);
-    setTimeout(() => { if (inputsRef.current[last]) inputsRef.current[last].focus(); }, 0);
+    setTimeout(() => { const last = Math.min(nums.length, 5); if (inputsRef.current[last]) inputsRef.current[last].focus(); }, 0);
   };
-  const submit = () => {
-    const entered = digits.join('');
-    if (entered.length !== 6) return;
-    if (entered === item.code) {
+
+  // Begin enrollment: get a QR + secret to scan, plus a challenge to verify it.
+  const startEnroll = async () => {
+    if (!mfa) { onClose(true); return; }
+    setBusy(true); setError('');
+    try {
+      const r = await mfa.enroll({ factorType: 'totp' });
+      if (r && r.error) { setError(r.error.message || 'Could not start 2FA setup'); setBusy(false); return; }
+      const d = r.data;
+      setFactorId(d.id);
+      setEnroll({ qr: (d.totp && d.totp.qr_code) || '', secret: (d.totp && d.totp.secret) || '' });
+      try { const c = await mfa.challenge({ factorId: d.id }); if (c && c.data) setChallengeId(c.data.id); } catch (e) {}
+      clearDigits(); setMode('enroll'); setBusy(false); focusFirst();
+    } catch (e) { setError('Setup failed — try again'); setBusy(false); }
+  };
+
+  // Verify the 6-digit code (works for both enroll-confirm and withdrawal-verify).
+  const doVerify = async () => {
+    const code = digits.join('');
+    if (code.length !== 6 || !mfa || !factorId || busy) return;
+    setBusy(true); setError('');
+    try {
+      let ch = challengeId;
+      if (!ch) { const c = await mfa.challenge({ factorId }); ch = c && c.data && c.data.id; setChallengeId(ch); }
+      const r = await mfa.verify({ factorId, challengeId: ch, code });
+      if (r && r.error) {
+        setError('Incorrect code — try again');
+        try { if (typeof AudioFX !== 'undefined') AudioFX.reject(); } catch (e) {}
+        clearDigits(); setBusy(false); focusFirst();
+        try { const c2 = await mfa.challenge({ factorId }); setChallengeId(c2 && c2.data ? c2.data.id : null); } catch (e) { setChallengeId(null); }
+        return;
+      }
       onClose(true);
-    } else {
-      setError(true);
-      if (typeof AudioFX !== 'undefined') AudioFX.reject();
-      setTimeout(() => { setDigits(['', '', '', '', '', '']); setError(false); if (inputsRef.current[0]) inputsRef.current[0].focus(); }, 700);
-    }
+    } catch (e) { setError('Verification failed — try again'); setBusy(false); }
   };
+
+  const submit = () => { if (mode === 'verify' || mode === 'enroll') doVerify(); };
 
   const hero = RH.accent;
   const filled = digits.join('').length;
+  const headline = mode === 'enroll' ? 'Set up\n2FA' : '2-factor\nauthentication';
+  const subline = mode === 'loading' ? 'Checking your security settings…'
+    : mode === 'prompt' ? 'Protect withdrawals with an authenticator app (Google Authenticator, Authy, 1Password…).'
+    : mode === 'enroll' ? 'Scan the QR with your authenticator app, then enter the 6-digit code it shows.'
+    : 'Enter the 6-digit code from your authenticator app.';
+  const Digits = () => (
+    <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+      {digits.map((d, i) => (
+        <input key={i} ref={(el) => inputsRef.current[i] = el}
+          type="text" inputMode="numeric" maxLength={1} value={d}
+          onChange={(e) => handleDigit(i, e.target.value)} onKeyDown={(e) => handleKeyDown(i, e)}
+          onPaste={i === 0 ? handlePaste : undefined}
+          style={{ width: 42, height: 54, textAlign: 'center', background: RH.surface,
+            border: `1.5px solid ${error ? RH.red : (d ? RH.accent : RH.line)}`, borderRadius: 12,
+            color: error ? RH.red : RH.text, fontSize: 24, fontWeight: 700, fontFamily: 'Geist Mono, monospace',
+            fontVariantNumeric: 'tabular-nums', outline: 'none', caretColor: RH.accent,
+            transition: 'border-color 140ms ease, color 140ms ease' }}/>
+      ))}
+    </div>
+  );
   return (
     <div style={{
       position: 'absolute', inset: 0, zIndex: 9999,
@@ -12561,87 +12628,60 @@ function TwoFAFullScreen({ item, onClose }) {
           </svg>
         </div>
         <div style={{
-          position: 'relative', zIndex: 1, marginTop: 22,
+          position: 'relative', zIndex: 1, marginTop: 22, whiteSpace: 'pre-line',
           fontSize: 32, fontWeight: 600, letterSpacing: -1, lineHeight: 1.1,
-        }}>2-factor<br/>authentication</div>
+        }}>{headline}</div>
         <div style={{
           position: 'relative', zIndex: 1, marginTop: 12,
           fontSize: 13, color: 'rgba(255,255,255,0.78)',
-          lineHeight: 1.5, maxWidth: 280,
+          lineHeight: 1.5, maxWidth: 290,
         }}>
-          Enter the 6-digit code to verify your withdrawal.
+          {subline}
         </div>
       </div>
 
-      {/* Body — input boxes + demo code hint */}
+      {/* Body — mode-aware */}
       <div className="alpexa-hide-scrollbar" style={{
-        flex: 1, padding: '40px 28px 0', position: 'relative', zIndex: 1,
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        flex: 1, padding: '30px 28px 0', position: 'relative', zIndex: 1,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto',
       }}>
-        <div style={{
-          fontSize: 10.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace',
-          letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 16,
-        }}>Verification code</div>
-
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          {digits.map((d, i) => (
-            <input key={i}
-              ref={(el) => inputsRef.current[i] = el}
-              type="text" inputMode="numeric" maxLength={1}
-              value={d}
-              onChange={(e) => handleDigit(i, e.target.value)}
-              onKeyDown={(e) => handleKeyDown(i, e)}
-              onPaste={i === 0 ? handlePaste : undefined}
-              style={{
-                width: 42, height: 54, textAlign: 'center',
-                background: RH.surface,
-                border: `1.5px solid ${error ? RH.red : (d ? RH.accent : RH.line)}`,
-                borderRadius: 12, color: error ? RH.red : RH.text,
-                fontSize: 24, fontWeight: 700,
-                fontFamily: 'Geist Mono, monospace',
-                fontVariantNumeric: 'tabular-nums', outline: 'none',
-                caretColor: RH.accent,
-                transition: 'border-color 140ms ease, color 140ms ease',
-              }}/>
-          ))}
-        </div>
-
-        {error ? (
-          <div style={{
-            fontSize: 12, color: RH.red, fontWeight: 600, marginBottom: 10,
-          }}>Incorrect code — try again</div>
-        ) : null}
-
-        <div style={{
-          marginTop: 6, padding: '11px 14px',
-          background: `${RH.accent}10`, border: `1px solid ${RH.accent}33`,
-          borderRadius: 12, fontFamily: 'Geist, Inter, system-ui',
-          maxWidth: 280, textAlign: 'center',
-        }}>
-          <div style={{
-            fontSize: 10.5, color: RH.accent, fontFamily: 'Geist Mono, monospace',
-            letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700, marginBottom: 4,
-          }}>Demo code</div>
-          <div style={{
-            fontSize: 18, color: RH.text, fontWeight: 700,
-            fontFamily: 'Geist Mono, monospace', letterSpacing: 4,
-          }}>{item.code}</div>
-          <div style={{ marginTop: 4, fontSize: 11, color: RH.textDim, lineHeight: 1.4 }}>
-            In production, this would be sent via SMS or your authenticator app.
+        {mode === 'loading' ? (
+          <div style={{ marginTop: 36, fontSize: 13, color: RH.textDim }}>Checking…</div>
+        ) : mode === 'prompt' ? (
+          <div style={{ maxWidth: 300, textAlign: 'center', marginTop: 4 }}>
+            <div style={{ fontSize: 13, color: RH.textDim, lineHeight: 1.6, marginBottom: 8 }}>
+              No authenticator is set up yet. Add one to require a fresh code for every withdrawal — a big step up from passwords alone.
+            </div>
+            {error ? <div style={{ fontSize: 12, color: RH.red, fontWeight: 600 }}>{error}</div> : null}
           </div>
-        </div>
+        ) : (
+          <React.Fragment>
+            {mode === 'enroll' && enroll ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 14 }}>
+                {/^\s*<svg/i.test(enroll.qr)
+                  ? <div style={{ width: 160, height: 160, background: '#fff', borderRadius: 12, padding: 8, boxSizing: 'border-box' }} dangerouslySetInnerHTML={{ __html: enroll.qr }}/>
+                  : <img src={enroll.qr} alt="2FA QR" style={{ width: 160, height: 160, background: '#fff', borderRadius: 12, padding: 8, boxSizing: 'border-box' }}/>}
+                <div style={{ marginTop: 9, fontSize: 10, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 0.8, textAlign: 'center' }}>Can't scan? Enter this key:</div>
+                <div style={{ marginTop: 3, fontSize: 11.5, color: RH.text, fontFamily: 'Geist Mono, monospace', wordBreak: 'break-all', maxWidth: 280, textAlign: 'center' }}>{enroll.secret}</div>
+              </div>
+            ) : null}
+            <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 14 }}>Authenticator code</div>
+            {Digits()}
+            {error ? <div style={{ fontSize: 12, color: RH.red, fontWeight: 600, marginBottom: 6 }}>{error}</div> : null}
+          </React.Fragment>
+        )}
       </div>
 
-      {/* Verify CTA */}
+      {/* CTA — mode-aware */}
       <div style={{ padding: '14px 22px 26px', position: 'relative', zIndex: 1 }}>
-        <button onClick={submit} disabled={filled !== 6} style={{
-          width: '100%', padding: '16px 0', borderRadius: 999,
-          background: filled === 6 ? RH.text : RH.surfaceUp,
-          color: filled === 6 ? RH.bg : RH.textMute,
-          border: 'none', cursor: filled === 6 ? 'pointer' : 'not-allowed',
-          fontSize: 15, fontWeight: 700, letterSpacing: 0.2,
-          fontFamily: 'Geist, Inter, system-ui',
-        }}>Verify</button>
+        {mode === 'prompt' ? (
+          <React.Fragment>
+            <button onClick={startEnroll} disabled={busy} style={{ width: '100%', padding: '16px 0', borderRadius: 999, background: RH.text, color: RH.bg, border: 'none', cursor: busy ? 'default' : 'pointer', fontSize: 15, fontWeight: 700, letterSpacing: 0.2, fontFamily: 'Geist, Inter, system-ui', opacity: busy ? 0.6 : 1 }}>{busy ? 'Setting up…' : 'Set up 2FA'}</button>
+            <button onClick={() => onClose(true)} style={{ width: '100%', marginTop: 10, padding: '12px 0', borderRadius: 999, background: 'transparent', color: RH.textDim, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'Geist, Inter, system-ui' }}>Not now — continue without 2FA</button>
+          </React.Fragment>
+        ) : (mode === 'verify' || mode === 'enroll') ? (
+          <button onClick={submit} disabled={filled !== 6 || busy} style={{ width: '100%', padding: '16px 0', borderRadius: 999, background: (filled === 6 && !busy) ? RH.text : RH.surfaceUp, color: (filled === 6 && !busy) ? RH.bg : RH.textMute, border: 'none', cursor: (filled === 6 && !busy) ? 'pointer' : 'not-allowed', fontSize: 15, fontWeight: 700, letterSpacing: 0.2, fontFamily: 'Geist, Inter, system-ui' }}>{busy ? 'Verifying…' : (mode === 'enroll' ? 'Verify & enable' : 'Verify')}</button>
+        ) : null}
       </div>
     </div>
     </div>
@@ -12864,13 +12904,10 @@ function AppRoot() {
       setModalQueue((q) => [...q, { type: 'confirm', msg, title: (opts && opts.title) || null, resolve }]);
     }),
     twofa: (opts = {}) => new Promise((resolve) => {
-      // Generate a 6-digit demo code that the user must type to confirm.
-      const code = String(Math.floor(100000 + Math.random() * 900000));
+      // Real TOTP 2FA (Supabase MFA) — the screen handles enroll/verify itself.
       setModalQueue((q) => [...q, {
         type: 'twofa',
-        msg: (opts && opts.msg) || `For your security, enter the 6-digit code. (Demo code: ${code})`,
         title: (opts && opts.title) || '2-factor authentication',
-        code,
         resolve,
       }]);
     }),
@@ -13711,7 +13748,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){var V='Crypto v109';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='Crypto v110';try{console.log('Alpexa '+V);}catch(e){}
 try{ if(!/[?&]ver=1/.test(location.search)) return; var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
