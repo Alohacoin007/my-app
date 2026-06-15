@@ -263,6 +263,15 @@
     var explained=INTEGRITY_OPENING+dep-wd+pnl, gap=actual-explained;
     return {actual:actual,explained:explained,gap:gap,dep:dep,wd:wd,pnl:pnl,opening:INTEGRITY_OPENING,flagged:gap>INTEGRITY_FLAG_GAP};
   }
+  // Withdrawal guard: a WITHDRAW approval is risky if the customer's balance can't
+  // be explained by their records (possible ledger tampering / self-credit, 🚩).
+  // Returns the integrity info if it should be guarded, else null.
+  function withdrawGuard(rq){
+    if(!rq || (rq.type||'')!=='withdraw') return null;
+    var p=null; for(var i=0;i<SRV_PLAYERS.length;i++){ if(SRV_PLAYERS[i].cust_id===rq.custId){ p=SRV_PLAYERS[i]; break; } }
+    if(!p) return null;
+    try{ var ig=acctIntegrity(p); return ig.flagged?ig:null; }catch(e){ return null; }
+  }
   // Presence: customers whose app reported a heartbeat in the last 90 seconds.
   var ONLINE=[];
   function pullOnline(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
@@ -1622,7 +1631,19 @@
 
   function toast(msg,bad){var t=document.getElementById('mtoast');if(!t){t=document.createElement('div');t.id='mtoast';t.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99999;padding:10px 16px;border-radius:4px;font:600 13px system-ui;color:#fff;max-width:90%;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.25)';document.body.appendChild(t);}t.textContent=msg;t.style.background=bad?'#C62828':'#1B5E20';t.style.display='block';clearTimeout(window.__mt);window.__mt=setTimeout(function(){t.style.display='none';},3500);}
   function decide(id,status){
-    try{ var rq=findReq(id); logAction(status==='approved'?'approve':'reject', rq?rq.custId:'', (rq?(typeLabel(rq.type)+' '+usd(rq.amount)):'')+' (#'+id+')'); }catch(e){}
+    var rq=findReq(id);
+    // WITHDRAWAL GUARD: block paying out an integrity-flagged account (possible
+    // self-credit / tampering) unless the admin explicitly overrides.
+    if(status==='approved'){
+      var ig=withdrawGuard(rq);
+      if(ig){
+        if(!confirm('🚩 BLOCKED — possible tampering\n\nThis customer\'s balance ('+usd(ig.actual)+') exceeds what their deposits/trades explain ('+usd(ig.explained)+') by '+usd(ig.gap)+'.\n\nApproving this WITHDRAWAL could pay out funds they did NOT legitimately earn. Review the Integrity check on their profile first.\n\nApprove anyway? (only if you are sure)')) {
+          try{ logAction('blocked_withdraw', rq?rq.custId:'', 'withdrawal approval blocked — integrity 🚩 gap '+usd(ig.gap)+' (#'+id+')'); }catch(e){}
+          toast('Blocked — account flagged (🚩). Not approved.',true); return;
+        }
+      }
+    }
+    try{ logAction(status==='approved'?'approve':'reject', rq?rq.custId:'', (rq?(typeLabel(rq.type)+' '+usd(rq.amount)):'')+' (#'+id+')'); }catch(e){}
     // local copy (this device's own requests, if any)
     var loc=getJSON('alpexa.withdrawals',[]); for(var i=0;i<loc.length;i++){if(loc[i].id===id){loc[i].status=status;loc[i].decidedTs=Date.now();break;}} setJSON('alpexa.withdrawals',loc);
     // server cache (so the UI updates instantly) + server write (so the customer's app sees it)
@@ -1639,6 +1660,9 @@
   }
   // Manual payout: record the on-chain tx hash and approve the withdrawal.
   function markPaid(id, txOverride){
+    // WITHDRAWAL GUARD: same tampering check before a manual payout.
+    var _ig=withdrawGuard(findReq(id));
+    if(_ig){ if(!confirm('🚩 BLOCKED — possible tampering\n\nBalance ('+usd(_ig.actual)+') exceeds explained ('+usd(_ig.explained)+') by '+usd(_ig.gap)+'. Paying out could release funds not legitimately earned.\n\nPay anyway? (only if sure)')){ toast('Blocked — account flagged (🚩).',true); return; } }
     var el=document.getElementById('tx_'+id); var tx=(txOverride!=null)?String(txOverride):(el?(el.value||'').trim():'');
     if(tx && !/^0x[0-9a-fA-F]{6,}$/.test(tx)){ if(!confirm('That doesn\'t look like a tx hash (0x…). Mark paid anyway?')) return; }
     for(var j=0;j<SRV_REQS.length;j++){ if(SRV_REQS[j].local_id===id){ SRV_REQS[j].status='approved'; SRV_REQS[j].txid=tx; SRV_REQS[j].decided_at=new Date().toISOString(); break; } }
@@ -1795,7 +1819,7 @@
   })();
   render();
   // Version stamp so we can tell at a glance if the latest manager loaded.
-  (function(){try{var b=document.createElement('div');b.textContent='Mgr v84';
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v85';
   b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
   document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
 </script>
