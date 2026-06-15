@@ -122,6 +122,9 @@ Deno.serve(async (req) => {
   // 1) Final scores from ESPN.
   const results: Record<string, Result> = {};
   await Promise.all(LEAGUES.map((L) => fetchLeagueResults(L, results)));
+  // Debug: ?debug=1 returns the final-game results map (gid -> score) so we can
+  // craft a controlled test bet on a real finished game.
+  if (url.searchParams.get("debug")) return json({ ok: true, results });
 
   // 2) Open sports bets.
   const posRes = await fetch(`${SB_URL}/rest/v1/positions?server=eq.sports&status=eq.open&select=id,cust_id,acct_no,local_id,stake,meta,symbol`, { headers: H });
