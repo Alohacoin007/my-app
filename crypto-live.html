@@ -409,11 +409,17 @@ const STAKE_ASSETS = {
   SOL:  { name: 'Solana',       symbol: 'S', color: '#9945FF', balance: 8.21,   balanceUsd:  708.19, apy:  7.2 },
   USDT: { name: 'Tether',       symbol: '₮', color: '#26A17B', balance: 894.41, balanceUsd:  894.41, apy:  9.8 },
 };
+// Staking TERM sets the APY and a hard lock: Flexible = unstake anytime (7%);
+// 90 days (10%) and 1 year (18%) are LOCKED until maturity — no early exit.
 const STAKE_PERIODS = [
-  { id: 'flexible', label: 'Flexible', bonus: 0,   note: 'Unstake anytime' },
-  { id: '30d',      label: '30 days',  bonus: 1.2, note: '+1.2% bonus APY' },
-  { id: '90d',      label: '90 days',  bonus: 2.5, note: '+2.5% bonus APY' },
+  { id: 'flexible', label: 'Flexible', apy: 7,  lockDays: 0,   note: '7% APY' },
+  { id: '90d',      label: '90 days',  apy: 10, lockDays: 90,  note: '10% APY' },
+  { id: '1y',       label: '1 year',   apy: 18, lockDays: 365, note: '18% APY' },
 ];
+function stakePeriodApy(id){ var p=STAKE_PERIODS.find(function(x){return x.id===id;}); return p?p.apy:7; }
+function stakeLockDays(id){ var p=STAKE_PERIODS.find(function(x){return x.id===id;}); return p?(p.lockDays||0):0; }
+function stakeMaturity(info){ return (info&&info.since)?(info.since+stakeLockDays(info.period)*86400000):0; }
+function stakeIsLocked(info){ var d=stakeLockDays(info&&info.period); return d>0 && Date.now()<stakeMaturity(info); }
 // Real time-based staking interest: principal grows at the APY rate for the
 // time elapsed since the stake started. 18% APY ≈ 1.5%/month ≈ 0.049%/day.
 const STAKE_APY = { ALPXS: 18.0, ETH: 4.5, SOL: 7.2, USDT: 9.8 };
@@ -1071,7 +1077,7 @@ function AssetRow({ a, kind, liveValue, onTap }) {
               <rect x="5" y="11" width="14" height="10" rx="2"/>
               <path d="M8 11 V7 a4 4 0 0 1 8 0 V11"/>
             </svg>
-            <span>{a.lockPeriod === 'flexible' ? 'Flexible' : a.lockPeriod === '30d' ? '30 days' : a.lockPeriod === '90d' ? '90 days' : 'Locked'}</span>
+            <span>{a.lockPeriod === 'flexible' ? 'Flexible' : a.lockPeriod === '90d' ? '90 days' : a.lockPeriod === '1y' ? '1 year' : 'Locked'}</span>
           </div>
         ) : null}
         <div style={{ fontSize: 14, fontWeight: 500, color: RH.text, display: 'flex', justifyContent: 'flex-end', lineHeight: 1.2 }}>
@@ -1905,9 +1911,7 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
                           || (PORTFOLIO.assets.find((x) => x.sym === sym))
                           || { sym, seed: 100, chg: 0 };
               const stakeMeta = (typeof STAKE_ASSETS !== 'undefined') ? STAKE_ASSETS[sym] : null;
-              const apy = (typeof meta.apy === 'number')
-                ? meta.apy
-                : (stakeMeta && typeof stakeMeta.apy === 'number' ? stakeMeta.apy : 0);
+              const apy = stakePeriodApy(period);
               const name = meta.name || (stakeMeta && stakeMeta.name) || sym;
               return (
                 <AssetRow
@@ -3701,7 +3705,7 @@ function Stake({ onBack, balances = {}, onStaked, initialAssetId }) {
   const liveBalanceUsd = balances.USDT || 0;
   const asset  = { ...stakeMeta, balanceUsd: liveBalanceUsd };
   const period = STAKE_PERIODS.find((p) => p.id === periodId);
-  const apy    = (asset.apy || 5) + period.bonus;
+  const apy    = period.apy;
   const amount = parseFloat(amountStr) || 0;
   const availableUsd = liveBalanceUsd;
   const insufficient = amount > availableUsd;
@@ -3829,7 +3833,7 @@ function Stake({ onBack, balances = {}, onStaked, initialAssetId }) {
                   <span style={{
                     fontSize: 12, color: RH.green, fontWeight: 700,
                     fontVariantNumeric: 'tabular-nums',
-                  }}>{a.apy.toFixed(1)}%</span>
+                  }}>up to {Math.max.apply(null, STAKE_PERIODS.map(function(p){return p.apy;}))}%</span>
                   {active ? (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={RH.green} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M5 12 l5 5 L20 7"/>
@@ -6378,7 +6382,7 @@ function Discover({ onPickAsset, onPickStakeInfo, tabBar }) {
               <div style={{ fontSize: 12, fontWeight: 700, color: RH.text }}>
                 <span>{s.sym}</span>
                 <span style={{ color: RH.textDim, fontWeight: 600 }}> · </span>
-                <span style={{ color: RH.accent, fontWeight: 700 }}>{s.apy.toFixed(2)}% APY</span>
+                <span style={{ color: RH.accent, fontWeight: 700 }}>up to {Math.max.apply(null, STAKE_PERIODS.map(function(p){return p.apy;}))}% APY</span>
               </div>
               <div style={{ marginTop: 2, fontSize: 10.5, color: RH.textDim }}>
                 Stake {s.sym} to earn
@@ -6770,11 +6774,11 @@ const HELP_ARTICLES = {
     { q: 'How does staking work?',
       a: `When you stake, you lock your tokens to help secure the network and earn rewards (APY). Alpexa runs validators for ETH, SOL, and ATOM, and distributes 90% of staking rewards to you.\n\nRewards accrue daily and are paid out to your wallet automatically. You can view accumulated rewards in real time on the asset's detail page.` },
     { q: 'What are the lock periods?',
-      a: `Flexible: unstake anytime, lower APY.\n14 / 30 / 60 / 90 day locks: higher APY in exchange for committing your tokens.\n\nFlexible staking has an unstaking cooldown of 1–7 days depending on the asset (set by the protocol, not Alpexa). Locked staking pays out the moment the lock period ends.` },
+      a: `Flexible — 7% APY, unstake anytime.\n90 days — 10% APY, locked for 90 days.\n1 year — 18% APY, locked for 1 year.\n\nLonger terms pay a higher APY in exchange for committing your tokens. Rewards accrue daily.` },
     { q: 'Can I unstake early?',
-      a: `Locked positions can be unstaked early with a 1% early-exit fee. The fee is deducted from the principal at the time of unstake.\n\nFlexible positions can always be unstaked without penalty, subject to the protocol cooldown.` },
+      a: `Flexible positions can be unstaked anytime. Locked terms (90 days / 1 year) cannot be unstaked before they end — they unlock automatically at maturity and return your full principal plus all accrued rewards.` },
     { q: 'What is ALPXS?',
-      a: `ALPXS is Alpexa's native loyalty token. Hold ALPXS to earn reduced trading fees, boost staking APY on other assets, and qualify for tier upgrades.\n\nALPXS itself stakes at 18% APY with flexible terms. New users receive 100 ALPXS as a welcome bonus.` },
+      a: `ALPXS is Alpexa's native loyalty token. Hold ALPXS to earn reduced trading fees, boost staking APY on other assets, and qualify for tier upgrades.\n\nALPXS stakes from 7% APY (flexible) up to 18% APY (1-year lock). New users receive 100 ALPXS as a welcome bonus.` },
     { q: 'Are staking rewards taxable?',
       a: `In the US, staking rewards are generally taxed as ordinary income at the fair market value on the day they're received. Alpexa issues a 1099-MISC for total staking rewards $600 or more per year (Account → Tax documents).\n\nConsult a tax professional for guidance specific to your situation.` },
   ],
@@ -10343,7 +10347,7 @@ function StakeInfo({ onBack, sym, onStartStake }) {
           />
           <Feature
             title="Flexible terms"
-            desc={`Unstake at any time to trade your ${sym}. Locked periods earn a higher bonus APY.`}
+            desc={`Flexible unstakes anytime (7% APY). 90-day (10%) and 1-year (18%) terms are locked until maturity.`}
           />
           <Feature
             title="Risks you should know"
@@ -10543,26 +10547,26 @@ function HeroConfirm({ heroColor, label, sublabel, rows = [], footnote, onDone, 
 }
 
 // Unstake — flow opened from AssetDetail when a staked position is tapped.
-// Flexible & past-lock: full principal + accrued APY back to wallet.
-// Locked & in-progress: early-exit → forfeit accrued + 0.5% principal penalty.
+// Flexible OR past maturity: full principal + accrued APY back to wallet.
+// Locked & before maturity: hard-locked — cannot unstake until the term ends.
 function Unstake({ onBack, sym, staked = {}, onUnstaked }) {
   const info = staked[sym] || { usd: 0, period: 'flexible' };
   const meta = PORTFOLIO.securities.find((s) => s.sym === sym)
             || PORTFOLIO.assets.find((a) => a.sym === sym)
             || { sym, name: sym, price: 1, apy: 5 };
-  const apy = (typeof meta.apy === 'number') ? meta.apy : 5;
+  const apy = stakePeriodApy(info.period);
   const principal = info.usd;
   // Real accrual — principal × APY × time staked.
   const accrued = stakeAccruedUsd(info, apy);
-  // Treat any locked period as in-progress for the demo.
-  const isLocked = info.period === '30d' || info.period === '90d';
-  const PENALTY_PCT = 0.005;
-  const penalty = isLocked ? principal * PENALTY_PCT : 0;
-  const forfeitedAccrued = isLocked ? accrued : 0;
-  const finalAmt = principal + (isLocked ? 0 : accrued) - penalty;
+  // Hard lock: 90-day / 1-year terms cannot be unstaked before maturity.
+  const locked = stakeIsLocked(info);
+  const unlockDate = info.since ? new Date(stakeMaturity(info)).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}) : '';
+  const periodLabel = (STAKE_PERIODS.find(function(p){return p.id===info.period;})||{}).label || '';
+  const finalAmt = principal + accrued;   // full principal + rewards (only when unlocked)
 
   const [confirmed, setConfirmed] = React.useState(false);
   const doUnstake = () => {
+    if (locked) return;                    // can't unstake before maturity
     if (typeof AudioFX !== 'undefined') AudioFX.success();
     if (onUnstaked) onUnstaked(sym, finalAmt);
     setConfirmed(true);
@@ -10576,15 +10580,11 @@ function Unstake({ onBack, sym, staked = {}, onUnstaked }) {
         label={`$${finalAmt.toFixed(2)} unstaked`}
         sublabel={`${coinAmt.toFixed(6).replace(/\.?0+$/, '')} ${sym}`}
         rows={[
-          { label: 'Principal',  value: `$${principal.toFixed(2)}` },
-          { label: isLocked ? 'Forfeited APY' : `Accrued APY`,
-            value: isLocked ? `-$${forfeitedAccrued.toFixed(2)}` : `+$${accrued.toFixed(2)}` },
-          { label: 'Penalty',    value: isLocked ? `-$${penalty.toFixed(2)}` : '$0.00' },
-          { label: 'To wallet',  value: `$${finalAmt.toFixed(2)}` },
+          { label: 'Principal',   value: `$${principal.toFixed(2)}` },
+          { label: 'Accrued APY', value: `+$${accrued.toFixed(2)}` },
+          { label: 'To wallet',   value: `$${finalAmt.toFixed(2)}` },
         ]}
-        footnote={isLocked
-          ? `Early exit from your ${info.period} lock. Rewards forfeited and a 0.5% principal penalty was deducted.`
-          : `Returned to your ${sym} balance. Rewards included.`}
+        footnote={`Returned to your ${sym} balance. Rewards included.`}
         onDone={onBack}
       />
     );
@@ -10616,16 +10616,17 @@ function Unstake({ onBack, sym, staked = {}, onUnstaked }) {
           borderRadius: 14, fontFamily: 'Geist, Inter, system-ui',
         }}>
           <div style={{
-            fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.textDim,
+            fontFamily: 'Geist Mono, monospace', fontSize: 10,
+            color: locked ? RH.red : RH.textDim,
             letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700,
-          }}>{isLocked ? 'Early unstake — locked' : 'Unstake'}</div>
+          }}>{locked ? 'Locked' : 'Unstake'}</div>
           <div style={{
-            marginTop: 6, fontSize: 28, fontWeight: 600, color: RH.text,
+            marginTop: 6, fontSize: locked ? 22 : 28, fontWeight: locked ? 700 : 600, color: RH.text,
             letterSpacing: -0.8, fontVariantNumeric: 'tabular-nums',
-          }}>${finalAmt.toFixed(2)}</div>
+          }}>{locked ? `Locked until ${unlockDate}` : `$${finalAmt.toFixed(2)}`}</div>
           <div style={{ marginTop: 4, fontSize: 12, color: RH.textDim }}>
-            {isLocked
-              ? `Period ${info.period} not yet ended — early exit applies`
+            {locked
+              ? `Your ${periodLabel} stake unlocks at maturity — no early withdrawal`
               : info.period === 'flexible' ? 'Flexible stake — instant withdrawal' : 'Lock period complete'}
           </div>
         </div>
@@ -10634,25 +10635,14 @@ function Unstake({ onBack, sym, staked = {}, onUnstaked }) {
         <div style={{ marginTop: 14, padding: 14, background: RH.surface, border: `1px solid ${RH.line}`, borderRadius: 12 }}>
           <BreakRow label="Principal staked"
                     value={`$${principal.toFixed(2)}`} />
-          {isLocked ? (
-            <BreakRow label="Accrued APY (forfeited)"
-                      value={`-$${forfeitedAccrued.toFixed(2)}`}
-                      colorValue={RH.red}/>
-          ) : (
-            <BreakRow label={`Accrued APY (${apy.toFixed(1)}%)`}
-                      value={`+$${accrued.toFixed(2)}`}
-                      colorValue={RH.green}/>
-          )}
-          {isLocked ? (
-            <BreakRow label="Early-exit penalty (0.5%)"
-                      value={`-$${penalty.toFixed(2)}`}
-                      colorValue={RH.red}/>
-          ) : null}
+          <BreakRow label={`Accrued APY (${apy.toFixed(1)}%)`}
+                    value={`+$${accrued.toFixed(2)}`}
+                    colorValue={RH.green}/>
           <div style={{ height: 1, background: RH.line, margin: '8px 0' }}/>
-          <BreakRow label="To wallet" value={`$${finalAmt.toFixed(2)}`} strong/>
+          <BreakRow label={locked ? 'Available at maturity' : 'To wallet'} value={`$${finalAmt.toFixed(2)}`} strong/>
         </div>
 
-        {isLocked ? (
+        {locked ? (
           <div style={{
             marginTop: 10, padding: 10,
             background: RH.red + '15', border: `1px solid ${RH.red}55`,
@@ -10660,17 +10650,19 @@ function Unstake({ onBack, sym, staked = {}, onUnstaked }) {
             fontFamily: 'Geist Mono, monospace', fontSize: 11,
             color: RH.red, letterSpacing: 0.4, textAlign: 'center',
           }}>
-            Early exit: rewards forfeited + 0.5% principal penalty
+            Locked until {unlockDate} — funds release with full rewards
           </div>
         ) : null}
 
         <div style={{ height: 16 }}/>
-        <button onClick={doUnstake} style={{
+        <button onClick={doUnstake} disabled={locked} style={{
           width: '100%', padding: '14px 0', borderRadius: 999,
-          background: `${RH.red}26`, color: RH.red,
-          border: `1px solid ${RH.red}`,
-          fontSize: 14, fontWeight: 700, letterSpacing: 0.2, cursor: 'pointer',
-        }}>{isLocked ? `Unstake anyway · $${finalAmt.toFixed(2)}` : `Unstake · $${finalAmt.toFixed(2)}`}</button>
+          background: locked ? RH.surfaceUp : `${RH.green}26`,
+          color: locked ? RH.textMute : RH.green,
+          border: `1px solid ${locked ? RH.line : RH.green}`,
+          fontSize: 14, fontWeight: 700, letterSpacing: 0.2,
+          cursor: locked ? 'not-allowed' : 'pointer',
+        }}>{locked ? `Locked until ${unlockDate}` : `Unstake · $${finalAmt.toFixed(2)}`}</button>
       </div>
 
     </Phone>
@@ -10945,7 +10937,7 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
     holdingUsd  = info.usd;
     holdingCoin = info.usd / (meta.price || 1);
     lockPeriod  = info.period;
-    accruedUsd  = stakeAccruedUsd(info, (meta.apy || 5));
+    accruedUsd  = stakeAccruedUsd(info, stakePeriodApy(info.period));
   } else if (isCrypto || isALPXS) {
     holdingUsd  = balances[sym] || 0;
     holdingCoin = holdingUsd / (meta.price || 1);
@@ -13350,7 +13342,7 @@ function App() {
       let principal = usdAmount;
       if (prev && prev.usd) {
         // capitalize interest earned so far, then add the new amount; reset clock
-        principal = prev.usd + stakeAccruedUsd(prev, stakeApyFor(assetId)) + usdAmount;
+        principal = prev.usd + stakeAccruedUsd(prev, stakePeriodApy(prev.period)) + usdAmount;
       }
       return { ...s, [assetId]: { usd: principal, period, since: now } };
     });
