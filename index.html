@@ -343,7 +343,16 @@
   // All network calls are wrapped so a blocked/failing feed never breaks the page.
   async function getJSON(url){ var r=await fetch(url,{cache:'no-store'}); if(!r.ok) throw 0; return r.json(); }
   async function getText(url){ var r=await fetch(url,{cache:'no-store'}); if(!r.ok) throw 0; return r.text(); }
-  async function fetchSPCX(){   // {c:last, o:today-open} from Stooq quote CSV
+  // Paste your free finnhub.io API key here → real-time SPCX quotes.
+  var FINNHUB_TOKEN = '';
+  async function fetchSPCX(){   // {c:last, o:today-open}
+    if(FINNHUB_TOKEN){
+      try{
+        var j=await getJSON('https://finnhub.io/api/v1/quote?symbol=SPCX&token='+FINNHUB_TOKEN);
+        if(j && isFinite(j.c) && j.c>0) return { c:j.c, o:(isFinite(j.o)&&j.o>0)?j.o:(isFinite(j.pc)?j.pc:null) };
+      }catch(e){}
+    }
+    // Fallback: Stooq (no key) — may be blocked by the browser (CORS).
     try{
       var t=await getText('https://stooq.com/q/l/?s=spcx.us&f=soc&e=csv');
       var p=t.trim().split(/\r?\n/).pop().split(',');
