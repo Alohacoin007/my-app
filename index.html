@@ -97,10 +97,10 @@
     </div>
 
     <div class="live">
-      <div class="live-lbl"><span class="dot"></span><span>SpaceX · NASDAQ</span></div>
+      <div class="live-lbl"><span class="dot"></span><span>BITCOIN · BTC / USD</span></div>
       <div class="price-row">
-        <span class="price" id="heroPrice">$182.40</span>
-        <span class="chg">▲ 2.40%</span>
+        <span class="price" id="heroPrice">—</span>
+        <span class="chg" id="heroChg">·</span>
       </div>
       <div class="chart" id="heroChart"></div>
     </div>
@@ -109,14 +109,14 @@
       <div class="mk">
         <div class="mk-cat">FX</div>
         <div class="mk-pair">EUR / USD</div>
-        <div class="mk-val" id="fxVal">1.0789</div>
-        <div class="mk-chg">▲ 0.08%</div>
+        <div class="mk-val" id="fxVal">—</div>
+        <div class="mk-chg" id="fxChg">·</div>
       </div>
       <div class="mk">
         <div class="mk-cat">CRYPTO</div>
-        <div class="mk-pair">BTC / USD</div>
-        <div class="mk-val" id="btcVal">67,120</div>
-        <div class="mk-chg">▲ 0.91%</div>
+        <div class="mk-pair">ETH / USD</div>
+        <div class="mk-val" id="ethVal">—</div>
+        <div class="mk-chg" id="ethChg">·</div>
       </div>
       <div class="mk">
         <div class="mk-cat">SPORTS</div>
@@ -158,19 +158,14 @@
     setTimeout(function(){ sp.classList.add('hide'); }, 1250);
   }
 
-  // ── live hero chart (seeded random-walk, ticks every 1.4s) ──
-  function makeSeries(seed,start,vol,drift,n){
+  // ── chart drawing helpers ──
+  function makeSeries(seed,start,vol,drift,n){   // only a fallback seed if the feed is unreachable
     var a=seed>>>0;
     function rng(){ a=(a+0x6D2B79F5)|0; var t=Math.imul(a^(a>>>15),1|a);
       t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; }
     var arr=[],v=start;
     for(var i=0;i<n;i++){ v+=(rng()+rng()-1)*vol+drift; arr.push(v); }
     return arr;
-  }
-  function step(series,vol,drift,lo,hi){
-    var last=series[series.length-1];
-    var next=last+(Math.random()+Math.random()-1)*vol+drift;
-    return series.slice(1).concat(Math.max(lo,Math.min(hi,next)));
   }
   function coords(arr,w,h,pad){
     var mn=Math.min.apply(null,arr),mx=Math.max.apply(null,arr),r=(mx-mn)||1;
@@ -194,33 +189,72 @@
       '<circle cx="'+last[0]+'" cy="'+last[1]+'" r="11" fill="rgba(47,107,246,0.18)"/>'+
       '<circle cx="'+last[0]+'" cy="'+last[1]+'" r="5" fill="#2f6bf6" stroke="#fff" stroke-width="1.6"/></svg>';
   }
-  var heroSeries=makeSeries(168,182,1.4,0.2,64);
-  var fxSeries=makeSeries(1337,1.0789,0.0006,0.00004,8);
-  var btcSeries=makeSeries(5521,67120,80,20,8);
-  function draw(){
-    var c=document.getElementById('heroChart');
-    if(!c) return;
-    var w=Math.round(c.clientWidth)||338;     // draw to the container's real pixel width
-    var h=Math.round(w*0.42);
-    c.innerHTML=areaSVG(heroSeries,w,h);
-    document.getElementById('heroPrice').textContent='$'+heroSeries[heroSeries.length-1].toFixed(2);
-    document.getElementById('fxVal').textContent=fxSeries[fxSeries.length-1].toFixed(4);
-    document.getElementById('btcVal').textContent=Math.round(btcSeries[btcSeries.length-1]).toLocaleString('en-US');
+
+  // ── live data (real market prices, fetched in the browser) ──
+  var heroSeries=[];          // real BTC/USD closes
+  var ethOpen=null, fxOpen=null;
+
+  function fmtUSD(n){ return '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function setChg(id, cur, ref){
+    var el=document.getElementById(id); if(!el) return;
+    if(ref==null || cur==null || !isFinite(cur)){ el.textContent='·'; el.style.color=''; return; }
+    var pct=(cur-ref)/ref*100, up=pct>=0;
+    el.style.color = up ? '#1AA05F' : '#E5484D';
+    el.textContent = (up?'▲ ':'▼ ')+Math.abs(pct).toFixed(2)+'%';
   }
-  function startChart(){
-    draw();
-    window.addEventListener('resize',draw);
-    setInterval(function(){
-      heroSeries=step(heroSeries,1.6,0.05,170,198);
-      fxSeries=step(fxSeries,0.0005,0.000003,1.060,1.108);
-      btcSeries=step(btcSeries,95,2,66700,68150);
-      draw();
-    },1400);
+  function drawHero(){
+    var c=document.getElementById('heroChart'); if(!c || !heroSeries.length) return;
+    var w=Math.round(c.clientWidth)||338, h=Math.round(w*0.42);
+    c.innerHTML=areaSVG(heroSeries,w,h);
+    var last=heroSeries[heroSeries.length-1];
+    document.getElementById('heroPrice').textContent=fmtUSD(last);
+    setChg('heroChg', last, heroSeries[0]);
   }
 
-  // Boot the chart now that makeSeries(), draw(), startChart() and the data
-  // series above are all defined/initialized.
-  startChart();
+  // All network calls are wrapped so a failing/blocked feed never breaks the page.
+  async function getJSON(url){ var r=await fetch(url,{cache:'no-store'}); if(!r.ok) throw 0; return r.json(); }
+  async function fetchBTC(){ try{ var j=await getJSON('https://api.coinbase.com/v2/prices/BTC-USD/spot'); return parseFloat(j.data.amount); }catch(e){ return null; } }
+  async function fetchETH(){ try{ var j=await getJSON('https://api.coinbase.com/v2/prices/ETH-USD/spot'); return parseFloat(j.data.amount); }catch(e){ return null; } }
+  async function fetchEURUSD(){
+    try{ var j=await getJSON('https://api.frankfurter.app/latest?from=EUR&to=USD'); return j.rates.USD; }
+    catch(e){ try{ var k=await getJSON('https://open.er-api.com/v6/latest/EUR'); return k.rates.USD; }catch(e2){ return null; } }
+  }
+  async function fetchBTCHistory(){   // real intraday closes to seed the chart line
+    try{ var a=await getJSON('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=64');
+      return a.map(function(k){ return parseFloat(k[4]); }); }catch(e){ return null; }
+  }
+
+  async function boot(){
+    // 1) Hero chart: seed with real BTC history (fallback: gentle line anchored to the live spot)
+    var hist=await fetchBTCHistory();
+    var spot=await fetchBTC();
+    if(hist && hist.length>=8){ heroSeries=hist; }
+    else if(spot){ heroSeries=makeSeries(168,spot,spot*0.004,0,48); }
+    else { heroSeries=makeSeries(168,182,1.4,0.2,48); }   // last-resort so the chart isn't empty
+    if(spot){ heroSeries[heroSeries.length-1]=spot; }
+    drawHero();
+    window.addEventListener('resize',drawHero);
+
+    // 2) Market tiles
+    var eth=await fetchETH();
+    if(eth){ ethOpen=eth; document.getElementById('ethVal').textContent=fmtUSD(eth); setChg('ethChg',eth,ethOpen); }
+    var fx=await fetchEURUSD();
+    if(fx){ fxOpen=fx; document.getElementById('fxVal').textContent=fx.toFixed(4); setChg('fxChg',fx,fxOpen); }
+
+    // 3) Live refresh — crypto every 6s, FX every 5 min (FX feed is daily)
+    setInterval(async function(){
+      var p=await fetchBTC();
+      if(p){ heroSeries=heroSeries.slice(1).concat(p); drawHero(); }
+      var e=await fetchETH();
+      if(e){ document.getElementById('ethVal').textContent=fmtUSD(e); setChg('ethChg',e,ethOpen); }
+    }, 6000);
+    setInterval(async function(){
+      var f=await fetchEURUSD();
+      if(f){ document.getElementById('fxVal').textContent=f.toFixed(4); setChg('fxChg',f,fxOpen); }
+    }, 300000);
+  }
+
+  boot();
 </script>
 </body>
 </html>
