@@ -3682,12 +3682,17 @@ function Receive({ onBack, balances = {}, onReceived }) {
 }
 
 // ─── Stake screen ──────────────────────────────────────────────────
-function Stake({ onBack, balances = {}, onStaked, initialAssetId }) {
+function Stake({ onBack, balances = {}, staked = {}, onStaked, initialAssetId }) {
   const [assetId, setAssetId]     = React.useState(initialAssetId || 'ALPXS');
   const [assetOpen, setAssetOpen] = React.useState(false);
   const [amountStr, setAmountStr] = React.useState('0');
   const [periodId, setPeriodId]   = React.useState('flexible');
   const [confirmed, setConfirmed] = React.useState(false);
+  // One stake term per coin: if this coin is already staked, you can only add to
+  // the SAME term (unstake first to switch terms). Lock the picker to that term.
+  const existingStake = (staked[assetId] && staked[assetId].usd > 0) ? staked[assetId] : null;
+  const lockedTerm = existingStake ? existingStake.period : null;
+  React.useEffect(() => { if (lockedTerm) setPeriodId(lockedTerm); }, [assetId, lockedTerm]);
 
 
 
@@ -3883,15 +3888,17 @@ function Stake({ onBack, balances = {}, onStaked, initialAssetId }) {
         <div style={{ margin: '0 22px 12px', display: 'flex', gap: 6 }}>
           {STAKE_PERIODS.map((p) => {
             const active = p.id === periodId;
+            const disabled = lockedTerm && p.id !== lockedTerm;
             return (
               <button
                 key={p.id}
-                onClick={() => setPeriodId(p.id)}
+                onClick={disabled ? undefined : () => setPeriodId(p.id)}
                 style={{
                   flex: 1, padding: '10px 0', borderRadius: 12,
                   background: active ? `${RH.green}1A` : RH.surface,
                   border: `1px solid ${active ? RH.green : RH.line}`,
-                  cursor: 'pointer',
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                  opacity: disabled ? 0.4 : 1,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
                 }}
               >
@@ -3907,6 +3914,11 @@ function Stake({ onBack, balances = {}, onStaked, initialAssetId }) {
             );
           })}
         </div>
+        {lockedTerm ? (
+          <div style={{ margin: '-4px 22px 12px', fontSize: 11, color: RH.textDim, lineHeight: 1.5 }}>
+            You already have a {(STAKE_PERIODS.find(function(p){return p.id===lockedTerm;})||{}).label} {assetId} stake — adding more keeps that term. Unstake it first to choose a different term.
+          </div>
+        ) : null}
 
         {/* Projected earnings */}
         <div style={{
@@ -13339,14 +13351,14 @@ function App() {
     setStaked((s) => {
       const prev = s[assetId];
       const now = Date.now();
-      let principal = usdAmount;
+      // One stake term per coin: adding to an existing stake KEEPS its term and
+      // lock clock (never changes flexible→locked or extends the lock).
       if (prev && prev.usd) {
-        // capitalize interest earned so far, then add the new amount; reset clock
-        principal = prev.usd + stakeAccruedUsd(prev, stakePeriodApy(prev.period)) + usdAmount;
+        return { ...s, [assetId]: { usd: prev.usd + usdAmount, period: prev.period, since: prev.since || now } };
       }
-      return { ...s, [assetId]: { usd: principal, period, since: now } };
+      return { ...s, [assetId]: { usd: usdAmount, period, since: now } };
     });
-    pushTx({ type: 'stake', sym: assetId, usd: usdAmount, period });
+    pushTx({ type: 'stake', sym: assetId, usd: usdAmount, period: (staked[assetId] && staked[assetId].usd > 0) ? staked[assetId].period : period });
     flashAsset(assetId);
   };
   // Simulated incoming receive — adds to a source asset balance.
@@ -13525,7 +13537,7 @@ function App() {
 
   if (screen === 'send')     return <Send     onBack={() => { setTab('home'); onBack(); }} balances={balances} onSent={onSendConfirmed}/>;
   if (screen === 'receive')  return <Receive  onBack={() => { setTab('home'); onBack(); }} balances={balances} onReceived={onReceiveSimulated}/>;
-  if (screen === 'stake')    return <Stake    onBack={() => { setStakeInitial(null); setTab('home'); onBack(); }} balances={balances} onStaked={onStakeConfirmed} initialAssetId={stakeInitial}/>;
+  if (screen === 'stake')    return <Stake    onBack={() => { setStakeInitial(null); setTab('home'); onBack(); }} balances={balances} staked={staked} onStaked={onStakeConfirmed} initialAssetId={stakeInitial}/>;
   if (screen === 'stakeinfo' && stakeInfoSym) return <StakeInfo
     onBack={() => { setStakeInfoSym(null); onBack(); }}
     sym={stakeInfoSym}
