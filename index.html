@@ -76,7 +76,7 @@
   .ticker{font-size:11px;font-weight:600;color:var(--accent);background:var(--accent-tint);
     padding:3px 9px;border-radius:9999px;letter-spacing:.5px;align-self:center}
   .chg{font-size:14px;font-weight:600;color:var(--accent)}
-  .chart{margin-top:30px;min-height:130px}
+  .chart{margin-top:54px;min-height:130px}
   .chart svg{display:block;width:100%;height:auto;overflow:visible}
 
   .markets{display:flex;margin-top:44px;flex:none}
@@ -131,27 +131,6 @@
           <span class="chg" id="heroChg">·</span>
         </div>
         <div class="chart" id="heroChart"></div>
-      </div>
-
-      <div class="markets">
-        <div class="mk">
-          <div class="mk-cat">FX</div>
-          <div class="mk-pair">EUR / USD</div>
-          <div class="mk-val" id="fxVal">—</div>
-          <div class="mk-chg" id="fxChg">·</div>
-        </div>
-        <div class="mk">
-          <div class="mk-cat">CRYPTO</div>
-          <div class="mk-pair">BTC / USD</div>
-          <div class="mk-val" id="btcVal">—</div>
-          <div class="mk-chg" id="btcChg">·</div>
-        </div>
-        <div class="mk">
-          <div class="mk-cat">SPORTS</div>
-          <div class="mk-pair">Madrid–Arsenal</div>
-          <div class="mk-val">1 – 0</div>
-          <div class="mk-chg"><span class="dot"></span>LIVE 67'</div>
-        </div>
       </div>
 
       <div class="bottom">
@@ -268,8 +247,7 @@
     }catch(e){}
     document.getElementById('screen').style.visibility='visible';
     runSplash();
-    // startChart() is called at the very bottom — AFTER the chart data series
-    // (heroSeries/fxSeries/btcSeries) have been created further down the script.
+    // boot() is called at the very bottom — after the chart helpers/series exist.
   })();
 
   function runSplash(){
@@ -371,20 +349,6 @@
       return cl.length ? cl : null;
     }catch(e){ return null; }
   }
-  async function fetchBTC(){ try{ var j=await getJSON('https://api.coinbase.com/v2/prices/BTC-USD/spot'); return parseFloat(j.data.amount); }catch(e){ return null; } }
-  async function fetchEURUSD(){
-    // Live EUR/USD via Coinbase cross: (BTC priced in USD) / (BTC priced in EUR).
-    // Updates every fetch (crypto ticks), unlike the free FX feeds (daily).
-    try{
-      var u=await getJSON('https://api.coinbase.com/v2/prices/BTC-USD/spot');
-      var e=await getJSON('https://api.coinbase.com/v2/prices/BTC-EUR/spot');
-      var usd=parseFloat(u.data.amount), eur=parseFloat(e.data.amount);
-      if(isFinite(usd)&&isFinite(eur)&&eur>0) return usd/eur;
-    }catch(err){}
-    try{ var j=await getJSON('https://api.frankfurter.app/latest?from=EUR&to=USD'); return j.rates.USD; }catch(e){}
-    return null;
-  }
-
   async function boot(){
     // Hero — real SPCX (price + today's % from the open). Seed the line with real
     // daily history if we have enough points, else an illustrative line anchored
@@ -400,20 +364,6 @@
       var r=await fetchSPCX();
       if(r && r.c){ heroSeries=heroSeries.slice(1).concat(r.c); if(r.o)heroOpen=r.o; drawHero(); }
     }, 30000);
-
-    // Real BTC/USD tile
-    var btc=await fetchBTC();
-    if(btc){ btcOpen=btc; document.getElementById('btcVal').textContent=fmtUSD0(btc); setChg('btcChg',btc,btcOpen); }
-    // Real EUR/USD tile
-    var fx=await fetchEURUSD();
-    if(fx){ fxOpen=fx; document.getElementById('fxVal').textContent=fx.toFixed(4); setChg('fxChg',fx,fxOpen); }
-
-    setInterval(async function(){
-      var p=await fetchBTC();
-      if(p){ document.getElementById('btcVal').textContent=fmtUSD0(p); setChg('btcChg',p,btcOpen); }
-      var f=await fetchEURUSD();
-      if(f){ document.getElementById('fxVal').textContent=f.toFixed(4); setChg('fxChg',f,fxOpen); }
-    }, 6000);
   }
 
   boot();
