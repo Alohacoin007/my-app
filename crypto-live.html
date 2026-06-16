@@ -116,6 +116,10 @@
 (function(){try{var m=(location.hash||"").match(/alpexa=([^&]+)/);if(m){var id=JSON.parse(decodeURIComponent(atob(m[1])));if(id&&id.accts){localStorage.setItem("alpexa.me",JSON.stringify(id));}}}catch(e){}})();
 /* Login gate (real service): no anonymous guest trading. Require a logged-in identity (email or authId); guests/empty go to login. */
 (function(){try{var m=JSON.parse(localStorage.getItem("alpexa.me")||"null");if(!(m&&m.accts&&(m.email||m.authId))){location.replace("login.html");}}catch(e){location.replace("login.html");}})();
+/* Default to the light (white) theme. One-time migration flips existing devices
+   (which auto-saved 'dark' under the old default) to light; after that the user's
+   manual Dark/Light choice in Account → Appearance is respected. */
+(function(){try{if(!localStorage.getItem("alpexa.themeDefaultLight")){localStorage.setItem("alpexa.theme",JSON.stringify("light"));localStorage.setItem("alpexa.themeDefaultLight","1");}}catch(e){}})();
 </script>
 <script src="alpexa-sync.js?v=9"></script>
 <!-- Test-only balance seeds removed for live service: real opening balances come
@@ -162,7 +166,7 @@ const LIGHT_PALETTE = {
 };
 // Mutable palette object — all RH.x reads pick up whichever palette is active.
 // Toggled via the ThemeContext (Account → Appearance).
-const RH = { ...DARK_PALETTE };
+const RH = { ...LIGHT_PALETTE };
 // Expose the active field background/text to CSS so the autofill override can
 // repaint over the browser's yellow highlight in the current theme.
 const syncFieldVars = () => {
@@ -12406,7 +12410,7 @@ function usePersistedState(key, initial) {
 
 // Theme — toggleable dark/light. Components read RH.x globals; setTheme
 // triggers an RH-object update + re-render via ThemeContext.
-const ThemeContext = React.createContext({ theme: 'dark', setTheme: () => {} });
+const ThemeContext = React.createContext({ theme: 'light', setTheme: () => {} });
 
 // BackInterceptor — children can hook the SubSubDetail header back button.
 // Set returns true to suppress the default back; false to allow it through.
@@ -12887,7 +12891,7 @@ function AppRoot() {
   }), [userName, userEmail]);
 
   // ── Theme — persisted, applies palette synchronously before children render
-  const [theme, setTheme] = usePersistedState('alpexa.theme', 'dark');
+  const [theme, setTheme] = usePersistedState('alpexa.theme', 'light');
   React.useMemo(() => { applyTheme(theme); }, [theme]);
   const themeApi = React.useMemo(() => ({ theme, setTheme }), [theme]);
 
