@@ -416,7 +416,22 @@ const STAKE_PERIODS = [
   { id: '90d',      label: '90 days',  apy: 10, lockDays: 90,  note: '10% APY' },
   { id: '1y',       label: '1 year',   apy: 18, lockDays: 365, note: '18% APY' },
 ];
-function stakePeriodApy(id){ var p=STAKE_PERIODS.find(function(x){return x.id===id;}); return p?p.apy:7; }
+// Per-coin, per-term APY. Longer lock = higher rate. SOL/ETH ~ industry rates;
+// USDT 3/6/9; ALPXS (native) highest 7/10/18.
+const STAKE_RATES = {
+  ALPXS: { flexible: 7, '90d': 10, '1y': 18 },
+  SOL:   { flexible: 5, '90d': 6,  '1y': 7  },
+  USDT:  { flexible: 3, '90d': 6,  '1y': 9  },
+  ETH:   { flexible: 3, '90d': 4,  '1y': 5  },
+};
+const STAKE_RATE_DEFAULT = { flexible: 5, '90d': 7, '1y': 9 };
+function stakePeriodApy(sym, id){
+  var r = STAKE_RATES[sym] || STAKE_RATE_DEFAULT;
+  if (r[id] != null) return r[id];
+  var p = STAKE_PERIODS.find(function(x){return x.id===id;});
+  return p ? p.apy : 5;
+}
+function stakeMaxApy(sym){ var r = STAKE_RATES[sym] || STAKE_RATE_DEFAULT; return Math.max(r.flexible||0, r['90d']||0, r['1y']||0); }
 function stakeLockDays(id){ var p=STAKE_PERIODS.find(function(x){return x.id===id;}); return p?(p.lockDays||0):0; }
 function stakeMaturity(info){ return (info&&info.since)?(info.since+stakeLockDays(info.period)*86400000):0; }
 function stakeIsLocked(info){ var d=stakeLockDays(info&&info.period); return d>0 && Date.now()<stakeMaturity(info); }
@@ -1911,7 +1926,7 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
                           || (PORTFOLIO.assets.find((x) => x.sym === sym))
                           || { sym, seed: 100, chg: 0 };
               const stakeMeta = (typeof STAKE_ASSETS !== 'undefined') ? STAKE_ASSETS[sym] : null;
-              const apy = stakePeriodApy(period);
+              const apy = stakePeriodApy(sym, period);
               const name = meta.name || (stakeMeta && stakeMeta.name) || sym;
               return (
                 <AssetRow
@@ -3710,7 +3725,7 @@ function Stake({ onBack, balances = {}, staked = {}, onStaked, initialAssetId })
   const liveBalanceUsd = balances.USDT || 0;
   const asset  = { ...stakeMeta, balanceUsd: liveBalanceUsd };
   const period = STAKE_PERIODS.find((p) => p.id === periodId);
-  const apy    = period.apy;
+  const apy    = stakePeriodApy(assetId, periodId);
   const amount = parseFloat(amountStr) || 0;
   const availableUsd = liveBalanceUsd;
   const insufficient = amount > availableUsd;
@@ -3838,7 +3853,7 @@ function Stake({ onBack, balances = {}, staked = {}, onStaked, initialAssetId })
                   <span style={{
                     fontSize: 12, color: RH.green, fontWeight: 700,
                     fontVariantNumeric: 'tabular-nums',
-                  }}>up to {Math.max.apply(null, STAKE_PERIODS.map(function(p){return p.apy;}))}%</span>
+                  }}>up to {stakeMaxApy(id)}%</span>
                   {active ? (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={RH.green} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M5 12 l5 5 L20 7"/>
@@ -3909,7 +3924,7 @@ function Stake({ onBack, balances = {}, staked = {}, onStaked, initialAssetId })
                   fontFamily: 'Geist Mono, monospace', fontSize: 9.5,
                   color: active ? RH.green : RH.textDim,
                   letterSpacing: 0.4, fontWeight: 700,
-                }}>{p.note}</span>
+                }}>{stakePeriodApy(assetId, p.id)}% APY</span>
               </button>
             );
           })}
@@ -6394,7 +6409,7 @@ function Discover({ onPickAsset, onPickStakeInfo, tabBar }) {
               <div style={{ fontSize: 12, fontWeight: 700, color: RH.text }}>
                 <span>{s.sym}</span>
                 <span style={{ color: RH.textDim, fontWeight: 600 }}> · </span>
-                <span style={{ color: RH.accent, fontWeight: 700 }}>up to {Math.max.apply(null, STAKE_PERIODS.map(function(p){return p.apy;}))}% APY</span>
+                <span style={{ color: RH.accent, fontWeight: 700 }}>up to {stakeMaxApy(s.sym)}% APY</span>
               </div>
               <div style={{ marginTop: 2, fontSize: 10.5, color: RH.textDim }}>
                 Stake {s.sym} to earn
@@ -6786,7 +6801,7 @@ const HELP_ARTICLES = {
     { q: 'How does staking work?',
       a: `When you stake, you lock your tokens to help secure the network and earn rewards (APY). Alpexa runs validators for ETH, SOL, and ATOM, and distributes 90% of staking rewards to you.\n\nRewards accrue daily and are paid out to your wallet automatically. You can view accumulated rewards in real time on the asset's detail page.` },
     { q: 'What are the lock periods?',
-      a: `Flexible — 7% APY, unstake anytime.\n90 days — 10% APY, locked for 90 days.\n1 year — 18% APY, locked for 1 year.\n\nLonger terms pay a higher APY in exchange for committing your tokens. Rewards accrue daily.` },
+      a: `Three terms: Flexible (unstake anytime), 90 days, and 1 year. Longer terms pay a higher APY in exchange for committing your tokens — 90-day and 1-year are locked until maturity.\n\nRates vary by coin, e.g. ALPXS up to 18%, USDT up to 9%, SOL up to 7%. Rewards accrue daily.` },
     { q: 'Can I unstake early?',
       a: `Flexible positions can be unstaked anytime. Locked terms (90 days / 1 year) cannot be unstaked before they end — they unlock automatically at maturity and return your full principal plus all accrued rewards.` },
     { q: 'What is ALPXS?',
@@ -10359,7 +10374,7 @@ function StakeInfo({ onBack, sym, onStartStake }) {
           />
           <Feature
             title="Flexible terms"
-            desc={`Flexible unstakes anytime (7% APY). 90-day (10%) and 1-year (18%) terms are locked until maturity.`}
+            desc={`Flexible unstakes anytime. 90-day and 1-year terms are locked until maturity and earn a higher APY.`}
           />
           <Feature
             title="Risks you should know"
@@ -10566,7 +10581,7 @@ function Unstake({ onBack, sym, staked = {}, onUnstaked }) {
   const meta = PORTFOLIO.securities.find((s) => s.sym === sym)
             || PORTFOLIO.assets.find((a) => a.sym === sym)
             || { sym, name: sym, price: 1, apy: 5 };
-  const apy = stakePeriodApy(info.period);
+  const apy = stakePeriodApy(sym, info.period);
   const principal = info.usd;
   // Real accrual — principal × APY × time staked.
   const accrued = stakeAccruedUsd(info, apy);
@@ -10949,7 +10964,7 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
     holdingUsd  = info.usd;
     holdingCoin = info.usd / (meta.price || 1);
     lockPeriod  = info.period;
-    accruedUsd  = stakeAccruedUsd(info, stakePeriodApy(info.period));
+    accruedUsd  = stakeAccruedUsd(info, stakePeriodApy(sym, info.period));
   } else if (isCrypto || isALPXS) {
     holdingUsd  = balances[sym] || 0;
     holdingCoin = holdingUsd / (meta.price || 1);
@@ -11204,7 +11219,7 @@ You will be notified on significant moves.`, { title: 'Alert active' });
                   <div>
                     <div style={{ fontSize: 10.5, color: RH.textDim, letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: 700 }}>APY</div>
                     <div style={{ marginTop: 4, fontSize: 16, fontWeight: 700, color: RH.green, fontVariantNumeric: 'tabular-nums' }}>
-                      {stakePeriodApy(lockPeriod).toFixed(1)}%
+                      {stakePeriodApy(sym, lockPeriod).toFixed(1)}%
                     </div>
                   </div>
                   <div>
