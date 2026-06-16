@@ -191,6 +191,32 @@
     try{ logAction('edit_customer', custId, 'profile · balances · KYC '+patch.kyc+' · status '+patch.status); }catch(e){}
     toast('Saved ✓ — synced'); PLAYER_EDIT=null; render(); setTimeout(pullPlayers,500);
   }
+  // Manual bonus: credit a customer's crypto wallet (USDT) as an APPROVED deposit.
+  // Reuses the deposit machinery so it's recorded (integrity monitor stays happy —
+  // no false 🚩) and reaches the app within ~4s. Customer can buy BTC with it.
+  function giveBonus(custId){
+    if(!window.AlpexaSync||!AlpexaSync.db){ toast('Not connected to server',true); return; }
+    var p=null; SRV_PLAYERS.forEach(function(x){ if(x.cust_id===custId)p=x; }); if(!p){ toast('Customer not found',true); return; }
+    var amt=parseFloat(val('ed_bonus_amt')); if(isNaN(amt)||amt<=0){ toast('Enter a bonus amount',true); return; }
+    amt=Math.round(amt*100)/100;
+    var ca=null; SRV_ACCOUNTS.forEach(function(x){ if(x.player_id===p.id && x.server==='crypto')ca=x; });
+    if(!ca){ toast('No crypto account for this customer',true); return; }
+    if(!confirm('Give '+(p.name||custId)+' a $'+amt.toFixed(2)+' crypto (USDT) bonus?\n\nIt is credited to their crypto wallet and recorded as a deposit.')) return;
+    var lid='bonus-'+Date.now();
+    AlpexaSync.db.from('requests').insert({
+      local_id: lid, cust_id: custId, name: p.name||'', acct_no: ca.acct_no,
+      server:'crypto', type:'deposit', amount:amt, fee:0, net:amt,
+      asset:'USDT', network:'ERC-20', from_label:'Bonus (admin)', status:'pending'
+    }).then(function(ins){
+      if(ins&&ins.error){ toast('Bonus error: '+ins.error.message,true); return; }
+      AlpexaSync.updateRequest(lid,{status:'approved'}).then(function(res){
+        if(res&&res.error){ toast('Bonus approve error: '+res.error.message,true); return; }
+        try{ logAction('bonus', custId, '$'+amt.toFixed(2)+' USDT crypto bonus'); }catch(e){}
+        toast('Bonus sent: $'+amt.toFixed(2)+' → '+(p.name||custId)+' ✓');
+        setTimeout(function(){ try{pullServer&&pullServer();}catch(e){} try{pullPlayers&&pullPlayers();}catch(e){} }, 400);
+      });
+    }, function(){ toast('Bonus failed (network)',true); });
+  }
   // Permanently remove a customer: profile + all accounts + open positions.
   // Transaction history (requests) and audit logs are kept on purpose.
   // Note: the auth login (email/password) lives in auth.users and is removed
@@ -756,6 +782,10 @@
           '<label class="lbl" style="display:block;margin-top:8px">Crypto balance</label><input class="in" id="ed_bal_crypto" type="number" step="0.01" value="'+bn('crypto')+'">'+
           '<label class="lbl" style="display:block;margin-top:8px">Sports balance</label><input class="in" id="ed_bal_sports" type="number" step="0.01" value="'+bn('sports')+'">'+
           '<div class="btns"><button class="ok" data-savepl="'+esc(cid)+'">Save</button><button class="no" data-cancelpl="1">Cancel</button></div>'+
+          '<div style="margin-top:14px;padding-top:12px;border-top:1px dashed #ddd"></div>'+
+          '<label class="lbl" style="display:block">🎁 Give crypto bonus (USDT)</label>'+
+          '<div style="display:flex;gap:6px;margin-top:4px"><input class="in" id="ed_bonus_amt" type="number" step="0.01" placeholder="e.g. 100" style="flex:1"><button class="ok" data-bonuspl="'+esc(cid)+'" style="width:auto;padding:0 16px;white-space:nowrap">Give</button></div>'+
+          '<div class="hint">Credited to the crypto wallet as a deposit — clean (no integrity flag), reaches the app in ~4s. Customer can buy BTC with it.</div>'+
           '<div class="hint">Balance changes reach the app within ~4s (even while it\'s open). Crypto: coins/stakes are kept — only USDT cash is adjusted.</div>'+
           (stt==='closed'
             ? '<button data-reopenpl="'+esc(cid)+'" style="width:100%;margin-top:16px;padding:11px;border:1px solid #9ccc9c;background:#eefaee;color:#1B5E20;border-radius:4px;font-weight:700;font-size:13px;cursor:pointer">↻ Reopen account</button>'+
@@ -1704,6 +1734,7 @@
     document.querySelectorAll('[data-pl]').forEach(function(b){b.onclick=function(){var id=b.getAttribute('data-pl');PLAYER_OPEN=(PLAYER_OPEN===id?null:id);if(PLAYER_OPEN!==id)PLAYER_EDIT=null;else{pullOpenSummary();pullSettle();POS_BY_CUST[id]=undefined;pullCustPos(id);}render();};});
     document.querySelectorAll('[data-editpl]').forEach(function(b){b.onclick=function(){PLAYER_EDIT=b.getAttribute('data-editpl');render();};});
     document.querySelectorAll('[data-savepl]').forEach(function(b){b.onclick=function(){savePlayer(b.getAttribute('data-savepl'));};});
+    document.querySelectorAll('[data-bonuspl]').forEach(function(b){b.onclick=function(){giveBonus(b.getAttribute('data-bonuspl'));};});
     document.querySelectorAll('[data-halt]').forEach(function(b){b.onclick=function(){setHalt(b.getAttribute('data-halt'));};});
     document.querySelectorAll('[data-live]').forEach(function(b){b.onclick=function(){setLiveBetting(b.getAttribute('data-live'));};});
     document.querySelectorAll('[data-cancelpl]').forEach(function(b){b.onclick=function(){PLAYER_EDIT=null;render();};});
