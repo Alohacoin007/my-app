@@ -33,13 +33,34 @@
   #splash.hide{opacity:0;pointer-events:none}
   #splash .mark{font-size:40px;font-weight:600;letter-spacing:-1.4px;color:var(--accent)}
 
-  /* ── Intro ── */
-  #intro{flex:1;display:flex;flex-direction:column;
-    padding:calc(env(safe-area-inset-top,14px) + 16px) 26px calc(env(safe-area-inset-bottom,16px) + 26px);
+  /* ── Intro (horizontal 3-page pager) ── */
+  #intro{flex:1;display:flex;flex-direction:row;overflow-x:auto;overflow-y:hidden;
+    scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;
     opacity:0;transition:opacity .6s ease}
+  #intro::-webkit-scrollbar{display:none}
   #intro.show{opacity:1}
+  .page{min-width:100%;width:100%;height:100%;flex:none;scroll-snap-align:start;
+    display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:none;
+    padding:calc(env(safe-area-inset-top,14px) + 16px) 26px calc(env(safe-area-inset-bottom,16px) + 26px)}
+  .page::-webkit-scrollbar{display:none}
+  .page-head{display:flex;align-items:center;justify-content:space-between;flex:none}
+  .head-login{font-size:14px;font-weight:600;color:var(--accent);background:var(--accent-tint);
+    padding:7px 15px;border-radius:9999px;text-decoration:none}
 
   .brand{font-size:17px;font-weight:600;letter-spacing:-0.4px;color:var(--accent);flex:none}
+  .overline{font-size:11px;font-weight:600;letter-spacing:2.6px;color:var(--accent)}
+  .h2{font-size:38px;font-weight:600;line-height:1.05;letter-spacing:-1.4px}
+  .h2.dim{color:var(--muted-light)}
+  @keyframes secpulse{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.12);opacity:.2}}
+  /* list rows (security / staking) */
+  .trow{display:flex;align-items:center;gap:14px;padding:12px 0;border-top:1px solid var(--hairline)}
+  .trow:last-child{border-bottom:1px solid var(--hairline)}
+  .tchip{width:40px;height:40px;border-radius:11px;background:var(--accent-tint);display:flex;align-items:center;justify-content:center;flex:none}
+  .tchip.round{border-radius:50%;width:38px;height:38px}
+  .tt{font-size:16px;font-weight:600}
+  .ts{font-size:13px;color:var(--muted);margin-top:2px}
+  .tapy{font-size:17px;font-weight:600;color:var(--accent);text-align:right}
+  .tapy small{display:block;font-size:11px;color:var(--muted);font-weight:400}
 
   .hero{margin-top:34px;flex:none}
   .hero span{display:block;font-size:clamp(34px,9.5vw,40px);font-weight:600;line-height:1.05;letter-spacing:-1.5px}
@@ -89,54 +110,148 @@
   <!-- Splash -->
   <div id="splash"><div class="mark">Alpexa Suisse</div></div>
 
-  <!-- Intro -->
+  <!-- Intro: 3 swipeable pages (Markets · Security · Welcome) -->
   <div id="intro">
-    <div class="brand">Alpexa Suisse</div>
 
-    <div class="hero">
-      <span>Every market.</span>
-      <span class="dim">One Swiss app.</span>
+    <!-- Page 1 — Markets -->
+    <div class="page">
+      <div class="brand">Alpexa Suisse</div>
+
+      <div class="hero">
+        <span>Every market.</span>
+        <span class="dim">One Swiss app.</span>
+      </div>
+
+      <div class="live">
+        <div class="live-lbl"><span class="dot"></span><span>SPACEX · SPCX</span></div>
+        <div class="price-row">
+          <span class="price" id="heroPrice">—</span>
+          <span class="ticker">SPCX</span>
+          <span class="chg" id="heroChg">·</span>
+        </div>
+        <div class="chart" id="heroChart"></div>
+      </div>
+
+      <div class="markets">
+        <div class="mk">
+          <div class="mk-cat">FX</div>
+          <div class="mk-pair">EUR / USD</div>
+          <div class="mk-val" id="fxVal">—</div>
+          <div class="mk-chg" id="fxChg">·</div>
+        </div>
+        <div class="mk">
+          <div class="mk-cat">CRYPTO</div>
+          <div class="mk-pair">BTC / USD</div>
+          <div class="mk-val" id="btcVal">—</div>
+          <div class="mk-chg" id="btcChg">·</div>
+        </div>
+        <div class="mk">
+          <div class="mk-cat">SPORTS</div>
+          <div class="mk-pair">Madrid–Arsenal</div>
+          <div class="mk-val">1 – 0</div>
+          <div class="mk-chg"><span class="dot"></span>LIVE 67'</div>
+        </div>
+      </div>
+
+      <div class="bottom">
+        <div class="dots"><i class="on"></i><i></i><i></i></div>
+        <div class="cta-row">
+          <a class="btn btn-tint" href="login.html?switch=1">Log in</a>
+          <a class="btn btn-primary" href="signup.html">Get Started</a>
+        </div>
+        <div class="legal">© Alpexa Suisse · Markets involve risk.</div>
+      </div>
     </div>
 
-    <div class="live">
-      <div class="live-lbl"><span class="dot"></span><span>SPACEX · SPCX</span></div>
-      <div class="price-row">
-        <span class="price" id="heroPrice">—</span>
-        <span class="ticker">SPCX</span>
-        <span class="chg" id="heroChg">·</span>
+    <!-- Page 2 — Security -->
+    <div class="page">
+      <div class="page-head">
+        <div class="brand">Alpexa Suisse</div>
+        <a class="head-login" href="login.html?switch=1">Log in</a>
       </div>
-      <div class="chart" id="heroChart"></div>
+
+      <div style="margin-top:22px;flex:none">
+        <div class="overline">SECURITY</div>
+        <div style="margin-top:14px">
+          <span class="h2" style="display:block">Assets in</span>
+          <span class="h2 dim" style="display:block">Swiss custody.</span>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;margin-top:20px;flex:none">
+        <div style="position:relative;width:82px;height:82px;display:flex;align-items:center;justify-content:center">
+          <span style="position:absolute;inset:0;border-radius:50%;background:var(--accent-tint);animation:secpulse 2.4s ease-in-out infinite"></span>
+          <svg viewBox="0 0 64 64" width="56" height="56" fill="none" style="position:relative"><path d="M32 7 L55 16 V32 C55 47 44 56 32 60 C20 56 9 47 9 32 V16 Z" stroke="#2f6bf6" stroke-width="3.4" stroke-linejoin="round"></path><path d="M22.5 32.5 l6.5 6.5 l13 -14" stroke="#2f6bf6" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </div>
+        <div style="font-size:34px;font-weight:600;letter-spacing:-1px;margin-top:10px">1 : 1</div>
+        <div style="font-size:14px;color:var(--muted);margin-top:5px">Proof of reserves · verified daily</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;margin-top:18px;flex:none">
+        <div class="trow">
+          <div class="tchip"><svg viewBox="0 0 24 24" width="21" height="21" fill="none"><path d="M12 3 V21 M4.2 7.5 L19.8 16.5 M19.8 7.5 L4.2 16.5" stroke="#2f6bf6" stroke-width="1.7" stroke-linecap="round"></path><path d="M9.5 4.5 L12 3 L14.5 4.5 M9.5 19.5 L12 21 L14.5 19.5 M6 6.6 L7.6 7.5 L7.2 9.3 M18 6.6 L16.4 7.5 L16.8 9.3 M6 17.4 L7.6 16.5 L7.2 14.7 M18 17.4 L16.4 16.5 L16.8 14.7" stroke="#2f6bf6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+          <div style="flex:1;min-width:0"><div class="tt">Hot / cold wallets</div><div class="ts">95% held in offline cold storage</div></div>
+        </div>
+        <div class="trow">
+          <div class="tchip"><svg viewBox="0 0 24 24" width="21" height="21" fill="none"><circle cx="6.5" cy="7.5" r="2.4" stroke="#2f6bf6" stroke-width="1.7"></circle><circle cx="17.5" cy="7.5" r="2.4" stroke="#2f6bf6" stroke-width="1.7"></circle><circle cx="12" cy="17" r="2.4" stroke="#2f6bf6" stroke-width="1.7"></circle><path d="M8.6 8.8 L10.6 15.2 M15.4 8.8 L13.4 15.2 M8.9 7.5 H15.1" stroke="#2f6bf6" stroke-width="1.6" stroke-linecap="round"></path></svg></div>
+          <div style="flex:1;min-width:0"><div class="tt">MPC multi-signature</div><div class="ts">Keys split across vaults — no single key</div></div>
+        </div>
+        <div class="trow">
+          <div class="tchip"><svg viewBox="0 0 24 24" width="21" height="21" fill="none"><rect x="6.5" y="6.5" width="11" height="11" rx="2" stroke="#2f6bf6" stroke-width="1.7"></rect><rect x="9.5" y="9.5" width="5" height="5" rx="1" stroke="#2f6bf6" stroke-width="1.5"></rect><path d="M9 6.5 V4 M12 6.5 V4 M15 6.5 V4 M9 17.5 V20 M12 17.5 V20 M15 17.5 V20 M6.5 9 H4 M6.5 12 H4 M6.5 15 H4 M17.5 9 H20 M17.5 12 H20 M17.5 15 H20" stroke="#2f6bf6" stroke-width="1.5" stroke-linecap="round"></path></svg></div>
+          <div style="flex:1;min-width:0"><div class="tt">HSM-secured keys</div><div class="ts">FIPS 140-2 Level 3 hardware modules</div></div>
+        </div>
+      </div>
+
+      <div class="bottom">
+        <div class="dots"><i></i><i class="on"></i><i></i></div>
+        <a class="btn btn-primary" style="margin-top:18px;display:flex;align-items:center;justify-content:center;gap:10px" href="#" onclick="goPage(2);return false;"><span>Continue</span><span style="font-size:18px;line-height:1">→</span></a>
+      </div>
     </div>
 
-    <div class="markets">
-      <div class="mk">
-        <div class="mk-cat">FX</div>
-        <div class="mk-pair">EUR / USD</div>
-        <div class="mk-val" id="fxVal">—</div>
-        <div class="mk-chg" id="fxChg">·</div>
+    <!-- Page 3 — Welcome bonus -->
+    <div class="page">
+      <div class="page-head">
+        <div class="brand">Alpexa Suisse</div>
+        <a class="head-login" href="login.html?switch=1">Log in</a>
       </div>
-      <div class="mk">
-        <div class="mk-cat">CRYPTO</div>
-        <div class="mk-pair">BTC / USD</div>
-        <div class="mk-val" id="btcVal">—</div>
-        <div class="mk-chg" id="btcChg">·</div>
+
+      <div style="margin-top:24px;flex:none">
+        <div class="overline">WELCOME BONUS</div>
+        <div style="display:flex;align-items:baseline;gap:11px;margin-top:12px">
+          <span style="font-size:56px;font-weight:600;letter-spacing:-2.2px;color:var(--accent);line-height:1">$100</span>
+          <span style="font-size:24px;font-weight:600;letter-spacing:-0.6px">in Bitcoin</span>
+        </div>
+        <div style="font-size:14px;color:var(--muted);margin-top:10px;line-height:1.5;max-width:300px">Fund $500 in your first week — we add $100 in BTC.</div>
       </div>
-      <div class="mk">
-        <div class="mk-cat">SPORTS</div>
-        <div class="mk-pair">Madrid–Arsenal</div>
-        <div class="mk-val">1 – 0</div>
-        <div class="mk-chg"><span class="dot"></span>LIVE 67'</div>
+
+      <div style="margin-top:24px;flex:none">
+        <div style="font-size:11px;font-weight:600;letter-spacing:1.6px;color:var(--muted)">STAKE &amp; EARN · UP TO <span style="color:var(--accent)">18% APY</span></div>
+        <div style="display:flex;flex-direction:column;margin-top:8px">
+          <div class="trow">
+            <div class="tchip round"><svg viewBox="0 0 48 48" width="20" height="20" fill="none"><path d="M8 40 L24 10 L40 40 M14.5 29 L33.5 29" stroke="#2f6bf6" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+            <div style="flex:1;min-width:0"><div class="tt">Alpexa</div><div class="ts">ALPXS</div></div>
+            <div class="tapy">18.0%<small>APY</small></div>
+          </div>
+          <div class="trow">
+            <div class="tchip round"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M5.5 8 H18.5 M12 8 V18.5 M8.5 12.2 H15.5" stroke="#2f6bf6" stroke-width="1.8" stroke-linecap="round"></path></svg></div>
+            <div style="flex:1;min-width:0"><div class="tt">Tether</div><div class="ts">USDT</div></div>
+            <div class="tapy">9.8%<small>APY</small></div>
+          </div>
+          <div class="trow">
+            <div class="tchip round"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M9 5 L5 9 L9 13" stroke="#2f6bf6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path><path d="M5 9 H15 a5 5 0 0 1 0 10 H9" stroke="#2f6bf6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+            <div style="flex:1;min-width:0"><div class="tt">Sports cashback</div><div class="ts">On net losses, weekly</div></div>
+            <div class="tapy">3%<small>BACK</small></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bottom">
+        <div class="dots"><i></i><i></i><i class="on"></i></div>
+        <a class="btn btn-primary" style="margin-top:16px;display:flex;align-items:center;justify-content:center;gap:10px" href="signup.html"><span>Claim your bonus</span><span style="font-size:18px;line-height:1">→</span></a>
+        <div class="legal">Terms apply · APY variable · Capital at risk</div>
       </div>
     </div>
 
-    <div class="bottom">
-      <div class="dots"><i class="on"></i><i></i><i></i></div>
-      <div class="cta-row">
-        <a class="btn btn-tint" href="login.html?switch=1">Log in</a>
-        <a class="btn btn-primary" href="signup.html">Get Started</a>
-      </div>
-      <div class="legal">© Alpexa Suisse · Markets involve risk.</div>
-    </div>
   </div>
 </div>
 
@@ -160,6 +275,13 @@
     setTimeout(function(){ intro.classList.add('show'); }, 1100);
     setTimeout(function(){ sp.classList.add('hide'); }, 1250);
   }
+  // Swipe between the 3 intro pages; Continue buttons jump forward.
+  function goPage(i){
+    var pager=document.getElementById('intro');
+    var pages=pager.getElementsByClassName('page');
+    if(pages[i]) pager.scrollTo({ left: i*pager.clientWidth, behavior:'smooth' });
+  }
+  window.goPage=goPage;
 
   // ── chart drawing helpers ──
   function makeSeries(seed,start,vol,drift,n){   // only a fallback seed if the feed is unreachable
