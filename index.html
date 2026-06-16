@@ -97,7 +97,7 @@
     </div>
 
     <div class="live">
-      <div class="live-lbl"><span class="dot"></span><span>SPACEX</span></div>
+      <div class="live-lbl"><span class="dot"></span><span>SPACEX · SPCX</span></div>
       <div class="price-row">
         <span class="price" id="heroPrice">—</span>
         <span class="chg" id="heroChg">·</span>
@@ -191,16 +191,12 @@
   }
 
   // ── data ──
-  // Hero = SPACEX showcase. SpaceX is a private company with no public market
-  // price, so this hero chart is an illustrative demo (animated, not real).
+  // Hero = SPACEX (SPCX) — IPO'd 2026-06-12 on NASDAQ. Real price via a free
+  // source (Stooq, no key, ~15min delayed). If that feed is blocked, the hero
+  // falls back to an illustrative line so the page still looks right.
   var heroSeries=makeSeries(168,182,1.4,0.2,64);
-  var btcOpen=null, fxOpen=null;   // session-open references for the % change
+  var heroOpen=null, btcOpen=null, fxOpen=null;   // session refs for the % change
 
-  function step(series,vol,drift,lo,hi){
-    var last=series[series.length-1];
-    var next=last+(Math.random()+Math.random()-1)*vol+drift;
-    return series.slice(1).concat(Math.max(lo,Math.min(hi,next)));
-  }
   function fmtUSD2(n){ return '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
   function fmtUSD0(n){ return '$'+Math.round(Number(n)).toLocaleString('en-US'); }
   function setChg(id, cur, ref){
@@ -216,12 +212,29 @@
     c.innerHTML=areaSVG(heroSeries,w,h);
     var last=heroSeries[heroSeries.length-1];
     document.getElementById('heroPrice').textContent=fmtUSD2(last);
-    setChg('heroChg', last, heroSeries[0]);
+    setChg('heroChg', last, heroOpen!=null?heroOpen:heroSeries[0]);
   }
 
-  // The lower tiles show REAL prices. All network calls are wrapped so a blocked
-  // feed never breaks the page (that tile just keeps '·' / its last value).
+  // All network calls are wrapped so a blocked/failing feed never breaks the page.
   async function getJSON(url){ var r=await fetch(url,{cache:'no-store'}); if(!r.ok) throw 0; return r.json(); }
+  async function getText(url){ var r=await fetch(url,{cache:'no-store'}); if(!r.ok) throw 0; return r.text(); }
+  async function fetchSPCX(){   // {c:last, o:today-open} from Stooq quote CSV
+    try{
+      var t=await getText('https://stooq.com/q/l/?s=spcx.us&f=soc&e=csv');
+      var p=t.trim().split(/\r?\n/).pop().split(',');
+      var o=parseFloat(p[1]), c=parseFloat(p[2]);
+      if(isFinite(c)&&c>0) return { c:c, o:(isFinite(o)&&o>0)?o:null };
+    }catch(e){}
+    return null;
+  }
+  async function fetchSPCXHistory(){   // recent daily closes from Stooq
+    try{
+      var t=await getText('https://stooq.com/q/d/l/?s=spcx.us&i=d');
+      var rows=t.trim().split(/\r?\n/).slice(1);
+      var cl=rows.map(function(r){ return parseFloat(r.split(',')[4]); }).filter(function(x){ return isFinite(x)&&x>0; });
+      return cl.length ? cl : null;
+    }catch(e){ return null; }
+  }
   async function fetchBTC(){ try{ var j=await getJSON('https://api.coinbase.com/v2/prices/BTC-USD/spot'); return parseFloat(j.data.amount); }catch(e){ return null; } }
   async function fetchEURUSD(){
     try{ var j=await getJSON('https://api.frankfurter.app/latest?from=EUR&to=USD'); return j.rates.USD; }
@@ -229,10 +242,20 @@
   }
 
   async function boot(){
-    // Hero (SpaceX showcase) — animated demo
+    // Hero — real SPCX (price + today's % from the open). Seed the line with real
+    // daily history if we have enough points, else an illustrative line anchored
+    // to the real price; the tail then fills in with real refreshes.
+    var hist=await fetchSPCXHistory();
+    var q=await fetchSPCX();
+    if(hist && hist.length>=5){ heroSeries=hist; }
+    else if(q && q.c){ heroSeries=makeSeries(168, q.c, q.c*0.01, 0, 48); }
+    if(q && q.c){ heroSeries[heroSeries.length-1]=q.c; heroOpen=q.o; }
     drawHero();
     window.addEventListener('resize',drawHero);
-    setInterval(function(){ heroSeries=step(heroSeries,1.6,0.05,170,198); drawHero(); }, 1400);
+    setInterval(async function(){
+      var r=await fetchSPCX();
+      if(r && r.c){ heroSeries=heroSeries.slice(1).concat(r.c); if(r.o)heroOpen=r.o; drawHero(); }
+    }, 30000);
 
     // Real BTC/USD tile
     var btc=await fetchBTC();
@@ -241,7 +264,6 @@
     var fx=await fetchEURUSD();
     if(fx){ fxOpen=fx; document.getElementById('fxVal').textContent=fx.toFixed(4); setChg('fxChg',fx,fxOpen); }
 
-    // Live refresh — BTC every 6s, FX every 5 min (FX feed updates daily)
     setInterval(async function(){
       var p=await fetchBTC();
       if(p){ document.getElementById('btcVal').textContent=fmtUSD0(p); setChg('btcChg',p,btcOpen); }
