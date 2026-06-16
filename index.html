@@ -197,13 +197,18 @@
   var fxSeries=makeSeries(1337,1.0789,0.0006,0.00004,8);
   var btcSeries=makeSeries(5521,67120,80,20,8);
   function draw(){
-    document.getElementById('heroChart').innerHTML=areaSVG(heroSeries,338,140);
+    var c=document.getElementById('heroChart');
+    if(!c) return;
+    var w=Math.round(c.clientWidth)||338;     // draw to the container's real pixel width
+    var h=Math.round(w*0.42);
+    c.innerHTML=areaSVG(heroSeries,w,h);
     document.getElementById('heroPrice').textContent='$'+heroSeries[heroSeries.length-1].toFixed(2);
     document.getElementById('fxVal').textContent=fxSeries[fxSeries.length-1].toFixed(4);
     document.getElementById('btcVal').textContent=Math.round(btcSeries[btcSeries.length-1]).toLocaleString('en-US');
   }
   function startChart(){
     draw();
+    window.addEventListener('resize',draw);
     setInterval(function(){
       heroSeries=step(heroSeries,1.6,0.05,170,198);
       fxSeries=step(fxSeries,0.0005,0.000003,1.060,1.108);
