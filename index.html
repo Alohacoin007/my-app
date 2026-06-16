@@ -4,58 +4,213 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="theme-color" content="#ffffff">
 <title>Alpexa Suisse</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=3">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=3">
+<link rel="shortcut icon" href="favicon.ico?v=3">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap">
 <style>
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-  :root{--bg:#0A0F1C;--card:#121a2c;--line:#1e2a42;--blue:#2D6CDF;--blue2:#1d4ed8;--txt:#fff;--dim:#9aa7bd}
+  :root{
+    --accent:#2F6BF6; --accent-press:#2257E6; --accent-tint:#EEF3FE;
+    --ink:#0F1115; --muted:#8A9099; --muted-light:#A3A3A9;
+    --canvas:#F5F5F7; --surface:#FFFFFF; --hairline:#ECECF0;
+  }
   html,body{height:100%}
-  body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
-    display:flex;justify-content:center;min-height:100dvh}
-  .wrap{width:100%;max-width:440px;min-height:100dvh;display:flex;flex-direction:column;position:relative;overflow:hidden}
-  /* hero */
-  .hero{background:linear-gradient(180deg,var(--blue) 0%,var(--blue2) 38%,var(--bg) 100%);
-    padding:calc(env(safe-area-inset-top,18px) + 26px) 26px 70px;position:relative}
-  .brand{font-size:14px;font-weight:800;letter-spacing:2px;color:#fff;opacity:.95}
-  .h1{margin-top:62px;font-size:clamp(34px,9vw,42px);font-weight:800;line-height:1.08;letter-spacing:-1px}
-  .sub{margin-top:14px;font-size:14.5px;color:#dbe6fb;line-height:1.5}
-  /* body */
-  .body{flex:1;padding:0 22px 22px;display:flex;flex-direction:column;margin-top:-34px}
-  .grid{display:flex;gap:12px;margin-bottom:12px}
-  .card{flex:1;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 16px 18px}
-  .card.full{margin-bottom:0;display:flex;align-items:center;gap:14px}
-  .ct{font-size:15px;font-weight:700;margin-top:0}
-  .cs{font-size:11.5px;color:var(--dim);margin-top:3px}
-  .spacer{flex:1;min-height:24px}
-  .cta{display:block;width:100%;text-align:center;padding:16px 0;border-radius:999px;font-size:16px;font-weight:800;
-    background:#fff;color:var(--bg);text-decoration:none;border:none;cursor:pointer}
-  .login{display:block;text-align:center;margin-top:16px;margin-bottom:8px;font-size:14px;font-weight:600;color:var(--dim);text-decoration:none}
-  .login b{color:#cfe0ff}
-  .foot{text-align:center;font-size:10.5px;color:#46566f;margin-top:14px;line-height:1.5}
+  body{background:var(--canvas);color:var(--ink);
+    font-family:'SF Pro Display',system-ui,-apple-system,BlinkMacSystemFont,'Inter','Helvetica Neue',Arial,sans-serif;
+    letter-spacing:-0.374px;display:flex;justify-content:center;min-height:100dvh}
+  .screen{width:100%;max-width:440px;min-height:100dvh;background:var(--surface);
+    position:relative;overflow:hidden;display:flex;flex-direction:column}
+
+  /* ── Splash ── */
+  #splash{position:absolute;inset:0;z-index:30;background:var(--surface);
+    display:flex;align-items:center;justify-content:center;
+    transition:opacity .55s ease;}
+  #splash.hide{opacity:0;pointer-events:none}
+  #splash .mark{font-size:40px;font-weight:600;letter-spacing:-1.4px;color:var(--accent)}
+
+  /* ── Intro ── */
+  #intro{flex:1;display:flex;flex-direction:column;
+    padding:calc(env(safe-area-inset-top,14px) + 16px) 26px calc(env(safe-area-inset-bottom,16px) + 26px);
+    opacity:0;transition:opacity .6s ease}
+  #intro.show{opacity:1}
+
+  .brand{font-size:17px;font-weight:600;letter-spacing:-0.4px;color:var(--accent);flex:none}
+
+  .hero{margin-top:34px;flex:none}
+  .hero span{display:block;font-size:clamp(34px,9.5vw,40px);font-weight:600;line-height:1.05;letter-spacing:-1.5px}
+  .hero .dim{color:var(--muted-light)}
+
+  .live{margin-top:28px;flex:none}
+  .live-lbl{display:flex;align-items:center;gap:8px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:livepulse 1.6s ease-in-out infinite}
+  @keyframes livepulse{0%,100%{box-shadow:0 0 0 0 rgba(47,107,246,.5)}50%{box-shadow:0 0 0 5px rgba(47,107,246,0)}}
+  .live-lbl span{font-size:12px;font-weight:600;letter-spacing:1.4px;color:var(--muted)}
+  .price-row{display:flex;align-items:baseline;gap:10px;margin-top:8px}
+  .price{font-size:38px;font-weight:600;letter-spacing:-1.4px;font-variant-numeric:tabular-nums}
+  .chg{font-size:14px;font-weight:600;color:var(--accent)}
+  .chart{margin-top:14px}
+  .chart svg{display:block;width:100%;height:auto;overflow:visible}
+
+  .markets{display:flex;margin-top:26px;flex:none}
+  .mk{flex:1}
+  .mk+.mk{padding-left:16px;border-left:1px solid var(--hairline)}
+  .mk{padding-right:16px}
+  .markets .mk:last-child{padding-right:0}
+  .mk-cat{font-size:10px;font-weight:600;letter-spacing:1.2px;color:var(--accent)}
+  .mk-pair{font-size:12px;color:var(--muted);margin-top:4px;white-space:nowrap}
+  .mk-val{font-size:19px;font-weight:600;margin-top:7px;font-variant-numeric:tabular-nums}
+  .mk-chg{font-size:12px;font-weight:600;color:var(--accent);margin-top:4px;display:flex;align-items:center;gap:5px}
+  .mk-chg .dot{width:5px;height:5px}
+
+  .bottom{margin-top:auto;padding-top:24px;flex:none}
+  .dots{display:flex;align-items:center;justify-content:center;gap:7px}
+  .dots i{display:block;width:6px;height:6px;border-radius:50%;background:rgba(0,0,0,.18)}
+  .dots i.on{width:20px;border-radius:9999px;background:var(--accent)}
+  .cta-row{display:flex;gap:12px;margin-top:18px}
+  .btn{flex:1;text-align:center;padding:16px 0;border-radius:9999px;font-size:17px;font-weight:600;
+    text-decoration:none;cursor:pointer;transition:transform .14s ease,background .2s ease}
+  .btn:active{transform:scale(.96)}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-primary:active{background:var(--accent-press)}
+  .btn-tint{background:var(--accent-tint);color:var(--accent)}
+  .legal{text-align:center;font-size:10px;color:var(--muted-light);margin-top:16px;line-height:1.5}
 </style>
 </head>
 <body>
-<div class="wrap" id="wrap" style="visibility:hidden">
-  <div class="hero">
-    <div class="brand">ALPEXA SUISSE</div>
-    <div class="h1">Trade it<br>all. One app.</div>
-    <div class="sub">FX · Crypto · Sports — real-time markets, bank-grade security.</div>
-  </div>
-  <div class="body">
-    <div class="spacer"></div>
-    <a class="cta" href="signup.html">Get Started &nbsp;→</a>
-    <a class="login" href="login.html?switch=1">Already have an account? <b>Log in</b></a>
-    <div class="foot">© Alpexa Suisse · Markets involve risk.</div>
+<div class="screen" id="screen" style="visibility:hidden">
+
+  <!-- Splash -->
+  <div id="splash"><div class="mark">Alpexa Suisse</div></div>
+
+  <!-- Intro -->
+  <div id="intro">
+    <div class="brand">Alpexa Suisse</div>
+
+    <div class="hero">
+      <span>Every market.</span>
+      <span class="dim">One Swiss app.</span>
+    </div>
+
+    <div class="live">
+      <div class="live-lbl"><span class="dot"></span><span>SpaceX · NASDAQ</span></div>
+      <div class="price-row">
+        <span class="price" id="heroPrice">$182.40</span>
+        <span class="chg">▲ 2.40%</span>
+      </div>
+      <div class="chart" id="heroChart"></div>
+    </div>
+
+    <div class="markets">
+      <div class="mk">
+        <div class="mk-cat">FX</div>
+        <div class="mk-pair">EUR / USD</div>
+        <div class="mk-val" id="fxVal">1.0789</div>
+        <div class="mk-chg">▲ 0.08%</div>
+      </div>
+      <div class="mk">
+        <div class="mk-cat">CRYPTO</div>
+        <div class="mk-pair">BTC / USD</div>
+        <div class="mk-val" id="btcVal">67,120</div>
+        <div class="mk-chg">▲ 0.91%</div>
+      </div>
+      <div class="mk">
+        <div class="mk-cat">SPORTS</div>
+        <div class="mk-pair">Madrid–Arsenal</div>
+        <div class="mk-val">1 – 0</div>
+        <div class="mk-chg"><span class="dot"></span>LIVE 67'</div>
+      </div>
+    </div>
+
+    <div class="bottom">
+      <div class="dots"><i class="on"></i><i></i><i></i></div>
+      <div class="cta-row">
+        <a class="btn btn-tint" href="login.html?switch=1">Log in</a>
+        <a class="btn btn-primary" href="signup.html">Get Started</a>
+      </div>
+      <div class="legal">© Alpexa Suisse · Markets involve risk.</div>
+    </div>
   </div>
 </div>
+
 <script>
   // Returning, signed-in users skip the intro and go straight to their app
   // (login.html auto-passes a valid session). Add ?intro=1 to force the landing.
-  try{
-    var force=/[?&]intro=1/.test(location.search);
-    var me=JSON.parse(localStorage.getItem('alpexa.me')||'null');
-    if(!force && me && me.authId){ location.replace('login.html'); }
-    else { document.getElementById('wrap').style.visibility='visible'; }
-  }catch(e){ document.getElementById('wrap').style.visibility='visible'; }
+  (function(){
+    try{
+      var force=/[?&]intro=1/.test(location.search);
+      var me=JSON.parse(localStorage.getItem('alpexa.me')||'null');
+      if(!force && me && me.authId){ location.replace('login.html'); return; }
+    }catch(e){}
+    document.getElementById('screen').style.visibility='visible';
+    runSplash();
+    startChart();
+  })();
+
+  function runSplash(){
+    var sp=document.getElementById('splash'), intro=document.getElementById('intro');
+    setTimeout(function(){ intro.classList.add('show'); }, 1100);
+    setTimeout(function(){ sp.classList.add('hide'); }, 1250);
+  }
+
+  // ── live hero chart (seeded random-walk, ticks every 1.4s) ──
+  function makeSeries(seed,start,vol,drift,n){
+    var a=seed>>>0;
+    function rng(){ a=(a+0x6D2B79F5)|0; var t=Math.imul(a^(a>>>15),1|a);
+      t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; }
+    var arr=[],v=start;
+    for(var i=0;i<n;i++){ v+=(rng()+rng()-1)*vol+drift; arr.push(v); }
+    return arr;
+  }
+  function step(series,vol,drift,lo,hi){
+    var last=series[series.length-1];
+    var next=last+(Math.random()+Math.random()-1)*vol+drift;
+    return series.slice(1).concat(Math.max(lo,Math.min(hi,next)));
+  }
+  function coords(arr,w,h,pad){
+    var mn=Math.min.apply(null,arr),mx=Math.max.apply(null,arr),r=(mx-mn)||1;
+    return arr.map(function(v,i){ return [
+      +(pad+i/(arr.length-1)*(w-2*pad)).toFixed(1),
+      +(pad+3+(1-(v-mn)/r)*(h-2*pad-6)).toFixed(1) ]; });
+  }
+  function areaSVG(arr,w,h){
+    var pad=8, pts=coords(arr,w,h,pad);
+    var line=pts.map(function(p){return p.join(',');}).join(' ');
+    var last=pts[pts.length-1];
+    var d='M '+pts[0][0]+' '+pts[0][1]+' '+pts.slice(1).map(function(p){return 'L '+p[0]+' '+p[1];}).join(' ')+
+          ' L '+last[0]+' '+h+' L '+pts[0][0]+' '+h+' Z';
+    return '<svg viewBox="0 0 '+w+' '+h+'">'+
+      '<defs><linearGradient id="hg" x1="0" y1="0" x2="0" y2="1">'+
+      '<stop offset="0%" stop-color="#2f6bf6" stop-opacity="0.20"/>'+
+      '<stop offset="100%" stop-color="#2f6bf6" stop-opacity="0"/></linearGradient></defs>'+
+      '<path d="'+d+'" fill="url(#hg)"/>'+
+      '<polyline points="'+line+'" fill="none" stroke="rgba(47,107,246,0.22)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>'+
+      '<polyline points="'+line+'" fill="none" stroke="#2f6bf6" stroke-width="2" stroke-linejoin="round"/>'+
+      '<circle cx="'+last[0]+'" cy="'+last[1]+'" r="11" fill="rgba(47,107,246,0.18)"/>'+
+      '<circle cx="'+last[0]+'" cy="'+last[1]+'" r="5" fill="#2f6bf6" stroke="#fff" stroke-width="1.6"/></svg>';
+  }
+  var heroSeries=makeSeries(168,182,1.4,0.2,64);
+  var fxSeries=makeSeries(1337,1.0789,0.0006,0.00004,8);
+  var btcSeries=makeSeries(5521,67120,80,20,8);
+  function draw(){
+    document.getElementById('heroChart').innerHTML=areaSVG(heroSeries,338,140);
+    document.getElementById('heroPrice').textContent='$'+heroSeries[heroSeries.length-1].toFixed(2);
+    document.getElementById('fxVal').textContent=fxSeries[fxSeries.length-1].toFixed(4);
+    document.getElementById('btcVal').textContent=Math.round(btcSeries[btcSeries.length-1]).toLocaleString('en-US');
+  }
+  function startChart(){
+    draw();
+    setInterval(function(){
+      heroSeries=step(heroSeries,1.6,0.05,170,198);
+      fxSeries=step(fxSeries,0.0005,0.000003,1.060,1.108);
+      btcSeries=step(btcSeries,95,2,66700,68150);
+      draw();
+    },1400);
+  }
 </script>
 </body>
 </html>
