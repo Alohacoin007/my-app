@@ -53,10 +53,10 @@
   .price-row{display:flex;align-items:baseline;gap:10px;margin-top:8px}
   .price{font-size:38px;font-weight:600;letter-spacing:-1.4px;font-variant-numeric:tabular-nums}
   .chg{font-size:14px;font-weight:600;color:var(--accent)}
-  .chart{margin-top:14px;min-height:130px}
+  .chart{margin-top:30px;min-height:130px}
   .chart svg{display:block;width:100%;height:auto;overflow:visible}
 
-  .markets{display:flex;margin-top:26px;flex:none}
+  .markets{display:flex;margin-top:44px;flex:none}
   .mk{flex:1}
   .mk+.mk{padding-left:16px;border-left:1px solid var(--hairline)}
   .mk{padding-right:16px}
@@ -97,7 +97,7 @@
     </div>
 
     <div class="live">
-      <div class="live-lbl"><span class="dot"></span><span>BITCOIN · BTC / USD</span></div>
+      <div class="live-lbl"><span class="dot"></span><span>SPACEX</span></div>
       <div class="price-row">
         <span class="price" id="heroPrice">—</span>
         <span class="chg" id="heroChg">·</span>
@@ -114,9 +114,9 @@
       </div>
       <div class="mk">
         <div class="mk-cat">CRYPTO</div>
-        <div class="mk-pair">ETH / USD</div>
-        <div class="mk-val" id="ethVal">—</div>
-        <div class="mk-chg" id="ethChg">·</div>
+        <div class="mk-pair">BTC / USD</div>
+        <div class="mk-val" id="btcVal">—</div>
+        <div class="mk-chg" id="btcChg">·</div>
       </div>
       <div class="mk">
         <div class="mk-cat">SPORTS</div>
@@ -190,11 +190,19 @@
       '<circle cx="'+last[0]+'" cy="'+last[1]+'" r="5" fill="#2f6bf6" stroke="#fff" stroke-width="1.6"/></svg>';
   }
 
-  // ── live data (real market prices, fetched in the browser) ──
-  var heroSeries=[];          // real BTC/USD closes
-  var ethOpen=null, fxOpen=null;
+  // ── data ──
+  // Hero = SPACEX showcase. SpaceX is a private company with no public market
+  // price, so this hero chart is an illustrative demo (animated, not real).
+  var heroSeries=makeSeries(168,182,1.4,0.2,64);
+  var btcOpen=null, fxOpen=null;   // session-open references for the % change
 
-  function fmtUSD(n){ return '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function step(series,vol,drift,lo,hi){
+    var last=series[series.length-1];
+    var next=last+(Math.random()+Math.random()-1)*vol+drift;
+    return series.slice(1).concat(Math.max(lo,Math.min(hi,next)));
+  }
+  function fmtUSD2(n){ return '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function fmtUSD0(n){ return '$'+Math.round(Number(n)).toLocaleString('en-US'); }
   function setChg(id, cur, ref){
     var el=document.getElementById(id); if(!el) return;
     if(ref==null || cur==null || !isFinite(cur)){ el.textContent='·'; el.style.color=''; return; }
@@ -207,46 +215,36 @@
     var w=Math.round(c.clientWidth)||338, h=Math.round(w*0.42);
     c.innerHTML=areaSVG(heroSeries,w,h);
     var last=heroSeries[heroSeries.length-1];
-    document.getElementById('heroPrice').textContent=fmtUSD(last);
+    document.getElementById('heroPrice').textContent=fmtUSD2(last);
     setChg('heroChg', last, heroSeries[0]);
   }
 
-  // All network calls are wrapped so a failing/blocked feed never breaks the page.
+  // The lower tiles show REAL prices. All network calls are wrapped so a blocked
+  // feed never breaks the page (that tile just keeps '·' / its last value).
   async function getJSON(url){ var r=await fetch(url,{cache:'no-store'}); if(!r.ok) throw 0; return r.json(); }
   async function fetchBTC(){ try{ var j=await getJSON('https://api.coinbase.com/v2/prices/BTC-USD/spot'); return parseFloat(j.data.amount); }catch(e){ return null; } }
-  async function fetchETH(){ try{ var j=await getJSON('https://api.coinbase.com/v2/prices/ETH-USD/spot'); return parseFloat(j.data.amount); }catch(e){ return null; } }
   async function fetchEURUSD(){
     try{ var j=await getJSON('https://api.frankfurter.app/latest?from=EUR&to=USD'); return j.rates.USD; }
     catch(e){ try{ var k=await getJSON('https://open.er-api.com/v6/latest/EUR'); return k.rates.USD; }catch(e2){ return null; } }
   }
-  async function fetchBTCHistory(){   // real intraday closes to seed the chart line
-    try{ var a=await getJSON('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=64');
-      return a.map(function(k){ return parseFloat(k[4]); }); }catch(e){ return null; }
-  }
 
   async function boot(){
-    // 1) Hero chart: seed with real BTC history (fallback: gentle line anchored to the live spot)
-    var hist=await fetchBTCHistory();
-    var spot=await fetchBTC();
-    if(hist && hist.length>=8){ heroSeries=hist; }
-    else if(spot){ heroSeries=makeSeries(168,spot,spot*0.004,0,48); }
-    else { heroSeries=makeSeries(168,182,1.4,0.2,48); }   // last-resort so the chart isn't empty
-    if(spot){ heroSeries[heroSeries.length-1]=spot; }
+    // Hero (SpaceX showcase) — animated demo
     drawHero();
     window.addEventListener('resize',drawHero);
+    setInterval(function(){ heroSeries=step(heroSeries,1.6,0.05,170,198); drawHero(); }, 1400);
 
-    // 2) Market tiles
-    var eth=await fetchETH();
-    if(eth){ ethOpen=eth; document.getElementById('ethVal').textContent=fmtUSD(eth); setChg('ethChg',eth,ethOpen); }
+    // Real BTC/USD tile
+    var btc=await fetchBTC();
+    if(btc){ btcOpen=btc; document.getElementById('btcVal').textContent=fmtUSD0(btc); setChg('btcChg',btc,btcOpen); }
+    // Real EUR/USD tile
     var fx=await fetchEURUSD();
     if(fx){ fxOpen=fx; document.getElementById('fxVal').textContent=fx.toFixed(4); setChg('fxChg',fx,fxOpen); }
 
-    // 3) Live refresh — crypto every 6s, FX every 5 min (FX feed is daily)
+    // Live refresh — BTC every 6s, FX every 5 min (FX feed updates daily)
     setInterval(async function(){
       var p=await fetchBTC();
-      if(p){ heroSeries=heroSeries.slice(1).concat(p); drawHero(); }
-      var e=await fetchETH();
-      if(e){ document.getElementById('ethVal').textContent=fmtUSD(e); setChg('ethChg',e,ethOpen); }
+      if(p){ document.getElementById('btcVal').textContent=fmtUSD0(p); setChg('btcChg',p,btcOpen); }
     }, 6000);
     setInterval(async function(){
       var f=await fetchEURUSD();
