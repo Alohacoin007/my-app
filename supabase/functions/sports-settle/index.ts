@@ -75,6 +75,38 @@ async function fetchLeagueResults(L: { lg: string; path: string }, out: Record<s
   }
 }
 
+// 🥊 UFC/MMA — a fight card (event) holds many bouts (ev.competitions[]). The
+// winner gets score 1, loser 0, so the shared gradeLeg moneyline (my>op) works.
+// gid = "UFC_" + bout id, mirroring the app's mapUFC so legs line up.
+async function fetchUFCResults(out: Record<string, Result>) {
+  const direct = `https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard`;
+  const tries = [direct, "https://corsproxy.io/?url=" + encodeURIComponent(direct)];
+  for (const u of tries) {
+    try {
+      const res = await fetch(u, { cache: "no-store" });
+      if (!res.ok) continue;
+      const d = await res.json();
+      for (const ev of (d.events || [])) {
+        for (const comp of (ev.competitions || [])) {
+          try {
+            const st = (comp.status && comp.status.type) ? comp.status.type : {};
+            if (st.state !== "post") continue; // only finished bouts
+            const cs = comp.competitors || []; if (cs.length < 2) continue;
+            let A = cs.find((c: any) => c.homeAway === "home") || cs[0];
+            let B = cs.find((c: any) => c.homeAway === "away") || cs[1];
+            if (A === B) { A = cs[0]; B = cs[1]; }
+            const nameOf = (c: any) => { const a = c.athlete || c.team || {}; return a.shortName || a.displayName || a.name || ""; };
+            const aw = A.winner === true, bw = B.winner === true;
+            if (!aw && !bw) continue; // no winner recorded (e.g., no contest) → leave ungraded
+            out["UFC_" + comp.id] = { hs: aw ? 1 : 0, as: bw ? 1 : 0, homeNm: nameOf(A), awayNm: nameOf(B), homeAb: "", awayAb: "" };
+          } catch (_e) { /* skip bout */ }
+        }
+      }
+      return;
+    } catch (_e) { /* try next mirror */ }
+  }
+}
+
 function teamSide(team: string, r: Result): "home" | "away" | null {
   const t = (team || "").toLowerCase().trim(); if (!t) return null;
   if (r.homeNm && r.homeNm.toLowerCase() === t) return "home";
@@ -126,9 +158,9 @@ Deno.serve(async (req) => {
   if (!SB_URL || !SB_KEY) return json({ ok: false, error: "Supabase env missing" }, 500);
   const H = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json" };
 
-  // 1) Final scores from ESPN.
+  // 1) Final scores from ESPN (team leagues + UFC bouts).
   const results: Record<string, Result> = {};
-  await Promise.all(LEAGUES.map((L) => fetchLeagueResults(L, results)));
+  await Promise.all([...LEAGUES.map((L) => fetchLeagueResults(L, results)), fetchUFCResults(results)]);
   // Debug: ?debug=1 returns the final-game results map (gid -> score) so we can
   // craft a controlled test bet on a real finished game.
   if (url.searchParams.get("debug")) return json({ ok: true, results });

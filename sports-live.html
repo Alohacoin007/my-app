@@ -654,6 +654,7 @@
         <div class="sport" data-sport="MLB">⚾ MLB</div>
         <div class="sport" data-sport="NHL">🏒 NHL</div>
         <div class="sport" data-sport="SOC">⚽ Soccer</div>
+        <div class="sport" data-sport="UFC">🥊 UFC</div>
       </div>
       <div class="colhead-wrap"><div class="colhead"><span data-i18n="col_today">Today</span><span data-i18n="col_spread">Spread</span><span data-i18n="col_total">Total</span><span data-i18n="col_ml">Moneyline</span></div></div>
       <div class="list" id="list"></div>
@@ -1585,7 +1586,7 @@
       }
       const isPinned=pinnedGames.has(g.id);
       const pinBtn=`<button class="pin-btn${isPinned?' pinned':''}" data-pin="${g.id}" title="${isPinned?'Unpin':'Pin to top'}">★</button>`;
-      return `<div class="card${isPinned?' pinned':''}"><div class="ch"><span class="lg">${({NBA:'🏀',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽'})[g.lg]||'🏈'} ${g.lg==='SOC'?'Soccer':g.lg}</span>
+      return `<div class="card${isPinned?' pinned':''}"><div class="ch"><span class="lg">${({NBA:'🏀',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽',UFC:'🥊'})[g.lg]||'🏈'} ${g.lg==='SOC'?'Soccer':g.lg}</span>
         <div class="ch-r"><span class="st${g.live?' live':''}">${g.live?'LIVE '+g.time:gameTimeLabel(g)}</span>${pinBtn}</div></div>
         <div class="matrix">${row(g.away,1)}${row(g.home,0)}</div>
         ${playHTML}
@@ -2818,6 +2819,9 @@
       { lg:'SOC', path:'soccer/eng.1' },
       { lg:'SOC', path:'soccer/uefa.champions' },
       { lg:'SOC', path:'soccer/usa.1' },
+      // 🥊 UFC/MMA — parsed by mapUFC (fight cards → individual bouts, fighters
+      // not teams, winner not score). Handled specially in fetchLeague below.
+      { lg:'UFC', path:'mma/ufc' },
     ];
     function mkCore(home, away, ev, lg){
       const isSoc = lg==='SOC';
@@ -2872,6 +2876,36 @@
         return { id:lg+'_'+ev.id, lg, state:state, live: state==='in', real: true, kickoff:(state==='pre'?kickoff:''), time, home, away, core: mkCore(home, away, ev, lg), props: [] };
       }catch(e){ return null; }
     }
+    // ── UFC/MMA mapper ── An ESPN MMA "event" is a fight card; ev.competitions[]
+    // are the individual bouts. Fighters (athletes), not teams; the winner gets
+    // score 1, loser 0 so the existing moneyline grading (my>op) works unchanged.
+    // Spread/Total don't apply → empty arrays render as blank cells.
+    function mapUFC(ev){
+      const out=[]; const comps=ev.competitions||[];
+      comps.forEach(function(comp){ try{
+        const cs=comp.competitors||[]; if(cs.length<2) return;
+        let A=cs.find(c=>c.homeAway==='home')||cs[0];
+        let B=cs.find(c=>c.homeAway==='away')||cs[1];
+        if(A===B){ A=cs[0]; B=cs[1]; }
+        const nameOf=(c)=>{ const a=c.athlete||c.team||{}; return a.shortName||a.displayName||a.name||'Fighter'; };
+        const abOf=(c)=>{ const a=c.athlete||c.team||{}; const s=String(a.lastName||a.shortName||a.displayName||'').split(/\s+/).pop().toUpperCase().slice(0,4); return s||'FTR'; };
+        const home={ ab:abOf(A), nm:nameOf(A) };
+        const away={ ab:abOf(B), nm:nameOf(B) };
+        const st=(comp.status&&comp.status.type)?comp.status.type:((ev.status&&ev.status.type)||{});
+        const state=st.state;
+        if(state==='in'||state==='post'){ const aw=A.winner===true, bw=B.winner===true; if(aw||bw){ home.sc=aw?1:0; away.sc=bw?1:0; } }
+        let mlH=null, mlA=null;
+        try{ const od=(comp.odds&&comp.odds[0])||null; if(od){
+          if(od.homeTeamOdds&&typeof od.homeTeamOdds.moneyLine==='number') mlH=od.homeTeamOdds.moneyLine;
+          if(od.awayTeamOdds&&typeof od.awayTeamOdds.moneyLine==='number') mlA=od.awayTeamOdds.moneyLine; } }catch(e){}
+        const ml=[{ln:'',am:(mlH!=null?mlH:-110),sel:home.nm+' ML'},{ln:'',am:(mlA!=null?mlA:-110),sel:away.nm+' ML'}];
+        const kickoff=comp.date||ev.date||'';
+        let time=(st.shortDetail||st.description||'').trim()||'TBD';
+        if(state==='pre'&&kickoff){ const f=fmtKick(kickoff); if(f) time=f; }
+        out.push({ id:'UFC_'+comp.id, lg:'UFC', state:state, live:state==='in', real:true, kickoff:(state==='pre'?kickoff:''), time, home, away, core:{spread:[],total:[],ml:ml}, props:[] });
+      }catch(e){} });
+      return out;
+    }
     async function fetchJson(url){
       const res = await fetch(url, { cache:'no-store' });
       if (!res.ok) throw new Error('HTTP '+res.status);
@@ -2886,7 +2920,10 @@
       ];
       let lastE;
       for (const u of tries){
-        try { const d = await fetchJson(u); const mapped=(d.events||[]).map(ev=>mapEvent(ev, L.lg)).filter(Boolean);
+        try { const d = await fetchJson(u);
+          let mapped;
+          if(L.lg==='UFC'){ mapped=[]; (d.events||[]).forEach(ev=>{ mapUFC(ev).forEach(g=>mapped.push(g)); }); }
+          else { mapped=(d.events||[]).map(ev=>mapEvent(ev, L.lg)).filter(Boolean); }
           mapped.forEach(g=>{ if(g.state==='post' && typeof g.home.sc==='number' && typeof g.away.sc==='number'){ RESULTS[g.id]={completed:true,homeNm:g.home.nm,awayNm:g.away.nm,homeAb:g.home.ab,awayAb:g.away.ab,hs:g.home.sc,as:g.away.sc}; } });
           return mapped.filter(g=>g.state!=='post'); }
         catch (e) { lastE = e; }
