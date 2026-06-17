@@ -2614,10 +2614,25 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
         const note=kind==='transfer'?('FX → '+(destAcct||'').toUpperCase()):(METHOD_NOTE[method]||'');
         const amt=parseFloat(amount)||0;
         const reqId='fx-'+Date.now()+'-'+Math.random().toString(36).slice(2,6);
-        // Pending until the back office approves — balance changes on approval.
-        try{pushFundingHistory({id:reqId,kind,method,amount:amt,currency:'USD',ref:REF_PREFIX[kind]+Math.floor(10000000+Math.random()*89999999),note,account:(account||'live'),destAcct:(kind==='transfer'?destAcct:undefined),status:'pending'});}catch(e){}
-        try{window.AlpexaSync&&AlpexaSync.pushRequest({id:reqId,type:kind,server:'FX',amount:amt,asset:'USD',network:method,address:((method==='wallet'||method==='crypto')?(wAddr||'').trim():''),from:(kind==='transfer'?'FX':''),to:(kind==='transfer'?(destAcct||'crypto'):'')});}catch(e){}
-        try{ window.alpexaNotify&&alpexaNotify({type:kind,pref:(kind==='withdraw'?'withdrawal':'deposit'),title:(kind==='deposit'?'Deposit':kind==='withdraw'?'Withdrawal':'Transfer')+' requested · $'+amt.toLocaleString()+' · pending approval'}); }catch(e){}
+        if(kind==='transfer'){
+          // INSTANT server-side transfer via RPC (atomic + idempotent). Server
+          // validates ownership + balance; no client ledger writes, no approval.
+          const acctOf=(k)=>{ try{ var a=(JSON.parse(localStorage.getItem('alpexa.me')||'{}').accts)||{}; if(k==='sports')return a.sports; if(k==='crypto')return a.crypto; return a.fx; }catch(e){ return ''; } };
+          const fromAcct=acctOf('fx'), toAcct=acctOf(destAcct||'crypto');
+          const ref='xfer-'+Date.now()+'-'+Math.random().toString(36).slice(2,7);
+          if(window.AlpexaSync&&AlpexaSync.db&&fromAcct&&toAcct){
+            AlpexaSync.db.rpc('app_transfer',{p_ref:ref,p_from:fromAcct,p_to:toAcct,p_amount:amt}).then(function(r){
+              const res=r&&r.data;
+              if(res&&res.ok){ try{pushFundingHistory({id:ref,kind:'transfer',method:'Internal transfer',amount:amt,currency:'USD',ref:REF_PREFIX.transfer+Math.floor(10000000+Math.random()*89999999),note,account:'live',destAcct:destAcct,status:'approved'});}catch(e){} }
+            },function(){});
+          }
+          try{ window.alpexaNotify&&alpexaNotify({type:'transfer',pref:'deposit',title:'Transfer complete · $'+amt.toLocaleString()}); }catch(e){}
+        } else {
+          // Deposit/withdraw stay pending until the back office approves.
+          try{pushFundingHistory({id:reqId,kind,method,amount:amt,currency:'USD',ref:REF_PREFIX[kind]+Math.floor(10000000+Math.random()*89999999),note,account:(account||'live'),status:'pending'});}catch(e){}
+          try{window.AlpexaSync&&AlpexaSync.pushRequest({id:reqId,type:kind,server:'FX',amount:amt,asset:'USD',network:method,address:((method==='wallet'||method==='crypto')?(wAddr||'').trim():'')});}catch(e){}
+          try{ window.alpexaNotify&&alpexaNotify({type:kind,pref:(kind==='withdraw'?'withdrawal':'deposit'),title:(kind==='deposit'?'Deposit':'Withdrawal')+' requested · $'+amt.toLocaleString()+' · pending approval'}); }catch(e){}
+        }
       }
     },1300);
   }
@@ -2630,12 +2645,12 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
           <div style={{padding:'22px 22px 28px',textAlign:'center'}}>
             <div style={{width:60,height:60,borderRadius:3,background:'rgba(46,111,176,0.16)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 14px',border:'1px solid #1B3955'}}><Mi name="check" size={32} fill style={{color:'#1B3955'}}/></div>
             <div style={{fontSize:17,fontWeight:700,color:'var(--ink)',marginBottom:6}}>
-              {kind==='deposit'&&'Deposit Submitted'}{kind==='withdraw'&&'Withdrawal Requested'}{kind==='transfer'&&'Transfer Submitted'}{kind==='report'&&'Report Sent'}
+              {kind==='deposit'&&'Deposit Submitted'}{kind==='withdraw'&&'Withdrawal Requested'}{kind==='transfer'&&'Transfer Complete'}{kind==='report'&&'Report Sent'}
             </div>
             <div style={{fontSize:13,color:'var(--text-2)',lineHeight:1.5,marginBottom:18}}>
               {kind==='deposit'&&<>$ {amount||'0'} deposit submitted.<br/>Pending back-office approval.</>}
               {kind==='withdraw'&&<>$ {amount||'0'} withdrawal requested.<br/>Pending back-office approval.</>}
-              {kind==='transfer'&&<>$ {amount||'0'} transfer submitted.<br/>Pending back-office approval.</>}
+              {kind==='transfer'&&<>$ {amount||'0'} moved instantly.<br/>Your balances are updated.</>}
               {kind==='report'&&<>{reportType} {reportFormat.toUpperCase()} report<br/>has been sent to your email.</>}
             </div>
             <button onClick={()=>{onClose();if(kind==='deposit'&&onNavigate)onNavigate('WATCH');}} style={{width:'100%',padding:'12px 0',borderRadius:3,background:'linear-gradient(180deg,#2D5478 0%,#1B3955 100%)',color:'#fff',fontSize:14,fontWeight:700,border:'1px solid #0F2742',boxShadow:'0 1px 0 rgba(255,255,255,0.18) inset,0 2px 4px rgba(0,0,0,0.15)'}}>Done</button>

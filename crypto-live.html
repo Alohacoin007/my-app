@@ -13051,13 +13051,21 @@ function App() {
   const newTxId = () => 't-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
   const serverName = (s) => s === 'crypto' ? 'Crypto' : s === 'fx' ? 'FX' : s === 'sports' ? 'Sports' : (s || '');
   const onTransferConfirmed = (fromId, toId, usd) => {
-    // Approval-gated: do NOT move balances yet. Create a pending request the
-    // back office must approve; balances are applied when approval arrives.
-    const id = newTxId();
-    pushTx({ id, type: 'transfer', sym: 'USDT', usd, from: fromId, to: toId });
-    try { window.AlpexaSync && AlpexaSync.pushRequest({
-      id, type: 'transfer', server: 'Crypto', amount: usd,
-      from: serverName(fromId), to: serverName(toId), fromKey: fromId, toKey: toId, asset: 'USDT' }); } catch (e) {}
+    // INSTANT server-side transfer via RPC (atomic + idempotent). No local balance
+    // math, no pending-approval, no per-device dedup. Server validates ownership +
+    // balance and moves the money in one transaction; the same ref can't double-apply.
+    const acctOf = (k) => { try { var a = (JSON.parse(localStorage.getItem('alpexa.me') || '{}').accts) || {}; if (k === 'sports') return a.sports; if (k === 'crypto') return a.crypto; return a.fx; } catch (e) { return ''; } };
+    const fromAcct = acctOf(fromId), toAcct = acctOf(toId);
+    if (!(window.AlpexaSync && AlpexaSync.db) || !fromAcct || !toAcct) return;
+    const ref = 'xfer-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+    AlpexaSync.db.rpc('app_transfer', { p_ref: ref, p_from: fromAcct, p_to: toAcct, p_amount: usd }).then(function (r) {
+      const res = r && r.data;
+      if (res && res.ok) {
+        // Server moved it — re-adopt holdings/balances from the server right away.
+        try { window.__cbLocalTs = 0; if (adoptHoldingsRef.current) adoptHoldingsRef.current(); } catch (e) {}
+        try { forceCryptoAdopt(); } catch (e) {}
+      }
+    }, function () {});
   };
 
   const onFundsConfirmed = (destId, netUsd, methodId) => {
