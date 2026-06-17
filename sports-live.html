@@ -2059,6 +2059,41 @@
       .on('postgres_changes',{event:'*',schema:'public',table:'positions',filter:'acct_no=eq.'+acct},function(){ if(!document.hidden) pullServerBets(); })
       .subscribe();
   }catch(e){} }, 2000);
+  // ── SERVER-AUTHORITATIVE financial activity (deposit / withdraw / transfer).
+  // Read straight from the `requests` table so the feed is identical on every
+  // device and matches the server balance — NO per-device localStorage. (Bets
+  // come from openBets, also server-synced; see renderTxns.)
+  let serverFinTxns=[];
+  function pullServerActivity(){
+    if(!(window.AlpexaSync&&AlpexaSync.db)) return; const cust=meCust(); if(!cust) return;
+    AlpexaSync.db.from('requests')
+      .select('local_id,created_at,type,status,amount,from_label,to_label,server')
+      .eq('cust_id',cust).order('created_at',{ascending:false}).limit(100)
+      .then(function(r){
+        const rows=(r&&r.data)||[]; const out=[];
+        rows.forEach(function(x){
+          const type=(x.type||'').toLowerCase(), st=(x.status||'pending').toLowerCase();
+          if(st==='voided') return;
+          const amt=+x.amount||0;
+          const from=(x.from_label||'').toLowerCase(), to=(x.to_label||'').toLowerCase(), srv=(x.server||'').toLowerCase();
+          const isDep=type==='deposit'&&/sport/.test(srv);
+          const isWd =type==='withdraw'&&/sport/.test(srv);
+          const toSp =type==='transfer'&&/sport/.test(to);
+          const frSp =type==='transfer'&&/sport/.test(from);
+          if(!(isDep||isWd||toSp||frSp)) return;
+          const ts=x.created_at?new Date(x.created_at).getTime():0;
+          let ic,t1,t2,a;
+          if(type==='deposit'){ t1='Deposit'; ic=st==='approved'?'⬇️':st==='rejected'?'⛔':'⏳'; t2='USDT · '+(st==='approved'?'Approved':st==='rejected'?'Rejected':'Pending approval'); a=st==='rejected'?0:amt; }
+          else if(type==='withdraw'){ t1='Withdraw'; ic=st==='approved'?'⬆️':st==='rejected'?'↩️':'⏳'; t2='USDT · '+(st==='approved'?'Sent':st==='rejected'?'Rejected · refunded':'Pending approval'); a=st==='rejected'?0:-amt; }
+          else { t1='Transfer'; ic=st==='rejected'?'↩️':'🔄'; t2=(toSp?'Received':'Sent')+' · '+(st==='approved'?'Approved':st==='rejected'?'Rejected · refunded':'Pending'); a=st==='rejected'?0:(toSp?amt:-amt); }
+          out.push({ts:ts,ic:ic,t1:t1,t2:t2,amt:a,reqId:x.local_id});
+        });
+        serverFinTxns=out;
+        try{ renderTxns(); }catch(e){}
+      },function(){});
+  }
+  setTimeout(pullServerActivity,1900);
+  setInterval(function(){ if(!document.hidden) pullServerActivity(); },6000);
 
   // ---------- wallet (multi-server balances) ----------
   const SERVERS=[
@@ -2239,8 +2274,11 @@
     (openBets||[]).concat(settledBets||[]).forEach(b=>{ if(!b||seenB[b.id])return; seenB[b.id]=1;
       const ln=(b.legs&&b.legs.length)||1;
       betActs.push({ts:+b.placedTs||0,ic:'🎫',t1:'Bet placed',t2:`${b.type||'Bet'}${ln>1?' · '+ln+' legs':''}`,amt:-(+b.stake||0)}); });
-    const nonBet=txns.filter(t=>t.t1!=='Bet placed');   // ignore any legacy stored bet rows
-    const list=nonBet.concat(betActs).filter(t=>txnMatchesType(t)&&txnMatchesPeriod(t)).sort((a,b)=>(+b.ts||0)-(+a.ts||0));
+    // Financial rows (deposit/withdraw/transfer) come from the SERVER (serverFinTxns);
+    // bets from openBets; only misc local rows (e.g. cashback) come from txns. Nothing
+    // money-related is sourced from per-device localStorage anymore.
+    const localMisc=txns.filter(t=>['Bet placed','Deposit','Withdraw','Transfer'].indexOf(t.t1)<0);
+    const list=serverFinTxns.concat(localMisc).concat(betActs).filter(t=>txnMatchesType(t)&&txnMatchesPeriod(t)).sort((a,b)=>(+b.ts||0)-(+a.ts||0));
     if(!list.length){el.innerHTML='<div class="txn-empty">No transactions in this range</div>';return;}
     el.innerHTML=list.map(t=>{
       const t2=t.ts?(/Just now|ago/.test(t.t2)?t.t2.replace(/Just now/,ago(t.ts)):t.t2+' · '+ago(t.ts)):t.t2;
@@ -2737,6 +2775,7 @@
     }
   });
   reconcileWithdrawals();
+  try{ pullServerActivity(); }catch(e){}   // server-authoritative financial feed on load
   renderCurServerIcon();renderGames();calc();renderTickets();updateWallet();
   applyLang();
   window.addEventListener('storage',e=>{ if(e.key==='alpexa.withdrawals'){ reconcileWithdrawals(); updateWallet(); } });
@@ -2799,7 +2838,7 @@
     var acct=null; try{var m=JSON.parse(localStorage.getItem('alpexa.me')||'null'); if(m&&m.accts) acct=m.accts.sports;}catch(e){}
     if(!acct) return;
     AlpexaSync.db.channel('sportsbal-'+acct)
-      .on('postgres_changes',{event:'*',schema:'public',table:'accounts',filter:'acct_no=eq.'+acct},function(){ if(!document.hidden) syncBalancesFromServer(); })
+      .on('postgres_changes',{event:'*',schema:'public',table:'accounts',filter:'acct_no=eq.'+acct},function(){ if(!document.hidden){ syncBalancesFromServer(); pullServerActivity(); } })
       .subscribe();
   }catch(e){} }, 2200);
   // settings initial application
