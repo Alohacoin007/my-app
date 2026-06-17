@@ -3497,6 +3497,43 @@ function App(){
   useEffect(()=>{try{localStorage.setItem('alpexa.fxClosed',JSON.stringify(closedHistory));}catch(e){}},[closedHistory]);
   useEffect(()=>{try{localStorage.setItem('alpexa.fxLive',JSON.stringify(liveOrders.map(o=>({...o,fresh:false}))));}catch(e){}},[liveOrders]);
   useEffect(()=>{try{localStorage.setItem('alpexa.fxPending',JSON.stringify(pendingOrders.map(o=>({...o,fresh:false}))));}catch(e){}},[pendingOrders]);
+  // ── MULTI-DEVICE: adopt open FX positions from the server every ~5s ──
+  // The server `positions` table is the shared truth. We ADD positions opened on
+  // another device and REMOVE ones closed elsewhere (6s grace so a just-opened
+  // local position isn't dropped before it syncs up). pnl is recomputed locally
+  // by the live ticker, so each device shows correct floating P&L.
+  useEffect(()=>{
+    if(!(window.AlpexaSync&&AlpexaSync.db)) return;
+    let stop=false;
+    function pullPos(){
+      let me; try{ me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); }catch(e){ me=null; }
+      if(!me||!me.custId) return;
+      AlpexaSync.db.from('positions')
+        .select('local_id,symbol,side,size,open_price,pnl,status')
+        .eq('cust_id',me.custId).eq('server','fx').eq('status','open')
+        .then(function(r){
+          if(stop||!r||!r.data) return;
+          const srv=r.data, srvIds={}; srv.forEach(p=>{srvIds[String(p.local_id)]=p;});
+          setLiveOrders(prev=>{
+            const have={}; prev.forEach(o=>{have[String(o.id)]=true;});
+            const now=Date.now();
+            // keep mine that are still on server, or freshly opened (<6s, not synced yet)
+            const kept=prev.filter(o=> srvIds[String(o.id)] || (now-(o.placedTs||0))<6000 );
+            // add positions opened on another device
+            const add=[];
+            srv.forEach(p=>{ if(have[String(p.local_id)]) return;
+              add.push({ id:p.local_id, sym:p.symbol, side:p.side, vol:+p.size||0,
+                open:+p.open_price||0, pnl:+p.pnl||0, status:'OPEN',
+                placedAt:'', placedTs:0, ticket:'', fresh:false, adopted:true }); });
+            if(add.length===0 && kept.length===prev.length) return prev; // no change
+            return [...add, ...kept];
+          });
+        }, function(){});
+    }
+    pullPos();
+    const iv=setInterval(()=>{ if(!document.hidden) pullPos(); }, 5000);
+    return ()=>{ stop=true; clearInterval(iv); };
+  }, []);
   const [modifyTarget,setModifyTarget]=useState(null);
   const [toast,setToast]=useState(null);
   const marketRef=useRef(null);
@@ -3717,6 +3754,7 @@ function App(){
         // (and equity stays continuous as the floating P&L drops off).
         try{window.addBalance&&window.addBalance(accountRef.current,order.pnl||0);}catch(e){}
         try{window.broadcastPositionClose&&window.broadcastPositionClose(order.id, closePrice, order.pnl||0);}catch(e){}
+        try{window.__fxSyncDelete&&window.__fxSyncDelete(order.id);}catch(e){}
         // Record the realized result on the server so the back office can
         // report company P&L (customer loss = company gain) by period.
         try{window.__alpexaSettle&&window.__alpexaSettle({server:'fx',kind:'fx_close',local_id:order.id,ticket:order.ticket,symbol:order.sym,stake:order.vol,pnl:order.pnl||0,detail:order.side+' '+order.vol+' @ '+(+order.open).toFixed(m?m.digits:5)+' → '+(+closePrice).toFixed(m?m.digits:5)});}catch(e){}
@@ -3943,15 +3981,24 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
     if(!window.AlpexaSync||!AlpexaSync.db)return;
     var m=meX(); if(!m||!m.accts.fx)return; var cust=m.custId, acct=m.accts.fx;
     AlpexaSync.db.from('players').update({last_seen:new Date().toISOString(),last_app:'fx'}).eq('cust_id',cust).then(function(){},function(){});
-    var items=[];
+    var items=[], ids=[];
     try{var live=JSON.parse(localStorage.getItem('alpexa.fxLive')||'[]')||[];
       live.forEach(function(o){ if(!o||!(+o.vol>0))return;
+        ids.push(String(o.id||''));
         items.push({cust_id:cust,acct_no:acct,server:'fx',kind:'position',local_id:String(o.id||''),symbol:o.sym||'',side:o.side||'',size:+o.vol||0,open_price:Math.round((+o.open||0)*1e5)/1e5,pnl:Math.round((+o.pnl||0)*100)/100,status:'open'});});
     }catch(e){}
-    AlpexaSync.db.from('positions').delete().eq('cust_id',cust).eq('server','fx').then(function(){
-      if(items.length)AlpexaSync.db.from('positions').insert(items).then(function(){},function(){});
+    // MULTI-DEVICE: only refresh MY positions (by local_id). Never wipe rows opened
+    // on another device — that's why two browsers used to disagree. If I have none,
+    // push nothing (don't delete the other device's positions).
+    if(!ids.length) return;
+    AlpexaSync.db.from('positions').delete().eq('cust_id',cust).eq('server','fx').in('local_id',ids).then(function(){
+      AlpexaSync.db.from('positions').insert(items).then(function(){},function(){});
     },function(){});
   }
+  // When a position is CLOSED on this device, remove it from the server so other
+  // devices drop it too (paired with the adopt loop in the app).
+  window.__fxSyncDelete=function(lid){ try{ if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m||!m.custId)return;
+    AlpexaSync.db.from('positions').delete().eq('cust_id',m.custId).eq('server','fx').eq('local_id',String(lid)).then(function(){},function(){}); }catch(e){} };
   setTimeout(push,2000); setInterval(function(){ if(!document.hidden){ push(); } else { window.__bgPosPush=window.__bgPosPush||0; if(Date.now()-window.__bgPosPush>9000){ window.__bgPosPush=Date.now(); push(); } } },3000);
   // Instant: when a position opens/closes (id list changes), push right away
   // instead of waiting for the next tick. PnL drift rides the 3s interval.
