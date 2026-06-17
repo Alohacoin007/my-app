@@ -1771,6 +1771,9 @@
     const d=legs.reduce((a,l)=>a*dec(l.am),1),stake=parseInt(stakeInput.value)||legs.reduce((a,l)=>a+l.stake,0);
     const pot = mode==='single'? legs.reduce((a,l)=>a+l.stake*dec(l.am),0) : stake*d;
     if(stake>balance){showToast('⚠️','Insufficient balance','Transfer funds to Sports first');return;}
+    // Operator max-bet cap (server `controls`, set in back office). 0 = no cap.
+    const _maxBet=+((window.__alpexaCtrl&&window.__alpexaCtrl.maxBet)||0);
+    if(_maxBet>0 && stake>_maxBet){showToast('🛡️','Max bet exceeded',`Limit is ${usd(_maxBet)} per bet`);return;}
     // single tap: place immediately
     const betType=mode==='single'?'Singles':mode==='sgp'?'Same Game':'Parlay';
     const legCount=legs.length;
