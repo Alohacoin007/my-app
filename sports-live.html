@@ -1778,13 +1778,14 @@
     const d0=legs.reduce((a,l)=>a*dec(l.am),1);
     const baseCash=Math.round(stake*0.92*100)/100;
     var spTicket; try{var _k='alpexa.seq.sp',_n=parseInt(localStorage.getItem(_k)||'100000',10)+1;localStorage.setItem(_k,String(_n));spTicket='SP-'+_n;}catch(e){spTicket='SP-'+Math.floor(100000+Math.random()*900000);}
-    openBets.unshift({id:'b'+Date.now(),type:betType,ticket:spTicket,placedTs:Date.now(),
+    const betId='b'+Date.now();
+    openBets.unshift({id:betId,type:betType,ticket:spTicket,placedTs:Date.now(),
       cls:mode,stake:stake,potential:pot,cashout:baseCash,
       d0:d0,baseCash:baseCash,
       legs:legs.map(l=>({pk:l.sel,sel:l.sel,gid:l.gid,market:l.market,gm:l.game,am:l.am,am0:l.am,dec0:dec(l.am),tm:l.tm,kt:l.kt||'',live:l.live,st:'o'}))});
     // deduct stake + log activity
     balance-=stake; syncSportsBal();
-    txns.unshift({ts:Date.now(),ic:'🎫',t1:'Bet placed',t2:`${betType}${legCount>1?' · '+legCount+' legs':''} · Just now`,amt:-stake});
+    txns.unshift({ts:Date.now(),ic:'🎫',t1:'Bet placed',t2:`${betType}${legCount>1?' · '+legCount+' legs':''} · Just now`,amt:-stake,betId:betId});
     try{window.AlpexaSync&&AlpexaSync.logActivity({server:'sports',kind:'bet',symbol:betType,amount:stake,ticket:spTicket,detail:((legs&&legs[0]&&(legs[0].game||legs[0].gm))||'')+(legCount>1?(' +'+(legCount-1)+' legs'):'')});}catch(e){}
     notify('🎫','Bet placed',`${betType} · ${usd(stake)} stake`,'betResults');
     legs=[];renderGames();syncSlip();closeSheet();renderTickets();updateWallet();
@@ -2031,6 +2032,12 @@
               legs:[{pk:(x.pick||x.symbol||'Selection'), sel:(x.pick||''), gm:(x.game||''), am:+x.odds||0, st:'o'}],
               fromServer:true, viewOnly:true });
           }
+          // Reflect adopted bets in Recent Activity too (deduped by id), so a bet
+          // placed on another device shows in the feed — not only the My Bets count.
+          try{ if(typeof txns!=='undefined' && !txns.some(t=>t.betId===id)){
+            const _ty=(m&&m.type)||x.symbol||'Bet', _ln=(m&&m.legs&&m.legs.length)||1, _stk=+(m&&m.stake)||+x.stake||0;
+            txns.unshift({ts:(m&&m.placedTs)||Date.now(),ic:'🎫',t1:'Bet placed',t2:`${_ty}${_ln>1?' · '+_ln+' legs':''}`,amt:-_stk,betId:id});
+          } }catch(e){}
           changed=true;
         });
         // drop pulled bets no longer on the server (settled/cashed somewhere)
