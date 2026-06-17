@@ -3784,7 +3784,7 @@ function App(){
         AlpexaSync.db.from('positions').delete().eq('acct_no',fx).eq('server','fx').eq('local_id',String(order.id)).eq('status','open').select('local_id').then(function(r){
           if(r&&r.data&&r.data.length>0){ bank(); done(); }              // we won → bank once
           else if(attempt<1){ setTimeout(()=>claim(attempt+1), 900); }   // maybe not synced yet → retry once
-          else { try{setToast&&setToast('Position already closed on another device');}catch(e){} done(); } // already banked elsewhere
+          else { try{ if(setToast){ setToast({error:false,icon:'check',msg:'Already closed',sub:'This position was closed on another device'}); setTimeout(()=>setToast(null),3000); } }catch(e){} done(); } // already banked elsewhere
         }, function(){ if(attempt<1){ setTimeout(()=>claim(attempt+1),900); } else { bank(); done(); } }); // network blip: bank once (rare)
       };
       claim(0);
