@@ -30,6 +30,13 @@ const LEAGUES = [
   { lg: "NBA", path: "basketball/nba" },
   { lg: "MLB", path: "baseball/mlb" },
   { lg: "NHL", path: "hockey/nhl" },
+  // ⚽ Soccer — must mirror the app's LEAGUES (same lg:'SOC' + paths) so the
+  // gid (lg + "_" + eventId) matches between the bet legs and these results.
+  // A drawn match makes moneyline legs grade as "push" (refund) = Draw No Bet.
+  { lg: "SOC", path: "soccer/fifa.world" },
+  { lg: "SOC", path: "soccer/eng.1" },
+  { lg: "SOC", path: "soccer/uefa.champions" },
+  { lg: "SOC", path: "soccer/usa.1" },
 ];
 
 type Result = { hs: number; as: number; homeNm: string; awayNm: string; homeAb: string; awayAb: string };

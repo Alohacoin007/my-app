@@ -653,6 +653,7 @@
         <div class="sport" data-sport="NFL">🏈 NFL</div>
         <div class="sport" data-sport="MLB">⚾ MLB</div>
         <div class="sport" data-sport="NHL">🏒 NHL</div>
+        <div class="sport" data-sport="SOC">⚽ Soccer</div>
       </div>
       <div class="colhead-wrap"><div class="colhead"><span data-i18n="col_today">Today</span><span data-i18n="col_spread">Spread</span><span data-i18n="col_total">Total</span><span data-i18n="col_ml">Moneyline</span></div></div>
       <div class="list" id="list"></div>
@@ -1584,7 +1585,7 @@
       }
       const isPinned=pinnedGames.has(g.id);
       const pinBtn=`<button class="pin-btn${isPinned?' pinned':''}" data-pin="${g.id}" title="${isPinned?'Unpin':'Pin to top'}">★</button>`;
-      return `<div class="card${isPinned?' pinned':''}"><div class="ch"><span class="lg">${({NBA:'🏀',NFL:'🏈',MLB:'⚾',NHL:'🏒'})[g.lg]||'🏈'} ${g.lg}</span>
+      return `<div class="card${isPinned?' pinned':''}"><div class="ch"><span class="lg">${({NBA:'🏀',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽'})[g.lg]||'🏈'} ${g.lg==='SOC'?'Soccer':g.lg}</span>
         <div class="ch-r"><span class="st${g.live?' live':''}">${g.live?'LIVE '+g.time:gameTimeLabel(g)}</span>${pinBtn}</div></div>
         <div class="matrix">${row(g.away,1)}${row(g.home,0)}</div>
         ${playHTML}
@@ -2810,8 +2811,16 @@
       { lg:'NBA', path:'basketball/nba' },
       { lg:'MLB', path:'baseball/mlb' },
       { lg:'NHL', path:'hockey/nhl' },
+      // ⚽ Soccer — one "Soccer" tab aggregates several competitions so there are
+      // games year-round (World Cup runs Jun–Jul 2026; EPL/UCL Aug–May; MLS summer).
+      // All tagged lg:'SOC' so they share the tab; gid stays unique via ESPN event id.
+      { lg:'SOC', path:'soccer/fifa.world' },
+      { lg:'SOC', path:'soccer/eng.1' },
+      { lg:'SOC', path:'soccer/uefa.champions' },
+      { lg:'SOC', path:'soccer/usa.1' },
     ];
-    function mkCore(home, away, ev){
+    function mkCore(home, away, ev, lg){
+      const isSoc = lg==='SOC';
       let total=null, spreadVal=null, favAbbr=null, mlHome=null, mlAway=null;
       try{
         const comp = ev.competitions && ev.competitions[0];
@@ -2829,8 +2838,8 @@
           if (od.awayTeamOdds && typeof od.awayTeamOdds.moneyLine === 'number') mlAway = od.awayTeamOdds.moneyLine;
         }
       }catch(e){}
-      const sp  = (spreadVal!=null && spreadVal>0) ? spreadVal : 3.5;
-      const tot = (total!=null && total>0) ? total : 45.5;
+      const sp  = (spreadVal!=null && spreadVal>0) ? spreadVal : (isSoc?0.5:3.5);
+      const tot = (total!=null && total>0) ? total : (isSoc?2.5:45.5);
       const homeFav = favAbbr ? (home.ab===favAbbr) : true;
       const spread = homeFav
         ? [{ln:'-'+sp,am:-110,sel:home.nm+' -'+sp},{ln:'+'+sp,am:-110,sel:away.nm+' +'+sp}]
@@ -2860,7 +2869,7 @@
         const kickoff = comp.date || ev.date || '';
         let time = (st.shortDetail || st.description || '').trim() || 'TBD';
         if(state==='pre' && kickoff){ const f=fmtKick(kickoff); if(f) time=f; }
-        return { id:lg+'_'+ev.id, lg, state:state, live: state==='in', real: true, kickoff:(state==='pre'?kickoff:''), time, home, away, core: mkCore(home, away, ev), props: [] };
+        return { id:lg+'_'+ev.id, lg, state:state, live: state==='in', real: true, kickoff:(state==='pre'?kickoff:''), time, home, away, core: mkCore(home, away, ev, lg), props: [] };
       }catch(e){ return null; }
     }
     async function fetchJson(url){
