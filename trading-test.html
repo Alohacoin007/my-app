@@ -3533,12 +3533,24 @@ function App(){
         }, function(){});
     }
     pullPos();
-    const iv=setInterval(()=>{ if(!document.hidden) pullPos(); }, 1500);
-    // Pull instantly when you switch to this browser/tab (feels real-time).
+    // Poll as a fallback (works even if Realtime isn't enabled). With Realtime on,
+    // changes arrive in <1s so this is just a safety net — keep it relaxed.
+    const iv=setInterval(()=>{ if(!document.hidden) pullPos(); }, 4000);
+    // Pull instantly when you switch to this browser/tab.
     const onVis=()=>{ if(!document.hidden) pullPos(); };
     document.addEventListener('visibilitychange', onVis);
     window.addEventListener('focus', onVis);
-    return ()=>{ stop=true; clearInterval(iv); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', onVis); };
+    // ── REALTIME: subscribe to position changes for this FX account (near-instant) ──
+    let ch=null;
+    try{
+      let me; try{ me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); }catch(e){ me=null; }
+      if(me&&me.accts&&me.accts.fx&&AlpexaSync.db.channel){
+        ch=AlpexaSync.db.channel('fxpos-'+me.accts.fx)
+          .on('postgres_changes',{event:'*',schema:'public',table:'positions',filter:'acct_no=eq.'+me.accts.fx},function(){ pullPos(); })
+          .subscribe();
+      }
+    }catch(e){}
+    return ()=>{ stop=true; clearInterval(iv); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', onVis); try{ if(ch&&AlpexaSync.db.removeChannel) AlpexaSync.db.removeChannel(ch); }catch(e){} };
   }, []);
   const [modifyTarget,setModifyTarget]=useState(null);
   const [toast,setToast]=useState(null);
@@ -3748,26 +3760,35 @@ function App(){
   function modifyPending(updated){setPendingOrders(prev=>prev.map(p=>p.id===updated.id?{...p,sl:updated.sl,tp:updated.tp,trigger:updated.trigger}:p));if(window.ALPEXA_SFX)window.ALPEXA_SFX.tick();}
 
   function closeOrder(id){
-    setLiveOrders(prev=>{
-      const order=prev.find(o=>o.id===id);
-      if(order){
-        const m=marketRef.current.state.find(s=>s.sym===order.sym);
-        const closePrice=m?(order.side==='BUY'?m.last:m.last+m.spread):order.open;
-        const now=new Date();
-        const dateStr=String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')+' '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-        setClosedHistory(h=>[{id:order.id,sym:order.sym,side:order.side,vol:order.vol,open:order.open,close:closePrice,pnl:order.pnl||0,date:dateStr,placedAt:order.placedAt},...h]);
-        // Bank the realized P&L into the balance so closed wins/losses stick
-        // (and equity stays continuous as the floating P&L drops off).
-        try{window.addBalance&&window.addBalance(accountRef.current,order.pnl||0);}catch(e){}
-        try{window.broadcastPositionClose&&window.broadcastPositionClose(order.id, closePrice, order.pnl||0);}catch(e){}
-        try{window.__fxSyncDelete&&window.__fxSyncDelete(order.id);}catch(e){}
-        // Record the realized result on the server so the back office can
-        // report company P&L (customer loss = company gain) by period.
-        try{window.__alpexaSettle&&window.__alpexaSettle({server:'fx',kind:'fx_close',local_id:order.id,ticket:order.ticket,symbol:order.sym,stake:order.vol,pnl:order.pnl||0,detail:order.side+' '+order.vol+' @ '+(+order.open).toFixed(m?m.digits:5)+' → '+(+closePrice).toFixed(m?m.digits:5)});}catch(e){}
-        if(window.ALPEXA_SFX)window.ALPEXA_SFX.closed();
-      }
-      return prev.filter(o=>o.id!==id);
-    });
+    const order=liveOrders.find(o=>String(o.id)===String(id));
+    setLiveOrders(prev=>prev.filter(o=>String(o.id)!==String(id)));   // remove from this device's UI now
+    if(!order) return;
+    const m=marketRef.current.state.find(s=>s.sym===order.sym);
+    const closePrice=m?(order.side==='BUY'?m.last:m.last+m.spread):order.open;
+    const pnl=order.pnl||0, acct=accountRef.current;
+    const now=new Date();
+    const dateStr=String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')+' '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+    // Bank the realized P&L — runs ONLY for the device that wins the server claim,
+    // so closing the same position on two devices can't double-count it.
+    function bank(){
+      setClosedHistory(h=>[{id:order.id,sym:order.sym,side:order.side,vol:order.vol,open:order.open,close:closePrice,pnl:pnl,date:dateStr,placedAt:order.placedAt},...h]);
+      try{window.addBalance&&window.addBalance(acct,pnl);}catch(e){}
+      try{window.__alpexaSettle&&window.__alpexaSettle({server:'fx',kind:'fx_close',local_id:order.id,ticket:order.ticket,symbol:order.sym,stake:order.vol,pnl:pnl,detail:order.side+' '+order.vol+' @ '+(+order.open).toFixed(m?m.digits:5)+' → '+(+closePrice).toFixed(m?m.digits:5)});}catch(e){}
+    }
+    function done(){ try{window.broadcastPositionClose&&window.broadcastPositionClose(order.id, closePrice, pnl);}catch(e){} if(window.ALPEXA_SFX)window.ALPEXA_SFX.closed(); }
+    let me; try{me=JSON.parse(localStorage.getItem('alpexa.me')||'null');}catch(e){}
+    if(window.AlpexaSync&&AlpexaSync.db&&me&&me.accts&&me.accts.fx){
+      const fx=me.accts.fx;
+      // CLAIM: atomically delete the open row. Exactly one device gets ≥1 row back.
+      const claim=(attempt)=>{
+        AlpexaSync.db.from('positions').delete().eq('acct_no',fx).eq('server','fx').eq('local_id',String(order.id)).eq('status','open').select('local_id').then(function(r){
+          if(r&&r.data&&r.data.length>0){ bank(); done(); }              // we won → bank once
+          else if(attempt<1){ setTimeout(()=>claim(attempt+1), 900); }   // maybe not synced yet → retry once
+          else { try{setToast&&setToast('Position already closed on another device');}catch(e){} done(); } // already banked elsewhere
+        }, function(){ if(attempt<1){ setTimeout(()=>claim(attempt+1),900); } else { bank(); done(); } }); // network blip: bank once (rare)
+      };
+      claim(0);
+    } else { bank(); done(); }   // offline / single device
   }
   // Expose force-close so the back-office command reader can liquidate a position.
   window.__alpexaFXClose=(lid)=>{ try{ const o=liveOrders.find(x=>String(x.id)===String(lid)); if(o)closeOrder(o.id); }catch(e){} };
