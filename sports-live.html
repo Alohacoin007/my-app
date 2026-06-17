@@ -2018,8 +2018,17 @@
         const have={}; openBets.forEach(function(b){ have[String(b.id)]=true; });
         let changed=false;
         rows.forEach(function(x){
-          const id=String(x.local_id); if(have[id]) return;
+          const id=String(x.local_id);
           const m=x.meta&&typeof x.meta==='object'?x.meta:null;
+          // Reconcile Recent Activity for EVERY server bet (deduped by id) — including
+          // bets already restored into openBets from a previous session. This is what
+          // makes the feed match My Bets on any device, even after a reload.
+          try{ if(typeof txns!=='undefined' && !txns.some(t=>t.betId===id)){
+            const _ty=(m&&m.type)||x.symbol||'Bet', _ln=(m&&m.legs&&m.legs.length)||1, _stk=+(m&&m.stake)||+x.stake||0;
+            txns.unshift({ts:(m&&m.placedTs)||Date.now(),ic:'🎫',t1:'Bet placed',t2:`${_ty}${_ln>1?' · '+_ln+' legs':''}`,amt:-_stk,betId:id});
+            changed=true;
+          } }catch(e){}
+          if(have[id]) return;   // already in the My Bets list — don't re-add the ticket
           if(m && m.legs && m.legs.length){
             // FULL bet rebuilt from meta → behaves like any open bet (cash out works)
             openBets.push({ id:id, type:m.type||x.symbol||'Bet', cls:m.cls||'', ticket:m.ticket||'',
@@ -2032,12 +2041,6 @@
               legs:[{pk:(x.pick||x.symbol||'Selection'), sel:(x.pick||''), gm:(x.game||''), am:+x.odds||0, st:'o'}],
               fromServer:true, viewOnly:true });
           }
-          // Reflect adopted bets in Recent Activity too (deduped by id), so a bet
-          // placed on another device shows in the feed — not only the My Bets count.
-          try{ if(typeof txns!=='undefined' && !txns.some(t=>t.betId===id)){
-            const _ty=(m&&m.type)||x.symbol||'Bet', _ln=(m&&m.legs&&m.legs.length)||1, _stk=+(m&&m.stake)||+x.stake||0;
-            txns.unshift({ts:(m&&m.placedTs)||Date.now(),ic:'🎫',t1:'Bet placed',t2:`${_ty}${_ln>1?' · '+_ln+' legs':''}`,amt:-_stk,betId:id});
-          } }catch(e){}
           changed=true;
         });
         // drop pulled bets no longer on the server (settled/cashed somewhere)
