@@ -3509,6 +3509,30 @@ function App(){
   const [pendingOrders,setPendingOrders]=useState(()=>{try{return JSON.parse(localStorage.getItem('alpexa.fxPending')||'[]');}catch(e){return [];}});
   const [closedHistory,setClosedHistory]=useState(()=>{try{return JSON.parse(localStorage.getItem('alpexa.fxClosed')||'[]');}catch(e){return [];}});
   useEffect(()=>{try{localStorage.setItem('alpexa.fxClosed',JSON.stringify(closedHistory));}catch(e){}},[closedHistory]);
+  // ── Cross-device closed-trade history: merge server `settlements` (kind fx_close).
+  // Closes on any device write a settlement row; pull them and add the ones not
+  // already local (deduped by id), reconstructing side/vol/open/close from `detail`.
+  useEffect(()=>{
+    if(!window.AlpexaSync||!AlpexaSync.db) return; let stop=false;
+    let me; try{me=JSON.parse(localStorage.getItem('alpexa.me')||'null');}catch(e){}
+    const cust=me&&me.custId; if(!cust) return;
+    const pull=()=>{ if(document.hidden) return;
+      AlpexaSync.db.from('settlements').select('local_id,ticket,symbol,stake,pnl,detail,created_at')
+        .eq('cust_id',cust).eq('server','fx').eq('kind','fx_close').order('created_at',{ascending:false}).limit(200)
+        .then(function(r){ if(stop||!r||r.error||!r.data) return;
+          setClosedHistory(cur=>{ const have=new Set((cur||[]).map(h=>String(h.id))); const add=[];
+            r.data.forEach(function(s){ const id=String(s.local_id||s.ticket||''); if(!id||have.has(id)) return;
+              const m=(s.detail||'').match(/(BUY|SELL)\s+([\d.]+)\s+@\s+([\d.]+)\s*(?:→|->)\s*([\d.]+)/i);
+              const d=s.created_at?new Date(s.created_at):null;
+              const ds=d?(String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')):'';
+              add.push({id:id,sym:s.symbol||'',side:m?m[1].toUpperCase():'',vol:m?+m[2]:(+s.stake||0),open:m?+m[3]:0,close:m?+m[4]:0,pnl:+s.pnl||0,date:ds,placedAt:0,_server:true}); });
+            return add.length?[...(cur||[]),...add]:cur;
+          });
+        },function(){}); };
+    const t0=setTimeout(pull,1900); const iv=setInterval(pull,8000);
+    const vis=()=>{if(!document.hidden)pull();}; document.addEventListener('visibilitychange',vis);
+    return ()=>{stop=true;clearTimeout(t0);clearInterval(iv);document.removeEventListener('visibilitychange',vis);};
+  },[]);
   useEffect(()=>{try{localStorage.setItem('alpexa.fxLive',JSON.stringify(liveOrders.map(o=>({...o,fresh:false}))));}catch(e){}},[liveOrders]);
   // ── MULTI-DEVICE: adopt open FX positions from the server (shared truth) ──
   // Add positions opened on another device, drop ones closed elsewhere (6s grace
