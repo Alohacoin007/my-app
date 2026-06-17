@@ -1437,7 +1437,17 @@
       return m;
     }catch(_){return {...DEFAULT_SETTINGS};}
   })();
-  function saveSettings(){try{localStorage.setItem('alpexaSettings',JSON.stringify(settings));}catch(_){}}
+  function saveSettings(){try{localStorage.setItem('alpexaSettings',JSON.stringify(settings));}catch(_){} try{pushRG();}catch(e){}}
+  // Responsible-gambling settings (self-exclusion + daily deposit/loss limits) are
+  // SERVER-owned (players columns) so they apply on every device and can't be bypassed
+  // by clearing localStorage. A DB trigger makes self-exclusion one-way (the customer
+  // can extend it but never shorten it — only an admin can clear it).
+  function pushRG(){ if(!(window.AlpexaSync&&AlpexaSync.db))return; var cust=meCust&&meCust(); if(!cust)return;
+    AlpexaSync.db.from('players').update({ self_exclude_until:Math.round(+settings.selfExcludeUntil||0), deposit_limit:+settings.depositLimit||0, loss_limit:+settings.lossLimit||0, reality_check_min:+settings.realityCheckMin||0 }).eq('cust_id',cust).then(function(){ setTimeout(pullRG,400); },function(){}); }
+  function pullRG(){ if(!(window.AlpexaSync&&AlpexaSync.db))return; var cust=meCust&&meCust(); if(!cust)return;
+    AlpexaSync.db.from('players').select('self_exclude_until,deposit_limit,loss_limit,reality_check_min').eq('cust_id',cust).limit(1).then(function(r){ var p=r&&r.data&&r.data[0]; if(!p)return;
+      settings.selfExcludeUntil=+p.self_exclude_until||0; settings.depositLimit=+p.deposit_limit||0; settings.lossLimit=+p.loss_limit||0; settings.realityCheckMin=+p.reality_check_min||0;
+      try{localStorage.setItem('alpexaSettings',JSON.stringify(settings));}catch(e){} try{updateWallet();}catch(e){} },function(){}); }
   // Time zone for game start times. 'auto' = the device's own zone (current location).
   const TZ_OPTS=[
     {v:'auto',                lbl:'Automatic (your device)'},
@@ -2825,6 +2835,9 @@
   reconcileWithdrawals();
   try{ pullServerActivity(); }catch(e){}   // server-authoritative financial feed on load
   try{ pullServerSettled(); }catch(e){}    // server-authoritative settled-bets on load
+  try{ pullRG(); }catch(e){}               // server-authoritative responsible-gambling settings
+  setTimeout(function(){ try{ pullRG(); }catch(e){} }, 4000);
+  setInterval(function(){ try{ if(!document.hidden) pullRG(); }catch(e){} }, 20000);
   renderCurServerIcon();renderGames();calc();renderTickets();updateWallet();
   applyLang();
   window.addEventListener('storage',e=>{ if(e.key==='alpexa.withdrawals'){ reconcileWithdrawals(); updateWallet(); } });
