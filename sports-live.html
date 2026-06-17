@@ -2385,30 +2385,37 @@
   document.getElementById('tfSwap').onclick=()=>{[tfFrom,tfTo]=[tfTo,tfFrom];renderTfSelectors();updateTfAvail();};
   document.getElementById('tfChips').onclick=e=>{const c=e.target.closest('.chip');if(!c)return;
     tfAmt.value=Math.floor(balOf(tfFrom)*(+c.dataset.pct)/100);};
+  function tfAcct(k){ try{ var a=(JSON.parse(localStorage.getItem('alpexa.me')||'{}').accts)||{}; if(k==='sports')return a.sports; if(k==='crypto')return a.crypto; return a.fx; }catch(e){ return ''; } }
   document.getElementById('tfConfirm').onclick=()=>{
     const v=parseFloat(tfAmt.value)||0,from=srvByKey(tfFrom),to=srvByKey(tfTo);
     if(from.locked||to.locked){showToast('🔒','Locked server','Cannot be used for transfers');return;}
     if(tfFrom===tfTo){showToast('⚠️','Select different servers');return;}
     if(v<=0){showToast('⚠️','Enter an amount');return;}
     if(v>balOf(tfFrom)){showToast('⚠️','Insufficient balance',`${from.short.replace('Alpexa ','')} is too low`);return;}
-    // All server-to-server transfers require back-office approval (funds held until approved).
-    if(tfFrom==='sports'){ balance-=v; syncSportsBal(); }
-    else { from.bal-=v; if(from.key==='crypto') saveCryptoBal(); /* Crypto balance+history are owned by the Crypto app, which debits this from Supabase. */ }
+    if(!(window.AlpexaSync&&AlpexaSync.db)){showToast('⚠️','No server connection');return;}
+    const fromAcct=tfAcct(tfFrom), toAcct=tfAcct(tfTo);
+    if(!fromAcct||!toAcct){showToast('⚠️','Account not found','Re-login and try again');return;}
     const fromNm=from.short.replace('Alpexa ',''), toNm=to.short.replace('Alpexa ','');
-    const tid='tf_'+Date.now();
-    const reqs=loadWithdrawals();
-    reqs.unshift({id:tid,ts:Date.now(),type:'transfer',server:'Sports',from:fromNm,to:toNm,fromKey:tfFrom,toKey:tfTo,asset:'USD',amount:v,fee:0,net:v,status:'pending'});
-    saveWithdrawals(reqs);
-    try{window.AlpexaSync&&AlpexaSync.pushRequest(reqs[0]);}catch(e){}
-    // This transfer is tracked locally and credited on approval by the status sync
-    // (toKey==='sports' → balance+=). Pre-mark it as already-pulled so the shared
-    // pullIncomingTransfers('sports') never credits it a SECOND time.
-    if(tfTo==='sports'){ try{var ap=JSON.parse(localStorage.getItem('alpexa.appliedTransfers')||'{}')||{};ap[tid+':in']=1;localStorage.setItem('alpexa.appliedTransfers',JSON.stringify(ap));}catch(e){} }
-    const sAmt=(tfTo==='sports')?+v:(tfFrom==='sports'?-v:0);
-    txns.unshift({ts:Date.now(),ic:'🔄',t1:'Transfer',t2:`${fromNm} → ${toNm} · Pending approval`,amt:sAmt,reqId:tid});
-    closeTransfer();updateWallet();
-    notify('⏳','Transfer requested',`${usd(v)} ${fromNm} → ${toNm} · awaiting approval`,'deposits');
-    showToast('⏳','Transfer requested','Pending back-office approval');
+    const btn=document.getElementById('tfConfirm'); btn.disabled=true;
+    // INSTANT server-side transfer (atomic + idempotent). The server validates
+    // ownership + balance and moves the money in ONE transaction — no local debit,
+    // no "pending approval", no per-device dedup. The same ref can never double-apply.
+    const ref='xfer-'+Date.now()+'-'+Math.random().toString(36).slice(2,7);
+    AlpexaSync.db.rpc('app_transfer',{p_ref:ref,p_from:fromAcct,p_to:toAcct,p_amount:v}).then(function(r){
+      btn.disabled=false;
+      if(r&&r.error){ showToast('⚠️','Transfer failed',(r.error.message||'')); return; }
+      const res=r&&r.data;
+      if(res&&res.ok){
+        closeTransfer();
+        try{ syncBalancesFromServer(); }catch(e){}   // server is the truth — pull fresh
+        try{ pullServerActivity(); }catch(e){}
+        try{ updateWallet(); }catch(e){}
+        notify('✅','Transfer complete',`${usd(v)} ${fromNm} → ${toNm}`,'deposits');
+        showToast('✅','Transfer complete',`${usd(v)} ${fromNm} → ${toNm}`);
+      } else {
+        showToast('⚠️','Transfer failed',(res&&res.error)||'Try again');
+      }
+    }, function(){ btn.disabled=false; showToast('⚠️','Transfer failed','Network error'); });
   };
 
   // ---------- withdraw sheet (from Sports balance · auto-routed via Crypto) ----------
