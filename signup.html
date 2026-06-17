@@ -762,7 +762,7 @@ async function createOnServer(){
   // Fallback: if extended columns aren't there yet, save the core fields.
   if(r1&&r1.error){ r1=await window._db.from('players').insert({cust_id:cust,name:fullName,email:data.email,auth_id:authId}).select().single(); }
   if(r1.error) throw r1.error;
-  var rows=[{player_id:r1.data.id,server:'sports',acct_no:data.accts.sports,balance:500},{player_id:r1.data.id,server:'crypto',acct_no:data.accts.crypto,balance:0},{player_id:r1.data.id,server:'fx',acct_no:data.accts.fx,balance:0}];
+  var rows=[{player_id:r1.data.id,server:'sports',acct_no:data.accts.sports,balance:100},{player_id:r1.data.id,server:'crypto',acct_no:data.accts.crypto,balance:0},{player_id:r1.data.id,server:'fx',acct_no:data.accts.fx,balance:0}];
   var r2=await window._db.from('accounts').insert(rows);
   if(r2.error) throw r2.error;
   // Referral: if a valid agent code was entered, auto-link this customer to
@@ -779,11 +779,11 @@ async function createOnServer(){
   // A new signup is always a fresh account — clear any previous account's cached
   // money data on this device so balances/positions don't carry over.
   try{ ['alpexa.serverBalances','alpexa.balances','alpexa.cryptoHoldings','alpexa.staked','alpexa.sportsBalance','alpexa.cryptoBalance','alpexa.fxLive','alpexa.openBets','alpexa.settledBets','alpexa.withdrawals','alpexa.transactions','alpexa.funding','alpexa.txns','alpexa.appliedTransfers','alpexa.customer','alpexa.openDeposit','alpexa.ownerFunded'].forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
-  // Opening balances for a new account: Sports $500, Crypto $0, FX $0 (sports only for now).
+  // Opening balances for a new account: Sports $100, Crypto $0, FX $0 (sports only for now).
   try{
-    localStorage.setItem('alpexa.balances', JSON.stringify({live:0, crypto:0, sports:500}));
-    localStorage.setItem('alpexa.serverBalances', JSON.stringify({fx:0, crypto:0, sports:500}));
-    localStorage.setItem('alpexa.sportsBalance', '500');
+    localStorage.setItem('alpexa.balances', JSON.stringify({live:0, crypto:0, sports:100}));
+    localStorage.setItem('alpexa.serverBalances', JSON.stringify({fx:0, crypto:0, sports:100}));
+    localStorage.setItem('alpexa.sportsBalance', '100');
     localStorage.setItem('alpexa.cryptoHoldings', JSON.stringify({USDT:0}));
   }catch(e){}
   // Remember who this is on the device so the apps can tag their transactions.

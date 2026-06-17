@@ -180,7 +180,7 @@ window.AlpexaSync = (function () {
         if (!r || !r.data) return null;
         var out = {};
         r.data.forEach(function (x) { if (x && x.server) out[x.server] = +x.balance || 0; });
-        return out; // e.g. { fx: 100, crypto: 100, sports: 500 }
+        return out; // e.g. { fx: 0, crypto: 0, sports: 100 }
       }, function () { return null; });
   }
 
