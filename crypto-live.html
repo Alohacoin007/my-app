@@ -13303,7 +13303,18 @@ function App() {
     const iv = setInterval(() => { if (!document.hidden) tick(); }, 8000);
     const vis = () => { if (!document.hidden) tick(); }; document.addEventListener('visibilitychange', vis);
     setTimeout(tick, 2000);
-    return () => { stop = true; clearInterval(iv); document.removeEventListener('visibilitychange', vis); };
+    // ── REALTIME: a trade on another device updates crypto_holdings → adopt near-instantly.
+    // tick() keeps its 7s "device busy" guard so this never clobbers a local trade-in-progress.
+    let ch = null;
+    try {
+      let me; try { me = JSON.parse(localStorage.getItem('alpexa.me') || 'null'); } catch (e) { me = null; }
+      if (me && me.accts && me.accts.crypto && AlpexaSync.db.channel) {
+        ch = AlpexaSync.db.channel('cryptohold-' + me.accts.crypto)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'crypto_holdings', filter: 'acct_no=eq.' + me.accts.crypto }, function () { if (!document.hidden) tick(); })
+          .subscribe();
+      }
+    } catch (e) {}
+    return () => { stop = true; clearInterval(iv); document.removeEventListener('visibilitychange', vis); try { if (ch && AlpexaSync.db.removeChannel) AlpexaSync.db.removeChannel(ch); } catch (e) {} };
   }, []);
   // ── STAKES: same server-owns-it pattern as holdings, for staked positions ──
   // WRITE staked snapshot (principal+period+since) on a genuine stake/unstake.
@@ -13356,7 +13367,17 @@ function App() {
     const iv = setInterval(() => { if (!document.hidden) tick(); }, 8000);
     const vis = () => { if (!document.hidden) tick(); }; document.addEventListener('visibilitychange', vis);
     setTimeout(tick, 2200);
-    return () => { stop = true; clearInterval(iv); document.removeEventListener('visibilitychange', vis); };
+    // ── REALTIME: a stake/unstake on another device updates crypto_stakes → adopt near-instantly.
+    let ch = null;
+    try {
+      let me; try { me = JSON.parse(localStorage.getItem('alpexa.me') || 'null'); } catch (e) { me = null; }
+      if (me && me.accts && me.accts.crypto && AlpexaSync.db.channel) {
+        ch = AlpexaSync.db.channel('cryptostk-' + me.accts.crypto)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'crypto_stakes', filter: 'acct_no=eq.' + me.accts.crypto }, function () { if (!document.hidden) tick(); })
+          .subscribe();
+      }
+    } catch (e) {}
+    return () => { stop = true; clearInterval(iv); document.removeEventListener('visibilitychange', vis); try { if (ch && AlpexaSync.db.removeChannel) AlpexaSync.db.removeChannel(ch); } catch (e) {} };
   }, []);
   // Move USD from balance → staked. Stores period alongside USD so the
   // Dashboard can render the lock-period chip.

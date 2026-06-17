@@ -2043,6 +2043,18 @@
   setInterval(function(){ const s=_curBetSig(); if(s!==_betSig){ _betSig=s; syncOwnBets(); } }, 800);
   setTimeout(syncOwnBets, 1500); setTimeout(pullServerBets, 1800);
   setInterval(function(){ if(!document.hidden){ syncOwnBets(); pullServerBets(); } }, 6000);
+  // ── REALTIME: a bet placed / cashed-out / settled on another device hits the
+  // positions table → pull instantly instead of waiting for the 6s timer. The
+  // positions table has REPLICA IDENTITY FULL (set for FX) so DELETE events carry
+  // acct_no too (cash-out / settle removal propagates right away). 6s poll stays as a fallback.
+  setTimeout(function(){ try{
+    if(!(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.channel)) return;
+    var acct=null; try{var m=JSON.parse(localStorage.getItem('alpexa.me')||'null'); if(m&&m.accts) acct=m.accts.sports;}catch(e){}
+    if(!acct) return;
+    AlpexaSync.db.channel('sportsbet-'+acct)
+      .on('postgres_changes',{event:'*',schema:'public',table:'positions',filter:'acct_no=eq.'+acct},function(){ if(!document.hidden) pullServerBets(); })
+      .subscribe();
+  }catch(e){} }, 2000);
 
   // ---------- wallet (multi-server balances) ----------
   const SERVERS=[
@@ -2767,6 +2779,17 @@
   syncBalancesFromServer();
   setInterval(function(){ if(!document.hidden) syncBalancesFromServer(); }, 10000);
   document.addEventListener('visibilitychange',function(){ if(!document.hidden) syncBalancesFromServer(); });
+  // ── REALTIME: when the server-side settler credits a win (accounts.balance changes),
+  // adopt it instantly instead of waiting up to 10s. The 7s local-change guard inside
+  // syncBalancesFromServer prevents reverting a just-placed bet. 10s poll stays as a fallback.
+  setTimeout(function(){ try{
+    if(!(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.channel)) return;
+    var acct=null; try{var m=JSON.parse(localStorage.getItem('alpexa.me')||'null'); if(m&&m.accts) acct=m.accts.sports;}catch(e){}
+    if(!acct) return;
+    AlpexaSync.db.channel('sportsbal-'+acct)
+      .on('postgres_changes',{event:'*',schema:'public',table:'accounts',filter:'acct_no=eq.'+acct},function(){ if(!document.hidden) syncBalancesFromServer(); })
+      .subscribe();
+  }catch(e){} }, 2200);
   // settings initial application
   restartRealityCheck();
   applySelfExclusion();
