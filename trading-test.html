@@ -3507,10 +3507,12 @@ function App(){
     let stop=false;
     function pullPos(){
       let me; try{ me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); }catch(e){ me=null; }
-      if(!me||!me.custId) return;
+      if(!me||!me.accts||!me.accts.fx) return;
+      // Match by FX account number (stable) rather than cust_id (which can drift
+      // between devices), so both browsers see the same shared positions.
       AlpexaSync.db.from('positions')
         .select('local_id,symbol,side,size,open_price,pnl,status')
-        .eq('cust_id',me.custId).eq('server','fx').eq('status','open')
+        .eq('acct_no',me.accts.fx).eq('server','fx').eq('status','open')
         .then(function(r){
           if(stop||!r||!r.data) return;
           const srv=r.data, srvIds={}; srv.forEach(p=>{srvIds[String(p.local_id)]=p;});
@@ -3991,14 +3993,15 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
     // on another device — that's why two browsers used to disagree. If I have none,
     // push nothing (don't delete the other device's positions).
     if(!ids.length) return;
-    AlpexaSync.db.from('positions').delete().eq('cust_id',cust).eq('server','fx').in('local_id',ids).then(function(){
+    // Key by acct_no (stable) so refreshes/deletes match rows from any device.
+    AlpexaSync.db.from('positions').delete().eq('acct_no',acct).eq('server','fx').in('local_id',ids).then(function(){
       AlpexaSync.db.from('positions').insert(items).then(function(){},function(){});
     },function(){});
   }
   // When a position is CLOSED on this device, remove it from the server so other
   // devices drop it too (paired with the adopt loop in the app).
-  window.__fxSyncDelete=function(lid){ try{ if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m||!m.custId)return;
-    AlpexaSync.db.from('positions').delete().eq('cust_id',m.custId).eq('server','fx').eq('local_id',String(lid)).then(function(){},function(){}); }catch(e){} };
+  window.__fxSyncDelete=function(lid){ try{ if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m||!m.accts||!m.accts.fx)return;
+    AlpexaSync.db.from('positions').delete().eq('acct_no',m.accts.fx).eq('server','fx').eq('local_id',String(lid)).then(function(){},function(){}); }catch(e){} };
   setTimeout(push,2000); setInterval(function(){ if(!document.hidden){ push(); } else { window.__bgPosPush=window.__bgPosPush||0; if(Date.now()-window.__bgPosPush>9000){ window.__bgPosPush=Date.now(); push(); } } },3000);
   // Instant: when a position opens/closes (id list changes), push right away
   // instead of waiting for the next tick. PnL drift rides the 3s interval.
