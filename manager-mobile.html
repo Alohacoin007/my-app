@@ -1577,6 +1577,12 @@
       toast(v==='1'?'🟢 Live betting ON — apps update in ~5s':'⚪ Live betting OFF'); render();
     },function(){ toast('Failed',true); });
   }
+  // Operator settings live in `controls` (server) — single source of truth, shared
+  // across manager devices and read by the apps. cnum reads a server value with a
+  // default; setControl writes it (admin-only via RLS, so customers can't tamper).
+  function cnum(k,def){ var v=CONTROLS&&CONTROLS[k]; return (v==null||v==='')?def:(+v||0); }
+  function setControl(k,v){ if(!window.AlpexaSync||!AlpexaSync.db) return; CONTROLS[k]=String(v);
+    AlpexaSync.db.from('controls').upsert({key:k,val:String(v),updated_at:new Date().toISOString()},{onConflict:'key'}).then(function(r){ if(r&&r.error) toast('Save failed: '+r.error.message,true); },function(){ toast('Save failed',true); }); }
   // ── Admin authentication (Stage A for RLS) ──
   // The back office signs in as a real Supabase admin account so AlpexaSync's
   // queries carry an admin JWT — this is what keeps full access AFTER RLS is
@@ -1640,19 +1646,19 @@
           '<div class="hint">Pre-match betting always works. This switch only controls in-play. Updates apps within ~5s.</div></div>';
       })()+
       '<div class="sec">Limits (#5)</div>'+
-      '<div class="card">'+cfgRow('Max bet (USDT)','cfgMaxBet',num('alpexa.maxBet',5000))+cfgRow('Max deposit (USDT)','cfgMaxDep',num('alpexa.maxDeposit',50000))+cfgRow('Max withdrawal (USDT)','cfgMaxWd',num('alpexa.maxWithdraw',50000))+
+      '<div class="card">'+cfgRow('Max bet (USDT)','cfgMaxBet',cnum('maxBet',5000))+cfgRow('Max deposit (USDT)','cfgMaxDep',cnum('maxDeposit',50000))+cfgRow('Max withdrawal (USDT)','cfgMaxWd',cnum('maxWithdraw',50000))+
         '<button class="save" id="saveLimits">Save limits</button><div class="hint">Per-request caps (demo — wired to app next).</div></div>'+
       '<div class="sec">Lines / margin (#9)</div>'+
-      '<div class="card">'+cfgRow('House margin / vig (%)','cfgMargin',num('alpexa.margin',5))+'<button class="save" id="saveMargin">Save margin</button>'+
+      '<div class="card">'+cfgRow('House margin / vig (%)','cfgMargin',cnum('margin',5))+'<button class="save" id="saveMargin">Save margin</button>'+
         '<div class="hint">Your built-in edge. (Odds currently come from the best book feed.)</div></div>'+
       '<div class="sec">Promotions (#10)</div>'+
-      '<div class="card">'+cfgRow('Loss cashback (%)','cfgCashback',num('alpexa.cashback',5))+'<button class="save" id="savePromo">Save promo</button>'+
+      '<div class="card">'+cfgRow('Loss cashback (%)','cfgCashback',cnum('cashback',5))+'<button class="save" id="savePromo">Save promo</button>'+
         '<div class="hint">Players earn this % of losses back as credit.</div></div>'+
       '<div class="sec">Payments</div>'+
       '<div class="card"><div class="lbl">Company deposit wallet · USDT (ERC-20)</div>'+
         '<input class="in" id="coAddrIn" spellcheck="false" autocomplete="off">'+
         '<div style="display:flex;gap:8px"><button class="save" id="coSave">Save</button><button class="save ghost" id="coCopy">Copy</button></div>'+
-        cfgRow('Withdrawal network fee (USDT)','cfgFee',num('alpexa.wdFee',5))+'<button class="save" id="saveFee">Save fee</button>'+
+        cfgRow('Withdrawal network fee (USDT)','cfgFee',cnum('wdFee',5))+'<button class="save" id="saveFee">Save fee</button>'+
         '<div class="hint">Match Coinbase\'s current send fee.</div></div>'+
       '<div class="sec">Danger zone</div>'+
       '<div class="card"><button class="save danger" id="resetBtn">🗑 Reset all demo data</button>'+
@@ -1784,16 +1790,16 @@
     document.querySelectorAll('[data-hedge]').forEach(function(b){b.onclick=function(){var p=(b.getAttribute('data-hedge')||'').split('|');recordHedge(p[0],p[1],+p[2],+p[3]);};});
     document.querySelectorAll('[data-rg]').forEach(function(b){b.onclick=function(){var g=b.getAttribute('data-rg');RISK_OPEN=(RISK_OPEN===g?null:g);render();};});
     var g;
-    if(g=document.getElementById('kycToggle'))g.onclick=function(){var k=localStorage.getItem('alpexa.kyc')||'pending';localStorage.setItem('alpexa.kyc',k==='verified'?'pending':'verified');render();};
+    if(g=document.getElementById('kycToggle'))g.onclick=function(){var k=(CONTROLS&&CONTROLS.kyc)||'pending';setControl('kyc',k==='verified'?'pending':'verified');render();};
     if(g=document.getElementById('rgSave'))g.onclick=function(){var st=getJSON('alpexaSettings',{});st.depositLimit=parseFloat(val('rgDep'))||0;st.lossLimit=parseFloat(val('rgLoss'))||0;var d=parseFloat(val('rgSE'))||0;st.selfExcludeUntil=d>0?Date.now()+d*86400000:0;setJSON('alpexaSettings',st);flash(g,'Saved ✓');render();};
     if(g=document.getElementById('adminIn'))g.onclick=function(){adminSignIn();};
     if(g=document.getElementById('adminOut'))g.onclick=function(){adminSignOut();};
-    if(g=document.getElementById('saveLimits'))g.onclick=function(){localStorage.setItem('alpexa.maxBet',val('cfgMaxBet'));localStorage.setItem('alpexa.maxDeposit',val('cfgMaxDep'));localStorage.setItem('alpexa.maxWithdraw',val('cfgMaxWd'));flash(g);};
-    if(g=document.getElementById('saveMargin'))g.onclick=function(){localStorage.setItem('alpexa.margin',val('cfgMargin'));flash(g);};
-    if(g=document.getElementById('savePromo'))g.onclick=function(){localStorage.setItem('alpexa.cashback',val('cfgCashback'));flash(g);};
-    if(g=document.getElementById('saveFee'))g.onclick=function(){localStorage.setItem('alpexa.wdFee',val('cfgFee'));flash(g);};
+    if(g=document.getElementById('saveLimits'))g.onclick=function(){setControl('maxBet',val('cfgMaxBet'));setControl('maxDeposit',val('cfgMaxDep'));setControl('maxWithdraw',val('cfgMaxWd'));flash(g);};
+    if(g=document.getElementById('saveMargin'))g.onclick=function(){setControl('margin',val('cfgMargin'));flash(g);};
+    if(g=document.getElementById('savePromo'))g.onclick=function(){setControl('cashback',val('cfgCashback'));flash(g);};
+    if(g=document.getElementById('saveFee'))g.onclick=function(){setControl('wdFee',val('cfgFee'));flash(g);};
     var ai=document.getElementById('coAddrIn'); if(ai)ai.value=CO_ADDR();
-    if(g=document.getElementById('coSave'))g.onclick=function(){var v=(ai.value||'').trim();if(v)localStorage.setItem('alpexa.companyAddr',v);flash(g);};
+    if(g=document.getElementById('coSave'))g.onclick=function(){var v=(ai.value||'').trim();if(v){setControl('companyAddr',v);localStorage.setItem('alpexa.companyAddr',v);}flash(g);};
     if(g=document.getElementById('coCopy'))g.onclick=function(){copy((ai.value||'').trim());flash(g,'Copied!');};
     if(g=document.getElementById('resetBtn'))g.onclick=function(){if(!confirm('Reset ALL demo data? Clears balances, bets, requests & activity.'))return;
       Object.keys(localStorage).forEach(function(k){var keep=(k==='alpexa.companyAddr'||k==='alpexa.wdFee'||k==='alpexa.maxBet'||k==='alpexa.maxDeposit'||k==='alpexa.maxWithdraw'||k==='alpexa.margin'||k==='alpexa.cashback');if(k.indexOf('alpexa')===0 && !keep)localStorage.removeItem(k);});

@@ -2335,7 +2335,7 @@
   // ---------- deposit sheet (external wallet -> Crypto server) ----------
   // Company deposit wallet addresses (DUMMY — replace with real ones later)
   const DEPOSIT_ADDR_DEFAULT='0x6B1c8941698Affc56757eF9Be1723Ec43F720966';
-  function companyAddr(){try{return localStorage.getItem('alpexa.companyAddr')||DEPOSIT_ADDR_DEFAULT;}catch(e){return DEPOSIT_ADDR_DEFAULT;}}
+  function companyAddr(){try{var c=(window.__alpexaCtrl&&window.__alpexaCtrl.companyAddr);return (c&&String(c).trim())||localStorage.getItem('alpexa.companyAddr')||DEPOSIT_ADDR_DEFAULT;}catch(e){return DEPOSIT_ADDR_DEFAULT;}}
   let dpNet='ERC-20';
   const dpSheet=document.getElementById('dpSheet'),dpOverlay=document.getElementById('dpOverlay'),dpAmt=document.getElementById('dpAmt');
   function updateDpAddr(){const el=document.getElementById('dpAddr');if(el)el.textContent=companyAddr();}
@@ -2454,7 +2454,7 @@
   };
 
   // ---------- withdraw sheet (from Sports balance · auto-routed via Crypto) ----------
-  function wdFee(){try{const x=parseFloat(localStorage.getItem('alpexa.wdFee'));return (!isNaN(x)&&x>=0)?x:5;}catch(e){return 5;}} // flat USDT network fee (set in back office)
+  function wdFee(){try{var c=(window.__alpexaCtrl&&window.__alpexaCtrl.wdFee);var x=(c!=null&&c!=='')?parseFloat(c):parseFloat(localStorage.getItem('alpexa.wdFee'));return (!isNaN(x)&&x>=0)?x:5;}catch(e){return 5;}} // flat USDT network fee — server controls (back office)
   const wdSheet=document.getElementById('wdSheet'),wdOverlay=document.getElementById('wdOverlay'),
         wdAmt=document.getElementById('wdAmt'),wdAddr=document.getElementById('wdAddr');
   function updateWdSummary(){
@@ -3214,6 +3214,13 @@
     AlpexaSync.db.from('controls').select('val').eq('key','live_betting').limit(1).then(function(r){
       window.__alpexaLiveBetting=!!(r&&r.data&&r.data[0]&&r.data[0].val==='1'); },function(){}); }
   setTimeout(pullLiveBetting,1500); setInterval(function(){ if(!document.hidden) pullLiveBetting(); },5000);
+  // Operator settings (withdrawal fee, company deposit address, limits, margin) live
+  // in `controls` (server) so they're admin-owned — customers can't tamper in
+  // localStorage. Cache them all; wdFee()/companyAddr() read from here.
+  window.__alpexaCtrl = window.__alpexaCtrl || {};
+  function pullCtrl(){ if(!window.AlpexaSync||!AlpexaSync.db)return;
+    AlpexaSync.db.from('controls').select('key,val').then(function(r){ if(r&&r.data){ var m={}; r.data.forEach(function(x){ m[x.key]=x.val; }); window.__alpexaCtrl=m; } },function(){}); }
+  setTimeout(pullCtrl,1400); setInterval(function(){ if(!document.hidden) pullCtrl(); },5000);
   /* Execute back-office commands (void bet). */
   function runCmds(){
     if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m||!m.accts.sports)return; var cust=m.custId;
