@@ -2442,8 +2442,11 @@
       const res=r&&r.data;
       if(res&&res.ok){
         closeTransfer();
-        // Transfers have no local balance math, so clear the "busy" guard and adopt
-        // the fresh server balance NOW (syncBalancesFromServer also calls updateWallet).
+        // Optimistic: reflect the sports leg INSTANTLY so it feels immediate; the
+        // server pull below reconciles to the authoritative value (same number).
+        if(tfFrom==='sports') balance=Math.max(0,balance-v); else if(tfTo==='sports') balance=balance+v;
+        try{ syncSportsBal(); }catch(e){}
+        try{ updateWallet(); }catch(e){}
         try{ window.__sbLocalTs=0; syncBalancesFromServer(); }catch(e){}
         try{ pullServerActivity(); }catch(e){}
         // Re-pull a beat later in case the commit lands just after the first pull.

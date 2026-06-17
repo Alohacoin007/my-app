@@ -2624,6 +2624,8 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
             AlpexaSync.db.rpc('app_transfer',{p_ref:ref,p_from:fromAcct,p_to:toAcct,p_amount:amt}).then(function(r){
               const res=r&&r.data;
               if(res&&res.ok){ try{pushFundingHistory({id:ref,kind:'transfer',method:'Internal transfer',amount:amt,currency:'USD',ref:REF_PREFIX.transfer+Math.floor(10000000+Math.random()*89999999),note,account:'live',destAcct:destAcct,status:'approved'});}catch(e){}
+                // Optimistic: reflect both legs instantly in the local balance cache.
+                try{ window.addBalance&&window.addBalance('live',-amt); window.addBalance&&window.addBalance(destAcct||'crypto',amt); }catch(e){}
                 // Refresh ALL server balances now so both legs reflect immediately.
                 try{ AlpexaSync.pullBalances&&AlpexaSync.pullBalances().then(function(b){ if(!b)return; try{var o=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{}; if(b.fx!=null)o.fx=b.fx; if(b.sports!=null)o.sports=b.sports; if(b.crypto!=null)o.crypto=b.crypto; localStorage.setItem('alpexa.serverBalances',JSON.stringify(o)); window.dispatchEvent(new Event('alpexa-balance-change')); }catch(e){} }); }catch(e){} }
             },function(){});

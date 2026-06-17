@@ -13061,6 +13061,10 @@ function App() {
     AlpexaSync.db.rpc('app_transfer', { p_ref: ref, p_from: fromAcct, p_to: toAcct, p_amount: usd }).then(function (r) {
       const res = r && r.data;
       if (res && res.ok) {
+        // Optimistic: reflect the crypto USDT leg INSTANTLY (server holdings already
+        // moved; the adopt below reconciles to the same value).
+        if (fromId === 'crypto') setBalances((b) => ({ ...b, USDT: Math.max(0, (b.USDT || 0) - usd) }));
+        else if (toId === 'crypto') setBalances((b) => ({ ...b, USDT: (b.USDT || 0) + usd }));
         // Server moved it — re-adopt holdings/balances from the server right away.
         try { window.__cbLocalTs = 0; if (adoptHoldingsRef.current) adoptHoldingsRef.current(); } catch (e) {}
         try { forceCryptoAdopt(); } catch (e) {}
