@@ -1823,12 +1823,12 @@
     if(seg==='open'){
       el.innerHTML=openBets.length?openBets.map(b=>ticketHTML(b,true)).join(''):'<div class="empty empty-cta"><div class="ec-ic">🎫</div><div class="ec-t">No open bets</div><div class="ec-s">Place a bet to see it here</div><button class="ec-btn" id="ecGo">Browse games</button></div>';
       const go=document.getElementById('ecGo'); if(go)go.onclick=()=>document.querySelector('[data-page="home"]').click();
-    }else{el.innerHTML=settledBets.map(b=>ticketHTML(b,false)).join('');}
+    }else{ const sl=settledList(); el.innerHTML=sl.length?sl.map(b=>ticketHTML(b,false)).join(''):'<div class="empty">No settled bets yet</div>'; }
     renderStats();
   }
   function renderStats(){
     const el=document.getElementById('betStats'); if(!el)return;
-    const sb=settledBets||[];
+    const sb=settledList();
     if(!sb.length){el.innerHTML='';return;}
     const staked=sb.reduce((a,b)=>a+(b.stake||0),0), returned=sb.reduce((a,b)=>a+(b.payout||0),0), net=returned-staked;
     const won=sb.filter(b=>b.result==='won').length, winRate=Math.round(won/sb.length*100), roi=staked?Math.round(net/staked*1000)/10:0, np=net>=0;
@@ -2056,7 +2056,7 @@
     var acct=null; try{var m=JSON.parse(localStorage.getItem('alpexa.me')||'null'); if(m&&m.accts) acct=m.accts.sports;}catch(e){}
     if(!acct) return;
     AlpexaSync.db.channel('sportsbet-'+acct)
-      .on('postgres_changes',{event:'*',schema:'public',table:'positions',filter:'acct_no=eq.'+acct},function(){ if(!document.hidden) pullServerBets(); })
+      .on('postgres_changes',{event:'*',schema:'public',table:'positions',filter:'acct_no=eq.'+acct},function(){ if(!document.hidden){ pullServerBets(); pullServerSettled(); } })
       .subscribe();
   }catch(e){} }, 2000);
   // ── SERVER-AUTHORITATIVE financial activity (deposit / withdraw / transfer).
@@ -2094,6 +2094,38 @@
   }
   setTimeout(pullServerActivity,1900);
   setInterval(function(){ if(!document.hidden) pullServerActivity(); },6000);
+
+  // ── SERVER-AUTHORITATIVE settled bets. Read won/lost results from the
+  // `settlements` table (written by the sports-settle engine) so the Settled tab
+  // is identical on every device — not per-device localStorage. Cash-outs (settled
+  // on-device, with full legs) are merged in. Rich legs preferred when available.
+  let serverSettled=[];
+  function pullServerSettled(){
+    if(!(window.AlpexaSync&&AlpexaSync.db)) return; const cust=meCust(); if(!cust) return;
+    AlpexaSync.db.from('settlements').select('local_id,ticket,symbol,stake,pnl,kind,created_at')
+      .eq('cust_id',cust).eq('server','sports').order('created_at',{ascending:false}).limit(100)
+      .then(function(r){
+        const rows=(r&&r.data)||[]; const out=[];
+        rows.forEach(function(x){
+          const k=(x.kind||'').toLowerCase(); if(k!=='bet_won'&&k!=='bet_lost') return;
+          const won=k==='bet_won', stake=+x.stake||0, pnl=+x.pnl||0;
+          const ts=x.created_at?new Date(x.created_at).getTime():0;
+          // prefer a local rich copy (has legs) if this device settled it
+          const loc=(settledBets||[]).find(b=>(b.id&&String(b.id).indexOf(String(x.local_id))>=0)||(x.ticket&&b.ticket===x.ticket));
+          if(loc&&loc.legs&&loc.legs.length){ out.push(Object.assign({},loc,{ts:loc.ts||ts})); }
+          else out.push({ id:'srv-'+x.local_id, ticket:x.ticket||'', type:x.symbol||'Bet', cls:'', stake:stake, result:won?'won':'lost', payout:won?Math.round((stake+pnl)*100)/100:0, legs:[], ts:ts });
+        });
+        serverSettled=out;
+        try{ renderTickets(); }catch(e){}
+      },function(){});
+  }
+  // Settled list shown in the UI = server settlements + local cash-outs (not on server).
+  function settledList(){
+    const cashed=(settledBets||[]).filter(b=>b.result==='cashed');
+    return serverSettled.concat(cashed).sort(function(a,b){return (+b.ts||0)-(+a.ts||0);});
+  }
+  setTimeout(pullServerSettled,2100);
+  setInterval(function(){ if(!document.hidden) pullServerSettled(); },6000);
 
   // ---------- wallet (multi-server balances) ----------
   const SERVERS=[
@@ -2783,6 +2815,7 @@
   });
   reconcileWithdrawals();
   try{ pullServerActivity(); }catch(e){}   // server-authoritative financial feed on load
+  try{ pullServerSettled(); }catch(e){}    // server-authoritative settled-bets on load
   renderCurServerIcon();renderGames();calc();renderTickets();updateWallet();
   applyLang();
   window.addEventListener('storage',e=>{ if(e.key==='alpexa.withdrawals'){ reconcileWithdrawals(); updateWallet(); } });
