@@ -2439,9 +2439,12 @@
       const res=r&&r.data;
       if(res&&res.ok){
         closeTransfer();
-        try{ syncBalancesFromServer(); }catch(e){}   // server is the truth — pull fresh
+        // Transfers have no local balance math, so clear the "busy" guard and adopt
+        // the fresh server balance NOW (syncBalancesFromServer also calls updateWallet).
+        try{ window.__sbLocalTs=0; syncBalancesFromServer(); }catch(e){}
         try{ pullServerActivity(); }catch(e){}
-        try{ updateWallet(); }catch(e){}
+        // Re-pull a beat later in case the commit lands just after the first pull.
+        setTimeout(function(){ try{ window.__sbLocalTs=0; syncBalancesFromServer(); }catch(e){} }, 1200);
         notify('✅','Transfer complete',`${usd(v)} ${fromNm} → ${toNm}`,'deposits');
         showToast('✅','Transfer complete',`${usd(v)} ${fromNm} → ${toNm}`);
       } else {

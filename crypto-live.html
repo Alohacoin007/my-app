@@ -13064,6 +13064,9 @@ function App() {
         // Server moved it — re-adopt holdings/balances from the server right away.
         try { window.__cbLocalTs = 0; if (adoptHoldingsRef.current) adoptHoldingsRef.current(); } catch (e) {}
         try { forceCryptoAdopt(); } catch (e) {}
+        // Refresh ALL cross-server balances now so the destination (FX/Sports) shows
+        // the new amount immediately in the switcher — not after the next poll.
+        try { AlpexaSync.pullBalances && AlpexaSync.pullBalances().then(function (b) { if (!b) return; setServerBalances(function (s) { const n = { ...s }; if (b.fx != null) n.fx = b.fx; if (b.sports != null) n.sports = b.sports; if (b.crypto != null) n.crypto = b.crypto; return n; }); try { var o = JSON.parse(localStorage.getItem('alpexa.serverBalances') || '{}') || {}; if (b.fx != null) o.fx = b.fx; if (b.sports != null) o.sports = b.sports; if (b.crypto != null) o.crypto = b.crypto; localStorage.setItem('alpexa.serverBalances', JSON.stringify(o)); } catch (e) {} }); } catch (e) {}
       }
     }, function () {});
   };
