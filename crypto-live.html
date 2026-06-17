@@ -13114,9 +13114,8 @@ function App() {
       setServerBalances((s) => ({ ...s, [t.source]: Math.max(0, (s[t.source] || 0) - g) }));
       if (t.source === 'crypto') forceCryptoAdopt();
     } else if (t.type === 'transfer') {
-      // Debit only the crypto source leg; the destination app credits itself
-      // (incoming transfers to crypto are applied via pullIncomingTransfers).
-      if (t.from === 'crypto' && t.to !== 'crypto') setBalances((b) => ({ ...b, USDT: Math.max(0, (b.USDT || 0) - t.usd) }));
+      // Transfers now move money via the app_transfer RPC (server-side); the crypto
+      // adopt loop reflects the new USDT holdings. Do NOT change balance here.
     }
   }, [setBalances, setServerBalances]);
   React.useEffect(() => {
@@ -13128,7 +13127,8 @@ function App() {
       AlpexaSync.pullIncomingTransfers('crypto').then((legs) => {
         if (stop || !legs || !legs.length) return;
         legs.forEach((l) => {
-          setBalances((b) => ({ ...b, USDT: (b.USDT || 0) + l.amount }));
+          // Money is credited SERVER-SIDE by app_transfer (→ crypto_holdings USDT),
+          // reflected by the adopt loop. Do NOT credit here (would double). History only.
           pushTx({ id: 'in-' + l.id, type: 'transfer', sym: 'USDT', usd: l.amount, from: l.from, to: 'crypto', approvedAt: Date.now() });
         });
         if (typeof AudioFX !== 'undefined') { try { AudioFX.cash(); } catch (e) {} }
@@ -13159,7 +13159,8 @@ function App() {
           const amt = +r.amount || 0; if (!(amt > 0)) return;
           if (srvN(r.from_label) !== 'crypto' || srvN(r.to_label) === 'crypto') return;
           if (localIds[r.local_id] || applied[r.local_id + ':out']) return;
-          setBalances((b) => ({ ...b, USDT: Math.max(0, (b.USDT || 0) - amt) }));
+          // Money is debited SERVER-SIDE by app_transfer (→ crypto_holdings USDT),
+          // reflected by the adopt loop. Do NOT debit here (would double). History only.
           pushTx({ id: 'out-' + r.local_id, type: 'transfer', sym: 'USDT', usd: amt, from: 'crypto', to: srvN(r.to_label), approvedAt: Date.now() });
           applied[r.local_id + ':out'] = 1; changed = true;
         });

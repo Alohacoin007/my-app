@@ -3437,11 +3437,9 @@ function App(){
           // SERVER-OWNS-BALANCE: deposits/withdrawals are applied by DB triggers
           // (apply_fx_deposit/withdraw_balance) and adopted from the server — do
           // NOT change the balance locally (would double-count, esp. app-closed).
-          // Transfers have no trigger, so post the FX leg to the ledger (delta).
-          if(h.kind==='transfer' && (h.account||'live')==='live'){
-            try{ var meT=JSON.parse(localStorage.getItem('alpexa.me')||'null'); var fxA=meT&&meT.accts&&meT.accts.fx;
-              if(fxA&&window.AlpexaSync&&AlpexaSync.db) AlpexaSync.db.from('ledger').insert({acct_no:fxA,cust_id:(meT.custId||''),server:'fx',kind:'transfer',amount:-amt,ref:'trf-'+h.id}).then(function(){},function(){}); }catch(e){}
-          }
+          // Transfers are now moved by the app_transfer RPC (server-side, both legs).
+          // The old per-leg ledger post is DISABLED (would double). 'xfer-' ids are
+          // RPC-handled; older non-RPC transfer entries also no longer post here.
         }
         if(r.status==='approved'||r.status==='rejected'){
           const lbl=(h.kind==='deposit'?'Deposit':h.kind==='withdraw'?'Withdrawal':'Transfer')+' $'+(+h.amount||0).toLocaleString();
@@ -3452,10 +3450,9 @@ function App(){
       if(changed){ try{localStorage.setItem('alpexa.funding',JSON.stringify(hist));}catch(e){} window.dispatchEvent(new Event('alpexa-balance-change')); }
       // Credit transfers that OTHER apps sent to FX (idempotent across apps).
       AlpexaSync.pullIncomingTransfers('live').then(legs=>{ legs.forEach(l=>{
-        // SERVER-OWNS-BALANCE: credit the incoming transfer via the ledger (delta)
-        // so accounts.balance is the source of truth; the app adopts it below.
-        try{ var meI=JSON.parse(localStorage.getItem('alpexa.me')||'null'); var fxI=meI&&meI.accts&&meI.accts.fx;
-          if(fxI&&window.AlpexaSync&&AlpexaSync.db) AlpexaSync.db.from('ledger').insert({acct_no:fxI,cust_id:(meI.custId||''),server:'fx',kind:'transfer',amount:+l.amount||0,ref:'trfin-'+l.id}).then(function(){},function(){}); }catch(e){}
+        // Money is credited SERVER-SIDE by app_transfer (ledger → balance), adopted
+        // below via pullBalances. Do NOT post a ledger credit here (would double).
+        // History only.
         try{ window.pushFundingHistory && window.pushFundingHistory({ id:'TRF-IN-'+l.id, kind:'transfer', method:'Internal transfer', amount:+l.amount||0, currency:'USD', note:'Received'+(l.from?(' from '+String(l.from).toUpperCase()):'')+' → FX', account:'live', status:'approved' }); }catch(e){}
         window.alpexaNotify&&alpexaNotify({type:'approved',pref:'deposit',title:'Transfer received · $'+(+l.amount).toLocaleString()+' → FX'}); }); }).catch(()=>{});
     }).catch(()=>{}); };

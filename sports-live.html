@@ -2836,15 +2836,10 @@
       });
       if(changed){ saveWithdrawals(all); reconcileWithdrawals(); updateWallet(); }
     }).catch(()=>{});
-    // Credit transfers that OTHER apps (FX / Crypto) sent to Sports — idempotent.
-    AlpexaSync.pullIncomingTransfers('sports').then(legs=>{
-      if(!legs||!legs.length) return;
-      legs.forEach(l=>{ balance+=(+l.amount||0);
-        txns.unshift({ts:Date.now(),ic:'🔄',t1:'Transfer',t2:'Received · Approved',amt:+l.amount||0}); });
-      syncSportsBal(); saveTxns(); updateWallet();
-      const tot=legs.reduce((a,l)=>a+(+l.amount||0),0);
-      showToast('✅','Transfer received','$'+tot.toLocaleString()+' added to Sports');
-    }).catch(()=>{});
+    // NOTE: incoming transfers are now credited SERVER-SIDE by the app_transfer RPC
+    // (ledger → balance), reflected via syncBalancesFromServer, and shown in the feed
+    // by pullServerActivity. The old client-side pullIncomingTransfers('sports') credit
+    // is DISABLED — keeping it would double-credit RPC transfers.
   }
   syncServerStatuses();
   setInterval(()=>{ if(!document.hidden) syncServerStatuses(); }, 15000);
