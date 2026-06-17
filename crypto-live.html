@@ -13177,6 +13177,41 @@ function App() {
     return () => { stop = true; clearInterval(iv); document.removeEventListener('visibilitychange', vis); };
   }, [applyApproval, setTransactions]);
 
+  // ── Cross-device transaction history: merge the server `activity` log (every
+  // pushTx is mirrored there) so transactions made on ANOTHER device also show in
+  // the history. Additive + deduped by ticket — never disturbs local entries or the
+  // approval-apply flow (server rows get a 'srv-' id that no request matches).
+  React.useEffect(() => {
+    if (!window.AlpexaSync || !AlpexaSync.db) return;
+    let stop = false;
+    const me = (() => { try { return JSON.parse(localStorage.getItem('alpexa.me') || 'null'); } catch (e) { return null; } })();
+    const cust = me && me.custId; if (!cust) return;
+    const pull = () => {
+      if (document.hidden) return;
+      AlpexaSync.db.from('activity').select('ticket,kind,symbol,amount,detail,created_at')
+        .eq('cust_id', cust).eq('server', 'crypto').order('created_at', { ascending: false }).limit(200)
+        .then((r) => {
+          if (stop || !r || r.error || !r.data) return;
+          const rows = r.data;
+          setTransactions((cur) => {
+            const have = new Set((cur || []).map((t) => t.ticket).filter(Boolean));
+            const add = [];
+            rows.forEach((a) => {
+              if (!a.ticket || have.has(a.ticket)) return;
+              add.push({ id: 'srv-' + a.ticket, ts: a.created_at ? new Date(a.created_at).getTime() : 0, ticket: a.ticket, type: a.kind || 'tx', sym: a.symbol || 'USDT', usd: +a.amount || 0, detail: a.detail || '', _server: true });
+            });
+            if (!add.length) return cur;
+            return [...(cur || []), ...add].sort((x, y) => (+y.ts || 0) - (+x.ts || 0));
+          });
+        }, () => {});
+    };
+    const t0 = setTimeout(pull, 1800);
+    const iv = setInterval(pull, 8000);
+    const vis = () => { if (!document.hidden) pull(); };
+    document.addEventListener('visibilitychange', vis);
+    return () => { stop = true; clearTimeout(t0); clearInterval(iv); document.removeEventListener('visibilitychange', vis); };
+  }, [setTransactions]);
+
   const flashAsset = (sym) => {
     setPulseAsset(sym);
     setTimeout(() => setPulseAsset(null), 1400);
