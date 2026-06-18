@@ -4040,7 +4040,9 @@ function Transfer({ onBack, serverBalances = {}, onTransferred }) {
   const fromBal = serverBalances[fromId] != null ? serverBalances[fromId] : 0;
   const amount  = parseFloat(amountStr) || 0;
   const insufficient = amount > fromBal;
-  const valid = amount > 0 && !insufficient && fromId !== toId;
+  // Don't let a stale/zero cached balance disable the button — the app_transfer RPC
+  // is the real guard (checks live USDT cash server-side) and reports the reason.
+  const valid = amount > 0 && fromId !== toId;
 
   const onKey = (k) => {
     setTransferQuick(null);
