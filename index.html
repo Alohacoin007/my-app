@@ -94,16 +94,26 @@
     <div class="note">"발생"은 그 패턴이 데이터에서 나온 횟수, 나머지는 그 다음에 실제로 나온 결과입니다. 다음 핸드 확률이 아닙니다.</div>
   </div>
 
+  <div class="card">
+    <h2>4. 베팅 패턴 승률</h2>
+    <div class="fld">베팅 패턴 (반복 적용)
+      <input id="betpat" inputmode="latin" placeholder="예: PBPB (P=플레이어 B=뱅커)" value="PBPB">
+    </div>
+    <div id="winOut" class="stats"></div>
+    <div class="note">입력한 결과에 패턴을 처음부터 반복 적용했을 때의 가상 성적입니다. 타이(T) 결과는 무승부(베팅 반환)로 처리하며 승률 계산에서 제외합니다. 과거 결과일 뿐 미래 예측이 아닙니다.</div>
+  </div>
+
   <div class="foot">도박은 장기적으로 손실(하우스 엣지 −1.06%)로 수렴합니다. 잃어도 되는 금액만, 정해둔 손절선을 지키세요.</div>
 
 <script>
 let data=[];
 function parse(s){return (s.toUpperCase().match(/[BPT]/g))||[];}
-function sync(){document.getElementById('seq').value=data.join(' ');drawSeq();stats();render();}
+function sync(){document.getElementById('seq').value=data.join(' ');drawSeq();stats();render();calcWin();}
 function add(x){data.push(x);sync();}
 function delLast(){data.pop();sync();}
 function clearAll(){data=[];sync();}
-document.getElementById('seq').addEventListener('input',e=>{data=parse(e.target.value);drawSeq();stats();render();});
+document.getElementById('seq').addEventListener('input',e=>{data=parse(e.target.value);drawSeq();stats();render();calcWin();});
+document.getElementById('betpat').addEventListener('input',calcWin);
 
 function drawSeq(){
   const v=document.getElementById('seqview');
@@ -129,6 +139,25 @@ function render(){
   const rows=keys.map(p=>{const m=map[p],cell=s=>m[s]?`<span class="pill p${s}">${m[s]}</span>`:`<span class="muted">0</span>`;
     return `<tr><td class="pat">${p}</td><td>${m.tot}</td><td>${cell('B')}</td><td>${cell('P')}</td><td>${cell('T')}</td></tr>`;}).join('');
   out.innerHTML=`<table><tr><th>직전 ${k}핸드</th><th>발생</th><th>다음 B</th><th>다음 P</th><th>다음 T</th></tr>${rows}</table>`;
+}
+function calcWin(){
+  const out=document.getElementById('winOut');
+  const pat=parse(document.getElementById('betpat').value);
+  if(!pat.length){out.innerHTML='<span class="muted">베팅 패턴을 입력하세요 (예: PBPB)</span>';return;}
+  if(!data.length){out.innerHTML='<span class="muted">먼저 결과 데이터를 입력하세요</span>';return;}
+  let win=0,loss=0,push=0;
+  data.forEach((r,i)=>{
+    const bet=pat[i%pat.length];
+    if(r==='T'&&bet!=='T')push++;
+    else if(r===bet)win++;
+    else loss++;
+  });
+  const decided=win+loss;
+  const rate=decided?(win/decided*100).toFixed(1)+'%':'-';
+  out.innerHTML=`패턴 <b>${pat.join('')}</b> 적용 · `+
+    `<b style="color:var(--tie)">${win}승</b> / <b style="color:var(--banker)">${loss}패</b>`+
+    `${push?` / <b style="color:var(--mut)">${push}무</b>`:''} · `+
+    `승률 <b>${rate}</b> <small style="color:var(--mut)">(무승부 제외 ${decided}판 기준)</small>`;
 }
 clearAll();
 </script>
