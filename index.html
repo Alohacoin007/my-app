@@ -1,112 +1,182 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>바카라 전략 앱</title>
-  <link rel="stylesheet" href="style.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="바카라 분석기">
+<meta name="theme-color" content="#eef1f6">
+<title>바카라 데이터 분석기</title>
+<style>
+  :root{
+    --line:#dde3ec; --txt:#1b2433; --mut:#64748b;
+    --banker:#d6453c; --player:#2f6fd6; --tie:#2f9e6a;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:#eef1f6;color:var(--txt);
+    font-family:-apple-system,'Segoe UI',Roboto,'Malgun Gothic',sans-serif;
+    line-height:1.5;padding:14px;padding-bottom:40px;}
+  h1{font-size:20px;margin:0 0 2px;color:#0f172a}
+  h2{font-size:16px;margin:0 0 12px;color:#0f172a}
+  .sub{color:var(--mut);font-size:12.5px;margin-bottom:14px}
+  .warn{background:#fff6e6;border:1px solid #f0d089;color:#8a5a12;
+    padding:11px 13px;border-radius:11px;font-size:12px;margin-bottom:14px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:14px;
+    padding:15px;margin-bottom:13px;box-shadow:0 1px 3px rgba(16,24,40,.05)}
+  textarea{width:100%;min-height:60px;background:#f8fafc;border:1px solid var(--line);
+    color:var(--txt);border-radius:10px;padding:11px;font-size:16px;letter-spacing:2px;resize:vertical}
+  .bprow{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:11px}
+  .bprow button{height:52px;font-size:16px}
+  .btns2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+  button{cursor:pointer;border:none;border-radius:11px;padding:13px 10px;font-size:15px;
+    font-weight:600;color:#fff;background:#64748b;transition:.1s}
+  button:active{transform:scale(.97)}
+  .b-bank{background:var(--banker)} .b-play{background:var(--player)} .b-tie{background:var(--tie)}
+  .b-del{background:#64748b} .b-clr{background:#b15b5b}
+  .b-go{background:var(--player);width:100%;margin-top:4px}
+  .fld{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mut);margin-bottom:11px}
+  .fld input,.fld select{background:#f8fafc;border:1px solid var(--line);color:var(--txt);
+    border-radius:9px;padding:11px;font-size:16px;width:100%}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .stat{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:11px 12px}
+  .stat .n{font-size:20px;font-weight:700}
+  .stat .l{font-size:11.5px;color:var(--mut)}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -3px}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:300px}
+  th,td{padding:8px 6px;text-align:center;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{color:var(--mut);font-weight:600;font-size:11.5px}
+  .pat{font-family:monospace;letter-spacing:1px;font-weight:700}
+  .pill{display:inline-block;min-width:20px;padding:2px 7px;border-radius:6px;font-weight:700;font-size:12px}
+  .pB{background:#fbe3e0;color:#b3372f} .pP{background:#e2edfb;color:#1f5bb0} .pT{background:#dcf2e7;color:#1f7a52}
+  .seqview{margin-top:11px;line-height:2}
+  .seqview span{display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;
+    border-radius:7px;margin:2px;font-weight:700;font-size:13px;color:#fff}
+  .sB{background:var(--banker)} .sP{background:var(--player)} .sT{background:var(--tie)}
+  .muted{color:var(--mut);font-size:12px}
+  .note{font-size:11px;color:#9a6a2c;margin-top:9px}
+  .ladwin{color:#1f7a52;font-weight:600} .ladloss{color:#c0392b}
+  .empty{color:var(--mut);font-style:italic;padding:8px 0;font-size:13px}
+  .foot{color:var(--mut);font-size:11.5px;text-align:center;margin-top:4px;padding:0 6px}
+</style>
 </head>
 <body>
-  <header class="app-header">
-    <h1>🎴 바카라 전략 앱</h1>
-    <p class="subtitle">결과 기록 · 로드맵 · 베팅 전략 · 자금 관리</p>
-  </header>
+  <h1>바카라 데이터 분석기</h1>
+  <div class="sub">입력한 과거 데이터만 요약 · 미래 예측 없음</div>
 
-  <main class="container">
-    <!-- 면책 안내 -->
-    <section class="disclaimer">
-      ⚠️ 이 앱은 학습 및 기록용 도구입니다. 바카라는 매 게임이 독립적이며,
-      어떤 전략도 카지노의 하우스 엣지를 이길 수 없습니다. 책임감 있게 이용하세요.
-    </section>
+  <div class="warn">
+    ⚠️ 이 앱은 입력한 과거 기록을 그대로 집계할 뿐입니다. 각 핸드는 독립이라 과거 패턴이 다음 핸드를 바꾸지 않습니다 (뱅커 ≈45.9%, 플레이어 ≈44.6% 고정). 어떤 수치도 다음 핸드 예측이 아닙니다.
+  </div>
 
-    <!-- 자금 설정 -->
-    <section class="panel">
-      <h2>자금 관리</h2>
-      <div class="settings-row">
-        <label>시작 자금
-          <input type="number" id="startBankroll" value="1000000" min="0" step="10000" />
-        </label>
-        <label>기본 베팅
-          <input type="number" id="baseBet" value="10000" min="0" step="1000" />
-        </label>
-        <label>베팅 시스템
-          <select id="bettingSystem">
-            <option value="flat">고정 베팅 (Flat)</option>
-            <option value="martingale">마틴게일 (배수)</option>
-            <option value="paroli">파롤리 (역마틴게일)</option>
-            <option value="1326">1-3-2-6 시스템</option>
-            <option value="dalembert">달랑베르</option>
-          </select>
-        </label>
-        <button id="applySettings" class="btn">적용 / 초기화</button>
-      </div>
-      <div class="bankroll-display">
-        <div class="stat-box">
-          <span class="stat-label">현재 자금</span>
-          <span class="stat-value" id="currentBankroll">-</span>
-        </div>
-        <div class="stat-box">
-          <span class="stat-label">손익</span>
-          <span class="stat-value" id="profitLoss">-</span>
-        </div>
-        <div class="stat-box">
-          <span class="stat-label">다음 추천 베팅</span>
-          <span class="stat-value" id="nextBetAmount">-</span>
-        </div>
-      </div>
-    </section>
+  <div class="card">
+    <h2>1. 데이터 입력</h2>
+    <textarea id="seq" inputmode="latin" placeholder="B P B B T P ... (B=뱅커 P=플레이어 T=타이)"></textarea>
+    <div class="bprow">
+      <button class="b-bank" onclick="add('B')">＋뱅커</button>
+      <button class="b-play" onclick="add('P')">＋플레이어</button>
+      <button class="b-tie" onclick="add('T')">＋타이</button>
+    </div>
+    <div class="btns2">
+      <button class="b-del" onclick="delLast()">↶ 마지막 삭제</button>
+      <button class="b-clr" onclick="clearAll()">전체 지우기</button>
+    </div>
+    <div id="seqview" class="seqview"></div>
+  </div>
 
-    <!-- 결과 입력 -->
-    <section class="panel">
-      <h2>결과 기록</h2>
-      <p class="hint">이번 판 결과를 누르세요. 직전 추천에 베팅했다고 가정하고 자금이 갱신됩니다.</p>
-      <div class="input-buttons">
-        <button class="result-btn player" data-result="P">플레이어<br/>PLAYER</button>
-        <button class="result-btn banker" data-result="B">뱅커<br/>BANKER</button>
-        <button class="result-btn tie" data-result="T">타이<br/>TIE</button>
-        <button class="result-btn undo" id="undoBtn">↩ 취소</button>
-        <button class="result-btn clear" id="clearBtn">전체 삭제</button>
-      </div>
-    </section>
+  <div class="card">
+    <h2>2. 빈도 · 연속 통계</h2>
+    <div id="stats" class="stats"></div>
+  </div>
 
-    <!-- 전략 추천 -->
-    <section class="panel strategy-panel">
-      <h2>다음 베팅 추천</h2>
-      <div class="strategy-row">
-        <label>예측 전략
-          <select id="predictStrategy">
-            <option value="banker">항상 뱅커 (하우스 엣지 최소)</option>
-            <option value="follow">추세 추종 (직전과 동일)</option>
-            <option value="opposite">역추세 (직전과 반대)</option>
-            <option value="majority">다수결 (P/B 더 많은 쪽)</option>
-          </select>
-        </label>
-      </div>
-      <div class="recommendation" id="recommendation">결과를 기록하면 추천이 표시됩니다.</div>
-    </section>
+  <div class="card">
+    <h2>3. 패턴 분석</h2>
+    <div class="fld">직전 몇 핸드를 패턴으로 볼지
+      <select id="depth" onchange="render()">
+        <option value="1">직전 1핸드</option>
+        <option value="2" selected>직전 2핸드</option>
+        <option value="3">직전 3핸드</option>
+        <option value="4">직전 4핸드</option>
+      </select>
+    </div>
+    <div class="scroll"><div id="pattern"></div></div>
+    <div class="note">"발생"은 그 패턴이 데이터에서 나온 횟수, 나머지는 그 다음에 실제로 나온 결과입니다. 다음 핸드 확률이 아닙니다.</div>
+  </div>
 
-    <!-- 통계 -->
-    <section class="panel">
-      <h2>통계</h2>
-      <div class="stats-grid" id="statsGrid"></div>
-    </section>
+  <div class="card">
+    <h2>4. 베팅 사다리 계산기</h2>
+    <div class="grid2">
+      <div class="fld">시작 자금($)<input id="bank" type="number" inputmode="numeric" value="500"></div>
+      <div class="fld">목표 자금($)<input id="target" type="number" inputmode="numeric" value="600"></div>
+      <div class="fld">기본 베팅($)<input id="base" type="number" inputmode="numeric" value="25"></div>
+      <div class="fld">손절(연패)<input id="maxL" type="number" inputmode="numeric" value="4"></div>
+    </div>
+    <div class="fld">커미션
+      <select id="comm">
+        <option value="0.95" selected>뱅커 5% (배당 0.95)</option>
+        <option value="1">없음 (배당 1:1)</option>
+      </select>
+    </div>
+    <button class="b-go" onclick="ladder()">계산하기</button>
+    <div class="scroll"><div id="ladderOut" style="margin-top:12px"></div></div>
+    <div class="note">각 단계 베팅은 2연승(파레이)으로 목표 자금을 복구하기 위한 1차 베팅액입니다.</div>
+  </div>
 
-    <!-- 로드맵 -->
-    <section class="panel">
-      <h2>비드 플레이트 (Bead Plate)</h2>
-      <div class="road bead-plate" id="beadPlate"></div>
-    </section>
+  <div class="foot">도박은 장기적으로 손실(하우스 엣지 −1.06%)로 수렴합니다. 잃어도 되는 금액만, 정해둔 손절선을 지키세요.</div>
 
-    <section class="panel">
-      <h2>빅 로드 (Big Road)</h2>
-      <div class="road big-road" id="bigRoad"></div>
-    </section>
-  </main>
+<script>
+let data=[];
+function parse(s){return (s.toUpperCase().match(/[BPT]/g))||[];}
+function sync(){document.getElementById('seq').value=data.join(' ');drawSeq();stats();render();}
+function add(x){data.push(x);sync();}
+function delLast(){data.pop();sync();}
+function clearAll(){data=[];sync();}
+document.getElementById('seq').addEventListener('input',e=>{data=parse(e.target.value);drawSeq();stats();render();});
 
-  <footer class="app-footer">
-    <p>바카라 전략 앱 · 데이터는 브라우저에만 저장됩니다 (localStorage)</p>
-  </footer>
-
-  <script src="app.js"></script>
+function drawSeq(){
+  const v=document.getElementById('seqview');
+  if(!data.length){v.innerHTML='<span class="muted" style="background:none;width:auto;color:var(--mut)">아직 데이터가 없습니다</span>';return;}
+  v.innerHTML=data.map((x,i)=>`<span class="s${x}" title="${i+1}">${x}</span>`).join('');
+}
+function longestRun(sym){let max=0,cur=0;for(const x of data){if(x===sym){cur++;if(cur>max)max=cur;}else cur=0;}return max;}
+function stats(){
+  const el=document.getElementById('stats'),n=data.length,c={B:0,P:0,T:0};
+  data.forEach(x=>c[x]++);
+  const pct=s=>n?(c[s]/n*100).toFixed(1)+'%':'0%';
+  el.innerHTML=`
+    <div class="stat"><div class="n">${n}</div><div class="l">총 핸드</div></div>
+    <div class="stat"><div class="n" style="color:var(--banker)">${c.B} <small style="font-size:12px;color:var(--mut)">${pct('B')}</small></div><div class="l">뱅커 B</div></div>
+    <div class="stat"><div class="n" style="color:var(--player)">${c.P} <small style="font-size:12px;color:var(--mut)">${pct('P')}</small></div><div class="l">플레이어 P</div></div>
+    <div class="stat"><div class="n" style="color:var(--tie)">${c.T} <small style="font-size:12px;color:var(--mut)">${pct('T')}</small></div><div class="l">타이 T</div></div>
+    <div class="stat" style="grid-column:1/-1"><div class="n">${longestRun('B')} / ${longestRun('P')} / ${longestRun('T')}</div><div class="l">최장 연속 (B / P / T)</div></div>`;
+}
+function render(){
+  const k=+document.getElementById('depth').value,out=document.getElementById('pattern');
+  if(data.length<=k){out.innerHTML='<div class="empty">패턴 집계에는 최소 '+(k+1)+'핸드가 필요합니다.</div>';return;}
+  const map={};
+  for(let i=k;i<data.length;i++){const pat=data.slice(i-k,i).join('-'),nxt=data[i];if(!map[pat])map[pat]={B:0,P:0,T:0,tot:0};map[pat][nxt]++;map[pat].tot++;}
+  const keys=Object.keys(map).sort((a,b)=>map[b].tot-map[a].tot);
+  const rows=keys.map(p=>{const m=map[p],cell=s=>m[s]?`<span class="pill p${s}">${m[s]}</span>`:`<span class="muted">0</span>`;
+    return `<tr><td class="pat">${p}</td><td>${m.tot}</td><td>${cell('B')}</td><td>${cell('P')}</td><td>${cell('T')}</td></tr>`;}).join('');
+  out.innerHTML=`<table><tr><th>직전 ${k}핸드</th><th>발생</th><th>다음 B</th><th>다음 P</th><th>다음 T</th></tr>${rows}</table>`;
+}
+function ladder(){
+  const start=+document.getElementById('bank').value,target=+document.getElementById('target').value,
+    base=+document.getElementById('base').value,maxL=Math.max(1,+document.getElementById('maxL').value),
+    pay=+document.getElementById('comm').value,mult=Math.pow(1+pay,2)-1;
+  let bank=start,rows='',totalRisk=0;
+  for(let step=1;step<=maxL;step++){
+    let bet=step===1?base:Math.round((target-bank)/mult);
+    if(bet>bank)bet=bank; if(bet<=0)break;
+    const winFinal=bank+bet*mult,afterLoss=bank-bet; totalRisk+=bet;
+    rows+=`<tr><td>${step}단계</td><td>$${bet.toLocaleString()}</td><td>$${Math.round(bank).toLocaleString()}</td><td class="ladwin">$${Math.round(winFinal).toLocaleString()}</td><td class="ladloss">$${Math.round(afterLoss).toLocaleString()}</td></tr>`;
+    bank=afterLoss;
+  }
+  document.getElementById('ladderOut').innerHTML=`<table><tr><th>단계</th><th>1차 베팅</th><th>베팅 전</th><th>2연승 시</th><th>패배 시</th></tr>${rows}</table>
+    <div class="note">${maxL}연패 시 누적 손실 <b>$${totalRisk.toLocaleString()}</b>, 남는 자금 <b>$${Math.round(bank).toLocaleString()}</b>.</div>`;
+}
+clearAll();ladder();
+</script>
 </body>
 </html>
