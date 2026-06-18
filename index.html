@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>바카라 전략 앱</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>🎴 바카라 전략 앱</h1>
+    <p class="subtitle">결과 기록 · 로드맵 · 베팅 전략 · 자금 관리</p>
+  </header>
+
+  <main class="container">
+    <!-- 면책 안내 -->
+    <section class="disclaimer">
+      ⚠️ 이 앱은 학습 및 기록용 도구입니다. 바카라는 매 게임이 독립적이며,
+      어떤 전략도 카지노의 하우스 엣지를 이길 수 없습니다. 책임감 있게 이용하세요.
+    </section>
+
+    <!-- 자금 설정 -->
+    <section class="panel">
+      <h2>자금 관리</h2>
+      <div class="settings-row">
+        <label>시작 자금
+          <input type="number" id="startBankroll" value="1000000" min="0" step="10000" />
+        </label>
+        <label>기본 베팅
+          <input type="number" id="baseBet" value="10000" min="0" step="1000" />
+        </label>
+        <label>베팅 시스템
+          <select id="bettingSystem">
+            <option value="flat">고정 베팅 (Flat)</option>
+            <option value="martingale">마틴게일 (배수)</option>
+            <option value="paroli">파롤리 (역마틴게일)</option>
+            <option value="1326">1-3-2-6 시스템</option>
+            <option value="dalembert">달랑베르</option>
+          </select>
+        </label>
+        <button id="applySettings" class="btn">적용 / 초기화</button>
+      </div>
+      <div class="bankroll-display">
+        <div class="stat-box">
+          <span class="stat-label">현재 자금</span>
+          <span class="stat-value" id="currentBankroll">-</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">손익</span>
+          <span class="stat-value" id="profitLoss">-</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">다음 추천 베팅</span>
+          <span class="stat-value" id="nextBetAmount">-</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 결과 입력 -->
+    <section class="panel">
+      <h2>결과 기록</h2>
+      <p class="hint">이번 판 결과를 누르세요. 직전 추천에 베팅했다고 가정하고 자금이 갱신됩니다.</p>
+      <div class="input-buttons">
+        <button class="result-btn player" data-result="P">플레이어<br/>PLAYER</button>
+        <button class="result-btn banker" data-result="B">뱅커<br/>BANKER</button>
+        <button class="result-btn tie" data-result="T">타이<br/>TIE</button>
+        <button class="result-btn undo" id="undoBtn">↩ 취소</button>
+        <button class="result-btn clear" id="clearBtn">전체 삭제</button>
+      </div>
+    </section>
+
+    <!-- 전략 추천 -->
+    <section class="panel strategy-panel">
+      <h2>다음 베팅 추천</h2>
+      <div class="strategy-row">
+        <label>예측 전략
+          <select id="predictStrategy">
+            <option value="banker">항상 뱅커 (하우스 엣지 최소)</option>
+            <option value="follow">추세 추종 (직전과 동일)</option>
+            <option value="opposite">역추세 (직전과 반대)</option>
+            <option value="majority">다수결 (P/B 더 많은 쪽)</option>
+          </select>
+        </label>
+      </div>
+      <div class="recommendation" id="recommendation">결과를 기록하면 추천이 표시됩니다.</div>
+    </section>
+
+    <!-- 통계 -->
+    <section class="panel">
+      <h2>통계</h2>
+      <div class="stats-grid" id="statsGrid"></div>
+    </section>
+
+    <!-- 로드맵 -->
+    <section class="panel">
+      <h2>비드 플레이트 (Bead Plate)</h2>
+      <div class="road bead-plate" id="beadPlate"></div>
+    </section>
+
+    <section class="panel">
+      <h2>빅 로드 (Big Road)</h2>
+      <div class="road big-road" id="bigRoad"></div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p>바카라 전략 앱 · 데이터는 브라우저에만 저장됩니다 (localStorage)</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
