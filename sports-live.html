@@ -2455,6 +2455,10 @@
         // Optimistic: reflect the sports leg INSTANTLY so it feels immediate; the
         // server pull below reconciles to the authoritative value (same number).
         if(tfFrom==='sports') balance=Math.max(0,balance-v); else if(tfTo==='sports') balance=balance+v;
+        // CRITICAL: the app_transfer RPC already wrote this leg to the ledger. Move the
+        // delta baseline to the new balance so syncSportsBal does NOT post the change
+        // again (that double-counted the transfer — e.g. $1M → −$2M).
+        window.__sbLastPushed = balance;
         try{ syncSportsBal(); }catch(e){}
         try{ updateWallet(); }catch(e){}
         try{ window.__sbLocalTs=0; syncBalancesFromServer(); }catch(e){}
