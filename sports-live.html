@@ -1888,6 +1888,11 @@
     }
     const nb=document.getElementById('navBadge');
     if(nb){nb.textContent=openBets.length||'';nb.style.display=openBets.length?'flex':'none';}
+    // BUGFIX: post the cash-out delta to the ledger (server-owns-balance) so the
+    // credit persists across reload / other devices. Every other money path calls
+    // syncSportsBal(); cash-out was the only one missing it → cash-outs were lost
+    // when the server balance was re-adopted.
+    syncSportsBal();
     renderTickets();updateWallet();
     notify('💵',partial?'Partial cash out':'Bet cashed out',`${b.type} · +${usd(payAmt)}`,'betResults');
     const toast=document.getElementById('creditToast');

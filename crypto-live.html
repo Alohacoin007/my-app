@@ -6769,11 +6769,11 @@ const HELP_ARTICLES = {
     { q: 'Why do you need my SSN and ID?',
       a: `Alpexa is regulated as a money services business (MSB) and must verify the identity of every account holder under the Bank Secrecy Act and SEC/FinCEN rules. Your information is encrypted in transit and at rest, and we never share it without your consent unless legally required.\n\nWithout verified identity, US law prohibits us from custodying funds or executing trades on your behalf.` },
     { q: 'Is Alpexa available in my country?',
-      a: `Alpexa is currently available to residents of the United States (all 50 states + DC), Canada, the UK, the European Economic Area, Singapore, and Australia. Service in additional countries is rolling out through 2026 — check alpexa.com/regions for the latest list.\n\nIf you move countries after signing up, your account may be temporarily restricted while we re-verify eligibility.` },
+      a: `Alpexa is currently available to residents of the United States (all 50 states + DC), Canada, the UK, the European Economic Area, Singapore, and Australia. Service in additional countries is rolling out through 2026 — check alpexa-suisse.com/regions for the latest list.\n\nIf you move countries after signing up, your account may be temporarily restricted while we re-verify eligibility.` },
     { q: 'What is the minimum age to sign up?',
       a: `You must be at least 18 years old (19 in Alabama and Nebraska, 21 in Mississippi) to open an Alpexa account. Custodial accounts for minors are not currently supported.` },
     { q: 'How do I download the app?',
-      a: `Search "Alpexa" on the App Store (iOS 15+) or Google Play (Android 9+). You can also scan the QR code at alpexa.com/get from your phone's camera. The web app at app.alpexa.com mirrors most mobile features for desktop trading.` },
+      a: `Search "Alpexa" on the App Store (iOS 15+) or Google Play (Android 9+). You can also scan the QR code at alpexa-suisse.com/get from your phone's camera. The web app at app.alpexa-suisse.com mirrors most mobile features for desktop trading.` },
   ],
   deposits: [
     { q: 'How long does a deposit take?',
@@ -6817,7 +6817,7 @@ const HELP_ARTICLES = {
     { q: 'What if I lose my 2FA device?',
       a: `Use the recovery codes you saved when 2FA was set up — each code works once. Without recovery codes, contact support: we'll verify your identity via a video call with your government ID before re-issuing access. This process takes 2–5 business days for security reasons.\n\nNever share your recovery codes or 2FA codes with anyone, including Alpexa support — we will never ask.` },
     { q: 'How do I report a suspicious email or call?',
-      a: `Forward suspicious emails to phishing@alpexa.com and delete them. Alpexa will never call or email asking for your password, 2FA code, recovery phrase, or to install remote-access software.\n\nIf you suspect your account has been compromised, immediately: change your password, revoke all sessions (Account → Security → Sign out all devices), and contact support.` },
+      a: `Forward suspicious emails to phishing@alpexa-suisse.com and delete them. Alpexa will never call or email asking for your password, 2FA code, recovery phrase, or to install remote-access software.\n\nIf you suspect your account has been compromised, immediately: change your password, revoke all sessions (Account → Security → Sign out all devices), and contact support.` },
     { q: 'Are my crypto deposits insured?',
       a: `Crypto held in Alpexa custody is held in cold storage with our institutional custodian and is covered by their commercial crime policy up to $250M aggregate. This insurance covers theft from our hot wallets, internal collusion, and physical loss of private keys.\n\nIt does not cover losses from your personal account compromise (e.g., phishing), market losses, or protocol failures of the underlying blockchains.` },
     { q: 'What is address allowlisting?',
@@ -6853,7 +6853,7 @@ const HELP_ARTICLES = {
     { q: 'How do I add or change my email?',
       a: `Account → Personal info → Email. Enter the new address and tap "Update email". We'll send a verification link to the new address — click it within 24 hours to complete the change.\n\nUntil verified, the old email remains active for security notifications. After change, all login alerts and statements go to the new address.` },
     { q: 'Can I have more than one Alpexa account?',
-      a: `No. Each individual is limited to one Alpexa account by SSN/government ID. Business and trust accounts are separate from personal accounts — see alpexa.com/business.\n\nAttempting to open a second account will result in both being flagged and potentially closed.` },
+      a: `No. Each individual is limited to one Alpexa account by SSN/government ID. Business and trust accounts are separate from personal accounts — see alpexa-suisse.com/business.\n\nAttempting to open a second account will result in both being flagged and potentially closed.` },
     { q: 'How do I close my account?',
       a: `Withdraw all funds (USD and crypto), then Account → Personal info → Close account. The close request is processed after a 7-day cooling-off period in case you change your mind.\n\nClosed accounts cannot be reopened — you would need to apply as a new user. Tax documents for prior years remain available indefinitely via support.` },
     { q: 'What happens to my account if I pass away?',
@@ -8636,9 +8636,20 @@ function BeneficiariesPanel({ list: pList, setList: pSetList }) {
 }
 
 
+// Real referral link → points at the LIVE signup on the real domain, carrying
+// the customer's own code (cust_id). Replaces the old hard-coded alpexa.com/r/jr.
+function alpexaRefLink(){
+  try{
+    var m = JSON.parse(localStorage.getItem('alpexa.me')||'null')||{};
+    var code = String(m.custId||m.cust_id||'').toUpperCase();
+    return 'https://app.alpexa-suisse.com/signup.html'+(code?('?ref='+encodeURIComponent(code)):'');
+  }catch(e){ return 'https://app.alpexa-suisse.com/signup.html'; }
+}
+function alpexaRefDisplay(){ return alpexaRefLink().replace(/^https:\/\//,''); }
+
 // Referral link with working Copy button + flash feedback.
 function ReferralLinkPanel() {
-  const URL = 'https://alpexa.com/r/jr';
+  const URL = alpexaRefLink();
   const [copied, setCopied] = React.useState(false);
   const copy = () => {
     try {
@@ -8671,7 +8682,7 @@ function ReferralLinkPanel() {
 
 // Share via — each row opens the right native handoff for that channel.
 function ShareViaPanel() {
-  const URL = 'https://alpexa.com/r/jr';
+  const URL = alpexaRefLink();
   const MSG = 'I just joined Alpexa — use my link to get $20 in ALPXS:';
   const ENC_MSG = encodeURIComponent(MSG);
   const ENC_URL = encodeURIComponent(URL);
@@ -9654,7 +9665,7 @@ function AccountSubPageContent({ subPage, setSubSub, transactions = [], setTrans
           </div>
         </AcctSection>
         <AcctSection title="Invite & earn">
-          <AcctRow label="Your referral link" value="alpexa.com/r/jr" onClick={go('rewards-link')}/>
+          <AcctRow label="Your referral link" value={alpexaRefDisplay()} onClick={go('rewards-link')}/>
           <AcctDivider/>
           <AcctRow label="Share with friends" sub="Earn $20 in ALPXS per signup" onClick={go('rewards-share')}/>
           <AcctDivider/>
