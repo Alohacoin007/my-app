@@ -35,11 +35,9 @@
   button:active{transform:scale(.97)}
   .b-bank{background:var(--banker)} .b-play{background:var(--player)} .b-tie{background:var(--tie)}
   .b-del{background:#64748b} .b-clr{background:#b15b5b}
-  .b-go{background:var(--player);width:100%;margin-top:4px}
   .fld{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mut);margin-bottom:11px}
   .fld input,.fld select{background:#f8fafc;border:1px solid var(--line);color:var(--txt);
     border-radius:9px;padding:11px;font-size:16px;width:100%}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .stats{display:grid;grid-template-columns:1fr 1fr;gap:9px}
   .stat{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:11px 12px}
   .stat .n{font-size:20px;font-weight:700}
@@ -57,7 +55,6 @@
   .sB{background:var(--banker)} .sP{background:var(--player)} .sT{background:var(--tie)}
   .muted{color:var(--mut);font-size:12px}
   .note{font-size:11px;color:#9a6a2c;margin-top:9px}
-  .ladwin{color:#1f7a52;font-weight:600} .ladloss{color:#c0392b}
   .empty{color:var(--mut);font-style:italic;padding:8px 0;font-size:13px}
   .foot{color:var(--mut);font-size:11.5px;text-align:center;margin-top:4px;padding:0 6px}
 </style>
@@ -104,25 +101,6 @@
     <div class="note">"발생"은 그 패턴이 데이터에서 나온 횟수, 나머지는 그 다음에 실제로 나온 결과입니다. 다음 핸드 확률이 아닙니다.</div>
   </div>
 
-  <div class="card">
-    <h2>4. 베팅 사다리 계산기</h2>
-    <div class="grid2">
-      <div class="fld">시작 자금($)<input id="bank" type="number" inputmode="numeric" value="500"></div>
-      <div class="fld">목표 자금($)<input id="target" type="number" inputmode="numeric" value="600"></div>
-      <div class="fld">기본 베팅($)<input id="base" type="number" inputmode="numeric" value="25"></div>
-      <div class="fld">손절(연패)<input id="maxL" type="number" inputmode="numeric" value="4"></div>
-    </div>
-    <div class="fld">커미션
-      <select id="comm">
-        <option value="0.95" selected>뱅커 5% (배당 0.95)</option>
-        <option value="1">없음 (배당 1:1)</option>
-      </select>
-    </div>
-    <button class="b-go" onclick="ladder()">계산하기</button>
-    <div class="scroll"><div id="ladderOut" style="margin-top:12px"></div></div>
-    <div class="note">각 단계 베팅은 2연승(파레이)으로 목표 자금을 복구하기 위한 1차 베팅액입니다.</div>
-  </div>
-
   <div class="foot">도박은 장기적으로 손실(하우스 엣지 −1.06%)로 수렴합니다. 잃어도 되는 금액만, 정해둔 손절선을 지키세요.</div>
 
 <script>
@@ -161,22 +139,7 @@ function render(){
     return `<tr><td class="pat">${p}</td><td>${m.tot}</td><td>${cell('B')}</td><td>${cell('P')}</td><td>${cell('T')}</td></tr>`;}).join('');
   out.innerHTML=`<table><tr><th>직전 ${k}핸드</th><th>발생</th><th>다음 B</th><th>다음 P</th><th>다음 T</th></tr>${rows}</table>`;
 }
-function ladder(){
-  const start=+document.getElementById('bank').value,target=+document.getElementById('target').value,
-    base=+document.getElementById('base').value,maxL=Math.max(1,+document.getElementById('maxL').value),
-    pay=+document.getElementById('comm').value,mult=Math.pow(1+pay,2)-1;
-  let bank=start,rows='',totalRisk=0;
-  for(let step=1;step<=maxL;step++){
-    let bet=step===1?base:Math.round((target-bank)/mult);
-    if(bet>bank)bet=bank; if(bet<=0)break;
-    const winFinal=bank+bet*mult,afterLoss=bank-bet; totalRisk+=bet;
-    rows+=`<tr><td>${step}단계</td><td>$${bet.toLocaleString()}</td><td>$${Math.round(bank).toLocaleString()}</td><td class="ladwin">$${Math.round(winFinal).toLocaleString()}</td><td class="ladloss">$${Math.round(afterLoss).toLocaleString()}</td></tr>`;
-    bank=afterLoss;
-  }
-  document.getElementById('ladderOut').innerHTML=`<table><tr><th>단계</th><th>1차 베팅</th><th>베팅 전</th><th>2연승 시</th><th>패배 시</th></tr>${rows}</table>
-    <div class="note">${maxL}연패 시 누적 손실 <b>$${totalRisk.toLocaleString()}</b>, 남는 자금 <b>$${Math.round(bank).toLocaleString()}</b>.</div>`;
-}
-clearAll();ladder();
+clearAll();
 </script>
 </body>
 </html>
