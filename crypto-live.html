@@ -13071,8 +13071,13 @@ function App() {
         // Refresh ALL cross-server balances now so the destination (FX/Sports) shows
         // the new amount immediately in the switcher — not after the next poll.
         try { AlpexaSync.pullBalances && AlpexaSync.pullBalances().then(function (b) { if (!b) return; setServerBalances(function (s) { const n = { ...s }; if (b.fx != null) n.fx = b.fx; if (b.sports != null) n.sports = b.sports; if (b.crypto != null) n.crypto = b.crypto; return n; }); try { var o = JSON.parse(localStorage.getItem('alpexa.serverBalances') || '{}') || {}; if (b.fx != null) o.fx = b.fx; if (b.sports != null) o.sports = b.sports; if (b.crypto != null) o.crypto = b.crypto; localStorage.setItem('alpexa.serverBalances', JSON.stringify(o)); } catch (e) {} }); } catch (e) {}
+      } else {
+        // RPC rejected — tell the user instead of failing silently. Most common cause:
+        // transfers send USDT CASH, and the crypto USDT balance is lower than the total
+        // value shown (coins aren't spendable cash until sold).
+        try { alert('Transfer not completed: ' + ((res && res.error) || (r && r.error && r.error.message) || 'please try again') + '\n\nNote: transfers move USDT cash. Your crypto USDT may be less than the total value shown (coins must be sold to USDT first).'); } catch (e) {}
       }
-    }, function () {});
+    }, function () { try { alert('Transfer failed — network error. Please try again.'); } catch (e) {} });
   };
 
   const onFundsConfirmed = (destId, netUsd, methodId) => {
