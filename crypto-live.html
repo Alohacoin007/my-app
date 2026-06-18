@@ -9774,6 +9774,7 @@ function ActivityList({ transactions = [] }) {
     sell:     { label: 'Sold',        color: RH.red,   sign: '-' },
     stake:    { label: 'Staked',      color: RH.text,  sign: '·' },
     unstake:  { label: 'Unstaked',    color: RH.text,  sign: '·' },
+    reward:   { label: 'Staking reward', color: RH.green, sign: '+' },
     redeem:   { label: 'Redeemed',    color: RH.text,  sign: '+' },
     send:     { label: 'Sent',        color: RH.red,   sign: '-' },
     receive:  { label: 'Received',    color: RH.green, sign: '+' },
@@ -10597,7 +10598,7 @@ function Unstake({ onBack, sym, staked = {}, onUnstaked }) {
   const doUnstake = () => {
     if (locked) return;                    // can't unstake before maturity
     if (typeof AudioFX !== 'undefined') AudioFX.success();
-    if (onUnstaked) onUnstaked(sym, finalAmt);
+    if (onUnstaked) onUnstaked(sym, finalAmt, accrued, principal);
     setConfirmed(true);
   };
 
@@ -13548,10 +13549,14 @@ function App() {
   };
 
   // Unstake → adds USD back to the asset balance, clears staked slot.
-  const onUnstakeConfirmed = (sym, amount) => {
+  const onUnstakeConfirmed = (sym, amount, accrued, principal) => {
     setBalances((b) => ({ ...b, [sym]: (b[sym] || 0) + amount }));
     setStaked((s) => { const next = { ...s }; delete next[sym]; return next; });
-    pushTx({ type: 'unstake', sym, usd: amount });
+    var _acc = +accrued || 0, _prin = (principal != null ? +principal : (amount - _acc));
+    // Record the principal returned, AND the staking reward (interest) as its own
+    // history line so the customer sees what they earned — not just the lump sum.
+    pushTx({ type: 'unstake', sym, usd: _prin });
+    if (_acc > 0.005) pushTx({ type: 'reward', sym, usd: _acc, detail: 'Staking reward' });
     flashAsset(sym);
   };
   // Swap → deduct from source asset, credit destination asset (USD-denominated).
