@@ -773,6 +773,11 @@ async function createOnServer(){
       var ar=await window._db.from('agents').select('code').eq('code',rc).limit(1);
       if(ar && ar.data && ar.data.length){
         await window._db.from('agent_links').insert({agent_code:rc,cust_id:cust,share:100});
+      } else {
+        // Customer referral: record it so the referrer earns their bonus once this
+        // new account makes its first $50 deposit (paid server-side by a trigger).
+        // RPC is SECURITY DEFINER; if it isn't installed yet this fails silently.
+        try{ await window._db.rpc('record_referral', { p_referrer: rc, p_referee: cust }); }catch(e){}
       }
     }
   }catch(e){}
