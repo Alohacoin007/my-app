@@ -110,12 +110,24 @@
      mirror it into --app-vh and the mobile CSS heights use that. */
   (function(){
     function setVH(){
-      try{ document.documentElement.style.setProperty('--app-vh', window.innerHeight + 'px'); }catch(e){}
+      try{
+        // visualViewport.height = the ACTUAL visible area in Safari (excludes the
+        // top/bottom toolbars), so the footer lands on the real bottom and the
+        // bottom holdings (Securities/Staked) aren't hidden behind Safari's bar.
+        var h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+        document.documentElement.style.setProperty('--app-vh', Math.round(h) + 'px');
+      }catch(e){}
     }
     setVH();
     window.addEventListener('resize', setVH);
     window.addEventListener('orientationchange', setVH);
-    if(window.visualViewport){ window.visualViewport.addEventListener('resize', setVH); }
+    if(window.visualViewport){
+      window.visualViewport.addEventListener('resize', setVH);
+      window.visualViewport.addEventListener('scroll', setVH);
+    }
+    // Safari settles its toolbars a beat after load — re-measure shortly after.
+    setTimeout(setVH, 300);
+    window.addEventListener('load', setVH);
   })();
 </script>
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
