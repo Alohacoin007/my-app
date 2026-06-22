@@ -712,11 +712,19 @@
   function pal(s){var h=0;for(var i=0;i<(s||'').length;i++)h=(h*31+s.charCodeAt(i))|0;return PALS[Math.abs(h)%PALS.length];}
   function dec(am){am=+am;if(!am)return 1.9;return Math.round((am>0?1+am/100:1+100/(-am))*100)/100;}
   function numOf(s){var m=String(s||'').match(/([\d.]+)/);return m?parseFloat(m[1]):0;}
+  // Render kickoff in the VIEWER's local timezone (server sends raw ISO in g.iso).
+  function fmtLocal(iso){
+    if(!iso) return '';
+    try{ var d=new Date(iso); if(isNaN(d.getTime())) return '';
+      return d.toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'}); }
+    catch(e){ return ''; }
+  }
   function toRow(g){
     var sp=g.spread||[],to=g.total||[],ml=g.ml||[];
     if(sp.length<2||to.length<2||ml.length<2) return null;
+    var statusTxt = g.live ? (g.time||'') : (fmtLocal(g.iso) || g.time || '');
     return {
-      sport:g.sport,league:g.lg,status:g.time||'',live:!!g.live,
+      sport:g.sport,league:g.lg,status:statusTxt,live:!!g.live,
       home:{ab:g.home.ab,name:g.home.nm,c:pal(g.home.nm),sc:(g.home.sc!=null?g.home.sc:null)},
       away:{ab:g.away.ab,name:g.away.nm,c:pal(g.away.nm),sc:(g.away.sc!=null?g.away.sc:null)},
       spread:{hl:sp[0].ln,ho:dec(sp[0].am),al:sp[1].ln,ao:dec(sp[1].am)},

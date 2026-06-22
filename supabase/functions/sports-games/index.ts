@@ -93,6 +93,7 @@ async function fetchLeague(L: { lg: string; sport: string; path: string }, out: 
           out.push({
             gid: L.lg + "_" + ev.id, lg: L.lg, sport: L.sport,
             live: state === "in", time: state === "in" ? (st.shortDetail || "Live") : fmtTime(ev.date),
+            iso: ev.date || "", // raw kickoff time — each client renders it in the viewer's local timezone
             home, away, spread: core.spread, total: core.total, ml: core.ml,
           });
         } catch (_e) { /* skip one event */ }
