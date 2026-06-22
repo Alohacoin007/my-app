@@ -417,7 +417,8 @@
     else{
       // replace any existing pick from same match+market
       state.slip=state.slip.filter(function(s){return !(s.mi===mi&&s.mk===d.mk);});
-      state.slip.push({key:key,mi:mi,mk:d.mk,sd:d.sd,pick:labelFor(m,d.mk,d.sd),sub:m.away.name+" @ "+m.home.name,odd:oddFor(m,d.mk,d.sd),stake:50});
+      var _idx=(d.sd==='h'||d.sd==='o')?0:1, _ci=(m._core&&m._core[d.mk])?m._core[d.mk][_idx]:null;
+      state.slip.push({key:key,mi:mi,mk:d.mk,sd:d.sd,pick:labelFor(m,d.mk,d.sd),sub:m.away.name+" @ "+m.home.name,odd:oddFor(m,d.mk,d.sd),stake:50,gid:m._gid,sel:(_ci&&_ci.sel)||labelFor(m,d.mk,d.sd),am:(_ci&&_ci.am)||0});
     }
     renderGames();renderSlip();
   }
@@ -491,33 +492,59 @@
   function addBets(k){ var n=getBetCount()+k; try{ localStorage.setItem('alpexa_openbets',n); }catch(e){} renderBetBadge(); }
   renderBetBadge();
 
-  $("place").addEventListener("click",function(){
+  var MKT={spread:'spread',total:'total',ml:'moneyline'};   // settler-friendly market names
+  var MKNAME={spread:'Spread',total:'Total',ml:'Moneyline'};
+  $("place").addEventListener("click", async function(){
     if(!state.slip.length) return;
-    var totStake, payout, summary;
+    if(!window._db){ toast('No server connection'); return; }
+    var me=null; try{ me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); }catch(e){}
+    var acct=me&&me.accts&&me.accts.sports;
+    if(!acct){ toast('Please log in first'); return; }
+    function legOf(s){ return { uid:'L'+Math.random().toString(36).slice(2,9), gid:s.gid, market:(MKT[s.mk]||s.mk), sel:s.sel, am:s.am, game:s.sub }; }
+    // Build the bet(s): singles = one bet per pick, parlay = one combined bet.
+    var bets=[];
     if(state.mode==='singles'){
-      totStake=0; payout=0;
-      state.slip.forEach(function(s){ var st=parseFloat(s.stake)||0; totStake+=st; payout+=st*s.odd; });
-      summary=state.slip.length+' single'+(state.slip.length>1?'s':'');
+      state.slip.forEach(function(s){ var st=parseFloat(s.stake)||0; if(st<=0)return;
+        bets.push({ cls:'single', stake:st, potential:Math.round(st*s.odd*100)/100,
+          type:((DATA[s.mi]&&DATA[s.mi].league)?DATA[s.mi].league+' ':'')+(MKNAME[s.mk]||'Bet'), pick:s.pick, legs:[legOf(s)] }); });
     }else{
-      var tot=state.slip.reduce(function(a,s){return a*s.odd;},1);
-      totStake=parseFloat($("stake").value)||0; payout=tot*totStake;
-      summary=state.slip.length+'-leg parlay';
+      var stake=parseFloat($("stake").value)||0; if(stake<=0){ toast('Enter a stake first'); return; }
+      var d=state.slip.reduce(function(a,s){return a*s.odd;},1);
+      bets.push({ cls:'parlay', stake:stake, potential:Math.round(stake*d*100)/100,
+        type:state.slip.length+'-leg parlay', pick:state.slip.length+'-leg parlay', legs:state.slip.map(legOf) });
     }
-    if(totStake<=0){ toast('Enter a stake first'); return; }
+    if(!bets.length){ toast('Enter a stake first'); return; }
+    var totStake=bets.reduce(function(a,b){return a+b.stake;},0);
     if(totStake>balance){ toast('Insufficient balance'); return; }
-    setBalance(balance-totStake);
-    var mkName={spread:'Spread',total:'Total',ml:'Moneyline'};
-    if(state.mode==='singles'){
-      state.slip.forEach(function(s){ var st=parseFloat(s.stake)||0; if(st<=0)return; OPEN.unshift({mi:s.mi, pick:s.pick, mk:(DATA[s.mi]?DATA[s.mi].league+' · ':'')+(mkName[s.mk]||'Bet'), stake:st, mult:s.odd}); });
-      addBets(state.slip.length);
-    }else{
-      var tot2=state.slip.reduce(function(a,s){return a*s.odd;},1);
-      OPEN.unshift({mi:null, pick:state.slip.length+'-leg parlay', mk:state.slip.length+' legs · combined', stake:totStake, mult:tot2});
-      addBets(1);
+    // Every leg must carry a game id, else the server can't settle it.
+    for(var k=0;k<bets.length;k++) for(var j=0;j<bets[k].legs.length;j++) if(!bets[k].legs[j].gid){ toast("This game can't be bet right now"); return; }
+    var pb=$("place"), label=pb.textContent; pb.disabled=true; pb.textContent='Placing…';
+    var ok=0, err='';
+    for(var bi=0; bi<bets.length; bi++){
+      var b=bets[bi];
+      var localId='sp'+Date.now()+'-'+bi+'-'+Math.random().toString(36).slice(2,6);
+      var meta={ type:b.type, cls:b.cls, stake:b.stake, potential:b.potential, ticket:localId, placedTs:Date.now(), legs:b.legs };
+      try{
+        var res=await window._db.rpc('place_bet',{ p_acct:acct, p_stake:b.stake, p_potential:b.potential,
+          p_symbol:b.type+' · '+b.pick, p_local_id:localId, p_meta:meta,
+          p_game:(b.legs[0]&&b.legs[0].game)||'', p_pick:b.pick, p_odds:(b.legs[0]&&b.legs[0].am)||0, p_size:b.legs.length });
+        var dt=res&&res.data;
+        if(res&&res.error){ err=res.error.message||'Bet failed'; }
+        else if(dt&&dt.ok===false){ err=dt.error||'Bet failed'; }
+        else { ok++; }
+      }catch(e){ err=(e&&e.message)||'Bet failed'; }
     }
-    renderOpenBets();
-    toast('Bet placed · '+summary+' · '+money(totStake)+' to win '+money(payout));
-    state.slip=[]; renderGames(); renderSlip();
+    pb.disabled=false; pb.textContent=label;
+    if(ok>0){
+      toast(ok+' bet'+(ok>1?'s':'')+' placed ✓');
+      state.slip=[]; renderGames(); renderSlip();
+      addBets(ok);
+      // Pull the new balance from the server (place_bet deducted the stake there).
+      window._db.from('accounts').select('balance').eq('acct_no',acct).maybeSingle().then(function(r){
+        if(r&&!r.error&&r.data){ setBalance(+r.data.balance||0); try{localStorage.setItem('alpexa.sportsBalance',String(+r.data.balance||0));}catch(e){} }
+      });
+    }
+    if(err){ toast(err); }
   });
 
   Array.prototype.forEach.call(document.querySelectorAll('#boardFilters .filt'),function(el){
@@ -636,56 +663,40 @@
 })();
 </script>
 <script>
-/* Real games + odds for the desktop dashboard — reads the SAME sports_odds
-   feed the app uses (server-side cron fills it). Read-only; betting wired later.
-   Live in-play scores come later (the app sources those from ESPN). */
+/* Server-center: read games from live_games (ONE source for app + desktop).
+   Each game carries gid + raw odds (am/sel) so a bet placed here settles on the
+   server exactly like the app's. Read-only. */
 (function(){
   if(!window._db || typeof DATA==='undefined') return;
-  var LG={NFL:'americanfootball_nfl',NBA:'basketball_nba',MLB:'baseball_mlb',NHL:'icehockey_nhl',EPL:'soccer_epl',UFC:'mma_mixed_martial_arts'};
-  var SPORTOF={NFL:'Football',NBA:'Basketball',MLB:'Baseball',NHL:'Hockey',EPL:'Soccer',UFC:'MMA'};
   var PALS=['linear-gradient(135deg,#e23744,#9e1124)','linear-gradient(135deg,#2a915c,#0c3b24)','linear-gradient(135deg,#1d4ed8,#0b1e66)','linear-gradient(135deg,#7c3aed,#3b1d72)','linear-gradient(135deg,#ea580c,#7c2d12)','linear-gradient(135deg,#0891b2,#0e4f5e)','linear-gradient(135deg,#475569,#1e293b)','linear-gradient(135deg,#b45309,#713f12)'];
-  function hashIdx(s){var h=0;for(var i=0;i<(s||'').length;i++)h=(h*31+s.charCodeAt(i))|0;return Math.abs(h)%PALS.length;}
-  function abbr(n){n=(n||'').trim();var w=n.split(/\s+/);var last=w[w.length-1]||n;return last.slice(0,3).toUpperCase();}
-  function nk(s){return (s||'').toLowerCase().replace(/[^a-z]/g,'');}
-  function dec(p){p=+p;if(!p)return null;return Math.round((p>0?1+p/100:1+100/(-p))*100)/100;}
-  function bestOf(ev,key,match){var b=null;(ev.bookmakers||[]).forEach(function(bk){var m=(bk.markets||[]).find(function(x){return x.key===key;});if(!m)return;(m.outcomes||[]).forEach(function(o){if(match(o)){var d=dec(o.price);if(d!=null&&(b===null||d>b.dec))b={dec:d,point:o.point};}});});return b;}
-  function core(ev){
-    var H=ev.home_team,A=ev.away_team;
-    var mlH=bestOf(ev,'h2h',function(o){return nk(o.name)===nk(H);}),mlA=bestOf(ev,'h2h',function(o){return nk(o.name)===nk(A);});
-    var spH=bestOf(ev,'spreads',function(o){return nk(o.name)===nk(H);}),spA=bestOf(ev,'spreads',function(o){return nk(o.name)===nk(A);});
-    var ov=bestOf(ev,'totals',function(o){return /over/i.test(o.name);}),un=bestOf(ev,'totals',function(o){return /under/i.test(o.name);});
-    var out={};
-    if(mlH&&mlA)out.ml={h:mlH.dec,a:mlA.dec};
-    if(spH&&spA&&spH.point!=null&&spA.point!=null)out.spread={hl:(spH.point>0?'+':'')+spH.point,ho:spH.dec,al:(spA.point>0?'+':'')+spA.point,ao:spA.dec};
-    if(ov&&un&&ov.point!=null)out.total={ln:ov.point,o:ov.dec,u:un.dec};
-    return out;
+  function pal(s){var h=0;for(var i=0;i<(s||'').length;i++)h=(h*31+s.charCodeAt(i))|0;return PALS[Math.abs(h)%PALS.length];}
+  function dec(am){am=+am;if(!am)return 1.9;return Math.round((am>0?1+am/100:1+100/(-am))*100)/100;}
+  function numOf(s){var m=String(s||'').match(/([\d.]+)/);return m?parseFloat(m[1]):0;}
+  function toRow(g){
+    var sp=g.spread||[],to=g.total||[],ml=g.ml||[];
+    if(sp.length<2||to.length<2||ml.length<2) return null;
+    return {
+      sport:g.sport,league:g.lg,status:g.time||'',live:!!g.live,
+      home:{ab:g.home.ab,name:g.home.nm,c:pal(g.home.nm),sc:(g.home.sc!=null?g.home.sc:null)},
+      away:{ab:g.away.ab,name:g.away.nm,c:pal(g.away.nm),sc:(g.away.sc!=null?g.away.sc:null)},
+      spread:{hl:sp[0].ln,ho:dec(sp[0].am),al:sp[1].ln,ao:dec(sp[1].am)},
+      total:{ln:numOf(to[0].ln||to[0].sel),o:dec(to[0].am),u:dec(to[1].am)},
+      ml:{h:dec(ml[0].am),a:dec(ml[1].am)},
+      _gid:g.gid,_core:{spread:sp,total:to,ml:ml}
+    };
   }
-  function fmtTime(iso){try{var d=new Date(iso);return d.toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'});}catch(e){return '';}}
   async function load(){
-    var leagues=Object.keys(LG),games=[];
-    for(var i=0;i<leagues.length;i++){
-      var lg=leagues[i];
-      try{
-        var r=await window._db.from('sports_odds').select('data').eq('sport',LG[lg]).limit(1);
-        var evs=(r&&r.data&&r.data[0]&&r.data[0].data)||[];
-        if(!Array.isArray(evs))continue;
-        evs.forEach(function(ev){
-          var c=core(ev);
-          if(!(c.ml&&c.spread&&c.total))return;            // need all 3 markets the board renders
-          var started=false;try{started=new Date(ev.commence_time).getTime()<=Date.now();}catch(e){}
-          games.push({sport:SPORTOF[lg]||'Football',league:lg,
-            status:started?'In play':fmtTime(ev.commence_time),live:false,  // no fake live scores yet
-            home:{ab:abbr(ev.home_team),name:ev.home_team,c:PALS[hashIdx(ev.home_team)]},
-            away:{ab:abbr(ev.away_team),name:ev.away_team,c:PALS[hashIdx(ev.away_team)]},
-            spread:c.spread,total:c.total,ml:c.ml});
-        });
-      }catch(e){}
-    }
-    window.__realOdds=true;                                  // stop the demo simulation
-    DATA.length=0; games.forEach(function(g){DATA.push(g);});
-    try{ if(typeof state==='object'){ var have={}; DATA.forEach(function(g){have[g.sport]=true;});
-      if(!have[state.sport]){ var first=Object.keys(have)[0]; if(first){ state.sport=first; if(typeof renderSports==='function')renderSports(); } } } }catch(e){}
-    if(typeof renderGames==='function') renderGames();
+    try{
+      var r=await window._db.from('live_games').select('data').eq('id','all').maybeSingle();
+      var games=(r&&r.data&&r.data.data)||[];
+      if(!Array.isArray(games)) return;
+      var rows=[]; games.forEach(function(g){ try{ var x=toRow(g); if(x) rows.push(x); }catch(e){} });
+      window.__realOdds=true;
+      DATA.length=0; rows.forEach(function(x){DATA.push(x);});
+      try{ if(typeof state==='object'){ var have={}; DATA.forEach(function(g){have[g.sport]=true;});
+        if(!have[state.sport]){ var first=Object.keys(have)[0]; if(first){ state.sport=first; if(typeof renderSports==='function')renderSports(); } } } }catch(e){}
+      if(typeof renderGames==='function') renderGames();
+    }catch(e){}
   }
   load(); setInterval(load,60000);
 })();
