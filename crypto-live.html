@@ -34,9 +34,9 @@
      Height comes from CSS (100dvh) so Safari's address bar can't make the footer
      jump. */
   @media (max-width: 600px) {
-    html, body { background: #FFFFFF !important; height: 100dvh !important; min-height: 0 !important; overflow: hidden !important; overscroll-behavior: none !important; }
-    .stage { padding: 0 !important; min-height: 0 !important; height: 100dvh !important; overflow: hidden !important; background: #FFFFFF !important; display: block !important; }
-    #phone.phone-shadow { box-shadow: none !important; border-radius: 0 !important; width: 100vw; height: 100dvh; overflow: hidden; }
+    html, body { background: #FFFFFF !important; height: var(--app-vh, 100dvh) !important; min-height: 0 !important; overflow: hidden !important; overscroll-behavior: none !important; }
+    .stage { padding: 0 !important; min-height: 0 !important; height: var(--app-vh, 100dvh) !important; overflow: hidden !important; background: #FFFFFF !important; display: block !important; }
+    #phone.phone-shadow { box-shadow: none !important; border-radius: 0 !important; width: 100vw; height: var(--app-vh, 100dvh); overflow: hidden; }
     .phone-shell { border-radius: 0 !important;
       width: 100% !important;
       height: 100% !important;
@@ -103,6 +103,21 @@
     100% { transform: scale(1.6); opacity: 0; }
   }
 </style>
+<script>
+  /* Pin the app to the ACTUAL visible height. In-app browsers (KakaoTalk,
+     Instagram, etc.) report 100dvh wrong, which left a white gap under the
+     footer (footer "floated up"). window.innerHeight is reliable there, so we
+     mirror it into --app-vh and the mobile CSS heights use that. */
+  (function(){
+    function setVH(){
+      try{ document.documentElement.style.setProperty('--app-vh', window.innerHeight + 'px'); }catch(e){}
+    }
+    setVH();
+    window.addEventListener('resize', setVH);
+    window.addEventListener('orientationchange', setVH);
+    if(window.visualViewport){ window.visualViewport.addEventListener('resize', setVH); }
+  })();
+</script>
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
