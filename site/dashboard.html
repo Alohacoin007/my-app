@@ -559,6 +559,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('.odd[data-mi="'+mi+'"]'),function(el){ el.classList.remove('upd'); void el.offsetWidth; el.classList.add('upd'); });
   }
   setInterval(function(){
+    if(window.__realOdds) return;
     var live=DATA.filter(function(m){return m.live;});
     if(!live.length) return;
     var m=live[Math.floor(Math.random()*live.length)], mi=DATA.indexOf(m), r=Math.random();
@@ -568,6 +569,7 @@
     if(state.sport===m.sport){ renderGames(); flashGame(mi); }
   },2600);
   setInterval(function(){
+    if(window.__realOdds) return;
     var live=DATA.filter(function(m){return m.live && m.home.sc!==null;});
     if(!live.length) return;
     var m=live[Math.floor(Math.random()*live.length)], mi=DATA.indexOf(m);
@@ -631,6 +633,61 @@
       });
     }
   }catch(e){}
+})();
+</script>
+<script>
+/* Real games + odds for the desktop dashboard — reads the SAME sports_odds
+   feed the app uses (server-side cron fills it). Read-only; betting wired later.
+   Live in-play scores come later (the app sources those from ESPN). */
+(function(){
+  if(!window._db || typeof DATA==='undefined') return;
+  var LG={NFL:'americanfootball_nfl',NBA:'basketball_nba',MLB:'baseball_mlb',NHL:'icehockey_nhl',EPL:'soccer_epl',UFC:'mma_mixed_martial_arts'};
+  var SPORTOF={NFL:'Football',NBA:'Basketball',MLB:'Baseball',NHL:'Hockey',EPL:'Soccer',UFC:'MMA'};
+  var PALS=['linear-gradient(135deg,#e23744,#9e1124)','linear-gradient(135deg,#2a915c,#0c3b24)','linear-gradient(135deg,#1d4ed8,#0b1e66)','linear-gradient(135deg,#7c3aed,#3b1d72)','linear-gradient(135deg,#ea580c,#7c2d12)','linear-gradient(135deg,#0891b2,#0e4f5e)','linear-gradient(135deg,#475569,#1e293b)','linear-gradient(135deg,#b45309,#713f12)'];
+  function hashIdx(s){var h=0;for(var i=0;i<(s||'').length;i++)h=(h*31+s.charCodeAt(i))|0;return Math.abs(h)%PALS.length;}
+  function abbr(n){n=(n||'').trim();var w=n.split(/\s+/);var last=w[w.length-1]||n;return last.slice(0,3).toUpperCase();}
+  function nk(s){return (s||'').toLowerCase().replace(/[^a-z]/g,'');}
+  function dec(p){p=+p;if(!p)return null;return Math.round((p>0?1+p/100:1+100/(-p))*100)/100;}
+  function bestOf(ev,key,match){var b=null;(ev.bookmakers||[]).forEach(function(bk){var m=(bk.markets||[]).find(function(x){return x.key===key;});if(!m)return;(m.outcomes||[]).forEach(function(o){if(match(o)){var d=dec(o.price);if(d!=null&&(b===null||d>b.dec))b={dec:d,point:o.point};}});});return b;}
+  function core(ev){
+    var H=ev.home_team,A=ev.away_team;
+    var mlH=bestOf(ev,'h2h',function(o){return nk(o.name)===nk(H);}),mlA=bestOf(ev,'h2h',function(o){return nk(o.name)===nk(A);});
+    var spH=bestOf(ev,'spreads',function(o){return nk(o.name)===nk(H);}),spA=bestOf(ev,'spreads',function(o){return nk(o.name)===nk(A);});
+    var ov=bestOf(ev,'totals',function(o){return /over/i.test(o.name);}),un=bestOf(ev,'totals',function(o){return /under/i.test(o.name);});
+    var out={};
+    if(mlH&&mlA)out.ml={h:mlH.dec,a:mlA.dec};
+    if(spH&&spA&&spH.point!=null&&spA.point!=null)out.spread={hl:(spH.point>0?'+':'')+spH.point,ho:spH.dec,al:(spA.point>0?'+':'')+spA.point,ao:spA.dec};
+    if(ov&&un&&ov.point!=null)out.total={ln:ov.point,o:ov.dec,u:un.dec};
+    return out;
+  }
+  function fmtTime(iso){try{var d=new Date(iso);return d.toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'});}catch(e){return '';}}
+  async function load(){
+    var leagues=Object.keys(LG),games=[];
+    for(var i=0;i<leagues.length;i++){
+      var lg=leagues[i];
+      try{
+        var r=await window._db.from('sports_odds').select('data').eq('sport',LG[lg]).limit(1);
+        var evs=(r&&r.data&&r.data[0]&&r.data[0].data)||[];
+        if(!Array.isArray(evs))continue;
+        evs.forEach(function(ev){
+          var c=core(ev);
+          if(!(c.ml&&c.spread&&c.total))return;            // need all 3 markets the board renders
+          var started=false;try{started=new Date(ev.commence_time).getTime()<=Date.now();}catch(e){}
+          games.push({sport:SPORTOF[lg]||'Football',league:lg,
+            status:started?'In play':fmtTime(ev.commence_time),live:false,  // no fake live scores yet
+            home:{ab:abbr(ev.home_team),name:ev.home_team,c:PALS[hashIdx(ev.home_team)]},
+            away:{ab:abbr(ev.away_team),name:ev.away_team,c:PALS[hashIdx(ev.away_team)]},
+            spread:c.spread,total:c.total,ml:c.ml});
+        });
+      }catch(e){}
+    }
+    window.__realOdds=true;                                  // stop the demo simulation
+    DATA.length=0; games.forEach(function(g){DATA.push(g);});
+    try{ if(typeof state==='object'){ var have={}; DATA.forEach(function(g){have[g.sport]=true;});
+      if(!have[state.sport]){ var first=Object.keys(have)[0]; if(first){ state.sport=first; if(typeof renderSports==='function')renderSports(); } } } }catch(e){}
+    if(typeof renderGames==='function') renderGames();
+  }
+  load(); setInterval(load,60000);
 })();
 </script>
 </body>
