@@ -283,7 +283,7 @@
         <div class="calc"><span id="calcLabel">Total odds</span><span id="totOdds">—</span></div>
         <div class="calc tot"><span>Total payout</span><span id="payout">$0.00</span></div>
         <button class="place" id="place" disabled>Place bet</button>
-        <div class="note">Demo only — no real bets are placed. 18+</div>
+        <div class="note">18+ · Bet responsibly</div>
       </div>
     </aside>
     </div>
@@ -538,7 +538,7 @@
     if(ok>0){
       toast(ok+' bet'+(ok>1?'s':'')+' placed ✓');
       state.slip=[]; renderGames(); renderSlip();
-      addBets(ok);
+      loadOpenBets();
       // Pull the new balance from the server (place_bet deducted the stake there).
       window._db.from('accounts').select('balance').eq('acct_no',acct).maybeSingle().then(function(r){
         if(r&&!r.error&&r.data){ setBalance(+r.data.balance||0); try{localStorage.setItem('alpexa.sportsBalance',String(+r.data.balance||0));}catch(e){} }
@@ -561,24 +561,29 @@
   var OPEN=[];  // no demo bets — a fresh account has none; real bets are wired in the bets step
   function renderOpenBets(){
     var el=$("openbets"); if(!el) return;
-    var head='<div class="oh"><h3>My open bets</h3>'+(OPEN.length?'<span class="lv">LIVE</span>':'')+'</div>';
+    var head='<div class="oh"><h3>My open bets</h3></div>';
     if(!OPEN.length){ el.innerHTML=head+'<div class="ob-empty">No open bets right now.</div>'; return; }
-    var LIMIT=3, shown=OPEN.slice(0,LIMIT);
-    el.innerHTML=head+shown.map(function(o,idx){
-      var m=DATA[o.mi], score=m?(m.away.ab+' '+m.away.sc+' – '+m.home.sc+' '+m.home.ab):'';
-      var cash=o.stake*o.mult;
-      return '<div class="ob"><div class="obpick">'+o.pick+'</div><div class="obsub">'+o.mk+' · $'+o.stake.toFixed(2)+' stake</div><div class="obrow"><span class="obscore">'+score+'</span><button class="cashout" data-i="'+idx+'">Cash out $'+cash.toFixed(2)+'</button></div></div>';
+    var LIMIT=4, shown=OPEN.slice(0,LIMIT);
+    el.innerHTML=head+shown.map(function(o){
+      return '<div class="ob"><div class="obpick">'+(o.pick||'Bet')+'</div><div class="obsub">'+(o.sub||'')+' · $'+(+o.stake||0).toFixed(2)+' → win $'+(+o.potential||0).toFixed(2)+'</div></div>';
     }).join('')+'<a class="ob-all" href="my-bets.html">View all in My Bets'+(OPEN.length>LIMIT?' ('+OPEN.length+')':'')+' &rsaquo;</a>';
-    Array.prototype.forEach.call(el.querySelectorAll('.cashout'),function(b){
-      b.addEventListener('click',function(){
-        var i=+b.dataset.i, o=OPEN[i]; if(!o) return;
-        setBalance(balance + o.stake*o.mult);
-        toast('Cashed out '+money(o.stake*o.mult));
-        OPEN.splice(i,1); addBets(-1); renderOpenBets();
-      });
-    });
   }
-  renderOpenBets();
+  // Load THIS account's open bets from the server (positions) — same source the app uses.
+  async function loadOpenBets(){
+    try{
+      if(!window._db) return;
+      var me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); var cust=me&&me.custId; if(!cust) return;
+      var r=await window._db.from('positions').select('symbol,stake,potential,game,pick,meta')
+        .eq('cust_id',cust).eq('server','sports').eq('kind','bet').eq('status','open');
+      if(r&&!r.error&&Array.isArray(r.data)){
+        OPEN.length=0;
+        r.data.forEach(function(p){ var meta=p.meta||{}; OPEN.push({ pick:p.pick||p.symbol||'Bet', sub:p.game||meta.type||'', stake:+p.stake||0, potential:+p.potential||0 }); });
+        try{ localStorage.setItem('alpexa_openbets', OPEN.length); }catch(e){}
+        renderBetBadge(); renderOpenBets();
+      }
+    }catch(e){}
+  }
+  renderOpenBets(); loadOpenBets(); setInterval(loadOpenBets, 30000);
 
   // ===== live odds + score simulation =====
   function nudge(o){ var v=Math.round((o+(Math.random()*0.08-0.04))*100)/100; return Math.min(3.6,Math.max(1.20,v)); }
