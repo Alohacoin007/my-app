@@ -566,19 +566,45 @@
     if(!OPEN.length){ el.innerHTML=head+'<div class="ob-empty">No open bets right now.</div>'; return; }
     var LIMIT=4, shown=OPEN.slice(0,LIMIT);
     el.innerHTML=head+shown.map(function(o){
-      return '<div class="ob"><div class="obpick">'+(o.pick||'Bet')+'</div><div class="obsub">'+(o.sub||'')+' · $'+(+o.stake||0).toFixed(2)+' → win $'+(+o.potential||0).toFixed(2)+'</div></div>';
+      var cash=(+o.stake||0)*0.92;
+      return '<div class="ob"><div class="obpick">'+(o.pick||'Bet')+'</div><div class="obsub">'+(o.sub||'')+' · $'+(+o.stake||0).toFixed(2)+' → win $'+(+o.potential||0).toFixed(2)+'</div>'+
+        '<div class="obrow"><button class="cashout" data-id="'+(o.localId||'')+'" data-f="1">Cash out $'+cash.toFixed(2)+'</button>'+
+        '<button class="cashout half" data-id="'+(o.localId||'')+'" data-f="0.5">50%</button></div></div>';
     }).join('')+'<a class="ob-all" href="my-bets.html">View all in My Bets'+(OPEN.length>LIMIT?' ('+OPEN.length+')':'')+' &rsaquo;</a>';
+    Array.prototype.forEach.call(el.querySelectorAll('.cashout'),function(b){
+      b.addEventListener('click',function(){ doCashout(b.dataset.id, parseFloat(b.dataset.f)||1); });
+    });
+  }
+  // Cash out (full or 50%) via the server — value is computed + capped server-side.
+  var _cashing=false;
+  async function doCashout(localId, frac){
+    if(_cashing||!localId) return;
+    if(!window._db){ toast('No server connection'); return; }
+    _cashing=true;
+    try{
+      var res=await window._db.rpc('cash_out',{ p_local_id:localId, p_fraction:frac });
+      var dt=res&&res.data;
+      if(res&&res.error){ toast(res.error.message||'Cash out failed'); }
+      else if(dt&&dt.ok===false){ toast(dt.error||'Cash out failed'); }
+      else {
+        toast('Cashed out $'+(+((dt&&dt.amount)||0)).toFixed(2));
+        var me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); var acct=me&&me.accts&&me.accts.sports;
+        if(acct){ window._db.from('accounts').select('balance').eq('acct_no',acct).maybeSingle().then(function(r){ if(r&&!r.error&&r.data){ setBalance(+r.data.balance||0); try{localStorage.setItem('alpexa.sportsBalance',String(+r.data.balance||0));}catch(e){} } }); }
+        loadOpenBets();
+      }
+    }catch(e){ toast((e&&e.message)||'Cash out failed'); }
+    _cashing=false;
   }
   // Load THIS account's open bets from the server (positions) — same source the app uses.
   async function loadOpenBets(){
     try{
       if(!window._db) return;
       var me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); var cust=me&&me.custId; if(!cust) return;
-      var r=await window._db.from('positions').select('symbol,stake,potential,game,pick,meta')
+      var r=await window._db.from('positions').select('local_id,symbol,stake,potential,game,pick,meta')
         .eq('cust_id',cust).eq('server','sports').eq('kind','bet').eq('status','open');
       if(r&&!r.error&&Array.isArray(r.data)){
         OPEN.length=0;
-        r.data.forEach(function(p){ var meta=p.meta||{}; OPEN.push({ pick:p.pick||p.symbol||'Bet', sub:p.game||meta.type||'', stake:+p.stake||0, potential:+p.potential||0 }); });
+        r.data.forEach(function(p){ var meta=p.meta||{}; OPEN.push({ localId:p.local_id, pick:p.pick||p.symbol||'Bet', sub:p.game||meta.type||'', stake:+p.stake||0, potential:+p.potential||0 }); });
         try{ localStorage.setItem('alpexa_openbets', OPEN.length); }catch(e){}
         renderBetBadge(); renderOpenBets();
       }
