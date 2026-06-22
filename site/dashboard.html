@@ -8,6 +8,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Alpexa Sports — Dashboard</title>
 <script>
+/* The dashboard is the DESKTOP trading UI. On phones, send people to the
+   mobile app (sports-live) instead — same account, mobile-built layout.
+   Add ?desktop=1 to force the dashboard on a phone. */
+(function(){try{
+  var force=/[?&]desktop=1/.test(location.search);
+  var isPhone=window.matchMedia&&window.matchMedia('(max-width:820px)').matches;
+  if(!force && isPhone){ location.replace('../sports-live.html'); }
+}catch(e){}})();
 /* Route guard: require a signed-in session, else send to login. */
 (function(){try{
   var m=JSON.parse(localStorage.getItem('alpexa.me')||'null');
