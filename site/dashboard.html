@@ -486,7 +486,7 @@
   function toast(msg){ toastEl.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span>'+msg+'</span>'; toastEl.classList.add('show'); clearTimeout(toastTmr); toastTmr=setTimeout(function(){toastEl.classList.remove('show');},2400); }
 
   // ===== open-bets badge =====
-  function getBetCount(){ var n; try{ n=parseInt(localStorage.getItem('alpexa_openbets'),10); }catch(e){} return isNaN(n)?2:n; }
+  function getBetCount(){ var n; try{ n=parseInt(localStorage.getItem('alpexa_openbets'),10); }catch(e){} return isNaN(n)?0:n; }
   function renderBetBadge(){ var b=$("myBetsBadge"); if(!b)return; var n=getBetCount(); b.textContent=n; b.style.display=n>0?'':'none'; }
   function addBets(k){ var n=getBetCount()+k; try{ localStorage.setItem('alpexa_openbets',n); }catch(e){} renderBetBadge(); }
   renderBetBadge();
@@ -531,10 +531,7 @@
   renderSports();renderGames();renderSlip();
 
   // ===== my open bets =====
-  var OPEN=[
-    {mi:0, pick:'Chiefs -2.5', mk:'NFL · Spread', stake:100, mult:1.46},
-    {mi:2, pick:'Lakers/Celtics Over 221.5', mk:'NBA · Total', stake:50, mult:1.78}
-  ];
+  var OPEN=[];  // no demo bets — a fresh account has none; real bets are wired in the bets step
   function renderOpenBets(){
     var el=$("openbets"); if(!el) return;
     var head='<div class="oh"><h3>My open bets</h3>'+(OPEN.length?'<span class="lv">LIVE</span>':'')+'</div>';
