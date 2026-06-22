@@ -198,5 +198,43 @@
   }catch(e){}
 })();
 </script>
+<script>
+/* My Bets — read THIS account's open + settled bets from the server (positions + settlements). */
+(function(){
+  if(!window._db) return;
+  var me=null; try{ me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); }catch(e){}
+  var cust=me&&me.custId; if(!cust) return;
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function money(v){ return '$'+(+v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  var EMPTY_O='<div style="text-align:center;color:var(--muted);padding:46px 12px;font-size:14px">No open bets yet. Place a bet and it will show up here.</div>';
+  var EMPTY_S='<div style="text-align:center;color:var(--muted);padding:46px 12px;font-size:14px">No settled bets yet.</div>';
+  function loadOpen(){
+    window._db.from('positions').select('symbol,stake,potential,game,pick,meta').eq('cust_id',cust).eq('server','sports').eq('kind','bet').eq('status','open').then(function(r){
+      var el=document.getElementById('open'); if(!el) return;
+      var rows=(r&&!r.error&&r.data)||[];
+      if(!rows.length){ el.innerHTML=EMPTY_O; return; }
+      el.innerHTML=rows.map(function(p){ var meta=p.meta||{};
+        return '<div class="bet"><div class="bet-top"><div class="bet-type">'+esc(meta.type||p.symbol||'Bet')+'</div><span class="status open">OPEN</span></div>'+
+          '<div class="legs"><div class="leg"><div><div class="pick">'+esc(p.pick||p.symbol||'Bet')+'</div><div class="sub">'+esc(p.game||'')+'</div></div></div></div>'+
+          '<div class="bet-foot"><div class="col"><span class="k">Stake</span><span class="v">'+money(p.stake)+'</span></div>'+
+          '<div class="col"><span class="k">Potential</span><span class="v">'+money(p.potential)+'</span></div></div></div>';
+      }).join('');
+    },function(){});
+  }
+  function loadSettled(){
+    window._db.from('settlements').select('symbol,stake,pnl,kind,created_at').eq('cust_id',cust).eq('server','sports').order('created_at',{ascending:false}).then(function(r){
+      var el=document.getElementById('settled'); if(!el) return;
+      var rows=((r&&!r.error&&r.data)||[]).filter(function(s){return s.kind==='bet_won'||s.kind==='bet_lost';});
+      if(!rows.length){ el.innerHTML=EMPTY_S; return; }
+      el.innerHTML=rows.map(function(s){ var won=s.kind==='bet_won'; var ret=won?((+s.stake||0)+(+s.pnl||0)):0;
+        return '<div class="bet"><div class="bet-top"><div class="bet-type">'+esc(s.symbol||'Bet')+'</div><span class="status '+(won?'won':'lost')+'">'+(won?'WON':'LOST')+'</span></div>'+
+          '<div class="bet-foot"><div class="col"><span class="k">Stake</span><span class="v">'+money(s.stake)+'</span></div>'+
+          '<div class="col"><span class="k">Returned</span><span class="v'+(won?' green':'')+'">'+money(ret)+'</span></div></div></div>';
+      }).join('');
+    },function(){});
+  }
+  loadOpen(); loadSettled(); setInterval(function(){ loadOpen(); loadSettled(); }, 30000);
+})();
+</script>
 </body>
 </html>

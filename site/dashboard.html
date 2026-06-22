@@ -511,7 +511,8 @@
       var stake=parseFloat($("stake").value)||0; if(stake<=0){ toast('Enter a stake first'); return; }
       var d=state.slip.reduce(function(a,s){return a*s.odd;},1);
       bets.push({ cls:'parlay', stake:stake, potential:Math.round(stake*d*100)/100,
-        type:state.slip.length+'-leg parlay', pick:state.slip.length+'-leg parlay', legs:state.slip.map(legOf) });
+        type:(state.slip.length>1?state.slip.length+'-leg parlay':'Single'),
+        pick:state.slip.map(function(s){return s.sel||s.pick;}).join(' + '), legs:state.slip.map(legOf) });
     }
     if(!bets.length){ toast('Enter a stake first'); return; }
     var totStake=bets.reduce(function(a,b){return a+b.stake;},0);
