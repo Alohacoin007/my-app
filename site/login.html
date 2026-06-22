@@ -72,6 +72,18 @@
     .side{display:none}
   }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>try{window._db=window.supabase.createClient('https://grxnbgtfnaayeluenvqh.supabase.co','sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu');}catch(e){console.error('supabase init',e);}</script>
+<script>
+/* Stay signed in: if this device already has a session, go straight to the
+   dashboard. Add ?switch=1 to the URL to force the login form. */
+(function(){try{
+  if(/[?&]switch=1/.test(location.search)) return;
+  if(/(type=recovery|access_token|error_description)/.test(location.hash)) return;
+  var m=JSON.parse(localStorage.getItem('alpexa.me')||'null');
+  if(m&&m.accts&&(m.email||m.authId)){ location.replace('dashboard.html'); }
+}catch(e){}})();
+</script>
 </head>
 <body>
   <div class="glow"></div>
@@ -112,13 +124,14 @@
               <span class="box"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
               <span class="lbl">Keep me signed in</span>
             </label>
+            <div class="err" id="authErr" style="display:none;color:#ff7a6b;font-size:12px;margin:0 0 12px"></div>
             <button type="submit" class="submit">Log in</button>
             <div class="or"><span></span><em>or</em><span></span></div>
             <div class="social">
               <div class="sbtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M16.5 1.6c.1 1-.3 2-.9 2.7-.7.8-1.8 1.4-2.8 1.3-.1-1 .4-2 .9-2.6.7-.8 1.9-1.3 2.8-1.4zM19.8 16.9c-.5 1.2-.8 1.7-1.4 2.8-.9 1.5-2.2 3.3-3.8 3.3-1.4 0-1.8-.9-3.7-.9s-2.3.9-3.7.9c-1.6 0-2.8-1.6-3.7-3.1-2.5-4.1-2.8-9-1.2-11.5C3.7 6.6 5.3 5.6 6.8 5.6c1.5 0 2.5 1 3.7 1 1.2 0 1.9-1 3.7-1 1.3 0 2.7.7 3.7 2-3.3 1.8-2.7 6.5.0 8.3z"/></svg>Apple</div>
               <div class="sbtn"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="#4285f4" d="M21.6 12.2c0-.6-.1-1.2-.2-1.8H12v3.5h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.2z"/><path fill="#34a853" d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22z"/><path fill="#fbbc05" d="M6.4 14c-.2-.6-.3-1.3-.3-2s.1-1.4.3-2V7.4H3.1A10 10 0 0 0 2 12c0 1.6.4 3.2 1.1 4.6L6.4 14z"/><path fill="#ea4335" d="M12 5.9c1.5 0 2.8.5 3.8 1.5l2.8-2.8A10 10 0 0 0 3.1 7.4L6.4 10c.8-2.3 3-4.1 5.6-4.1z"/></svg>Google</div>
             </div>
-            <div class="demo-note">Demo form — no real authentication. 18+ only.</div>
+            <div class="demo-note">18+ only. Bet responsibly.</div>
           </form>
         </div>
 
@@ -132,20 +145,101 @@
   </div>
 
   <script>
+  /* Real login wired to our Supabase backend (same accounts as the app). */
   (function(){
     var form=document.getElementById('loginForm');
     var email=document.getElementById('email'),pass=document.getElementById('pass');
-    var re=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    function set(id,bad){document.getElementById(id).classList.toggle('invalid',bad);}
-    form.addEventListener('submit',function(e){
+    var errEl=document.getElementById('authErr');
+    var btn=form.querySelector('.submit');
+    function fieldBad(id,bad){document.getElementById(id).classList.toggle('invalid',bad);}
+    function showErr(msg,good){ if(!errEl)return; errEl.textContent=msg; errEl.style.color=good?'#3ddc84':'#ff7a6b'; errEl.style.display=msg?'block':'none'; }
+    function clearErr(){ showErr(''); }
+    [email,pass].forEach(function(el){el.addEventListener('input',function(){el.closest('.field').classList.remove('invalid');clearErr();});});
+
+    // Forgot password -> send a reset email; the link reuses the app's working
+    // reset screen (root /login.html handles the recovery token).
+    var forgot=document.querySelector('#f-pass .forgot');
+    if(forgot){ forgot.addEventListener('click', async function(e){
       e.preventDefault();
-      var ok=true;
-      if(!re.test(email.value.trim())){set('f-email',true);ok=false;}else set('f-email',false);
-      if(!pass.value){set('f-pass',true);ok=false;}else set('f-pass',false);
-      if(!ok)return;
-      window.location.href='dashboard.html';
+      var login=(email.value||'').trim();
+      if(!login){ fieldBad('f-email',true); showErr('Enter your email first, then tap Forgot.'); return; }
+      if(!window._db){ showErr('No server connection — check your internet.'); return; }
+      try{
+        var addr=login;
+        if(login.indexOf('@')<0){ var r=await window._db.rpc('login_email',{p_login:login.toUpperCase()}); if(r&&!r.error&&r.data){addr=r.data;} else { showErr('Account not found. Enter the email you signed up with.'); return; } }
+        var rr=await window._db.auth.resetPasswordForEmail(addr,{ redirectTo: location.origin+'/login.html' });
+        if(rr&&rr.error){ showErr(rr.error.message||'Could not send the reset email.'); return; }
+        showErr('Reset email sent to '+addr+' — check your inbox.', true);
+      }catch(e2){ showErr('Could not send the reset email. Please try again.'); }
+    }); }
+
+    form.addEventListener('submit', async function(e){
+      e.preventDefault();
+      clearErr();
+      var login=(email.value||'').trim(), pw=pass.value, ok=true;
+      if(!login){ fieldBad('f-email',true); ok=false; } else fieldBad('f-email',false);
+      if(!pw){ fieldBad('f-pass',true); ok=false; } else fieldBad('f-pass',false);
+      if(!ok) return;
+      if(!window._db){ showErr('No server connection — check your internet.'); return; }
+      var label=btn.textContent; btn.disabled=true; btn.style.opacity='.7'; btn.textContent='Logging in…';
+      var fail=function(m){ btn.disabled=false; btn.style.opacity='1'; btn.textContent=label; showErr(m); };
+      try{
+        // Allow account-number login by resolving it to the email first.
+        var addr=login;
+        if(login.indexOf('@')<0){
+          var lr=await window._db.rpc('login_email',{p_login:login.toUpperCase()});
+          if(lr.error) throw lr.error;
+          if(!lr.data){ fail('Account not found. Check it, or sign up.'); return; }
+          addr=lr.data;
+        }
+        // Real password check via Supabase Auth.
+        var au=await window._db.auth.signInWithPassword({ email:addr, password:pw });
+        if(au && au.error){
+          var msg=(au.error.message||'').toLowerCase();
+          if(msg.indexOf('invalid')>=0||msg.indexOf('credential')>=0){ fail('Wrong email or password.'); return; }
+          if(msg.indexOf('confirm')>=0){ fail('Please confirm your email first (check your inbox).'); return; }
+          fail(au.error.message||'Login failed.'); return;
+        }
+        var authId=(au&&au.data&&au.data.user)?au.data.user.id:null;
+        // Load the linked profile (by auth link first, then email).
+        var player=null;
+        if(authId){
+          var p1=await window._db.from('players').select('id,cust_id,name,email').eq('auth_id',authId).order('created_at',{ascending:true}).limit(1);
+          if(!p1.error&&p1.data&&p1.data.length) player=p1.data[0];
+        }
+        if(!player){
+          var p2=await window._db.from('players').select('id,cust_id,name,email').ilike('email',addr).order('created_at',{ascending:true}).limit(1);
+          if(!p2.error&&p2.data&&p2.data.length) player=p2.data[0];
+        }
+        if(!player){ fail('Signed in, but no profile found. Contact support.'); return; }
+        var accs=await window._db.from('accounts').select('server,acct_no,balance').eq('player_id',player.id);
+        if(accs.error) throw accs.error;
+        var accts={sports:'',crypto:'',fx:''}, bals={sports:0,crypto:0,fx:0};
+        (accs.data||[]).forEach(function(a){ if(a.server){ accts[a.server]=a.acct_no; bals[a.server]=+a.balance||0; } });
+        // If a DIFFERENT customer signs in on this device, clear the previous
+        // account's cached money data so balances don't bleed across accounts.
+        try{ var _prev=JSON.parse(localStorage.getItem('alpexa.me')||'null');
+          if(!_prev||_prev.custId!==player.cust_id){
+            ['alpexa.serverBalances','alpexa.balances','alpexa.cryptoHoldings','alpexa.staked','alpexa.sportsBalance','alpexa.cryptoBalance','alpexa.fxLive','alpexa.openBets','alpexa.settledBets','alpexa.withdrawals','alpexa.transactions','alpexa.funding','alpexa.txns','alpexa.appliedTransfers','alpexa.customer','alpexa.openDeposit','alpexa.ownerFunded'].forEach(function(k){ localStorage.removeItem(k); });
+          } }catch(e3){}
+        // Adopt the SERVER's balances as the source of truth on login.
+        try{
+          localStorage.setItem('alpexa.serverBalances', JSON.stringify({fx:bals.fx,crypto:bals.crypto,sports:bals.sports}));
+          localStorage.setItem('alpexa.balances', JSON.stringify({live:bals.fx,crypto:bals.crypto,sports:bals.sports}));
+          localStorage.setItem('alpexa.sportsBalance', String(bals.sports));
+          var _hadH=false; try{var _h=JSON.parse(localStorage.getItem('alpexa.cryptoHoldings')||'null'); _hadH=_h&&Object.keys(_h).length>0;}catch(e4){}
+          if(!_hadH){ localStorage.setItem('alpexa.cryptoHoldings', JSON.stringify({USDT:bals.crypto})); }
+        }catch(e5){}
+        // Identity (source of truth across the whole domain — app + website).
+        localStorage.setItem('alpexa.me', JSON.stringify({custId:player.cust_id,name:player.name,email:player.email,authId:authId,accts:accts}));
+        try{ localStorage.setItem('alpexa.lastServer','sports'); }catch(e6){}
+        // Success UI -> dashboard.
+        document.getElementById('successMsg').textContent='Signed in as '+(player.name||player.cust_id);
+        document.getElementById('formWrap').style.display='none';
+        document.getElementById('success').style.display='block';
+        setTimeout(function(){ window.location.href='dashboard.html'; }, 900);
+      }catch(err){ fail((err&&err.message)||'Login failed. Please try again.'); }
     });
-    [email,pass].forEach(function(el){el.addEventListener('input',function(){el.closest('.field').classList.remove('invalid');});});
   })();
   </script>
 
