@@ -500,17 +500,17 @@
     var me=null; try{ me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); }catch(e){}
     var acct=me&&me.accts&&me.accts.sports;
     if(!acct){ toast('Please log in first'); return; }
-    function legOf(s){ return { uid:'L'+Math.random().toString(36).slice(2,9), gid:s.gid, market:(MKT[s.mk]||s.mk), sel:s.sel, am:s.am, game:s.sub }; }
+    function legOf(s){ return { uid:'L'+Math.random().toString(36).slice(2,9), gid:s.gid, market:(MKT[s.mk]||s.mk), sel:s.sel, pk:s.sel, am:s.am, game:s.sub, gm:s.sub, st:s.sd, live:false }; }
     // Build the bet(s): singles = one bet per pick, parlay = one combined bet.
     var bets=[];
     if(state.mode==='singles'){
       state.slip.forEach(function(s){ var st=parseFloat(s.stake)||0; if(st<=0)return;
-        bets.push({ cls:'single', stake:st, potential:Math.round(st*s.odd*100)/100,
+        bets.push({ cls:'single', stake:st, potential:Math.round(st*s.odd*100)/100, baseCash:Math.round(st*0.92*100)/100, d0:s.odd, cashout:Math.round(st*0.92*100)/100,
           type:((DATA[s.mi]&&DATA[s.mi].league)?DATA[s.mi].league+' ':'')+(MKNAME[s.mk]||'Bet'), pick:s.pick, legs:[legOf(s)] }); });
     }else{
       var stake=parseFloat($("stake").value)||0; if(stake<=0){ toast('Enter a stake first'); return; }
       var d=state.slip.reduce(function(a,s){return a*s.odd;},1);
-      bets.push({ cls:'parlay', stake:stake, potential:Math.round(stake*d*100)/100,
+      bets.push({ cls:'parlay', stake:stake, potential:Math.round(stake*d*100)/100, baseCash:Math.round(stake*0.92*100)/100, d0:d, cashout:Math.round(stake*0.92*100)/100,
         type:(state.slip.length>1?state.slip.length+'-leg parlay':'Single'),
         pick:state.slip.map(function(s){return s.sel||s.pick;}).join(' + '), legs:state.slip.map(legOf) });
     }
@@ -524,7 +524,7 @@
     for(var bi=0; bi<bets.length; bi++){
       var b=bets[bi];
       var localId='sp'+Date.now()+'-'+bi+'-'+Math.random().toString(36).slice(2,6);
-      var meta={ type:b.type, cls:b.cls, stake:b.stake, potential:b.potential, ticket:localId, placedTs:Date.now(), legs:b.legs };
+      var meta={ type:b.type, cls:b.cls, stake:b.stake, potential:b.potential, baseCash:b.baseCash, d0:b.d0, cashout:b.cashout, ticket:localId, placedTs:Date.now(), legs:b.legs };
       try{
         var res=await window._db.rpc('place_bet',{ p_acct:acct, p_stake:b.stake, p_potential:b.potential,
           p_symbol:b.type+' · '+b.pick, p_local_id:localId, p_meta:meta,
