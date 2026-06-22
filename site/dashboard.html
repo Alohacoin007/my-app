@@ -11,6 +11,8 @@
   if(!(m&&m.accts&&(m.email||m.authId))){ location.replace('login.html'); }
 }catch(e){ location.replace('login.html'); }})();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>try{window._db=window.supabase.createClient('https://grxnbgtfnaayeluenvqh.supabase.co','sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu');}catch(e){console.error('supabase init',e);}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Rajdhani:wght@500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -598,6 +600,38 @@
     document.addEventListener('click',function(e){ if(!acc.contains(e.target)) acc.classList.remove('open'); });
     document.addEventListener('keydown',function(e){ if(e.key==='Escape') acc.classList.remove('open'); });
   })();
+</script>
+<script>
+/* Step 2: show the REAL sports balance (same account as the app).
+   Paints instantly from the value cached at login, then refreshes from the
+   server so the number always matches sports-live.html. */
+(function(){
+  function applyBal(b){
+    b=Math.max(0,+b||0);
+    if(typeof setBalance==='function'){ try{ setBalance(b); return; }catch(e){} }
+    var el=document.getElementById('balance');
+    if(el) el.textContent='$'+b.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
+  try{
+    var me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); if(!me) return;
+    var cached=parseFloat(localStorage.getItem('alpexa.sportsBalance'));
+    if(!isNaN(cached)) applyBal(cached);
+    var acct=me.accts && me.accts.sports;
+    if(acct && window._db){
+      window._db.from('accounts').select('balance').eq('acct_no',acct).maybeSingle().then(function(r){
+        if(r && !r.error && r.data){
+          var b=+r.data.balance||0;
+          applyBal(b);
+          try{
+            localStorage.setItem('alpexa.sportsBalance', String(b));
+            var sb=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}'); sb.sports=b;
+            localStorage.setItem('alpexa.serverBalances', JSON.stringify(sb));
+          }catch(e){}
+        }
+      });
+    }
+  }catch(e){}
+})();
 </script>
 </body>
 </html>
