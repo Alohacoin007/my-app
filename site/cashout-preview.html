@@ -3,8 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cash-out card — design options</title>
+<title>Cash-out card — D refinements</title>
 <style>
   :root{--bg:#0b0f1a;--surface:#141a28;--surface2:#1d2536;--line:rgba(255,255,255,.08);
     --text:#eef2f8;--muted:#9aa6bd;--green:#1aa850;--green2:#34d27b;--accent:#3a5bf0;}
@@ -17,7 +19,7 @@
   .opt{max-width:420px;margin:0 auto 30px}
   .optlbl{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;
     color:var(--accent);text-transform:uppercase;letter-spacing:.6px;margin:0 0 10px}
-  .optlbl .n{width:20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;
+  .optlbl .n{padding:0 9px;height:20px;border-radius:999px;background:var(--accent);color:#fff;
     display:flex;align-items:center;justify-content:center;font-size:11px;flex:none}
   .note{font-size:11.5px;color:var(--muted);margin:9px 2px 0}
 
@@ -31,117 +33,93 @@
   .obsub .win{color:var(--green2);font-weight:700}
   button{font-family:inherit;cursor:pointer}
 
-  /* ===== A: segmented (one connected control) ===== */
-  .segA{display:flex;border-radius:11px;overflow:hidden;border:1px solid var(--green)}
-  .segA .main{flex:1;border:none;background:var(--green);color:#fff;font-size:13px;font-weight:700;
-    padding:11px 12px;font-variant-numeric:tabular-nums;letter-spacing:.2px}
-  .segA .half{flex:none;border:none;background:transparent;color:var(--green2);font-size:13px;font-weight:700;
-    padding:11px 16px;border-left:1px solid var(--green)}
-  .segA .half:hover{background:rgba(52,210,123,.14)}
-  .segA .main:hover{filter:brightness(1.08)}
+  /* ===== D1: inline label + value, soft tint ===== */
+  .d1{display:flex;align-items:stretch;gap:9px}
+  .d1 .main{flex:1;border:1px solid rgba(52,210,123,.4);background:rgba(26,168,80,.12);
+    border-radius:11px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between}
+  .d1 .main:hover{background:rgba(26,168,80,.2)}
+  .d1 .main .cap{font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.2px}
+  .d1 .main .val{font-size:14px;font-weight:800;color:var(--green2);font-variant-numeric:tabular-nums}
+  .d1 .half{flex:none;background:transparent;border:1px solid var(--line);color:var(--muted);
+    border-radius:11px;padding:0 15px;font-size:12px;font-weight:700}
+  .d1 .half:hover{color:var(--green2);border-color:rgba(52,210,123,.4)}
 
-  /* ===== B: two equal buttons ===== */
-  .segB{display:flex;gap:9px}
-  .segB button{flex:1;border-radius:11px;padding:11px 10px;font-size:13px;font-weight:700;
-    font-variant-numeric:tabular-nums;line-height:1.15}
-  .segB .main{border:none;background:var(--green);color:#fff}
-  .segB .main:hover{filter:brightness(1.08)}
-  .segB .half{background:transparent;border:1px solid rgba(52,210,123,.5);color:var(--green2)}
-  .segB .half:hover{background:rgba(52,210,123,.12)}
-  .segB .sm{display:block;font-size:10px;font-weight:600;opacity:.85;margin-top:1px}
+  /* ===== D2: centered tint pill + small ghost 50% ===== */
+  .d2{display:flex;align-items:center;gap:9px}
+  .d2 .main{flex:1;border:1px solid rgba(52,210,123,.4);background:rgba(26,168,80,.12);
+    color:var(--green2);border-radius:11px;padding:11px 12px;font-size:13px;font-weight:700;
+    font-variant-numeric:tabular-nums;text-align:center}
+  .d2 .main:hover{background:rgba(26,168,80,.2)}
+  .d2 .half{flex:none;background:transparent;border:1px solid var(--line);color:var(--muted);
+    border-radius:11px;padding:11px 14px;font-size:12px;font-weight:700}
+  .d2 .half:hover{color:var(--green2);border-color:rgba(52,210,123,.4)}
 
-  /* ===== C: premium stacked ===== */
-  .obC{position:relative}
-  .obC::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;border-radius:3px;background:var(--green)}
-  .obC{padding-left:22px}
-  .segC .main{width:100%;border:none;border-radius:11px;background:linear-gradient(180deg,#1fbf5b,#168f45);
-    color:#fff;font-size:13.5px;font-weight:800;padding:12px;font-variant-numeric:tabular-nums;
-    box-shadow:0 6px 16px rgba(26,168,80,.28);letter-spacing:.2px}
-  .segC .main:hover{filter:brightness(1.06)}
-  .segC .half{display:block;width:100%;margin-top:8px;background:transparent;border:none;
-    color:var(--muted);font-size:12px;font-weight:600;padding:4px}
-  .segC .half b{color:var(--green2)}
-  .segC .half:hover{color:var(--text)}
-
-  /* ===== D: minimal / muted ===== */
-  .segD{display:flex;align-items:center;gap:10px}
-  .segD .main{flex:1;border:1px solid rgba(52,210,123,.45);background:rgba(26,168,80,.12);
-    color:var(--green2);border-radius:10px;padding:10px 12px;font-size:13px;font-weight:700;
-    font-variant-numeric:tabular-nums;display:flex;justify-content:space-between;align-items:center}
-  .segD .main:hover{background:rgba(26,168,80,.2)}
-  .segD .main .cap{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
-  .segD .half{flex:none;background:transparent;border:1px solid var(--line);color:var(--muted);
-    border-radius:10px;padding:10px 13px;font-size:12px;font-weight:700}
-  .segD .half:hover{color:var(--text);border-color:var(--green2)}
+  /* ===== D3: one segmented tinted bar ===== */
+  .d3{display:flex;border:1px solid rgba(52,210,123,.4);border-radius:11px;overflow:hidden;
+    background:rgba(26,168,80,.1)}
+  .d3 .main{flex:1;border:none;background:transparent;color:var(--green2);
+    padding:11px 14px;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;
+    display:flex;align-items:center;justify-content:space-between}
+  .d3 .main:hover{background:rgba(26,168,80,.16)}
+  .d3 .main .cap{font-size:11px;font-weight:600;color:var(--muted)}
+  .d3 .half{flex:none;border:none;background:transparent;color:var(--muted);
+    padding:11px 16px;font-size:12px;font-weight:700;border-left:1px solid rgba(52,210,123,.3)}
+  .d3 .half:hover{background:rgba(26,168,80,.16);color:var(--green2)}
 </style>
 </head>
 <body>
-  <h1>Cash-out card — 4 design options</h1>
-  <p class="sub">하나 골라서 알려주세요. 고른 것만 데쉬보드에 적용할게요.</p>
+  <h1>Cash-out 카드 — D 다듬은 3가지</h1>
+  <p class="sub">D 방향(차분한 초록 톤)을 다듬었어요. D1 / D2 / D3 중 하나 골라주세요.</p>
 
-  <!-- A -->
+  <!-- D1 -->
   <div class="opt">
-    <div class="optlbl"><span class="n">A</span> 세그먼티드 (하나로 합쳐짐)</div>
+    <div class="optlbl"><span class="n">D1</span> 라벨 + 금액 (한 줄)</div>
     <div class="openbets">
       <div class="oh"><h3>My open bets</h3></div>
       <div class="ob">
         <div class="obpick">Patriots ML</div>
         <div class="obsub">NE @ SEA · $100.00 → <span class="win">win $285.00</span></div>
-        <div class="segA"><button class="main">Cash Out $92.00</button><button class="half">50%</button></div>
-      </div>
-    </div>
-    <p class="note">한 덩어리 버튼, 가운데 구분선으로 50% 분리. 깔끔하고 컴팩트.</p>
-  </div>
-
-  <!-- B -->
-  <div class="opt">
-    <div class="optlbl"><span class="n">B</span> 두 버튼 동일 크기</div>
-    <div class="openbets">
-      <div class="oh"><h3>My open bets</h3></div>
-      <div class="ob">
-        <div class="obpick">Patriots ML</div>
-        <div class="obsub">NE @ SEA · $100.00 → <span class="win">win $285.00</span></div>
-        <div class="segB">
-          <button class="main">Cash Out $92.00</button>
-          <button class="half">50%<span class="sm">$46.00</span></button>
-        </div>
-      </div>
-    </div>
-    <p class="note">두 개를 같은 크기로. 50% 버튼에 받을 금액($46)도 표시.</p>
-  </div>
-
-  <!-- C -->
-  <div class="opt">
-    <div class="optlbl"><span class="n">C</span> 프리미엄 (세로 + 그린 강조바)</div>
-    <div class="openbets">
-      <div class="oh"><h3>My open bets</h3></div>
-      <div class="ob obC">
-        <div class="obpick">Patriots ML</div>
-        <div class="obsub">NE @ SEA · $100.00 → <span class="win">win $285.00</span></div>
-        <div class="segC">
-          <button class="main">Cash Out $92.00</button>
-          <button class="half">Cash out half (50%) · <b>$46.00</b></button>
-        </div>
-      </div>
-    </div>
-    <p class="note">큰 메인 버튼 + 아래 작은 50% 링크. 왼쪽 초록 강조바. 고급스러운 느낌.</p>
-  </div>
-
-  <!-- D -->
-  <div class="opt">
-    <div class="optlbl"><span class="n">D</span> 미니멀 / 차분한 톤</div>
-    <div class="openbets">
-      <div class="oh"><h3>My open bets</h3></div>
-      <div class="ob">
-        <div class="obpick">Patriots ML</div>
-        <div class="obsub">NE @ SEA · $100.00 → <span class="win">win $285.00</span></div>
-        <div class="segD">
-          <button class="main"><span><span class="cap">Cash out</span><br>$92.00</span><span>→</span></button>
+        <div class="d1">
+          <button class="main"><span class="cap">Cash out</span><span class="val">$92.00</span></button>
           <button class="half">50%</button>
         </div>
       </div>
     </div>
-    <p class="note">형광 초록 대신 은은한 초록 톤. 눈에 안 따갑고 차분함.</p>
+    <p class="note">왼쪽 'Cash out', 오른쪽 받을 금액 $92.00. 가장 깔끔하고 정보 명확.</p>
+  </div>
+
+  <!-- D2 -->
+  <div class="opt">
+    <div class="optlbl"><span class="n">D2</span> 가운데 정렬 + 작은 50%</div>
+    <div class="openbets">
+      <div class="oh"><h3>My open bets</h3></div>
+      <div class="ob">
+        <div class="obpick">Patriots ML</div>
+        <div class="obsub">NE @ SEA · $100.00 → <span class="win">win $285.00</span></div>
+        <div class="d2">
+          <button class="main">Cash out $92.00</button>
+          <button class="half">50%</button>
+        </div>
+      </div>
+    </div>
+    <p class="note">메인은 가운데 정렬 한 줄, 50%는 작은 보조 버튼.</p>
+  </div>
+
+  <!-- D3 -->
+  <div class="opt">
+    <div class="optlbl"><span class="n">D3</span> 한 덩어리 (구분선)</div>
+    <div class="openbets">
+      <div class="oh"><h3>My open bets</h3></div>
+      <div class="ob">
+        <div class="obpick">Patriots ML</div>
+        <div class="obsub">NE @ SEA · $100.00 → <span class="win">win $285.00</span></div>
+        <div class="d3">
+          <button class="main"><span class="cap">Cash out</span><span>$92.00</span></button>
+          <button class="half">50%</button>
+        </div>
+      </div>
+    </div>
+    <p class="note">전체가 하나의 은은한 초록 바, 가운데 구분선으로 50% 분리.</p>
   </div>
 </body>
 </html>
