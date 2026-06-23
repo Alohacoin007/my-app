@@ -3801,27 +3801,42 @@ function App(){
     const pnl=order.pnl||0, acct=accountRef.current;
     const now=new Date();
     const dateStr=String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')+' '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-    // Bank the realized P&L — runs ONLY for the device that wins the server claim,
-    // so closing the same position on two devices can't double-count it.
-    function bank(){
-      setClosedHistory(h=>[{id:order.id,sym:order.sym,side:order.side,vol:order.vol,open:order.open,close:closePrice,pnl:pnl,date:dateStr,placedAt:order.placedAt},...h]);
-      try{window.addBalance&&window.addBalance(acct,pnl);}catch(e){}
-      try{window.__alpexaSettle&&window.__alpexaSettle({server:'fx',kind:'fx_close',local_id:order.id,ticket:order.ticket,symbol:order.sym,stake:order.vol,pnl:pnl,detail:order.side+' '+order.vol+' @ '+(+order.open).toFixed(m?m.digits:5)+' → '+(+closePrice).toFixed(m?m.digits:5)});}catch(e){}
+    // Local display/history bookkeeping — records the closed-trade row and moves
+    // THIS device's displayed balance. The realized P&L + close price come from the
+    // server when it settles (so the figures match the authoritative balance).
+    function bankLocal(px, realized){
+      setClosedHistory(h=>[{id:order.id,sym:order.sym,side:order.side,vol:order.vol,open:order.open,close:px,pnl:realized,date:dateStr,placedAt:order.placedAt},...h]);
+      try{window.addBalance&&window.addBalance(acct,realized);}catch(e){}
     }
-    function done(){ try{window.broadcastPositionClose&&window.broadcastPositionClose(order.id, closePrice, pnl);}catch(e){} if(window.ALPEXA_SFX)window.ALPEXA_SFX.closed(); }
+    function done(px,realized){ try{window.broadcastPositionClose&&window.broadcastPositionClose(order.id, px, realized);}catch(e){} if(window.ALPEXA_SFX)window.ALPEXA_SFX.closed(); }
     let me; try{me=JSON.parse(localStorage.getItem('alpexa.me')||'null');}catch(e){}
+    // CLIENT fallback — used when there's no server, or the symbol has no fresh
+    // server price / spec (e.g. some crypto/index symbols). Mirrors the old flow:
+    // client close price + settlement (settlements trigger banks the server balance).
+    function clientClose(){
+      bankLocal(closePrice, pnl);
+      try{window.__alpexaSettle&&window.__alpexaSettle({server:'fx',kind:'fx_close',local_id:order.id,ticket:order.ticket,symbol:order.sym,stake:order.vol,pnl:pnl,detail:order.side+' '+order.vol+' @ '+(+order.open).toFixed(m?m.digits:5)+' → '+(+closePrice).toFixed(m?m.digits:5)});}catch(e){}
+      try{ if(window.AlpexaSync&&AlpexaSync.db&&me&&me.accts&&me.accts.fx) AlpexaSync.db.from('positions').delete().eq('acct_no',me.accts.fx).eq('server','fx').eq('local_id',String(order.id)).eq('status','open').then(function(){},function(){}); }catch(e){}
+      done(closePrice, pnl);
+    }
     if(window.AlpexaSync&&AlpexaSync.db&&me&&me.accts&&me.accts.fx){
-      const fx=me.accts.fx;
-      // CLAIM: atomically delete the open row. Exactly one device gets ≥1 row back.
-      const claim=(attempt)=>{
-        AlpexaSync.db.from('positions').delete().eq('acct_no',fx).eq('server','fx').eq('local_id',String(order.id)).eq('status','open').select('local_id').then(function(r){
-          if(r&&r.data&&r.data.length>0){ bank(); done(); }              // we won → bank once
-          else if(attempt<1){ setTimeout(()=>claim(attempt+1), 900); }   // maybe not synced yet → retry once
-          else { try{ if(setToast){ setToast({error:false,icon:'check',msg:'Already closed',sub:'This position was closed on another device'}); setTimeout(()=>setToast(null),3000); } }catch(e){} done(); } // already banked elsewhere
-        }, function(){ if(attempt<1){ setTimeout(()=>claim(attempt+1),900); } else { bank(); done(); } }); // network blip: bank once (rare)
-      };
-      claim(0);
-    } else { bank(); done(); }   // offline / single device
+      // SERVER-AUTHORITATIVE close: fx_close picks the SERVER price, computes P&L,
+      // banks it via the settlement trigger, and closes the row atomically (so a
+      // frozen client price can't be used to bank a wrong number, and two devices
+      // can't double-bank). We only sync the local display from the server result.
+      AlpexaSync.db.rpc('fx_close',{p_local_id:String(order.id)}).then(function(r){
+        const d=r&&r.data;
+        if(d&&d.ok===true){
+          if(d.duplicate){ done(closePrice,pnl); return; }   // closed elsewhere → server already banked
+          var px=(d.close!=null)?+d.close:closePrice;
+          var realized=(d.pnl!=null)?+d.pnl:pnl;
+          bankLocal(px, realized);   // server already wrote settlement+balance; do NOT settle again
+          done(px, realized);
+        } else {
+          clientClose();   // no price / no spec / stale → safe client fallback
+        }
+      }, function(){ clientClose(); });   // network error → fallback
+    } else { clientClose(); }   // offline / single device
   }
   // Expose force-close so the back-office command reader can liquidate a position.
   window.__alpexaFXClose=(lid)=>{ try{ const o=liveOrders.find(x=>String(x.id)===String(lid)); if(o)closeOrder(o.id); }catch(e){} };
