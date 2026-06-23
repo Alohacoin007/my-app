@@ -141,6 +141,9 @@
   .odd.sel{border-color:transparent;background:var(--accent)}
   .odd.sel .l{color:rgba(255,255,255,.85)}
   .odd.sel .v{color:#fff}
+  .odd .v.pos{color:var(--green)}
+  body.dark .odd .v.pos{color:#34d27b}
+  .odd.sel .v.pos{color:#fff}
   .odd.locked{cursor:not-allowed;opacity:.5;background:var(--surface)}
   .odd.locked:hover{border-color:var(--line);background:var(--surface)}
   .odd.locked .v{font-size:13px;color:var(--muted)}
@@ -335,7 +338,11 @@
     });
   }
 
-  function cell(mi,market,side,label,odd){
+  // American odds, exactly like the app (+120 / -110). am = American moneyline.
+  function fmtAm(am){ var a=Math.round(+am||0); if(!a) return '—'; return (a>0?'+':'')+a; }
+  // Decimal → American (for combined/parlay odds shown in the slip).
+  function decToAm(d){ d=+d||0; if(d<=1) return '—'; return d>=2 ? '+'+Math.round((d-1)*100) : '-'+Math.round(100/(d-1)); }
+  function cell(mi,market,side,label,am){
     var key=mi+"|"+market+"|"+side;
     var lab=label?'<div class="l">'+label+'</div>':'';
     // Live betting is disabled (same rule as the app) — show live odds locked.
@@ -344,7 +351,8 @@
     }
     var sel=state.slip.some(function(s){return s.key===key;});
     var dir=oddDir[key], arr=dir?'<span class="oarr '+dir+'">'+(dir==='up'?'▲':'▼')+'</span>':'';
-    return '<div class="odd'+(sel?' sel':'')+'" data-key="'+key+'" data-mi="'+mi+'" data-mk="'+market+'" data-sd="'+side+'">'+lab+'<div class="v">'+odd.toFixed(2)+arr+'</div></div>';
+    var pos=(Math.round(+am||0)>0)?' pos':'';
+    return '<div class="odd'+(sel?' sel':'')+'" data-key="'+key+'" data-mi="'+mi+'" data-mk="'+market+'" data-sd="'+side+'">'+lab+'<div class="v'+pos+'">'+fmtAm(am)+arr+'</div></div>';
   }
 
   function renderGames(){
@@ -352,18 +360,21 @@
     $("mktTitle").textContent=state.sport+" · Today";
     $("games").innerHTML=list.map(function(m){
       var mi=DATA.indexOf(m);
+      var C=m._core||{};
+      function A(mk,i){ try{ return C[mk][i].am; }catch(e){ return 0; } }
       var top='<div class="g-top">'+(m.live?'<span class="livep"><span class="dot"></span>'+m.status+'</span>':'<span class="g-league">'+m.league+'</span>')+'<span class="g-time">'+(m.live?'':m.status)+'</span></div>';
-      var rowH='<div class="g-row">'+
-        '<div class="team"><span class="ab">'+m.home.ab+'</span>'+m.home.name+(m.home.sc!==null?'<span class="sc">'+m.home.sc+'</span>':'')+'</div>'+
-        cell(mi,"spread","h",m.spread.hl,m.spread.ho)+
-        cell(mi,"total","o","O "+m.total.ln,m.total.o)+
-        cell(mi,"ml","h","",m.ml.h)+'</div>';
+      // Away team on top, then home — same order as the app.
       var rowA='<div class="g-row">'+
         '<div class="team"><span class="ab">'+m.away.ab+'</span>'+m.away.name+(m.away.sc!==null?'<span class="sc">'+m.away.sc+'</span>':'')+'</div>'+
-        cell(mi,"spread","a",m.spread.al,m.spread.ao)+
-        cell(mi,"total","u","U "+m.total.ln,m.total.u)+
-        cell(mi,"ml","a","",m.ml.a)+'</div>';
-      return '<div class="game'+(m.live?' live':'')+'">'+top+rowH+rowA+'</div>';
+        cell(mi,"spread","a",m.spread.al,A('spread',1))+
+        cell(mi,"total","u","U "+m.total.ln,A('total',1))+
+        cell(mi,"ml","a","",A('ml',1))+'</div>';
+      var rowH='<div class="g-row">'+
+        '<div class="team"><span class="ab">'+m.home.ab+'</span>'+m.home.name+(m.home.sc!==null?'<span class="sc">'+m.home.sc+'</span>':'')+'</div>'+
+        cell(mi,"spread","h",m.spread.hl,A('spread',0))+
+        cell(mi,"total","o","O "+m.total.ln,A('total',0))+
+        cell(mi,"ml","h","",A('ml',0))+'</div>';
+      return '<div class="game'+(m.live?' live':'')+'">'+top+rowA+rowH+'</div>';
     }).join("")||'<div class="empty">'+(!GAMES_LOADED?'Loading live games…':(state.filter==='live'?'No live games right now.':'No games for this sport right now.'))+'</div>';
     Array.prototype.forEach.call($("games").querySelectorAll(".odd:not(.locked)"),function(el){
       el.addEventListener("click",function(){toggle(el.dataset);});
@@ -402,7 +413,7 @@
       var singles=state.mode==='singles';
       $("slipBody").innerHTML=state.slip.map(function(s){
         var srow = singles ? '<div class="srow"><span>$</span><input class="sstake" type="number" min="0" step="5" data-key="'+s.key+'" value="'+s.stake+'"><span class="ip">→ $'+(s.odd*(parseFloat(s.stake)||0)).toFixed(2)+'</span></div>' : '';
-        return '<div class="bsel"><div style="flex:1;min-width:0"><div class="pick">'+s.pick+'</div><div class="sub">'+s.sub+'</div>'+srow+'</div><div class="right"><span class="o">'+s.odd.toFixed(2)+'</span><button class="rm" data-key="'+s.key+'">&times;</button></div></div>';
+        return '<div class="bsel"><div style="flex:1;min-width:0"><div class="pick">'+s.pick+'</div><div class="sub">'+s.sub+'</div>'+srow+'</div><div class="right"><span class="o">'+fmtAm(s.am)+'</span><button class="rm" data-key="'+s.key+'">&times;</button></div></div>';
       }).join("");
       Array.prototype.forEach.call($("slipBody").querySelectorAll(".rm"),function(b){
         b.addEventListener("click",function(){
@@ -441,7 +452,7 @@
       var tot=state.slip.reduce(function(a,s){return a*s.odd;},1);
       var stake=parseFloat($("stake").value)||0;
       $("calcLabel").textContent="Total odds";
-      $("totOdds").textContent=n?tot.toFixed(2):"—";
+      $("totOdds").textContent=n?decToAm(tot):"—";
       $("payout").textContent="$"+(n?tot*stake:0).toFixed(2);
       $("place").disabled=!n||stake<=0;
     }
