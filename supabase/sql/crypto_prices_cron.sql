@@ -19,9 +19,10 @@ create extension if not exists pg_net;
 -- NOTE: the deployed Edge function is named `crypto-price` (singular), so the
 -- URL must match exactly — `crypto-prices` (plural) returns 404 NOT_FOUND.
 -- The function tries the Binance public data mirror (real-time) then falls back
--- to CoinGecko. 15s keeps it fresh while staying safe for the CoinGecko fallback's
--- free rate limit.
-select cron.schedule('crypto-prices-60s', '15 seconds', $$
+-- to CoinGecko. The mirror has Binance-grade limits, so 5s gives a near-live feed.
+-- (If it ever falls back to CoinGecko long-term, raise this to ~15s to stay under
+-- CoinGecko's free rate limit.)
+select cron.schedule('crypto-prices-60s', '5 seconds', $$
   select net.http_get(
     url := 'https://grxnbgtfnaayeluenvqh.supabase.co/functions/v1/crypto-price'
   );
