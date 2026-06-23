@@ -3514,10 +3514,9 @@ function App(){
   const [lots,setLots]=useState(0.10);
   const [indicators,setIndicators]=useState({ma:true,vol:false,bb:false,rsi:false,macd:false});
   // Open positions & pending orders persist across server switches / reloads.
-  const [liveOrders,setLiveOrders]=useState(()=>{try{return (JSON.parse(localStorage.getItem('alpexa.fxLive')||'[]')||[]).filter(o=>o&&(+o.vol)>0);}catch(e){return [];}});
+  const [liveOrders,setLiveOrders]=useState([]);   // server-only: pullPos adopts open positions from the `positions` table (no localStorage)
   const [pendingOrders,setPendingOrders]=useState(()=>{try{return JSON.parse(localStorage.getItem('alpexa.fxPending')||'[]');}catch(e){return [];}});
-  const [closedHistory,setClosedHistory]=useState(()=>{try{return JSON.parse(localStorage.getItem('alpexa.fxClosed')||'[]');}catch(e){return [];}});
-  useEffect(()=>{try{localStorage.setItem('alpexa.fxClosed',JSON.stringify(closedHistory));}catch(e){}},[closedHistory]);
+  const [closedHistory,setClosedHistory]=useState([]);   // server-only: merged from `settlements` (no localStorage)
   // ── Cross-device closed-trade history: merge server `settlements` (kind fx_close).
   // Closes on any device write a settlement row; pull them and add the ones not
   // already local (deduped by id), reconstructing side/vol/open/close from `detail`.
@@ -3542,7 +3541,7 @@ function App(){
     const vis=()=>{if(!document.hidden)pull();}; document.addEventListener('visibilitychange',vis);
     return ()=>{stop=true;clearTimeout(t0);clearInterval(iv);document.removeEventListener('visibilitychange',vis);};
   },[]);
-  useEffect(()=>{try{localStorage.setItem('alpexa.fxLive',JSON.stringify(liveOrders.map(o=>({...o,fresh:false}))));}catch(e){}},[liveOrders]);
+  // (open positions are server-owned via the `positions` table — no localStorage mirror)
   // ── MULTI-DEVICE: adopt open FX positions from the server (shared truth) ──
   // Add positions opened on another device, drop ones closed elsewhere (6s grace
   // so a just-opened local position isn't dropped before it syncs). pnl is
