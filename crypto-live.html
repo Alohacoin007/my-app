@@ -11877,13 +11877,20 @@ function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiq
   })();
   const triggerOk = triggerTier === 'ok' || triggerTier === 'warn';
 
-  const doBuy = () => {
+  const submittingRef = React.useRef(false);
+  const doBuy = async () => {
+    if (submittingRef.current) return;                 // ignore double-taps while a trade is in flight
     if (window.__alpexaHalt) { AudioFX.reject(); alert('Trading is temporarily paused. Please try again shortly.'); return; }
     if (!valid || !triggerOk) { AudioFX.reject(); return; }
-    AudioFX.success();
     const cb = isSell ? onSold : onBought;
     if (orderType === 'Market') {
-      if (cb) cb(assetId, usdAmount);
+      // Market orders settle on the SERVER (crypto_trade RPC). Await the result so a
+      // rejected trade (insufficient funds / stale price) never shows "done".
+      let res;
+      submittingRef.current = true;
+      try { res = cb ? await cb(assetId, usdAmount) : { ok: true }; }
+      finally { submittingRef.current = false; }
+      if (res && res.ok === false) { AudioFX.reject(); alert('Trade not completed: ' + (res.error || 'please try again')); return; }
     } else {
       // Limit / Stop orders become pending — placed in the App's queue,
       // shown in Dashboard's Open Orders section.
@@ -11891,6 +11898,7 @@ function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiq
         type: orderType, triggerPrice, coinAmount, side,
       });
     }
+    AudioFX.success();
     setConfirmed(true);
   };
 
@@ -13534,17 +13542,44 @@ function App() {
       // Dealing-desk markup: customer pays full USDT but receives slightly less
       // coin value (the house spread). The difference is company fee revenue.
       const mkP = Math.max(0, Math.min(50, (window.__alpexaCryptoMarks && +window.__alpexaCryptoMarks[assetId]) || 0));
-      const credited = usdAmount * (1 - mkP / 100);
-      const feeUsd = usdAmount - credited;
-      setBalances((b) => ({
-        ...b,
-        USDT:     Math.max(0, (b.USDT || 0) - usdAmount),
-        [assetId]: (b[assetId] || 0) + credited,
-      }));
-      pushTx({ type: 'buy', sym: assetId, usd: usdAmount });
-      if (feeUsd > 0) { try{ window.__alpexaSettle && window.__alpexaSettle({server:'crypto',kind:'crypto_fee',local_id:'bf-'+Date.now(),symbol:assetId,stake:feeUsd,pnl:0,detail:'buy markup '+mkP+'%'}); }catch(e){} }
-      setPulseAsset(assetId);
-      setTimeout(() => setPulseAsset(null), 1400);
+      const feeUsd = usdAmount * (mkP / 100);
+      // Client-side execution — used for securities, coins with no server price, or
+      // when offline/no account (degraded mode). Mirrors the original behaviour.
+      const clientBuy = () => {
+        const credited = usdAmount * (1 - mkP / 100);
+        setBalances((b) => ({ ...b, USDT: Math.max(0, (b.USDT || 0) - usdAmount), [assetId]: (b[assetId] || 0) + credited }));
+        pushTx({ type: 'buy', sym: assetId, usd: usdAmount });
+        if (feeUsd > 0) { try{ window.__alpexaSettle && window.__alpexaSettle({server:'crypto',kind:'crypto_fee',local_id:'bf-'+Date.now(),symbol:assetId,stake:feeUsd,pnl:0,detail:'buy markup '+mkP+'%'}); }catch(e){} }
+        setPulseAsset(assetId); setTimeout(() => setPulseAsset(null), 1400);
+        return { ok: true };
+      };
+      const acct = cryptoAcctRef.current;
+      const isSecurity = (typeof PORTFOLIO !== 'undefined') && PORTFOLIO.securities && PORTFOLIO.securities.some((s) => s.sym === assetId);
+      // Securities / offline / no account → client path (server can't price these).
+      if (isSecurity || !(window.AlpexaSync && AlpexaSync.db && acct)) {
+        return Promise.resolve(clientBuy());
+      }
+      // SERVER-AUTHORITATIVE buy: crypto_trade debits USDT and credits the coin at
+      // the SERVER price (and rejects a stale price), so the fill can't be gamed by
+      // a frozen client price. We then re-adopt holdings from the server for display.
+      window.__cbLocalTs = Date.now();  // mark busy so the adopt loop doesn't fight the trade
+      return AlpexaSync.db.rpc('crypto_trade', {
+        p_ref: 'cb-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+        p_acct: acct, p_symbol: assetId, p_usd: usdAmount, p_side: 'buy', p_markup: mkP,
+      }).then((r) => {
+        const d = r && r.data;
+        if (!d || d.ok !== true) {
+          const err = (d && d.error) || (r && r.error && r.error.message) || 'trade failed';
+          if (/no price/i.test(err)) return clientBuy();   // asset not in the server feed → client path
+          return { ok: false, error: err };
+        }
+        pushTx({ type: 'buy', sym: assetId, usd: usdAmount });
+        if (feeUsd > 0) { try{ window.__alpexaSettle && window.__alpexaSettle({server:'crypto',kind:'crypto_fee',local_id:'bf-'+Date.now(),symbol:assetId,stake:feeUsd,pnl:0,detail:'buy markup '+mkP+'%'}); }catch(e){} }
+        forceCryptoAdopt();           // pull the new server holdings into the wallet
+        setPulseAsset(assetId);
+        setTimeout(() => setPulseAsset(null), 1400);
+        return { ok: true };
+      }, () => ({ ok: false, error: 'network error' }));
     } else {
       // Limit / Stop: queue as pending order. Funds aren't moved until fill.
       setPendingOrders((p) => [
