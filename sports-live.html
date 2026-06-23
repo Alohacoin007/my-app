@@ -3248,33 +3248,11 @@
         }
       }catch(e){}
     }
-    // SERVER-CENTRE: settled (won/lost) bets come from the shared settlements table
-    // (same source as the dashboard). Locally-tracked cash-outs are kept (merged).
-    async function pullServerSettled(){
-      if(!(window.AlpexaSync && AlpexaSync.db)) return;
-      var cust=meCust(); if(!cust) return;
-      try{
-        var r=await AlpexaSync.db.from('settlements').select('local_id,ticket,symbol,stake,pnl,kind,created_at')
-          .eq('cust_id',cust).eq('server','sports').order('created_at',{ascending:false}).limit(300);
-        if(r && !r.error && Array.isArray(r.data)){
-          var serverSettled = r.data.map(function(s){
-            var won=(s.kind==='bet_won')||(+s.pnl>0); var stake=+s.stake||0;
-            return { id:'sv'+(s.local_id||s.ticket||s.created_at), type:s.symbol||'Bet', cls:'single', stake:stake,
-              result:(won?'won':'lost'), payout:(won?(stake+(+s.pnl||0)):0), legs:[] };
-          });
-          var localCashed = (settledBets||[]).filter(function(b){ return b && b.result==='cashed'; });
-          settledBets = serverSettled.concat(localCashed);
-          saveBets();
-          try{ if(typeof renderTickets==='function') renderTickets(); }catch(e){}
-        }
-      }catch(e){}
-    }
     // Clear the built-in sample games immediately so customers only ever see REAL ones.
     try{ GAMES.length=0; if(typeof renderGames==='function') renderGames(); }catch(e){}
     loadLive(false);
     pullServerBets();
-    pullServerSettled();
-    setInterval(()=>{ if(!document.hidden){ loadLive(true); pullServerBets(); pullServerSettled(); } }, 30000);   // full refresh + odds + bets
+    setInterval(()=>{ if(!document.hidden){ loadLive(true); pullServerBets(); } }, 30000);   // full refresh + odds + bets
     setInterval(()=>{ if(!document.hidden) watchLiveScores(); }, 9000); // fast score-suspend
     // re-render when a suspension lapses so the 🔒 clears on its own
     setInterval(()=>{ if(!document.hidden && window.__alpexaLiveBetting && typeof renderGames==='function'){
