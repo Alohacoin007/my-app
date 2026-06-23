@@ -68,6 +68,50 @@ function fmtTime(iso: string): string {
   catch (_e) { return ""; }
 }
 
+// ── Overlay REAL odds from the sports_odds table (already populated by the
+// sports-odds function from The Odds API). No extra Odds API credits — we just
+// read what's stored — so the dashboard shows the SAME real odds as the app.
+const ODDS_SPORT: Record<string, string> = { NFL: "americanfootball_nfl", NBA: "basketball_nba", MLB: "baseball_mlb", NHL: "icehockey_nhl" };
+function nick(name: string): string { return String(name || "").trim().toLowerCase().split(/\s+/).pop() || ""; }
+function decP(p: number): number { return p > 0 ? 1 + p / 100 : 1 + 100 / (-p); }
+function fmtPt(p: number): string { return (p > 0 ? "+" : "") + p; }
+function bestOutcome(ev: any, marketKey: string, matchFn: (o: any) => boolean): any {
+  let b: any = null;
+  (ev.bookmakers || []).forEach((bk: any) => {
+    const m = (bk.markets || []).find((x: any) => x.key === marketKey); if (!m) return;
+    (m.outcomes || []).forEach((o: any) => { if (matchFn(o)) { if (b === null || decP(o.price) > decP(b.price)) b = { price: o.price, point: o.point }; } });
+  });
+  return b;
+}
+function oddsToCore(ev: any, home: any, away: any): any {
+  if (!ev.bookmakers || !ev.bookmakers.length) return null;
+  const core: any = {};
+  const mlH = bestOutcome(ev, "h2h", (o) => nick(o.name) === nick(home.nm)), mlA = bestOutcome(ev, "h2h", (o) => nick(o.name) === nick(away.nm));
+  if (mlH && mlA) core.ml = [{ ln: "", am: mlH.price, sel: home.nm + " ML" }, { ln: "", am: mlA.price, sel: away.nm + " ML" }];
+  const spH = bestOutcome(ev, "spreads", (o) => nick(o.name) === nick(home.nm)), spA = bestOutcome(ev, "spreads", (o) => nick(o.name) === nick(away.nm));
+  if (spH && spA && spH.point != null && spA.point != null) core.spread = [{ ln: fmtPt(spH.point), am: spH.price, sel: home.nm + " " + fmtPt(spH.point) }, { ln: fmtPt(spA.point), am: spA.price, sel: away.nm + " " + fmtPt(spA.point) }];
+  const ov = bestOutcome(ev, "totals", (o) => /over/i.test(o.name)), un = bestOutcome(ev, "totals", (o) => /under/i.test(o.name));
+  if (ov && un && ov.point != null && un.point != null) core.total = [{ ln: "Over " + ov.point, am: ov.price, sel: "Over " + ov.point }, { ln: "Under " + un.point, am: un.price, sel: "Under " + un.point }];
+  return (core.ml || core.spread || core.total) ? core : null;
+}
+async function overlayRealOdds(games: any[], SB_URL: string, H: Record<string, string>) {
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/sports_odds?select=sport,data`, { headers: H });
+    if (!res.ok) return;
+    const rows = await res.json();
+    const bySport: Record<string, any[]> = {};
+    (rows || []).forEach((row: any) => { if (row && row.sport) bySport[row.sport] = Array.isArray(row.data) ? row.data : []; });
+    games.forEach((g: any) => {
+      const sk = ODDS_SPORT[g.lg]; if (!sk) return;
+      const data = bySport[sk]; if (!data || !data.length) return;
+      const ev = data.find((e: any) => { const s = new Set([nick(e.home_team), nick(e.away_team)]); return s.has(nick(g.home.nm)) && s.has(nick(g.away.nm)); });
+      if (!ev) return;
+      const core = oddsToCore(ev, g.home, g.away);
+      if (core) { if (core.ml) g.ml = core.ml; if (core.spread) g.spread = core.spread; if (core.total) g.total = core.total; }
+    });
+  } catch (_e) { /* keep ESPN odds if the overlay fails */ }
+}
+
 async function fetchLeague(L: { lg: string; sport: string; path: string }, out: any[]) {
   const direct = `https://site.api.espn.com/apis/site/v2/sports/${L.path}/scoreboard`;
   const tries = [direct, "https://corsproxy.io/?url=" + encodeURIComponent(direct)];
@@ -116,6 +160,10 @@ Deno.serve(async (req) => {
 
   const games: any[] = [];
   await Promise.all(LEAGUES.map((L) => fetchLeague(L, games)));
+
+  // Overlay the REAL odds the app already uses (sports_odds table) so the
+  // dashboard's live_games carries the same real moneyline/spread/total.
+  await overlayRealOdds(games, SB_URL, H);
 
   // Upsert the single 'all' row (clients read this).
   const r = await fetch(`${SB_URL}/rest/v1/live_games?on_conflict=id`, {
