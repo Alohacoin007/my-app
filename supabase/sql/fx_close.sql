@@ -61,7 +61,7 @@ begin
   if v_pos.local_id is null then return jsonb_build_object('ok',false,'error','position not found or already closed'); end if;
   v_acct := v_pos.acct_no; v_sym := v_pos.symbol; v_side := v_pos.side;
   v_open := coalesce(v_pos.open_price,0); v_size := coalesce(v_pos.size,0);
-  select cust_id into v_cust from public.accounts where acct_no = v_acct;
+  v_cust := v_pos.cust_id;   -- positions carries cust_id (accounts does not)
 
   -- class spec (reject if unknown -> client fallback)
   select cls into v_cls from public.fx_specs where symbol = v_sym;
