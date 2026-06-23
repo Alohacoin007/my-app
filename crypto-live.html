@@ -13378,9 +13378,16 @@ function App() {
     // garbage and could ZERO-OUT real coins on the server. Wait for a real feed.
     if (!window.__alpexaPricesReady) return;
     const rows = []; const seen = {};
+    const sq = holdingsSyncRef.current.serverQty || {};
     Object.keys(balances).forEach((sym) => {
       const usd = +balances[sym] || 0; const px = cryptoPriceOf(sym);
-      seen[sym] = true; rows.push({ acct_no: acct, asset: sym, qty: px > 0 ? usd / px : 0 });
+      let q = px > 0 ? usd / px : 0;
+      // Snap to the EXACT server quantity when the implied change is within
+      // price-noise tolerance (0.5%). Re-anchoring balances on a price tick then
+      // never drifts the stored qty; only a genuine trade (>0.5%) writes a change.
+      const sv = +sq[sym] || 0;
+      if (sv > 0 && Math.abs(q - sv) <= sv * 0.005) q = sv;
+      seen[sym] = true; rows.push({ acct_no: acct, asset: sym, qty: q });
     });
     const sig = cryptoQtySig(rows);
     if (holdingsSyncRef.current.first) { holdingsSyncRef.current.first = false; holdingsSyncRef.current.prev = seen; holdingsSyncRef.current.srvSig = sig; return; }
@@ -13416,6 +13423,10 @@ function App() {
         AlpexaSync.db.from('crypto_holdings').select('asset,qty').eq('acct_no', acct).then((hr) => {
           if (stop || !hr || hr.error || !hr.data) return;
           const data = hr.data;
+          // Remember the EXACT server quantities so the write-back can snap to them
+          // (kills price-noise drift). Updated every tick, even when sig is unchanged.
+          const sqMap = {}; data.forEach((h) => { sqMap[h.asset] = +h.qty || 0; });
+          holdingsSyncRef.current.serverQty = sqMap;
           const sig = cryptoQtySig(data);
           if (sig === holdingsSyncRef.current.srvSig) return; // server unchanged
           if (!data.length) { holdingsSyncRef.current.srvSig = ''; return; } // server empty — enable writes, nothing to adopt
