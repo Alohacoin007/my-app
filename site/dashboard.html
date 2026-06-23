@@ -568,6 +568,15 @@
   async function doCashout(localId, frac){
     if(_cashing||!localId) return;
     if(!window._db){ toast('No server connection'); return; }
+    // cash_out checks auth.uid() server-side; without a live session it fails.
+    try{
+      var _u=await window._db.auth.getUser();
+      if(!(_u&&_u.data&&_u.data.user)){
+        toast('Session expired — please log in again');
+        setTimeout(function(){ location.href='login.html?switch=1'; }, 1300);
+        return;
+      }
+    }catch(e){ toast('Session expired — please log in again'); setTimeout(function(){ location.href='login.html?switch=1'; }, 1300); return; }
     _cashing=true;
     try{
       var res=await window._db.rpc('cash_out',{ p_local_id:localId, p_fraction:frac });
