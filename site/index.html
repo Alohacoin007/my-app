@@ -719,7 +719,18 @@
     {league:'NBA',live:true,time:'Q2 · 5:10',home:{ab:'LAL',c:'#552583',name:'Lakers',sc:54},away:{ab:'BOS',c:'#007a33',name:'Celtics',sc:49},spread:{ho:1.91,ao:1.90,hl:'-1.5',al:'+1.5'},total:{o:1.92,u:1.88,ln:221},ml:{h:1.62,a:2.30}},
     {league:'EPL',live:false,time:'Sun · 11:30',home:{ab:'MCI',c:'#6cabdd',name:'Man City',sc:null},away:{ab:'LIV',c:'#c8102e',name:'Liverpool',sc:null},spread:{ho:1.80,ao:2.00,hl:'-0.5',al:'+0.5'},total:{o:1.95,u:1.85,ln:3.5},ml:{h:1.70,a:4.50}}
   ];
-  var slip=[], dir={};
+  var slip=[], dir={}, userTouched=false;
+  // Pre-fill a sample multi-pick slip so the showcase isn't empty. Stops the
+  // moment the visitor taps any odds or removes a pick (then it's their slip).
+  function seedSlip(){
+    if(userTouched || slip.length || !G.length) return;
+    [[0,'ml','h'],[1,'ml','h'],[1,'spread','h']].forEach(function(p){
+      var gi=p[0],mk=p[1],sd=p[2],g=G[gi]; if(!g) return;
+      var key=gi+'|'+mk+'|'+sd; if(slip.some(function(s){return s.key===key;})) return;
+      slip.push({key:key,gi:gi,mk:mk,pick:labelFor(g,mk,sd),sub:g.away.name+' @ '+g.home.name,odd:oddFor(g,mk,sd)});
+    });
+    render(); renderSlip();
+  }
   function odd(gi,mk,sd,label,o){
     var key=gi+'|'+mk+'|'+sd, sel=slip.some(function(s){return s.key===key;});
     var d=dir[key], arr=d?'<span class="oarr '+d+'">'+(d==='up'?'▲':'▼')+'</span>':'';
@@ -739,6 +750,7 @@
   function labelFor(g,mk,sd){ if(mk==='spread')return (sd==='h'?g.home.name+' '+g.spread.hl:g.away.name+' '+g.spread.al); if(mk==='total')return (sd==='o'?'Over '+g.total.ln:'Under '+g.total.ln); return (sd==='h'?g.home.name:g.away.name)+' ML'; }
   function oddFor(g,mk,sd){ if(mk==='spread')return sd==='h'?g.spread.ho:g.spread.ao; if(mk==='total')return sd==='o'?g.total.o:g.total.u; return sd==='h'?g.ml.h:g.ml.a; }
   function toggle(d){
+    userTouched=true;
     var key=d.key,gi=+d.gi,g=G[gi];
     var i=slip.findIndex(function(s){return s.key===key;});
     if(i>-1){slip.splice(i,1);}
@@ -750,7 +762,7 @@
     if(!slip.length){ $('lbBody').innerHTML='<div class="lb-empty">Tap any odds above to add<br>your first selection.</div>'; }
     else{
       $('lbBody').innerHTML=slip.map(function(s){ return '<div class="lb-sel"><div><div class="pk">'+s.pick+'</div><div class="sb">'+s.sub+'</div></div><div class="lb-right"><span class="so">'+s.odd.toFixed(2)+'</span><button class="rm" data-key="'+s.key+'">&times;</button></div></div>'; }).join('');
-      [].slice.call($('lbBody').querySelectorAll('.rm')).forEach(function(b){ b.addEventListener('click',function(){ var i=slip.findIndex(function(s){return s.key===b.dataset.key;}); if(i>-1){slip.splice(i,1);render();renderSlip();} }); });
+      [].slice.call($('lbBody').querySelectorAll('.rm')).forEach(function(b){ b.addEventListener('click',function(){ userTouched=true; var i=slip.findIndex(function(s){return s.key===b.dataset.key;}); if(i>-1){slip.splice(i,1);render();renderSlip();} }); });
     }
     calc();
   }
@@ -762,7 +774,7 @@
   }
   $('lbStake').addEventListener('input',calc);
   $('lbPlace').addEventListener('click',function(){ location.href='signup.html'; });
-  render(); renderSlip();
+  render(); renderSlip(); seedSlip();
 
   // ── Real data: swap the demo board for live games when the server has them.
   // If there are none (off-season / fetch fails), keep the demo board running.
@@ -793,7 +805,7 @@
         var wasReal=realLoaded;
         G.length=0; rows.slice(0,5).forEach(function(x){G.push(x);});
         realLoaded=true; if(!wasReal) slip=[];
-        render(); renderSlip();
+        render(); renderSlip(); seedSlip();
       },function(){});
     }catch(e){}
   }
