@@ -229,6 +229,9 @@
   .ob{padding:13px 15px;border-bottom:1px solid var(--line)}
   .ob:last-child{border-bottom:none}
   .ob .obpick{font-size:13.5px;font-weight:700;letter-spacing:-.1px}
+  .ob-badge{display:inline-block;margin-left:8px;vertical-align:middle;font-size:9.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:var(--surface2);color:var(--muted);border:1px solid var(--line)}
+  .ob-badge.live{background:rgba(229,72,77,.12);color:#e5484d;border-color:transparent}
+  body.dark .ob-badge.live{background:rgba(255,90,95,.16);color:#ff7a7e}
   .ob .obsub{font-size:11.5px;color:var(--muted);margin:3px 0 11px;font-variant-numeric:tabular-nums}
   .ob .obsub .win{color:var(--green);font-weight:700}
   body.dark .ob .obsub .win{color:#34d27b}
@@ -566,7 +569,10 @@
     var LIMIT=4, shown=OPEN.slice(0,LIMIT);
     el.innerHTML=head+shown.map(function(o){
       var cash=(+o.stake||0)*0.92;
-      return '<div class="ob"><div class="obpick">'+(o.pick||'Bet')+'</div><div class="obsub">'+(o.sub||'')+' · $'+(+o.stake||0).toFixed(2)+' → <span class="win">win $'+(+o.potential||0).toFixed(2)+'</span></div>'+
+      // Status badge: match the bet's game to the live feed (LIVE vs upcoming).
+      var g=o.gid?DATA.filter(function(x){return x._gid===o.gid;})[0]:null;
+      var badge=g ? (g.live?'<span class="ob-badge live">● LIVE</span>':'<span class="ob-badge">Upcoming</span>') : '';
+      return '<div class="ob"><div class="obpick">'+(o.pick||'Bet')+badge+'</div><div class="obsub">'+(o.sub||'')+' · $'+(+o.stake||0).toFixed(2)+' → <span class="win">win $'+(+o.potential||0).toFixed(2)+'</span></div>'+
         '<div class="obrow"><button class="cashout" data-id="'+(o.localId||'')+'" data-f="1">Cash out $'+cash.toFixed(2)+'</button>'+
         '<button class="cashout half" data-id="'+(o.localId||'')+'" data-f="0.5">50%</button></div></div>';
     }).join('')+'<a class="ob-all" href="my-bets.html">View all in My Bets'+(OPEN.length>LIMIT?' ('+OPEN.length+')':'')+' &rsaquo;</a>';
@@ -612,7 +618,7 @@
         .eq('cust_id',cust).eq('server','sports').eq('kind','bet').eq('status','open');
       if(r&&!r.error&&Array.isArray(r.data)){
         OPEN.length=0;
-        r.data.forEach(function(p){ var meta=p.meta||{}; OPEN.push({ localId:p.local_id, pick:p.pick||p.symbol||'Bet', sub:p.game||meta.type||'', stake:+p.stake||0, potential:+p.potential||0 }); });
+        r.data.forEach(function(p){ var meta=p.meta||{}; var gid=(meta.legs&&meta.legs[0]&&meta.legs[0].gid)||''; OPEN.push({ localId:p.local_id, pick:p.pick||p.symbol||'Bet', sub:p.game||meta.type||'', stake:+p.stake||0, potential:+p.potential||0, gid:gid }); });
         try{ localStorage.setItem('alpexa_openbets', OPEN.length); }catch(e){}
         renderBetBadge(); renderOpenBets();
       }
