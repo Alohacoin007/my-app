@@ -13340,6 +13340,11 @@ function App() {
   React.useEffect(() => {
     if (!window.AlpexaSync || !AlpexaSync.db) return;
     const acct = cryptoAcctRef.current; if (!acct) return;
+    // SAFETY: never write holdings while prices are unknown. balances holds USD
+    // VALUE, so qty is recomputed as value/price — if no real price has loaded
+    // (Binance/CoinGecko blocked AND server prices not yet in), the qty would be
+    // garbage and could ZERO-OUT real coins on the server. Wait for a real feed.
+    if (!window.__alpexaPricesReady) return;
     const rows = []; const seen = {};
     Object.keys(balances).forEach((sym) => {
       const usd = +balances[sym] || 0; const px = cryptoPriceOf(sym);
@@ -13750,7 +13755,42 @@ function alpexaApplyLivePrices(data) {
       }
     });
   });
+  if (hits) window.__alpexaPricesReady = true;   // real prices are loaded → qty math is trustworthy
   return hits;
+}
+
+// SERVER price source — the Supabase `prices` table (filled by the crypto-prices
+// Edge function). This is the AUTHORITATIVE, region-independent feed: it works
+// even where Binance / CoinGecko are blocked (some regions/browsers), so coins
+// NEVER vanish just because a client-direct exchange is unreachable. Maps the
+// shared prices table (symbol, mid) onto MARKET / PORTFOLIO / WATCHLIST by symbol.
+function alpexaApplyServerPrices(rows) {
+  if (!rows || !rows.length) return 0;
+  const bySym = {};
+  rows.forEach((r) => { if (r && r.symbol && +r.mid > 0) bySym[r.symbol] = +r.mid; });
+  const tables = [];
+  try { if (typeof PORTFOLIO !== 'undefined' && PORTFOLIO.assets)     tables.push(PORTFOLIO.assets); } catch (e) {}
+  try { if (typeof PORTFOLIO !== 'undefined' && PORTFOLIO.securities) tables.push(PORTFOLIO.securities); } catch (e) {}
+  try { if (typeof WATCHLIST !== 'undefined') tables.push(WATCHLIST); } catch (e) {}
+  try { if (typeof MARKET    !== 'undefined') tables.push(MARKET);    } catch (e) {}
+  let hits = 0;
+  tables.forEach((arr) => {
+    if (!arr) return;
+    arr.forEach((row) => {
+      const p = bySym[row.sym];
+      if (p > 0) { row.price = p; if (typeof row.qty === 'number') row.mine = +(row.qty * row.price).toFixed(2); hits++; }
+    });
+  });
+  if (hits) { window.__alpexaPricesReady = true; window.__alpexaServerFeedLive = true; }
+  return hits;
+}
+async function alpexaLoadServerPrices() {
+  try {
+    if (!(window.AlpexaSync && AlpexaSync.db)) return 0;
+    const r = await AlpexaSync.db.from('prices').select('symbol,mid');
+    if (!r || r.error || !r.data) return 0;
+    return alpexaApplyServerPrices(r.data);
+  } catch (e) { return 0; }
 }
 
 window.__alpexaSpark = window.__alpexaSpark || {};   // 7-day mini-chart data per symbol
@@ -13837,14 +13877,29 @@ function alpexaPortfolioSeries(range, n, endValue) {
 
 (async () => {
   try {
+    // Server prices FIRST (Supabase — reachable everywhere, even where Binance/
+    // CoinGecko are blocked). Then CoinGecko for 24h-change + sparklines. Either
+    // alone is enough to render real prices, so a blocked exchange never blanks
+    // the wallet. Whichever resolves first lets us render without waiting.
     await Promise.race([
+      alpexaLoadServerPrices(),
       alpexaLoadLivePrices(),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000)),
+      new Promise((res) => setTimeout(res, 5000)),
     ]);
+    alpexaLoadLivePrices().catch(() => {});   // fill sparklines/24h in the background
   } catch (e) {
     console.warn('[ALPEXA] live prices unavailable, using demo prices —', e.message);
   }
   ReactDOM.createRoot(document.getElementById('phone')).render(<AppRoot/>);
+})();
+
+// Keep MARKET prices fresh from the SERVER even when the Binance/Coinbase
+// WebSocket is blocked (region/browser). Polling the shared `prices` table is
+// what makes holdings show correctly EVERYWHERE — not only where Binance works.
+(function () {
+  function poll() { try { alpexaLoadServerPrices().catch(function () {}); } catch (e) {} }
+  setTimeout(poll, 1500); setTimeout(poll, 4000);   // early catch-up if AlpexaSync wasn't ready at startup
+  setInterval(function () { if (!document.hidden) poll(); }, 20000);
 })();
 </script>
 <script>
