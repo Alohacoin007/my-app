@@ -16,9 +16,11 @@ create extension if not exists pg_net;
 
 -- If you set a CRON_SECRET on the crypto-prices function, append it as a query
 -- param:  .../crypto-prices?token=<CRON_SECRET>   (omit if no secret is set).
+-- NOTE: the deployed Edge function is named `crypto-price` (singular), so the
+-- URL must match exactly — `crypto-prices` (plural) returns 404 NOT_FOUND.
 select cron.schedule('crypto-prices-60s', '* * * * *', $$
   select net.http_get(
-    url := 'https://grxnbgtfnaayeluenvqh.supabase.co/functions/v1/crypto-prices'
+    url := 'https://grxnbgtfnaayeluenvqh.supabase.co/functions/v1/crypto-price'
   );
 $$);
 
