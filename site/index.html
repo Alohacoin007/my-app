@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --bg:#05070f;--surface:#0c1120;--surface2:#141a2c;--line:rgba(255,255,255,.09);
@@ -762,8 +763,45 @@
   $('lbStake').addEventListener('input',calc);
   $('lbPlace').addEventListener('click',function(){ location.href='signup.html'; });
   render(); renderSlip();
+
+  // ── Real data: swap the demo board for live games when the server has them.
+  // If there are none (off-season / fetch fails), keep the demo board running.
+  var realLoaded=false;
+  function dec(am){am=+am;if(!am)return 1.9;return Math.round((am>0?1+am/100:1+100/(-am))*100)/100;}
+  function numOf(s){var m=String(s||'').match(/([\d.]+)/);return m?parseFloat(m[1]):0;}
+  var LBPAL=['#e31837','#06452a','#552583','#007a33','#6cabdd','#c8102e','#1d4ed8','#ea580c','#0891b2','#7c3aed'];
+  function lbCol(s){var h=0;for(var i=0;i<(s||'').length;i++)h=(h*31+s.charCodeAt(i))|0;return LBPAL[Math.abs(h)%LBPAL.length];}
+  function fmtShort(iso){try{var d=new Date(iso);if(isNaN(d.getTime()))return'';return d.toLocaleDateString('en-US',{weekday:'short'})+' · '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});}catch(e){return'';}}
+  function toLB(g){
+    var sp=g.spread||[],to=g.total||[],ml=g.ml||[]; if(sp.length<2||to.length<2||ml.length<2) return null;
+    return {league:g.lg,live:!!g.live,time:g.live?(g.time||'Live'):fmtShort(g.iso),
+      home:{ab:g.home.ab,c:lbCol(g.home.nm),name:g.home.nm,sc:(g.home.sc!=null?g.home.sc:null)},
+      away:{ab:g.away.ab,c:lbCol(g.away.nm),name:g.away.nm,sc:(g.away.sc!=null?g.away.sc:null)},
+      spread:{ho:dec(sp[0].am),ao:dec(sp[1].am),hl:sp[0].ln,al:sp[1].ln},
+      total:{o:dec(to[0].am),u:dec(to[1].am),ln:numOf(to[0].ln)},
+      ml:{h:dec(ml[0].am),a:dec(ml[1].am)}};
+  }
+  function loadReal(){
+    if(!window.supabase) return;
+    try{
+      var db=window.supabase.createClient('https://grxnbgtfnaayeluenvqh.supabase.co','sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu');
+      db.from('live_games').select('data').eq('id','all').maybeSingle().then(function(r){
+        var games=(r&&r.data&&r.data.data)||[]; if(!Array.isArray(games)||!games.length) return;
+        var rows=[]; games.forEach(function(g){try{var x=toLB(g);if(x)rows.push(x);}catch(e){}});
+        if(!rows.length) return;
+        rows.sort(function(a,b){return (b.live?1:0)-(a.live?1:0);}); // live games first
+        var wasReal=realLoaded;
+        G.length=0; rows.slice(0,5).forEach(function(x){G.push(x);});
+        realLoaded=true; if(!wasReal) slip=[];
+        render(); renderSlip();
+      },function(){});
+    }catch(e){}
+  }
+  loadReal(); setInterval(loadReal,60000);
+
   function nudge(o){ var v=Math.round((o+(Math.random()*0.08-0.04))*100)/100; return Math.min(3.6,Math.max(1.2,v)); }
   setInterval(function(){
+    if(realLoaded) return;   // demo movement only — never fake-move real odds
     var live=[]; G.forEach(function(g,i){ if(g.live) live.push(i); });
     if(!live.length) return;
     var gi=live[Math.floor(Math.random()*live.length)], g=G[gi], r=Math.random();
