@@ -105,11 +105,10 @@ begin
     where local_id = p_local_id and acct_no = v_acct and server = 'fx' and status = 'open';
   if not found then return jsonb_build_object('ok',true,'duplicate',true); end if;
 
-  -- apply realized P&L to balance via the ledger (trigger updates accounts.balance)
-  insert into public.ledger(acct_no, cust_id, server, kind, amount, ref)
-    values (v_acct, v_cust, 'fx', 'fx_close', v_pnl, 'fxclose-'||p_local_id);
-
-  -- record the settlement (closed-trade history; the app already reads these)
+  -- Record the settlement. settlements has trg_settlement_balance (AFTER INSERT)
+  -- which applies pnl to accounts.balance — so this ONE insert both banks the P&L
+  -- and writes the closed-trade history the app reads. (Do NOT also write `ledger`:
+  -- it has its own balance trigger and would double-count.)
   insert into public.settlements(cust_id, acct_no, server, kind, local_id, symbol, stake, pnl, detail)
     values (v_cust, v_acct, 'fx', 'fx_close', p_local_id, v_sym, v_size, v_pnl,
             upper(v_side)||' '||v_size||' @ '||v_open||' -> '||round(v_mid,5));
