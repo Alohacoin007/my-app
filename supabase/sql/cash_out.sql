@@ -20,7 +20,7 @@ begin
   if v_pos.local_id is null then
     return jsonb_build_object('ok', false, 'error', 'bet not found or already settled');
   end if;
-  select cust_id into v_cust from public.accounts where acct_no = v_pos.acct_no;
+  v_cust := v_pos.cust_id;   -- positions carries cust_id (accounts does not)
   -- conservative, capped value: 92% of remaining stake (always <= stake)
   v_val := round( (coalesce(v_pos.stake,0) * 0.92) * v_frac, 2 );
   if v_val <= 0 then return jsonb_build_object('ok', false, 'error', 'nothing to cash out'); end if;
