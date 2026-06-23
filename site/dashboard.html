@@ -141,6 +141,9 @@
   .odd.sel{border-color:transparent;background:var(--accent)}
   .odd.sel .l{color:rgba(255,255,255,.85)}
   .odd.sel .v{color:#fff}
+  .odd.locked{cursor:not-allowed;opacity:.5;background:var(--surface)}
+  .odd.locked:hover{border-color:var(--line);background:var(--surface)}
+  .odd.locked .v{font-size:13px;color:var(--muted)}
 
   /* bet slip */
   .slip{position:sticky;top:88px;margin-top:38px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--surface)}
@@ -334,8 +337,12 @@
 
   function cell(mi,market,side,label,odd){
     var key=mi+"|"+market+"|"+side;
-    var sel=state.slip.some(function(s){return s.key===key;});
     var lab=label?'<div class="l">'+label+'</div>':'';
+    // Live betting is disabled (same rule as the app) — show live odds locked.
+    if(DATA[mi]&&DATA[mi].live){
+      return '<div class="odd locked" title="Live betting unavailable">'+lab+'<div class="v">🔒</div></div>';
+    }
+    var sel=state.slip.some(function(s){return s.key===key;});
     var dir=oddDir[key], arr=dir?'<span class="oarr '+dir+'">'+(dir==='up'?'▲':'▼')+'</span>':'';
     return '<div class="odd'+(sel?' sel':'')+'" data-key="'+key+'" data-mi="'+mi+'" data-mk="'+market+'" data-sd="'+side+'">'+lab+'<div class="v">'+odd.toFixed(2)+arr+'</div></div>';
   }
@@ -358,7 +365,7 @@
         cell(mi,"ml","a","",m.ml.a)+'</div>';
       return '<div class="game'+(m.live?' live':'')+'">'+top+rowH+rowA+'</div>';
     }).join("")||'<div class="empty">'+(!GAMES_LOADED?'Loading live games…':(state.filter==='live'?'No live games right now.':'No games for this sport right now.'))+'</div>';
-    Array.prototype.forEach.call($("games").querySelectorAll(".odd"),function(el){
+    Array.prototype.forEach.call($("games").querySelectorAll(".odd:not(.locked)"),function(el){
       el.addEventListener("click",function(){toggle(el.dataset);});
     });
   }
