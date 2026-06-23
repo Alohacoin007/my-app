@@ -227,7 +227,9 @@
       var rows=((r&&!r.error&&r.data)||[]).filter(function(s){return s.kind==='bet_won'||s.kind==='bet_lost';});
       if(!rows.length){ el.innerHTML=EMPTY_S; return; }
       el.innerHTML=rows.map(function(s){ var won=s.kind==='bet_won'; var ret=won?((+s.stake||0)+(+s.pnl||0)):0;
+        var when=''; try{ if(s.created_at){ var d=new Date(s.created_at); if(!isNaN(d.getTime())) when=d.toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); } }catch(e){}
         return '<div class="bet"><div class="bet-top"><div class="bet-type">'+esc(s.symbol||'Bet')+'</div><span class="status '+(won?'won':'lost')+'">'+(won?'WON':'LOST')+'</span></div>'+
+          (when?'<div class="bet-when" style="font-size:11px;color:var(--muted);margin:2px 0 6px">Settled · '+when+'</div>':'')+
           '<div class="bet-foot"><div class="col"><span class="k">Stake</span><span class="v">'+money(s.stake)+'</span></div>'+
           '<div class="col"><span class="k">Returned</span><span class="v'+(won?' green':'')+'">'+money(ret)+'</span></div></div></div>';
       }).join('');
