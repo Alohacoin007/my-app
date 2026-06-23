@@ -41,7 +41,6 @@ setTimeout(function(){
     checks.push('React: ' + (typeof React !== 'undefined' ? 'OK' : 'MISSING'));
     checks.push('ReactDOM: ' + (typeof ReactDOM !== 'undefined' ? 'OK' : 'MISSING'));
     checks.push('Babel: ' + (typeof Babel !== 'undefined' ? 'OK' : 'MISSING'));
-    checks.push('firebase: ' + (typeof firebase !== 'undefined' ? 'OK' : 'MISSING'));
     var s = document.getElementById('alpexaStatus');
     var p = document.getElementById('alpexaProgress');
     if (s) { s.textContent = 'Still loading after 30s — diagnostic:'; s.style.color = '#c62828'; }
@@ -158,35 +157,7 @@ window.__alpexaCDNFail = function(name) {
 </script>
 
 <script>
-// Firebase init — wrapped so SDK load failures (file:// / no internet) don't break the page.
-try {
-  if (typeof firebase !== 'undefined') {
-    firebase.initializeApp({
-      apiKey:"AIzaSyCSv55bIKN_wHr4ELz-UFIMhgkauFnpTCQ",
-      authDomain:"alpexa-suisse.firebaseapp.com",
-      projectId:"alpexa-suisse",
-      storageBucket:"alpexa-suisse.firebasestorage.app",
-      messagingSenderId:"591910134277",
-      appId:"1:591910134277:web:f7918ee328bf5d3365726c",
-      measurementId:"G-E6ZXJZHEW5"
-    });
-    const FB = {
-      auth: firebase.auth(),
-      db: firebase.firestore(),
-      async createUserProfile(uid,data){await FB.db.doc('users/'+uid).set({...data,balance:10000,createdAt:firebase.firestore.FieldValue.serverTimestamp()});},
-      async getUserProfile(uid){const snap=await FB.db.doc('users/'+uid).get();return snap.exists?snap.data():null;},
-      async updateBalance(uid,balance){await FB.db.doc('users/'+uid).update({balance});},
-      async saveTrade(uid,trade){await FB.db.collection('users/'+uid+'/trades').add({...trade,createdAt:firebase.firestore.FieldValue.serverTimestamp()});},
-      async savePosition(uid,pos){await FB.db.doc('users/'+uid+'/positions/'+pos.id).set(pos);},
-      async removePosition(uid,posId){await FB.db.doc('users/'+uid+'/positions/'+posId).delete();},
-    };
-    window.FB=FB;
-  } else {
-    console.warn('[ALPEXA] Firebase SDK not loaded — demo mode');
-  }
-} catch (e) {
-  console.error('[ALPEXA] Firebase init failed:', e);
-}
+// (Firebase removed — auth & data are handled by Supabase / AlpexaSync.)
 
 // Global error visibility — show errors directly on screen so they're not silent.
 window.addEventListener('error', function(ev){
@@ -451,19 +422,9 @@ window.getLotSize=getLotSize;window.isUsdBaseFx=isUsdBaseFx;window.getNotionalUS
 const POSITIONS=[];const PENDING=[];
 // Closed-trade history comes from the server (settlements) — no demo data.
 const HISTORY=[];
-const NEWS=[
-  {t:'09:42',tag:'CRYPTO',ttl:'BTC breaks 71.2K as ETF inflows accelerate',body:'US spot ETFs added +$560M yesterday. Risk-on bid after NVDA earnings.',impact:'high'},
-  {t:'09:18',tag:'FX',ttl:'DXY at 104.4, flat ahead of May FOMC minutes',body:'PPI cooled but June-cut bets weakened on hawkish Fed-speak.',impact:'med'},
-  {t:'08:55',tag:'METAL',ttl:'Gold reclaims $2,350 on renewed Middle East risk',body:'Iran-Israel tensions resurface, safe-haven demand. XAUUSD pressing higher.',impact:'med'},
-  {t:'08:30',tag:'US',ttl:'US weekly jobless claims 221K, in line with forecast',body:'Labor market gradually softening. S&P futures +0.18%, 10Y at 4.36%.',impact:'low'},
-  {t:'07:48',tag:'EARNINGS',ttl:'NVDA earnings D-7, consensus +24% beat expected',body:'Data-center revenue est. $21.1B. Options IV spiking.',impact:'med'},
-];
-const CALENDAR=[
-  {time:'14:30',ccy:'USD',ttl:'Initial Jobless Claims',fcst:'220K',prev:'231K',impact:3},
-  {time:'14:30',ccy:'USD',ttl:'Philly Fed Manufacturing',fcst:'8.0',prev:'15.5',impact:3},
-  {time:'18:00',ccy:'USD',ttl:'Fed Bostic Speech',fcst:'—',prev:'—',impact:2},
-  {time:'21:00',ccy:'EUR',ttl:'ECB Lagarde Speech',fcst:'—',prev:'—',impact:2},
-];
+// News & economic calendar — no demo data (would be a real feed in production).
+const NEWS=[];
+const CALENDAR=[];
 window.ALPEXA_MARKET={SYMBOLS,createMarket,fmt,POSITIONS,HISTORY,NEWS,CALENDAR,PENDING,getLotSize,isUsdBaseFx,getNotionalUSD,getMarginUSD,getPnlUSD,getUnitLabel,fmtVol};
 </script>
 
@@ -1147,98 +1108,6 @@ function formatPriceFixed(n,digits){
   const s=n.toLocaleString('en-US',{minimumFractionDigits:digits,maximumFractionDigits:digits});
   if(digits>=2)return{big:s.slice(0,-2),small:s.slice(-2)};
   return{big:s,small:''};
-}
-
-// ── AuthScreen ──
-function AuthScreen({onAuth}){
-  const [tab,setTab]=useState('login');
-  const [email,setEmail]=useState('');
-  const [password,setPassword]=useState('');
-  const [name,setName]=useState('');
-  const [loading,setLoading]=useState(false);
-  const [error,setError]=useState('');
-
-  async function handleLogin(e){
-    e.preventDefault();setError('');setLoading(true);
-    try{
-      const cred=await window.FB.auth.signInWithEmailAndPassword(email,password);
-      onAuth(cred.user);
-    }catch(err){
-      setError(err.message.replace('Firebase: ','').replace(/\(auth.*\)/,'').trim());
-    }finally{setLoading(false);}
-  }
-  async function handleSignup(e){
-    e.preventDefault();setError('');setLoading(true);
-    try{
-      const cred=await window.FB.auth.createUserWithEmailAndPassword(email,password);
-      await window.FB.createUserProfile(cred.user.uid,{name,email});
-      onAuth(cred.user);
-    }catch(err){
-      setError(err.message.replace('Firebase: ','').replace(/\(auth.*\)/,'').trim());
-    }finally{setLoading(false);}
-  }
-
-  return(
-    <div style={{display:'flex',flexDirection:'column',flex:1,background:'var(--bg)',overflowY:'auto'}}>
-      {/* Hero */}
-      <div style={{background:'var(--acc)',padding:'48px 24px 32px',textAlign:'center'}}>
-        <div style={{fontFamily:'var(--brand)',fontSize:28,fontWeight:800,color:'#fff',letterSpacing:4,marginBottom:6}}>ALPEXA SUISSE</div>
-        <div style={{fontSize:12,color:'rgba(255,255,255,0.7)',letterSpacing:1}}>Professional Trading Platform</div>
-      </div>
-      {/* Tabs */}
-      <div style={{display:'flex',background:'var(--surface)',borderBottom:'1px solid var(--line)'}}>
-        {[['login','Sign In'],['signup','Create Account']].map(([k,l])=>(
-          <button key={k} onClick={()=>{setTab(k);setError('');}} style={{flex:1,padding:'14px 0',fontSize:13,fontWeight:tab===k?700:500,color:tab===k?'var(--ink)':'var(--text-3)',borderBottom:tab===k?'2px solid var(--acc)':'2px solid transparent'}}>{l}</button>
-        ))}
-      </div>
-      {/* Form */}
-      <form onSubmit={tab==='login'?handleLogin:handleSignup} style={{padding:'24px 20px',display:'flex',flexDirection:'column',gap:14}}>
-        {tab==='signup'&&(
-          <div>
-            <div style={{fontSize:10,fontWeight:700,color:'var(--text-3)',letterSpacing:0.5,marginBottom:6}}>FULL NAME</div>
-            <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',background:'var(--surface)',borderRadius:10,border:'1.5px solid var(--line-2)'}}>
-              <Mi name="person" size={18} style={{color:'var(--text-3)'}}/>
-              <input value={name} onChange={e=>setName(e.target.value)} placeholder="Christian Kang" required style={{flex:1,fontSize:14,color:'var(--ink)'}}/>
-            </div>
-          </div>
-        )}
-        <div>
-          <div style={{fontSize:10,fontWeight:700,color:'var(--text-3)',letterSpacing:0.5,marginBottom:6}}>EMAIL</div>
-          <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',background:'var(--surface)',borderRadius:10,border:'1.5px solid var(--line-2)'}}>
-            <Mi name="mail" size={18} style={{color:'var(--text-3)'}}/>
-            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" required style={{flex:1,fontSize:14,color:'var(--ink)'}}/>
-          </div>
-        </div>
-        <div>
-          <div style={{fontSize:10,fontWeight:700,color:'var(--text-3)',letterSpacing:0.5,marginBottom:6}}>PASSWORD</div>
-          <div style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',background:'var(--surface)',borderRadius:10,border:'1.5px solid var(--line-2)'}}>
-            <Mi name="lock" size={18} style={{color:'var(--text-3)'}}/>
-            <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" required minLength={6} style={{flex:1,fontSize:14,color:'var(--ink)'}}/>
-          </div>
-        </div>
-        {error&&(
-          <div style={{padding:'10px 14px',background:'var(--sell-tint)',borderRadius:9,border:'1px solid rgba(229,57,53,0.25)',fontSize:12.5,color:'var(--sell-2)',display:'flex',alignItems:'flex-start',gap:8}}>
-            <Mi name="error" size={16} style={{flexShrink:0,marginTop:1}}/>
-            <span>{error}</span>
-          </div>
-        )}
-        <button type="submit" disabled={loading} style={{padding:'14px 0',borderRadius:11,background:loading?'var(--muted)':'var(--acc)',color:'#fff',fontSize:14,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginTop:4}}>
-          {loading?(
-            <><div style={{width:16,height:16,border:'2.5px solid rgba(255,255,255,0.35)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>{tab==='login'?'Signing in…':'Creating account…'}</>
-          ):(tab==='login'?'Sign In':'Create Account')}
-        </button>
-        {tab==='login'&&(
-          <div style={{textAlign:'center',fontSize:11.5,color:'var(--text-3)'}}>
-            Forgot password? <button type="button" onClick={async()=>{if(email){try{await window.FB.auth.sendPasswordResetEmail(email);setError('Password reset email sent!');}catch(err){setError(err.message);}}else{setError('Enter your email first.');}}} style={{color:'var(--acc-2)',fontWeight:600}}>Reset</button>
-          </div>
-        )}
-        <div style={{textAlign:'center',fontSize:10.5,color:'var(--text-3)',lineHeight:1.5,marginTop:4}}>
-          By continuing you agree to ALPEXA's Terms of Service and Privacy Policy. Trading leveraged products carries significant risk.
-        </div>
-      </form>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-    </div>
-  );
 }
 
 // ── Watchlist ──
@@ -2044,6 +1913,7 @@ function NewsScreen(){
       </div>
       {tab==='NEWS'&&(
         <div style={{flex:1,overflowY:'auto'}}>
+          {ALPEXA_MARKET.NEWS.length===0&&<div style={{padding:'40px 20px',textAlign:'center',color:'var(--text-3)',fontSize:13}}>No market news right now.</div>}
           {ALPEXA_MARKET.NEWS.map((n,i)=>(
             <div key={i} style={{background:'var(--surface)',padding:'12px 14px',borderBottom:'1px solid var(--line)'}}>
               <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:5}}>
@@ -2059,7 +1929,7 @@ function NewsScreen(){
       )}
       {tab==='CAL'&&(
         <div style={{flex:1,overflowY:'auto',background:'var(--surface)'}}>
-          <div style={{padding:'10px 14px 4px',fontSize:10,fontWeight:700,color:'var(--text-3)',letterSpacing:0.5}}>2026-05-19 (Tue)</div>
+          {ALPEXA_MARKET.CALENDAR.length===0&&<div style={{padding:'40px 20px',textAlign:'center',color:'var(--text-3)',fontSize:13}}>No scheduled events.</div>}
           {ALPEXA_MARKET.CALENDAR.map((c,i)=>(
             <div key={i} style={{display:'flex',alignItems:'center',padding:'12px 14px',borderBottom:'1px solid var(--line)',gap:10}}>
               <span className="mono" style={{fontSize:12,fontWeight:700,color:'var(--ink)',width:42}}>{c.time}</span>
@@ -3976,18 +3846,9 @@ function Root(){
     return()=>window.removeEventListener('resize',onResize);
   },[]);
   useEffect(()=>{
-    // Demo mode: allow access without Firebase auth (file:// / no internet).
-    // If a real Firebase session exists, use it. Otherwise show as a demo user.
-    if(window.FB&&window.FB.auth){
-      const unsub=window.FB.auth.onAuthStateChanged(u=>{
-        if(u){ setUser(u); }
-        else { setUser({ email:'demo@alpexa.com', displayName:'Demo User', uid:'demo' }); }
-      });
-      return unsub;
-    } else {
-      // Firebase unavailable — proceed in demo mode (don't bounce to login).
-      setUser({ email:'demo@alpexa.com', displayName:'Demo User', uid:'demo' });
-    }
+    // Auth is handled by Supabase (login.html). This screen only needs a non-null
+    // user object to render; real identity/accounts come from alpexa.me + AlpexaSync.
+    setUser({ email:'demo@alpexa.com', displayName:'Demo User', uid:'demo' });
   },[]);
 
   if(user===undefined||!user){
