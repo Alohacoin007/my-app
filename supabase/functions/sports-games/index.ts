@@ -1,12 +1,12 @@
-// Alpexa — sports-games  (The Odds API version)
-// SERVER-SIDE game + REAL odds feed for ALL clients (mobile app + desktop website).
-// Pulls real bookmaker odds (moneyline / spread / total) from The Odds API
-// (https://the-odds-api.com) for each league, builds games in the app's format
-// with gid = "<LG>_<oddsApiEventId>", and stores everything in the `live_games`
-// table (single row id='all'). Clients just READ this row — one source of truth.
+// Alpexa — sports-games
+// SERVER-SIDE game + odds feed for ALL clients (mobile app + desktop website).
+// Fetches ESPN scoreboards (FREE, no key) for each league, builds games in the
+// app's GAMES format with gid = "<LG>_<espnEventId>" so the server settler
+// (sports-settle) recognises bets placed against them, and stores everything in
+// the `live_games` table (single row id='all'). Clients just READ this row — one
+// source of truth, no per-client ESPN calls. Run on a ~1-minute pg_cron.
 //
-// Required secret: ODDS_API_KEY  (set in Supabase → Edge Functions → Secrets)
-// Auto env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. Optional CRON_SECRET.
+// Required env (auto): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. Optional CRON_SECRET.
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -17,117 +17,90 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 }
 
-// The Odds API sport keys → our league/sport labels. gids stay "<LG>_<eventId>"
-// so the settler can recognise bets placed against them.
-const SPORTS = [
-  { key: "americanfootball_nfl",        lg: "NFL", sport: "Football" },
-  { key: "basketball_nba",              lg: "NBA", sport: "Basketball" },
-  { key: "baseball_mlb",                lg: "MLB", sport: "Baseball" },
-  { key: "icehockey_nhl",               lg: "NHL", sport: "Hockey" },
-  { key: "soccer_epl",                  lg: "SOC", sport: "Soccer" },
-  { key: "soccer_uefa_champs_league",   lg: "SOC", sport: "Soccer" },
-  { key: "soccer_usa_mls",              lg: "SOC", sport: "Soccer" },
+// Mirrors the app's LEAGUES + the settler's leagues so gids line up everywhere.
+const LEAGUES = [
+  { lg: "NFL", sport: "Football",   path: "football/nfl" },
+  { lg: "NBA", sport: "Basketball", path: "basketball/nba" },
+  { lg: "MLB", sport: "Baseball",   path: "baseball/mlb" },
+  { lg: "NHL", sport: "Hockey",     path: "hockey/nhl" },
+  { lg: "SOC", sport: "Soccer",     path: "soccer/eng.1" },
+  { lg: "SOC", sport: "Soccer",     path: "soccer/uefa.champions" },
+  { lg: "SOC", sport: "Soccer",     path: "soccer/usa.1" },
+  { lg: "SOC", sport: "Soccer",     path: "soccer/fifa.world" },
 ];
 
-// Prefer a major US book for a stable, consistent line; fall back to the first.
-const BOOK_PRIORITY = ["draftkings", "fanduel", "betmgm", "williamhill_us", "betrivers", "bovada"];
-
-// Short code shown in the UI (Odds API gives full team names only).
-function abbr(name: string): string {
-  const words = String(name || "").trim().split(/\s+/);
-  const last = words[words.length - 1] || name || "";
-  return last.slice(0, 3).toUpperCase();
-}
-function signed(n: number): string { return (n > 0 ? "+" : "") + n; }
-
-function pickBook(ev: any): any {
-  const books = ev.bookmakers || [];
-  for (const want of BOOK_PRIORITY) { const b = books.find((x: any) => x.key === want); if (b) return b; }
-  return books[0] || null;
-}
-function market(book: any, key: string): any {
-  return (book && book.markets || []).find((m: any) => m.key === key) || null;
-}
-
-function mkGame(ev: any, L: { lg: string; sport: string }) {
-  const book = pickBook(ev);
-  if (!book) return null;
-  const homeNm = ev.home_team, awayNm = ev.away_team;
-  if (!homeNm || !awayNm) return null;
-  const isSoc = L.lg === "SOC";
-
-  // Moneyline (h2h) — required.
-  const h2h = market(book, "h2h");
-  const hO = h2h && (h2h.outcomes || []).find((o: any) => o.name === homeNm);
-  const aO = h2h && (h2h.outcomes || []).find((o: any) => o.name === awayNm);
-  const mlHome = hO && typeof hO.price === "number" ? hO.price : (isSoc ? 150 : -140);
-  const mlAway = aO && typeof aO.price === "number" ? aO.price : (isSoc ? 180 : 120);
-  const ml = [
-    { ln: "", am: mlHome, sel: homeNm + " ML" },
-    { ln: "", am: mlAway, sel: awayNm + " ML" },
-  ];
-
-  // Spread — use real if present, else a sensible default priced at -110.
-  const spM = market(book, "spreads");
-  const spH = spM && (spM.outcomes || []).find((o: any) => o.name === homeNm);
-  const spA = spM && (spM.outcomes || []).find((o: any) => o.name === awayNm);
-  let spread;
-  if (spH && spA && typeof spH.point === "number" && typeof spA.point === "number") {
-    spread = [
-      { ln: signed(spH.point), am: (typeof spH.price === "number" ? spH.price : -110), sel: homeNm + " " + signed(spH.point) },
-      { ln: signed(spA.point), am: (typeof spA.price === "number" ? spA.price : -110), sel: awayNm + " " + signed(spA.point) },
-    ];
-  } else {
-    const d = isSoc ? 0.5 : 3.5;
-    spread = [
-      { ln: signed(-d), am: -110, sel: homeNm + " " + signed(-d) },
-      { ln: signed(d),  am: -110, sel: awayNm + " " + signed(d) },
-    ];
-  }
-
-  // Total — use real if present, else default priced at -110.
-  const toM = market(book, "totals");
-  const ovr = toM && (toM.outcomes || []).find((o: any) => /over/i.test(o.name));
-  const und = toM && (toM.outcomes || []).find((o: any) => /under/i.test(o.name));
-  let total;
-  if (ovr && und && typeof ovr.point === "number") {
-    total = [
-      { ln: "Over " + ovr.point,  am: (typeof ovr.price === "number" ? ovr.price : -110), sel: "Over " + ovr.point },
-      { ln: "Under " + und.point, am: (typeof und.price === "number" ? und.price : -110), sel: "Under " + und.point },
-    ];
-  } else {
-    const t = isSoc ? 2.5 : 45.5;
-    total = [
-      { ln: "Over " + t,  am: -110, sel: "Over " + t },
-      { ln: "Under " + t, am: -110, sel: "Under " + t },
-    ];
-  }
-
-  const now = Date.now();
-  const start = ev.commence_time ? new Date(ev.commence_time).getTime() : 0;
-  const live = start > 0 && start <= now; // basic in-play flag (scores feed handles grading)
-
-  return {
-    gid: L.lg + "_" + ev.id, lg: L.lg, sport: L.sport,
-    live, time: live ? "Live" : "", iso: ev.commence_time || "",
-    home: { ab: abbr(homeNm), nm: homeNm },
-    away: { ab: abbr(awayNm), nm: awayNm },
-    spread, total, ml,
-  };
-}
-
-async function fetchSport(L: { key: string; lg: string; sport: string }, apiKey: string, out: any[]) {
-  const u = `https://api.the-odds-api.com/v4/sports/${L.key}/odds/?apiKey=${apiKey}`
-    + `&regions=us&markets=h2h,spreads,totals&oddsFormat=american&dateFormat=iso`;
+// Build spread/total/ml in the app's leg format ({ln,am,sel}) from ESPN odds,
+// with sensible defaults when a market is missing. am = American odds; sel is the
+// exact selection string the settler's gradeLeg parses ("Team ML", "Over 45.5"...).
+function mkCore(home: any, away: any, ev: any, lg: string) {
+  const isSoc = lg === "SOC";
+  let total: number | null = null, spreadVal: number | null = null, favAbbr: string | null = null, mlHome: number | null = null, mlAway: number | null = null;
   try {
-    const res = await fetch(u, { cache: "no-store" });
-    if (!res.ok) return; // skip this league (e.g. out of season → 404/422)
-    const events = await res.json();
-    if (!Array.isArray(events)) return;
-    for (const ev of events) {
-      try { const g = mkGame(ev, L); if (g) out.push(g); } catch (_e) { /* skip one */ }
+    const comp = ev.competitions && ev.competitions[0];
+    const od = comp && comp.odds && comp.odds[0];
+    if (od) {
+      if (typeof od.overUnder === "number") total = od.overUnder;
+      if (typeof od.spread === "number") spreadVal = Math.abs(od.spread);
+      if (od.details) {
+        const parts = String(od.details).trim().split(/\s+/); favAbbr = parts[0];
+        const m = String(od.details).match(/(-?\d+(?:\.\d+)?)\s*$/); if (m) spreadVal = Math.abs(parseFloat(m[1]));
+      }
+      if (od.homeTeamOdds && typeof od.homeTeamOdds.moneyLine === "number") mlHome = od.homeTeamOdds.moneyLine;
+      if (od.awayTeamOdds && typeof od.awayTeamOdds.moneyLine === "number") mlAway = od.awayTeamOdds.moneyLine;
     }
-  } catch (_e) { /* skip league on network error */ }
+  } catch (_e) { /* defaults below */ }
+  const sp = (spreadVal != null && spreadVal > 0) ? spreadVal : (isSoc ? 0.5 : 3.5);
+  const tot = (total != null && total > 0) ? total : (isSoc ? 2.5 : 45.5);
+  const homeFav = favAbbr ? (home.ab === favAbbr) : true;
+  const spread = homeFav
+    ? [{ ln: "-" + sp, am: -110, sel: home.nm + " -" + sp }, { ln: "+" + sp, am: -110, sel: away.nm + " +" + sp }]
+    : [{ ln: "+" + sp, am: -110, sel: home.nm + " +" + sp }, { ln: "-" + sp, am: -110, sel: away.nm + " -" + sp }];
+  const total2 = [{ ln: "Over " + tot, am: -110, sel: "Over " + tot }, { ln: "Under " + tot, am: -110, sel: "Under " + tot }];
+  const ml = [
+    { ln: "", am: (mlHome != null ? mlHome : (homeFav ? -140 : 120)), sel: home.nm + " ML" },
+    { ln: "", am: (mlAway != null ? mlAway : (homeFav ? 120 : -140)), sel: away.nm + " ML" },
+  ];
+  return { spread, total: total2, ml };
+}
+
+function fmtTime(iso: string): string {
+  try { return new Date(iso).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" }); }
+  catch (_e) { return ""; }
+}
+
+async function fetchLeague(L: { lg: string; sport: string; path: string }, out: any[]) {
+  const direct = `https://site.api.espn.com/apis/site/v2/sports/${L.path}/scoreboard`;
+  const tries = [direct, "https://corsproxy.io/?url=" + encodeURIComponent(direct)];
+  for (const u of tries) {
+    try {
+      const res = await fetch(u, { cache: "no-store" });
+      if (!res.ok) continue;
+      const d = await res.json();
+      for (const ev of (d.events || [])) {
+        try {
+          const comp = ev.competitions && ev.competitions[0];
+          if (!comp || !comp.competitors) continue;
+          const hc = comp.competitors.find((c: any) => c.homeAway === "home");
+          const ac = comp.competitors.find((c: any) => c.homeAway === "away");
+          if (!hc || !ac || !hc.team || !ac.team) continue;
+          const st = (ev.status && ev.status.type) ? ev.status.type : {};
+          const state = st.state; // "pre" | "in" | "post"
+          if (state === "post") continue; // finished games aren't bettable
+          const home: any = { ab: String(hc.team.abbreviation || hc.team.shortDisplayName || "").toUpperCase(), nm: hc.team.shortDisplayName || hc.team.name || hc.team.displayName || "Home" };
+          const away: any = { ab: String(ac.team.abbreviation || ac.team.shortDisplayName || "").toUpperCase(), nm: ac.team.shortDisplayName || ac.team.name || ac.team.displayName || "Away" };
+          if (state === "in") { const hs = parseInt(hc.score, 10), as = parseInt(ac.score, 10); if (!isNaN(hs)) home.sc = hs; if (!isNaN(as)) away.sc = as; }
+          const core = mkCore(home, away, ev, L.lg);
+          out.push({
+            gid: L.lg + "_" + ev.id, lg: L.lg, sport: L.sport,
+            live: state === "in", time: state === "in" ? (st.shortDetail || "Live") : fmtTime(ev.date),
+            iso: ev.date || "", // raw kickoff time — each client renders it in the viewer's local timezone
+            home, away, spread: core.spread, total: core.total, ml: core.ml,
+          });
+        } catch (_e) { /* skip one event */ }
+      }
+      return; // got this league from a working mirror
+    } catch (_e) { /* try next mirror */ }
+  }
 }
 
 Deno.serve(async (req) => {
@@ -136,17 +109,15 @@ Deno.serve(async (req) => {
   const CRON_SECRET = Deno.env.get("CRON_SECRET");
   if (CRON_SECRET && url.searchParams.get("token") !== CRON_SECRET) return json({ ok: false, error: "unauthorized" }, 401);
 
-  const API_KEY = Deno.env.get("ODDS_API_KEY");
-  if (!API_KEY) return json({ ok: false, error: "ODDS_API_KEY secret missing" }, 500);
-
   const SB_URL = Deno.env.get("SUPABASE_URL");
   const SB_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!SB_URL || !SB_KEY) return json({ ok: false, error: "Supabase env missing" }, 500);
   const H = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json" };
 
   const games: any[] = [];
-  await Promise.all(SPORTS.map((L) => fetchSport(L, API_KEY, games)));
+  await Promise.all(LEAGUES.map((L) => fetchLeague(L, games)));
 
+  // Upsert the single 'all' row (clients read this).
   const r = await fetch(`${SB_URL}/rest/v1/live_games?on_conflict=id`, {
     method: "POST",
     headers: { ...H, "Prefer": "resolution=merge-duplicates,return=minimal" },
