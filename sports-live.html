@@ -2901,7 +2901,7 @@
     var acct=null; try{var m=JSON.parse(localStorage.getItem('alpexa.me')||'null'); if(m&&m.accts) acct=m.accts.sports;}catch(e){}
     if(!acct) return;
     AlpexaSync.db.channel('sportsbal-'+acct)
-      .on('postgres_changes',{event:'*',schema:'public',table:'accounts',filter:'acct_no=eq.'+acct},function(){ if(!document.hidden){ syncBalancesFromServer(); pullServerActivity(); } })
+      .on('postgres_changes',{event:'*',schema:'public',table:'accounts',filter:'acct_no=eq.'+acct},function(){ syncBalancesFromServer(); if(!document.hidden){ pullServerActivity(); } })
       .subscribe();
   }catch(e){} }, 2200);
   // settings initial application
