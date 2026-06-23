@@ -14,6 +14,8 @@
   if(!(m&&m.accts&&(m.email||m.authId))){ location.replace('login.html'); }
 }catch(e){ location.replace('login.html'); }})();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>try{window._db=window.supabase.createClient('https://grxnbgtfnaayeluenvqh.supabase.co','sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu');}catch(e){console.error('supabase init',e);}</script>
 <style>
   :root{--bg:#f4f6fb;--surface:#ffffff;--surface2:#eef1f7;--line:#e7ebf2;--text:#0e1726;--muted:#5a6478;--tertiary:#aab3c2;--accent:#1e40d8;--green:#16a34a;--red:#e5484d;--usdt:#26a17b}
   body.dark{--bg:#0b0f1a;--surface:#141a28;--surface2:#1d2536;--line:rgba(255,255,255,.08);--text:#eef2f8;--muted:#9aa6bd;--tertiary:#5e6b80}
@@ -141,6 +143,12 @@
   .net button.on{color:var(--accent);border-color:var(--accent);background:rgba(59,108,246,.08)}
   .submit{width:100%;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;transition:filter .15s}
   .submit:hover{filter:brightness(1.08)}
+  .submit:disabled{opacity:.5;cursor:not-allowed}
+  .tfsel{width:100%;height:44px;border:1px solid var(--line);border-radius:11px;background:var(--bg);color:var(--text);padding:0 13px;font-size:14px;outline:none;font-family:inherit;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a94a6' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center}
+  .tfsel:focus{border-color:var(--accent)}
+  .tfbal{font-size:11.5px;color:var(--muted);margin-top:5px;font-variant-numeric:tabular-nums}
+  .tfswap{width:34px;height:34px;margin:8px auto;border-radius:50%;border:1px solid var(--line);background:var(--surface2);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s,color .15s}
+  .tfswap:hover{background:var(--accent);color:#fff;border-color:transparent}
   .warn{font-size:11.5px;color:var(--muted);margin-top:13px;line-height:1.5}
   .warn svg{display:none}
 
@@ -191,7 +199,7 @@
     <div class="actions">
       <button class="act on" data-p="deposit"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span>Deposit</button>
       <button class="act" data-p="withdraw"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span>Withdraw</button>
-      <button class="act" data-p="send"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></span>Send</button>
+      <button class="act" data-p="transfer"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>Transfer</button>
     </div>
 
     <!-- DEPOSIT -->
@@ -250,24 +258,22 @@
     </section>
 
     <!-- SEND (P2P) -->
-    <section class="panel" id="send">
-      <h3>Send to an Alpexa user</h3>
-      <div class="desc">Transfer USDT instantly to another user — by username or QR code. No network fee.</div>
-      <div class="seg" id="sendSeg"><button class="on" data-m="pay">Send</button><button data-m="recv">Receive (My QR)</button></div>
-
-      <div id="sendPay">
-        <div class="field"><label>To (username or @handle)</label><input id="pUser" type="text" placeholder="@username or wallet address"></div>
-        <div class="field"><label>Amount (USDT)</label><input id="pAmt" type="text" inputmode="decimal" placeholder="0.00"></div>
-        <button class="submit" id="pBtn">Send USDT</button>
+    <section class="panel" id="transfer">
+      <h3>Transfer between your servers</h3>
+      <div class="desc">Move funds between your Sports, Crypto and FX servers instantly — no fees. Transfer to Sports to start betting.</div>
+      <div class="field"><label>From</label>
+        <select id="tfFrom" class="tfsel"></select>
+        <div class="tfbal" id="tfFromBal"></div>
       </div>
-
-      <div id="sendRecv" style="display:none">
-        <div class="qr-wrap">
-          <div class="qr" id="qrRecv"></div>
-          <div class="desc" style="margin:0">Have a friend scan this to send you USDT</div>
-          <div class="addr"><code id="myHandle">@christian.k · 0xA1pExaDemo7Vk2MwqUSDT9bQr4Zx8c3e</code><button class="copy" data-copy="myHandle">Copy</button></div>
-        </div>
+      <div class="tfswap" id="tfSwap" title="Swap direction">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M7 4L3 8M7 4l4 4"/><path d="M17 20V4M17 20l4-4M17 20l-4-4"/></svg>
       </div>
+      <div class="field"><label>To</label>
+        <select id="tfTo" class="tfsel"></select>
+        <div class="tfbal" id="tfToBal"></div>
+      </div>
+      <div class="field"><label>Amount (USD)</label><input id="tfAmt" type="text" inputmode="decimal" placeholder="0.00"></div>
+      <button class="submit" id="tfBtn">Transfer</button>
     </section>
 
     <!-- HISTORY -->
@@ -301,7 +307,6 @@
 
     function qr(el,text){ try{ el.innerHTML=''; new QRCode(el,{text:text,width:142,height:142,colorDark:'#0e1726',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M}); }catch(e){ el.textContent='QR'; } }
     qr(document.getElementById('qrDeposit'), document.getElementById('depAddr').textContent);
-    qr(document.getElementById('qrRecv'), document.getElementById('myHandle').textContent);
 
     // action panels
     var acts=[].slice.call(document.querySelectorAll('.act'));
@@ -325,7 +330,7 @@
       ['crypto','card','bank','zelle'].forEach(function(k){ var pane=document.getElementById('dep-'+k); if(pane)pane.classList.toggle('on',k===m); });
     }); }
     // ===== wallet state =====
-    var balance=1186257.40;
+    var balance=(function(){try{var c=parseFloat(JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}').sports);return isNaN(c)?0:c;}catch(e){return 0;}})();
     var txns=[
       {t:'deposit',title:'Deposit · Ethereum',date:'Jun 19, 10:42',amt:500},
       {t:'send',title:'Sent to @mike.r',date:'Jun 18, 21:10',amt:-120},
@@ -399,12 +404,6 @@
       var o=c.textContent;c.textContent='Copied';setTimeout(function(){c.textContent=o;},1200);
     });});
 
-    // send sub-toggle
-    document.getElementById('sendSeg').addEventListener('click',function(e){var bt=e.target.closest('button');if(!bt)return;
-      [].slice.call(this.children).forEach(function(x){x.classList.toggle('on',x===bt);});
-      document.getElementById('sendPay').style.display=bt.dataset.m==='pay'?'block':'none';
-      document.getElementById('sendRecv').style.display=bt.dataset.m==='recv'?'block':'none';
-    });
 
     // ===== withdraw (validated + confirm) =====
     document.getElementById('wdBtn').addEventListener('click',function(){
@@ -418,15 +417,82 @@
       confirmModal({title:'Confirm withdrawal',desc:'Demo — no real funds are moved.',rows:[['Network',net],['To',shortAddr],['Amount',fmt(amt)+' USDT'],['Network fee',fee.toFixed(2)+' USDT'],['Total debit','−'+fmt(amt+fee)+' USDT']],ok:'Withdraw',onOk:function(){ addTx('withdraw','Withdraw · '+net,-(amt+fee)); document.getElementById('wdAmt').value=''; document.getElementById('wdAddr').value=''; toast('Withdrawal submitted'); }});
     });
 
-    // ===== send P2P (validated + confirm) =====
-    document.getElementById('pBtn').addEventListener('click',function(){
-      var to=document.getElementById('pUser').value.trim();
-      var amt=num(document.getElementById('pAmt').value);
-      if(!to){ toast('Enter a recipient'); return; }
+    // ===== Transfer between the user's own servers (server-side app_transfer RPC) =====
+    var SERVERS=[{k:'sports',nm:'Sports'},{k:'crypto',nm:'Crypto'},{k:'fx',nm:'FX'}];
+    var meTf=null; try{ meTf=JSON.parse(localStorage.getItem('alpexa.me')||'null'); }catch(e){}
+    function svBals(){ try{ return JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{}; }catch(e){ return {}; } }
+    function balOf(k){ var b=svBals(); var v=+b[k]; return isNaN(v)?0:v; }
+    function acctOf(k){ return meTf&&meTf.accts&&meTf.accts[k]; }
+    function fillSel(sel){ sel.innerHTML=SERVERS.map(function(s){ return '<option value="'+s.k+'">Alpexa '+s.nm+'</option>'; }).join(''); }
+    var tfFrom=document.getElementById('tfFrom'), tfTo=document.getElementById('tfTo');
+    var tfFromBal=document.getElementById('tfFromBal'), tfToBal=document.getElementById('tfToBal');
+    function paintTf(){
+      if(!tfFrom) return;
+      tfFromBal.textContent='Balance: $'+fmt(balOf(tfFrom.value));
+      tfToBal.textContent='Balance: $'+fmt(balOf(tfTo.value));
+    }
+    if(tfFrom&&tfTo){
+      fillSel(tfFrom); fillSel(tfTo);
+      tfFrom.value='crypto'; tfTo.value='sports';   // most common: fund Sports from Crypto
+      // Keep the two pickers on different servers.
+      function ensureDiff(changed){
+        if(tfFrom.value===tfTo.value){
+          var other=SERVERS.filter(function(s){return s.k!==tfFrom.value;})[0].k;
+          if(changed==='to') tfFrom.value=other; else tfTo.value=other;
+        }
+        paintTf();
+      }
+      tfFrom.addEventListener('change',function(){ ensureDiff('from'); });
+      tfTo.addEventListener('change',function(){ ensureDiff('to'); });
+      document.getElementById('tfSwap').addEventListener('click',function(){ var a=tfFrom.value; tfFrom.value=tfTo.value; tfTo.value=a; paintTf(); });
+      paintTf();
+    }
+    var _tfBusy=false;
+    document.getElementById('tfBtn').addEventListener('click',async function(){
+      if(_tfBusy) return;
+      var from=tfFrom.value, to=tfTo.value, amt=num(document.getElementById('tfAmt').value);
+      if(from===to){ toast('Pick two different servers'); return; }
       if(amt<=0){ toast('Enter a valid amount'); return; }
-      if(amt>balance){ toast('Insufficient balance'); return; }
-      confirmModal({title:'Confirm transfer',desc:'Instant · no network fee.',rows:[['To',to],['Amount',fmt(amt)+' USDT'],['New balance',fmt(balance-amt)+' USDT']],ok:'Send '+fmt(amt),onOk:function(){ addTx('send','Sent to '+to,-amt); document.getElementById('pAmt').value=''; document.getElementById('pUser').value=''; toast('Sent '+fmt(amt)+' USDT'); }});
+      if(amt>balOf(from)){ toast('Insufficient balance'); return; }
+      if(!window._db){ toast('No server connection'); return; }
+      var fromAcct=acctOf(from), toAcct=acctOf(to);
+      if(!fromAcct||!toAcct){ toast('Account not found — re-login'); return; }
+      // app_transfer checks auth.uid server-side; without a session it fails.
+      try{ var _u=await window._db.auth.getUser(); if(!(_u&&_u.data&&_u.data.user)){ toast('Session expired — please log in again'); setTimeout(function(){location.href='login.html?switch=1';},1300); return; } }
+      catch(e){ toast('Session expired — please log in again'); setTimeout(function(){location.href='login.html?switch=1';},1300); return; }
+      var btn=document.getElementById('tfBtn'); _tfBusy=true; btn.disabled=true; var lbl=btn.textContent; btn.textContent='Transferring…';
+      try{
+        var ref='xfer-'+Date.now()+'-'+Math.random().toString(36).slice(2,7);
+        var r=await window._db.rpc('app_transfer',{p_ref:ref,p_from:fromAcct,p_to:toAcct,p_amount:amt});
+        if(r&&r.error){ toast(r.error.message||'Transfer failed'); }
+        else if(r&&r.data&&r.data.ok===false){ toast(r.data.error||'Transfer failed'); }
+        else {
+          toast('Transferred $'+fmt(amt));
+          document.getElementById('tfAmt').value='';
+          // Pull fresh balances from the server (both legs) and update cache + UI.
+          await refreshServerBalances();
+          paintTf();
+          if(from==='sports'||to==='sports'){ balance=balOf('sports'); renderBalance(); }
+        }
+      }catch(e){ toast((e&&e.message)||'Transfer failed'); }
+      _tfBusy=false; btn.disabled=false; btn.textContent=lbl;
     });
+    // Read all three server balances from the accounts table and cache them.
+    async function refreshServerBalances(){
+      try{
+        if(!window._db||!meTf||!meTf.accts) return;
+        var nos=SERVERS.map(function(s){return meTf.accts[s.k];}).filter(Boolean);
+        if(!nos.length) return;
+        var r=await window._db.from('accounts').select('server,balance').in('acct_no',nos);
+        if(r&&!r.error&&r.data){
+          var sb=svBals();
+          r.data.forEach(function(a){ if(a.server) sb[a.server]=+a.balance||0; });
+          localStorage.setItem('alpexa.serverBalances', JSON.stringify(sb));
+          if(sb.sports!=null) localStorage.setItem('alpexa.sportsBalance', String(sb.sports));
+        }
+      }catch(e){}
+    }
+    refreshServerBalances().then(function(){ paintTf(); if(balOf('sports')){ balance=balOf('sports'); renderBalance(); } });
   })();
   </script>
 <script>(function(){var n;try{n=parseInt(localStorage.getItem('alpexa_openbets'),10);}catch(e){}if(isNaN(n))n=2;var b=document.getElementById('myBetsBadge');if(b){b.textContent=n;b.style.display=n>0?'':'none';}})();</script>
