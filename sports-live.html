@@ -2056,31 +2056,30 @@
     AlpexaSync.db.from('positions').select('local_id,symbol,stake,potential,game,pick,odds,size,status,meta')
       .eq('cust_id',cust).eq('server','sports').eq('kind','bet').eq('status','open')
       .then(function(r){
-        const rows=(r&&r.data)||[]; const onServer={}; rows.forEach(function(x){ onServer[String(x.local_id)]=x; });
-        const have={}; openBets.forEach(function(b){ have[String(b.id)]=true; });
-        let changed=false;
-        rows.forEach(function(x){
-          const id=String(x.local_id);
-          if(have[id]) return;   // already in the My Bets list (Recent Activity is derived in renderTxns)
+        if(!(r && !r.error && Array.isArray(r.data))) return;   // query error → keep current, don't wipe
+        const rows=r.data; const onServer={};
+        const rebuilt=rows.map(function(x){
+          onServer[String(x.local_id)]=1;
           const m=x.meta&&typeof x.meta==='object'?x.meta:null;
           if(m && m.legs && m.legs.length){
             // FULL bet rebuilt from meta → behaves like any open bet (cash out works)
-            openBets.push({ id:id, type:m.type||x.symbol||'Bet', cls:m.cls||'', ticket:m.ticket||'',
+            return { id:String(x.local_id), type:m.type||x.symbol||'Bet', cls:m.cls||'', ticket:m.ticket||'',
               placedTs:m.placedTs||0, stake:+m.stake||+x.stake||0, potential:+m.potential||+x.potential||0,
-              baseCash:+m.baseCash||0, d0:+m.d0||0, cashout:+m.cashout||0, legs:m.legs, fromServer:true });
-          } else {
-            // Legacy row without meta → minimal view-only display.
-            openBets.push({ id:id, type:(x.symbol||'Bet'), cls:'', ticket:'', placedTs:0,
-              stake:+x.stake||0, potential:+x.potential||0, cashout:0,
-              legs:[{pk:(x.pick||x.symbol||'Selection'), sel:(x.pick||''), gm:(x.game||''), am:+x.odds||0, st:'o'}],
-              fromServer:true, viewOnly:true });
+              baseCash:+m.baseCash||0, d0:+m.d0||0, cashout:+m.cashout||0, legs:m.legs, fromServer:true };
           }
-          changed=true;
+          // Legacy row without meta → minimal view-only display.
+          return { id:String(x.local_id), type:(x.symbol||'Bet'), cls:'', ticket:'', placedTs:0,
+            stake:+x.stake||0, potential:+x.potential||0, cashout:0,
+            legs:[{pk:(x.pick||x.symbol||'Selection'), sel:(x.pick||''), gm:(x.game||''), am:+x.odds||0, st:'o'}],
+            fromServer:true, viewOnly:true };
         });
-        // drop pulled bets no longer on the server (settled/cashed somewhere)
-        for(let i=openBets.length-1;i>=0;i--){ if(openBets[i].fromServer && !onServer[String(openBets[i].id)]){ openBets.splice(i,1); changed=true; } }
-        if(changed){ try{renderTickets();}catch(e){} try{updateWallet();}catch(e){}
-          const nb=document.getElementById('navBadge'); if(nb){nb.textContent=openBets.length||'';nb.style.display=openBets.length?'flex':'none';} }
+        // SERVER IS THE SOURCE OF TRUTH (same as the dashboard). Keep only a just-placed
+        // local bet (<15s, not yet synced) so it doesn't blink out before its push lands.
+        const now=Date.now();
+        const recentLocal=openBets.filter(function(b){ return b && !b.fromServer && !onServer[String(b.id)] && (now-(+b.placedTs||0))<15000; });
+        openBets = rebuilt.concat(recentLocal);
+        try{renderTickets();}catch(e){} try{updateWallet();}catch(e){}
+        const nb=document.getElementById('navBadge'); if(nb){nb.textContent=openBets.length||'';nb.style.display=openBets.length?'flex':'none';}
       },function(){});
   }
   // Push own bets the instant they change; pull everyone-else's view on a timer.
