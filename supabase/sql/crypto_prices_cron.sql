@@ -5,7 +5,9 @@
 -- (b) makes crypto_trade reject with "price unavailable (stale)".
 --
 -- CoinGecko free tier: one call (~30 ids) per minute is well within limits, so
--- run every 60 seconds.
+-- run every minute. NOTE: Supabase pg_cron accepts standard cron syntax for
+-- minute granularity ('* * * * *' = every minute); the "[1-59] seconds" interval
+-- form is only for sub-minute schedules (so '60 seconds' is rejected).
 --
 -- Run ONCE in the Supabase SQL editor.
 
@@ -14,7 +16,7 @@ create extension if not exists pg_net;
 
 -- If you set a CRON_SECRET on the crypto-prices function, append it as a query
 -- param:  .../crypto-prices?token=<CRON_SECRET>   (omit if no secret is set).
-select cron.schedule('crypto-prices-60s', '60 seconds', $$
+select cron.schedule('crypto-prices-60s', '* * * * *', $$
   select net.http_get(
     url := 'https://grxnbgtfnaayeluenvqh.supabase.co/functions/v1/crypto-prices'
   );
