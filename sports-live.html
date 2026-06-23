@@ -3145,40 +3145,7 @@
       });
     }
 
-    // Transform a server live_games entry into the app's GAMES shape.
-    function lgToGame(g){
-      var sp=g.spread||[],to=g.total||[],ml=g.ml||[];
-      if(sp.length<2||to.length<2||ml.length<2) return null;
-      var home={ab:(g.home&&g.home.ab)||'',nm:(g.home&&g.home.nm)||'Home'};
-      var away={ab:(g.away&&g.away.ab)||'',nm:(g.away&&g.away.nm)||'Away'};
-      if(g.live){ if(g.home&&g.home.sc!=null)home.sc=g.home.sc; if(g.away&&g.away.sc!=null)away.sc=g.away.sc; }
-      return { id:g.gid, lg:g.lg, state:(g.live?'in':'pre'), live:!!g.live, real:true,
-        kickoff:(g.live?'':(g.iso||'')),
-        time:(g.live ? (g.time||'Live') : (g.iso ? (fmtKick(g.iso)||g.time||'TBD') : (g.time||'TBD'))),
-        home:home, away:away, core:{spread:sp,total:to,ml:ml}, props:[] };
-    }
     async function loadLive(isRefresh){
-      // SERVER-CENTRE: read the shared live_games feed (one fast query — same data
-      // the desktop dashboard uses). Only fall back to direct ESPN if it's empty.
-      try{
-        if(window.AlpexaSync && AlpexaSync.db){
-          var r = await AlpexaSync.db.from('live_games').select('data').eq('id','all').maybeSingle();
-          var raw = (r && r.data && r.data.data) || [];
-          if(Array.isArray(raw) && raw.length){
-            var sgames=[]; raw.forEach(function(g){ var x=lgToGame(g); if(x) sgames.push(x); });
-            if(sgames.length){
-              window.__alpexaOddsTs=Date.now(); refreshOddsStale();
-              applySuspensions(sgames);
-              GAMES.length=0; sgames.forEach(function(g){GAMES.push(g);});
-              if(typeof renderGames==='function') renderGames();
-              try{ settleBets(); }catch(e){}
-              if(!isRefresh){ try{ if(badge&&badge.parentNode) badge.remove(); }catch(e){} }
-              return;
-            }
-          }
-        }
-      }catch(e){}
-      // Fallback: direct ESPN (original behaviour) if the server feed is empty/unreachable.
       try{
         const results = await Promise.all(LEAGUES.map(L => fetchLeague(L).catch(()=>[])));
         const all = [].concat.apply([], results);
@@ -3221,38 +3188,10 @@
         if(changed && typeof renderGames==='function') renderGames();
       }catch(e){}
     }
-    // SERVER-CENTRE: open bets come from the shared positions table (same source
-    // as the desktop dashboard) so the count matches on every device / login path.
-    async function pullServerBets(){
-      if(!(window.AlpexaSync && AlpexaSync.db)) return;
-      var cust=meCust(); if(!cust) return;
-      try{
-        var r=await AlpexaSync.db.from('positions').select('local_id,meta,stake,potential,symbol')
-          .eq('cust_id',cust).eq('server','sports').eq('kind','bet').eq('status','open');
-        if(r && !r.error && Array.isArray(r.data)){
-          var rebuilt = r.data.map(function(p){
-            var m=p.meta||{}; var b=Object.assign({}, m); b.id=p.local_id;
-            if(b.stake==null) b.stake=+p.stake||0;
-            if(b.potential==null) b.potential=+p.potential||0;
-            if(!b.type) b.type=p.symbol||'Bet';
-            if(!b.legs) b.legs=[];
-            return b;
-          });
-          // Keep any just-placed local bet that hasn't synced to the server yet.
-          var have={}; rebuilt.forEach(function(b){ have[String(b.id)]=1; });
-          var localOnly = openBets.filter(function(b){ return !have[String(b.id)]; });
-          openBets = rebuilt.concat(localOnly);
-          saveBets();
-          try{ if(typeof renderTickets==='function') renderTickets(); }catch(e){}
-          try{ var nb=document.getElementById('navBadge'); if(nb){nb.textContent=openBets.length||'';nb.style.display=openBets.length?'flex':'none';} }catch(e){}
-        }
-      }catch(e){}
-    }
     // Clear the built-in sample games immediately so customers only ever see REAL ones.
     try{ GAMES.length=0; if(typeof renderGames==='function') renderGames(); }catch(e){}
     loadLive(false);
-    pullServerBets();
-    setInterval(()=>{ if(!document.hidden){ loadLive(true); pullServerBets(); } }, 30000);   // full refresh + odds + bets
+    setInterval(()=>{ if(!document.hidden) loadLive(true); }, 30000);   // full refresh + odds
     setInterval(()=>{ if(!document.hidden) watchLiveScores(); }, 9000); // fast score-suspend
     // re-render when a suspension lapses so the 🔒 clears on its own
     setInterval(()=>{ if(!document.hidden && window.__alpexaLiveBetting && typeof renderGames==='function'){
