@@ -3718,7 +3718,8 @@ function App(){
             const p=tg.order;
             const addLive=function(openPx){
               const lo={...p,status:'OPEN',open:openPx,placedAt:tg.time,fresh:true,pnl:0};
-              setLiveOrders(prevLo=>[lo,...prevLo]);
+              // dedupe vs the realtime adopt (pullPos) of the fx_open-created row
+              setLiveOrders(prevLo=> prevLo.some(o=>String(o.id)===String(p.id)) ? prevLo : [lo,...prevLo]);
               setToast({side:p.side,sym:p.sym,vol:p.vol,price:openPx,triggered:true});
               setTimeout(()=>setToast(null),3200);
               if(window.ALPEXA_SFX)window.ALPEXA_SFX.triggered();
@@ -3798,7 +3799,9 @@ function App(){
     const _ticket=alpexaTicket('FX');
     const finalize=(openPx)=>{
       const newOrder={id,...orderData,open:openPx,status:'OPEN',placedAt:time,placedTs:Date.now(),ticket:_ticket,pnl:0,fresh:true};
-      setLiveOrders(prev=>[newOrder,...prev]);
+      // dedupe: the realtime adopt (pullPos) may have already added this id after
+      // fx_open created the row — never show / sync the same position twice.
+      setLiveOrders(prev=> prev.some(o=>String(o.id)===String(id)) ? prev : [newOrder,...prev]);
       try{window.broadcastPositionOpen&&window.broadcastPositionOpen(newOrder, account);}catch(e){}
       try{window.AlpexaSync&&AlpexaSync.logActivity({server:'fx',kind:'trade_open',symbol:orderData.sym,amount:orderData.vol||0,ticket:_ticket,detail:(orderData.side||'')+' '+(orderData.vol||0)+' lots @ '+openPx});}catch(e){}
       setToast({side:orderData.side,sym:orderData.sym,vol:orderData.vol,price:openPx});
@@ -3841,10 +3844,18 @@ function App(){
     // server price / spec (e.g. some crypto/index symbols). Mirrors the old flow:
     // client close price + settlement (settlements trigger banks the server balance).
     function clientClose(){
-      bankLocal(closePrice, pnl);
-      try{window.__alpexaSettle&&window.__alpexaSettle({server:'fx',kind:'fx_close',local_id:order.id,ticket:order.ticket,symbol:order.sym,stake:order.vol,pnl:pnl,detail:order.side+' '+order.vol+' @ '+(+order.open).toFixed(m?m.digits:5)+' → '+(+closePrice).toFixed(m?m.digits:5)});}catch(e){}
-      try{ if(window.AlpexaSync&&AlpexaSync.db&&me&&me.accts&&me.accts.fx) AlpexaSync.db.from('positions').delete().eq('acct_no',me.accts.fx).eq('server','fx').eq('local_id',String(order.id)).eq('status','open').then(function(){},function(){}); }catch(e){}
-      done(closePrice, pnl);
+      const bankFallback=function(){
+        bankLocal(closePrice, pnl);
+        try{window.__alpexaSettle&&window.__alpexaSettle({server:'fx',kind:'fx_close',local_id:order.id,ticket:order.ticket,symbol:order.sym,stake:order.vol,pnl:pnl,detail:order.side+' '+order.vol+' @ '+(+order.open).toFixed(m?m.digits:5)+' → '+(+closePrice).toFixed(m?m.digits:5)});}catch(e){}
+      };
+      // Atomic claim: only the device whose DELETE removes the open row banks the
+      // P&L, so closing an (unpriced) symbol on two devices can't double-count.
+      if(window.AlpexaSync&&AlpexaSync.db&&me&&me.accts&&me.accts.fx){
+        AlpexaSync.db.from('positions').delete().eq('acct_no',me.accts.fx).eq('server','fx').eq('local_id',String(order.id)).eq('status','open').select('local_id').then(function(r){
+          if(r&&r.data&&r.data.length>0){ bankFallback(); }   // we won → bank once
+          done(closePrice, pnl);
+        }, function(){ bankFallback(); done(closePrice, pnl); });   // network blip → bank (rare)
+      } else { bankFallback(); done(closePrice, pnl); }            // offline / single device
     }
     if(window.AlpexaSync&&AlpexaSync.db&&me&&me.accts&&me.accts.fx){
       // SERVER-AUTHORITATIVE close: fx_close picks the SERVER price, computes P&L,
