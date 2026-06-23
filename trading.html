@@ -3949,18 +3949,22 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
     if(!window.AlpexaSync||!AlpexaSync.db)return;
     var m=meX(); if(!m||!m.accts.fx)return; var cust=m.custId, acct=m.accts.fx;
     AlpexaSync.db.from('players').update({last_seen:new Date().toISOString(),last_app:'fx'}).eq('cust_id',cust).then(function(){},function(){});
-    var items=[], ids=[];
-    try{var live=window.__fxLive||[];
-      live.forEach(function(o){ if(!o||!(+o.vol>0))return;
-        ids.push(String(o.id||''));
-        items.push({cust_id:cust,acct_no:acct,server:'fx',kind:'position',local_id:String(o.id||''),symbol:o.sym||'',side:o.side||'',size:+o.vol||0,open_price:Math.round((+o.open||0)*1e5)/1e5,pnl:Math.round((+o.pnl||0)*100)/100,status:'open'});});
-    }catch(e){}
-    // MULTI-DEVICE: only refresh MY positions (by local_id, keyed on acct_no which
-    // is stable across devices). Never wipe rows opened on another device.
-    if(!ids.length) return;
-    AlpexaSync.db.from('positions').delete().eq('acct_no',acct).eq('server','fx').in('local_id',ids).then(function(){
-      AlpexaSync.db.from('positions').insert(items).then(function(){},function(){});
-    },function(){});
+    var live=[]; try{ live=window.__fxLive||[]; }catch(e){}
+    // Positions are CREATED by fx_open and CLOSED by fx_close/__fxSyncDelete. Here we
+    // only keep each open position's pnl fresh for the back office — via UPDATE (never
+    // delete+insert), so the server row never momentarily vanishes (the delete→insert
+    // gap was making positions flicker/disappear on screen). If a row doesn't exist yet
+    // (rare client-fallback open of an unpriced symbol), insert it once.
+    live.forEach(function(o){ if(!o||!(+o.vol>0))return;
+      var lid=String(o.id||''); if(!lid) return;
+      AlpexaSync.db.from('positions').update({pnl:Math.round((+o.pnl||0)*100)/100})
+        .eq('acct_no',acct).eq('server','fx').eq('local_id',lid).select('local_id')
+        .then(function(r){
+          if(!(r&&r.data&&r.data.length)){
+            AlpexaSync.db.from('positions').insert({cust_id:cust,acct_no:acct,server:'fx',kind:'position',local_id:lid,symbol:o.sym||'',side:o.side||'',size:+o.vol||0,open_price:Math.round((+o.open||0)*1e5)/1e5,pnl:Math.round((+o.pnl||0)*100)/100,status:'open'}).then(function(){},function(){});
+          }
+        },function(){});
+    });
   }
   // Closed on this device → remove from server so other devices drop it too.
   window.__fxSyncDelete=function(lid){ try{ if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m||!m.accts||!m.accts.fx)return;
