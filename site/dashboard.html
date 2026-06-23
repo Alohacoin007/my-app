@@ -480,7 +480,14 @@
     }
     if(!bets.length){ toast('Enter a stake first'); return; }
     var totStake=bets.reduce(function(a,b){return a+b.stake;},0);
-    if(totStake>balance){ toast('Insufficient balance'); return; }
+    // Use the most reliable balance we know (var may be 0 before the server load).
+    var avail=balance;
+    try{
+      var c1=parseFloat(localStorage.getItem('alpexa.sportsBalance')); if(!isNaN(c1)) avail=Math.max(avail,c1);
+      var sb=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}'); if(sb&&sb.sports!=null) avail=Math.max(avail,+sb.sports||0);
+      var disp=parseFloat(($("balance").textContent||'').replace(/[^0-9.]/g,'')); if(!isNaN(disp)) avail=Math.max(avail,disp);
+    }catch(e){}
+    if(totStake>avail){ toast('Insufficient balance'); return; }
     // Every leg must carry a game id, else the server can't settle it.
     for(var k=0;k<bets.length;k++) for(var j=0;j<bets[k].legs.length;j++) if(!bets[k].legs[j].gid){ toast("This game can't be bet right now"); return; }
     var pb=$("place"), label=pb.textContent; pb.disabled=true; pb.textContent='Placing…';
