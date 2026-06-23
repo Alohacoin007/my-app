@@ -1440,6 +1440,13 @@ function TradeTicket({market,sym,setSym,lots,setLots,onPlace}){
   // USD value of one point — derived from the (USD-correct) P&L of a 1-point move,
   // so cross pairs like EURJPY convert to USD just like the position P&L does.
   const tickValueUSD=Math.abs(ALPEXA_MARKET.getPnlUSD(s,entryPx,entryPx+tickSize,'BUY',vol));
+  // Standard PIP value (matches MT4/MT5 & other brokers): a pip is 10 POINTS on
+  // fractional-pip quotes (5-digit FX, 3-digit JPY/metals), else 1 point. The
+  // tickValueUSD above is the POINT value; multiply to get the true pip value.
+  // (Display only — SL/TP distances stay in points and their $ amounts are already
+  // correct = point value × points.)
+  const pipFactor=(s.cls==='FX'&&(s.digits===5||s.digits===3))?10:1;
+  const pipValueUSD=tickValueUSD*pipFactor;
 
   function sltpHelper(val,isTp){
     if(val===''||val==null)return null;
@@ -1584,7 +1591,7 @@ function TradeTicket({market,sym,setSym,lots,setLots,onPlace}){
           <SumRow label="Required margin" val={`$${margin.toLocaleString('en-US',{maximumFractionDigits:2})} (${marginPct}%)`}/>
           <SumRow label="Leverage" val={`1:${lev}`}/>
           <SumRow label="Commission" val={`$${commission.toFixed(2)}`}/>
-          <SumRow label={s.cls==='FX'?'Pip value (1 pip)':`Tick value (${tickSize.toFixed(s.digits)})`} val={`$${tickValueUSD.toFixed(4)}`}/>
+          <SumRow label={s.cls==='FX'?'Pip value (1 pip)':`Tick value (${tickSize.toFixed(s.digits)})`} val={`$${(s.cls==='FX'?pipValueUSD:tickValueUSD).toFixed(s.cls==='FX'?2:4)}`}/>
           <SumRow label="Swap (overnight)" val={s.cls==='CRYPTO'?'−12.0':s.cls==='STOCK'?'−3.5':side==='BUY'?'−0.5':'+0.2'}/>
         </div>
       </div>
