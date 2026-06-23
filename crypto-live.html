@@ -13602,21 +13602,48 @@ function App() {
   // Limit/Stop: queue pending order with side='sell'.
   const onSoldConfirmed = (assetId, usdAmount, order) => {
     if (!order || order.type === 'Market') {
-      // Net USDT credited = sold amount minus a $1 network fee.
-      const FEE = 1.00;
-      // Dealing-desk markdown: customer receives less than mid on sells (house spread).
       const mkP = Math.max(0, Math.min(50, (window.__alpexaCryptoMarks && +window.__alpexaCryptoMarks[assetId]) || 0));
-      const markdown = usdAmount * (mkP / 100);
-      const net = Math.max(0, usdAmount - FEE - markdown);
-      setBalances((b) => ({
-        ...b,
-        [assetId]: Math.max(0, (b[assetId] || 0) - usdAmount),
-        USDT:      (b.USDT || 0) + net,
-      }));
-      pushTx({ type: 'sell', sym: assetId, usd: usdAmount, net });
-      // Record the fee + markup on the server — company revenue + agent commission base.
-      try{window.__alpexaSettle&&window.__alpexaSettle({server:'crypto',kind:'crypto_fee',local_id:'sf-'+Date.now(),symbol:assetId,stake:Math.min(FEE+markdown,usdAmount),pnl:0,detail:'sell fee+markup '+mkP+'%'});}catch(e){}
-      flashAsset(assetId);
+      // Client-side execution — securities, coins with no server price, or offline.
+      // Net USDT credited = sold amount minus a $1 network fee and the house markdown.
+      const clientSell = () => {
+        const FEE = 1.00;
+        const markdown = usdAmount * (mkP / 100);
+        const net = Math.max(0, usdAmount - FEE - markdown);
+        setBalances((b) => ({ ...b, [assetId]: Math.max(0, (b[assetId] || 0) - usdAmount), USDT: (b.USDT || 0) + net }));
+        pushTx({ type: 'sell', sym: assetId, usd: usdAmount, net });
+        try{window.__alpexaSettle&&window.__alpexaSettle({server:'crypto',kind:'crypto_fee',local_id:'sf-'+Date.now(),symbol:assetId,stake:Math.min(FEE+markdown,usdAmount),pnl:0,detail:'sell fee+markup '+mkP+'%'});}catch(e){}
+        flashAsset(assetId);
+        return { ok: true };
+      };
+      const acct = cryptoAcctRef.current;
+      const isSecurity = (typeof PORTFOLIO !== 'undefined') && PORTFOLIO.securities && PORTFOLIO.securities.some((s) => s.sym === assetId);
+      if (isSecurity || !(window.AlpexaSync && AlpexaSync.db && acct)) {
+        return Promise.resolve(clientSell());
+      }
+      // SERVER-AUTHORITATIVE sell at the server price. p_all liquidates the whole
+      // position by quantity, so a client/server price gap can't reject "sell max".
+      const held = (balances && +balances[assetId]) || 0;
+      const isAll = held > 0 && usdAmount >= held - 0.01;
+      window.__cbLocalTs = Date.now();
+      return AlpexaSync.db.rpc('crypto_trade', {
+        p_ref: 'cs-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+        p_acct: acct, p_symbol: assetId, p_usd: usdAmount, p_side: 'sell', p_markup: mkP, p_all: isAll,
+      }).then((r) => {
+        const d = r && r.data;
+        if (!d || d.ok !== true) {
+          const err = (d && d.error) || (r && r.error && r.error.message) || 'trade failed';
+          if (/no price/i.test(err)) return clientSell();   // not in the server feed → client path
+          return { ok: false, error: err };
+        }
+        const gross = (d.usd != null) ? +d.usd : usdAmount;
+        const net   = (d.net != null) ? +d.net : gross;
+        pushTx({ type: 'sell', sym: assetId, usd: gross, net });
+        const feeUsd = (d.fee != null) ? +d.fee : (gross * mkP / 100);
+        if (feeUsd > 0) { try{ window.__alpexaSettle && window.__alpexaSettle({server:'crypto',kind:'crypto_fee',local_id:'sf-'+Date.now(),symbol:assetId,stake:feeUsd,pnl:0,detail:'sell markup '+mkP+'%'}); }catch(e){} }
+        forceCryptoAdopt();
+        flashAsset(assetId);
+        return { ok: true };
+      }, () => ({ ok: false, error: 'network error' }));
     } else {
       setPendingOrders((p) => [
         ...p,
