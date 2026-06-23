@@ -326,5 +326,33 @@
   });
 })();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* Live sport cards: pull real per-sport game + live counts from the server
+   (live_games) and link each card to the app. Sports the feed doesn't carry
+   (Tennis/MMA/Golf/Motorsport) show UPCOMING instead of a fake live count. */
+(function(){
+  var FEED={Football:1,Basketball:1,Baseball:1,Hockey:1,Soccer:1};
+  // Every card opens the app's live board.
+  [].forEach.call(document.querySelectorAll('a.sport'),function(a){ a.setAttribute('href','../sports-live.html'); });
+  var db; try{ db=window.supabase.createClient('https://grxnbgtfnaayeluenvqh.supabase.co','sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu'); }catch(e){ return; }
+  function apply(){
+    db.from('live_games').select('data').eq('id','all').maybeSingle().then(function(r){
+      var games=(r&&r.data&&r.data.data)||[]; if(!Array.isArray(games)) return;
+      var tot={}, live={};
+      games.forEach(function(g){ var s=g.sport; if(!s) return; tot[s]=(tot[s]||0)+1; if(g.live) live[s]=(live[s]||0)+1; });
+      [].forEach.call(document.querySelectorAll('a.sport'),function(card){
+        var h=card.querySelector('h3'); if(!h) return; var s=h.textContent.trim();
+        var lvEl=card.querySelector('.live');
+        if(!FEED[s]){ if(lvEl) lvEl.textContent='UPCOMING'; return; }
+        var n=tot[s]||0, lv=live[s]||0;
+        var gb=card.querySelector('.games b'); if(gb) gb.textContent=n;
+        if(lvEl){ lvEl.innerHTML = lv>0 ? '<span class="dot"></span>'+lv+' LIVE' : 'UPCOMING'; }
+      });
+    },function(){});
+  }
+  apply(); setInterval(apply,60000);
+})();
+</script>
 </body>
 </html>
