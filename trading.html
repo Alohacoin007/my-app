@@ -3777,15 +3777,28 @@ function App(){
       }
     }
     const fillPx=sObj?applySlippage(sObj,orderData.side,fillBase,'MARKET'):fillBase;
-    const newOrder={id,...orderData,open:fillPx,status:'OPEN',placedAt:time,placedTs:Date.now(),ticket:alpexaTicket('FX'),pnl:0,fresh:true};
-    setLiveOrders(prev=>[newOrder,...prev]);
-    try{window.broadcastPositionOpen&&window.broadcastPositionOpen(newOrder, account);}catch(e){}
-    try{window.AlpexaSync&&AlpexaSync.logActivity({server:'fx',kind:'trade_open',symbol:orderData.sym,amount:orderData.vol||0,ticket:newOrder.ticket,detail:(orderData.side||'')+' '+(orderData.vol||0)+' lots @ '+fillPx});}catch(e){}
-    setToast({side:orderData.side,sym:orderData.sym,vol:orderData.vol,price:fillPx});
-    setTimeout(()=>setToast(null),3200);
-    if(window.ALPEXA_SFX)window.ALPEXA_SFX.orderFill(orderData.side);
-    setTimeout(()=>{setLiveOrders(prev=>prev.map(o=>o.id===id?{...o,fresh:false}:o));},1500);
-    setTab('HIST');setPosTab('OPEN');
+    // Create the position with a SERVER-decided entry price (fx_open) so the
+    // open_price can't be forged to fake P&L at close. If the server can't price it
+    // (no spec / stale / offline) we fall back to the feed-anchored client fill.
+    // The ticket is generated once so it stays stable across the async call.
+    const _ticket=alpexaTicket('FX');
+    const finalize=(openPx)=>{
+      const newOrder={id,...orderData,open:openPx,status:'OPEN',placedAt:time,placedTs:Date.now(),ticket:_ticket,pnl:0,fresh:true};
+      setLiveOrders(prev=>[newOrder,...prev]);
+      try{window.broadcastPositionOpen&&window.broadcastPositionOpen(newOrder, account);}catch(e){}
+      try{window.AlpexaSync&&AlpexaSync.logActivity({server:'fx',kind:'trade_open',symbol:orderData.sym,amount:orderData.vol||0,ticket:_ticket,detail:(orderData.side||'')+' '+(orderData.vol||0)+' lots @ '+openPx});}catch(e){}
+      setToast({side:orderData.side,sym:orderData.sym,vol:orderData.vol,price:openPx});
+      setTimeout(()=>setToast(null),3200);
+      if(window.ALPEXA_SFX)window.ALPEXA_SFX.orderFill(orderData.side);
+      setTimeout(()=>{setLiveOrders(prev=>prev.map(o=>o.id===id?{...o,fresh:false}:o));},1500);
+      setTab('HIST');setPosTab('OPEN');
+    };
+    let _me; try{_me=JSON.parse(localStorage.getItem('alpexa.me')||'null');}catch(e){}
+    if(window.AlpexaSync&&AlpexaSync.db&&_me&&_me.accts&&_me.accts.fx){
+      AlpexaSync.db.rpc('fx_open',{p_local_id:String(id),p_symbol:orderData.sym,p_side:orderData.side,p_size:orderData.vol}).then(function(r){
+        const d=r&&r.data; finalize(d&&d.ok&&d.open!=null ? +d.open : fillPx);
+      }, function(){ finalize(fillPx); });
+    } else { finalize(fillPx); }
   }
 
   function cancelPending(id){setPendingOrders(prev=>prev.filter(p=>p.id!==id));}
