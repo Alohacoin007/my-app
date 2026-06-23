@@ -213,5 +213,20 @@
     });
   })();
   </script>
+  <script>
+  /* Wire up the promo buttons. Signed-in users go to the app to use the
+     offer; new visitors go to sign-up (where bonuses are granted). */
+  (function(){
+    var loggedIn=false;
+    try{ var m=JSON.parse(localStorage.getItem('alpexa.me')||'null'); loggedIn=!!(m&&m.accts&&(m.email||m.authId)); }catch(e){}
+    var app='../sports-live.html', signup='signup.html', board='sports.html';
+    [].forEach.call(document.querySelectorAll('a.claim'),function(a){
+      var t=(a.textContent||'').toLowerCase();
+      if(t.indexOf('sign up')>=0) a.href=signup;
+      else if(t.indexOf('boost')>=0) a.href=loggedIn?app:board;
+      else a.href=loggedIn?app:signup;
+    });
+  })();
+  </script>
 </body>
 </html>
