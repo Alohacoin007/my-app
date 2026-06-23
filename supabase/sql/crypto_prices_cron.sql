@@ -18,7 +18,9 @@ create extension if not exists pg_net;
 -- param:  .../crypto-prices?token=<CRON_SECRET>   (omit if no secret is set).
 -- NOTE: the deployed Edge function is named `crypto-price` (singular), so the
 -- URL must match exactly — `crypto-prices` (plural) returns 404 NOT_FOUND.
-select cron.schedule('crypto-prices-60s', '* * * * *', $$
+-- The function now reads Binance (server-side, real-time), which has generous
+-- limits, so run every 5 seconds for a near-live feed everywhere.
+select cron.schedule('crypto-prices-60s', '5 seconds', $$
   select net.http_get(
     url := 'https://grxnbgtfnaayeluenvqh.supabase.co/functions/v1/crypto-price'
   );
