@@ -567,16 +567,20 @@ function broadcastPositionClose(orderId, closePrice, pnl){
 window.broadcastPositionOpen = broadcastPositionOpen;
 window.broadcastPositionClose = broadcastPositionClose;
 
-const DEFAULT_BALANCES={live:10000,crypto:10000,sports:10000};
-function getBalances(){try{const raw=localStorage.getItem('alpexa.balances');if(raw){const obj=JSON.parse(raw);return {...DEFAULT_BALANCES,...obj};}}catch(e){}return {...DEFAULT_BALANCES};}
-function setBalances(obj){window.__fxLocalTs=Date.now();try{localStorage.setItem('alpexa.balances',JSON.stringify(obj));}catch(e){}window.dispatchEvent(new Event('alpexa-balance-change'));}
+// No fake seed — the real balance is loaded from the server (accounts.balance).
+// Held IN MEMORY only (window.__fxBal); never persisted to localStorage.
+const DEFAULT_BALANCES={live:0,crypto:0,sports:0};
+function getBalances(){return {...DEFAULT_BALANCES,...(window.__fxBal||{})};}
+function setBalances(obj){window.__fxLocalTs=Date.now();window.__fxBal=obj;window.dispatchEvent(new Event('alpexa-balance-change'));}
 function addBalance(acctId,delta){const b=getBalances();b[acctId]=Math.max(0,(b[acctId]||0)+delta);setBalances(b);}
 function fmtBalance(n){return '$'+(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
 window.getBalances=getBalances;window.addBalance=addBalance;window.fmtBalance=fmtBalance;
 // Shared cross-app server balances (so every app's server switcher agrees).
-function getServerBalances(){try{return Object.assign({crypto:10000,fx:25000,sports:50000},JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}'));}catch(e){return {crypto:10000,fx:25000,sports:50000};}}
+// Cross-app dropdown balances — in memory only, populated from the server via
+// pullBalances (returns fx/sports/crypto). No fake seed, no localStorage.
+function getServerBalances(){return Object.assign({crypto:0,fx:0,sports:0},window.__fxSrvBal||{});}
 function srvBalById(id){const s=getServerBalances();return id==='live'?s.fx:(id==='crypto'?s.crypto:s.sports);}
-function syncMyServerBalance(){try{const o=getServerBalances();o.fx=getBalances().live;localStorage.setItem('alpexa.serverBalances',JSON.stringify(o));}catch(e){}}
+function syncMyServerBalance(){try{const o=getServerBalances();o.fx=getBalances().live;window.__fxSrvBal=o;}catch(e){}}
 window.addEventListener('alpexa-balance-change',syncMyServerBalance);
 syncMyServerBalance();
 const DEFAULT_LEVERAGE={FX:100,INDEX:20,STOCK:5,CRYPTO:5};
@@ -2634,7 +2638,7 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
                 // Optimistic: reflect both legs instantly in the local balance cache.
                 try{ window.addBalance&&window.addBalance('live',-amt); window.addBalance&&window.addBalance(destAcct||'crypto',amt); }catch(e){}
                 // Refresh ALL server balances now so both legs reflect immediately.
-                try{ AlpexaSync.pullBalances&&AlpexaSync.pullBalances().then(function(b){ if(!b)return; try{var o=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{}; if(b.fx!=null)o.fx=b.fx; if(b.sports!=null)o.sports=b.sports; if(b.crypto!=null)o.crypto=b.crypto; localStorage.setItem('alpexa.serverBalances',JSON.stringify(o)); window.dispatchEvent(new Event('alpexa-balance-change')); }catch(e){} }); }catch(e){} }
+                try{ AlpexaSync.pullBalances&&AlpexaSync.pullBalances().then(function(b){ if(!b)return; try{var o=window.__fxSrvBal||{}; if(b.fx!=null)o.fx=b.fx; if(b.sports!=null)o.sports=b.sports; if(b.crypto!=null)o.crypto=b.crypto; window.__fxSrvBal=o; window.dispatchEvent(new Event('alpexa-balance-change')); }catch(e){} }); }catch(e){} }
             },function(){});
           }
           try{ window.alpexaNotify&&alpexaNotify({type:'transfer',pref:'deposit',title:'Transfer complete · $'+amt.toLocaleString()}); }catch(e){}
@@ -3541,7 +3545,9 @@ function App(){
     const vis=()=>{if(!document.hidden)pull();}; document.addEventListener('visibilitychange',vis);
     return ()=>{stop=true;clearTimeout(t0);clearInterval(iv);document.removeEventListener('visibilitychange',vis);};
   },[]);
-  // (open positions are server-owned via the `positions` table — no localStorage mirror)
+  // Open positions are server-owned (no localStorage). Keep an IN-MEMORY mirror so
+  // the module-level sync/heartbeat helpers can read the live set without persisting.
+  useEffect(()=>{ window.__fxLive = liveOrders.filter(o=>o&&(+o.vol)>0); },[liveOrders]);
   // ── MULTI-DEVICE: adopt open FX positions from the server (shared truth) ──
   // Add positions opened on another device, drop ones closed elsewhere (6s grace
   // so a just-opened local position isn't dropped before it syncs). pnl is
@@ -3678,8 +3684,8 @@ function App(){
       // floating P&L) so the switcher matches the balance card instead of showing
       // only the cash balance.
       try{const eqBal=(window.getBalances?window.getBalances():{})[accountRef.current]||0;
-        const sbo=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{};
-        sbo.fx=eqBal+floatPnl; localStorage.setItem('alpexa.serverBalances',JSON.stringify(sbo));
+        const sbo=window.__fxSrvBal||{};
+        sbo.fx=eqBal+floatPnl; window.__fxSrvBal=sbo;
         // SERVER-OWNS-BALANCE: do NOT push the full equity here. accounts.balance
         // is owned by the DB triggers (deposit/withdraw/settlement) + ledger and
         // adopted below. Pushing the absolute equity clobbered those server-side
@@ -4036,19 +4042,19 @@ root.render(<Root/>);
 // serverBalances (the dropdown) always follows the server; the FX cash balance is
 // only adopted when FLAT (no open positions, so equity==cash) and not mid-change.
 (function(){
-  function fxFlat(){ try{ return (JSON.parse(localStorage.getItem('alpexa.fxLive')||'[]')||[]).filter(function(o){return o&&(+o.vol)>0;}).length===0; }catch(e){ return true; } }
+  function fxFlat(){ try{ return (window.__fxLive||[]).filter(function(o){return o&&(+o.vol)>0;}).length===0; }catch(e){ return true; } }
   function syncBalances(){
     if(!(window.AlpexaSync&&AlpexaSync.pullBalances)) return;
     AlpexaSync.pullBalances().then(function(b){
       if(!b) return; var changed=false;
-      try{ var o=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{};
+      try{ var o=window.__fxSrvBal||{};
         if(b.crypto!=null){o.crypto=b.crypto;} if(b.sports!=null){o.sports=b.sports;} if(b.fx!=null){o.fx=b.fx;}
-        localStorage.setItem('alpexa.serverBalances',JSON.stringify(o)); changed=true; }catch(e){}
+        window.__fxSrvBal=o; changed=true; }catch(e){}
       // accounts.balance is now CASH (server-owned), so adopt it even with open
       // positions (equity = this cash + local floating P&L). Idle-gated so we
       // don't fight a fresh local change.
       try{ if(b.fx!=null && (Date.now()-(window.__fxLocalTs||0))>7000 && window.getBalances){
-        var bal=window.getBalances(); if(Math.abs((+bal.live||0)-b.fx)>0.01){ bal.live=b.fx; localStorage.setItem('alpexa.balances',JSON.stringify(bal)); changed=true; } } }catch(e){}
+        var bal=window.getBalances(); if(Math.abs((+bal.live||0)-b.fx)>0.01){ bal.live=b.fx; window.__fxBal=bal; changed=true; } } }catch(e){}
       if(changed){ try{ window.dispatchEvent(new Event('alpexa-balance-change')); }catch(e){} }
     }).catch(function(){});
   }
@@ -4097,7 +4103,7 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
     var m=meX(); if(!m||!m.accts.fx)return; var cust=m.custId, acct=m.accts.fx;
     AlpexaSync.db.from('players').update({last_seen:new Date().toISOString(),last_app:'fx'}).eq('cust_id',cust).then(function(){},function(){});
     var items=[], ids=[];
-    try{var live=JSON.parse(localStorage.getItem('alpexa.fxLive')||'[]')||[];
+    try{var live=window.__fxLive||[];
       live.forEach(function(o){ if(!o||!(+o.vol>0))return;
         ids.push(String(o.id||''));
         items.push({cust_id:cust,acct_no:acct,server:'fx',kind:'position',local_id:String(o.id||''),symbol:o.sym||'',side:o.side||'',size:+o.vol||0,open_price:Math.round((+o.open||0)*1e5)/1e5,pnl:Math.round((+o.pnl||0)*100)/100,status:'open'});});
@@ -4115,7 +4121,7 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
   setTimeout(push,2000); setInterval(function(){ if(!document.hidden){ push(); } else { window.__bgPosPush=window.__bgPosPush||0; if(Date.now()-window.__bgPosPush>9000){ window.__bgPosPush=Date.now(); push(); } } },3000);
   // Instant: when a position opens/closes (id list changes), push right away
   // instead of waiting for the next tick. PnL drift rides the 3s interval.
-  function posSig(){try{var a=JSON.parse(localStorage.getItem('alpexa.fxLive')||'[]')||[];return a.map(function(o){return o&&o.id;}).join(',');}catch(e){return'';}}
+  function posSig(){try{var a=window.__fxLive||[];return a.map(function(o){return o&&o.id;}).join(',');}catch(e){return'';}}
   var _psig=posSig();
   setInterval(function(){var n=posSig(); if(n!==_psig){_psig=n; if(!document.hidden)push();}},700);
   // Lightweight presence heartbeat — runs even in the background so the back
