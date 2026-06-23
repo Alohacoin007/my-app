@@ -624,7 +624,29 @@
       }
     }catch(e){}
   }
-  renderOpenBets(); loadOpenBets(); setInterval(loadOpenBets, 30000);
+  renderOpenBets(); loadOpenBets(); setInterval(function(){ if(!document.hidden) loadOpenBets(); }, 12000);
+  // REALTIME: reflect bet changes (cash-out / new bet / settle) and balance the
+  // instant the server changes them — no 30s wait, no manual refresh (like the app).
+  (function(){
+    try{
+      if(!window._db || !window._db.channel) return;
+      var me=JSON.parse(localStorage.getItem('alpexa.me')||'null');
+      var cust=me&&me.custId, acct=me&&me.accts&&me.accts.sports;
+      function refreshBalance(){ try{ if(acct&&window._db){ window._db.from('accounts').select('balance').eq('acct_no',acct).maybeSingle().then(function(r){ if(r&&!r.error&&r.data){ setBalance(+r.data.balance||0); try{localStorage.setItem('alpexa.sportsBalance',String(+r.data.balance||0));}catch(e){} } }); } }catch(e){} }
+      if(cust){
+        window._db.channel('dash-pos-'+cust)
+          .on('postgres_changes',{event:'*',schema:'public',table:'positions',filter:'cust_id=eq.'+cust},function(){ loadOpenBets(); refreshBalance(); })
+          .subscribe();
+      }
+      if(acct){
+        window._db.channel('dash-acct-'+acct)
+          .on('postgres_changes',{event:'*',schema:'public',table:'accounts',filter:'acct_no=eq.'+acct},function(p){ try{ var b=p&&p.new&&p.new.balance; if(b!=null){ setBalance(+b||0); try{localStorage.setItem('alpexa.sportsBalance',String(+b||0));}catch(e){} } }catch(e){} })
+          .subscribe();
+      }
+      // also refresh when the tab regains focus (covers any missed event)
+      document.addEventListener('visibilitychange',function(){ if(!document.hidden) loadOpenBets(); });
+    }catch(e){}
+  })();
 
   // ===== live odds + score simulation =====
   function nudge(o){ var v=Math.round((o+(Math.random()*0.08-0.04))*100)/100; return Math.min(3.6,Math.max(1.20,v)); }
