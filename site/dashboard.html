@@ -284,7 +284,7 @@
         <button class="filt on" data-f="all">All</button>
         <button class="filt" data-f="live"><span class="fdot"></span>Live</button>
       </div>
-      <div class="mkt-head"><span id="mktTitle">Football · Today</span><span>Spread</span><span>Total</span><span>Money</span></div>
+      <div class="mkt-head"><span id="mktTitle">Today</span><span>Spread</span><span>Total</span><span>Moneyline</span></div>
       <div id="games"></div>
     </main>
 
@@ -357,7 +357,7 @@
 
   function renderGames(){
     var list=DATA.filter(function(m){return m.sport===state.sport&&(state.filter!=='live'||m.live);});
-    $("mktTitle").textContent=state.sport+" · Today";
+    $("mktTitle").textContent="Today";
     $("games").innerHTML=list.map(function(m){
       var mi=DATA.indexOf(m);
       var C=m._core||{};
@@ -367,12 +367,12 @@
       var rowA='<div class="g-row">'+
         '<div class="team"><span class="ab">'+m.away.ab+'</span>'+m.away.name+(m.away.sc!==null?'<span class="sc">'+m.away.sc+'</span>':'')+'</div>'+
         cell(mi,"spread","a",m.spread.al,A('spread',1))+
-        cell(mi,"total","u","U "+m.total.ln,A('total',1))+
+        cell(mi,"total","u","Under "+m.total.ln,A('total',1))+
         cell(mi,"ml","a","",A('ml',1))+'</div>';
       var rowH='<div class="g-row">'+
         '<div class="team"><span class="ab">'+m.home.ab+'</span>'+m.home.name+(m.home.sc!==null?'<span class="sc">'+m.home.sc+'</span>':'')+'</div>'+
         cell(mi,"spread","h",m.spread.hl,A('spread',0))+
-        cell(mi,"total","o","O "+m.total.ln,A('total',0))+
+        cell(mi,"total","o","Over "+m.total.ln,A('total',0))+
         cell(mi,"ml","h","",A('ml',0))+'</div>';
       return '<div class="game'+(m.live?' live':'')+'">'+top+rowA+rowH+'</div>';
     }).join("")||'<div class="empty">'+(!GAMES_LOADED?'Loading live games…':(state.filter==='live'?'No live games right now.':'No games for this sport right now.'))+'</div>';
@@ -732,7 +732,8 @@
   function fmtLocal(iso){
     if(!iso) return '';
     try{ var d=new Date(iso); if(isNaN(d.getTime())) return '';
-      return d.toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit'}); }
+      return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})
+           +' · '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}); }
     catch(e){ return ''; }
   }
   function toRow(g){
