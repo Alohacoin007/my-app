@@ -3705,19 +3705,33 @@ function App(){
           if(hit){
             const now=new Date();
             const time=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
+            // client fill is the FALLBACK; the real fill price comes from fx_open (server)
             const fillPx=applySlippage(m,p.side,px,p.otype);
-            triggered.push({...p,status:'OPEN',open:fillPx,placedAt:time,fresh:true,pnl:0});
+            triggered.push({order:p,time:time,fillPx:fillPx});
             return false;
           }
           return true;
         });
         if(triggered.length>0){
-          setLiveOrders(lo=>[...triggered,...lo]);
-          const t=triggered[0];
-          setToast({side:t.side,sym:t.sym,vol:t.vol,price:t.open,triggered:true});
-          setTimeout(()=>setToast(null),3200);
-          if(window.ALPEXA_SFX)window.ALPEXA_SFX.triggered();
-          setTimeout(()=>{setLiveOrders(lo=>lo.map(o=>triggered.find(tr=>tr.id===o.id)?{...o,fresh:false}:o));},1500);
+          let me; try{me=JSON.parse(localStorage.getItem('alpexa.me')||'null');}catch(e){}
+          triggered.forEach(function(tg){
+            const p=tg.order;
+            const addLive=function(openPx){
+              const lo={...p,status:'OPEN',open:openPx,placedAt:tg.time,fresh:true,pnl:0};
+              setLiveOrders(prevLo=>[lo,...prevLo]);
+              setToast({side:p.side,sym:p.sym,vol:p.vol,price:openPx,triggered:true});
+              setTimeout(()=>setToast(null),3200);
+              if(window.ALPEXA_SFX)window.ALPEXA_SFX.triggered();
+              setTimeout(()=>{setLiveOrders(lo2=>lo2.map(o=>o.id===p.id?{...o,fresh:false}:o));},1500);
+            };
+            // Trigger watching stays client-side (real-time); the FILL is server-
+            // authoritative via fx_open, so a triggered order's entry can't be forged.
+            if(window.AlpexaSync&&AlpexaSync.db&&me&&me.accts&&me.accts.fx){
+              AlpexaSync.db.rpc('fx_open',{p_local_id:String(p.id),p_symbol:p.sym,p_side:p.side,p_size:p.vol}).then(function(r){
+                const d=r&&r.data; addLive(d&&d.ok&&d.open!=null?+d.open:tg.fillPx);
+              }, function(){ addLive(tg.fillPx); });
+            } else { addLive(tg.fillPx); }
+          });
         }
         return stillPending;
       });
