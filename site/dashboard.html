@@ -464,6 +464,16 @@
     var me=null; try{ me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); }catch(e){}
     var acct=me&&me.accts&&me.accts.sports;
     if(!acct){ toast('Please log in first'); return; }
+    // place_bet needs a live session (auth.uid); without it the server returns
+    // "not your account". If the session is gone (expired/incognito), re-login.
+    try{
+      var _u=await window._db.auth.getUser();
+      if(!(_u&&_u.data&&_u.data.user)){
+        toast('Session expired — please log in again');
+        setTimeout(function(){ location.href='login.html?switch=1'; }, 1300);
+        return;
+      }
+    }catch(e){ toast('Session expired — please log in again'); setTimeout(function(){ location.href='login.html?switch=1'; }, 1300); return; }
     function legOf(s){ return { uid:'L'+Math.random().toString(36).slice(2,9), gid:s.gid, market:(MKT[s.mk]||s.mk), sel:s.sel, pk:s.sel, am:s.am, game:s.sub, gm:s.sub, st:s.sd, live:false }; }
     // Build the bet(s): singles = one bet per pick, parlay = one combined bet.
     var bets=[];
