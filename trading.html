@@ -449,21 +449,8 @@ function getUnitLabel(cls,plural=true){if(cls==='STOCK')return plural?'shares':'
 function fmtVol(cls,vol){if(cls==='STOCK'||cls==='INDEX')return Math.round(vol).toString();return vol.toFixed(2);}
 window.getLotSize=getLotSize;window.isUsdBaseFx=isUsdBaseFx;window.getNotionalUSD=getNotionalUSD;window.getMarginUSD=getMarginUSD;window.getPnlUSD=getPnlUSD;window.getUnitLabel=getUnitLabel;window.fmtVol=fmtVol;
 const POSITIONS=[];const PENDING=[];
-// Demo closed-trade history so Trading Statistics shows meaningful numbers.
-const HISTORY=[
-  {id:'h001',sym:'EURUSD',side:'BUY', vol:0.50,open:1.0820,close:1.0851,pnl: 155.00,date:'05-24 14:32',placedAt:'14:32'},
-  {id:'h002',sym:'BTCUSD',side:'BUY', vol:0.05,open:70850,close:71284,pnl:  21.70,date:'05-24 13:18',placedAt:'13:18'},
-  {id:'h003',sym:'XAUUSD',side:'SELL',vol:0.20,open:2365.4,close:2362.4,pnl:  60.00,date:'05-24 11:05',placedAt:'11:05'},
-  {id:'h004',sym:'TSLA',  side:'BUY', vol:10,  open:243.20,close:247.47,pnl:  42.70,date:'05-24 10:42',placedAt:'10:42'},
-  {id:'h005',sym:'NVDA',  side:'BUY', vol:5,   open:925.30,close:923.14,pnl: -10.80,date:'05-24 09:51',placedAt:'09:51'},
-  {id:'h006',sym:'GBPUSD',side:'SELL',vol:0.30,open:1.2705,close:1.2682,pnl:  69.00,date:'05-23 17:24',placedAt:'17:24'},
-  {id:'h007',sym:'USDJPY',side:'BUY', vol:0.50,open:151.05,close:151.24,pnl:  62.83,date:'05-23 15:11',placedAt:'15:11'},
-  {id:'h008',sym:'ETHUSD',side:'BUY', vol:0.50,open:3870.00,close:3842.10,pnl:-13.95,date:'05-23 12:48',placedAt:'12:48'},
-  {id:'h009',sym:'EURUSD',side:'SELL',vol:1.00,open:1.0875,close:1.0842,pnl: 330.00,date:'05-23 10:17',placedAt:'10:17'},
-  {id:'h010',sym:'BTCUSD',side:'SELL',vol:0.02,open:71500,close:71284,pnl:   4.32,date:'05-22 22:03',placedAt:'22:03'},
-  {id:'h011',sym:'AAPL',  side:'BUY', vol:8,   open:189.50,close:188.20,pnl: -10.40,date:'05-22 16:30',placedAt:'16:30'},
-  {id:'h012',sym:'XAUUSD',side:'BUY', vol:0.10,open:2348.0,close:2362.4,pnl: 144.00,date:'05-22 11:14',placedAt:'11:14'},
-];
+// Closed-trade history comes from the server (settlements) — no demo data.
+const HISTORY=[];
 const NEWS=[
   {t:'09:42',tag:'CRYPTO',ttl:'BTC breaks 71.2K as ETF inflows accelerate',body:'US spot ETFs added +$560M yesterday. Risk-on bid after NVDA earnings.',impact:'high'},
   {t:'09:18',tag:'FX',ttl:'DXY at 104.4, flat ahead of May FOMC minutes',body:'PPI cooled but June-cut bets weakened on hawkish Fed-speak.',impact:'med'},
@@ -1842,8 +1829,8 @@ function filterByDate(history,mode,customFrom,customTo){
 }
 
 function Positions({tab,setTab,liveOrders=[],pendingOrders=[],closedHistory=[],market=[],onClose,onCancelPending,onModify,onModifyPending}){
-  const allPositions=[...liveOrders,...ALPEXA_MARKET.POSITIONS.map(p=>({...p,isStatic:true}))];
-  const allHistory=[...closedHistory,...ALPEXA_MARKET.HISTORY];
+  const allPositions=[...liveOrders];
+  const allHistory=[...closedHistory];
   const totalPnl=allPositions.reduce((s,p)=>s+(p.pnl||0),0);
   const totalMargin=allPositions.reduce((sum,p)=>{
     const symInfo=ALPEXA_MARKET.SYMBOLS.find(s=>s.sym===p.sym);if(!symInfo)return sum;
@@ -1881,7 +1868,6 @@ function Positions({tab,setTab,liveOrders=[],pendingOrders=[],closedHistory=[],m
           )}
           {openGroup==='time'&&(
             <>
-              {liveOrders.length===0&&<div style={{padding:'8px 14px 4px',fontSize:9.5,fontWeight:700,color:'var(--text-3)',letterSpacing:0.6}}>DEMO POSITIONS</div>}
               {liveOrders.length>0&&<div style={{padding:'8px 14px 4px',fontSize:9.5,fontWeight:700,color:'var(--acc-2)',letterSpacing:0.6,display:'flex',alignItems:'center',gap:4}}><span className="livedot"/> LIVE — {liveOrders.length} ACTIVE</div>}
               {allPositions.map((p,i)=><PosCard key={p.id||'static-'+i} p={p} onClose={onClose} onModify={onModify}/>)}
             </>
@@ -3297,7 +3283,7 @@ function AppMenu({indicators,setIndicators,liveOrders,closedHistory,onClose}){
   function toggleDark(){document.documentElement.classList.toggle('dark');force(x=>x+1);}
   // Combine this session's closed trades with the preset demo history so the
   // Trading Statistics screen always shows meaningful numbers.
-  const closed=[...(closedHistory||[]),...((ALPEXA_MARKET&&ALPEXA_MARKET.HISTORY)||[])];
+  const closed=[...(closedHistory||[])];
   const wins=closed.filter(c=>c.pnl>=0);
   const losses=closed.filter(c=>c.pnl<0);
   const winRate=closed.length?((wins.length/closed.length)*100).toFixed(1):'0.0';
