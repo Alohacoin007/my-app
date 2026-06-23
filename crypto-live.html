@@ -149,6 +149,30 @@
 (function(){try{if(!localStorage.getItem("alpexa.themeDefaultLight")){localStorage.setItem("alpexa.theme",JSON.stringify("light"));localStorage.setItem("alpexa.themeDefaultLight","1");}}catch(e){}})();
 </script>
 <script src="alpexa-sync.js?v=9"></script>
+<script>
+/* Session guard. The identity gate above only checks alpexa.me (a local name tag).
+   But reading your OWN holdings/positions needs a real Supabase auth SESSION —
+   without it, RLS hides every row and the wallet looks EMPTY ("my coins vanished"),
+   which is exactly what happens when the app is opened via a shared #alpexa link or
+   after the session expired. So: if Supabase is reachable and there is NO session,
+   send the user to log in (which establishes one). Guarded with a per-tab flag so it
+   can never loop, and silent if Supabase is simply unreachable (offline degraded). */
+(function(){
+  try {
+    if (!window.AlpexaSync || !AlpexaSync.db || !AlpexaSync.db.auth) return;
+    var m = JSON.parse(localStorage.getItem("alpexa.me")||"null");
+    if (!(m && m.accts)) return;                          // no identity → handled by the gate above
+    if (sessionStorage.getItem("alpexa.sessChecked")) return; // already checked this tab → no loop
+    AlpexaSync.db.auth.getSession().then(function(r){
+      var hasSession = !!(r && r.data && r.data.session);
+      if (!hasSession) {
+        sessionStorage.setItem("alpexa.sessChecked","1");  // set BEFORE redirect → cannot loop
+        location.replace("login.html?expired=1");
+      }
+    }).catch(function(){ /* Supabase unreachable → stay in local degraded mode */ });
+  } catch(e) {}
+})();
+</script>
 <!-- Test-only balance seeds removed for live service: real opening balances come
      from signup (Sports $100 / Crypto $0 / FX $0); no $10k default or owner $1M seeding. -->
 </head>
