@@ -3119,7 +3119,40 @@
       });
     }
 
+    // Transform a server live_games entry into the app's GAMES shape.
+    function lgToGame(g){
+      var sp=g.spread||[],to=g.total||[],ml=g.ml||[];
+      if(sp.length<2||to.length<2||ml.length<2) return null;
+      var home={ab:(g.home&&g.home.ab)||'',nm:(g.home&&g.home.nm)||'Home'};
+      var away={ab:(g.away&&g.away.ab)||'',nm:(g.away&&g.away.nm)||'Away'};
+      if(g.live){ if(g.home&&g.home.sc!=null)home.sc=g.home.sc; if(g.away&&g.away.sc!=null)away.sc=g.away.sc; }
+      return { id:g.gid, lg:g.lg, state:(g.live?'in':'pre'), live:!!g.live, real:true,
+        kickoff:(g.live?'':(g.iso||'')),
+        time:(g.live ? (g.time||'Live') : (g.iso ? (fmtKick(g.iso)||g.time||'TBD') : (g.time||'TBD'))),
+        home:home, away:away, core:{spread:sp,total:to,ml:ml}, props:[] };
+    }
     async function loadLive(isRefresh){
+      // SERVER-CENTRE: read the shared live_games feed (one fast query — same data as
+      // the desktop dashboard). Fall back to direct ESPN only if it's empty/unreachable.
+      try{
+        if(window.AlpexaSync && AlpexaSync.db){
+          var r = await AlpexaSync.db.from('live_games').select('data').eq('id','all').maybeSingle();
+          var raw = (r && r.data && r.data.data) || [];
+          if(Array.isArray(raw) && raw.length){
+            var sgames=[]; raw.forEach(function(g){ var x=lgToGame(g); if(x) sgames.push(x); });
+            if(sgames.length){
+              window.__alpexaOddsTs=Date.now(); refreshOddsStale();
+              applySuspensions(sgames);
+              GAMES.length=0; sgames.forEach(function(g){GAMES.push(g);});
+              if(typeof renderGames==='function') renderGames();
+              try{ settleBets(); }catch(e){}
+              if(!isRefresh){ try{ if(badge&&badge.parentNode) badge.remove(); }catch(e){} }
+              return;
+            }
+          }
+        }
+      }catch(e){}
+      // Fallback: direct ESPN (original behaviour).
       try{
         const results = await Promise.all(LEAGUES.map(L => fetchLeague(L).catch(()=>[])));
         const all = [].concat.apply([], results);
