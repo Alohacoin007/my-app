@@ -724,7 +724,7 @@
   // moment the visitor taps any odds or removes a pick (then it's their slip).
   function seedSlip(){
     if(userTouched || slip.length || !G.length) return;
-    [[0,'ml','h'],[1,'ml','h'],[1,'spread','h']].forEach(function(p){
+    [[0,'ml','h'],[1,'spread','h'],[2,'total','o']].forEach(function(p){
       var gi=p[0],mk=p[1],sd=p[2],g=G[gi]; if(!g) return;
       var key=gi+'|'+mk+'|'+sd; if(slip.some(function(s){return s.key===key;})) return;
       slip.push({key:key,gi:gi,mk:mk,pick:labelFor(g,mk,sd),sub:g.away.name+' @ '+g.home.name,odd:oddFor(g,mk,sd)});
@@ -803,7 +803,7 @@
         if(!rows.length) return;
         rows.sort(function(a,b){return (b.live?1:0)-(a.live?1:0);}); // live games first
         var wasReal=realLoaded;
-        G.length=0; rows.slice(0,5).forEach(function(x){G.push(x);});
+        G.length=0; rows.slice(0,3).forEach(function(x){G.push(x);});
         realLoaded=true; if(!wasReal) slip=[];
         render(); renderSlip(); seedSlip();
       },function(){});
