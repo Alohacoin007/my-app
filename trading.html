@@ -536,6 +536,23 @@ function broadcastPositionClose(orderId, closePrice, pnl){
 window.broadcastPositionOpen = broadcastPositionOpen;
 window.broadcastPositionClose = broadcastPositionClose;
 
+// ── Pending orders: server-backed (fx_pending table). localStorage stays as a fast
+// cache/fallback; these helpers mirror every create/cancel/modify/fill to the server
+// so pending orders aren't device-bound. All best-effort: if the table/RLS isn't set
+// up (or offline), they silently no-op and the app keeps working from localStorage. ──
+function fxMe(){ try{ return JSON.parse(localStorage.getItem('alpexa.me')||'null'); }catch(e){ return null; } }
+function fxPendingRow(p){
+  const me=fxMe(); if(!me||!me.accts||!me.accts.fx) return null;
+  return { cust_id:me.custId||null, acct_no:me.accts.fx, server:'fx', local_id:String(p.id),
+    ticket:p.ticket||'', symbol:p.sym||'', side:p.side||'', size:+p.vol||0, otype:p.otype||'',
+    trigger:(p.trigger!=null?+p.trigger:null), sl:(p.sl!=null?+p.sl:null), tp:(p.tp!=null?+p.tp:null),
+    status:'pending' };
+}
+function fxPendingInsert(p){ try{ if(!(window.AlpexaSync&&AlpexaSync.db))return; const r=fxPendingRow(p); if(!r)return;
+  AlpexaSync.db.from('fx_pending').upsert(r,{onConflict:'acct_no,local_id'}).then(function(){},function(){}); }catch(e){} }
+function fxPendingDelete(id){ try{ if(!(window.AlpexaSync&&AlpexaSync.db))return; const me=fxMe(); if(!me||!me.accts||!me.accts.fx)return;
+  AlpexaSync.db.from('fx_pending').delete().eq('acct_no',me.accts.fx).eq('local_id',String(id)).then(function(){},function(){}); }catch(e){} }
+
 // No fake seed — the real balance is loaded from the server (accounts.balance).
 // Held IN MEMORY only (window.__fxBal); never persisted to localStorage.
 const DEFAULT_BALANCES={live:0,crypto:0,sports:0};
@@ -3475,6 +3492,54 @@ function App(){
     }catch(e){}
     return ()=>{ stop=true; clearInterval(iv); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', onVis); try{ if(ch&&AlpexaSync.db.removeChannel) AlpexaSync.db.removeChannel(ch); }catch(e){} };
   }, []);
+  // ── Pending orders: adopt from the server (fx_pending), drop ones cancelled/filled
+  // elsewhere (6s grace for a just-placed local order). Mirrors the positions sync. ──
+  useEffect(()=>{
+    if(!(window.AlpexaSync&&AlpexaSync.db)) return;
+    let stop=false;
+    function pullPending(){
+      let me; try{ me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); }catch(e){ me=null; }
+      if(!me||!me.accts||!me.accts.fx) return;
+      AlpexaSync.db.from('fx_pending')
+        .select('local_id,ticket,symbol,side,size,otype,trigger,sl,tp')
+        .eq('acct_no',me.accts.fx).eq('status','pending')
+        .then(function(r){
+          if(stop||!r||!r.data) return;
+          const srv=r.data, srvIds={}; srv.forEach(p=>{srvIds[String(p.local_id)]=p;});
+          setPendingOrders(prev=>{
+            const have={}; prev.forEach(o=>{have[String(o.id)]=true;});
+            const now=Date.now();
+            const kept=prev.filter(o=> srvIds[String(o.id)] || (now-(o.placedTs||0))<6000 );
+            // reconcile sl/tp/trigger edits made on another device (keep same ref if unchanged)
+            const merged=kept.map(o=>{ const s=srvIds[String(o.id)]; if(!s) return o;
+              const nsl=(s.sl!=null?+s.sl:o.sl), ntp=(s.tp!=null?+s.tp:o.tp), ntr=(s.trigger!=null?+s.trigger:o.trigger);
+              return (nsl===o.sl&&ntp===o.tp&&ntr===o.trigger)?o:{...o, sl:nsl, tp:ntp, trigger:ntr}; });
+            const add=[];
+            srv.forEach(p=>{ if(have[String(p.local_id)]) return;
+              add.push({ id:(isNaN(+p.local_id)?p.local_id:+p.local_id), sym:p.symbol, side:p.side, vol:+p.size||0,
+                otype:p.otype, trigger:(p.trigger!=null?+p.trigger:undefined), sl:(p.sl!=null?+p.sl:undefined), tp:(p.tp!=null?+p.tp:undefined),
+                status:'PENDING', ticket:p.ticket||'', placedAt:'', placedTs:0, adopted:true }); });
+            const changed = add.length>0 || kept.length!==prev.length || merged.some((m,i)=>m!==kept[i]);
+            return changed ? [...add, ...merged] : prev;
+          });
+        }, function(){});
+    }
+    pullPending();
+    const iv=setInterval(()=>{ if(!document.hidden) pullPending(); }, 4000);
+    const onVis=()=>{ if(!document.hidden) pullPending(); };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', onVis);
+    let ch=null;
+    try{
+      let me; try{ me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); }catch(e){ me=null; }
+      if(me&&me.accts&&me.accts.fx&&AlpexaSync.db.channel){
+        ch=AlpexaSync.db.channel('fxpend-'+me.accts.fx)
+          .on('postgres_changes',{event:'*',schema:'public',table:'fx_pending',filter:'acct_no=eq.'+me.accts.fx},function(){ pullPending(); })
+          .subscribe();
+      }
+    }catch(e){}
+    return ()=>{ stop=true; clearInterval(iv); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', onVis); try{ if(ch&&AlpexaSync.db.removeChannel) AlpexaSync.db.removeChannel(ch); }catch(e){} };
+  }, []);
   useEffect(()=>{try{localStorage.setItem('alpexa.fxPending',JSON.stringify(pendingOrders.map(o=>({...o,fresh:false}))));}catch(e){}},[pendingOrders]);
   const [modifyTarget,setModifyTarget]=useState(null);
   const [toast,setToast]=useState(null);
@@ -3607,6 +3672,7 @@ function App(){
           let me; try{me=JSON.parse(localStorage.getItem('alpexa.me')||'null');}catch(e){}
           triggered.forEach(function(tg){
             const p=tg.order;
+            fxPendingDelete(p.id);   // triggered → no longer pending; drop the server row
             const addLive=function(openPx){
               const lo={...p,status:'OPEN',open:openPx,placedAt:tg.time,fresh:true,pnl:0};
               // dedupe vs the realtime adopt (pullPos) of the fx_open-created row
@@ -3664,6 +3730,7 @@ function App(){
     if(orderData.otype&&orderData.otype!=='MARKET'){
       const newPending={id,...orderData,status:'PENDING',placedAt:time,placedTs:Date.now(),ticket:alpexaTicket('FX')};
       setPendingOrders(prev=>[newPending,...prev]);
+      fxPendingInsert(newPending);   // mirror to server (fx_pending)
       setToast({side:orderData.side,sym:orderData.sym,vol:orderData.vol,price:orderData.trigger,pending:true,otype:orderData.otype});
       setTimeout(()=>setToast(null),3200);
       if(window.ALPEXA_SFX)window.ALPEXA_SFX.pendingPlaced();
@@ -3709,9 +3776,9 @@ function App(){
     } else { finalize(fillPx); }
   }
 
-  function cancelPending(id){setPendingOrders(prev=>prev.filter(p=>p.id!==id));}
+  function cancelPending(id){setPendingOrders(prev=>prev.filter(p=>p.id!==id));fxPendingDelete(id);}
   function modifyPosition(updated){setLiveOrders(prev=>prev.map(o=>o.id===updated.id?{...o,sl:updated.sl,tp:updated.tp}:o));if(window.ALPEXA_SFX)window.ALPEXA_SFX.tick();}
-  function modifyPending(updated){setPendingOrders(prev=>prev.map(p=>p.id===updated.id?{...p,sl:updated.sl,tp:updated.tp,trigger:updated.trigger}:p));if(window.ALPEXA_SFX)window.ALPEXA_SFX.tick();}
+  function modifyPending(updated){setPendingOrders(prev=>prev.map(p=>{if(p.id!==updated.id)return p;const np={...p,sl:updated.sl,tp:updated.tp,trigger:updated.trigger};try{fxPendingInsert(np);}catch(e){}return np;}));if(window.ALPEXA_SFX)window.ALPEXA_SFX.tick();}
 
   function closeOrder(id){
     const order=liveOrders.find(o=>String(o.id)===String(id));
