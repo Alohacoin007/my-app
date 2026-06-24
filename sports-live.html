@@ -1812,12 +1812,34 @@
     const baseCash=Math.round(stake*0.92*100)/100;
     var spTicket; try{var _k='alpexa.seq.sp',_n=parseInt(localStorage.getItem(_k)||'100000',10)+1;localStorage.setItem(_k,String(_n));spTicket='SP-'+_n;}catch(e){spTicket='SP-'+Math.floor(100000+Math.random()*900000);}
     const betId='b'+Date.now();
-    openBets.unshift({id:betId,type:betType,ticket:spTicket,placedTs:Date.now(),
+    const newBet={id:betId,type:betType,ticket:spTicket,placedTs:Date.now(),
       cls:mode,stake:stake,potential:pot,cashout:baseCash,
       d0:d0,baseCash:baseCash,
-      legs:legs.map(l=>({pk:l.sel,sel:l.sel,gid:l.gid,market:l.market,gm:l.game,am:l.am,am0:l.am,dec0:dec(l.am),tm:l.tm,kt:l.kt||'',live:l.live,st:'o'}))});
-    // deduct stake + log activity
-    balance-=stake; syncSportsBal();
+      legs:legs.map(l=>({pk:l.sel,sel:l.sel,gid:l.gid,market:l.market,gm:l.game,am:l.am,am0:l.am,dec0:dec(l.am),tm:l.tm,kt:l.kt||'',live:l.live,st:'o'}))};
+    openBets.unshift(newBet);
+    // SERVER-AUTHORITATIVE placement (same as the dashboard's place_bet): the server
+    // atomically RE-checks + debits the balance and creates the positions row, so a
+    // stale-high local balance can't place a bet the server can't cover, and the stake
+    // is debited exactly once (no client `balance-=stake`). Roll back the optimistic
+    // row if the server rejects. Offline → fall back to the old local path.
+    (function(){
+      let me; try{me=JSON.parse(localStorage.getItem('alpexa.me')||'null');}catch(e){}
+      const acct=me&&me.accts&&me.accts.sports;
+      if(!(window.AlpexaSync&&AlpexaSync.db&&acct)){ balance-=stake; syncSportsBal(); return; }
+      const fl=newBet.legs[0]||{};
+      const meta={ type:betType, cls:mode, stake:stake, potential:pot, baseCash:baseCash, d0:d0, cashout:baseCash, ticket:spTicket, placedTs:newBet.placedTs, legs:newBet.legs };
+      AlpexaSync.db.rpc('place_bet',{ p_acct:acct, p_stake:stake, p_potential:pot, p_symbol:betType+' · '+(fl.sel||''), p_local_id:String(betId), p_meta:meta, p_game:(fl.gm||''), p_pick:(fl.sel||''), p_odds:(fl.am||0), p_size:legCount }).then(function(res){
+        const dt=res&&res.data;
+        if((res&&res.error)||(dt&&dt.ok===false)){
+          openBets=openBets.filter(x=>x.id!==betId);
+          const nb2=document.getElementById('navBadge'); if(nb2){nb2.textContent=openBets.length||'';nb2.style.display=openBets.length?'flex':'none';}
+          showToast('⚠️','Bet not placed',(dt&&dt.error)||(res&&res.error&&res.error.message)||'Server rejected the bet');
+          renderTickets(); updateWallet(); return;
+        }
+        _pushedBets[betId]=true;   // place_bet already created the server row → skip the insertBetRow auto-push
+        AlpexaSync.db.from('accounts').select('balance').eq('acct_no',acct).maybeSingle().then(function(r){ if(r&&!r.error&&r.data){ balance=+r.data.balance||0; window.__sbLocalTs=0; try{sportsSrv().bal=balance;}catch(e){} try{localStorage.setItem('alpexa.sportsBalance',String(balance));}catch(e){} updateWallet(); } });
+      }, function(){ /* network error: keep optimistic bet; insertBetRow auto-push will create the row, balance reconciles on next adopt */ });
+    })();
     // (Recent Activity bet rows are derived from openBets in renderTxns — not stored here.)
     try{window.AlpexaSync&&AlpexaSync.logActivity({server:'sports',kind:'bet',symbol:betType,amount:stake,ticket:spTicket,detail:((legs&&legs[0]&&(legs[0].game||legs[0].gm))||'')+(legCount>1?(' +'+(legCount-1)+' legs'):'')});}catch(e){}
     notify('🎫','Bet placed',`${betType} · ${usd(stake)} stake`,'betResults');
