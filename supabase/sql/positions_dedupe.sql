@@ -22,11 +22,18 @@ where a.ctid < b.ctid
   and a.server   is not distinct from b.server
   and a.local_id is not distinct from b.local_id;
 
--- 2) Hard stop: one row per (acct_no, server, local_id) from now on. Partial index
---    (local_id not null) so rows without a local_id are unaffected.
+-- 2) Hard stop: one row per (acct_no, server, local_id) from now on.
+--    NOTE: must be a FULL (non-partial) unique index. A PARTIAL index
+--    (... where local_id is not null) cannot be used as the arbiter for the
+--    client's upsert onConflict('acct_no,server,local_id') — PostgREST errors,
+--    the upsert fails, and client-written rows (e.g. crypto/BTC positions that
+--    fx_open rejects for lack of an fx_specs row) never persist, so pullPos
+--    drops them after the 6s grace and the position "closes by itself".
+--    NULLs are distinct in a unique index, so rows without a local_id never
+--    collide even without a WHERE predicate.
+drop index if exists public.positions_acct_server_localid_uidx;
 create unique index if not exists positions_acct_server_localid_uidx
-  on public.positions (acct_no, server, local_id)
-  where local_id is not null;
+  on public.positions (acct_no, server, local_id);
 
 commit;
 
