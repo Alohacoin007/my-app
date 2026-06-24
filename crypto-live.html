@@ -10156,7 +10156,13 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
           <div style={{
             fontSize: 30, fontWeight: 700, color: RH.text,
             letterSpacing: -0.8, fontVariantNumeric: 'tabular-nums', lineHeight: 1.05,
-          }}>${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          }}>{(() => {
+            const s = total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const i = s.lastIndexOf('.');
+            return i < 0
+              ? <>${s}</>
+              : <>${s.slice(0, i)}<span style={{ color: RH.textMute }}>{s.slice(i)}</span></>;
+          })()}</div>
           <div style={{
             marginTop: 6, display: 'flex', alignItems: 'center', gap: 6,
             fontSize: 13, fontWeight: 600,
