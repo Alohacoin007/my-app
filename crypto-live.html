@@ -13256,6 +13256,14 @@ function App() {
         const toReject  = list.filter((t) => map[t.id] === 'rejected'  && !t.rejectedAt && !t.approvedAt);
         if (toApprove.length || toReject.length) {
           toApprove.forEach(applyApproval);
+          // A REJECTED crypto payout was optimistically deducted at submit time → refund
+          // the coins (once; the rejectedAt stamp below makes this idempotent).
+          toReject.forEach((t) => {
+            if (t.optimistic && t.asset && (+t.usd > 0)) {
+              window.__cbLocalTs = Date.now();
+              setBalances((b) => ({ ...b, [t.asset]: (b[t.asset] || 0) + (+t.usd || 0) }));
+            }
+          });
           setTransactions((cur) => cur.map((x) => {
             if (map[x.id] === 'approved' && !x.approvedAt) return { ...x, approvedAt: Date.now() };
             if (map[x.id] === 'rejected' && !x.rejectedAt) return { ...x, rejectedAt: Date.now() };
@@ -13353,8 +13361,13 @@ function App() {
     }
     // External wallet send (0x…) → create a back-office payout request (owner pays via MetaMask).
     if (recipient && recipient.type === 'wallet' && recipient.address && window.AlpexaSync) {
-      finalize(recipient.address);
-      try { AlpexaSync.pushRequest({ id: 'cr-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+      // Use ONE id for both the tx and the request so the reject-sync can match them and
+      // refund. Mark optimistic:true so a rejected payout re-credits the deducted coins.
+      const reqId = 'cr-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+      setBalances((b) => ({ ...b, [assetId]: Math.max(0, (b[assetId] || 0) - usdAmount) }));
+      pushTx({ id: reqId, type: 'withdraw', sym: assetId, asset: assetId, usd: usdAmount, gross: usdAmount, to: recipient.address, optimistic: true });
+      flashAsset(assetId);
+      try { AlpexaSync.pushRequest({ id: reqId,
         type: 'withdraw', server: 'crypto', amount: usdAmount, net: usdAmount, fee: 0,
         asset: assetId, network: 'ERC-20', address: recipient.address, status: 'pending' }); } catch (e) {}
       return;
