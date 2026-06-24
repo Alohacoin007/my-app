@@ -882,17 +882,18 @@ function OdometerDigit({ ch, fontSize, color }) {
 // Odometer — full number with optional prefix/suffix, commas, decimals.
 // centsScale<1 renders the decimal part (".XX") smaller; the flex-start row
 // top-aligns it so it reads as a raised superscript.
-function Odometer({ value, decimals = 2, fontSize = 38, color = RH.text, prefix = '$', suffix = '', centsScale = 1 }) {
+function Odometer({ value, decimals = 2, fontSize = 38, color = RH.text, prefix = '$', suffix = '', centsScale = 1, centsColor = null }) {
   const formatted = prefix + Math.abs(value).toLocaleString('en-US', {
     minimumFractionDigits: decimals, maximumFractionDigits: decimals,
   }) + suffix;
-  const dotIdx = (centsScale !== 1) ? formatted.indexOf('.') : -1;
+  const dotIdx = (centsScale !== 1 || centsColor) ? formatted.indexOf('.') : -1;
   const smallFs = Math.round(fontSize * centsScale);
   return (
     <span style={{ display: 'inline-flex', alignItems: 'flex-start', lineHeight: 1 }}>
-      {[...formatted].map((ch, i) => (
-        <OdometerDigit key={`${i}-${ch}`} ch={ch} fontSize={(dotIdx >= 0 && i >= dotIdx) ? smallFs : fontSize} color={color}/>
-      ))}
+      {[...formatted].map((ch, i) => {
+        const isCents = dotIdx >= 0 && i >= dotIdx;
+        return <OdometerDigit key={`${i}-${ch}`} ch={ch} fontSize={isCents ? smallFs : fontSize} color={isCents && centsColor ? centsColor : color}/>;
+      })}
     </span>
   );
 }
@@ -1825,7 +1826,7 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
           fontSize: 38, fontWeight: 600, letterSpacing: -1.2,
           lineHeight: 1.05,
         }}>
-          <Odometer value={scrubValue} fontSize={38} color={RH.text}/>
+          <Odometer value={scrubValue} fontSize={38} color={RH.text} centsScale={0.45} centsColor={RH.textDim}/>
         </div>
         <div style={{
           marginTop: 8, display: 'flex', alignItems: 'center', gap: 6,
