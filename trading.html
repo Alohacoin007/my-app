@@ -1754,10 +1754,11 @@ function Positions({tab,setTab,liveOrders=[],pendingOrders=[],closedHistory=[],m
           {liveOrders.length>0&&(
             <div style={{display:'flex',alignItems:'center',gap:6,padding:'8px 14px',background:'var(--surface)',borderBottom:'1px solid var(--line)'}}>
               <span style={{fontSize:9.5,fontWeight:700,color:'var(--text-3)',letterSpacing:0.5}}>GROUP BY</span>
-              <span style={{flex:1}}/>
               {[['time','Time'],['class','Class'],['symbol','Symbol']].map(([k,l])=>(
                 <button key={k} onClick={()=>setOpenGroup(k)} style={{padding:'5px 10px',borderRadius:6,fontSize:11,fontWeight:600,background:openGroup===k?'var(--ink)':'var(--bg-2)',color:openGroup===k?'var(--ink-fg)':'var(--text-2)'}}>{l}</button>
               ))}
+              <span style={{flex:1}}/>
+              <button onClick={()=>{ if(window.confirm('Close all '+liveOrders.length+' open positions? This settles each at the current price.')){ liveOrders.slice().forEach(function(o){ try{ onClose&&onClose(o.id); }catch(e){} }); } }} style={{padding:'5px 11px',borderRadius:6,fontSize:11,fontWeight:700,background:'rgba(224,65,65,0.12)',color:'#E04141',border:'1px solid rgba(224,65,65,0.45)',letterSpacing:0.2}}>Close all</button>
             </div>
           )}
           {openGroup==='time'&&(
@@ -3977,13 +3978,12 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
     // (rare client-fallback open of an unpriced symbol), insert it once.
     live.forEach(function(o){ if(!o||!(+o.vol>0))return;
       var lid=String(o.id||''); if(!lid) return;
-      AlpexaSync.db.from('positions').update({pnl:Math.round((+o.pnl||0)*100)/100})
-        .eq('acct_no',acct).eq('server','fx').eq('local_id',lid).select('local_id')
-        .then(function(r){
-          if(!(r&&r.data&&r.data.length)){
-            AlpexaSync.db.from('positions').insert({cust_id:cust,acct_no:acct,server:'fx',kind:'position',local_id:lid,symbol:o.sym||'',side:o.side||'',size:+o.vol||0,open_price:Math.round((+o.open||0)*1e5)/1e5,pnl:Math.round((+o.pnl||0)*100)/100,status:'open'}).then(function(){},function(){});
-          }
-        },function(){});
+      // UPSERT by (acct_no,server,local_id) — NEVER update-then-insert. The old path
+      // re-INSERTed whenever the UPDATE's RETURNING came back empty (RLS can hide the
+      // returned row even though the row exists), spawning a duplicate every 3s →
+      // dozens of phantom positions. Upsert collapses to a single row per position.
+      // Requires the unique index in supabase/sql/positions_dedupe.sql.
+      AlpexaSync.db.from('positions').upsert({cust_id:cust,acct_no:acct,server:'fx',kind:'position',local_id:lid,symbol:o.sym||'',side:o.side||'',size:+o.vol||0,open_price:Math.round((+o.open||0)*1e5)/1e5,pnl:Math.round((+o.pnl||0)*100)/100,status:'open'},{onConflict:'acct_no,server,local_id'}).then(function(){},function(){});
     });
   }
   // Closed on this device → remove from server so other devices drop it too.
