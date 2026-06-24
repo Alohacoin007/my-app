@@ -391,7 +391,14 @@
       el.addEventListener('click',function(){
         var amt=num(document.getElementById(amtId).value);
         if(amt<=0){ toast('Enter a valid amount'); return; }
-        confirmModal({title:'Confirm deposit',desc:'Demo — no real payment is processed.',rows:[['Method',method],['Amount','$'+fmt(amt)],['New balance',fmt(balance+amt)+' USDT']],ok:'Deposit $'+fmt(amt),onOk:function(){ addTx('deposit',label,amt); document.getElementById(amtId).value=''; toast('Deposited $'+fmt(amt)); }});
+        confirmModal({title:'Confirm deposit',desc:'Send the funds using the details shown. Your balance is credited after we confirm receipt.',rows:[['Method',method],['Amount','$'+fmt(amt)],['Status','Pending review']],ok:'Submit deposit',onOk:function(){
+          // Create a PENDING deposit request for back-office confirmation. Do NOT credit
+          // the balance locally — the server credits it once payment is confirmed
+          // (self-crediting would be free money). Real money never moves client-side.
+          var lid='dep'+Date.now();
+          try{ if(window._db&&meTf&&meTf.custId){ window._db.from('requests').insert({ local_id:lid, cust_id:meTf.custId, name:meTf.name||'', acct_no:acctOf('sports')||'', server:'sports', type:'deposit', amount:amt, fee:0, net:amt, asset:'USDT', from_label:method, to_label:'', status:'pending' }).then(function(){},function(){}); } }catch(e){}
+          txns.unshift({t:'deposit',title:label+' · Pending',date:nowDate(),amt:amt}); renderTx();
+          document.getElementById(amtId).value=''; toast('Deposit request submitted — credited after we confirm payment'); }});
       });
     }
     depositFlow('bankBtn','bankAmt','Deposit · Bank transfer','Bank transfer');
@@ -414,7 +421,14 @@
       if(amt<10){ toast('Minimum withdrawal is 10 USDT'); return; }
       if(amt+fee>balance){ toast('Insufficient balance'); return; }
       var shortAddr=addr.length>22?addr.slice(0,10)+'…'+addr.slice(-8):addr;
-      confirmModal({title:'Confirm withdrawal',desc:'Demo — no real funds are moved.',rows:[['Network',net],['To',shortAddr],['Amount',fmt(amt)+' USDT'],['Network fee',fee.toFixed(2)+' USDT'],['Total debit','−'+fmt(amt+fee)+' USDT']],ok:'Withdraw',onOk:function(){ addTx('withdraw','Withdraw · '+net,-(amt+fee)); document.getElementById('wdAmt').value=''; document.getElementById('wdAddr').value=''; toast('Withdrawal submitted'); }});
+      confirmModal({title:'Confirm withdrawal',desc:'Submitted for review. Funds are sent after approval.',rows:[['Network',net],['To',shortAddr],['Amount',fmt(amt)+' USDT'],['Network fee',fee.toFixed(2)+' USDT'],['Total','−'+fmt(amt+fee)+' USDT'],['Status','Pending review']],ok:'Submit withdrawal',onOk:function(){
+        // Create a PENDING withdrawal request for back-office approval. Do NOT debit
+        // locally — the server debits + sends on approval (and re-validates the
+        // balance), so the displayed balance can't be forged into a withdrawal.
+        var lid='wd'+Date.now();
+        try{ if(window._db&&meTf&&meTf.custId){ window._db.from('requests').insert({ local_id:lid, cust_id:meTf.custId, name:meTf.name||'', acct_no:acctOf('sports')||'', server:'sports', type:'withdraw', amount:amt, fee:fee, net:amt, asset:'USDT', network:net, address:addr, from_label:'', to_label:shortAddr, status:'pending' }).then(function(){},function(){}); } }catch(e){}
+        txns.unshift({t:'withdraw',title:'Withdraw · '+net+' · Pending',date:nowDate(),amt:-(amt+fee)}); renderTx();
+        document.getElementById('wdAmt').value=''; document.getElementById('wdAddr').value=''; toast('Withdrawal request submitted — pending review'); }});
     });
 
     // ===== Transfer between the user's own servers (server-side app_transfer RPC) =====
