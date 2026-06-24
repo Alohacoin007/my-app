@@ -161,10 +161,15 @@ window.AlpexaSync = (function () {
     return db.from('payments').select('*').eq('status', 'sent').in('to_acct', accts)
       .then(function (r) { return (r && r.data) || []; }, function () { return []; });
   }
+  // Atomic claim: only flips a row that is STILL 'sent', and returns the claimed
+  // rows. The winner gets a non-empty array; a device that lost the race gets []
+  // — so the caller must credit ONLY when this returns rows (prevents P2P
+  // double-credit, since P2P has no server-side balance movement).
   function claimPayment(localId) {
-    if (!db) return Promise.resolve();
+    if (!db) return Promise.resolve([]);
     return db.from('payments').update({ status: 'claimed', claimed_at: new Date().toISOString() })
-      .eq('local_id', String(localId)).then(function (x) { return x; }, function () {});
+      .eq('local_id', String(localId)).eq('status', 'sent').select('local_id')
+      .then(function (x) { return (x && x.data) || []; }, function () { return []; });
   }
 
   // Server-authoritative balances: fetch THIS user's current per-server balances

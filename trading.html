@@ -3497,6 +3497,7 @@ function App(){
   useEffect(()=>{
     if(!(window.AlpexaSync&&AlpexaSync.db)) return;
     let stop=false;
+    let firstPullDone=false;   // never drop localStorage-cached pending until the server has answered once (avoids nuking them on reload before fx_pending is reachable)
     function pullPending(){
       let me; try{ me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); }catch(e){ me=null; }
       if(!me||!me.accts||!me.accts.fx) return;
@@ -3509,7 +3510,10 @@ function App(){
           setPendingOrders(prev=>{
             const have={}; prev.forEach(o=>{have[String(o.id)]=true;});
             const now=Date.now();
-            const kept=prev.filter(o=> srvIds[String(o.id)] || (now-(o.placedTs||0))<6000 );
+            // First successful pull after mount: keep ALL cached pending (don't drop)
+            // — the server may be momentarily empty/RLS-blocked and we must not lose
+            // locally-cached orders. Later pulls reconcile (so cross-device cancels apply).
+            const kept=(!firstPullDone)?prev.slice():prev.filter(o=> srvIds[String(o.id)] || (now-(o.placedTs||0))<6000 );
             // reconcile sl/tp/trigger edits made on another device (keep same ref if unchanged)
             const merged=kept.map(o=>{ const s=srvIds[String(o.id)]; if(!s) return o;
               const nsl=(s.sl!=null?+s.sl:o.sl), ntp=(s.tp!=null?+s.tp:o.tp), ntr=(s.trigger!=null?+s.trigger:o.trigger);
@@ -3522,6 +3526,7 @@ function App(){
             const changed = add.length>0 || kept.length!==prev.length || merged.some((m,i)=>m!==kept[i]);
             return changed ? [...add, ...merged] : prev;
           });
+          firstPullDone=true;   // server has answered once → later pulls may now reconcile/drop
         }, function(){});
     }
     pullPending();
@@ -3638,7 +3643,7 @@ function App(){
       if(usedM>=0.01){
         const bal=(window.getBalances?window.getBalances():{})[accountRef.current]||0;
         const lvl=((bal+floatPnl)/usedM)*100;
-        if(lvl<50&&worst){ // stop out: liquidate the worst-losing live position
+        if(lvl<50&&worst&&!sltpHits.some(h=>h.id===worst.id)){ // stop out: liquidate the worst-losing live position (skip if it's already being SL/TP-closed this tick → no double close)
           closeOrder(worst.id);
           try{window.alpexaNotify&&alpexaNotify({type:'marginCall',pref:'marginCall',title:'Stop out · '+worst.sym+' liquidated at '+Math.round(lvl)+'% margin'});}catch(e){}
           setToast({error:true,icon:'warning',msg:'Stop out — '+Math.round(lvl)+'%',sub:worst.sym+' liquidated to protect your account'});

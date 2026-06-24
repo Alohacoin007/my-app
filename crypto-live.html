@@ -383,6 +383,19 @@ function cryptoPriceOf(sym){
   }catch(e){}
   return 1;
 }
+// Whether a REAL price (not the 1 fallback) is known for a symbol. Used to guard
+// the holdings WRITE: if no real price has loaded, qty = usd/1 would be garbage and
+// could write e.g. 5000 "coins" for a $5000 position, so we must skip such assets.
+function cryptoHasRealPrice(sym){
+  if(!sym) return false;
+  if(sym==='USDT'||sym==='USDC'||sym==='DAI') return true;
+  try{
+    var m=MARKET.find(function(x){return x.sym===sym;}); if(m&&m.price>0) return true;
+    var p=PORTFOLIO.assets.find(function(x){return x.sym===sym;}); if(p&&p.price>0) return true;
+    var s=PORTFOLIO.securities.find(function(x){return x.sym===sym;}); if(s&&s.price>0) return true;
+  }catch(e){}
+  return false;
+}
 // Stable signature of a holdings set BY QUANTITY — lets us detect a real trade
 // (qty changed) vs. mere price drift (qty unchanged). Dust is ignored.
 function cryptoQtySig(list){
@@ -900,6 +913,7 @@ function Odometer({ value, decimals = 2, fontSize = 38, color = RH.text, prefix 
 
 // $XX,XXX.XX formatter
 function fmtUsd(n, decimals = 2) {
+  n = +n || 0;   // coerce undefined/null/NaN -> 0 so we never render "$NaN"
   const neg = n < 0; const v = Math.abs(n);
   let dec = decimals;
   // Tiny prices (meme coins like SHIB/PEPE/BONK) round to $0.00 at 2 decimals —
@@ -13342,15 +13356,33 @@ function App() {
   React.useEffect(() => {
     if (!window.AlpexaSync || !AlpexaSync.db) return;
     let stop = false;
+    let cbApplied = {}; try { cbApplied = JSON.parse(localStorage.getItem('alpexa.appliedPayments') || '{}') || {}; } catch (e) {}
+    const saveCbApplied = () => { try { localStorage.setItem('alpexa.appliedPayments', JSON.stringify(cbApplied)); } catch (e) {} };
+    const myCust = () => { try { return String((JSON.parse(localStorage.getItem('alpexa.me') || 'null') || {}).custId || '').toUpperCase(); } catch (e) { return ''; } };
     const tick = () => { AlpexaSync.pullIncoming().then((rows) => {
       if (stop || !rows || !rows.length) return;
       rows.forEach((r) => {
-        const amt = +r.amount || 0; if (!(amt > 0)) { AlpexaSync.claimPayment(r.local_id); return; }
-        const sym = r.asset || 'USDT';
-        setBalances((b) => ({ ...b, [sym]: (b[sym] || 0) + amt }));
-        pushTx({ type: 'receive', sym: sym, usd: amt, from: r.from_name || r.from_cust });
-        AlpexaSync.claimPayment(r.local_id);
-        if (typeof AudioFX !== 'undefined') { try { AudioFX.cash(); } catch (e) {} }
+        const dest = String(r.to_acct || '').toUpperCase();
+        const myCrypto = String(cryptoAcctRef.current || '').toUpperCase();
+        // Only handle payments addressed to THIS crypto wallet (or the customer id).
+        // Leave FX/Sports-addressed payments unclaimed so those apps credit them.
+        if (dest && dest !== myCrypto && dest !== myCust()) return;
+        const amt = +r.amount || 0;
+        const key = String(r.local_id || ''); if (!key) return;
+        if (!(amt > 0)) { AlpexaSync.claimPayment(r.local_id); return; }
+        if (cbApplied[key]) return;   // already credited on this device
+        // Atomic claim FIRST; credit ONLY if THIS device won the claim (P2P has no
+        // server-side balance movement, so the claim is the single dedup gate).
+        AlpexaSync.claimPayment(r.local_id).then((claimed) => {
+          if (stop || !claimed || !claimed.length) return;   // lost the race → do not credit
+          if (cbApplied[key]) return;
+          cbApplied[key] = 1; saveCbApplied();
+          const sym = r.asset || 'USDT';
+          window.__cbLocalTs = Date.now();   // mark busy so the adopt loop doesn't revert this credit
+          setBalances((b) => ({ ...b, [sym]: (b[sym] || 0) + amt }));
+          pushTx({ type: 'receive', sym: sym, usd: amt, from: r.from_name || r.from_cust });
+          if (typeof AudioFX !== 'undefined') { try { AudioFX.cash(); } catch (e) {} }
+        }).catch(() => {});
       });
     }).catch(() => {}); };
     tick(); const iv = setInterval(() => { if (!document.hidden) tick(); }, 12000);
@@ -13384,7 +13416,12 @@ function App() {
     const rows = []; const seen = {};
     const sq = holdingsSyncRef.current.serverQty || {};
     Object.keys(balances).forEach((sym) => {
-      const usd = +balances[sym] || 0; const px = cryptoPriceOf(sym);
+      const usd = +balances[sym] || 0;
+      // No REAL price for this asset → qty = usd/1 would corrupt the server (e.g.
+      // 5000 coins for $5000). Don't recompute; preserve the server qty and never
+      // overwrite it. Marked seen so it isn't zeroed out as "removed".
+      if (!cryptoHasRealPrice(sym)) { seen[sym] = true; const sv0 = +sq[sym] || 0; if (sv0 > 0) rows.push({ acct_no: acct, asset: sym, qty: sv0 }); return; }
+      const px = cryptoPriceOf(sym);
       let q = px > 0 ? usd / px : 0;
       // Snap to the EXACT server quantity when the implied change is within
       // price-noise tolerance (0.2%). Re-anchoring balances on a price tick then
@@ -13462,7 +13499,7 @@ function App() {
       let me; try { me = JSON.parse(localStorage.getItem('alpexa.me') || 'null'); } catch (e) { me = null; }
       if (me && me.accts && me.accts.crypto && AlpexaSync.db.channel) {
         ch = AlpexaSync.db.channel('cryptohold-' + me.accts.crypto)
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'crypto_holdings', filter: 'acct_no=eq.' + me.accts.crypto }, function () { if (!document.hidden) tick(); })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'crypto_holdings', filter: 'acct_no=eq.' + me.accts.crypto }, function () { tick(); })
           .subscribe();
       }
     } catch (e) {}
@@ -13525,7 +13562,7 @@ function App() {
       let me; try { me = JSON.parse(localStorage.getItem('alpexa.me') || 'null'); } catch (e) { me = null; }
       if (me && me.accts && me.accts.crypto && AlpexaSync.db.channel) {
         ch = AlpexaSync.db.channel('cryptostk-' + me.accts.crypto)
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'crypto_stakes', filter: 'acct_no=eq.' + me.accts.crypto }, function () { if (!document.hidden) tick(); })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'crypto_stakes', filter: 'acct_no=eq.' + me.accts.crypto }, function () { tick(); })
           .subscribe();
       }
     } catch (e) {}
