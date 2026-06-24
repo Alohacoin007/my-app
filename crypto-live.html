@@ -1647,34 +1647,45 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
     Object.values(staked).forEach((info) => { if (info && info.usd > 0) t += info.usd; });
     return t;
   })();
-  // Publish the live wallet total so the server switcher (here and, via persisted
-  // serverBalances, the FX/Sports apps) shows the same real-time crypto value as
-  // the hero instead of a static cost-basis number.
+  // ANCHOR total: the same sum but from the stable adopted values (a.mine), WITHOUT the
+  // per-tick price simulation. heroLive (above) is for the live on-screen hero only;
+  // anything PERSISTED or written to the SERVER must use this stable anchor, or the
+  // simulated noise would wobble the server balance every 3s (and disagree with the
+  // real holdings the other apps read).
+  const anchorTotal = (() => {
+    let t = 0;
+    liveAssets.forEach((a) => { t += +a.mine || 0; });
+    liveSecurities.forEach((s) => { t += +s.mine || 0; });
+    Object.values(staked).forEach((info) => { if (info && info.usd > 0) t += info.usd; });
+    return t;
+  })();
+  // Publish the live wallet total so the server switcher shows a real-time value here,
+  // while persisting/writing the STABLE anchor (no simulated drift).
   React.useEffect(() => {
     window.__cryptoLiveUsd = heroLive;
     try {
       const sb = JSON.parse(localStorage.getItem('alpexa.serverBalances') || '{}') || {};
-      if (Math.abs((sb.crypto || 0) - heroLive) > 0.005) {
-        sb.crypto = heroLive;
+      if (Math.abs((sb.crypto || 0) - anchorTotal) > 0.005) {
+        sb.crypto = anchorTotal;
         localStorage.setItem('alpexa.serverBalances', JSON.stringify(sb));
       }
     } catch (e) {}
     window.dispatchEvent(new Event('alpexa-crypto-live'));
-    // Push the live wallet total to the server (throttled) so the back-office
-    // Players list shows this customer's real-time crypto balance.
+    // Push the STABLE wallet total to the server (throttled) so the back-office
+    // Players list shows a steady crypto balance, not a simulated wobble.
     try {
       if (window.AlpexaSync && AlpexaSync.db) {
         const meId = JSON.parse(localStorage.getItem('alpexa.me') || 'null');
         const acct = meId && meId.accts && meId.accts.crypto;
         const now = Date.now();
         window.__balPush = window.__balPush || {};
-        if (acct && now - (window.__balPush.crypto || 0) > 3000) {
-          window.__balPush.crypto = now;
-          AlpexaSync.db.from('accounts').update({ balance: Math.round(heroLive * 100) / 100 }).eq('acct_no', acct).then(function(){}, function(){});
+        if (acct && now - (window.__balPush.crypto || 0) > 3000 && Math.abs((window.__balPush.cryptoVal||0) - anchorTotal) > 0.01) {
+          window.__balPush.crypto = now; window.__balPush.cryptoVal = anchorTotal;
+          AlpexaSync.db.from('accounts').update({ balance: Math.round(anchorTotal * 100) / 100 }).eq('acct_no', acct).then(function(){}, function(){});
         }
       }
     } catch (e) {}
-  }, [heroLive]);
+  }, [heroLive, anchorTotal]);
 
   // Per-range seeded series. Last point uses live close so the chart's tip
   // moves with the tick.
