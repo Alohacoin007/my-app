@@ -255,13 +255,13 @@
   function pullPlayers(){
     if(!window.AlpexaSync||!AlpexaSync.db) return;
     AlpexaSync.db.from('players').select('id,cust_id,name,email,created_at,phone,dob,country,server,leverage,currency,kyc,status').then(function(r){
-      if(r&&r.data){ SRV_PLAYERS=r.data; if(cur==='players'&&!busyEditing())render(); }
+      if(r&&r.data){ SRV_PLAYERS=r.data; if((cur==='players'||cur==='watch')&&!busyEditing())render(); }
     },function(){
       // Older DB without the profile columns — fall back to the core fields.
-      AlpexaSync.db.from('players').select('id,cust_id,name,email,created_at').then(function(r2){ if(r2&&r2.data){SRV_PLAYERS=r2.data; if(cur==='players'&&!busyEditing())render();} },function(){});
+      AlpexaSync.db.from('players').select('id,cust_id,name,email,created_at').then(function(r2){ if(r2&&r2.data){SRV_PLAYERS=r2.data; if((cur==='players'||cur==='watch')&&!busyEditing())render();} },function(){});
     });
     AlpexaSync.db.from('accounts').select('player_id,server,acct_no,balance').then(function(r){
-      if(r&&r.data){ SRV_ACCOUNTS=r.data; if(cur==='players'&&!busyEditing())render(); }
+      if(r&&r.data){ SRV_ACCOUNTS=r.data; if((cur==='players'||cur==='watch')&&!busyEditing())render(); }
     },function(){});
   }
   // Approximate balance for a customer = approved deposits − approved withdrawals.
@@ -350,7 +350,7 @@
   // Core tabs (always visible) vs the rest, tucked behind a "More" toggle so the
   // day-to-day back office stays simple. Nothing is removed — just hidden.
   var TABS_CORE=[['overview','Overview','dashboard'],['online','Online','sensors'],['approvals','Approvals','task_alt'],['players','Players','group'],['wallet','Wallet','account_balance_wallet']];
-  var TABS_MORE=[['history','History','receipt_long'],['report','Report','monitoring'],['pricing','Pricing','tune'],['risk','Risk','gpp_maybe'],['bets','Open','candlestick_chart'],['agents','Agents','handshake'],['logs','Logs','list_alt'],['config','Config','settings']];
+  var TABS_MORE=[['watch','Watch','visibility'],['history','History','receipt_long'],['report','Report','monitoring'],['pricing','Pricing','tune'],['risk','Risk','gpp_maybe'],['bets','Open','candlestick_chart'],['agents','Agents','handshake'],['logs','Logs','list_alt'],['config','Config','settings']];
   var TABS=TABS_CORE.concat(TABS_MORE);
   var SHOW_MORE=false;
   var cur='overview';
@@ -364,6 +364,7 @@
     document.getElementById('tabs').innerHTML=html;
     document.querySelectorAll('.tab[data-more]').forEach(function(b){b.onclick=function(){SHOW_MORE=!SHOW_MORE;renderTabs();};});
     document.querySelectorAll('.tab[data-t]').forEach(function(b){b.onclick=function(){cur=b.getAttribute('data-t');
+      if(cur==='watch'){pullSettle();pullServer();pullPlayers();}
       if(cur==='history'||cur==='report'){pullSettle();pullServer();}
       if(cur==='agents'){pullAgents();pullSettle();}
       if(cur==='wallet'){pullWallet(true);}
@@ -381,6 +382,7 @@
     else if(cur==='history')h=viewHistory();
     else if(cur==='players')h=viewPlayers(f);
     else if(cur==='online')h=viewOnline();
+    else if(cur==='watch')h=viewWatch();
     else if(cur==='risk')h=viewRisk(f);
     else if(cur==='bets')h=viewBets();
     else if(cur==='wallet')h=viewWallet();
@@ -444,7 +446,7 @@
   // Finished trades reported by the apps (FX closes, bet results) → company P&L.
   var SRV_SETTLE=[];
   function pullSettle(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
-    AlpexaSync.db.from('settlements').select('*').order('created_at',{ascending:false}).limit(2000).then(function(r){ if(r&&r.data){ SRV_SETTLE=r.data; if((cur==='report'||cur==='players'||cur==='history')&&!busyEditing())render(); } },function(){}); }
+    AlpexaSync.db.from('settlements').select('*').order('created_at',{ascending:false}).limit(2000).then(function(r){ if(r&&r.data){ SRV_SETTLE=r.data; if((cur==='report'||cur==='players'||cur==='history'||cur==='watch')&&!busyEditing())render(); } },function(){}); }
   // Internal user-to-user transfers (payments table) — so the back office can see them.
   var SRV_PAYMENTS=[];
   function pullPayments(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
@@ -884,6 +886,81 @@
     if(book===null) return;
     AlpexaSync.db.from('hedges').insert({game:game,pick:pick,amount:Math.round(amount*100)/100,odds:Math.round((+odds||0)*100)/100,book:book||'manual'}).then(function(r){ if(r&&r.error)toast('Error: '+r.error.message,true); else { toast('Hedge recorded ✓'); setTimeout(pullRisk,300); } },function(){});
     try{ logAction('hedge','',game+' · '+pick+' · $'+Math.round(amount)+' @ '+(book||'manual')); }catch(e){}
+  }
+  // ── Watch: today's orders across ALL servers, with automatic risk flags. ──
+  // Reads server data already loaded (settlements / requests / accounts / players).
+  // Thresholds are conservative defaults; tune here.
+  var WATCH_THRESH={ stake:1000, payout:5000, withdraw:5000, velocity:15, cashouts:5 };
+  var WATCH_SRV='all', WATCH_SEV=0;
+  function viewWatch(){
+    var t0=new Date(); t0.setHours(0,0,0,0); var dayStart=t0.getTime();
+    var TH=WATCH_THRESH;
+    var nameOf={}; SRV_PLAYERS.forEach(function(p){ nameOf[p.cust_id]=p.name||p.cust_id; });
+    var ts=function(x){ return x ? new Date(x).getTime() : 0; };
+    var setl=(SRV_SETTLE||[]).filter(function(s){ return ts(s.created_at)>=dayStart; });
+    var reqs=(SRV_REQS||[]).filter(function(w){ return ts(w.created_at)>=dayStart; });
+    if(WATCH_SRV!=='all'){ setl=setl.filter(function(s){return (s.server||'')===WATCH_SRV;}); reqs=reqs.filter(function(w){return (w.server||'')===WATCH_SRV;}); }
+    // per-customer tallies for behaviour flags
+    var byC={};
+    function bump(c){ if(!c)c='—'; if(!byC[c])byC[c]={cust:c,orders:0,stake:0,pnl:0,cashouts:0,dep:0,wd:0,srv:{}}; return byC[c]; }
+    setl.forEach(function(s){ var u=bump(s.cust_id); u.orders++; u.stake+=(+s.stake||0); u.pnl+=(+s.pnl||0); if(String(s.kind||'').indexOf('cashout')>=0)u.cashouts++; if(s.server)u.srv[s.server]=1; });
+    reqs.forEach(function(w){ var u=bump(w.cust_id); if((w.type||'')==='deposit')u.dep+=(+w.amount||0); if((w.type||'')==='withdraw')u.wd+=(+w.amount||0); });
+    var flags=[];
+    function flag(sev,t,cust,srv,amt,reason){ flags.push({sev:sev,ts:t,cust:cust,nm:nameOf[cust]||cust||'—',srv:srv||'',amt:amt,reason:reason}); }
+    // per-order flags
+    setl.forEach(function(s){ var t=ts(s.created_at);
+      if((+s.stake||0)>=TH.stake) flag(2,t,s.cust_id,s.server,+s.stake,'High stake · '+k0(s.stake));
+      var payout=(+s.stake||0)+(+s.pnl||0);
+      if(String(s.kind||'').indexOf('won')>=0 && payout>=TH.payout) flag(3,t,s.cust_id,s.server,payout,'Big payout · '+k0(payout));
+    });
+    reqs.forEach(function(w){ var t=ts(w.created_at);
+      if((w.type||'')==='withdraw' && (+w.amount||0)>=TH.withdraw) flag(3,t,w.cust_id,w.server,+w.amount,'Large withdrawal · '+k0(w.amount)+(w.status==='pending'?' (pending)':''));
+    });
+    // per-customer behaviour flags
+    Object.keys(byC).forEach(function(k){ var u=byC[k];
+      if(u.orders>=TH.velocity) flag(2,Date.now(),u.cust,Object.keys(u.srv).join(','),u.orders,'High velocity · '+u.orders+' orders today');
+      if(u.dep>0 && u.wd>0) flag(2,Date.now(),u.cust,'',u.wd,'Deposit→withdraw churn · in '+k0(u.dep)+' / out '+k0(u.wd));
+      if(u.cashouts>=TH.cashouts) flag(1,Date.now(),u.cust,'',u.cashouts,'Frequent cashouts · '+u.cashouts+' today');
+    });
+    // integrity: negative balances (any server)
+    (SRV_ACCOUNTS||[]).forEach(function(a){ if((+a.balance||0)<-0.01 && (WATCH_SRV==='all'||a.server===WATCH_SRV)) flag(3,Date.now(),'',a.server,+a.balance,'NEGATIVE balance · '+a.acct_no+' '+k0(a.balance)); });
+    if(WATCH_SEV>0) flags=flags.filter(function(x){return x.sev>=WATCH_SEV;});
+    flags.sort(function(a,b){ return (b.sev-a.sev)||(b.ts-a.ts); });
+    // summary
+    var volume=setl.reduce(function(a,s){return a+(+s.stake||0);},0);
+    var nCash=setl.filter(function(s){return String(s.kind||'').indexOf('cashout')>=0;}).length;
+    var depT=reqs.filter(function(w){return (w.type||'')==='deposit';}).reduce(function(a,w){return a+(+w.amount||0);},0);
+    var wdT=reqs.filter(function(w){return (w.type||'')==='withdraw';}).reduce(function(a,w){return a+(+w.amount||0);},0);
+    var sevCol={3:'var(--neg)',2:'#D97706',1:'var(--dim)'};
+    var sevLbl={3:'HIGH',2:'MED',1:'LOW'};
+    var srvPill={fx:'FX',sports:'SP',crypto:'CR',live:'FX'};
+    var h='<div class="sec">Watch · today · all servers</div>';
+    h+='<div class="kpis">'+
+      kpi('Orders today',setl.length,k0(volume)+' volume')+
+      kpi('Cashouts',nCash,'')+
+      kpi('Deposits',k0(depT),'today')+
+      kpi('Withdrawals',k0(wdT),'today',wdT>depT?'neg':'')+
+      '</div>';
+    // filters
+    var srvs=[['all','All'],['sports','Sports'],['fx','FX'],['crypto','Crypto']];
+    h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 14px 2px">'+srvs.map(function(s){return '<button class="wf" data-wsrv="'+s[0]+'" style="font:600 11px system-ui;padding:5px 10px;border-radius:14px;border:1px solid var(--line);background:'+(WATCH_SRV===s[0]?'var(--ink)':'#fff')+';color:'+(WATCH_SRV===s[0]?'#fff':'var(--dim)')+'">'+s[1]+'</button>';}).join('')+
+      '<span style="flex:1"></span>'+
+      [[0,'All'],[2,'Med+'],[3,'High']].map(function(s){return '<button class="wf" data-wsev="'+s[0]+'" style="font:600 11px system-ui;padding:5px 10px;border-radius:14px;border:1px solid var(--line);background:'+(WATCH_SEV===s[0]?'var(--ink)':'#fff')+';color:'+(WATCH_SEV===s[0]?'#fff':'var(--dim)')+'">'+s[1]+'</button>';}).join('')+'</div>';
+    h+='<div class="sec">Flagged · '+flags.length+'</div>';
+    if(!flags.length){ h+='<div class="hint" style="margin:0 14px">No risk flags today for this filter. ✓</div>'; return h; }
+    h+=flags.slice(0,120).map(function(x){
+      return '<div class="row" style="align-items:flex-start">'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="display:flex;align-items:center;gap:6px">'+
+            '<span style="font:800 8.5px system-ui;color:#fff;background:'+sevCol[x.sev]+';padding:1px 5px;border-radius:3px">'+sevLbl[x.sev]+'</span>'+
+            (x.srv?'<span style="font:700 8.5px ui-monospace;color:var(--dim)">'+(srvPill[x.srv]||String(x.srv).toUpperCase())+'</span>':'')+
+            '<b style="font-size:12.5px">'+(x.nm||'—')+'</b>'+
+          '</div>'+
+          '<div style="font-size:11.5px;color:var(--ink);margin-top:2px">'+x.reason+'</div>'+
+          '<div style="font-size:10px;color:var(--dim);margin-top:1px">'+(x.cust?x.cust+' · ':'')+(x.ts?ago(x.ts):'')+'</div>'+
+        '</div></div>';
+    }).join('');
+    return h;
   }
   function viewRisk(f){
     if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Risk</div><div class="card"><div class="empty">Not connected to server.</div></div>';
@@ -1789,6 +1866,8 @@
     var rt=document.getElementById('rpTo'); if(rt) rt.onchange=function(){ REPORT_TO=this.value; render(); };
     document.querySelectorAll('[data-hedge]').forEach(function(b){b.onclick=function(){var p=(b.getAttribute('data-hedge')||'').split('|');recordHedge(p[0],p[1],+p[2],+p[3]);};});
     document.querySelectorAll('[data-rg]').forEach(function(b){b.onclick=function(){var g=b.getAttribute('data-rg');RISK_OPEN=(RISK_OPEN===g?null:g);render();};});
+    document.querySelectorAll('[data-wsrv]').forEach(function(b){b.onclick=function(){WATCH_SRV=b.getAttribute('data-wsrv');render();};});
+    document.querySelectorAll('[data-wsev]').forEach(function(b){b.onclick=function(){WATCH_SEV=+b.getAttribute('data-wsev');render();};});
     var g;
     if(g=document.getElementById('kycToggle'))g.onclick=function(){var k=(CONTROLS&&CONTROLS.kyc)||'pending';setControl('kyc',k==='verified'?'pending':'verified');render();};
     if(g=document.getElementById('rgSave'))g.onclick=function(){var st=getJSON('alpexaSettings',{});st.depositLimit=parseFloat(val('rgDep'))||0;st.lossLimit=parseFloat(val('rgLoss'))||0;var d=parseFloat(val('rgSE'))||0;st.selfExcludeUntil=d>0?Date.now()+d*86400000:0;setJSON('alpexaSettings',st);flash(g,'Saved ✓');render();};
