@@ -11188,7 +11188,13 @@ You will be notified on significant moves.`, { title: 'Alert active' });
             <div style={{
               fontSize: 36, fontWeight: 600, color: RH.text,
               letterSpacing: -1.2, lineHeight: 1, fontVariantNumeric: 'tabular-nums',
-            }}>${fmtUsd(scrubPrice)}</div>
+            }}>{(() => {
+              const s = fmtUsd(scrubPrice);
+              const i = s.lastIndexOf('.');
+              return i < 0
+                ? <>${s}</>
+                : <>${s.slice(0, i)}<span style={{ color: RH.textMute }}>{s.slice(i)}</span></>;
+            })()}</div>
           </div>
           <div style={{
             marginTop: 6, display: 'flex', alignItems: 'center', gap: 6,
