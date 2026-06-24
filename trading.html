@@ -1738,17 +1738,10 @@ function Positions({tab,setTab,liveOrders=[],pendingOrders=[],closedHistory=[],m
   return(
     <div style={{display:'flex',flexDirection:'column',flex:1,minHeight:0,background:'var(--bg)'}}>
       <div style={{display:'flex',background:'var(--surface)',borderBottom:'1px solid var(--line)',padding:'0 14px'}}>
-        {[['OPEN','Open'],['PEND',`Pending${pendingOrders.length?` (${pendingOrders.length})`:''}`],['HIST','History'],['FUND','Funding']].map(([k,l])=>(
+        {[['OPEN',`Open${allPositions.length?` (${allPositions.length})`:''}`],['PEND',`Pending${pendingOrders.length?` (${pendingOrders.length})`:''}`],['HIST','History'],['FUND','Funding']].map(([k,l])=>(
           <button key={k} onClick={()=>setTab(k)} style={{padding:'12px 0',marginRight:18,fontSize:13,fontWeight:tab===k?700:500,color:tab===k?'#1B3955':'var(--text-3)',borderBottom:tab===k?'2px solid #1B3955':'2px solid transparent'}}>{l}</button>
         ))}
       </div>
-      {tab!=='FUND'&&(
-        <div style={{display:'flex',padding:'12px 14px',gap:14,background:'var(--surface)',borderBottom:'1px solid var(--line)'}}>
-          <Stat label="Total P/L" val={`${totalPnl>=0?'+':''}$${totalPnl.toFixed(2)}`} color={totalPnl>=0?'#2E6FB0':'#E04141'}/>
-          <Stat label="Positions" val={`${allPositions.length}`}/>
-          <Stat label="Total Margin" val={`$${totalMargin.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`}/>
-        </div>
-      )}
       {tab==='OPEN'&&(
         <div style={{flex:1,overflowY:'auto'}}>
           {liveOrders.length>0&&(
