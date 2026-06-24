@@ -1882,37 +1882,43 @@
     const b=openBets.find(x=>x.id===id);if(!b)return;
     if(b.viewOnly){ showToast('🔄','Not available here','Open this bet on the device that placed it'); return; }
     frac=(frac&&frac>0&&frac<1)?frac:1; const partial=frac<1;
-    const payAmt=Math.round(b.cashout*frac*100)/100, stakePart=b.stake*frac;
-    // CLAIM the server row first so the same bet can't be cashed out twice across
-    // devices. If we didn't get it, someone already settled/cashed it elsewhere.
-    const got=await claimIfShared(b);
-    if(!got){ openBets=openBets.filter(x=>x.id!==id); renderTickets(); updateWallet();
-      showToast('🔄','Already settled','This bet was settled on another device'); return; }
-    balance+=payAmt; playTapSound();
+    if(!(window.AlpexaSync&&AlpexaSync.db)){ showToast('🔄','No connection','Cash out needs a server connection'); return; }
+    // SERVER-AUTHORITATIVE cash-out (same as the dashboard). The cash_out RPC caps the
+    // payout at 92% of the (remaining) stake, credits the LEDGER (trg_apply_ledger →
+    // accounts.balance), and reduces/removes the position — all in one transaction. We
+    // must NOT also local-credit or post a settlements row (the settlements trigger
+    // would double-pay), and the amount is decided by the server (un-forgeable).
+    let res; try{ res=await AlpexaSync.db.rpc('cash_out',{p_local_id:String(b.id),p_fraction:frac}); }catch(e){ res=null; }
+    const dt=res&&res.data;
+    if((res&&res.error)||!dt||dt.ok===false){
+      const msg=(dt&&dt.error)||(res&&res.error&&res.error.message)||'';
+      if(/not found|already|settled/i.test(msg)){ openBets=openBets.filter(x=>x.id!==id); }
+      renderTickets(); updateWallet();
+      showToast('🔄', msg?'Cash out failed':'Already settled', msg||'This bet was settled elsewhere'); return;
+    }
+    const payAmt=+dt.amount||0, stakePart=b.stake*frac; playTapSound();
     txns.unshift({ts:Date.now(),ic:'💵',t1:'Cashout',t2:(partial?'Partial '+Math.round(frac*100)+'% · ':'')+b.type+' · Just now',amt:+payAmt});
-    try{window.__alpexaSettle&&window.__alpexaSettle({server:'sports',kind:'bet_cashout',local_id:b.id,ticket:b.ticket,symbol:b.type||'Bet',stake:stakePart,pnl:payAmt-stakePart,detail:(partial?'partial '+Math.round(frac*100)+'%':'full')});}catch(e){}
     const loss=stakePart-payAmt;
     if(loss>0){ totalLost+=loss; const back=Math.round(loss*CASHBACK_RATE*100)/100;
       if(back>0){credit+=back; txns.unshift({ts:Date.now(),ic:'🎁',t1:'Cashback Credit',t2:`5% of ${usd(loss)} loss · Just now`,amt:+back});} }
     if(partial){
+      // cash_out reduced the stake in-place on the server; reflect locally (no re-insert)
       b.stake=Math.round((b.stake-stakePart)*100)/100;
       b.cashout=Math.round((b.cashout-payAmt)*100)/100;
       if(b.potential) b.potential=Math.round(b.potential*(1-frac)*100)/100;
       if(b.baseCash) b.baseCash=Math.round(b.baseCash*(1-frac)*100)/100;
-      // the bet is still open (smaller) → put the updated row back on the server
-      try{ delete _pushedBets[b.id]; insertBetRow(b); }catch(e){}
     } else {
       settledBets.unshift({ id:'c'+b.id, type:b.type, cls:b.cls, stake:b.stake, result:'cashed', payout:payAmt, ts:Date.now(), legs:(b.legs||[]).map(l=>({pk:l.pk||l.sel,gm:l.gm||l.game,am:l.am,st:'c'})) });
       openBets=openBets.filter(x=>x.id!==id);
-      // server row already removed by the claim above
     }
     const nb=document.getElementById('navBadge');
     if(nb){nb.textContent=openBets.length||'';nb.style.display=openBets.length?'flex':'none';}
-    // BUGFIX: post the cash-out delta to the ledger (server-owns-balance) so the
-    // credit persists across reload / other devices. Every other money path calls
-    // syncSportsBal(); cash-out was the only one missing it → cash-outs were lost
-    // when the server balance was re-adopted.
-    syncSportsBal();
+    // Adopt the SERVER balance (the RPC already credited it). Do NOT call syncSportsBal()
+    // (it would post another ledger row = a second credit).
+    try{ const me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); const acct=me&&me.accts&&me.accts.sports;
+      if(acct){ AlpexaSync.db.from('accounts').select('balance').eq('acct_no',acct).maybeSingle().then(function(r){
+        if(r&&!r.error&&r.data){ balance=+r.data.balance||0; window.__sbLocalTs=0; try{sportsSrv().bal=balance;}catch(e){} try{localStorage.setItem('alpexa.sportsBalance',String(balance));}catch(e){} renderTickets(); updateWallet(); } }); }
+    }catch(e){}
     renderTickets();updateWallet();
     notify('💵',partial?'Partial cash out':'Bet cashed out',`${b.type} · +${usd(payAmt)}`,'betResults');
     const toast=document.getElementById('creditToast');
