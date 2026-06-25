@@ -945,6 +945,25 @@ function cryptoNotify(n){
 }
 function cryptoUnreadCount(){ try{ return getCryptoNotifs().filter(function(n){return n.unread;}).length; }catch(e){ return 0; } }
 window.cryptoNotify = cryptoNotify;
+// Parse an Alpexa pay request. A "Request amount" QR encodes the amount/asset as
+// alpexa:<address>?amt=<n>&asset=<SYM> ; a plain address (or @handle / 0x…) returns
+// amount 0. Used by the QR scanner + paste so the Send form pre-fills the amount.
+function parseAlpexaPay(s){
+  s = String(s || '').trim();
+  var out = { address: s, amount: 0, asset: '' };
+  try {
+    var m = s.match(/^alpexa:([^?]+)(?:\?(.*))?$/i);
+    if (m) {
+      out.address = decodeURIComponent(m[1]);
+      (m[2] || '').split('&').forEach(function (kv) {
+        var p = kv.split('='); var k = (p[0] || '').toLowerCase(); var v = decodeURIComponent(p[1] || '');
+        if (k === 'amt' || k === 'amount') out.amount = parseFloat(v) || 0;
+        if (k === 'asset') out.asset = v;
+      });
+    }
+  } catch (e) {}
+  return out;
+}
 </script>
 
 <!-- ═══════════════════════════════════════════════════════════════
@@ -2803,8 +2822,9 @@ function Send({ onBack, balances = {}, onSent }) {
     return null;
   };
   const confirmAddress = () => {
-    const v = addrInput.trim();
-    const r = detectRecipient(v);
+    const p = parseAlpexaPay(addrInput.trim());   // handles a pasted request URI (with amount)
+    if (p.amount > 0) setAmountStr(String(p.amount));
+    const r = detectRecipient(p.address);
     if (!r) return;
     setRecipient(r);
     setAddrInput('');
@@ -2812,10 +2832,12 @@ function Send({ onBack, balances = {}, onSent }) {
   };
   // Open the live QR scanner. The scanner calls onResult with whatever was decoded.
   const onScanQR = () => setQrOpen(true);
-  const onQrResult = (text) => {
-    setAddrInput(text);
+  const onQrResult = (raw) => {
+    const p = parseAlpexaPay(raw);          // pull amount/asset out of a request QR
+    setAddrInput(p.address);
+    if (p.amount > 0) setAmountStr(String(p.amount));   // pre-fill the requested amount
     // If the decoded text is a complete recipient, auto-confirm and go to amount entry.
-    const r = detectRecipient(text);
+    const r = detectRecipient(p.address);
     if (r) {
       setRecipient(r);
       setAddrInput('');
@@ -2825,7 +2847,7 @@ function Send({ onBack, balances = {}, onSent }) {
     }
   };
   // Detected type for the live hint under the input
-  const pending = addrInput.trim() ? detectRecipient(addrInput.trim()) : null;
+  const pending = addrInput.trim() ? detectRecipient(parseAlpexaPay(addrInput.trim()).address) : null;
   const [memo, setMemo] = React.useState('');
 
   const asset = SEND_ASSETS[assetId];
@@ -2857,7 +2879,7 @@ function Send({ onBack, balances = {}, onSent }) {
     return (
       <Phone width={390} height={844} bg={RH.bg}>
         <StatusBar/>
-        {qrOpen ? <QrScanner onResult={(addr) => { setAddrInput(addr); setStep('form'); setQrOpen(false); setIntroMode('qr'); }} onClose={() => { setQrOpen(false); setIntroMode('qr'); }}/> : null}
+        {qrOpen ? <QrScanner onResult={(raw) => { const p = parseAlpexaPay(raw); setAddrInput(p.address); if (p.amount > 0) setAmountStr(String(p.amount)); setStep('form'); setQrOpen(false); setIntroMode('qr'); }} onClose={() => { setQrOpen(false); setIntroMode('qr'); }}/> : null}
 
         {/* Top bar — ✕ close on the right */}
         <div style={{
@@ -2998,7 +3020,7 @@ function Send({ onBack, balances = {}, onSent }) {
 
   return (
     <Phone width={390} height={844} bg={RH.bg}>
-      {qrOpen ? <QrScanner onResult={(addr) => { setAddrInput(addr); setStep('form'); setQrOpen(false); }} onClose={() => setQrOpen(false)}/> : null}
+      {qrOpen ? <QrScanner onResult={(raw) => { const p = parseAlpexaPay(raw); setAddrInput(p.address); if (p.amount > 0) setAmountStr(String(p.amount)); setStep('form'); setQrOpen(false); }} onClose={() => setQrOpen(false)}/> : null}
       {reviewOpen ? (
         <SendReview
           recipient={recipient}
@@ -3561,7 +3583,7 @@ function Receive({ onBack, balances = {}, onReceived }) {
                 background: '#fff', padding: 12, borderRadius: 8,
                 boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
               }}>
-                <QrPattern data={address} size={150} dark="#000" light="#FFF"/>
+                <QrPattern data={requestAmount > 0 ? ('alpexa:' + encodeURIComponent(address) + '?amt=' + requestAmount + '&asset=' + assetId) : address} size={150} dark="#000" light="#FFF"/>
               </div>
             </div>
           </div>
