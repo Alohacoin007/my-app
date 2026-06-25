@@ -3985,6 +3985,23 @@ function Root(){
 
 const root=ReactDOM.createRoot(document.getElementById('root'));
 root.render(<Root/>);
+
+// Wide / desktop preview: shrink the fixed 402×874 device frame so the WHOLE app —
+// including bottom buttons on every screen — always fits the window. CSS zoom also
+// shrinks the layout box so it centers with no overflow. Mobile (<480) = full screen.
+(function(){
+  var el=document.getElementById('root');
+  function fit(){
+    if(!el) return;
+    if(window.innerWidth<480){ el.style.zoom=''; return; }
+    var sc=Math.min(1,(window.innerHeight-28)/874,(window.innerWidth-28)/402);
+    el.style.zoom = sc<1 ? sc : '';
+  }
+  fit();
+  window.addEventListener('resize',fit);
+  window.addEventListener('orientationchange',function(){ fit(); setTimeout(fit,300); });
+  [60,300,800].forEach(function(ms){ setTimeout(fit,ms); });
+})();
 </script>
 <script>
 // Server-authoritative balances: pull the user's real per-server balances on load
