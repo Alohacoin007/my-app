@@ -1166,19 +1166,20 @@ function Watchlist({market,onSelect,current,onDepositCrypto}){
   const [filter,setFilter]=useState('FAV');
   const [search,setSearch]=useState('');
   const [favs,setFavs]=useState(getFavSyms());
-  // ─── Trending Today (top 5 by total volume, auto-refreshed daily) ───
+  // ─── Trending Today (top 4 by total volume, auto-refreshed daily) ───
   // Trending = today's biggest movers by real % change (Twelve Data).
   // Prefer symbols that already have real data; refresh at most once a minute.
+  // 4 (not 5) so the Deposit banner below stays visible on mobile.
   const trendingSymsRef=useRef(null);
   const trendingTsRef=useRef(0);
   (function(){
     const now=Date.now();
     if(trendingSymsRef.current && now-trendingTsRef.current<60000) return;
-    const byMove=arr=>arr.slice().sort((a,b)=>Math.abs(b.chgPct||0)-Math.abs(a.chgPct||0)).slice(0,5).map(x=>x.sym);
+    const byMove=arr=>arr.slice().sort((a,b)=>Math.abs(b.chgPct||0)-Math.abs(a.chgPct||0)).slice(0,4).map(x=>x.sym);
     const real=market.filter(s=>s.real && isFinite(s.chgPct));
-    let top5 = real.length>=5 ? byMove(real) : byMove(market.filter(s=>isFinite(s.chgPct)));
-    if(top5.length===5){ trendingSymsRef.current=top5; trendingTsRef.current=now; }
-    else if(!trendingSymsRef.current){ trendingSymsRef.current=['TSLA','NVDA','EURUSD','BTCUSD','WTI']; }
+    let top4 = real.length>=4 ? byMove(real) : byMove(market.filter(s=>isFinite(s.chgPct)));
+    if(top4.length===4){ trendingSymsRef.current=top4; trendingTsRef.current=now; }
+    else if(!trendingSymsRef.current){ trendingSymsRef.current=['TSLA','NVDA','EURUSD','BTCUSD']; }
   })();
   function toggleFav(sym){const next=favs.includes(sym)?favs.filter(f=>f!==sym):[...favs,sym];setFavs(next);saveFavSyms(next);}
   const cats=[{id:'FAV',label:'Favorites'},{id:'FX',label:'Forex'},{id:'STOCK',label:'Stocks'},{id:'CRYPTO',label:'Crypto'},{id:'INDEX',label:'Indices'}];
