@@ -5328,14 +5328,16 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
     // provider in plain, grandma-friendly steps: buy USDT with the card, then send it to
     // their Alpexa address (shown big with one-tap copy).
     const addr = '0x6B1c8941698Affc56757eF9Be1723Ec43F720966';
-    const buyUrl = 'https://global.transak.com/?cryptoCurrencyCode=USDT&network=ethereum&fiatCurrency=USD&walletAddress=' + addr + (amount > 0 ? ('&defaultFiatAmount=' + Math.round(amount)) : '');
-    const openBuy = () => {
-      // Record a PENDING deposit through the SAME path as wire/ACH (onFunded →
-      // onFundsConfirmed): it writes BOTH the customer's local history row ("Deposit ·
-      // Pending") AND the server request the operator approves. So the customer can see
-      // their own deposit (pending → confirmed) and the back office can match + credit it.
-      try { onFunded && onFunded(destId, amount, 'card'); } catch (e) {}
-      try { window.open(buyUrl, '_blank'); } catch (e) { try { window.location.href = buyUrl; } catch (_) {} }
+    // Open a consumer card on-ramp that the user TAPS deliberately (no auto-redirect, no
+    // partner-key deep-link — that's what triggered Transak's Cloudflare "blocked" page).
+    const openProvider = (url) => { try { window.open(url, '_blank'); } catch (e) { try { window.location.href = url; } catch (_) {} } };
+    // Record a PENDING deposit through the SAME path as wire/ACH (onFunded →
+    // onFundsConfirmed): writes BOTH the customer's history row ("Deposit · Pending") AND
+    // the server request the operator approves → customer sees it, operator credits it.
+    const recordPaid = (e) => {
+      if (!(amount > 0)) return;
+      try { onFunded && onFunded(destId, amount, 'card'); } catch (_) {}
+      try { const b = e.currentTarget; b.textContent = 'Got it — we will confirm shortly ✓'; b.disabled = true; b.style.opacity = '0.7'; } catch (_) {}
     };
     const stepRow = (n, title, body) => (
       <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
@@ -5365,17 +5367,21 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
               <span style={{ fontSize: 13, color: RH.textDim, fontWeight: 600 }}>USD</span>
             </div>
           </div>
-          {stepRow('1', 'Tap the blue button and pay', "A secure payment page opens. Type your card number, just like buying anything online. (The first time, it asks for a photo of your ID — that's the law for buying crypto with a card.)")}
-          <button onClick={() => amount > 0 && openBuy()} disabled={amount <= 0} style={{ width: '100%', padding: '16px 0', borderRadius: 14, background: amount > 0 ? RH.accent : RH.surfaceUp, color: amount > 0 ? '#fff' : RH.textMute, border: 'none', fontSize: 16, fontWeight: 800, letterSpacing: 0.2, cursor: amount > 0 ? 'pointer' : 'not-allowed', marginBottom: 20, boxShadow: amount > 0 ? ('0 10px 24px -10px ' + RH.accent) : 'none' }}>
-            {amount > 0 ? ('Buy $' + amount.toFixed(0) + ' USDT with my card →') : 'Enter an amount above first'}
-          </button>
+          {stepRow('1', 'Buy USDT with your card', <>Open one of these, pay with your card, and choose <b>USDT</b> on the <b>Ethereum</b> network. First time only, they check your ID — that's the law.</>)}
+          <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+            <button onClick={() => openProvider('https://www.moonpay.com/buy')} style={{ flex: 1, padding: '15px 0', borderRadius: 12, background: RH.accent, color: '#fff', border: 'none', fontSize: 14.5, fontWeight: 800, cursor: 'pointer' }}>MoonPay →</button>
+            <button onClick={() => openProvider('https://portfolio.metamask.io/buy')} style={{ flex: 1, padding: '15px 0', borderRadius: 12, background: RH.surfaceUp, color: RH.text, border: '1px solid ' + RH.line, fontSize: 14.5, fontWeight: 800, cursor: 'pointer' }}>MetaMask →</button>
+          </div>
           {stepRow('2', 'It asks "where to send it?"', <>Tap <b>Copy</b> below, then paste it into the box on that page. This is your Alpexa address. Choose the network <b>Ethereum (ERC-20)</b>.</>)}
           <div style={{ background: RH.surface, border: '1px solid ' + RH.line, borderRadius: 14, padding: '14px', marginBottom: 20 }}>
             <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700, marginBottom: 8 }}>Your deposit address</div>
             <div style={{ fontFamily: 'Geist Mono, monospace', fontSize: 12.5, color: RH.text, wordBreak: 'break-all', lineHeight: 1.5, marginBottom: 12 }}>{addr}</div>
             <button onClick={(e) => { try { navigator.clipboard.writeText(addr); } catch (_) {} const b = e.currentTarget; const o = b.textContent; b.textContent = 'Copied!'; setTimeout(() => { try { b.textContent = o; } catch (_) {} }, 1500); }} style={{ width: '100%', padding: '13px 0', borderRadius: 999, background: RH.green, color: '#000', border: 'none', fontSize: 15, fontWeight: 800, cursor: 'pointer' }}>Copy address</button>
           </div>
-          {stepRow('3', 'Done — sit back', "Your money arrives in a few minutes and shows up in your Alpexa balance by itself. That's all! 🎉")}
+          {stepRow('3', 'Tap below after you pay', "This tells us your deposit is on the way. It shows in your history as 'Pending' and lands in your balance once we confirm it (usually a few minutes). 🎉")}
+          <button onClick={recordPaid} disabled={amount <= 0} style={{ width: '100%', padding: '15px 0', borderRadius: 14, background: amount > 0 ? RH.green : RH.surfaceUp, color: amount > 0 ? '#000' : RH.textMute, border: 'none', fontSize: 15.5, fontWeight: 800, cursor: amount > 0 ? 'pointer' : 'not-allowed', marginBottom: 14 }}>
+            {amount > 0 ? "I've paid — notify Alpexa" : 'Enter an amount above first'}
+          </button>
           <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: 12, padding: '12px 14px', fontSize: 12.5, color: '#92400E', lineHeight: 1.55, marginTop: 6 }}>
             ⚠️ Send only <b>USDT</b> on the <b>Ethereum (ERC-20)</b> network. A different coin or network can lose the money.
           </div>
@@ -14167,7 +14173,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){var V='Crypto v126';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='Crypto v127';try{console.log('Alpexa '+V);}catch(e){}
 try{ var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
