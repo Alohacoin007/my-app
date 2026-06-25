@@ -112,6 +112,10 @@
   .empty{text-align:center;color:var(--muted);font-size:13px;padding:50px 10px}
   .panel{display:none}
   .panel.on{display:block}
+  .bet-daygroup{display:flex;justify-content:space-between;align-items:baseline;margin:18px 4px 8px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  #settled .bet-daygroup:first-child{margin-top:4px}
+  .dg-net{letter-spacing:0;font-size:12px;font-weight:800}
+  .dg-net.green{color:var(--green)} .dg-net.red{color:var(--red)}
 </style>
 </head>
 <body>
@@ -226,12 +230,21 @@
       var el=document.getElementById('settled'); if(!el) return;
       var rows=((r&&!r.error&&r.data)||[]).filter(function(s){return s.kind==='bet_won'||s.kind==='bet_lost';});
       if(!rows.length){ el.innerHTML=EMPTY_S; return; }
-      el.innerHTML=rows.map(function(s){ var won=s.kind==='bet_won'; var ret=won?((+s.stake||0)+(+s.pnl||0)):0;
-        var when=''; try{ if(s.created_at){ var d=new Date(s.created_at); if(!isNaN(d.getTime())) when=d.toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); } }catch(e){}
-        return '<div class="bet"><div class="bet-top"><div class="bet-type">'+esc(s.symbol||'Bet')+'</div><span class="status '+(won?'won':'lost')+'">'+(won?'WON':'LOST')+'</span></div>'+
-          (when?'<div class="bet-when" style="font-size:11px;color:var(--muted);margin:2px 0 6px">Settled · '+when+'</div>':'')+
-          '<div class="bet-foot"><div class="col"><span class="k">Stake</span><span class="v">'+money(s.stake)+'</span></div>'+
-          '<div class="col"><span class="k">Returned</span><span class="v'+(won?' green':'')+'">'+money(ret)+'</span></div></div></div>';
+      // Group settled bets by DAY (rows are already sorted newest-first), with a date
+      // header + that day's net P/L.
+      function dayLabel(d){ if(!d||isNaN(d.getTime()))return 'Earlier'; var n=new Date(); var t=new Date(n.getFullYear(),n.getMonth(),n.getDate()); var dd=new Date(d.getFullYear(),d.getMonth(),d.getDate()); var diff=Math.round((t-dd)/86400000); if(diff===0)return 'Today'; if(diff===1)return 'Yesterday'; return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}); }
+      var groups=[], gmap={};
+      rows.forEach(function(s){ var d=null; try{ if(s.created_at){ d=new Date(s.created_at); if(isNaN(d.getTime())) d=null; } }catch(e){ d=null; } var key=d?d.toDateString():'?'; if(!gmap[key]){ gmap[key]={d:d,items:[]}; groups.push(gmap[key]); } gmap[key].items.push(s); });
+      el.innerHTML=groups.map(function(grp){
+        var net=0; grp.items.forEach(function(s){ net+=(s.kind==='bet_won')?(+s.pnl||0):-(+s.stake||0); });
+        var hdr='<div class="bet-daygroup"><span>'+esc(dayLabel(grp.d))+'</span><span class="dg-net '+(net>=0?'green':'red')+'">'+(net>=0?'+':'-')+money(Math.abs(net))+'</span></div>';
+        return hdr+grp.items.map(function(s){ var won=s.kind==='bet_won'; var ret=won?((+s.stake||0)+(+s.pnl||0)):0;
+          var tm=''; try{ if(s.created_at){ var dt=new Date(s.created_at); if(!isNaN(dt.getTime())) tm=dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); } }catch(e){}
+          return '<div class="bet"><div class="bet-top"><div class="bet-type">'+esc(s.symbol||'Bet')+'</div><span class="status '+(won?'won':'lost')+'">'+(won?'WON':'LOST')+'</span></div>'+
+            (tm?'<div class="bet-when" style="font-size:11px;color:var(--muted);margin:2px 0 6px">Settled · '+tm+'</div>':'')+
+            '<div class="bet-foot"><div class="col"><span class="k">Stake</span><span class="v">'+money(s.stake)+'</span></div>'+
+            '<div class="col"><span class="k">Returned</span><span class="v'+(won?' green':'')+'">'+money(ret)+'</span></div></div></div>';
+        }).join('');
       }).join('');
     },function(){});
   }
