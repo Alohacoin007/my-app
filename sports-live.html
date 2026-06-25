@@ -922,7 +922,10 @@
       <div class="grip"></div>
       <div class="sh"><h3 data-i18n="sheet_deposit">Deposit</h3><button class="close" id="dpCloseBtn">✕</button></div>
       <div class="tf-body">
-        <div class="wd-info">Send USDT to the <b>company deposit address</b> below, then enter the amount you sent and submit. Your deposit is credited once the back office confirms receipt.</div>
+        <div class="tf-field"><label>Buy USDT with your card</label></div>
+        <button class="place" id="dpMoonpay" style="margin-bottom:8px">Buy USDT with card</button>
+        <button id="dpMetamask" style="display:block;margin:0 auto 12px;background:none;border:none;color:var(--dim);font-size:13px;font-weight:600;cursor:pointer">or use MetaMask</button>
+        <div class="wd-info">First time only, the provider verifies your ID. Then send the USDT to the <b>company deposit address</b> below and submit — already have USDT? Just send it. Credited once the back office confirms receipt.</div>
         <div class="tf-field"><label>Network</label></div>
         <div class="wd-net" id="dpNet">
           <button class="wd-net-pill on" data-net="ERC-20">USDT · ERC-20 (Ethereum)</button>
@@ -2566,6 +2569,10 @@
     else showToast('📋','Deposit address',a);};
   document.getElementById('dpChips').onclick=e=>{const c=e.target.closest('.chip');if(!c)return;
     dpAmt.value=c.dataset.set;};
+  // Card on-ramp: user taps to buy USDT with a card at a consumer provider, then sends
+  // it to the company address and submits (same as crypto/FX apps).
+  (function(){var mp=document.getElementById('dpMoonpay');if(mp)mp.onclick=function(){try{window.open('https://www.moonpay.com/buy','_blank');}catch(e){try{location.href='https://www.moonpay.com/buy';}catch(_){}}};
+   var mm=document.getElementById('dpMetamask');if(mm)mm.onclick=function(){try{window.open('https://portfolio.metamask.io/buy','_blank');}catch(e){try{location.href='https://portfolio.metamask.io/buy';}catch(_){}}};})();
   document.getElementById('dpConfirm').onclick=()=>{
     const v=parseFloat(dpAmt.value)||0;
     if(v<=0){showToast('⚠️','Enter a deposit amount');return;}
