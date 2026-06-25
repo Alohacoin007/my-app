@@ -5323,71 +5323,53 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
     return sum % 10 === 0;
   };
   if (step === 'card') {
-    // Card on-ramp guide. Buying crypto with a card legally needs a regulated provider
-    // (KYC), so rather than take the card ourselves we walk the user through a trusted
-    // provider in plain, grandma-friendly steps: buy USDT with the card, then send it to
-    // their Alpexa address (shown big with one-tap copy).
+    // Simple, on-brand card-deposit screen (approved design): amount hero → one Buy
+    // button (MoonPay) + MetaMask text link → address with Copy → "I've paid".
     const addr = '0x6B1c8941698Affc56757eF9Be1723Ec43F720966';
-    // Open a consumer card on-ramp that the user TAPS deliberately (no auto-redirect, no
-    // partner-key deep-link — that's what triggered Transak's Cloudflare "blocked" page).
+    const shortAddr = addr.slice(0, 10) + '…' + addr.slice(-6);
     const openProvider = (url) => { try { window.open(url, '_blank'); } catch (e) { try { window.location.href = url; } catch (_) {} } };
-    // Record a PENDING deposit through the SAME path as wire/ACH (onFunded →
-    // onFundsConfirmed): writes BOTH the customer's history row ("Deposit · Pending") AND
-    // the server request the operator approves → customer sees it, operator credits it.
+    // Record through the SAME path as wire/ACH (onFunded) → shows in the customer's
+    // history as Pending AND in the operator's approval queue; credited on approval.
     const recordPaid = (e) => {
-      if (!(amount > 0)) return;
+      const b = e.currentTarget;
+      if (!(amount > 0)) { try { const o = b.textContent; b.textContent = 'Enter an amount first'; setTimeout(() => { try { b.textContent = o; } catch (_) {} }, 1500); } catch (_) {} return; }
       try { onFunded && onFunded(destId, amount, 'card'); } catch (_) {}
-      try { const b = e.currentTarget; b.textContent = 'Got it — we will confirm shortly ✓'; b.disabled = true; b.style.opacity = '0.7'; } catch (_) {}
+      try { b.textContent = 'Got it — we will confirm shortly ✓'; b.disabled = true; b.style.opacity = '0.7'; } catch (_) {}
     };
-    const stepRow = (n, title, body) => (
-      <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
-        <div style={{ width: 30, height: 30, borderRadius: 15, background: RH.accent, color: '#fff', fontSize: 15, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{n}</div>
-        <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: RH.text, marginBottom: 3 }}>{title}</div>
-          <div style={{ fontSize: 13, color: RH.textDim, lineHeight: 1.55 }}>{body}</div>
-        </div>
-      </div>
-    );
+    const copyAddr = (e) => { try { navigator.clipboard.writeText(addr); } catch (_) {} const b = e.currentTarget; const o = b.textContent; b.textContent = 'Copied'; setTimeout(() => { try { b.textContent = o; } catch (_) {} }, 1400); };
+    const label = (t) => (<div style={{ fontSize: 11, letterSpacing: 1.6, fontWeight: 700, color: RH.textDim, fontFamily: 'Geist Mono, monospace', textTransform: 'uppercase', marginBottom: 12 }}>{t}</div>);
     return (
       <Phone width={390} height={844} bg={RH.bg}>
         <StatusBar/>
         <Header title="Pay with card" back={() => setStep('pick')}/>
-        <div className="alpexa-hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '6px 22px calc(20px + env(safe-area-inset-bottom, 0px))' }}>
-          <div style={{ fontSize: 14.5, color: RH.text, lineHeight: 1.6, marginBottom: 18, fontWeight: 500 }}>
-            To pay by card you buy <b>USDT</b> — a digital dollar (1 USDT is about $1) — and it lands in your balance. It takes about 5 minutes. Just do these 3 steps. 👇
+        <div className="alpexa-hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '16px 24px calc(20px + env(safe-area-inset-bottom, 0px))' }}>
+          {/* Amount — hero, like the balance */}
+          {label('Amount')}
+          <div style={{ display: 'flex', alignItems: 'center', borderBottom: '2px solid ' + RH.line, paddingBottom: 10, marginBottom: 32 }}>
+            <span style={{ fontSize: 40, fontWeight: 800, color: RH.text, marginRight: 4, letterSpacing: -1 }}>$</span>
+            <input type="text" inputMode="decimal" value={amountStr === '0' ? '' : amountStr}
+              onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ''); setAmountStr(v === '' ? '0' : v); }}
+              placeholder="0" style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', color: RH.text, fontSize: 44, fontWeight: 800, letterSpacing: -1.5, fontFamily: 'Geist, Inter, system-ui' }}/>
+            <span style={{ fontSize: 14, fontWeight: 600, color: RH.textDim }}>USD</span>
           </div>
-          {/* How much — needed so the deposit record has an amount the operator can match. */}
-          <div style={{ marginBottom: 18 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 700, color: RH.text, marginBottom: 8 }}>How much do you want to add?</div>
-            <div style={{ display: 'flex', alignItems: 'center', background: RH.surface, border: '1px solid ' + RH.line, borderRadius: 12, padding: '12px 14px' }}>
-              <span style={{ fontSize: 22, fontWeight: 700, color: RH.textDim, marginRight: 6 }}>$</span>
-              <input type="text" inputMode="decimal" value={amountStr === '0' ? '' : amountStr}
-                onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ''); setAmountStr(v === '' ? '0' : v); }}
-                placeholder="0" style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', color: RH.text, fontSize: 22, fontWeight: 700, fontFamily: 'Geist Mono, monospace' }}/>
-              <span style={{ fontSize: 13, color: RH.textDim, fontWeight: 600 }}>USD</span>
+
+          {/* Buy */}
+          {label('Buy USDT with your card')}
+          <button onClick={() => openProvider('https://www.moonpay.com/buy')} style={{ width: '100%', padding: '17px 0', borderRadius: 18, background: RH.accent, color: '#fff', border: 'none', fontSize: 16.5, fontWeight: 700, letterSpacing: 0.2, cursor: 'pointer' }}>Buy USDT with card</button>
+          <button onClick={() => openProvider('https://portfolio.metamask.io/buy')} style={{ display: 'block', margin: '14px auto 32px', background: 'none', border: 'none', color: RH.textDim, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>or use MetaMask</button>
+
+          {/* Send to */}
+          {label('Send to')}
+          <div style={{ background: RH.surface, borderRadius: 18, padding: '16px 18px', marginBottom: 32, display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: 'Geist Mono, monospace', fontSize: 14.5, color: RH.text, fontWeight: 600 }}>{shortAddr}</div>
+              <div style={{ fontSize: 12, color: RH.textDim, marginTop: 3 }}>USDT · Ethereum (ERC-20) only</div>
             </div>
+            <button onClick={copyAddr} style={{ flexShrink: 0, padding: '9px 18px', borderRadius: 18, background: RH.text, color: RH.bg, border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Copy</button>
           </div>
-          {stepRow('1', 'Buy USDT with your card', <>Open one of these, pay with your card, and choose <b>USDT</b> on the <b>Ethereum</b> network. First time only, they check your ID — that's the law.</>)}
-          <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
-            <button onClick={() => openProvider('https://www.moonpay.com/buy')} style={{ flex: 1, padding: '15px 0', borderRadius: 12, background: RH.accent, color: '#fff', border: 'none', fontSize: 14.5, fontWeight: 800, cursor: 'pointer' }}>MoonPay →</button>
-            <button onClick={() => openProvider('https://portfolio.metamask.io/buy')} style={{ flex: 1, padding: '15px 0', borderRadius: 12, background: RH.surfaceUp, color: RH.text, border: '1px solid ' + RH.line, fontSize: 14.5, fontWeight: 800, cursor: 'pointer' }}>MetaMask →</button>
-          </div>
-          {stepRow('2', 'It asks "where to send it?"', <>Tap <b>Copy</b> below, then paste it into the box on that page. This is your Alpexa address. Choose the network <b>Ethereum (ERC-20)</b>.</>)}
-          <div style={{ background: RH.surface, border: '1px solid ' + RH.line, borderRadius: 14, padding: '14px', marginBottom: 20 }}>
-            <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700, marginBottom: 8 }}>Your deposit address</div>
-            <div style={{ fontFamily: 'Geist Mono, monospace', fontSize: 12.5, color: RH.text, wordBreak: 'break-all', lineHeight: 1.5, marginBottom: 12 }}>{addr}</div>
-            <button onClick={(e) => { try { navigator.clipboard.writeText(addr); } catch (_) {} const b = e.currentTarget; const o = b.textContent; b.textContent = 'Copied!'; setTimeout(() => { try { b.textContent = o; } catch (_) {} }, 1500); }} style={{ width: '100%', padding: '13px 0', borderRadius: 999, background: RH.green, color: '#000', border: 'none', fontSize: 15, fontWeight: 800, cursor: 'pointer' }}>Copy address</button>
-          </div>
-          {stepRow('3', 'Tap below after you pay', "This tells us your deposit is on the way. It shows in your history as 'Pending' and lands in your balance once we confirm it (usually a few minutes). 🎉")}
-          <button onClick={recordPaid} disabled={amount <= 0} style={{ width: '100%', padding: '15px 0', borderRadius: 14, background: amount > 0 ? RH.green : RH.surfaceUp, color: amount > 0 ? '#000' : RH.textMute, border: 'none', fontSize: 15.5, fontWeight: 800, cursor: amount > 0 ? 'pointer' : 'not-allowed', marginBottom: 14 }}>
-            {amount > 0 ? "I've paid — notify Alpexa" : 'Enter an amount above first'}
-          </button>
-          <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: 12, padding: '12px 14px', fontSize: 12.5, color: '#92400E', lineHeight: 1.55, marginTop: 6 }}>
-            ⚠️ Send only <b>USDT</b> on the <b>Ethereum (ERC-20)</b> network. A different coin or network can lose the money.
-          </div>
-          <div style={{ fontSize: 12.5, color: RH.textDim, lineHeight: 1.6, marginTop: 16 }}>
-            Already have USDT (on Coinbase, Binance, MetaMask…)? You can skip step 1 — just send it to the address above.
-          </div>
+
+          {/* Paid */}
+          <button onClick={recordPaid} style={{ width: '100%', padding: '17px 0', borderRadius: 18, background: RH.surface, color: RH.text, border: '1px solid ' + RH.line, fontSize: 16, fontWeight: 700, cursor: 'pointer' }}>I've paid</button>
         </div>
       </Phone>
     );
@@ -14173,7 +14155,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){var V='Crypto v127';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='Crypto v128';try{console.log('Alpexa '+V);}catch(e){}
 try{ var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
