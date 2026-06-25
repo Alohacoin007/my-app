@@ -5068,6 +5068,36 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
     setConfirmed(true);
   };
 
+  // Card deposit via Transak on-ramp. The Edge Function (transak-widget) builds a
+  // Secure Widget URL server-side (api-secret stays on the server); we open it so
+  // Transak handles the card + KYC and delivers USDT. If Transak isn't configured/
+  // reachable yet, fall back to the existing pending-deposit request flow.
+  const payWithTransak = async () => {
+    const amt = amount;
+    let me = null; try { me = JSON.parse(localStorage.getItem('alpexa.me') || 'null'); } catch (e) {}
+    const oid = 'tx-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+    if (!(window.AlpexaSync && AlpexaSync.db && AlpexaSync.db.functions)) { doConfirm('card'); return; }
+    try {
+      const res = await AlpexaSync.db.functions.invoke('transak-widget', { body: {
+        amount: amt,
+        walletAddress: '0x6B1c8941698Affc56757eF9Be1723Ec43F720966',  // platform USDT receive address
+        cryptoCurrencyCode: 'USDT', network: 'ethereum', fiatCurrency: 'USD',
+        partnerOrderId: oid,
+        partnerCustomerId: (me && me.custId) || '',
+        email: (me && me.email) || '',
+        referrerDomain: (location && location.hostname) || 'alpexa-sports.com',
+      }});
+      const data = res && res.data;
+      if ((res && res.error) || !data || !data.widgetUrl) {
+        try { alpexa.toast && alpexa.toast('Card on-ramp not ready — submitted as pending deposit'); } catch (_) {}
+        doConfirm('card'); return;
+      }
+      // Record a pending deposit so the back office expects it, then open Transak.
+      try { window.AlpexaSync && AlpexaSync.pushRequest({ id: oid, type: 'deposit', server: 'Crypto', amount: amt, asset: 'USDT', network: 'Transak card', from_label: 'Transak ' + oid }); } catch (_) {}
+      window.location.href = data.widgetUrl;
+    } catch (e) { doConfirm('card'); }
+  };
+
   const Header = ({ title, back }) => (
     <div style={{
       padding: '6px 16px 10px', display: 'flex',
@@ -5442,7 +5472,7 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
           {renderAmountBlock('Card')}
           <div style={{ flex: 1 }}/>
           <div style={{ padding: '10px 22px 22px' }}>
-            <button disabled={!valid} onClick={() => valid && doConfirm('card')} style={{
+            <button disabled={!valid} onClick={() => valid && payWithTransak()} style={{
               width: '100%', padding: '16px 0', borderRadius: 999,
               background: valid ? RH.green : RH.surfaceUp,
               color: valid ? '#000' : RH.textMute,
