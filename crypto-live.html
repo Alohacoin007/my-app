@@ -23,8 +23,8 @@
   html, body { margin: 0; padding: 0; background: #FFFFFF; min-height: 100vh;
     font-family: 'Geist', 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; color: #0E0E0E; }
   * { box-sizing: border-box; }
-  .stage { min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    padding: 40px 24px; background: #FFFFFF; }
+  .stage { height: 100vh; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 0; background: #FFFFFF; overflow: hidden; }
   .phone-shadow { border-radius: 54px; box-shadow:
     0 50px 90px -30px rgba(0,0,0,0.28),
     0 24px 48px -24px rgba(0,0,0,0.18),
@@ -14208,7 +14208,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
   var phoneEl=document.getElementById('phone');
   function fit(){
     if(window.innerWidth<=600){
-      if(phoneEl) phoneEl.style.zoom='';            // mobile = full screen, never zoom
+      if(phoneEl){ phoneEl.style.zoom=''; phoneEl.style.transform=''; }  // mobile = full screen, no scale
       var w=(window.visualViewport&&window.visualViewport.width)||window.innerWidth;
       var h=(window.visualViewport&&window.visualViewport.height)||window.innerHeight;
       var s=w/390;                                  // UNIFORM scale by width — no squished text
@@ -14226,12 +14226,14 @@ function alpexaPortfolioSeries(range, n, endValue) {
       // including the bottom buttons on EVERY screen — always fits the window. Using
       // CSS zoom (not transform) also shrinks the layout box, so it centers cleanly
       // with no overflow/scroll. This is global: one fit covers all screens.
-      // .stage has 40px top + 40px bottom padding (80) and 24px each side (48).
-      // Subtract that (plus a small buffer) or the zoomed phone + padding overflows
-      // the window and the bottom buttons get pushed off-screen.
+      // Shrink the 390×844 mock with transform:scale (works in EVERY browser, unlike
+      // CSS zoom which Safari/iOS-WebKit ignore). .stage is exactly 100vh and centers
+      // the phone, so the scaled phone is always fully visible — buttons included.
       if(phoneEl){
-        var sc=Math.min(1,(window.innerHeight-96)/844,(window.innerWidth-64)/390);
-        phoneEl.style.zoom = sc<1 ? sc : '';
+        var sc=Math.min(1,(window.innerHeight-24)/844,(window.innerWidth-24)/390);
+        phoneEl.style.transformOrigin='center center';
+        phoneEl.style.transform = sc<1 ? ('scale('+sc+')') : '';
+        phoneEl.style.zoom='';
       }
       root.style.removeProperty('--ph-s');
       root.style.removeProperty('--ph-ph');
@@ -14268,7 +14270,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){var V='Crypto v116';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='Crypto v117';try{console.log('Alpexa '+V);}catch(e){}
 try{ if(!/[?&]ver=1/.test(location.search)) return; var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
