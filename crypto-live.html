@@ -4737,13 +4737,12 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
               <span style={{ fontSize: 13.5, color: RH.accent, fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>${fmtUsd(netAmt)}</span>
             </div>
           </div>
-        </div>
-
-        <div style={{ padding: '0 22px 18px' }}>
+          {/* CTA lives INSIDE the scroll area (not a pinned footer) so the keyboard
+              can never hide it — the user can always scroll down to reach it. */}
           <button onClick={() => { if (valid) setStep('review'); }}
           disabled={!valid}
           style={{
-            width: '100%', padding: '15px 0', borderRadius: 999,
+            width: '100%', marginTop: 16, padding: '15px 0', borderRadius: 999,
             background: valid ? RH.accent : RH.surfaceUp,
             color: valid ? '#fff' : RH.textMute,
             border: 'none',
@@ -4825,8 +4824,9 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
           </div>
 
           {/* Details */}
-          <div style={{
-            background: 'transparent', padding: '40px 26px 0', flex: 1,
+          <div className="alpexa-hide-scrollbar" style={{
+            background: 'transparent', padding: '40px 26px 16px', flex: 1,
+            overflowY: 'auto', minHeight: 0,
             fontFamily: 'Geist, Inter, system-ui', position: 'relative', zIndex: 1,
           }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '22px 24px' }}>
@@ -14211,10 +14211,12 @@ function alpexaPortfolioSeries(range, n, endValue) {
       var h=(window.visualViewport&&window.visualViewport.height)||window.innerHeight;
       var s=w/390;                                  // UNIFORM scale by width — no squished text
       root.style.setProperty('--ph-s', s);
-      // Keyboard open (viewport shrinks a lot): freeze the design height so the
-      // layout doesn't jump while typing. Address-bar changes (<150px) still re-fit.
-      if(baseH && h < baseH - 150){ return; }
-      if(h > baseH) baseH = h;
+      // Keyboard open (viewport shrinks >150px): DON'T bump baseH, so the full height
+      // restores when the keyboard closes. But still re-fit the frame to the *visible*
+      // height — otherwise the bottom CTA (Withdraw / Verify & send) sits below the
+      // keyboard, off-screen and unreachable. Shrinking the frame keeps it visible.
+      var keyboardOpen = baseH && h < baseH - 150;
+      if(!keyboardOpen && h > baseH) baseH = h;
       root.style.setProperty('--ph-ph', (h/s)+'px'); // design height so scaled = real height
       root.style.setProperty('--ph-vh', h+'px');
     } else {
@@ -14253,7 +14255,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){var V='Crypto v112';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='Crypto v113';try{console.log('Alpexa '+V);}catch(e){}
 try{ if(!/[?&]ver=1/.test(location.search)) return; var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
