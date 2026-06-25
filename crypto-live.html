@@ -1516,6 +1516,18 @@ function ActionRow({ onAction }) {
 // Alerts handled via header bell + Account settings (industry convention).
 // Floating server switcher — shown on every non-home tab so the user can
 // change servers from any page (home already has one in its header).
+// FX equity bridge: the FX app (trading.html) publishes its live equity (cash +
+// floating P/L) to localStorage. We show that — not raw cash balance — for FX so the
+// dropdown / Accounts / withdraw / transfer reflect money the user can actually move.
+// Falls back to the raw balance if equity hasn't been published (e.g. fresh device).
+function fxEquityUsd() {
+  try { var v = parseFloat(localStorage.getItem('alpexa.fxEquity')); return isFinite(v) ? v : null; } catch (e) { return null; }
+}
+function effBal(id, raw) {
+  if (id === 'fx') { var e = fxEquityUsd(); if (e != null) return e; }
+  return raw;
+}
+
 function ServerSwitcher({ cryptoBal }) {
   const [open, setOpen] = React.useState(false);
   const [, bump] = React.useState(0);
@@ -1543,7 +1555,7 @@ function ServerSwitcher({ cryptoBal }) {
   const money = (n) => '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const servers = [
     { id: 'crypto', label: 'Alpexa Crypto', desc: 'Crypto · securities', code: 'CR', bal: SB.crypto },
-    { id: 'fx',     label: 'Alpexa FX',   desc: 'FX · Stocks · Indices', code: 'FX', bal: SB.fx },
+    { id: 'fx',     label: 'Alpexa FX',   desc: 'FX · Stocks · Indices', code: 'FX', bal: effBal('fx', SB.fx) },
     { id: 'sports', label: 'Alpexa Sports', desc: 'Sports markets',      code: 'SP', bal: SB.sports },
   ];
   const go = (id) => { if (id === 'fx') { window.location.href = 'trading.html'; return; } if (id === 'sports') { window.location.href = 'sports-live.html'; return; } setOpen(false); };
@@ -1848,7 +1860,7 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
 
                 {[
                   { id: 'crypto', label: 'Alpexa Crypto', desc: 'Crypto · securities', balance: serverBalances.crypto != null ? serverBalances.crypto : PORTFOLIO.buyingPower, code: 'CR' },
-                  { id: 'fx',     label: 'Alpexa FX',   desc: 'FX · Stocks · Indices', balance: serverBalances.fx     != null ? serverBalances.fx     : 12480.50,           code: 'FX' },
+                  { id: 'fx',     label: 'Alpexa FX',   desc: 'FX · Stocks · Indices', balance: effBal('fx', serverBalances.fx != null ? serverBalances.fx : 12480.50), code: 'FX' },
                   { id: 'sports', label: 'Alpexa Sports', desc: 'Sports markets',      balance: serverBalances.sports != null ? serverBalances.sports :  2340.00,           code: 'SP' },
                 ].map((s) => {
                   const active = server === s.id;
@@ -4185,7 +4197,7 @@ function Transfer({ onBack, serverBalances = {}, onTransferred }) {
     if (other) setFromId(other);
   } }, [toId]);
 
-  const fromBal = serverBalances[fromId] != null ? serverBalances[fromId] : 0;
+  const fromBal = effBal(fromId, serverBalances[fromId] != null ? serverBalances[fromId] : 0);
   const amount  = parseFloat(amountStr) || 0;
   const insufficient = amount > fromBal;
   // Don't let a stale/zero cached balance disable the button — the app_transfer RPC
@@ -4210,7 +4222,7 @@ function Transfer({ onBack, serverBalances = {}, onTransferred }) {
 
   const renderServerCard = (label, sid, open, setOpen, otherSid, locked) => {
     const meta = SERVERS[sid];
-    const bal  = serverBalances[sid] != null ? serverBalances[sid] : 0;
+    const bal  = effBal(sid, serverBalances[sid] != null ? serverBalances[sid] : 0);
     return (
       <div style={{ position: 'relative' }}>
         <div
@@ -4250,7 +4262,7 @@ function Transfer({ onBack, serverBalances = {}, onTransferred }) {
             boxShadow: '0 16px 40px -12px rgba(0,0,0,0.6)',
           }}>
             {ids.filter((i) => i !== otherSid).map((i) => {
-              const m = SERVERS[i]; const b = serverBalances[i] != null ? serverBalances[i] : 0;
+              const m = SERVERS[i]; const b = effBal(i, serverBalances[i] != null ? serverBalances[i] : 0);
               const active = i === sid;
               return (
                 <button key={i} onClick={() => { (label === 'FROM' ? setFromId : setToId)(i); setOpen(false); }} style={{
@@ -4473,8 +4485,8 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
   const achValid  = achBank.trim().length >= 2 && achHolder.trim().length >= 2 && /^\d{9}$/.test(achRouting) && /^\d{4,17}$/.test(achAccount);
   const wireValid = wireBank.trim().length >= 2 && wireHolder.trim().length >= 2 && (wireSwift.trim().length >= 8 || /^\d{9}$/.test(wireSwift)) && wireAccount.trim().length >= 4;
 
-  const totalUsd = (serverBalances.crypto || 0) + (serverBalances.fx || 0) + (serverBalances.sports || 0);
-  const srcBal   = serverBalances[sourceId] || 0;
+  const totalUsd = (serverBalances.crypto || 0) + effBal('fx', serverBalances.fx || 0) + (serverBalances.sports || 0);
+  const srcBal   = effBal(sourceId, serverBalances[sourceId] || 0);
 
   const METHODS = [
     { id: 'card', label: 'Debit card',    sub: `Instant · ${(fees.withdrawCardBps/100).toFixed(2)}% fee`,
@@ -4638,7 +4650,7 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
           }}>
             {['crypto','fx','sports'].map((sid) => {
               const active = sourceId === sid;
-              const bal = serverBalances[sid] || 0;
+              const bal = effBal(sid, serverBalances[sid] || 0);
               return (
                 <button key={sid} onClick={() => setSourceId(sid)} style={{
                   background: active ? RH.surfaceUp : 'transparent', border: 'none',
@@ -10166,7 +10178,7 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
   }, [_cryptoAnchor]);
   const effBalances = {
     crypto: (typeof window.__cryptoLiveUsd === 'number' && window.__cryptoLiveUsd > 0) ? window.__cryptoLiveUsd : _cryptoAnchor,
-    fx:     serverBalances.fx     || 0,
+    fx:     effBal('fx', serverBalances.fx || 0),
     sports: serverBalances.sports || 0,
   };
   // Portfolio total — sums Crypto wallet (balances + staked) + non-crypto
@@ -10175,7 +10187,7 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
     let t = 0;
     Object.values(balances).forEach((v) => { t += (v || 0); });
     Object.values(staked).forEach((s) => { if (s && s.usd) t += s.usd; });
-    t += (serverBalances.fx || 0);
+    t += effBal('fx', serverBalances.fx || 0);
     t += (serverBalances.sports || 0);
     return t;
   }, [balances, staked, serverBalances]);
@@ -14274,7 +14286,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){var V='Crypto v121';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='Crypto v122';try{console.log('Alpexa '+V);}catch(e){}
 try{ var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
