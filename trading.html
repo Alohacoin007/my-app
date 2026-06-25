@@ -3358,6 +3358,13 @@ function App(){
         }
         h.status=r.status; changed=true;
       });
+      // Backfill: add any server funding request (deposit/withdraw/transfer) not yet in
+      // the local history → a NEW device shows the customer's past funding too.
+      const have={}; hist.forEach(h=>{ if(h.id) have[String(h.id)]=true; });
+      rows.forEach(r=>{ const t=(r.type||''); if(t!=='deposit'&&t!=='withdraw'&&t!=='transfer') return;
+        if(have[String(r.local_id)]) return;
+        hist.push({ id:r.local_id, kind:t, method:(t==='transfer'?'Internal transfer':(r.from_label||r.to_label||t)), amount:+r.amount||0, currency:'USD', ref:String(r.local_id||''), note:'', account:'live', status:r.status||'pending', backfill:true });
+        changed=true; });
       if(changed){ try{localStorage.setItem('alpexa.funding',JSON.stringify(hist));}catch(e){} window.dispatchEvent(new Event('alpexa-balance-change')); }
       // Credit transfers that OTHER apps sent to FX (idempotent across apps).
       AlpexaSync.pullIncomingTransfers('live').then(legs=>{ legs.forEach(l=>{
