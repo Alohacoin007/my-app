@@ -9384,18 +9384,23 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
     if (id === 'rewards-redeem') {
       return <RedeemCodePanel
         onRedeemed={(code) => {
-          // Credit 100 ALPXS — ALPXS price ~$1.50, so 100 * 1.50 = $150 USD value
-          try {
-            const raw = window.localStorage.getItem('alpexa.cryptoHoldings');
-            const b = raw ? JSON.parse(raw) : { USDT: 0 };
-            b.ALPXS = (b.ALPXS || 0) + 100 * 1.50;
-            window.localStorage.setItem('alpexa.cryptoHoldings', JSON.stringify(b));
-            window.localStorage.setItem('alpexa.referralRedeemed', JSON.stringify({ code, ts: Date.now() }));
-          } catch (_) {}
-          if (typeof AudioFX !== 'undefined') AudioFX.cash();
-          flashAndClose('Code applied · 100 ALPXS earned');
-          // Soft reload to reflect new balance everywhere.
-          setTimeout(() => { try { window.location.reload(); } catch (_) {} }, 1100);
+          // SERVER-ENFORCED: redeem_referral records a unique row per customer (so a
+          // cleared localStorage can't re-claim) and credits ALPXS to crypto_holdings
+          // server-side. The local flag is just a UX cache; the server is authoritative.
+          if (!(window.AlpexaSync && AlpexaSync.db)) { try { alert('No server connection — try again.'); } catch (_) {} return; }
+          AlpexaSync.db.rpc('redeem_referral', { p_code: code }).then((r) => {
+            const d = r && r.data;
+            if ((r && r.error) || !d || d.ok === false) {
+              const msg = (d && d.error) || (r && r.error && r.error.message) || 'Could not redeem this code.';
+              try { alert(msg === 'already redeemed' ? 'You have already redeemed a referral code.' : msg); } catch (_) {}
+              return;
+            }
+            try { window.localStorage.setItem('alpexa.referralRedeemed', JSON.stringify({ code, ts: Date.now() })); } catch (_) {}
+            if (typeof AudioFX !== 'undefined') AudioFX.cash();
+            flashAndClose('Code applied · 100 ALPXS earned');
+            // Soft reload to adopt the new server holdings everywhere.
+            setTimeout(() => { try { window.location.reload(); } catch (_) {} }, 1100);
+          }, () => { try { alert('Network error — try again.'); } catch (_) {} });
         }}/>;
     }
         if (id === 'rewards-link') {
