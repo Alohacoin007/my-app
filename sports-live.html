@@ -590,6 +590,50 @@
   .nav .ic{width:22px;height:22px;display:block;box-sizing:content-box;padding:2px 14px;border-radius:6px;transition:background .18s}
   .nav .item.active .ic{background:rgba(47,107,246,.12)}
   .nav .item .nbadge{position:absolute;top:-1px;right:18px;background:var(--neg);color:#fff;font-size:8px;font-weight:700;min-width:15px;height:15px;border-radius:4px;display:flex;align-items:center;justify-content:center;padding:0 3px;border:1.5px solid var(--surface)}
+  /* ===== Live coverage (dedicated live tracker screen) ===== */
+  .lcov{position:fixed;inset:0;z-index:400;background:var(--bg);display:flex;flex-direction:column;transform:translateY(100%);transition:transform .26s cubic-bezier(.2,.8,.2,1);visibility:hidden}
+  .lcov.open{transform:translateY(0);visibility:visible}
+  .lcov-hd{display:flex;align-items:center;gap:10px;padding:max(12px,env(safe-area-inset-top)) 16px 12px;border-bottom:1px solid var(--line);background:var(--surface)}
+  .lcov-back{font-size:26px;line-height:1;color:var(--text);background:none;border:none;width:30px;cursor:pointer}
+  .lcov-hd-lg{font-size:14px;font-weight:800;color:var(--text);letter-spacing:.5px;flex:1}
+  .lcov-hd-st{font-size:12px;font-weight:700;color:var(--live);display:flex;align-items:center;gap:5px}
+  .lcov-hd-st .lp-dot2{width:7px;height:7px;border-radius:50%;background:var(--live)}
+  .lcov-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 16px calc(20px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}
+  .lcov-score{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:4px 14px;margin-bottom:14px}
+  .lcov-team{display:flex;align-items:center;gap:12px;padding:12px 0}
+  .lcov-team+.lcov-team{border-top:1px solid var(--line)}
+  .lcov-ab{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;background:#22344e;flex-shrink:0}
+  .lcov-tn{flex:1;min-width:0}
+  .lcov-tnm{font-size:16px;font-weight:700;color:var(--text)}
+  .lcov-team.lead .lcov-tnm{font-weight:800}
+  .lcov-tsub{font-size:11px;color:var(--dim);margin-top:1px}
+  .lcov-sc{font-size:32px;font-weight:800;color:var(--dim);font-variant-numeric:tabular-nums;flex-shrink:0}
+  .lcov-team.lead .lcov-sc{color:var(--text)}
+  .lcov-statewrap{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:16px}
+  .lcov-bigstate{font-size:15px;font-weight:800;color:var(--pos)}
+  .lcov-sub{font-size:13px;color:var(--text);font-weight:600;margin-top:3px}
+  .lcov-lbl{font-size:10.5px;letter-spacing:1.4px;font-weight:800;color:var(--dim);margin:6px 0 10px;display:flex;align-items:center;gap:6px}
+  .lcov-livedot{width:6px;height:6px;border-radius:50%;background:var(--live);display:inline-block}
+  .lcov-feed{margin-bottom:18px}
+  .lcov-play{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line);font-size:13px;color:var(--text)}
+  .lcov-play.fresh{animation:lcovpulse .7s ease}
+  .lcov-play.score{background:var(--surface-2);border-radius:10px;padding:11px 12px;border-bottom:none;margin:2px 0}
+  .lp-ic2{flex-shrink:0}
+  .lp-tx2{flex:1;min-width:0}
+  .lp-pt2{color:var(--pos);font-weight:800;font-size:12px;flex-shrink:0}
+  .lp-t2{font-size:10.5px;color:var(--dim);flex-shrink:0}
+  .lcov-empty{padding:18px;text-align:center;color:var(--dim);font-size:12.5px}
+  .lcov-betrow{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .lcov-bt{width:46px;font-size:12px;font-weight:800;color:var(--text);flex-shrink:0}
+  .lcb{flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 4px;text-align:center;cursor:pointer;display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center}
+  .lcb.bet.sel{background:var(--accent);border-color:var(--accent)}
+  .lcb.bet.sel .lcb-ln,.lcb.bet.sel .lcb-pr{color:#fff}
+  .lcb.sus{opacity:.55;cursor:not-allowed}
+  .lcb-ln{font-size:10px;color:var(--dim)}
+  .lcb-pr{font-size:14px;font-weight:800;color:var(--text)}
+  @keyframes lcovpulse{0%{background:var(--surface-2)}100%{background:transparent}}
+  .watch-live{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:9px 12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);color:var(--text);font-size:12.5px;font-weight:700;cursor:pointer}
+  .watch-live .wl-go{color:var(--dim);font-size:16px}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1628,6 +1672,7 @@
         <div class="ch-r"><span class="st${g.live?' live':''}">${g.live?'LIVE '+g.time:gameTimeLabel(g)}</span>${pinBtn}</div></div>
         <div class="matrix">${row(g.away,1)}${row(g.home,0)}</div>
         ${playHTML}
+        ${showPlay&&g.live?`<div class="watch-live" data-watch="${g.id}"><span>📺 Watch live tracker</span><span class="wl-go">›</span></div>`:''}
         ${pc>0?`<div class="more-mkt" data-expand="${g.id}">+ More Markets <span class="cnt">(${pc})</span></div>`:''}</div>`;
     }).join('');
   }
@@ -1674,8 +1719,85 @@
     document.querySelectorAll('.pin-btn').forEach(p=>{
       p.onclick=(e)=>{e.stopPropagation();togglePin(p.dataset.pin);};
     });
+    document.querySelectorAll('[data-watch]').forEach(w=>{ w.onclick=()=>openLiveCoverage(w.dataset.watch); });
   }
 
+  // ===== Live coverage (dedicated live tracker screen) =======================
+  let _lcovId=null;
+  function lcovFeedPush(g){
+    if(!g||!g.lastPlay) return;
+    g._feed=g._feed||[];
+    if(!g._feed.length || g._feed[0].seq!==g.lastPlay.seq){
+      g._feed.unshift({kind:g.lastPlay.kind,team:g.lastPlay.team,txt:g.lastPlay.txt,pts:g.lastPlay.pts,seq:g.lastPlay.seq,t:g.time});
+      if(g._feed.length>14) g._feed.length=14;
+    }
+  }
+  function lcovFeedHTML(g){
+    const f=g._feed||[];
+    if(!f.length) return '<div class="lcov-empty">Waiting for the next play…</div>';
+    return f.map((p,idx)=>{
+      const icon=p.kind==='state'?'⏸':p.kind==='score'?'🔥':'•';
+      return '<div class="lcov-play'+(idx===0?' fresh':'')+(p.kind==='score'?' score':'')+'"><span class="lp-ic2">'+icon+'</span><span class="lp-tx2">'+(p.team?'<b>'+p.team+'</b> ':'')+p.txt+'</span>'+(p.pts?'<span class="lp-pt2">+'+p.pts+'</span>':'')+'<span class="lp-t2">'+(p.t||'')+'</span></div>';
+    }).join('');
+  }
+  function lcovDiamond(g){
+    const s=g._seq||0, on='var(--accent)', off='rgba(120,140,170,.25)';
+    const b=(x)=>'<rect x="-6.5" y="-6.5" width="13" height="13" rx="2" fill="'+x+'"/>';
+    return '<svg width="58" height="58" viewBox="0 0 58 58">'+
+      '<g transform="translate(40,29) rotate(45)">'+b((s&1)?on:off)+'</g>'+
+      '<g transform="translate(29,18) rotate(45)">'+b((s&2)?on:off)+'</g>'+
+      '<g transform="translate(18,29) rotate(45)">'+b((s&4)?on:off)+'</g>'+
+      '<g transform="translate(29,40) rotate(45)">'+b('rgba(120,140,170,.45)')+'</g></svg>';
+  }
+  function lcovStateHTML(g){
+    if(g.clk&&g.clk.type==='inning'){
+      const s=g._seq||0, outs=s%3, balls=(Math.floor(s/2))%4, strikes=s%3;
+      return '<div class="lcov-statewrap"><div>'+lcovDiamond(g)+'</div><div style="flex:1"><div class="lcov-bigstate">▲ '+g.time+'</div><div class="lcov-sub">'+outs+' Out · Count '+balls+'–'+strikes+'</div></div></div>';
+    }
+    let sub='In progress';
+    if(g.clk&&g.clk.type==='clock'&&g.clk.sec!=null){const m=Math.floor(g.clk.sec/60),ss=('0'+(g.clk.sec%60)).slice(-2);sub=m+':'+ss+' remaining';}
+    return '<div class="lcov-statewrap"><div style="flex:1"><div class="lcov-bigstate">'+g.time+'</div><div class="lcov-sub">'+sub+'</div></div></div>';
+  }
+  function lcovBetRow(g,t,i){
+    const cell=(arr,key)=>{const b=arr[i];if(!b)return '<div class="lcb"></div>';
+      if(g.live&&!liveOK(g))return '<div class="lcb sus"><span class="lcb-pr">🔒</span></div>';
+      const on=legs.some(l=>l.uid===g.id+'|'+b.sel);
+      return '<div class="lcb bet'+(on?' sel':'')+'" data-game="'+g.id+'" data-market="'+key+'" data-sel="'+b.sel+'" data-am="'+b.am+'"><span class="lcb-ln">'+(b.ln||'&nbsp;')+'</span><span class="lcb-pr">'+fmtAm(b.am)+'</span></div>';};
+    return '<div class="lcov-betrow"><span class="lcov-bt">'+t.ab+'</span>'+cell(g.core.spread,'Spread')+cell(g.core.total,'Total')+cell(g.core.ml,'Moneyline')+'</div>';
+  }
+  function renderCoverage(){
+    if(!_lcovId) return;
+    const g=GAMES.find(x=>x.id===_lcovId), el=document.getElementById('lcov');
+    if(!g||!el){ closeCoverage(); return; }
+    lcovFeedPush(g);
+    const lead=g.home.sc>g.away.sc?'home':(g.away.sc>g.home.sc?'away':'');
+    const teamRow=(t,who)=>'<div class="lcov-team'+(lead===who?' lead':'')+'"><span class="lcov-ab">'+t.ab+'</span><div class="lcov-tn"><div class="lcov-tnm">'+t.nm+'</div><div class="lcov-tsub">'+(who==='home'?'Home':'Away')+'</div></div><div class="lcov-sc">'+(t.sc!=null?t.sc:'–')+'</div></div>';
+    el.querySelector('.lcov-hd-st').innerHTML='<span class="lp-dot2"></span>LIVE · '+g.time;
+    el.querySelector('.lcov-body').innerHTML=
+      '<div class="lcov-score">'+teamRow(g.away,'away')+teamRow(g.home,'home')+'</div>'+
+      lcovStateHTML(g)+
+      '<div class="lcov-lbl">PLAY-BY-PLAY <span class="lcov-livedot"></span>LIVE</div>'+
+      '<div class="lcov-feed">'+lcovFeedHTML(g)+'</div>'+
+      '<div class="lcov-lbl">BET LIVE</div>'+
+      lcovBetRow(g,g.away,1)+lcovBetRow(g,g.home,0);
+    el.querySelectorAll('.lcb.bet').forEach(b=>{ b.onclick=()=>toggle(b.dataset.game,b.dataset.market,b.dataset.sel,+b.dataset.am); });
+  }
+  function openLiveCoverage(gid){
+    const g=GAMES.find(x=>x.id===gid); if(!g) return;
+    _lcovId=gid;
+    let el=document.getElementById('lcov');
+    if(!el){
+      el=document.createElement('div'); el.id='lcov'; el.className='lcov';
+      el.innerHTML='<div class="lcov-hd"><button class="lcov-back" id="lcovBack">‹</button><span class="lcov-hd-lg"></span><span class="lcov-hd-st"></span></div><div class="lcov-body"></div>';
+      document.body.appendChild(el);
+      el.querySelector('#lcovBack').onclick=closeCoverage;
+    }
+    const lgIcon=({NBA:'🏀',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽',UFC:'🥊'})[g.lg]||'🏈';
+    el.querySelector('.lcov-hd-lg').textContent=lgIcon+' '+(g.lg==='SOC'?'Soccer':g.lg);
+    el.classList.add('open');
+    renderCoverage();
+  }
+  function closeCoverage(){ _lcovId=null; const el=document.getElementById('lcov'); if(el) el.classList.remove('open'); }
   function openProps(gid){
     const g=GAMES.find(x=>x.id===gid);
     document.getElementById('legs').dataset.props=gid;
@@ -2841,7 +2963,7 @@
         if(np)g.lastPlay={kind:'play',team:np.team,txt:np.txt,pts:0,seq:(g._seq=(g._seq||0)+1)};
       }
     });
-    renderGames();if(!legsEl.dataset.props&&legs.length)drawLegs();calc();
+    renderGames();if(_lcovId)renderCoverage();if(!legsEl.dataset.props&&legs.length)drawLegs();calc();
     // recompute cashout from live odds: cashout = baseCash × (d0 / dNow)
     openBets.forEach(b=>{
       let dNow=1, found=false;
