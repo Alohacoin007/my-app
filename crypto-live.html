@@ -5142,7 +5142,7 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
   const Picker = () => {
     const METHODS = [
       { id: 'card', label: 'Credit / Debit Card',
-        sub: 'Instant · 2.5% fee',
+        sub: 'Buy USDT with your card · ~5 min',
         icon: <><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10 H21"/></> },
       { id: 'wire', label: 'Wire / Bank Transfer',
         sub: 'Free · Same day',
@@ -5323,183 +5323,50 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
     return sum % 10 === 0;
   };
   if (step === 'card') {
-    const ccDigits = cardNum.replace(/\s/g,'');
-    // Demo: accept any 16-digit card to make testing easy. Luhn checksum still
-    // available (luhn(ccDigits)) but enforced only by the issuer in production.
-    const validCardNum = ccDigits.length === 16;
-    const validExp = cardExp.length === 5;
-    const validCvv = cardCvv.length >= 3;
-    const validZip = cardZip.length >= 5;
-    const validCard = validCardNum && validExp && validCvv && validZip;
-    const valid = validCard && amount > 0;
-    // Friendly hint for what's missing.
-    let missingHint = 'Complete card details';
-    if (!validCardNum)    missingHint = 'Enter 16-digit card number';
-    else if (!validExp)   missingHint = 'Enter expiry MM/YY';
-    else if (!validCvv)   missingHint = 'Enter CVV';
-    else if (!validZip)   missingHint = 'Enter ZIP code';
-    else if (amount <= 0) missingHint = 'Enter amount';
+    // Card on-ramp guide. Buying crypto with a card legally needs a regulated provider
+    // (KYC), so rather than take the card ourselves we walk the user through a trusted
+    // provider in plain, grandma-friendly steps: buy USDT with the card, then send it to
+    // their Alpexa address (shown big with one-tap copy).
+    const addr = '0x6B1c8941698Affc56757eF9Be1723Ec43F720966';
+    const buyUrl = 'https://global.transak.com/?cryptoCurrencyCode=USDT&network=ethereum&fiatCurrency=USD&walletAddress=' + addr + (amount > 0 ? ('&defaultFiatAmount=' + Math.round(amount)) : '');
+    const openBuy = () => {
+      // Let the back office expect this customer's USDT so they can match the deposit.
+      try { window.AlpexaSync && AlpexaSync.pushRequest({ id: 'card-' + Date.now(), type: 'deposit', server: 'Crypto', amount: amount || 0, asset: 'USDT', network: 'Card -> USDT (ERC-20)', from_label: 'Card on-ramp' }); } catch (e) {}
+      try { window.open(buyUrl, '_blank'); } catch (e) { try { window.location.href = buyUrl; } catch (_) {} }
+    };
+    const stepRow = (n, title, body) => (
+      <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+        <div style={{ width: 30, height: 30, borderRadius: 15, background: RH.accent, color: '#fff', fontSize: 15, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{n}</div>
+        <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: RH.text, marginBottom: 3 }}>{title}</div>
+          <div style={{ fontSize: 13, color: RH.textDim, lineHeight: 1.55 }}>{body}</div>
+        </div>
+      </div>
+    );
     return (
       <Phone width={390} height={844} bg={RH.bg}>
-        
         <StatusBar/>
-        <Header title="Card deposit" back={() => setStep('pick')}/>
-        <div className="alpexa-hide-scrollbar" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '4px 22px 0' }}>
-            {/* Card mock */}
-            <div style={{
-              padding: '16px 18px', borderRadius: 14,
-              background: `linear-gradient(135deg, ${RH.accent} 0%, #1E40AF 100%)`,
-              color: '#fff', marginBottom: 12,
-              minHeight: 96, display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-              boxShadow: `0 16px 40px -16px ${RH.accent}50`,
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <span style={{ fontFamily: 'Geist Mono, monospace', fontSize: 10, letterSpacing: 1.4, opacity: 0.8, fontWeight: 700 }}>ALPEXA</span>
-                <svg width="22" height="14" viewBox="0 0 36 22" fill="#fff">
-                  <circle cx="14" cy="11" r="9" opacity="0.9"/>
-                  <circle cx="22" cy="11" r="9" opacity="0.6"/>
-                </svg>
-              </div>
-              <div style={{ fontFamily: 'Geist Mono, monospace', fontSize: 15, letterSpacing: 2, fontWeight: 600 }}>
-                {(cardNum || '•••• •••• •••• ••••')}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', fontFamily: 'Geist Mono, monospace', fontSize: 10, letterSpacing: 0.6 }}>
-                <span>{cardExp || 'MM/YY'}</span>
-                <span>CVV {cardCvv ? '•••' : '—'}</span>
-              </div>
-            </div>
-            {savedCards.length > 0 ? (
-              <div style={{ marginBottom: 10 }}>
-                <div style={{
-                  fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.textDim,
-                  letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6,
-                }}>Saved cards</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {savedCards.map((c) => (
-                    <div key={c.id} style={{
-                      padding: '8px 6px 8px 12px', borderRadius: 10,
-                      background: RH.surface, border: `1px solid ${RH.line}`,
-                      display: 'flex', alignItems: 'center', gap: 10,
-                    }}>
-                      <button onClick={() => useSavedCard(c)} style={{
-                        flex: 1, padding: 0, background: 'transparent', border: 'none',
-                        display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
-                        textAlign: 'left',
-                      }}>
-                        <div style={{
-                          width: 26, height: 26, borderRadius: 13,
-                          background: RH.accent, color: '#fff',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          flexShrink: 0,
-                        }}>
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10 H21"/>
-                          </svg>
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 12.5, fontWeight: 600, color: RH.text, fontFamily: 'Geist Mono, monospace' }}>•••• {c.last4}</div>
-                          <div style={{ fontSize: 10, color: RH.textDim, marginTop: 1, fontFamily: 'Geist Mono, monospace' }}>Exp {c.exp}</div>
-                        </div>
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); removeCard(c.id); }} aria-label="Remove" style={{
-                        width: 28, height: 28, borderRadius: 14,
-                        background: 'transparent', border: 'none',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        cursor: 'pointer', padding: 0, flexShrink: 0,
-                      }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={RH.red} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M4 7 H20 M9 7 V4 a1 1 0 011 -1 h4 a1 1 0 011 1 V7 M6 7 L7 21 a1 1 0 001 1 h8 a1 1 0 001 -1 L18 7"/>
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <div style={{
-                  marginTop: 10, fontFamily: 'Geist Mono, monospace', fontSize: 10,
-                  color: RH.textDim, letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700,
-                }}>Or enter a new card</div>
-              </div>
-            ) : null}
-            <input
-              type="text" inputMode="numeric" name="cc-number" autoComplete="cc-number"
-              autoCorrect="off" autoCapitalize="off" spellCheck={false}
-              value={cardNum}
-              onChange={(e) => setCardNum(fmtCard(e.target.value))}
-              placeholder="Card number"
-              style={{
-                width: '100%', background: RH.surface, border: `1px solid ${RH.line}`,
-                borderRadius: 12, padding: '14px 14px', color: RH.text,
-                fontSize: 15, fontWeight: 600,
-                fontFamily: 'Geist Mono, monospace', letterSpacing: 0.6, marginBottom: 8,
-                cursor: 'text',
-              }}
-              onFocus={(e) => (e.currentTarget.style.borderColor = RH.accent)}
-              onBlur={(e) =>  (e.currentTarget.style.borderColor = RH.line)}
-            />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-              <input type="text" inputMode="numeric" name="cc-exp" autoComplete="cc-exp"
-                autoCorrect="off" autoCapitalize="off" spellCheck={false}
-                value={cardExp} onChange={(e) => setCardExp(fmtExp(e.target.value))} placeholder="MM/YY"
-                onFocus={(e) => (e.currentTarget.style.borderColor = RH.accent)}
-                onBlur={(e) =>  (e.currentTarget.style.borderColor = RH.line)}
-                style={{
-                  width: '100%', minWidth: 0, boxSizing: 'border-box',
-                  background: RH.surface, border: `1px solid ${RH.line}`, borderRadius: 12,
-                  padding: '12px 4px', color: RH.text, fontSize: 12, fontWeight: 600,
-                  fontFamily: 'Geist Mono, monospace', textAlign: 'center', cursor: 'text',
-                }}/>
-              <input type="text" inputMode="numeric" name="cc-csc" autoComplete="cc-csc"
-                autoCorrect="off" autoCapitalize="off" spellCheck={false}
-                value={cardCvv} onChange={(e) => setCardCvv(e.target.value.replace(/\D/g,'').slice(0,4))} placeholder="CVV"
-                onFocus={(e) => (e.currentTarget.style.borderColor = RH.accent)}
-                onBlur={(e) =>  (e.currentTarget.style.borderColor = RH.line)}
-                style={{
-                  width: '100%', minWidth: 0, boxSizing: 'border-box',
-                  background: RH.surface, border: `1px solid ${RH.line}`, borderRadius: 12,
-                  padding: '12px 4px', color: RH.text, fontSize: 12, fontWeight: 600,
-                  fontFamily: 'Geist Mono, monospace', textAlign: 'center', cursor: 'text',
-                }}/>
-              <input type="text" inputMode="numeric" name="postal-code" autoComplete="postal-code"
-                autoCorrect="off" autoCapitalize="off" spellCheck={false}
-                value={cardZip} onChange={(e) => setCardZip(e.target.value.replace(/\D/g,'').slice(0,5))} placeholder="ZIP"
-                onFocus={(e) => (e.currentTarget.style.borderColor = RH.accent)}
-                onBlur={(e) =>  (e.currentTarget.style.borderColor = RH.line)}
-                style={{
-                  width: '100%', minWidth: 0, boxSizing: 'border-box',
-                  background: RH.surface, border: `1px solid ${RH.line}`, borderRadius: 12,
-                  padding: '12px 4px', color: RH.text, fontSize: 12, fontWeight: 600,
-                  fontFamily: 'Geist Mono, monospace', textAlign: 'center', cursor: 'text',
-                }}/>
-            </div>
-            {/* Save card toggle */}
-            <label style={{
-              marginTop: 10, padding: '10px 12px',
-              background: RH.surface, border: `1px solid ${RH.line}`,
-              borderRadius: 12,
-              display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
-            }}>
-              <input type="checkbox" checked={saveCardChecked}
-                onChange={(e) => setSaveCardChecked(e.target.checked)}
-                style={{
-                  width: 16, height: 16, accentColor: RH.accent, cursor: 'pointer',
-                }}/>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: RH.text }}>Save card for next time</div>
-                <div style={{ fontSize: 10.5, color: RH.textDim, marginTop: 1 }}>Stored securely · Use one-tap next deposit</div>
-              </div>
-            </label>
+        <Header title="Pay with card" back={() => setStep('pick')}/>
+        <div className="alpexa-hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '6px 22px calc(20px + env(safe-area-inset-bottom, 0px))' }}>
+          <div style={{ fontSize: 14.5, color: RH.text, lineHeight: 1.6, marginBottom: 18, fontWeight: 500 }}>
+            To pay by card you buy <b>USDT</b> — a digital dollar (1 USDT is about $1) — and it lands in your balance. It takes about 5 minutes. Just do these 3 steps. 👇
           </div>
-          {renderAmountBlock('Card')}
-          <div style={{ flex: 1 }}/>
-          <div style={{ padding: '10px 22px 22px' }}>
-            <button disabled={!valid} onClick={() => valid && payWithTransak()} style={{
-              width: '100%', padding: '16px 0', borderRadius: 999,
-              background: valid ? RH.green : RH.surfaceUp,
-              color: valid ? '#000' : RH.textMute,
-              border: 'none', cursor: valid ? 'pointer' : 'not-allowed',
-              fontSize: 15, fontWeight: 700, letterSpacing: 0.2,
-            }}>{valid ? `Add $${amount.toFixed(2)} via card` : missingHint}</button>
+          {stepRow('1', 'Tap the blue button and pay', "A secure payment page opens. Type your card number, just like buying anything online. (The first time, it asks for a photo of your ID — that's the law for buying crypto with a card.)")}
+          <button onClick={openBuy} style={{ width: '100%', padding: '16px 0', borderRadius: 14, background: RH.accent, color: '#fff', border: 'none', fontSize: 16, fontWeight: 800, letterSpacing: 0.2, cursor: 'pointer', marginBottom: 20, boxShadow: '0 10px 24px -10px ' + RH.accent }}>
+            Buy USDT with my card →
+          </button>
+          {stepRow('2', 'It asks "where to send it?"', <>Tap <b>Copy</b> below, then paste it into the box on that page. This is your Alpexa address. Choose the network <b>Ethereum (ERC-20)</b>.</>)}
+          <div style={{ background: RH.surface, border: '1px solid ' + RH.line, borderRadius: 14, padding: '14px', marginBottom: 20 }}>
+            <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700, marginBottom: 8 }}>Your deposit address</div>
+            <div style={{ fontFamily: 'Geist Mono, monospace', fontSize: 12.5, color: RH.text, wordBreak: 'break-all', lineHeight: 1.5, marginBottom: 12 }}>{addr}</div>
+            <button onClick={(e) => { try { navigator.clipboard.writeText(addr); } catch (_) {} const b = e.currentTarget; const o = b.textContent; b.textContent = 'Copied!'; setTimeout(() => { try { b.textContent = o; } catch (_) {} }, 1500); }} style={{ width: '100%', padding: '13px 0', borderRadius: 999, background: RH.green, color: '#000', border: 'none', fontSize: 15, fontWeight: 800, cursor: 'pointer' }}>Copy address</button>
+          </div>
+          {stepRow('3', 'Done — sit back', "Your money arrives in a few minutes and shows up in your Alpexa balance by itself. That's all! 🎉")}
+          <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: 12, padding: '12px 14px', fontSize: 12.5, color: '#92400E', lineHeight: 1.55, marginTop: 6 }}>
+            ⚠️ Send only <b>USDT</b> on the <b>Ethereum (ERC-20)</b> network. A different coin or network can lose the money.
+          </div>
+          <div style={{ fontSize: 12.5, color: RH.textDim, lineHeight: 1.6, marginTop: 16 }}>
+            Already have USDT (on Coinbase, Binance, MetaMask…)? You can skip step 1 — just send it to the address above.
           </div>
         </div>
       </Phone>
@@ -14286,7 +14153,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){var V='Crypto v123';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='Crypto v124';try{console.log('Alpexa '+V);}catch(e){}
 try{ var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
