@@ -84,7 +84,7 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
   var m=JSON.parse(localStorage.getItem('alpexa.me')||'null');
   if(m&&m.accts&&(m.email||m.authId)){
     var ls=(localStorage.getItem('alpexa.lastServer')||'').toLowerCase();
-    var dest= ls==='crypto'?'crypto-live.html': ls==='sports'?'sports-live.html':'trading.html';
+    var dest= ls==='sports'?'sports-live.html': ls==='fx'||ls==='live'?'trading.html':'crypto-live.html';
     location.replace(dest);
   }
 }catch(e){}})();
@@ -144,7 +144,7 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
   <div class="suc-ico"><svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg></div>
   <div class="suc-title">Welcome back</div>
   <div class="suc-sub" id="sucSub"></div>
-  <button class="suc-btn" onclick="window.location.href='trading.html'">Continue &nbsp;→</button>
+  <button class="suc-btn" onclick="window.location.href=(selServer===2?'sports-live.html':selServer===0?'trading.html':'crypto-live.html')">Continue &nbsp;→</button>
 </div>
 <div id="resetScreen" class="success-screen" style="display:none">
   <div class="suc-title" style="margin-bottom:8px">Set a new password</div>
@@ -162,7 +162,7 @@ const SERVERS=[
   {name:'Alpexa Crypto', url:'crypto.alpexa-suisse.com:443', color:'#1565c0',tag:'Crypto',    tagBg:'#e3f2fd',tagTxt:'#1565c0'},
   {name:'Alpexa Sports', url:'sports.alpexa-suisse.com:443', color:'#757575',tag:'Sports',    tagBg:'#f5f5f5',tagTxt:'#757575'},
 ];
-let selServer=0,savePw=true,pwVisible=false,qrInterval=null,qrSec=60;
+let selServer=1,savePw=true,pwVisible=false,qrInterval=null,qrSec=60;
 function renderServers(list){document.getElementById('serverList').innerHTML=list.map(s=>{const i=SERVERS.indexOf(s);return`<div class="sh-item" onclick="selectServer(${i})"><div class="sh-ico" style="background:${s.color}"><svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></div><div class="sh-item-body"><div class="sh-item-name">${s.name}</div><div class="sh-item-url">${s.url}</div><span class="sh-item-tag" style="background:${s.tagBg};color:${s.tagTxt}">${s.tag}</span></div><div class="sh-chk">${i===selServer?'<svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>':''}</div></div>`;}).join('');}
 function openServerSheet(){document.getElementById('serverSheet').style.display='block';document.getElementById('serverSearch').value='';renderServers(SERVERS);setTimeout(()=>document.getElementById('serverSearch').focus(),100);}
 function closeSheet(){document.getElementById('serverSheet').style.display='none';}
