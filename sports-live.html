@@ -1447,7 +1447,7 @@
   const DEFAULT_SETTINGS={
     oddsFormat:'american',
     timezone:'auto',
-    theme:'dark',
+    theme:'light',
     notifications:{liveStart:true,betResults:true,deposits:true,promos:false,sound:true},
     depositLimit:0,lossLimit:0,realityCheckMin:0,selfExcludeUntil:0,language:'en'
   };
@@ -1456,6 +1456,9 @@
       if(!s)return {...DEFAULT_SETTINGS};
       const m={...DEFAULT_SETTINGS,...s,notifications:{...DEFAULT_SETTINGS.notifications,...(s.notifications||{})}};
       if(!m._soundV2){ m.notifications.sound=true; m._soundV2=true; }
+      // One-time: flip existing devices to the light theme (new default). Respects
+      // any future user choice (only runs once).
+      if(!m._themeLightV1){ m.theme='light'; m._themeLightV1=true; try{localStorage.setItem('alpexaSettings',JSON.stringify(m));}catch(e){} }
       return m;
     }catch(_){return {...DEFAULT_SETTINGS};}
   })();
