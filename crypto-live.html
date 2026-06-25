@@ -23,13 +23,14 @@
   html, body { margin: 0; padding: 0; background: #FFFFFF; min-height: 100vh;
     font-family: 'Geist', 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; color: #0E0E0E; }
   * { box-sizing: border-box; }
-  .stage { min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  .stage { min-height: var(--app-vh, 100vh); display: flex; align-items: center; justify-content: center;
     padding: 20px; background: #FFFFFF; }
-  /* Wide / desktop preview: cap the phone to the window height so its internal scroll
-     keeps the bottom buttons visible on every screen (no transform/zoom — those broke
-     rendering / aren't supported everywhere). Mobile (<=600) is full-screen below. */
+  /* Wide / desktop preview: cap the phone to the REAL visible height (--app-vh is the
+     JS-measured visualViewport height, so it excludes a mobile browser's toolbars —
+     plain 100vh overestimates there and pushed the bottom buttons behind the bar).
+     Keeps the bottom buttons visible on every screen. Mobile (<=600) is full-screen below. */
   @media (min-width: 601px) {
-    .phone-shell { max-height: calc(100vh - 40px) !important; }
+    .phone-shell { max-height: calc(var(--app-vh, 100svh) - 40px) !important; }
   }
   .phone-shadow { border-radius: 54px; box-shadow:
     0 50px 90px -30px rgba(0,0,0,0.28),
@@ -14273,7 +14274,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){var V='Crypto v120';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='Crypto v121';try{console.log('Alpexa '+V);}catch(e){}
 try{ var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
