@@ -153,6 +153,10 @@ input{font-family:inherit;outline:none;border:none;background:none;color:inherit
    frame's internal scroll keeps the bottom buttons visible on every screen. */
 @media (min-width:480px){ .ios-device{ max-height: calc(var(--app-vh, 100svh) - 32px) !important; } }
 @media (max-width:600px){ .app-hdr, .chart-hdr{ padding-top: max(10px, env(safe-area-inset-top)) !important; } }
+/* On mobile, bottom-sheets must cover the WHOLE viewport. `position:absolute` anchors
+   to the scrolling page (so the page showed through below the sheet); `fixed` pins it
+   to the viewport. Desktop keeps `absolute` so the sheet stays inside the phone frame. */
+@media (max-width:600px){ .fx-sheet-overlay{ position: fixed !important; } }
 /* Footer is an in-flow flex row at the bottom of the 100dvh column (same as
    desktop), so it stays pinned to the real visible bottom and never floats when
    Safari's address bar shows/hides. */
@@ -1632,7 +1636,7 @@ function ModifySheet({position,isPending=false,market=[],onSave,onClose}){
   }
   const canSave=(!slH||(!slH.invalid&&!slH.tooClose))&&(!tpH||(!tpH.invalid&&!tpH.tooClose));
   return(
-    <div onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(10,14,26,0.55)',zIndex:300,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
+    <div className="fx-sheet-overlay" onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(10,14,26,0.55)',zIndex:300,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
       <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderTopLeftRadius:16,borderTopRightRadius:16,display:'flex',flexDirection:'column',animation:'slideUp 0.22s cubic-bezier(0.2,0.8,0.2,1)'}}>
         <div style={{display:'flex',justifyContent:'center',padding:'8px 0 4px'}}><div style={{width:36,height:4,borderRadius:2,background:'var(--line-2)'}}/></div>
         <div style={{padding:'6px 16px 6px',display:'flex',alignItems:'center'}}>
@@ -2062,7 +2066,7 @@ function LeverageSheet({ openPositions, onClose }) {
   function save() { setLeverageSettings(lev); window.dispatchEvent(new Event('alpexa-balance-change')); onClose(); }
   function reset() { const d={FX:100,INDEX:20,STOCK:5,CRYPTO:5}; setLev(d); setLeverageSettings(d); window.dispatchEvent(new Event('alpexa-balance-change')); }
   return (
-    <div onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(10,14,26,0.55)',zIndex:300,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
+    <div className="fx-sheet-overlay" onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(10,14,26,0.55)',zIndex:300,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
       <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderTopLeftRadius:16,borderTopRightRadius:16,display:'flex',flexDirection:'column',maxHeight:'88%',overflow:'hidden',animation:'slideUp 0.22s cubic-bezier(0.2,0.8,0.2,1)'}}>
         <div style={{display:'flex',justifyContent:'center',padding:'8px 0 4px'}}><div style={{width:36,height:4,borderRadius:2,background:'var(--line-2)'}}/></div>
         <div style={{padding:'6px 16px 12px',display:'flex',alignItems:'center'}}>
@@ -2163,7 +2167,7 @@ function LanguageSheet({onClose}){
   function save(){setPref('language',selected);onClose();}
   const filtered=LANGUAGES.filter(l=>!search||l.name.toLowerCase().includes(search.toLowerCase())||l.native.toLowerCase().includes(search.toLowerCase())||l.code.toLowerCase().includes(search.toLowerCase()));
   return(
-    <div onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(10,14,26,0.55)',zIndex:300,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
+    <div className="fx-sheet-overlay" onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(10,14,26,0.55)',zIndex:300,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
       <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderTopLeftRadius:16,borderTopRightRadius:16,display:'flex',flexDirection:'column',maxHeight:'88%',animation:'slideUp 0.22s cubic-bezier(0.2,0.8,0.2,1)'}}>
         <div style={{display:'flex',justifyContent:'center',padding:'8px 0 4px'}}><div style={{width:36,height:4,borderRadius:2,background:'var(--line-2)'}}/></div>
         <div style={{padding:'6px 16px 12px',display:'flex',alignItems:'center'}}>
@@ -2209,7 +2213,7 @@ function CurrencySheet({onClose}){
   function save(){setPref('currency',selected);onClose();}
   const filtered=CURRENCIES.filter(c=>!search||c.code.toLowerCase().includes(search.toLowerCase())||c.name.toLowerCase().includes(search.toLowerCase()));
   return(
-    <div onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(10,14,26,0.55)',zIndex:300,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
+    <div className="fx-sheet-overlay" onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(10,14,26,0.55)',zIndex:300,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
       <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderTopLeftRadius:16,borderTopRightRadius:16,display:'flex',flexDirection:'column',maxHeight:'88%',animation:'slideUp 0.22s cubic-bezier(0.2,0.8,0.2,1)'}}>
         <div style={{display:'flex',justifyContent:'center',padding:'8px 0 4px'}}><div style={{width:36,height:4,borderRadius:2,background:'var(--line-2)'}}/></div>
         <div style={{padding:'6px 16px 12px',display:'flex',alignItems:'center'}}>
@@ -2476,7 +2480,7 @@ function SettingSheet({kind,onClose}){
   const titles={alerts:{title:'Price Alerts',sub:'Get notified when prices hit your targets'},notif:{title:'Notifications',sub:'Manage push and email notifications'},'2fa':{title:'Two-Factor Auth',sub:'Enabled · Authenticator app'},sessions:{title:'Active Sessions',sub:'Devices currently signed in'},terms:{title:'Terms of Use',sub:'Last updated May 10, 2026'},support:{title:'Support',sub:'Get help from our team'}};
   const t=titles[kind]||{title:'Settings',sub:''};
   return(
-    <div onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(10,14,26,0.55)',zIndex:300,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
+    <div className="fx-sheet-overlay" onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(10,14,26,0.55)',zIndex:300,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
       <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderTopLeftRadius:16,borderTopRightRadius:16,display:'flex',flexDirection:'column',maxHeight:'88%',overflow:'hidden',animation:'slideUp 0.22s cubic-bezier(0.2,0.8,0.2,1)'}}>
         <div style={{display:'flex',justifyContent:'center',padding:'8px 0 4px'}}><div style={{width:36,height:4,borderRadius:2,background:'var(--line-2)'}}/></div>
         <div style={{padding:'6px 16px 12px',display:'flex',alignItems:'center'}}>
@@ -2549,7 +2553,7 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
   }
   const QUICK=[100,500,1000,5000];
   return(
-    <div onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(10,14,26,0.55)',zIndex:300,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
+    <div className="fx-sheet-overlay" onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(10,14,26,0.55)',zIndex:300,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
       <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderTopLeftRadius:16,borderTopRightRadius:16,display:'flex',flexDirection:'column',maxHeight:'88%',overflow:'hidden',animation:'slideUp 0.22s cubic-bezier(0.2,0.8,0.2,1)'}}>
         <div style={{display:'flex',justifyContent:'center',padding:'6px 0 2px'}}><div style={{width:36,height:4,borderRadius:2,background:'var(--line-2)'}}/></div>
         {step==='done'?(
@@ -3200,7 +3204,7 @@ function AppMenu({indicators,setIndicators,liveOrders,closedHistory,onClose}){
   const avgWin=wins.length?wins.reduce((s,c)=>s+c.pnl,0)/wins.length:0;
   const avgLoss=losses.length?losses.reduce((s,c)=>s+c.pnl,0)/losses.length:0;
   return(
-    <div onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(10,14,26,0.55)',zIndex:300,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
+    <div className="fx-sheet-overlay" onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(10,14,26,0.55)',zIndex:300,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
       <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderTopLeftRadius:16,borderTopRightRadius:16,display:'flex',flexDirection:'column',maxHeight:'80%',overflow:'hidden',animation:'slideUp 0.22s cubic-bezier(0.2,0.8,0.2,1)'}}>
         <div style={{background:'#1B3955',borderTopLeftRadius:16,borderTopRightRadius:16,padding:'10px 16px 12px',display:'flex',alignItems:'center',gap:8}}>
           {view!=='root'&&(<button onClick={()=>setView('root')} style={{width:28,height:28,borderRadius:14,background:'rgba(255,255,255,0.1)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff'}}><Mi name="arrow_back" size={16}/></button>)}
@@ -3281,7 +3285,7 @@ function NotificationSheet({notifications,setNotifications,onClose}){
     return n.title?<>{n.title}</>:null;
   }
   return(
-    <div onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(10,14,26,0.55)',zIndex:300,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
+    <div className="fx-sheet-overlay" onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(10,14,26,0.55)',zIndex:300,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
       <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderTopLeftRadius:16,borderTopRightRadius:16,display:'flex',flexDirection:'column',maxHeight:'82%',overflow:'hidden',animation:'slideUp 0.22s cubic-bezier(0.2,0.8,0.2,1)'}}>
         <div style={{display:'flex',justifyContent:'center',padding:'8px 0 4px'}}><div style={{width:36,height:4,borderRadius:2,background:'var(--line-2)'}}/></div>
         <div style={{padding:'6px 16px 12px',display:'flex',alignItems:'center',gap:8}}>
