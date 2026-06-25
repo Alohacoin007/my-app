@@ -23,8 +23,14 @@
   html, body { margin: 0; padding: 0; background: #FFFFFF; min-height: 100vh;
     font-family: 'Geist', 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; color: #0E0E0E; }
   * { box-sizing: border-box; }
-  .stage { height: 100vh; min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    padding: 0; background: #FFFFFF; overflow: hidden; }
+  .stage { min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 20px; background: #FFFFFF; }
+  /* Wide / desktop preview: cap the phone to the window height so its internal scroll
+     keeps the bottom buttons visible on every screen (no transform/zoom — those broke
+     rendering / aren't supported everywhere). Mobile (<=600) is full-screen below. */
+  @media (min-width: 601px) {
+    .phone-shell { max-height: calc(100vh - 40px) !important; }
+  }
   .phone-shadow { border-radius: 54px; box-shadow:
     0 50px 90px -30px rgba(0,0,0,0.28),
     0 24px 48px -24px rgba(0,0,0,0.18),
@@ -4784,7 +4790,7 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
     return (
       <Phone width={390} height={844} bg={RH.bg}>
         <StatusBar/>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
           {/* Hero */}
           <div style={{
             background: hero, color: '#fff',
@@ -14226,15 +14232,10 @@ function alpexaPortfolioSeries(range, n, endValue) {
       // including the bottom buttons on EVERY screen — always fits the window. Using
       // CSS zoom (not transform) also shrinks the layout box, so it centers cleanly
       // with no overflow/scroll. This is global: one fit covers all screens.
-      // Shrink the 390×844 mock with transform:scale (works in EVERY browser, unlike
-      // CSS zoom which Safari/iOS-WebKit ignore). .stage is exactly 100vh and centers
-      // the phone, so the scaled phone is always fully visible — buttons included.
-      if(phoneEl){
-        var sc=Math.min(1,(window.innerHeight-24)/844,(window.innerWidth-24)/390);
-        phoneEl.style.transformOrigin='center center';
-        phoneEl.style.transform = sc<1 ? ('scale('+sc+')') : '';
-        phoneEl.style.zoom='';
-      }
+      // Desktop preview: no scaling (it broke rendering / isn't universally supported).
+      // The phone height is capped via CSS (.phone-shell max-height) so its internal
+      // scroll keeps the bottom buttons visible. Clear any stale inline scale.
+      if(phoneEl){ phoneEl.style.transform=''; phoneEl.style.zoom=''; }
       root.style.removeProperty('--ph-s');
       root.style.removeProperty('--ph-ph');
       root.style.removeProperty('--ph-vh');
@@ -14270,7 +14271,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){var V='Crypto v117';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='Crypto v118';try{console.log('Alpexa '+V);}catch(e){}
 try{ if(!/[?&]ver=1/.test(location.search)) return; var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
