@@ -116,6 +116,14 @@
   #settled .bet-daygroup:first-child{margin-top:4px}
   .dg-net{letter-spacing:0;font-size:12px;font-weight:800}
   .dg-net.green{color:var(--green)} .dg-net.red{color:var(--red)}
+  .dg-meta{font-weight:600;color:var(--tertiary);letter-spacing:0;font-size:10px;margin-left:6px;text-transform:none}
+  .sf-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:2px 0 16px}
+  .sf-quicks{display:flex;gap:6px}
+  .sf-q{font-size:12px;font-weight:700;padding:6px 13px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer}
+  .sf-q.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .sf-range{display:flex;align-items:center;gap:6px}
+  .sf-range input[type=date]{font-size:12px;padding:6px 9px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--text);font-family:inherit}
+  .sf-dash{color:var(--muted)}
 </style>
 </head>
 <body>
@@ -154,7 +162,15 @@
 
     <!-- SETTLED -->
     <section class="panel" id="settled">
-      <div style="text-align:center;color:var(--muted);padding:46px 12px;font-size:14px">No settled bets yet.</div>
+      <div class="sf-bar">
+        <div class="sf-quicks">
+          <button class="sf-q on" data-d="0">All</button>
+          <button class="sf-q" data-d="7">7d</button>
+          <button class="sf-q" data-d="30">30d</button>
+        </div>
+        <div class="sf-range"><input type="date" id="sfFrom"><span class="sf-dash">–</span><input type="date" id="sfTo"></div>
+      </div>
+      <div id="settledList"><div style="text-align:center;color:var(--muted);padding:46px 12px;font-size:14px">No settled bets yet.</div></div>
     </section>
   </div>
 
@@ -225,29 +241,47 @@
       }).join('');
     },function(){});
   }
+  var SETTLED_ALL=[];
+  function _dayLabel(d){ if(!d||isNaN(d.getTime()))return 'Earlier'; var n=new Date(); var t=new Date(n.getFullYear(),n.getMonth(),n.getDate()); var dd=new Date(d.getFullYear(),d.getMonth(),d.getDate()); var diff=Math.round((t-dd)/86400000); if(diff===0)return 'Today'; if(diff===1)return 'Yesterday'; return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}); }
+  function renderSettled(){
+    var list=document.getElementById('settledList'); if(!list) return;
+    var fEl=document.getElementById('sfFrom'), tEl=document.getElementById('sfTo');
+    var from=fEl?fEl.value:'', to=tEl?tEl.value:'';
+    var fromT=from?new Date(from+'T00:00:00').getTime():null, toT=to?new Date(to+'T23:59:59').getTime():null;
+    var rows=SETTLED_ALL.filter(function(s){ if(!fromT&&!toT)return true; if(!s.created_at)return false; var t=new Date(s.created_at).getTime(); if(isNaN(t))return false; if(fromT&&t<fromT)return false; if(toT&&t>toT)return false; return true; });
+    if(!rows.length){ list.innerHTML='<div style="text-align:center;color:var(--muted);padding:46px 12px;font-size:14px">'+((fromT||toT)?'No settled bets in this range.':'No settled bets yet.')+'</div>'; return; }
+    // Group by DAY (rows already newest-first) with a date header: count · win% · net P/L.
+    var groups=[], gmap={};
+    rows.forEach(function(s){ var d=null; try{ if(s.created_at){ d=new Date(s.created_at); if(isNaN(d.getTime())) d=null; } }catch(e){ d=null; } var key=d?d.toDateString():'?'; if(!gmap[key]){ gmap[key]={d:d,items:[]}; groups.push(gmap[key]); } gmap[key].items.push(s); });
+    list.innerHTML=groups.map(function(grp){
+      var net=0, wins=0; grp.items.forEach(function(s){ var won=s.kind==='bet_won'; if(won)wins++; net+=won?(+s.pnl||0):-(+s.stake||0); });
+      var nb=grp.items.length, wr=Math.round(wins/nb*100);
+      var hdr='<div class="bet-daygroup"><span>'+esc(_dayLabel(grp.d))+'<span class="dg-meta">'+nb+(nb===1?' bet':' bets')+' · '+wr+'% win</span></span><span class="dg-net '+(net>=0?'green':'red')+'">'+(net>=0?'+':'-')+money(Math.abs(net))+'</span></div>';
+      return hdr+grp.items.map(function(s){ var won=s.kind==='bet_won'; var ret=won?((+s.stake||0)+(+s.pnl||0)):0;
+        var tm=''; try{ if(s.created_at){ var dt=new Date(s.created_at); if(!isNaN(dt.getTime())) tm=dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); } }catch(e){}
+        return '<div class="bet"><div class="bet-top"><div class="bet-type">'+esc(s.symbol||'Bet')+'</div><span class="status '+(won?'won':'lost')+'">'+(won?'WON':'LOST')+'</span></div>'+
+          (tm?'<div class="bet-when" style="font-size:11px;color:var(--muted);margin:2px 0 6px">Settled · '+tm+'</div>':'')+
+          '<div class="bet-foot"><div class="col"><span class="k">Stake</span><span class="v">'+money(s.stake)+'</span></div>'+
+          '<div class="col"><span class="k">Returned</span><span class="v'+(won?' green':'')+'">'+money(ret)+'</span></div></div></div>';
+      }).join('');
+    }).join('');
+  }
   function loadSettled(){
     window._db.from('settlements').select('symbol,stake,pnl,kind,created_at').eq('cust_id',cust).eq('server','sports').order('created_at',{ascending:false}).then(function(r){
-      var el=document.getElementById('settled'); if(!el) return;
-      var rows=((r&&!r.error&&r.data)||[]).filter(function(s){return s.kind==='bet_won'||s.kind==='bet_lost';});
-      if(!rows.length){ el.innerHTML=EMPTY_S; return; }
-      // Group settled bets by DAY (rows are already sorted newest-first), with a date
-      // header + that day's net P/L.
-      function dayLabel(d){ if(!d||isNaN(d.getTime()))return 'Earlier'; var n=new Date(); var t=new Date(n.getFullYear(),n.getMonth(),n.getDate()); var dd=new Date(d.getFullYear(),d.getMonth(),d.getDate()); var diff=Math.round((t-dd)/86400000); if(diff===0)return 'Today'; if(diff===1)return 'Yesterday'; return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}); }
-      var groups=[], gmap={};
-      rows.forEach(function(s){ var d=null; try{ if(s.created_at){ d=new Date(s.created_at); if(isNaN(d.getTime())) d=null; } }catch(e){ d=null; } var key=d?d.toDateString():'?'; if(!gmap[key]){ gmap[key]={d:d,items:[]}; groups.push(gmap[key]); } gmap[key].items.push(s); });
-      el.innerHTML=groups.map(function(grp){
-        var net=0; grp.items.forEach(function(s){ net+=(s.kind==='bet_won')?(+s.pnl||0):-(+s.stake||0); });
-        var hdr='<div class="bet-daygroup"><span>'+esc(dayLabel(grp.d))+'</span><span class="dg-net '+(net>=0?'green':'red')+'">'+(net>=0?'+':'-')+money(Math.abs(net))+'</span></div>';
-        return hdr+grp.items.map(function(s){ var won=s.kind==='bet_won'; var ret=won?((+s.stake||0)+(+s.pnl||0)):0;
-          var tm=''; try{ if(s.created_at){ var dt=new Date(s.created_at); if(!isNaN(dt.getTime())) tm=dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); } }catch(e){}
-          return '<div class="bet"><div class="bet-top"><div class="bet-type">'+esc(s.symbol||'Bet')+'</div><span class="status '+(won?'won':'lost')+'">'+(won?'WON':'LOST')+'</span></div>'+
-            (tm?'<div class="bet-when" style="font-size:11px;color:var(--muted);margin:2px 0 6px">Settled · '+tm+'</div>':'')+
-            '<div class="bet-foot"><div class="col"><span class="k">Stake</span><span class="v">'+money(s.stake)+'</span></div>'+
-            '<div class="col"><span class="k">Returned</span><span class="v'+(won?' green':'')+'">'+money(ret)+'</span></div></div></div>';
-        }).join('');
-      }).join('');
+      SETTLED_ALL=((r&&!r.error&&r.data)||[]).filter(function(s){return s.kind==='bet_won'||s.kind==='bet_lost';});
+      renderSettled();
     },function(){});
   }
+  (function(){
+    var f=document.getElementById('sfFrom'), t=document.getElementById('sfTo');
+    function clearQuick(){ var qs=document.querySelectorAll('.sf-q'); for(var i=0;i<qs.length;i++) qs[i].classList.remove('on'); }
+    if(f) f.onchange=function(){ clearQuick(); renderSettled(); };
+    if(t) t.onchange=function(){ clearQuick(); renderSettled(); };
+    var qs=document.querySelectorAll('.sf-q');
+    for(var i=0;i<qs.length;i++){ (function(b){ b.onclick=function(){ clearQuick(); b.classList.add('on'); var d=+b.dataset.d;
+      if(d===0){ if(f)f.value=''; if(t)t.value=''; } else { var now=new Date(); var fr=new Date(now.getTime()-(d-1)*86400000); if(t)t.value=now.toISOString().slice(0,10); if(f)f.value=fr.toISOString().slice(0,10); }
+      renderSettled(); }; })(qs[i]); }
+  })();
   loadOpen(); loadSettled(); setInterval(function(){ loadOpen(); loadSettled(); }, 30000);
 })();
 </script>
