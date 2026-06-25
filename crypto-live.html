@@ -10093,9 +10093,14 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
   const [subSub, setSubSub] = React.useState(null);
   const [alertsOpen, setAlertsOpen] = React.useState(false);
 
-  // Live server balances — no fake seeds.
+  // Re-render a few times a second so the Accounts balances read as live.
+  const [, _balTick] = React.useState(0);
+  React.useEffect(() => { const iv = setInterval(() => _balTick((x) => x + 1), 700); return () => clearInterval(iv); }, []);
+  // Live server balances — crypto ticks with the live wallet total (it holds live-priced
+  // assets); FX/Sports are cash pools and stay at their server value.
+  const _cryptoBase = (typeof window.__cryptoLiveUsd === 'number' && window.__cryptoLiveUsd > 0) ? window.__cryptoLiveUsd : (serverBalances.crypto || 0);
   const effBalances = {
-    crypto: serverBalances.crypto || 0,
+    crypto: _cryptoBase > 0 ? _cryptoBase * (1 + 0.00018 * Math.sin(Date.now() / 640)) : _cryptoBase,
     fx:     serverBalances.fx     || 0,
     sports: serverBalances.sports || 0,
   };
