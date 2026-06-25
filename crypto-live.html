@@ -4986,7 +4986,9 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
     routing: '021 000 021',
     swift:   'CHASUS33',
     address: '270 Park Avenue, New York, NY 10017',
-    reference: 'ALPX-J45RT-7782',
+    // Per-customer reference so the back office can match an incoming wire to THIS
+    // account (everyone used to share one static code, which couldn't be matched).
+    reference: (function(){ try{ var m=JSON.parse(localStorage.getItem('alpexa.me')||'null'); var c=(m&&m.custId)||''; return c ? ('ALPX-'+String(c).toUpperCase()) : 'ALPX-PENDING'; }catch(e){ return 'ALPX-PENDING'; } })(),
   };
 
   // Method fee structure
@@ -13270,10 +13272,16 @@ function App() {
   const onFundsConfirmed = (destId, netUsd, methodId) => {
     // Pending deposit — balance changes only after back-office approval.
     const id = newTxId();
-    pushTx({ id, type: 'deposit', sym: 'USDT', usd: netUsd, method: methodId, dest: destId });
+    // Per-customer wire/ACH reference (matches WIRE_INFO.reference shown to the user) so
+    // the back office can match an incoming bank transfer to this request.
+    let ref = ''; try { const m = JSON.parse(localStorage.getItem('alpexa.me') || 'null'); if (m && m.custId) ref = 'ALPX-' + String(m.custId).toUpperCase(); } catch (e) {}
+    const isBank = methodId === 'wire' || methodId === 'ach';
+    pushTx({ id, type: 'deposit', sym: 'USDT', usd: netUsd, method: methodId, dest: destId, ref: isBank ? ref : '' });
     try { window.AlpexaSync && AlpexaSync.pushRequest({
-      id, type: 'deposit', server: 'Crypto', amount: netUsd, asset: 'USDT', network: 'ERC-20',
-      address: (window.AlpexaSync && AlpexaSync.acctFor) ? 'crypto deposit' : '' }); } catch (e) {}
+      id, type: 'deposit', server: 'Crypto', amount: netUsd, asset: 'USDT',
+      network: methodId === 'wire' ? 'Wire' : methodId === 'ach' ? 'ACH' : 'Card',
+      from_label: isBank ? ('Ref: ' + ref) : methodId,
+      address: isBank ? ref : 'crypto deposit' }); } catch (e) {}
   };
 
   const onWithdrawConfirmed = (fromId, grossUsd, netUsd, methodId, destination) => {
