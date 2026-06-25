@@ -1140,11 +1140,16 @@
   function saveTxns(){ try{ localStorage.setItem('alpexa.txns', JSON.stringify(txns)); }catch(e){} }
   function updateTxnByReq(reqId,patch){ if(typeof txns==='undefined')return false; for(let i=0;i<txns.length;i++){ if(txns[i].reqId===reqId){ Object.assign(txns[i],patch); return true; } } return false; }
   // ---------- notifications ----------
-  let notifs = [];
+  let notifs = (function(){ try{ var a=JSON.parse(localStorage.getItem('alpexa.sportsNotifs')||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } })();
+  function saveNotifs(){ try{ localStorage.setItem('alpexa.sportsNotifs', JSON.stringify(notifs.slice(0,100))); }catch(e){} }
   function notify(ic,t1,t2,cat){
     // categories: 'liveStart' | 'betResults' | 'deposits' | 'promos' | undefined (always show)
     if(cat && settings.notifications && settings.notifications[cat]===false) return;
+    // de-dupe an identical notification fired twice within 4s (optimistic + server adopt)
+    if(notifs[0] && notifs[0].t1===t1 && notifs[0].t2===t2 && (Date.now()-(notifs[0].ts||0))<4000) return;
     notifs.unshift({ic,t1,t2,ts:Date.now(),unread:true});
+    notifs=notifs.slice(0,100);
+    saveNotifs();
     renderNotifs();
   }
   // ===== SETTINGS render + actions =====
@@ -2165,6 +2170,8 @@
   // is identical on every device — not per-device localStorage. Cash-outs (settled
   // on-device, with full legs) are merged in. Rich legs preferred when available.
   let serverSettled=[];
+  let _settleFirst=true;
+  let _settleNotified=(function(){try{return JSON.parse(localStorage.getItem('alpexa.sportsSettleNotified')||'{}')||{};}catch(e){return {};}})();
   function pullServerSettled(){
     if(!(window.AlpexaSync&&AlpexaSync.db)) return; const cust=meCust(); if(!cust) return;
     AlpexaSync.db.from('settlements').select('local_id,ticket,symbol,stake,pnl,kind,created_at')
@@ -2181,6 +2188,21 @@
           else out.push({ id:'srv-'+x.local_id, ticket:x.ticket||'', type:x.symbol||'Bet', cls:'', stake:stake, result:won?'won':'lost', payout:won?Math.round((stake+pnl)*100)/100:0, legs:[], ts:ts });
         });
         serverSettled=out;
+        // Notify on bets the SERVER settled (sports-settle) — ones this device didn't
+        // settle itself. First pull seeds a baseline so old results don't flood in.
+        let _newN=false;
+        rows.forEach(function(x){
+          const k=(x.kind||'').toLowerCase(); if(k!=='bet_won'&&k!=='bet_lost') return;
+          const sid=String(x.local_id||''); if(!sid||_settleNotified[sid]) return;
+          if(_settleFirst){ _settleNotified[sid]=1; _newN=true; return; }
+          const loc=(settledBets||[]).find(b=>(b.id&&String(b.id).indexOf(sid)>=0)||(x.ticket&&b.ticket===x.ticket));
+          if(loc){ _settleNotified[sid]=1; return; }   // this device already settled+notified it
+          const won=k==='bet_won', stake=+x.stake||0, pnl=+x.pnl||0;
+          notify(won?'🏆':'❌', won?'Bet won!':'Bet lost', (x.symbol||'Bet')+' · '+(won?('+'+usd(Math.round((stake+pnl)*100)/100)):(usd(stake)+' stake')), 'betResults');
+          _settleNotified[sid]=1; _newN=true;
+        });
+        _settleFirst=false;
+        if(_newN){ try{localStorage.setItem('alpexa.sportsSettleNotified',JSON.stringify(_settleNotified));}catch(e){} }
         try{ renderTickets(); }catch(e){}
       },function(){});
   }
@@ -2867,11 +2889,11 @@
   document.getElementById('bellBtn').onclick=e=>{
     e.stopPropagation();srvMenu.classList.remove('show');
     const showing=notifMenu.classList.toggle('show');
-    if(showing){renderNotifs();}
+    if(showing){ renderNotifs(); notifs.forEach(n=>n.unread=false); saveNotifs(); document.getElementById('bellDot').style.display='none'; }
   };
   notifMenu.onclick=e=>e.stopPropagation();
   document.getElementById('notifClear').onclick=()=>{
-    notifs.forEach(n=>n.unread=false);renderNotifs();
+    notifs.forEach(n=>n.unread=false);saveNotifs();renderNotifs();
   };
   renderNotifs();
 
