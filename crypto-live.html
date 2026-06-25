@@ -10042,7 +10042,11 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
   // event so BOTH the Accounts row and the server-switcher dropdown read the exact same
   // number (no independent drift → they always match). FX/Sports are cash pools (static).
   const [, _balTick] = React.useState(0);
-  const _cryptoAnchor = serverBalances.crypto || 0;
+  // Anchor to the LIVE crypto wallet total (holdings + staked) — the same value the home
+  // hero and the server-switcher prop use — so the Accounts row matches the wallet.
+  // (serverBalances.crypto gets overwritten by pullBalances with the server account
+  // balance, which can differ from the live holdings → the mismatch the user saw.)
+  const _cryptoAnchor = Object.values(balances).reduce((a, v) => a + (+v || 0), 0) + Object.values(staked).reduce((a, s) => a + ((s && s.usd) || 0), 0);
   React.useEffect(() => {
     const iv = setInterval(() => {
       if (_cryptoAnchor > 0) {
@@ -14163,7 +14167,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){var V='Crypto v136';try{console.log('Alpexa '+V);}catch(e){}})();
+(function(){var V='Crypto v137';try{console.log('Alpexa '+V);}catch(e){}})();
 </script>
 <script>
 /* Report crypto holdings + stakes to the server for the back office. */
