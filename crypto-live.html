@@ -5330,8 +5330,11 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
     const addr = '0x6B1c8941698Affc56757eF9Be1723Ec43F720966';
     const buyUrl = 'https://global.transak.com/?cryptoCurrencyCode=USDT&network=ethereum&fiatCurrency=USD&walletAddress=' + addr + (amount > 0 ? ('&defaultFiatAmount=' + Math.round(amount)) : '');
     const openBuy = () => {
-      // Let the back office expect this customer's USDT so they can match the deposit.
-      try { window.AlpexaSync && AlpexaSync.pushRequest({ id: 'card-' + Date.now(), type: 'deposit', server: 'Crypto', amount: amount || 0, asset: 'USDT', network: 'Card -> USDT (ERC-20)', from_label: 'Card on-ramp' }); } catch (e) {}
+      // Record a PENDING deposit through the SAME path as wire/ACH (onFunded →
+      // onFundsConfirmed): it writes BOTH the customer's local history row ("Deposit ·
+      // Pending") AND the server request the operator approves. So the customer can see
+      // their own deposit (pending → confirmed) and the back office can match + credit it.
+      try { onFunded && onFunded(destId, amount, 'card'); } catch (e) {}
       try { window.open(buyUrl, '_blank'); } catch (e) { try { window.location.href = buyUrl; } catch (_) {} }
     };
     const stepRow = (n, title, body) => (
@@ -5351,9 +5354,20 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
           <div style={{ fontSize: 14.5, color: RH.text, lineHeight: 1.6, marginBottom: 18, fontWeight: 500 }}>
             To pay by card you buy <b>USDT</b> — a digital dollar (1 USDT is about $1) — and it lands in your balance. It takes about 5 minutes. Just do these 3 steps. 👇
           </div>
+          {/* How much — needed so the deposit record has an amount the operator can match. */}
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: RH.text, marginBottom: 8 }}>How much do you want to add?</div>
+            <div style={{ display: 'flex', alignItems: 'center', background: RH.surface, border: '1px solid ' + RH.line, borderRadius: 12, padding: '12px 14px' }}>
+              <span style={{ fontSize: 22, fontWeight: 700, color: RH.textDim, marginRight: 6 }}>$</span>
+              <input type="text" inputMode="decimal" value={amountStr === '0' ? '' : amountStr}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ''); setAmountStr(v === '' ? '0' : v); }}
+                placeholder="0" style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', color: RH.text, fontSize: 22, fontWeight: 700, fontFamily: 'Geist Mono, monospace' }}/>
+              <span style={{ fontSize: 13, color: RH.textDim, fontWeight: 600 }}>USD</span>
+            </div>
+          </div>
           {stepRow('1', 'Tap the blue button and pay', "A secure payment page opens. Type your card number, just like buying anything online. (The first time, it asks for a photo of your ID — that's the law for buying crypto with a card.)")}
-          <button onClick={openBuy} style={{ width: '100%', padding: '16px 0', borderRadius: 14, background: RH.accent, color: '#fff', border: 'none', fontSize: 16, fontWeight: 800, letterSpacing: 0.2, cursor: 'pointer', marginBottom: 20, boxShadow: '0 10px 24px -10px ' + RH.accent }}>
-            Buy USDT with my card →
+          <button onClick={() => amount > 0 && openBuy()} disabled={amount <= 0} style={{ width: '100%', padding: '16px 0', borderRadius: 14, background: amount > 0 ? RH.accent : RH.surfaceUp, color: amount > 0 ? '#fff' : RH.textMute, border: 'none', fontSize: 16, fontWeight: 800, letterSpacing: 0.2, cursor: amount > 0 ? 'pointer' : 'not-allowed', marginBottom: 20, boxShadow: amount > 0 ? ('0 10px 24px -10px ' + RH.accent) : 'none' }}>
+            {amount > 0 ? ('Buy $' + amount.toFixed(0) + ' USDT with my card →') : 'Enter an amount above first'}
           </button>
           {stepRow('2', 'It asks "where to send it?"', <>Tap <b>Copy</b> below, then paste it into the box on that page. This is your Alpexa address. Choose the network <b>Ethereum (ERC-20)</b>.</>)}
           <div style={{ background: RH.surface, border: '1px solid ' + RH.line, borderRadius: 14, padding: '14px', marginBottom: 20 }}>
@@ -14153,7 +14167,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){var V='Crypto v124';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='Crypto v125';try{console.log('Alpexa '+V);}catch(e){}
 try{ var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
