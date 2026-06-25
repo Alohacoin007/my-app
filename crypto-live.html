@@ -5573,77 +5573,125 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
   // ── Wire Transfer page ───────────────────────────────────────────
   if (step === 'wire') {
     const valid = amount > 0;
-    const [copied, setCopied] = [null, null];
+    const copyAll = (e) => { try { navigator.clipboard.writeText('Bank: '+WIRE_INFO.bank+'\nBeneficiary: '+WIRE_INFO.name+'\nAccount: '+WIRE_INFO.account+'\nRouting (ABA): '+WIRE_INFO.routing+'\nSWIFT: '+WIRE_INFO.swift+'\nAddress: '+WIRE_INFO.address+'\nReference: '+WIRE_INFO.reference); } catch (_) {} const b = e.currentTarget; const o = b.textContent; b.textContent = 'Copied'; setTimeout(() => { try { b.textContent = o; } catch (_) {} }, 1400); };
+    const copyRef = (e) => { try { navigator.clipboard.writeText(WIRE_INFO.reference); } catch (_) {} const b = e.currentTarget; const o = b.textContent; b.textContent = 'Copied'; setTimeout(() => { try { b.textContent = o; } catch (_) {} }, 1400); };
     return (
       <Phone width={390} height={844} bg={RH.bg}>
-        
         <StatusBar/>
         <Header title="Wire transfer" back={() => setStep('pick')}/>
         <div className="alpexa-hide-scrollbar" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '4px 22px 0' }}>
-            <div style={{
-              fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.textDim,
-              letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 8,
-            }}>Send wire to</div>
-            <div style={{
-              padding: '14px 16px', background: RH.surface, border: `1px solid ${RH.line}`,
-              borderRadius: 14, fontFamily: 'Geist Mono, monospace',
-            }}>
+          <div style={{ padding: '12px 22px 0' }}>
+            <div style={{ fontSize: 10, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Amount</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', borderBottom: '2px solid ' + RH.line, paddingBottom: 8, marginBottom: 22 }}>
+              <span style={{ fontSize: 30, fontWeight: 700, color: RH.text, marginRight: 3, opacity: 0.5 }}>$</span>
+              <span style={{ fontSize: 40, fontWeight: 700, color: RH.text, letterSpacing: -1, fontVariantNumeric: 'tabular-nums' }}>{intPart}</span>
+              <span style={{ fontSize: 26, fontWeight: 600, color: RH.textDim, fontVariantNumeric: 'tabular-nums' }}>{fracDisplay}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ fontSize: 10, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700 }}>Send a wire with these details</div>
+              <button onClick={copyAll} style={{ background: 'none', border: 'none', color: RH.accent, fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: 0 }}>Copy all</button>
+            </div>
+            <div style={{ background: RH.surface, border: '1px solid ' + RH.line, borderRadius: 16, padding: '14px 16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 12, borderBottom: '1px solid ' + RH.line, marginBottom: 12 }}>
+                <span style={{ fontSize: 13, color: RH.red, fontWeight: 600 }}>Reference</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontFamily: 'Geist Mono, monospace', fontSize: 14, fontWeight: 800, color: RH.red, letterSpacing: 0.5 }}>{WIRE_INFO.reference}</span>
+                  <button onClick={copyRef} style={{ background: 'none', border: 'none', color: RH.accent, fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: 0 }}>Copy</button>
+                </div>
+              </div>
               {[
-                ['Bank',       WIRE_INFO.bank],
-                ['Beneficiary',WIRE_INFO.name],
-                ['Account #',  WIRE_INFO.account],
-                ['ABA / Routing', WIRE_INFO.routing],
-                ['SWIFT / BIC', WIRE_INFO.swift],
-                ['Bank address', WIRE_INFO.address],
-              ].map(([k, v], i) => (
-                <div key={k} style={{
-                  display: 'flex', justifyContent: 'space-between', gap: 10,
-                  paddingTop: i === 0 ? 0 : 8,
-                  paddingBottom: 8,
-                  borderBottom: i < 5 ? `1px solid ${RH.line}` : 'none',
-                }}>
-                  <div style={{
-                    fontSize: 9.5, color: RH.textDim, fontWeight: 700,
-                    letterSpacing: 1, textTransform: 'uppercase', whiteSpace: 'nowrap',
-                  }}>{k}</div>
-                  <div style={{
-                    fontSize: 11, color: RH.text, fontWeight: 600,
-                    textAlign: 'right', wordBreak: 'break-all',
-                  }}>{v}</div>
+                ['Bank', WIRE_INFO.bank],
+                ['Beneficiary', WIRE_INFO.name],
+                ['Account', WIRE_INFO.account],
+                ['Routing (ABA)', WIRE_INFO.routing],
+                ['SWIFT', WIRE_INFO.swift],
+                ['Address', WIRE_INFO.address],
+              ].map(([k, v], i, arr) => (
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, paddingTop: i === 0 ? 0 : 9, paddingBottom: i === arr.length - 1 ? 0 : 9 }}>
+                  <span style={{ fontSize: 13, color: RH.textDim }}>{k}</span>
+                  <span style={{ fontSize: 13, color: RH.text, fontWeight: 600, textAlign: 'right', wordBreak: 'break-word', maxWidth: '62%' }}>{v}</span>
                 </div>
               ))}
             </div>
-            <div style={{
-              marginTop: 10, padding: '12px 14px',
-              background: `${RH.red}12`, border: `1px solid ${RH.red}40`,
-              borderRadius: 12,
-            }}>
-              <div style={{
-                fontFamily: 'Geist Mono, monospace', fontSize: 9.5, color: RH.red,
-                letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 4,
-              }}>Required reference</div>
-              <div style={{
-                fontSize: 16, fontWeight: 700, color: RH.text,
-                fontFamily: 'Geist Mono, monospace', letterSpacing: 1,
-              }}>{WIRE_INFO.reference}</div>
-              <div style={{ fontSize: 10.5, color: RH.textDim, marginTop: 4, lineHeight: 1.4 }}>
-                You must include this reference. Without it the deposit cannot be matched to your account.
-              </div>
-            </div>
-            <div style={{
-              marginTop: 10, padding: '8px 12px',
-              background: `${RH.accent}10`, border: `1px solid ${RH.accent}40`,
-              borderRadius: 12, display: 'flex', alignItems: 'center', gap: 8,
-              fontSize: 11, color: RH.text,
-            }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={RH.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="9"/><path d="M12 8 v5 M12 17 h0.01"/>
-              </svg>
-              $15 fee · Arrives within 1 hour during business hours
-            </div>
           </div>
-          {renderAmountBlock('Wire')}
+          <div style={{ height: 10 }}/>
+      <div style={{ padding: '4px 22px 6px', position: 'relative' }}>
+        <div onClick={() => setDestOpen((o) => !o)} style={{
+          padding: '10px 14px',
+          background: RH.surface, border: `1px solid ${RH.line}`,
+          borderRadius: 12,
+          display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+        }}>
+          <div style={{
+            fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.textDim,
+            letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, width: 24, flexShrink: 0,
+          }}>TO</div>
+          <div style={{
+            width: 24, height: 24, borderRadius: 12,
+            background: RH.surfaceUp, border: `1px solid ${RH.line}`,
+            color: RH.text, fontWeight: 700, fontSize: 9,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>{SERVERS[destId].code}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: RH.text }}>{SERVERS[destId].label}</div>
+            <div style={{
+              fontSize: 11, color: RH.textDim, marginTop: 1,
+              fontVariantNumeric: 'tabular-nums',
+            }}>${(serverBalances[destId] || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          </div>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={RH.textDim} strokeWidth="2.4">
+            <path d="M6 9l6 6 6-6"/>
+          </svg>
+        </div>
+        {destOpen ? (
+          <div style={{
+            position: 'absolute', left: 22, right: 22, top: 'calc(100% + 4px)',
+            background: RH.surface, border: `1px solid ${RH.line}`,
+            borderRadius: 12, padding: 4, zIndex: 30,
+            boxShadow: '0 16px 40px -12px rgba(0,0,0,0.6)',
+          }}>
+            {['crypto','fx','sports'].map((i) => {
+              const m = SERVERS[i]; const active = i === destId;
+              return (
+                <button key={i} onClick={() => { setDestId(i); setDestOpen(false); }} style={{
+                  width: '100%', textAlign: 'left',
+                  background: active ? RH.surfaceUp : 'transparent',
+                  border: 'none', borderRadius: 8, padding: '10px 12px',
+                  display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+                }}>
+                  <span style={{
+                    width: 22, height: 22, borderRadius: 11,
+                    background: RH.surfaceUp, border: `1px solid ${RH.line}`,
+                    color: RH.text, fontWeight: 700, fontSize: 9,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  }}>{m.code}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: RH.text }}>{m.label}</div>
+                  </div>
+                  {active ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={RH.green} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M5 12 l5 5 L20 7"/>
+                    </svg>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+      <div style={{
+        padding: '4px 18px 0',
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+        rowGap: 4, columnGap: 4,
+      }}>
+        {['1','2','3','4','5','6','7','8','9','.','0','⌫'].map((k) => (
+          <button key={k} onClick={() => onKey(k)} style={{
+            background: 'transparent', border: 'none', padding: '8px 0',
+            color: RH.text, fontSize: 22, fontWeight: 500,
+            letterSpacing: -0.5, cursor: 'pointer', fontFamily: 'Geist, Inter, system-ui',
+          }}>{k}</button>
+        ))}
+      </div>
           <div style={{ flex: 1 }}/>
           <div style={{ padding: '10px 22px 22px' }}>
             <button disabled={!valid} onClick={() => valid && doConfirm('wire')} style={{
@@ -14155,7 +14203,7 @@ function alpexaPortfolioSeries(range, n, endValue) {
 })();
 </script>
 <script>
-(function(){var V='Crypto v128';try{console.log('Alpexa '+V);}catch(e){}
+(function(){var V='Crypto v129';try{console.log('Alpexa '+V);}catch(e){}
 try{ var b=document.createElement('div');b.textContent=V;
 b.style.cssText='position:fixed;left:50%;top:env(safe-area-inset-top,8px);transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:8px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
 document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
