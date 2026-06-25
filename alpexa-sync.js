@@ -180,12 +180,25 @@ window.AlpexaSync = (function () {
     var m = me(); var a = m.accts || {};
     var nums = [a.fx, a.crypto, a.sports].filter(Boolean).map(function (x) { return String(x).toUpperCase(); });
     if (!nums.length) return Promise.resolve(null);
+    var fxAcct = a.fx ? String(a.fx).toUpperCase() : null;
     return db.from('accounts').select('server,acct_no,balance').in('acct_no', nums)
       .then(function (r) {
         if (!r || !r.data) return null;
         var out = {};
         r.data.forEach(function (x) { if (x && x.server) out[x.server] = +x.balance || 0; });
-        return out; // e.g. { fx: 0, crypto: 0, sports: 100 }
+        // FX equity (server-side) = cash balance + Σ floating P/L of OPEN fx positions.
+        // The FX app writes each open position's live pnl to `positions` every ~3s, so
+        // this reflects unrealised P/L without re-doing the lot/FX math here. We publish
+        // it to localStorage('alpexa.fxEquity') so the Crypto app shows equity (not raw
+        // cash) for FX in the dropdown / Accounts / withdraw / transfer — cross-device.
+        if (!fxAcct || out.fx == null) return out;
+        return db.from('positions').select('pnl').eq('acct_no', fxAcct).eq('server', 'fx').eq('status', 'open')
+          .then(function (pr) {
+            var sum = 0; if (pr && pr.data) pr.data.forEach(function (p) { sum += (+p.pnl || 0); });
+            out.fxEquity = (+out.fx || 0) + sum;
+            try { localStorage.setItem('alpexa.fxEquity', String(out.fxEquity)); } catch (e) {}
+            return out;
+          }, function () { return out; });
       }, function () { return null; });
   }
 
