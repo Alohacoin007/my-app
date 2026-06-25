@@ -142,11 +142,11 @@ input{font-family:inherit;outline:none;border:none;background:none;color:inherit
 .cat-strip::-webkit-scrollbar{display:none;}
 /* On phones the device frame's status bar is gone, so the 56px header top
    padding is too tall — shrink it (keep notch clearance via safe-area). */
-@media (max-width:600px){ html,body{ min-height:0 !important; height:var(--app-vh, 100dvh) !important; overflow:hidden !important; margin:0 !important; background:#1B3955 !important; } }
-/* Height = --app-vh (JS-measured visualViewport = the REAL visible area, excludes the
-   browser toolbar) so the footer pins to the true bottom and the navy app background
-   can't leak under it. Falls back to 100dvh. Standalone (no toolbar) uses 100vh below. */
-.fx-mobile-shell{ height:var(--app-vh, 100dvh); }
+@media (max-width:600px){ html,body{ min-height:0 !important; height:100dvh !important; overflow:hidden !important; margin:0 !important; background:#fff !important; } }
+/* Use 100dvh (browser-managed dynamic viewport = the real visible area as the toolbar
+   shows/hides) so the footer sits at the true bottom. A JS --app-vh undershoot left a
+   navy gap below the footer, so we rely on dvh here. Standalone (no toolbar) uses 100vh. */
+.fx-mobile-shell{ height:100dvh; }
 @media (display-mode:standalone){ html,body{ height:100vh !important; } .fx-mobile-shell{ height:100vh; } }
 /* Wide / desktop preview: cap the 402×874 device frame to the REAL visible height
    (--app-vh from visualViewport, so it excludes a mobile browser's toolbars) so the
@@ -3966,7 +3966,7 @@ function Root(){
   // fill-container logic have a bounded parent (prevents infinite growth).
   if(isMobile){
     return(
-      <div className="fx-mobile-shell" style={{width:'100%',overflow:'hidden',background:'#1B3955'}}>
+      <div className="fx-mobile-shell" style={{width:'100%',overflow:'hidden',background:'#fff'}}>
         <App/>
       </div>
     );
