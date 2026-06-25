@@ -34,7 +34,10 @@ async function getAccessToken(apiKey: string, apiSecret: string): Promise<string
   });
   const d = await r.json().catch(() => ({}));
   const token = d?.data?.accessToken || d?.accessToken;
-  if (!token) throw new Error("refresh-token failed: " + JSON.stringify(d).slice(0, 300));
+  if (!token) {
+    console.error("REFRESH-TOKEN FAIL", "env=" + ENV, "status=" + r.status, "body=" + JSON.stringify(d).slice(0, 500));
+    throw new Error("refresh-token failed [" + r.status + "]: " + JSON.stringify(d).slice(0, 300));
+  }
   return token;
 }
 
@@ -78,9 +81,10 @@ Deno.serve(async (req) => {
     });
     const sd = await sres.json().catch(() => ({}));
     const widgetUrl = sd?.data?.widgetUrl || sd?.widgetUrl;
-    if (!widgetUrl) return json({ ok: false, error: "session failed: " + JSON.stringify(sd).slice(0, 400) }, 502);
+    if (!widgetUrl) { console.error("SESSION FAIL", "status=" + sres.status, "body=" + JSON.stringify(sd).slice(0, 500)); return json({ ok: false, error: "session failed: " + JSON.stringify(sd).slice(0, 400) }, 502); }
     return json({ ok: true, widgetUrl });
   } catch (e) {
+    console.error("TRANSAK-WIDGET ERROR", String(e));
     return json({ ok: false, error: String(e) }, 500);
   }
 });
