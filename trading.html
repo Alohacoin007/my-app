@@ -2019,13 +2019,9 @@ function SheetLabel({children}){return<div style={{fontSize:10,fontWeight:700,co
 function Row2({l,v,bold}){return(<div style={{display:'flex',justifyContent:'space-between',padding:'4px 0',fontSize:12,color:bold?'var(--ink)':'var(--text-2)',fontWeight:bold?700:500}}><span>{l}</span><span className="mono">{v}</span></div>);}
 function MethodGrid({value,onChange,options}){
   return(
-    <div style={{display:'flex',flexDirection:'column',gap:5,marginBottom:14}}>
+    <div style={{display:'flex',gap:6,marginBottom:14}}>
       {options.map(o=>(
-        <button key={o.v} onClick={()=>onChange(o.v)} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 12px',borderRadius:3,textAlign:'left',background:value===o.v?'var(--acc-3)':'var(--surface)',border:value===o.v?'1.5px solid #1B3955':'1px solid var(--line-2)'}}>
-          <div style={{width:34,height:34,borderRadius:3,background:value===o.v?'#1B3955':'var(--bg-2)',color:value===o.v?'#fff':'var(--text-2)',display:'flex',alignItems:'center',justifyContent:'center',border:'1px solid '+(value===o.v?'#0F2742':'var(--line-2)')}}><Mi name={o.icon} size={18} weight={500}/></div>
-          <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:'var(--ink)'}}>{o.label}</div><div style={{fontSize:10.5,color:'var(--text-3)',marginTop:2}}>{o.sub}</div></div>
-          {value===o.v&&<Mi name="check_circle" size={18} fill style={{color:'#1B3955'}}/>}
-        </button>
+        <button key={o.v} onClick={()=>onChange(o.v)} style={{flex:1,minWidth:0,padding:'11px 6px',borderRadius:8,cursor:'pointer',background:value===o.v?'#0F2742':'var(--surface)',border:value===o.v?'1.5px solid #0F2742':'1px solid var(--line-2)',color:value===o.v?'#fff':'var(--ink)',fontSize:12.5,fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{o.label}</button>
       ))}
     </div>
   );
@@ -2578,7 +2574,7 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
               <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,letterSpacing:0.5,textTransform:'uppercase'}}>{t.title}</div><div style={{fontSize:10.5,color:'#A9C4DE',marginTop:1}}>{t.sub}</div></div>
               <button onClick={onClose} style={{width:26,height:26,borderRadius:13,background:'rgba(255,255,255,0.12)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff'}}><Mi name="close" size={14}/></button>
             </div>
-            <div style={{flex:1,overflowY:'auto',padding:'4px 16px 14px'}}>
+            <div style={{flex:1,overflowY:'auto',overflowX:'hidden',overscrollBehavior:'contain',padding:'4px 16px 14px'}}>
               {kind==='deposit'&&(
                 <><SheetLabel>Method</SheetLabel>
                 <MethodGrid value={account==='sports'?'crypto':method} onChange={account==='sports'?(v=>setMethod('crypto')):setMethod} options={account==='sports'?[{v:'crypto',icon:'currency_bitcoin',label:'USDT (ERC-20)',sub:'Only USDT accepted · 10 min · 0% fee'}]:[{v:'card',icon:'credit_card',label:'Card',sub:'Buy USDT · ~5 min'},{v:'bank',icon:'account_balance',label:'Bank Wire',sub:'1–2 days · Free'},{v:'crypto',icon:'currency_bitcoin',label:'Crypto',sub:'10 min · 0% fee'}]}/>
