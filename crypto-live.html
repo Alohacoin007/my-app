@@ -8154,6 +8154,7 @@ function RecurringPanel({ isBuy, linkedBanks = [], onSaved }) {
       const arr = JSON.parse(raw);
       arr.push(entry);
       window.localStorage.setItem('alpexa.recurring', JSON.stringify(arr));
+      try { if (window.AlpexaSync && AlpexaSync.saveUserData) AlpexaSync.saveUserData('recurring', arr); } catch (_) {}
       setExisting((cur) => [...cur, entry]);
     } catch (_) {}
     if (typeof AudioFX !== 'undefined') AudioFX.success();
@@ -13145,6 +13146,21 @@ function App() {
   } catch (e) {} };
   const [whitelist,    setWhitelist]    = usePersistedState('alpexa.whitelist', []);
   const [beneficiaries, setBeneficiaries] = usePersistedState('alpexa.beneficiaries', []);
+  // Cross-device sync (server user_data; localStorage stays as the fast cache). On a
+  // new device these are pulled from the server; local edits are pushed back.
+  React.useEffect(() => {
+    if (!(window.AlpexaSync && AlpexaSync.loadUserData)) return;
+    AlpexaSync.loadUserData('whitelist').then((d) => { if (Array.isArray(d)) setWhitelist(d); });
+    AlpexaSync.loadUserData('beneficiaries').then((d) => { if (Array.isArray(d)) setBeneficiaries(d); });
+    // recurring is read from localStorage elsewhere → sync the server copy into it
+    AlpexaSync.loadUserData('recurring').then((d) => { if (Array.isArray(d)) { try { window.localStorage.setItem('alpexa.recurring', JSON.stringify(d)); } catch (_) {} } });
+  }, []);
+  const _wlFirst = React.useRef(true);
+  React.useEffect(() => { if (_wlFirst.current) { _wlFirst.current = false; return; }
+    if (window.AlpexaSync && AlpexaSync.saveUserData) AlpexaSync.saveUserData('whitelist', whitelist); }, [whitelist]);
+  const _bnFirst = React.useRef(true);
+  React.useEffect(() => { if (_bnFirst.current) { _bnFirst.current = false; return; }
+    if (window.AlpexaSync && AlpexaSync.saveUserData) AlpexaSync.saveUserData('beneficiaries', beneficiaries); }, [beneficiaries]);
   const [savedCards,  setSavedCards]  = usePersistedState('alpexa.savedCards',  []);
   const [linkedBanks, setLinkedBanks] = usePersistedState('alpexa.linkedBanks', [
     { id: 'chase',  bank: 'Chase Checking',          tail: '4521' },

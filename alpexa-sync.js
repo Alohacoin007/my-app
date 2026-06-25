@@ -207,10 +207,26 @@ window.AlpexaSync = (function () {
       function (e) { return { error: e }; });
   }
 
+  // ── Per-customer cross-device data (user_data table): whitelist, recurring buys,
+  //    beneficiaries. Best-effort; null/no-op if the table/session isn't there. ──
+  function loadUserData(key) {
+    if (!db) return Promise.resolve(null);
+    var m = me(); if (!m || !m.custId) return Promise.resolve(null);
+    return db.from('user_data').select('data').eq('cust_id', m.custId).eq('key', key).maybeSingle()
+      .then(function (r) { return (r && r.data && r.data.data) || null; }, function () { return null; });
+  }
+  function saveUserData(key, data) {
+    if (!db) return Promise.resolve();
+    var m = me(); if (!m || !m.custId) return Promise.resolve();
+    return db.from('user_data').upsert({ cust_id: m.custId, key: key, data: data, updated_at: new Date().toISOString() }, { onConflict: 'cust_id,key' })
+      .then(function (r) { return r; }, function () {});
+  }
+
   return { db: db, me: me, acctFor: acctFor, pushRequest: pushRequest,
            pullAll: pullAll, pullMine: pullMine, setStatus: setStatus,
            updateRequest: updateRequest, deleteRequest: deleteRequest,
            sendPayment: sendPayment, pullIncoming: pullIncoming, claimPayment: claimPayment,
            pullIncomingTransfers: pullIncomingTransfers, normSrv: normSrv,
-           logActivity: logActivity, pullBalances: pullBalances };
+           logActivity: logActivity, pullBalances: pullBalances,
+           loadUserData: loadUserData, saveUserData: saveUserData };
 })();
