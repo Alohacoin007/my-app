@@ -7970,7 +7970,15 @@ function PersonalNamePanel({ onSaved }) {
   const valid = first.trim().length >= 1 && last.trim().length >= 1;
   const save = () => {
     if (!valid) return;
-    id.setName((first.trim() + ' ' + last.trim()).trim());
+    const fullName = (first.trim() + ' ' + last.trim()).trim();
+    id.setName(fullName);   // local cache (instant UI)
+    // Persist to the SERVER players row so it syncs to the back office + other devices.
+    try {
+      if (window.AlpexaSync && AlpexaSync.db) {
+        AlpexaSync.db.rpc('update_my_name', { p_name: fullName }).then(function () {}, function () {});
+        try { const me = JSON.parse(localStorage.getItem('alpexa.me') || 'null'); if (me) { me.name = fullName; localStorage.setItem('alpexa.me', JSON.stringify(me)); } } catch (e) {}
+      }
+    } catch (e) {}
     if (typeof AudioFX !== 'undefined') AudioFX.success();
     onSaved && onSaved();
   };
