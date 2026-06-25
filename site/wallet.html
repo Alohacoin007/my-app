@@ -225,12 +225,14 @@
       <!-- card -->
       <!-- bank -->
       <div class="dep-pane" id="dep-bank">
-        <div class="desc" style="margin-top:-2px">Send a bank/wire transfer to the details below. Funds are credited after we receive them (usually 1–2 business days).</div>
-        <div class="bankrow"><span>Beneficiary</span><b>Alpexa Payments Ltd.</b></div>
-        <div class="bankrow"><span>Bank</span><b>Demo International Bank</b></div>
-        <div class="bankrow"><span>Account number</span><b>0123 4567 8901</b></div>
-        <div class="bankrow"><span>Routing / SWIFT</span><b>DEMOUS33</b></div>
-        <div class="bankrow"><span>Reference (required)</span><b>ALP-CK-48217</b></div>
+        <div class="desc" style="margin-top:-2px">Send a domestic wire or ACH transfer to the details below. Funds are credited after we receive them (usually 1–2 business days).</div>
+        <div class="bankrow"><span>Beneficiary</span><b>REDROCKFX LLC</b></div>
+        <div class="bankrow"><span>Bank</span><b>Nevada State Bank</b></div>
+        <div class="bankrow"><span>Account number</span><b>984869966</b></div>
+        <div class="bankrow"><span>ABA / Routing</span><b>122400779</b></div>
+        <div class="bankrow"><span>SWIFT / BIC</span><b>ZFNBUS55</b></div>
+        <div class="bankrow"><span>Bank address</span><b>9415 W Flamingo Rd, Las Vegas, NV 89147</b></div>
+        <div class="bankrow"><span>Reference (required)</span><b id="bankRef">ALPX-PENDING</b></div>
         <div class="field" style="margin-top:14px"><label>Amount you're sending (USD)</label><input id="bankAmt" type="text" inputmode="decimal" placeholder="0.00"></div>
         <button class="submit" id="bankBtn">I've sent the transfer</button>
       </div>
@@ -239,8 +241,8 @@
       <div class="dep-pane" id="dep-zelle">
         <div class="desc" style="margin-top:-2px">Open your bank's app, send via Zelle to the recipient below, and include your reference in the memo.</div>
         <div class="bankrow"><span>Zelle email</span><b>deposits@alpexa-demo.com</b></div>
-        <div class="bankrow"><span>Recipient name</span><b>Alpexa Payments</b></div>
-        <div class="bankrow"><span>Reference (required)</span><b>ALP-CK-48217</b></div>
+        <div class="bankrow"><span>Recipient name</span><b>REDROCKFX LLC</b></div>
+        <div class="bankrow"><span>Reference (required)</span><b id="zelleRef">ALPX-PENDING</b></div>
         <div class="field" style="margin-top:14px"><label>Amount you're sending (USD)</label><input id="zelleAmt" type="text" inputmode="decimal" placeholder="0.00"></div>
         <button class="submit" id="zelleBtn">I've sent via Zelle</button>
       </div>
@@ -434,6 +436,10 @@
     // ===== Transfer between the user's own servers (server-side app_transfer RPC) =====
     var SERVERS=[{k:'sports',nm:'Sports'},{k:'crypto',nm:'Crypto'},{k:'fx',nm:'FX'}];
     var meTf=null; try{ meTf=JSON.parse(localStorage.getItem('alpexa.me')||'null'); }catch(e){}
+    // Per-customer deposit reference so back-office can match an incoming wire/Zelle to the sender.
+    try{ var _ref=(meTf&&meTf.custId)?('ALPX-'+String(meTf.custId).toUpperCase()):'ALPX-PENDING';
+      var _br=document.getElementById('bankRef'); if(_br)_br.textContent=_ref;
+      var _zr=document.getElementById('zelleRef'); if(_zr)_zr.textContent=_ref; }catch(e){}
     function svBals(){ try{ return JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{}; }catch(e){ return {}; } }
     function balOf(k){ var b=svBals(); var v=+b[k]; return isNaN(v)?0:v; }
     function acctOf(k){ return meTf&&meTf.accts&&meTf.accts[k]; }
