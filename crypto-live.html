@@ -929,6 +929,22 @@ function fmtPct(n, decimals = 2) {
   const sign = n > 0 ? '+' : n < 0 ? '−' : '';
   return sign + Math.abs(n).toFixed(decimals) + '%';
 }
+// ── Crypto notifications: real events (fills, deposits, withdrawals, P2P, alerts)
+//    feed a persisted list; the header bell shows the unread count. ──
+function getCryptoNotifs(){ try{ return JSON.parse(localStorage.getItem('alpexa.cryptoNotifs')||'[]')||[]; }catch(e){ return []; } }
+function setCryptoNotifs(arr){ try{ localStorage.setItem('alpexa.cryptoNotifs', JSON.stringify((arr||[]).slice(0,100))); }catch(e){} try{ window.dispatchEvent(new Event('alpexa-crypto-notif')); }catch(e){} }
+function cryptoNotify(n){
+  try{
+    var arr=getCryptoNotifs();
+    var item=Object.assign({ id:'n'+Date.now()+Math.random().toString(36).slice(2,6), ts:Date.now(), unread:true }, n||{});
+    // de-dupe identical title within 4s (avoid double-fire from optimistic + adopt)
+    if(arr[0] && arr[0].title===item.title && (item.ts-(arr[0].ts||0))<4000) return;
+    arr.unshift(item);
+    setCryptoNotifs(arr);
+  }catch(e){}
+}
+function cryptoUnreadCount(){ try{ return getCryptoNotifs().filter(function(n){return n.unread;}).length; }catch(e){ return 0; } }
+window.cryptoNotify = cryptoNotify;
 </script>
 
 <!-- ═══════════════════════════════════════════════════════════════
@@ -1204,13 +1220,53 @@ function WatchRow({ a, liveValue }) {
 }
 
 
+// Header bell with a live unread badge (re-renders on every new notification).
+function NotifBell({ onClick }) {
+  const [, bump] = React.useState(0);
+  React.useEffect(() => {
+    const h = () => bump((x) => x + 1);
+    window.addEventListener('alpexa-crypto-notif', h);
+    window.addEventListener('storage', h);
+    return () => { window.removeEventListener('alpexa-crypto-notif', h); window.removeEventListener('storage', h); };
+  }, []);
+  const unread = cryptoUnreadCount();
+  return (
+    <button aria-label="Alerts" onClick={onClick} style={{
+      width: 38, height: 38, borderRadius: 19,
+      background: RH.surface, border: `1px solid ${RH.line}`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      cursor: 'pointer', padding: 0, position: 'relative',
+    }}>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={RH.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0112 0v5l1.5 3h-15L6 13z"/><path d="M10 19a2 2 0 004 0"/></svg>
+      {unread > 0 ? (
+        <span style={{
+          position: 'absolute', top: 3, right: 4, minWidth: 14, height: 14,
+          padding: '0 3px', borderRadius: 7, background: RH.red, color: '#fff',
+          fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center',
+          justifyContent: 'center', lineHeight: 1, border: `1.5px solid ${RH.surface}`,
+        }}>{unread > 9 ? '9+' : unread}</span>
+      ) : null}
+    </button>
+  );
+}
 function NotificationsSheet({ onClose }) {
-  // Real service: notifications come from ACTUAL events (fills, deposits, alerts the
-  // user actually set). No fake/demo seed data.
-  const SEED = [];
-  const [items, setItems] = React.useState(SEED);
-  const markRead = (id) => setItems((arr) => arr.map((n) => n.id === id ? { ...n, unread: false } : n));
-  const clearAll = () => setItems((arr) => arr.map((n) => ({ ...n, unread: false })));
+  // Real notifications from ACTUAL events, persisted in localStorage (alpexa.cryptoNotifs)
+  // and written by cryptoNotify() at each event (fills, deposits, withdrawals, P2P, alerts).
+  const [items, setItems] = React.useState(() => getCryptoNotifs());
+  React.useEffect(() => {
+    const h = () => setItems(getCryptoNotifs());
+    window.addEventListener('alpexa-crypto-notif', h);
+    return () => window.removeEventListener('alpexa-crypto-notif', h);
+  }, []);
+  // Opening the sheet marks everything read (clears the bell badge).
+  React.useEffect(() => {
+    const cur = getCryptoNotifs();
+    if (cur.some((n) => n.unread)) setCryptoNotifs(cur.map((n) => ({ ...n, unread: false })));
+  }, []);
+  const markRead = (id) => { const next = getCryptoNotifs().map((n) => n.id === id ? { ...n, unread: false } : n); setCryptoNotifs(next); setItems(next); };
+  const clearAll = () => { const next = getCryptoNotifs().map((n) => ({ ...n, unread: false })); setCryptoNotifs(next); setItems(next); };
+  const fmtAgo = (ts) => { const s = Math.floor((Date.now() - (ts || 0)) / 1000); if (s < 60) return 'just now'; const m = (s / 60) | 0; if (m < 60) return m + 'm ago'; const hr = (m / 60) | 0; if (hr < 24) return hr + 'h ago'; return ((hr / 24) | 0) + 'd ago'; };
+  const COLORS = { fill: RH.green, price: RH.accent, reward: RH.accent, deposit: RH.green, withdraw: RH.red, system: RH.textDim };
   const unreadCount = items.filter((n) => n.unread).length;
   return (
     <div style={{
@@ -1276,9 +1332,9 @@ function NotificationsSheet({ onClose }) {
             }}>
               <div style={{
                 flexShrink: 0, width: 32, height: 32, borderRadius: 16,
-                background: `${n.color}22`,
+                background: `${n.color || COLORS[n.type] || RH.textDim}22`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: n.color,
+                color: n.color || COLORS[n.type] || RH.textDim,
               }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   {n.type === 'price'  ? (<><path d="M4 17 L9 12 L13 16 L20 7"/><path d="M14 7 L20 7 L20 13"/></>)
@@ -1299,7 +1355,7 @@ function NotificationsSheet({ onClose }) {
                   marginTop: 4, fontSize: 10.5, color: RH.textMute,
                   fontFamily: 'Geist Mono, monospace', letterSpacing: 0.4,
                   textTransform: 'uppercase', fontWeight: 700,
-                }}>{n.ts}</div>
+                }}>{fmtAgo(n.ts)}</div>
               </div>
             </button>
           ))}
@@ -1830,14 +1886,7 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
           </div>
 
           {/* Bell with dot */}
-          <button aria-label="Alerts" onClick={() => setAlertsOpen(true)} style={{
-            width: 38, height: 38, borderRadius: 19,
-            background: RH.surface, border: `1px solid ${RH.line}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', padding: 0, position: 'relative',
-          }}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={RH.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0112 0v5l1.5 3h-15L6 13z"/><path d="M10 19a2 2 0 004 0"/></svg>
-          </button>
+          <NotifBell onClick={() => setAlertsOpen(true)}/>
         </div>
       </div>
 
@@ -13241,9 +13290,11 @@ function App() {
       // device. The app just adopts the new holdings, so we do NOT credit USDT
       // here (that would double-count).
       setServerBalances((s) => ({ ...s, [t.dest]: (s[t.dest] || 0) + t.usd }));
+      try { cryptoNotify({ type: 'deposit', title: 'Deposit approved', body: '+' + fmtUsd(t.usd) + ' added to your ' + (t.dest || 'crypto') + ' wallet' }); } catch (e) {}
       if (t.dest === 'crypto') forceCryptoAdopt();
     } else if (t.type === 'withdraw') {
       const g = t.gross || t.usd;
+      try { cryptoNotify({ type: 'withdraw', title: 'Withdrawal sent', body: fmtUsd(g) + ' withdrawn from your ' + (t.source || 'crypto') + ' wallet' }); } catch (e) {}
       // Crypto withdrawals are debited SERVER-SIDE (DB trigger → crypto_holdings
       // USDT) on approval — works app-closed/multi-device. Don't debit here.
       setServerBalances((s) => ({ ...s, [t.source]: Math.max(0, (s[t.source] || 0) - g) }));
@@ -13283,6 +13334,7 @@ function App() {
             if (t.optimistic && t.asset && (+t.usd > 0)) {
               window.__cbLocalTs = Date.now();
               setBalances((b) => ({ ...b, [t.asset]: (b[t.asset] || 0) + (+t.usd || 0) }));
+              try { cryptoNotify({ type: 'withdraw', title: 'Payout rejected', body: fmtUsd(t.usd) + ' ' + t.asset + ' returned to your wallet' }); } catch (e) {}
             }
           });
           setTransactions((cur) => cur.map((x) => {
@@ -13426,6 +13478,7 @@ function App() {
           window.__cbLocalTs = Date.now();   // mark busy so the adopt loop doesn't revert this credit
           setBalances((b) => ({ ...b, [sym]: (b[sym] || 0) + amt }));
           pushTx({ type: 'receive', sym: sym, usd: amt, from: r.from_name || r.from_cust });
+          try { cryptoNotify({ type: 'fill', title: 'Payment received', body: '+' + fmtUsd(amt) + ' ' + sym + ((r.from_name || r.from_cust) ? (' from ' + (r.from_name || r.from_cust)) : '') }); } catch (e) {}
           if (typeof AudioFX !== 'undefined') { try { AudioFX.cash(); } catch (e) {} }
         }).catch(() => {});
       });
@@ -13649,6 +13702,7 @@ function App() {
         const credited = usdAmount * (1 - mkP / 100);
         setBalances((b) => ({ ...b, USDT: Math.max(0, (b.USDT || 0) - usdAmount), [assetId]: (b[assetId] || 0) + credited }));
         pushTx({ type: 'buy', sym: assetId, usd: usdAmount });
+        try { cryptoNotify({ type: 'fill', title: 'Buy filled', body: fmtUsd(usdAmount) + ' of ' + assetId }); } catch (e) {}
         if (feeUsd > 0) { try{ window.__alpexaSettle && window.__alpexaSettle({server:'crypto',kind:'crypto_fee',local_id:'bf-'+Date.now(),symbol:assetId,stake:feeUsd,pnl:0,detail:'buy markup '+mkP+'%'}); }catch(e){} }
         setPulseAsset(assetId); setTimeout(() => setPulseAsset(null), 1400);
         return { ok: true };
@@ -13674,6 +13728,7 @@ function App() {
           return { ok: false, error: err };
         }
         pushTx({ type: 'buy', sym: assetId, usd: usdAmount });
+        try { cryptoNotify({ type: 'fill', title: 'Buy filled', body: fmtUsd(usdAmount) + ' of ' + assetId }); } catch (e) {}
         if (feeUsd > 0) { try{ window.__alpexaSettle && window.__alpexaSettle({server:'crypto',kind:'crypto_fee',local_id:'bf-'+Date.now(),symbol:assetId,stake:feeUsd,pnl:0,detail:'buy markup '+mkP+'%'}); }catch(e){} }
         forceCryptoAdopt();           // pull the new server holdings into the wallet
         setPulseAsset(assetId);
@@ -13711,6 +13766,7 @@ function App() {
         const net = Math.max(0, usdAmount - FEE - markdown);
         setBalances((b) => ({ ...b, [assetId]: Math.max(0, (b[assetId] || 0) - usdAmount), USDT: (b.USDT || 0) + net }));
         pushTx({ type: 'sell', sym: assetId, usd: usdAmount, net });
+        try { cryptoNotify({ type: 'fill', title: 'Sell filled', body: fmtUsd(usdAmount) + ' of ' + assetId + ' → ' + fmtUsd(net) + ' USDT' }); } catch (e) {}
         try{window.__alpexaSettle&&window.__alpexaSettle({server:'crypto',kind:'crypto_fee',local_id:'sf-'+Date.now(),symbol:assetId,stake:Math.min(FEE+markdown,usdAmount),pnl:0,detail:'sell fee+markup '+mkP+'%'});}catch(e){}
         flashAsset(assetId);
         return { ok: true };
@@ -13738,6 +13794,7 @@ function App() {
         const gross = (d.usd != null) ? +d.usd : usdAmount;
         const net   = (d.net != null) ? +d.net : gross;
         pushTx({ type: 'sell', sym: assetId, usd: gross, net });
+        try { cryptoNotify({ type: 'fill', title: 'Sell filled', body: fmtUsd(gross) + ' of ' + assetId + ' → ' + fmtUsd(net) + ' USDT' }); } catch (e) {}
         const feeUsd = (d.fee != null) ? +d.fee : (gross * mkP / 100);
         if (feeUsd > 0) { try{ window.__alpexaSettle && window.__alpexaSettle({server:'crypto',kind:'crypto_fee',local_id:'sf-'+Date.now(),symbol:assetId,stake:feeUsd,pnl:0,detail:'sell markup '+mkP+'%'}); }catch(e){} }
         forceCryptoAdopt();
