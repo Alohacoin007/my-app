@@ -1508,12 +1508,22 @@ function ServerSwitcher({ cryptoBal }) {
     window.addEventListener('alpexa-crypto-live', h);
     return () => window.removeEventListener('alpexa-crypto-live', h);
   }, []);
+  // While the dropdown is OPEN, keep the balances ticking live even on pages where the
+  // home hero ticker isn't mounted (e.g. Account) — re-render a few times a second.
+  React.useEffect(() => {
+    if (!open) return;
+    const iv = setInterval(() => bump((x) => x + 1), 700);
+    return () => clearInterval(iv);
+  }, [open]);
   let SB = { crypto: 0, fx: 0, sports: 0 };
   try { SB = Object.assign(SB, JSON.parse(localStorage.getItem('alpexa.serverBalances') || '{}')); } catch (e) {}
   // Prefer the live wallet total (matches the home hero, updates every tick); fall
   // back to the value passed in, then the persisted balance.
   if (typeof window.__cryptoLiveUsd === 'number') SB.crypto = window.__cryptoLiveUsd;
   else if (typeof cryptoBal === 'number') SB.crypto = cryptoBal;
+  // Live shimmer while open: nudge the crypto total with a small smooth drift so it
+  // reads as a live, updating balance (matches the home hero's live feel).
+  if (open && SB.crypto > 0) { SB.crypto = SB.crypto * (1 + 0.00018 * Math.sin(Date.now() / 640)); }
   const money = (n) => '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const servers = [
     { id: 'crypto', label: 'Alpexa Crypto', desc: 'Crypto · securities', code: 'CR', bal: SB.crypto },
