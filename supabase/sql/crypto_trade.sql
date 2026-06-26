@@ -28,7 +28,10 @@ create table if not exists public.crypto_trades (
 );
 alter table public.crypto_trades enable row level security;
 drop policy if exists crypto_trades_read on public.crypto_trades;
-create policy crypto_trades_read on public.crypto_trades for select using (true);
+-- SECURITY: owner/admin only (was `using(true)` = world-readable PII leak of every
+-- customer's trade history). Writes are SECURITY DEFINER (crypto_trade RPC) so they bypass RLS.
+create policy crypto_trades_read on public.crypto_trades
+  for select using (public.is_admin() OR public.owns_acct(acct_no));
 
 -- 2) Price freshness: stamp `prices` so the RPC can reject a frozen feed.
 alter table public.prices add column if not exists updated_at timestamptz not null default now();
