@@ -5871,8 +5871,9 @@ function Swap({ onBack, balances = {}, onSwapped }) {
   const SWAP_FEE_PCT = (fees.swapBps || 0) / 10000;
   const feeUsd = fromUsd * SWAP_FEE_PCT;
   const netUsd = fromUsd - feeUsd;
-  const slippedUsd = netUsd * (1 - slippage);
-  const toCoin = toLive > 0 ? slippedUsd / toLive : 0;
+  const toUsd  = netUsd;                    // expected received — fee only (matches the swap_crypto RPC; slippage is a MAX limit, not a deduction)
+  const minUsd = netUsd * (1 - slippage);   // minimum received if the price moves up to the tolerance
+  const toCoin = toLive > 0 ? toUsd / toLive : 0;
   const rate   = toLive > 0 ? fromLive / toLive : 0;
   const insufficient = fromUsd > fromBalanceUsd;
   const sameSide = fromSym === toSym;
@@ -5903,7 +5904,7 @@ function Swap({ onBack, balances = {}, onSwapped }) {
   const doSwap = () => {
     if (!valid) return;
     if (typeof AudioFX !== 'undefined') AudioFX.success();
-    if (onSwapped) onSwapped(fromSym, toSym, fromUsd, slippedUsd);
+    if (onSwapped) onSwapped(fromSym, toSym, fromUsd, toUsd);
     setConfirmed(true);
   };
 
@@ -5912,14 +5913,14 @@ function Swap({ onBack, balances = {}, onSwapped }) {
       <HeroConfirm
         heroColor={RH.heroBlue}
         label={`${fromCoin.toFixed(6).replace(/\.?0+$/, '')} ${fromSym}`}
-        sublabel={`→ ${toCoin.toFixed(6).replace(/\.?0+$/, '')} ${toSym}  ·  $${slippedUsd.toFixed(2)}`}
+        sublabel={`→ ${toCoin.toFixed(6).replace(/\.?0+$/, '')} ${toSym}  ·  $${toUsd.toFixed(2)}`}
         rows={[
-          { label: 'Rate',     value: `1 ${fromSym} ≈ ${rate.toFixed(rate < 1 ? 6 : 4).replace(/\.?0+$/, '')} ${toSym}` },
-          { label: 'Slippage', value: `${(slippage * 100).toFixed(1)}%` },
-          { label: 'Fee',      value: `$${feeUsd.toFixed(2)}` },
-          { label: 'Received', value: `$${slippedUsd.toFixed(2)}` },
+          { label: 'Rate',         value: `1 ${fromSym} ≈ ${rate.toFixed(rate < 1 ? 6 : 4).replace(/\.?0+$/, '')} ${toSym}` },
+          { label: 'Fee',          value: `$${feeUsd.toFixed(2)}` },
+          { label: 'Received',     value: `$${toUsd.toFixed(2)}` },
+          { label: 'Min. received', value: `$${minUsd.toFixed(2)} · max slippage ${(slippage * 100).toFixed(1)}%` },
         ]}
-        footnote={`Swapped ${fromCoin.toFixed(6).replace(/\.?0+$/, '')} ${fromSym} into ${toCoin.toFixed(6).replace(/\.?0+$/, '')} ${toSym}. Fee 0.3% + max slippage ${(slippage * 100).toFixed(1)}% applied.`}
+        footnote={`Swapped ${fromCoin.toFixed(6).replace(/\.?0+$/, '')} ${fromSym} into ${toCoin.toFixed(6).replace(/\.?0+$/, '')} ${toSym}. Fee 0.3% applied; slippage tolerance ${(slippage * 100).toFixed(1)}% is a max, not a charge.`}
         onDone={onBack}
       />
     );
@@ -6099,7 +6100,7 @@ function Swap({ onBack, balances = {}, onSwapped }) {
                 <div style={{
                   marginTop: 2, fontSize: 11, color: RH.textDim,
                   fontFamily: 'Geist Mono, monospace', fontVariantNumeric: 'tabular-nums',
-                }}>≈ ${slippedUsd.toFixed(2)}</div>
+                }}>≈ ${toUsd.toFixed(2)}</div>
               </div>
             </div>
           </div>
