@@ -3886,8 +3886,8 @@ function Stake({ onBack, balances = {}, staked = {}, onStaked, initialAssetId })
     balanceUsd: 0,
     apy: 5.0,
   };
-  // Stakes are funded from USDT. The user pays USDT and earns the staked asset's APY.
-  const liveBalanceUsd = balances.USDT || 0;
+  // A-model: stake the asset you OWN — funded from that asset's own balance (not USDT).
+  const liveBalanceUsd = balances[assetId] || 0;
   const asset  = { ...stakeMeta, balanceUsd: liveBalanceUsd };
   const period = STAKE_PERIODS.find((p) => p.id === periodId);
   const apy    = stakePeriodApy(assetId, periodId);
@@ -4012,7 +4012,7 @@ function Stake({ onBack, balances = {}, staked = {}, onStaked, initialAssetId })
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: RH.text }}>{a.name}</div>
                     <div style={{ fontSize: 11, color: RH.textDim, marginTop: 1 }}>
-                      Fund with USDT · ${(balances.USDT || 0).toFixed(2)}
+                      Stake your {assetId} · ${(balances[assetId] || 0).toFixed(2)}
                     </div>
                   </div>
                   <span style={{
@@ -4060,7 +4060,7 @@ function Stake({ onBack, balances = {}, staked = {}, onStaked, initialAssetId })
           }}>
             {insufficient
               ? `Insufficient — only $${availableUsd.toFixed(2)} available`
-              : `Available · ${asset.balance} ${assetId}  ($${availableUsd.toFixed(2)})`}
+              : `Available · $${availableUsd.toFixed(2)} of ${assetId}`}
           </div>
         </div>
 
@@ -13636,7 +13636,7 @@ function App() {
     const prevPeriod = (staked[assetId] && staked[assetId].usd > 0) ? staked[assetId].period : period;
     // Client path (offline / no account) — original optimistic behaviour.
     const clientStake = () => {
-      setBalances((b) => ({ ...b, USDT: Math.max(0, (b.USDT || 0) - usdAmount) }));
+      setBalances((b) => ({ ...b, [assetId]: Math.max(0, (b[assetId] || 0) - usdAmount) }));
       setStaked((s) => {
         const prev = s[assetId]; const now = Date.now();
         if (prev && prev.usd) return { ...s, [assetId]: { usd: prev.usd + usdAmount, period: prev.period, since: prev.since || now } };
