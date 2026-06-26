@@ -291,9 +291,9 @@
   .cashout.half{flex:0 0 auto;min-width:64px;background:transparent;font-size:12px}
   .betstats{margin:0 0 12px;padding:0 16px}
   .bs-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-  .bs-cell{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 5px;text-align:center;min-width:0}
-  .bs-lbl{font-size:9px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.3px}
-  .bs-v{font-size:14px;font-weight:800;margin-top:3px;font-variant-numeric:tabular-nums}
+  .bs-cell{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 4px;text-align:center;min-width:0;overflow:hidden}
+  .bs-lbl{font-size:9px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bs-v{font-size:14px;font-weight:800;margin-top:3px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;line-height:1.15}
   .bs-v.pos{color:var(--pos)}.bs-v.neg{color:var(--neg)}
 
   /* wallet */
@@ -2026,6 +2026,11 @@
       <div class="bs-cell"><div class="bs-lbl">Win rate</div><div class="bs-v">${winRate}%</div></div>
       <div class="bs-cell"><div class="bs-lbl">Settled</div><div class="bs-v">${sb.length}</div></div>
     </div>`;
+    // auto-shrink any value that would overflow its cell — numbers must never spill outside the box
+    el.querySelectorAll('.bs-v').forEach(function(v){
+      var fs=14;
+      while(v.scrollWidth>v.clientWidth+1 && fs>9){ fs-=0.5; v.style.fontSize=fs+'px'; }
+    });
   }
   // event delegation: works regardless of re-render / tab switches
   document.getElementById('tickets').addEventListener('click',e=>{
