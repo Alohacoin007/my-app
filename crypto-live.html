@@ -13674,7 +13674,7 @@ function App() {
       const acct = cryptoAcctRef.current;
       const isSecurity = (typeof PORTFOLIO !== 'undefined') && PORTFOLIO.securities && PORTFOLIO.securities.some((s) => s.sym === assetId);
       // Securities / offline / no account → client path (server can't price these).
-      if (isSecurity || !(window.AlpexaSync && AlpexaSync.db && acct)) {
+      if (!(window.AlpexaSync && AlpexaSync.db && acct)) {   // securities are server-priced now → RPC; 'no price' still falls back to client
         return Promise.resolve(clientBuy());
       }
       // SERVER-AUTHORITATIVE buy: crypto_trade debits USDT and credits the coin at
@@ -13737,7 +13737,7 @@ function App() {
       };
       const acct = cryptoAcctRef.current;
       const isSecurity = (typeof PORTFOLIO !== 'undefined') && PORTFOLIO.securities && PORTFOLIO.securities.some((s) => s.sym === assetId);
-      if (isSecurity || !(window.AlpexaSync && AlpexaSync.db && acct)) {
+      if (!(window.AlpexaSync && AlpexaSync.db && acct)) {   // securities are server-priced now → RPC; 'no price' still falls back to client
         return Promise.resolve(clientSell());
       }
       // SERVER-AUTHORITATIVE sell at the server price. p_all liquidates the whole
