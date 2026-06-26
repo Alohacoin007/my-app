@@ -2012,7 +2012,7 @@
       const lgIcon=lgKey?(ICONS[lgKey]||'🏈'):'';
       const gmLine=liveSc
         ? `<div class="gm2"><span class="ic">${lgIcon}</span><span class="ld"></span><span class="sc">${g.away.ab} ${g.away.sc!=null?g.away.sc:'–'} — ${g.home.sc!=null?g.home.sc:'–'} ${g.home.ab}</span> · ${g.time}</div>`
-        : `<div class="gm">${lgIcon?lgIcon+' ':''}${l.gm}${l.tm?` <span style="opacity:.7">· ${l.live?'🔴 ':'🕒 '}${legTimeLabel(l)}</span>`:''}</div>`;
+        : `<div class="gm">${lgIcon?lgIcon+' ':''}${l.gm||l.game||''}${l.tm?` <span style="opacity:.7">· ${l.live?'🔴 ':'🕒 '}${legTimeLabel(l)}</span>`:''}</div>`;
       // settled legs: show the per-leg outcome (Won / Lost / Push · refunded)
       var rr=l.r||(!isOpen?(l.st==='w'?'won':l.st==='l'?'lost':l.st==='p'?'push':''):'');
       var resTag = rr==='won' ? '<div style="font-size:10px;font-weight:800;margin-top:2px;color:var(--pos)">Won</div>'
@@ -2020,7 +2020,7 @@
                  : rr==='push'? '<div style="font-size:10px;font-weight:800;margin-top:2px;color:var(--dim)">Push · refunded</div>'
                  : '';
       return `<div class="tleg ${l.st}"><div class="left"><span class="dot"></span>
-      <div class="info"><div class="pk">${l.pk}</div>${gmLine}</div></div>
+      <div class="info"><div class="pk">${l.pk||l.sel||b.type||'Selection'}</div>${gmLine}</div></div>
       <div style="text-align:right;white-space:nowrap"><span class="odd">${fmtAm(l.am)}</span>${resTag}</div></div>`;
     }).join('');
     const isSingle=(b.legs&&b.legs.length===1);
