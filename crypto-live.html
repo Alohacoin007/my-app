@@ -13866,19 +13866,29 @@ function App() {
   };
   // Liquidate every non-stable position into USDT in a single atomic move.
   const onLiquidateAll = (expectedUsd) => {
-    setBalances((b) => {
-      let usdt = b.USDT || 0;
-      const next = { ...b };
-      Object.entries(b).forEach(([sym, v]) => {
-        if (sym !== 'USDT' && v > 0) {
-          usdt += v;
-          next[sym] = 0;
-        }
+    // Client path (offline / no account / nothing to sell) — original atomic behaviour.
+    const clientLiquidate = () => {
+      setBalances((b) => {
+        let usdt = b.USDT || 0; const next = { ...b };
+        Object.entries(b).forEach(([sym, v]) => { if (sym !== 'USDT' && v > 0) { usdt += v; next[sym] = 0; } });
+        next.USDT = usdt; return next;
       });
-      next.USDT = usdt;
-      return next;
-    });
-    flashAsset('USDT');
+      flashAsset('USDT');
+    };
+    const acct = cryptoAcctRef.current;
+    const syms = Object.keys(balances).filter((s) => s !== 'USDT' && (+balances[s] || 0) > 0);
+    if (!(window.AlpexaSync && AlpexaSync.db && acct) || !syms.length) { clientLiquidate(); return; }
+    // Sell each position at the SERVER price (p_all = the whole qty). Assets with no
+    // server price (e.g. ALPXS) fall back to a local sell, same as the Sell screen.
+    window.__cbLocalTs = Date.now();
+    Promise.all(syms.map((sym) => {
+      const mkP = Math.max(0, Math.min(50, (window.__alpexaCryptoMarks && +window.__alpexaCryptoMarks[sym]) || 0));
+      const localSell = () => setBalances((b) => ({ ...b, USDT: (b.USDT || 0) + (+b[sym] || 0), [sym]: 0 }));
+      return AlpexaSync.db.rpc('crypto_trade', {
+        p_ref: 'lq-' + Date.now() + '-' + sym + '-' + Math.random().toString(36).slice(2, 6),
+        p_acct: acct, p_symbol: sym, p_usd: (+balances[sym] || 0), p_side: 'sell', p_markup: mkP, p_all: true,
+      }).then((r) => { const d = r && r.data; if (!(d && d.ok === true)) localSell(); }, () => localSell());
+    })).then(() => { forceCryptoAdopt(); flashAsset('USDT'); });
   };
   const cancelOrder = (id) => setPendingOrders((p) => p.filter((o) => o.id !== id));
 
