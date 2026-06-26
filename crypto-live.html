@@ -13808,18 +13808,42 @@ function App() {
     if (_acc > 0.005) pushTx({ type: 'reward', sym, usd: _acc, detail: 'Staking reward' });
     flashAsset(sym);
   };
-  // Swap → deduct from source asset, credit destination asset (USD-denominated).
+  // Swap → SERVER-AUTHORITATIVE for crypto (swap_crypto RPC at the server price, like
+  // buy/sell). Securities / no-server-price / offline fall back to the client path.
   const onSwapConfirmed = (fromSym, toSym, fromUsd, toUsd) => {
-    setBalances((b) => ({
-      ...b,
-      [fromSym]: Math.max(0, (b[fromSym] || 0) - fromUsd),
-      [toSym]:   (b[toSym] || 0) + toUsd,
-    }));
-    pushTx({ type: 'swap', sym: fromSym, usd: fromUsd, to: toSym, toUsd });
-    // Record the swap fee (already deducted inside toUsd) for company P&L.
-    try{var swFee=Math.max(0,Math.round((fromUsd-toUsd)*100)/100);
-      if(swFee>0&&window.__alpexaSettle)window.__alpexaSettle({server:'crypto',kind:'crypto_fee',local_id:'sw-'+Date.now(),symbol:fromSym+'→'+toSym,stake:swFee,pnl:0,detail:'swap fee+slippage'});}catch(e){}
-    flashAsset(toSym);
+    const swFee = () => { try{ var f=Math.max(0,Math.round((fromUsd-toUsd)*100)/100);
+      if(f>0&&window.__alpexaSettle) window.__alpexaSettle({server:'crypto',kind:'crypto_fee',local_id:'sw-'+Date.now(),symbol:fromSym+'→'+toSym,stake:f,pnl:0,detail:'swap fee+slippage'}); }catch(e){} };
+    const clientSwap = () => {
+      setBalances((b) => ({ ...b, [fromSym]: Math.max(0, (b[fromSym] || 0) - fromUsd), [toSym]: (b[toSym] || 0) + toUsd }));
+      pushTx({ type: 'swap', sym: fromSym, usd: fromUsd, to: toSym, toUsd });
+      swFee(); flashAsset(toSym);
+      return { ok: true };
+    };
+    const acct = cryptoAcctRef.current;
+    const isSec = (s) => (typeof PORTFOLIO !== 'undefined') && PORTFOLIO.securities && PORTFOLIO.securities.some((x) => x.sym === s);
+    // Server can't price securities → client path; also offline / no account.
+    if (isSec(fromSym) || isSec(toSym) || !(window.AlpexaSync && AlpexaSync.db && acct)) {
+      return Promise.resolve(clientSwap());
+    }
+    const mkP = Math.max(0, Math.min(50, (window.__alpexaCryptoMarks && +window.__alpexaCryptoMarks[fromSym]) || 0));
+    window.__cbLocalTs = Date.now();   // mark busy so the adopt loop doesn't fight the swap
+    return AlpexaSync.db.rpc('swap_crypto', {
+      p_ref: 'sw-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+      p_acct: acct, p_from: fromSym, p_to: toSym, p_usd: fromUsd, p_markup: mkP,
+    }).then((r) => {
+      const d = r && r.data;
+      if (!d || d.ok !== true) {
+        const err = (d && d.error) || (r && r.error && r.error.message) || 'swap failed';
+        if (/no price/i.test(err)) return clientSwap();   // not in the server feed → client path
+        try { alert('Swap not completed — ' + err); } catch (e) {}
+        return { ok: false, error: err };
+      }
+      pushTx({ type: 'swap', sym: fromSym, usd: fromUsd, to: toSym, toUsd });
+      swFee();
+      forceCryptoAdopt();   // pull the new server holdings into the wallet
+      flashAsset(toSym);
+      return { ok: true };
+    }, () => ({ ok: false, error: 'network error' }));
   };
   // Liquidate every non-stable position into USDT in a single atomic move.
   const onLiquidateAll = (expectedUsd) => {
