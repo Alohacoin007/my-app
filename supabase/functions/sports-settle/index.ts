@@ -178,10 +178,12 @@ Deno.serve(async (req) => {
       if (!legs.length) continue;
       const stake = +meta.stake || +p.stake || 0;
       let allDone = true, anyLost = false, decMul = 1;
+      const legResults: any[] = [];
       for (const l of legs) {
         const r = results[l.gid]; if (!r) { allDone = false; break; }
         const g = gradeLeg(l, r); if (g === null) { allDone = false; break; }
         if (g === "lost") anyLost = true; else if (g === "won") decMul *= decOf(l);
+        legResults.push({ pk: (l.sel || l.pk || ""), gm: (l.gm || l.game || ""), am: (+l.am || 0), r: g });
       }
       if (!allDone) continue; // not all games final yet
 
@@ -211,7 +213,7 @@ Deno.serve(async (req) => {
           cust_id: p.cust_id, acct_no: p.acct_no, server: "sports",
           kind: won ? "bet_won" : "bet_lost", local_id: String(p.local_id || p.id),
           ticket: String(meta.ticket || ""), symbol: p.symbol || meta.type || "Bet",
-          stake, pnl: won ? (payout - stake) : -stake, detail: "server-settled",
+          stake, pnl: won ? (payout - stake) : -stake, detail: JSON.stringify({ legs: legResults }),
         }),
       });
       settled.push({ local_id: p.local_id, result: won ? "won" : "lost", payout });
