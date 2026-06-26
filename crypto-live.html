@@ -3507,7 +3507,9 @@ function Receive({ onBack, balances = {}, onReceived }) {
             background: RH.surface, border: `1px solid ${RH.line}`,
             borderRadius: 12, padding: 4,
           }}>
-            {Object.entries(SEND_ASSETS).map(([id, a]) => {
+            {/* USDT-only deposits: only USDT is receivable (BTC/ETH/SOL disabled —
+                re-enable by removing this .filter to restore the full list). */}
+            {Object.entries(SEND_ASSETS).filter(([id]) => id === 'USDT').map(([id, a]) => {
               const active = id === assetId;
               return (
                 <button key={id} onClick={() => { setAssetId(id); setAssetOpen(false); }} style={{
@@ -9670,14 +9672,8 @@ function AccountSubPageContent({ subPage, setSubSub, transactions = [], setTrans
     return (
       <>
         <AcctSection title="Wallets">
-          <AcctRow label="Bitcoin (BTC)"
-            sub={(() => { const a = getDepositAddresses().BTC; return a.slice(0,6) + '••••' + a.slice(-4); })()}
-            onClick={go('crypto-wallet-btc')}/>
-          <AcctDivider/>
-          <AcctRow label="Ethereum (ETH)"
-            sub={(() => { const a = getDepositAddresses().ETH; return a.slice(0,6) + '••••' + a.slice(-4); })()}
-            onClick={go('crypto-wallet-eth')}/>
-          <AcctDivider/>
+          {/* USDT-only deposits: BTC/ETH wallet rows hidden (re-enable by restoring
+              the AcctRow/AcctDivider blocks for Bitcoin and Ethereum). */}
           <AcctRow label="Tether (USDT)"
             sub={(() => { const a = getDepositAddresses().USDT_ERC20; return a.slice(0,6) + '••••' + a.slice(-4) + ' · ERC-20'; })()}
             onClick={go('crypto-wallet-usdt')}/>
