@@ -45,6 +45,9 @@ body{font-family:'SF Pro Display',system-ui,-apple-system,BlinkMacSystemFont,'In
 .field-inner .eye svg{width:20px;height:20px;stroke:var(--muted);fill:none;stroke-width:1.6;stroke-linecap:round}
 .forgot{text-align:right;margin-top:2px}
 .forgot .link-btn{font-size:13px;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;font-family:inherit;padding:0}
+.srv-seg{display:flex;gap:8px}
+.srv-opt{flex:1;height:48px;border:1px solid var(--line);background:var(--soft);border-radius:12px;font-family:inherit;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;transition:border-color .15s,background .15s,color .15s;letter-spacing:-.2px}
+.srv-opt.on{border-color:var(--accent);background:var(--tint);color:var(--accent)}
 .actions{margin-top:auto;padding-bottom:calc(env(safe-area-inset-bottom,18px) + 24px)}
 .btn-row{display:flex;align-items:center;gap:12px}
 .signin-btn{flex:1;height:54px;background:var(--accent);border:none;border-radius:9999px;color:#fff;font-size:17px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;transition:transform .14s,background .2s}
@@ -109,6 +112,14 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
   <div class="error-bar" id="errBar"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span id="errTxt"></span></div>
   <div class="form">
     <div>
+      <label class="field-label">Server</label>
+      <div class="srv-seg" id="srvSeg">
+        <button type="button" class="srv-opt" data-srv="0" onclick="selectServer(0)">FX</button>
+        <button type="button" class="srv-opt" data-srv="1" onclick="selectServer(1)">Crypto</button>
+        <button type="button" class="srv-opt" data-srv="2" onclick="selectServer(2)">Sports</button>
+      </div>
+    </div>
+    <div>
       <label class="field-label">Email</label>
       <div class="field-inner"><input id="loginInput" type="text" autocapitalize="none" autocorrect="off" placeholder="Account number or email" oninput="clearErr()"></div>
     </div>
@@ -167,7 +178,8 @@ function renderServers(list){document.getElementById('serverList').innerHTML=lis
 function openServerSheet(){document.getElementById('serverSheet').style.display='block';document.getElementById('serverSearch').value='';renderServers(SERVERS);setTimeout(()=>document.getElementById('serverSearch').focus(),100);}
 function closeSheet(){document.getElementById('serverSheet').style.display='none';}
 function filterServers(q){renderServers(q?SERVERS.filter(s=>s.name.toLowerCase().includes(q.toLowerCase())||s.url.includes(q)):SERVERS);}
-function selectServer(i){selServer=i;const sv=document.getElementById('serverVal');sv.textContent=SERVERS[i].name;sv.style.color='#212121';closeSheet();}
+function selectServer(i){selServer=i;const sv=document.getElementById('serverVal');if(sv){sv.textContent=SERVERS[i].name;sv.style.color='#212121';}closeSheet();syncSrvUI();}
+function syncSrvUI(){try{document.querySelectorAll('.srv-opt').forEach(function(b){b.classList.toggle('on',+b.dataset.srv===selServer);});}catch(e){}}
 function togglePw(){pwVisible=!pwVisible;const inp=document.getElementById('pwInput');inp.type=pwVisible?'text':'password';document.getElementById('eyeIcon').innerHTML=pwVisible?'<line x1="1" y1="1" x2="23" y2="23"/><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>':'<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';}
 function toggleSave(){savePw=!savePw;const b=document.getElementById('saveBox');b.className='checkbox'+(savePw?' on':'');b.innerHTML=savePw?'<svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>':'';}
 function clearErr(){document.getElementById('errBar').style.display='none';}
@@ -310,6 +322,7 @@ try{
 buildQR();
 // Default the server to the one chosen at signup (so login lands on the same app).
 try{ var _ls=localStorage.getItem('alpexa.lastServer'); var _idx={fx:0,live:0,crypto:1,sports:2}[_ls]; if(_idx!=null) selectServer(_idx); }catch(e){}
+syncSrvUI();
 
 /* ── Saved login + Face ID / fingerprint quick login ──────────────────────── */
 function getSavedCred(){ try{ var s=localStorage.getItem('alpexa.cred'); if(!s) return null; return JSON.parse(decodeURIComponent(escape(atob(s)))); }catch(e){ return null; } }
