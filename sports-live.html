@@ -284,11 +284,11 @@
   .tfoot .amt .l{color:#c1121f}
   .tfoot .amt .c{color:var(--accent)}
   /* cashout button */
-  .cashout{background:var(--surface-2);border:1px solid var(--accent);color:var(--accent);padding:9px 14px;border-radius:6px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;line-height:1.2}
-  .cashout span{font-size:10px;color:var(--dim);font-weight:700}
+  .cashout{background:var(--surface-2);border:1px solid var(--accent);color:var(--accent);padding:9px 14px;border-radius:6px;font-size:14px;font-weight:800;font-family:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;line-height:1.2}
+  .cashout span{font-size:10px;color:var(--dim);font-weight:700;margin-top:2px}
   .cashout:active{transform:scale(.97)}
   .cash-btns{display:flex;gap:6px;align-items:stretch}
-  .cashout.half{flex:0 0 auto;min-width:64px;background:transparent;font-size:12px}
+  .cashout.half{flex:0 0 auto;min-width:64px;background:transparent}
   .betstats{margin:0 0 12px;padding:0 16px}
   .bs-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
   .bs-cell{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 4px;text-align:center;min-width:0;overflow:hidden}
@@ -2000,7 +2000,7 @@
     if(isOpen && b.viewOnly){foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b>Est. ${usd(b.potential)}</b></div>
       <div style="font-size:10.5px;color:var(--dim);padding:2px 2px 0">🔄 Open on another device</div></div>`;}
     else if(isOpen){foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b>Est. ${usd(b.potential)}</b></div>
-      <div class="cash-btns"><button class="cashout half" data-cashhalf="${b.id}">50%<span>${usd(b.cashout/2)}</span></button><button class="cashout" data-cash="${b.id}">Cash Out ${usd(b.cashout)}<span>Settle now</span></button></div></div>`;}
+      <div class="cash-btns"><button class="cashout half" data-cashhalf="${b.id}">${usd(b.cashout/2)}<span>Cash 50%</span></button><button class="cashout" data-cash="${b.id}">${usd(b.cashout)}<span>Cash Out</span></button></div></div>`;}
     else if(b.result==='cashed'){foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b class="c">Cashed ${usd(b.payout)}</b></div>${b.ts?`<div style="font-size:10px;color:var(--dim);padding:3px 2px 0">Settled · ${fmtStamp(b.ts)}</div>`:''}</div>`;}
     else{foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b class="${b.result==='won'?'g':'l'}">${b.result==='won'?'Win '+usd(b.payout):'Loss '+usd(b.stake)}</b></div>${b.ts?`<div style="font-size:10px;color:var(--dim);padding:3px 2px 0">Settled · ${fmtStamp(b.ts)}</div>`:''}</div>`;}
     return `<div class="ticket ${isOpen?'':b.result}">${head}${legsH}${foot}</div>`;
@@ -2021,8 +2021,8 @@
     const staked=sb.reduce((a,b)=>a+(b.stake||0),0), returned=sb.reduce((a,b)=>a+(b.payout||0),0), net=returned-staked;
     const won=sb.filter(b=>b.result==='won').length, winRate=Math.round(won/sb.length*100), roi=staked?Math.round(net/staked*1000)/10:0, np=net>=0;
     el.innerHTML=`<div class="bs-grid">
-      <div class="bs-cell"><div class="bs-lbl">P&amp;L</div><div class="bs-v ${np?'pos':'neg'}">${np?'+':'-'}${usd(Math.abs(net))}</div></div>
-      <div class="bs-cell"><div class="bs-lbl">ROI</div><div class="bs-v ${np?'pos':'neg'}">${np?'+':''}${roi}%</div></div>
+      <div class="bs-cell"><div class="bs-lbl">P&amp;L</div><div class="bs-v ${np?'pos':'neg'}">${np?'':'-'}${usd(Math.abs(net))}</div></div>
+      <div class="bs-cell"><div class="bs-lbl">ROI</div><div class="bs-v ${np?'pos':'neg'}">${roi}%</div></div>
       <div class="bs-cell"><div class="bs-lbl">Win rate</div><div class="bs-v">${winRate}%</div></div>
       <div class="bs-cell"><div class="bs-lbl">Settled</div><div class="bs-v">${sb.length}</div></div>
     </div>`;
