@@ -59,6 +59,18 @@ Deno.serve(async (req) => {
   for (const x of results) {
     if (x.c > 0) rows.push({ symbol: x.sym, mid: Math.round(x.c * 100) / 100, spr_pts: 0 });
   }
+
+  // ALPXS (Alpexa's own token) — fictional, priced with the SAME formula as the app
+  // (crypto-live.html alpxsPrice): $1.00 base, +2%/month compounding from 2024-01-01.
+  // Writing it here every minute keeps server == app AND keeps it fresh, so crypto_trade
+  // / swap_crypto can price ALPXS (lets the crypto_holdings RLS lock cover it too).
+  if (!only || only === "ALPXS") {
+    const ALPXS_EPOCH = Date.UTC(2024, 0, 1);
+    const months = (Date.now() - ALPXS_EPOCH) / 2629800000;
+    const alpxs = Math.round(1.00 * Math.pow(1.02, months) * 100) / 100;
+    rows.push({ symbol: "ALPXS", mid: alpxs, spr_pts: 0 });
+  }
+
   if (!rows.length) return json({ ok: false, error: "no quotes (check key/limits)", sample: results.slice(0, 3) }, 502);
 
   try {
