@@ -35,7 +35,8 @@ create or replace function public.stake_crypto(
   p_ref text, p_acct text, p_asset text, p_usd numeric, p_period text default 'flexible'
 ) returns jsonb language plpgsql security definer set search_path to 'public' as $$
 declare v_uid uuid := auth.uid(); v_acct public.accounts%rowtype; v_cust text;
-        v_cash numeric; v_now bigint := (extract(epoch from now())*1000)::bigint;
+        v_price numeric; v_pts timestamptz; v_have numeric; v_qty numeric;
+        v_now bigint := (extract(epoch from now())*1000)::bigint;
 begin
   if v_uid is null then return jsonb_build_object('ok',false,'error','not authenticated'); end if;
   if p_usd is null or p_usd <= 0 then return jsonb_build_object('ok',false,'error','bad amount'); end if;
@@ -50,25 +51,35 @@ begin
   if exists (select 1 from public.crypto_trades where ref=p_ref) then
     return jsonb_build_object('ok',true,'duplicate',true); end if;
 
-  -- fund the stake from USDT cash
-  select coalesce(qty,0) into v_cash from public.crypto_holdings where acct_no=p_acct and asset='USDT';
-  if coalesce(v_cash,0) < p_usd then
-    return jsonb_build_object('ok',false,'error','insufficient USDT','balance',coalesce(v_cash,0)); end if;
+  -- A-model: price the staked asset → coins to lock (USDT = 1)
+  if p_asset='USDT' then v_price:=1; else
+    select mid, updated_at into v_price, v_pts from public.prices where symbol=p_asset limit 1;
+    if v_price is null or v_price<=0 then return jsonb_build_object('ok',false,'error','no price for '||p_asset); end if;
+    if v_pts is null or (now()-v_pts) > interval '120 seconds' then
+      return jsonb_build_object('ok',false,'error','price unavailable (stale)'); end if;
+  end if;
+  v_qty := round((p_usd / v_price)::numeric, 8);
+
+  -- lock the user's OWN coins of that asset (NOT USDT)
+  select coalesce(qty,0) into v_have from public.crypto_holdings where acct_no=p_acct and asset=p_asset;
+  if coalesce(v_have,0) < v_qty - 1e-9 then
+    return jsonb_build_object('ok',false,'error','insufficient '||p_asset,'have',coalesce(v_have,0)); end if;
 
   insert into public.crypto_trades(ref,cust_id,acct_no,asset,side,usd,qty,price,fee)
-    values (p_ref, v_cust, p_acct, p_asset, 'stake', p_usd, 0, 0, 0);
+    values (p_ref, v_cust, p_acct, p_asset, 'stake', p_usd, v_qty, v_price, 0);
 
-  update public.crypto_holdings set qty = round((qty - p_usd)::numeric,8), updated_at=now()
-    where acct_no=p_acct and asset='USDT';
+  update public.crypto_holdings set qty = round((qty - v_qty)::numeric,8), updated_at=now()
+    where acct_no=p_acct and asset=p_asset;
 
   -- add to an existing stake (keep its term + clocks) or open a new one
   insert into public.crypto_stakes(acct_no, asset, usd, period, since, staked_at, updated_at)
     values (p_acct, p_asset, round(p_usd,2), p_period, v_now, v_now, now())
     on conflict (acct_no, asset) do update
-      set usd = round((public.crypto_stakes.usd + excluded.usd)::numeric,2), updated_at=now();
-      -- period / since / staked_at intentionally KEPT from the existing row
+      set usd = round((public.crypto_stakes.usd + excluded.usd)::numeric,2),
+          staked_at = coalesce(public.crypto_stakes.staked_at, excluded.staked_at),
+          updated_at = now();
 
-  return jsonb_build_object('ok',true,'staked',p_usd,'asset',p_asset,'period',p_period);
+  return jsonb_build_object('ok',true,'staked',p_usd,'qty',v_qty,'asset',p_asset,'period',p_period);
 end;$$;
 
 
