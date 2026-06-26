@@ -4,8 +4,9 @@
 -- 1-year ALPXS stake (locked, 18% APY). All server-forced so the client can't
 -- pick its own opening balance, and the crypto bonus is locked (anti-abuse +
 -- showcases staking + uses the company's own token = near-zero real cost).
--- (Cash $200 can't be withdrawn either — the integrity/withdrawal guard blocks
---  withdrawing more than was deposited.)
+-- (Cash $200 = Sports $100 + FX $100; crypto cash is $0 because the crypto
+--  bonus is the ALPXS stake. Cash can't be withdrawn either — the integrity/
+--  withdrawal guard blocks withdrawing more than was deposited.)
 --
 -- Admin/back-office account creation is exempt (can set any balance, no stake).
 -- ============================================================================
@@ -17,7 +18,7 @@ begin
   if not public.is_admin() then
     new.balance := case new.server
       when 'sports' then 100
-      when 'crypto' then 100
+      when 'crypto' then 0    -- crypto welcome is the $100 ALPXS stake, NOT spendable cash
       when 'fx'     then 100
       else 0 end;
   end if;
