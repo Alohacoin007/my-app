@@ -2170,41 +2170,16 @@
       if(diff===0)return 'push'; return diff>0?'won':'lost'; }
     return null; }
   async function settleBets(){
-    if(!openBets.length)return;
-    // Find bets that are fully graded (all legs have final results).
-    const ready=[];
-    openBets.forEach(b=>{
-      if(b.viewOnly) return;                 // legacy display-only row, can't grade
-      let allDone=true, anyLost=false, decMul=1;
-      (b.legs||[]).forEach(l=>{ const r=RESULTS[l.gid]; if(!r||!r.completed){allDone=false;return;}
-        const res=gradeLeg(l,r); if(res===null){allDone=false;return;}
-        if(res==='lost')anyLost=true; else if(res==='won')decMul*=(+l.dec0||dec(l.am0||l.am)); });
-      if(allDone) ready.push({b,anyLost,decMul});
-    });
-    if(!ready.length) return;
-    let changed=false;
-    for(const it of ready){
-      const b=it.b;
-      // CLAIM so only ONE device credits this bet (prevents double payout).
-      const won = await claimIfShared(b);
-      openBets = openBets.filter(x=>x.id!==b.id);   // resolved somewhere → drop locally
-      changed=true;
-      if(!won) continue;                            // another device already credited it
-      if(it.anyLost){
-        settledBets.unshift({id:'st'+b.id,type:b.type,cls:b.cls,stake:b.stake,result:'lost',payout:0,legs:(b.legs||[]).map(l=>({pk:l.sel||l.pk,gm:l.game||l.gm,am:l.am,st:'l'}))});
-        txns.unshift({ts:Date.now(),ic:'❌',t1:'Bet lost',t2:`${b.type} · ${usd(b.stake)} stake`,amt:0});
-        try{window.__alpexaSettle&&window.__alpexaSettle({server:'sports',kind:'bet_lost',local_id:b.id,ticket:b.ticket,symbol:b.type||'Bet',stake:b.stake,pnl:-(+b.stake||0),detail:((b.legs&&b.legs[0])||{}).gm||''});}catch(e){}
-      } else {
-        const payout=Math.round(b.stake*it.decMul*100)/100; balance+=payout;
-        settledBets.unshift({id:'st'+b.id,type:b.type,cls:b.cls,stake:b.stake,result:'won',payout:payout,legs:(b.legs||[]).map(l=>({pk:l.sel||l.pk,gm:l.game||l.gm,am:l.am,st:'w'}))});
-        txns.unshift({ts:Date.now(),ic:'🏆',t1:'Bet Won',t2:`${b.type} · +${usd(payout)}`,amt:+payout});
-        try{notify('🏆','Bet won!',`${b.type} · +${usd(payout)}`,'betResults');}catch(e){}
-        try{window.__alpexaSettle&&window.__alpexaSettle({server:'sports',kind:'bet_won',local_id:b.id,ticket:b.ticket,symbol:b.type||'Bet',stake:b.stake,pnl:payout-(+b.stake||0),detail:'payout '+payout});}catch(e){}
-      }
-    }
-    if(changed){ syncSportsBal();
-      const nb=document.getElementById('navBadge'); if(nb){nb.textContent=openBets.length||'';nb.style.display=openBets.length?'flex':'none';}
-      renderTickets(); updateWallet(); }
+    // SERVER-ONLY SETTLEMENT (security): the client no longer grades, claims, or credits
+    // bets. The old client path computed payout = stake × CLIENT-held odds and self-credited
+    // via the ledger delta — a modified client could forge a 1000× payout (see
+    // tests/settlement-server-only.test.js). The Edge function `sports-settle` is now the
+    // SOLE settler: it grades from server scores, credits the winner with an idempotent
+    // `betpay-<id>` ledger ref, writes the settlements row, and deletes the positions row.
+    // The client only reflects the result: pullServerBets() drops the bet from Open,
+    // pullServerSettled() shows it in Settled, syncBalancesFromServer() adopts the credited
+    // balance. ⚠ REQUIRES the sports-settle pg_cron to be scheduled (every ~3–5 min).
+    return;
   }
 
   // ─── Server-owns-bets sync (so a bet shows on EVERY device the customer logs
