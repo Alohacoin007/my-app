@@ -2784,20 +2784,31 @@
       raf=requestAnimationFrame(tick);
     }catch(e){ stop(); showToast('📷','Camera blocked','Allow camera or type the address'); }
   };
-  document.getElementById('wdConfirm').onclick=()=>{
+  document.getElementById('wdConfirm').onclick=async ()=>{
     syncSportsBal();
     const v=parseFloat(wdAmt.value)||0,addr=wdAddr.value.trim();
     if(v<=0){showToast('⚠️','Enter a withdrawal amount');return;}
     if(v>sportsSrv().bal){showToast('⚠️','Insufficient balance','Exceeds your Sports balance');return;}
     if(addr.length<8){showToast('⚠️','Invalid wallet address','Enter a valid USDT address');return;}
     const fee=wdFee(); if(v<=fee){showToast('⚠️','Amount too low','Must exceed the network fee '+usd(fee));return;} const net=v-fee;
-    balance-=v; syncSportsBal();   // hold the funds while the request is pending
+    // Server-first: the request must reach the back office (requests table) BEFORE we hold
+    // funds or tell the user it's pending. No silent local-only withdrawals.
+    if(!(window.AlpexaSync&&AlpexaSync.pushRequest)){ showToast('🔌','No server connection','Withdrawal needs a connection — please try again'); return; }
+    const btn=document.getElementById('wdConfirm'), oldTxt=btn.textContent;
     const wid='wd_'+Date.now();
-    const reqs=loadWithdrawals();
-    reqs.unshift({id:wid,ts:Date.now(),type:'withdraw',server:'Sports',asset:'USDT',network:wdNet,amount:v,fee:fee,net:net,address:addr,status:'pending'});
-    saveWithdrawals(reqs);
-    try{window.AlpexaSync&&AlpexaSync.pushRequest(reqs[0]);}catch(e){}
+    const req={id:wid,ts:Date.now(),type:'withdraw',server:'Sports',asset:'USDT',network:wdNet,amount:v,fee:fee,net:net,address:addr,status:'pending'};
+    btn.disabled=true; btn.style.opacity='0.7'; btn.textContent='Requesting…';
+    let res; try{ res=await AlpexaSync.pushRequest(req); }catch(e){ res={error:e}; }
+    if(!res||res.skipped||res.error){
+      btn.disabled=false; btn.style.opacity='1'; btn.textContent=oldTxt;
+      showToast('⚠️','Withdrawal not submitted','Couldn’t reach the server — nothing was deducted. Try again.');
+      return;   // abort: no balance hold, no local record, no false "pending"
+    }
+    // Back office confirmed the request → now hold the funds and record it locally.
+    balance-=v; syncSportsBal();
+    const reqs=loadWithdrawals(); reqs.unshift(req); saveWithdrawals(reqs);
     txns.unshift({ts:Date.now(),ic:'⬆️',t1:'Withdraw',t2:`USDT (${wdNet}) → ${addr.slice(0,6)}…${addr.slice(-4)} · Pending approval`,amt:-v,reqId:wid});
+    btn.disabled=false; btn.style.opacity='1'; btn.textContent=oldTxt;
     closeWithdraw();updateWallet();
     notify('⏳','Withdrawal requested',`${usd(v)} · awaiting back-office approval`,'deposits');
     showToast('⏳','Withdrawal requested','Pending back-office approval');
