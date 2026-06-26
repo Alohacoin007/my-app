@@ -13633,20 +13633,38 @@ function App() {
   // Move USD from balance → staked. Stores period alongside USD so the
   // Dashboard can render the lock-period chip.
   const onStakeConfirmed = (assetId, usdAmount, period = 'flexible') => {
-    // Stakes are funded from USDT — deduct USDT, credit the staked position.
-    setBalances((b) => ({ ...b, USDT: Math.max(0, (b.USDT || 0) - usdAmount) }));
-    setStaked((s) => {
-      const prev = s[assetId];
-      const now = Date.now();
-      // One stake term per coin: adding to an existing stake KEEPS its term and
-      // lock clock (never changes flexible→locked or extends the lock).
-      if (prev && prev.usd) {
-        return { ...s, [assetId]: { usd: prev.usd + usdAmount, period: prev.period, since: prev.since || now } };
+    const prevPeriod = (staked[assetId] && staked[assetId].usd > 0) ? staked[assetId].period : period;
+    // Client path (offline / no account) — original optimistic behaviour.
+    const clientStake = () => {
+      setBalances((b) => ({ ...b, USDT: Math.max(0, (b.USDT || 0) - usdAmount) }));
+      setStaked((s) => {
+        const prev = s[assetId]; const now = Date.now();
+        if (prev && prev.usd) return { ...s, [assetId]: { usd: prev.usd + usdAmount, period: prev.period, since: prev.since || now } };
+        return { ...s, [assetId]: { usd: usdAmount, period, since: now } };
+      });
+      pushTx({ type: 'stake', sym: assetId, usd: usdAmount, period: prevPeriod });
+      flashAsset(assetId);
+      return { ok: true };
+    };
+    const acct = cryptoAcctRef.current;
+    if (!(window.AlpexaSync && AlpexaSync.db && acct)) return Promise.resolve(clientStake());
+    // SERVER-AUTHORITATIVE stake — debits USDT and records the stake on the server.
+    window.__cbLocalTs = Date.now();
+    return AlpexaSync.db.rpc('stake_crypto', {
+      p_ref: 'stk-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+      p_acct: acct, p_asset: assetId, p_usd: usdAmount, p_period: prevPeriod,
+    }).then((r) => {
+      const d = r && r.data;
+      if (!d || d.ok !== true) {
+        const err = (d && d.error) || (r && r.error && r.error.message) || 'stake failed';
+        try { alert('Stake not completed — ' + err); } catch (e) {}
+        return { ok: false, error: err };
       }
-      return { ...s, [assetId]: { usd: usdAmount, period, since: now } };
-    });
-    pushTx({ type: 'stake', sym: assetId, usd: usdAmount, period: (staked[assetId] && staked[assetId].usd > 0) ? staked[assetId].period : period });
-    flashAsset(assetId);
+      pushTx({ type: 'stake', sym: assetId, usd: usdAmount, period: prevPeriod });
+      forceCryptoAdopt();
+      flashAsset(assetId);
+      return { ok: true };
+    }, () => ({ ok: false, error: 'network error' }));
   };
   // Simulated incoming receive — adds to a source asset balance.
   const onReceiveSimulated = (assetId, usdAmount) => {
@@ -13818,14 +13836,37 @@ function App() {
 
   // Unstake → adds USD back to the asset balance, clears staked slot.
   const onUnstakeConfirmed = (sym, amount, accrued, principal) => {
-    setBalances((b) => ({ ...b, [sym]: (b[sym] || 0) + amount }));
-    setStaked((s) => { const next = { ...s }; delete next[sym]; return next; });
     var _acc = +accrued || 0, _prin = (principal != null ? +principal : (amount - _acc));
-    // Record the principal returned, AND the staking reward (interest) as its own
-    // history line so the customer sees what they earned — not just the lump sum.
-    pushTx({ type: 'unstake', sym, usd: _prin });
-    if (_acc > 0.005) pushTx({ type: 'reward', sym, usd: _acc, detail: 'Staking reward' });
-    flashAsset(sym);
+    // Record the principal returned + the staking reward (interest) as its own history line.
+    const recordTx = () => { pushTx({ type: 'unstake', sym, usd: _prin }); if (_acc > 0.005) pushTx({ type: 'reward', sym, usd: _acc, detail: 'Staking reward' }); };
+    // Client path (offline / no account) — original optimistic behaviour.
+    const clientUnstake = () => {
+      setBalances((b) => ({ ...b, [sym]: (b[sym] || 0) + amount }));
+      setStaked((s) => { const next = { ...s }; delete next[sym]; return next; });
+      recordTx(); flashAsset(sym);
+      return { ok: true };
+    };
+    const acct = cryptoAcctRef.current;
+    if (!(window.AlpexaSync && AlpexaSync.db && acct)) return Promise.resolve(clientUnstake());
+    // SERVER-AUTHORITATIVE unstake — enforces the lock + credits the coins server-side.
+    window.__cbLocalTs = Date.now();
+    return AlpexaSync.db.rpc('unstake_crypto', {
+      p_ref: 'unstk-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+      p_acct: acct, p_asset: sym,
+    }).then((r) => {
+      const d = r && r.data;
+      if (!d || d.ok !== true) {
+        const err = (d && d.error) || (r && r.error && r.error.message) || 'unstake failed';
+        if (/locked/i.test(err)) { try { alert('Still locked until maturity.'); } catch (e) {} }
+        else { try { alert('Unstake not completed — ' + err); } catch (e) {} }
+        return { ok: false, error: err };
+      }
+      setStaked((s) => { const next = { ...s }; delete next[sym]; return next; });
+      recordTx();
+      forceCryptoAdopt();
+      flashAsset(sym);
+      return { ok: true };
+    }, () => ({ ok: false, error: 'network error' }));
   };
   // Swap → SERVER-AUTHORITATIVE for crypto (swap_crypto RPC at the server price, like
   // buy/sell). Securities / no-server-price / offline fall back to the client path.
