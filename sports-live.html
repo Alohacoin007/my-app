@@ -2019,12 +2019,27 @@
     const head=`<div class="th"><span class="badge ${badgeCls}">${badgeTxt}</span>
       <span class="res ${isOpen?'open':b.result}">${isOpen?'Open':b.result==='won'?'Won':b.result==='cashed'?'Cashed Out':'Lost'}</span></div>`+
       ((b.ticket||b.placedTs)?`<div style="font-family:ui-monospace,monospace;font-size:9.5px;color:var(--dim);padding:0 2px 4px">${b.ticket||''}${b.ticket&&b.placedTs?' · ':''}${b.placedTs?fmtStamp(b.placedTs):''}</div>`:'');
-    // is any leg's game currently live? (drives the Live / Upcoming status tag)
-    let anyLive=false;
-    if(isOpen && typeof GAMES!=='undefined' && GAMES) anyLive=b.legs.some(l=>{const g=l.gid&&GAMES.find(x=>x.id===l.gid);return !!(g&&g.live);});
-    const statusTag=anyLive
-      ? `<div class="res" style="font-size:11px;font-weight:700;color:var(--live);display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:50%;background:var(--live);display:inline-block;animation:blink 1.2s infinite"></span>Live</div>`
-      : `<div class="res" style="font-size:11px;font-weight:700;color:var(--dim)">Upcoming</div>`;
+    // Open-ticket status: Live (a leg is playing) > Awaiting result (a leg has kicked off /
+    // finished but isn't settled yet — finished games drop out of the GAMES feed) > Upcoming
+    // (all legs still before kickoff). Kickoff is the stored UTC-ISO `kt` (or the feed's).
+    let stState='upcoming';
+    if(isOpen){
+      const GS=(typeof GAMES!=='undefined'&&GAMES)?GAMES:[];
+      let anyLive=false, anyStarted=false;
+      b.legs.forEach(l=>{
+        const g=l.gid&&GS.find(x=>x.id===l.gid);
+        if(g&&g.live){ anyLive=true; return; }
+        const kt=l.kt||(g&&g.kickoff)||'';
+        const t=kt?Date.parse(kt):NaN;
+        if(!isNaN(t)){ if(Date.now()>=t) anyStarted=true; }
+        else if(!g){ anyStarted=true; }   // not in feed & no kickoff info → assume it has begun
+      });
+      stState=anyLive?'live':(anyStarted?'started':'upcoming');
+    }
+    const statusTag =
+      stState==='live'    ? `<div class="res" style="font-size:11px;font-weight:700;color:var(--live);display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:50%;background:var(--live);display:inline-block;animation:blink 1.2s infinite"></span>Live</div>`
+    : stState==='started' ? `<div class="res" style="font-size:11px;font-weight:700;color:var(--accent)">Awaiting result</div>`
+    :                       `<div class="res" style="font-size:11px;font-weight:700;color:var(--dim)">Upcoming</div>`;
     let foot;
     if(isOpen && b.viewOnly){foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b>Est. ${usd(b.potential)}</b></div>
       <div style="font-size:10.5px;color:var(--dim);padding:2px 2px 0">🔄 Open on another device</div></div>`;}
