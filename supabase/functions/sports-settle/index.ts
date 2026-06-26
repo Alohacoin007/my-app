@@ -183,7 +183,7 @@ Deno.serve(async (req) => {
         const r = results[l.gid]; if (!r) { allDone = false; break; }
         const g = gradeLeg(l, r); if (g === null) { allDone = false; break; }
         if (g === "lost") anyLost = true; else if (g === "won") decMul *= decOf(l);
-        legResults.push({ pk: (l.sel || l.pk || ""), gm: (l.gm || l.game || ""), am: (+l.am || 0), r: g });
+        legResults.push({ pk: (l.sel || l.pk || ""), gm: (l.gm || l.game || ""), am: (+l.am || 0), gid: (l.gid || ""), lg: (l.lg || ""), r: g });
       }
       if (!allDone) continue; // not all games final yet
 

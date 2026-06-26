@@ -2020,8 +2020,9 @@
       <div style="text-align:right;white-space:nowrap"><span class="odd">${fmtAm(l.am)}</span>${resTag}</div></div>`;
     }).join('');
     const isSingle=(b.legs&&b.legs.length===1);
-    const badgeCls=isSingle?'single':(b.cls||'');
-    const badgeTxt=isSingle?'Single':`${b.type}${b.legs.length>1?' '+b.legs.length+' legs':''}`;
+    const tw=String(b.type||'Bet').split(' · ')[0];   // bet-type word only (server symbol is "Parlay · pick +N")
+    const badgeCls=isSingle?'single':(b.cls||(/same game/i.test(tw)?'sgp':'parlay'));
+    const badgeTxt=isSingle?'Single':`${tw}${b.legs.length>1?' '+b.legs.length+' legs':''}`;
     const head=`<div class="th"><span class="badge ${badgeCls}">${badgeTxt}</span>
       <span class="res ${isOpen?'open':b.result}">${isOpen?'Open':b.result==='won'?'Won':b.result==='cashed'?'Cashed Out':'Lost'}</span></div>`+
       ((b.ticket||b.placedTs)?`<div style="font-family:ui-monospace,monospace;font-size:9.5px;color:var(--dim);padding:0 2px 4px">${b.ticket||''}${b.ticket&&b.placedTs?' · ':''}${b.placedTs?fmtStamp(b.placedTs):''}</div>`:'');
@@ -2372,7 +2373,7 @@
           const ts=x.created_at?new Date(x.created_at).getTime():0;
           // Per-leg results (won/lost/push) from the settlement detail (set by sports-settle).
           let detLegs=null;
-          try{ const d=x.detail?JSON.parse(x.detail):null; if(d&&Array.isArray(d.legs)&&d.legs.length){ detLegs=d.legs.map(function(L){ var rr=L.r||''; return {pk:L.pk||'',sel:L.pk||'',gm:L.gm||'',am:+L.am||0,r:rr,st:rr==='won'?'w':rr==='push'?'p':'l'}; }); } }catch(e){}
+          try{ const d=x.detail?JSON.parse(x.detail):null; if(d&&Array.isArray(d.legs)&&d.legs.length){ detLegs=d.legs.map(function(L){ var rr=L.r||''; return {pk:L.pk||'',sel:L.pk||'',gm:L.gm||'',am:+L.am||0,gid:L.gid||'',lg:L.lg||'',r:rr,st:rr==='won'?'w':rr==='push'?'p':'l'}; }); } }catch(e){}
           // prefer a local rich copy (has legs) if this device settled it
           const loc=(settledBets||[]).find(b=>(b.id&&String(b.id).indexOf(String(x.local_id))>=0)||(x.ticket&&b.ticket===x.ticket));
           if(detLegs){ out.push({ id:'srv-'+x.local_id, ticket:x.ticket||'', type:x.symbol||'Bet', cls:'', stake:stake, result:won?'won':'lost', payout:won?Math.round((stake+pnl)*100)/100:0, legs:detLegs, ts:ts }); }
