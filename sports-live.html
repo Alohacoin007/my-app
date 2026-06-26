@@ -780,7 +780,7 @@
           <button class="wbtn wd" id="wdBtn" data-i18n="btn_withdraw">Withdraw</button>
           <button class="wbtn tf" id="tfBtn" data-i18n="btn_transfer">Transfer</button>
         </div>
-        <div class="cashback-card">
+        <div class="cashback-card" style="display:none"><!-- CASHBACK DISABLED (security): hidden until rebuilt server-side -->
           <div class="cb-head"><span class="cb-title"><span class="cb-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#80cbc4" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 10.5c4.6-.3 9.3-.3 14 0 .6 0 1 .5 1 1.1-.1 2.4-.1 4.7 0 7.1 0 .6-.4 1.1-1 1.1-4.6.3-9.2.3-13.8 0-.7 0-1.1-.5-1.1-1.1.1-2.4.1-4.7 0-7.1 0-.6.3-1 .9-1.1Z"/><path d="M12 10.4c-1.4-.6-3.4-1.4-3.2-3.2.2-1.5 1.8-1.4 2.5-.6.6.8.8 2.3.7 3.8Zm0 0c1.4-.6 3.4-1.4 3.2-3.2-.2-1.5-1.8-1.4-2.5-.6-.6.8-.8 2.3-.7 3.8Zm0 0v10.3"/></svg></span><span data-i18n="loss_cashback">Loss Cashback</span></span><span class="cb-rate">5%</span></div>
           <div class="cb-rows">
             <div class="cb-row"><span data-i18n="total_lost">Total Lost</span><b id="cbLost">$0.00</b></div>
@@ -1641,10 +1641,10 @@
     document.getElementById('ctSub').textContent='Added to your balance';
     toast.classList.remove('show'); void toast.offsetWidth; toast.classList.add('show');
     setTimeout(()=>{
-      balance+=claimed; credit=0; syncSportsBal();
+      // CASHBACK DISABLED (security): never move client `credit` into the real balance.
+      // (Guarded above by `if(credit<=0)return`; credit can no longer accrue, so this is dead.)
+      credit=0;
       badge.classList.remove('claiming');
-      txns.unshift({ts:Date.now(),ic:'🎁',t1:'Credit Used',t2:`Bonus → Sports balance · Just now`,amt:+claimed});
-      notify('🎁','Credit used',`${usd(claimed)} moved to your balance`,'promos');
       updateWallet();
     },600);
   };
@@ -2115,8 +2115,8 @@
     const payAmt=+dt.amount||0, stakePart=b.stake*frac; playTapSound();
     txns.unshift({ts:Date.now(),ic:'💵',t1:'Cashout',t2:(partial?'Partial '+Math.round(frac*100)+'% · ':'')+b.type+' · Just now',amt:+payAmt});
     const loss=stakePart-payAmt;
-    if(loss>0){ totalLost+=loss; const back=Math.round(loss*CASHBACK_RATE*100)/100;
-      if(back>0){credit+=back; txns.unshift({ts:Date.now(),ic:'🎁',t1:'Cashback Credit',t2:`5% of ${usd(loss)} loss · Just now`,amt:+back});} }
+    // CASHBACK DISABLED (security): no client-side cashback accrual into `credit`.
+    if(loss>0){ totalLost+=loss; }
     if(partial){
       // cash_out reduced the stake in-place on the server; reflect locally (no re-insert)
       b.stake=Math.round((b.stake-stakePart)*100)/100;
@@ -2553,7 +2553,7 @@
     // credit (withdrawable promo) — now always-visible micro stat with .has highlight
     document.getElementById('creditVal').textContent=usd(credit);
     const cBadge=document.getElementById('balbarCredit');
-    cBadge.style.display='';
+    cBadge.style.display=credit>0?'':'none';   // CASHBACK DISABLED: hide the dead $0 credit chip
     cBadge.classList.toggle('has',credit>0);
     // cashback status
     const cbL=document.getElementById('cbLost'); if(cbL)cbL.textContent=usd(totalLost);
@@ -3106,9 +3106,9 @@
   renderNotifs();
 
   // init
-  // seed cashback from already-settled losses (5% of net loss)
-  settledBets.filter(b=>b.result==='lost').forEach(b=>{ totalLost+=b.stake; });
-  credit+=totalLost*CASHBACK_RATE;
+  // CASHBACK DISABLED (security): cashback was derived from client-held settledBets
+  // and claimed into the real balance via a client ledger delta = self-credit exploit.
+  // Removed until rebuilt server-side. credit stays 0; nothing is seeded from localStorage.
   // backfill cashout baselines for pre-seeded open bets
   openBets.forEach(b=>{
     if(!b.d0){
