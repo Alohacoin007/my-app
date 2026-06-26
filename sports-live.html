@@ -1959,11 +1959,15 @@
     // atomically RE-checks + debits the balance and creates the positions row, so a
     // stale-high local balance can't place a bet the server can't cover, and the stake
     // is debited exactly once (no client `balance-=stake`). Roll back the optimistic
-    // row if the server rejects. Offline → fall back to the old local path.
+    // row if the server rejects. Offline → abort (no local debit; the client never
+    // moves money — same stance as withdrawals).
     (function(){
       let me; try{me=JSON.parse(localStorage.getItem('alpexa.me')||'null');}catch(e){}
       const acct=me&&me.accts&&me.accts.sports;
-      if(!(window.AlpexaSync&&AlpexaSync.db&&acct)){ balance-=stake; syncSportsBal(); return; }
+      if(!(window.AlpexaSync&&AlpexaSync.db&&acct)){
+        openBets=openBets.filter(x=>x.id!==betId);
+        showToast('🔌','No connection','Betting needs a server connection — try again');
+        renderTickets(); updateWallet(); return; }
       const fl=newBet.legs[0]||{};
       const meta={ type:betType, cls:mode, stake:stake, potential:pot, baseCash:baseCash, d0:d0, cashout:baseCash, ticket:spTicket, placedTs:newBet.placedTs, legs:newBet.legs };
       AlpexaSync.db.rpc('place_bet',{ p_acct:acct, p_stake:stake, p_potential:pot, p_symbol:betType+' · '+(fl.sel||''), p_local_id:String(betId), p_meta:meta, p_game:(fl.gm||''), p_pick:(fl.sel||''), p_odds:(fl.am||0), p_size:legCount }).then(function(res){
@@ -2399,10 +2403,11 @@
   const CASHBACK_RATE=0.05;
   function syncSportsBal(){window.__sbLocalTs=Date.now();sportsSrv().bal=balance;try{localStorage.setItem('alpexa.sportsBalance',String(balance));}catch(e){}
     try{var o=Object.assign({crypto:0,fx:0,sports:0},JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}'));o.sports=balance;localStorage.setItem('alpexa.serverBalances',JSON.stringify(o));}catch(e){}
-    // SERVER-OWNS-BALANCE: post only the DELTA since our last sync (never overwrite
-    // the server balance → deposits & other devices can't be clobbered).
-    try{ if(window.__sbLastPushed!=null){ var d=Math.round((balance-window.__sbLastPushed)*100)/100;
-      if(Math.abs(d)>=0.005){ window.__sbLastPushed=balance; ledgerPost('sports_app', d); } } }catch(e){}}
+    // DISPLAY ONLY. The client NO LONGER posts balance deltas to the ledger — that path
+    // let a modified client self-credit (and caused the double-debit bug). Every balance
+    // change now goes through a server RPC (place_bet, cash_out, app_transfer, withdraw_hold,
+    // admin_*) or the sports-settle Edge; the client just adopts the server balance.
+    window.__sbLastPushed=balance;}
   function saveCryptoBal(){try{const c=SERVERS.find(s=>s.key==='crypto');if(c){localStorage.setItem('alpexa.cryptoBalance',String(c.bal));var o={};try{o=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{};}catch(e){o={};}o.crypto=c.bal;localStorage.setItem('alpexa.serverBalances',JSON.stringify(o));}}catch(e){}}
   // The Crypto app's real wallet is cryptoHoldings (USDT cash). Adjust it too so a
   // Crypto↔Sports transfer survives re-opening the Crypto app (which recomputes its
@@ -3546,9 +3551,11 @@
     if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m||!m.accts.sports)return; var cust=m.custId;
     AlpexaSync.db.from('commands').select('*').eq('cust_id',cust).eq('server','sports').eq('status','pending').then(function(r){
       if(!r||!r.data||!r.data.length)return;
-      r.data.forEach(function(c){ try{
-        if(c.action==='set_balance'){ if(window.__alpexaSportsSetBal) window.__alpexaSportsSetBal(parseFloat(c.local_id)); }
-        else if(window.__alpexaSportsVoid) window.__alpexaSportsVoid(c.local_id); }catch(e){}
+      r.data.forEach(function(c){
+        // Back-office money actions (set_balance / void) are now applied SERVER-SIDE by
+        // admin RPCs (admin_set_balance / admin_void_bet). The client must NOT re-apply them
+        // (it can no longer write the ledger). Just acknowledge; pullServerBets +
+        // syncBalancesFromServer reflect the result. (Legacy pending commands are drained here.)
         AlpexaSync.db.from('commands').update({status:'done'}).eq('id',c.id).then(function(){},function(){}); });
       setTimeout(push,1000);
     },function(){});

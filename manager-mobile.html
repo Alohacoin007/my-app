@@ -177,11 +177,17 @@
       var a=null; accs.forEach(function(x){ if(x.server===s)a=x; }); if(!a)return;
       var b=parseFloat(val('ed_bal_'+s)); if(isNaN(b))return; b=Math.round(b*100)/100;
       var oldB=+a.balance||0;
-      AlpexaSync.db.from('accounts').update({balance:b}).eq('acct_no',a.acct_no).then(function(){},function(){});
-      if(Math.abs(b-oldB)>0.009){
-        // Also send a set_balance command so an OPEN app applies it within ~4s
-        // instead of overwriting our edit with its own pushed balance.
+      if(Math.abs(b-oldB)<=0.009) return;   // no change
+      if(s==='crypto'){
+        // Crypto balance lives in crypto_holdings (separate subsystem) — keep existing path.
+        AlpexaSync.db.from('accounts').update({balance:b}).eq('acct_no',a.acct_no).then(function(){},function(){});
         AlpexaSync.db.from('commands').insert({cust_id:custId,server:s,action:'set_balance',local_id:String(b),status:'pending'}).then(function(){},function(){});
+      } else {
+        // SERVER-AUTHORITATIVE (sports/fx): admin_set_balance posts a corrective ledger
+        // entry as admin — works after the accounts/ledger write-locks; no client delta.
+        AlpexaSync.db.rpc('admin_set_balance',{p_acct:a.acct_no,p_target:b}).then(function(r){
+          var d=r&&r.data; if((r&&r.error)||(d&&d.ok===false)) toast('Set balance failed: '+((d&&d.error)||(r&&r.error&&r.error.message)||'')+' — signed in as admin?',true);
+        },function(){ toast('Set balance failed (network)',true); });
         if(s==='fx' && b<oldB){
           var hasPos=(POS_BY_CUST[custId]||[]).some(function(x){ return x.server==='fx'; });
           if(hasPos) toast('⚠️ FX lowered with open positions — stop-out may liquidate them',true);
@@ -1067,6 +1073,14 @@
     if(!window.AlpexaSync||!AlpexaSync.db){ toast('Not connected to server',true); return; }
     if(!confirm('Force '+(server==='sports'?'void':'close')+' this item for '+custId+'?')) return;
     try{ logAction(server==='sports'?'force_void':'force_close', custId, server+' · '+localId); }catch(e){}
+    if(server==='sports'){
+      // SERVER-AUTHORITATIVE: admin_void_bet refunds the stake + removes the position as admin.
+      AlpexaSync.db.rpc('admin_void_bet',{p_local_id:localId}).then(function(r){
+        var d=r&&r.data; if((r&&r.error)||(d&&d.ok===false)) toast('Void failed: '+((d&&d.error)||(r&&r.error&&r.error.message)||'')+' — signed in as admin?',true);
+        else toast('Voided ✓ — refunded $'+((d&&d.refunded)||0));
+      },function(){ toast('Void failed (network)',true); });
+      return;
+    }
     AlpexaSync.db.from('commands').insert({cust_id:custId,server:server,action:'close',local_id:localId,status:'pending'}).then(function(r){
       if(r&&r.error)toast('Error: '+r.error.message,true); else toast('Sent ✓ — applies on next customer sync');
     },function(){ toast('Send failed',true); });
