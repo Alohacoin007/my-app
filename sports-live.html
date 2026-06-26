@@ -2008,11 +2008,17 @@
     const head=`<div class="th"><span class="badge ${b.cls}">${b.type}${b.legs.length>1?' '+b.legs.length+'legs':''}</span>
       <span class="res ${isOpen?'open':b.result}">${isOpen?'Open':b.result==='won'?'Won':b.result==='cashed'?'Cashed Out':'Lost'}</span></div>`+
       ((b.ticket||b.placedTs)?`<div style="font-family:ui-monospace,monospace;font-size:9.5px;color:var(--dim);padding:0 2px 4px">${b.ticket||''}${b.ticket&&b.placedTs?' · ':''}${b.placedTs?fmtStamp(b.placedTs):''}</div>`:'');
+    // is any leg's game currently live? (drives the Live / Upcoming status tag)
+    let anyLive=false;
+    if(isOpen && typeof GAMES!=='undefined' && GAMES) anyLive=b.legs.some(l=>{const g=l.gid&&GAMES.find(x=>x.id===l.gid);return !!(g&&g.live);});
+    const statusTag=anyLive
+      ? `<div class="res" style="font-size:11px;font-weight:700;color:var(--live);display:flex;align-items:center;gap:5px"><span style="width:6px;height:6px;border-radius:50%;background:var(--live);display:inline-block;animation:blink 1.2s infinite"></span>Live</div>`
+      : `<div class="res" style="font-size:11px;font-weight:700;color:var(--dim)">Upcoming</div>`;
     let foot;
     if(isOpen && b.viewOnly){foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b>Est. ${usd(b.potential)}</b></div>
       <div style="font-size:10.5px;color:var(--dim);padding:2px 2px 0">🔄 Open on another device</div></div>`;}
     else if(isOpen){foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b>Est. ${usd(b.potential)}</b></div>
-      <div class="res open" style="font-size:11px">In play</div></div>`;/* cash-out hidden until real live-odds feed is wired up — buttons & doCashout kept in code to re-enable later */}
+      ${statusTag}</div>`;/* cash-out hidden until real live-odds feed is wired up — buttons & doCashout kept in code to re-enable later */}
     else if(b.result==='cashed'){foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b class="c">Cashed ${usd(b.payout)}</b></div>${b.ts?`<div style="font-size:10px;color:var(--dim);padding:3px 2px 0">Settled · ${fmtStamp(b.ts)}</div>`:''}</div>`;}
     else{foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b class="${b.result==='won'?'g':'l'}">${b.result==='won'?'Win '+usd(b.payout):'Loss '+usd(b.stake)}</b></div>${b.ts?`<div style="font-size:10px;color:var(--dim);padding:3px 2px 0">Settled · ${fmtStamp(b.ts)}</div>`:''}</div>`;}
     return `<div class="ticket ${isOpen?'':b.result}">${head}${legsH}${foot}</div>`;
