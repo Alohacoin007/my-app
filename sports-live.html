@@ -2026,11 +2026,12 @@
       <div class="bs-cell"><div class="bs-lbl">Win rate</div><div class="bs-v">${winRate}%</div></div>
       <div class="bs-cell"><div class="bs-lbl">Settled</div><div class="bs-v">${sb.length}</div></div>
     </div>`;
-    // auto-shrink any value that would overflow its cell — numbers must never spill outside the box
-    el.querySelectorAll('.bs-v').forEach(function(v){
-      var fs=14;
-      while(v.scrollWidth>v.clientWidth+1 && fs>9){ fs-=0.5; v.style.fontSize=fs+'px'; }
-    });
+    // shrink ALL values together to one uniform size so the four cells always match —
+    // numbers must never spill outside their box, and the font must stay consistent.
+    var cells=el.querySelectorAll('.bs-v');
+    var fs=14;
+    function overflowing(){ for(var i=0;i<cells.length;i++){ if(cells[i].scrollWidth>cells[i].clientWidth+1) return true; } return false; }
+    while(overflowing() && fs>9){ fs-=0.5; for(var i=0;i<cells.length;i++) cells[i].style.fontSize=fs+'px'; }
   }
   // event delegation: works regardless of re-render / tab switches
   document.getElementById('tickets').addEventListener('click',e=>{
