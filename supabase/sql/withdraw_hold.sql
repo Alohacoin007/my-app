@@ -31,8 +31,11 @@ begin
     join public.players pl on pl.id = a.player_id
    where a.acct_no = p_acct and pl.auth_id = v_uid;
   if v_acct.acct_no is null then return jsonb_build_object('ok',false,'error','account not found'); end if;
-  if v_acct.server not in ('sports','fx') then
-    return jsonb_build_object('ok',false,'error','unsupported server for this RPC'); end if;
+  -- SPORTS ONLY: sports has NO server-side withdraw trigger, so the hold here is the
+  -- sole debit. FX/crypto already debit on APPROVAL (apply_fx_withdraw_balance /
+  -- apply_crypto_withdraw_holding) — holding here too would double-debit them.
+  if v_acct.server <> 'sports' then
+    return jsonb_build_object('ok',false,'error','withdraw_hold is sports-only'); end if;
 
   -- idempotent: same withdrawal id can't double-hold (ledger.ref is UNIQUE)
   if exists (select 1 from public.ledger where ref = 'wdhold-'||p_id) then
@@ -61,8 +64,12 @@ end;$$;
 create or replace function public.on_withdraw_decision()
 returns trigger language plpgsql security definer set search_path to 'public' as $$
 begin
+  -- Refund ONLY if this withdrawal was actually held by withdraw_hold (sports).
+  -- FX/crypto debit on APPROVAL, so a rejected FX/crypto withdraw never debited →
+  -- nothing to refund. The wdhold-<id> existence check makes this safe for all servers.
   if NEW.type = 'withdraw' and NEW.status = 'rejected'
      and coalesce(OLD.status,'') is distinct from 'rejected'
+     and exists (select 1 from public.ledger where ref = 'wdhold-'||NEW.local_id)
      and not exists (select 1 from public.ledger where ref = 'wdrefund-'||NEW.local_id) then
     insert into public.ledger(acct_no, cust_id, server, kind, amount, ref)
       values (NEW.acct_no, NEW.cust_id, NEW.server, 'withdraw_refund',
