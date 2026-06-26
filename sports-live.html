@@ -2000,8 +2000,12 @@
       let g=null;
       if(isOpen && l.gid && typeof GAMES!=='undefined' && GAMES) g=GAMES.find(x=>x.id===l.gid)||null;
       const liveSc=(g&&g.live&&g.home&&g.away);
-      const lgKey=(g&&g.lg)||l.lg||'';
-      const lgIcon=lgKey?(({NBA:'🏀',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽',UFC:'🥊'})[lgKey]||'🏈'):'';
+      // league source: live game → stored on leg → gid prefix (real gids are "<LG>_<espnId>").
+      // The gid fallback only counts if it's a known league, so demo gids ("KC_BUF") give no false icon.
+      var ICONS={NBA:'🏀',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽',UFC:'🥊'};
+      var gidLg=String(l.gid||'').split('_')[0];
+      const lgKey=(g&&g.lg)||l.lg||(ICONS[gidLg]?gidLg:'');
+      const lgIcon=lgKey?(ICONS[lgKey]||'🏈'):'';
       const gmLine=liveSc
         ? `<div class="gm2"><span class="ic">${lgIcon}</span><span class="ld"></span><span class="sc">${g.away.ab} ${g.away.sc!=null?g.away.sc:'–'} — ${g.home.sc!=null?g.home.sc:'–'} ${g.home.ab}</span> · ${g.time}</div>`
         : `<div class="gm">${lgIcon?lgIcon+' ':''}${l.gm}${l.tm?` <span style="opacity:.7">· ${l.live?'🔴 ':'🕒 '}${legTimeLabel(l)}</span>`:''}</div>`;
