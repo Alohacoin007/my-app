@@ -2454,7 +2454,9 @@
         changed=true;
       }
       if(type==='withdraw' && w.status==='approved' && !w.notified){ w.notified=true; changed=true; updateTxnByReq(w.id,{t2:`${w.asset||'USDT'} · Sent`}); }
-      if(type==='withdraw' && w.status==='rejected' && !w.refunded){ balance+=w.amount; w.refunded=true; changed=true; updateTxnByReq(w.id,{ic:'↩️',t2:`Rejected by admin · refunded`,amt:0}); }
+      // SERVER refunds a rejected withdraw (trg_withdraw_decision → ledger wdrefund-<id>);
+      // the client only updates the display and adopts the server balance — no client credit.
+      if(type==='withdraw' && w.status==='rejected' && !w.refunded){ w.refunded=true; changed=true; updateTxnByReq(w.id,{ic:'↩️',t2:`Rejected by admin · refunded`,amt:0}); }
       if(type==='deposit' && w.status==='approved' && !w.credited){ /* SERVER (DB trigger) credits deposits → don't credit locally (no double); balance is adopted from server */ w.credited=true; changed=true; updateTxnByReq(w.id,{ic:'⬇️',t2:`${w.asset||'USDT'} · Approved`}); }
       if(type==='deposit' && w.status==='rejected' && !w.handled){ w.handled=true; changed=true; updateTxnByReq(w.id,{ic:'⛔',t2:`${w.asset||'USDT'} · Rejected by admin`,amt:0}); }
       // Sports only credits/refunds ITS OWN balance. The Crypto leg (credit on
@@ -2804,21 +2806,27 @@
     if(v>sportsSrv().bal){showToast('⚠️','Insufficient balance','Exceeds your Sports balance');return;}
     if(addr.length<8){showToast('⚠️','Invalid wallet address','Enter a valid USDT address');return;}
     const fee=wdFee(); if(v<=fee){showToast('⚠️','Amount too low','Must exceed the network fee '+usd(fee));return;} const net=v-fee;
-    // Server-first: the request must reach the back office (requests table) BEFORE we hold
-    // funds or tell the user it's pending. No silent local-only withdrawals.
-    if(!(window.AlpexaSync&&AlpexaSync.pushRequest)){ showToast('🔌','No server connection','Withdrawal needs a connection — please try again'); return; }
+    // SERVER-AUTHORITATIVE: the withdraw_hold RPC atomically re-checks the balance,
+    // creates the back-office request, AND debits the ledger (idempotent wdhold-<id>).
+    // The client NEVER holds its own balance (that delta was forgeable/skippable) — it
+    // just adopts the server balance after. Reject-refund is handled server-side too.
+    let me; try{me=JSON.parse(localStorage.getItem('alpexa.me')||'null');}catch(e){}
+    const acct=me&&me.accts&&me.accts.sports;
+    if(!(window.AlpexaSync&&AlpexaSync.db&&acct)){ showToast('🔌','No server connection','Withdrawal needs a connection — please try again'); return; }
     const btn=document.getElementById('wdConfirm'), oldTxt=btn.textContent;
     const wid='wd_'+Date.now();
     const req={id:wid,ts:Date.now(),type:'withdraw',server:'Sports',asset:'USDT',network:wdNet,amount:v,fee:fee,net:net,address:addr,status:'pending'};
     btn.disabled=true; btn.style.opacity='0.7'; btn.textContent='Requesting…';
-    let res; try{ res=await AlpexaSync.pushRequest(req); }catch(e){ res={error:e}; }
-    if(!res||res.skipped||res.error){
+    let res; try{ res=await AlpexaSync.db.rpc('withdraw_hold',{p_id:wid,p_acct:acct,p_amount:v,p_fee:fee,p_asset:'USDT',p_network:wdNet,p_address:addr}); }catch(e){ res={error:e}; }
+    const dt=res&&res.data;
+    if((res&&res.error)||!dt||dt.ok===false){
       btn.disabled=false; btn.style.opacity='1'; btn.textContent=oldTxt;
-      showToast('⚠️','Withdrawal not submitted','Couldn’t reach the server — nothing was deducted. Try again.');
-      return;   // abort: no balance hold, no local record, no false "pending"
+      const m=(dt&&dt.error)||(res&&res.error&&res.error.message)||'';
+      showToast('⚠️','Withdrawal not submitted', m||'Couldn’t reach the server — nothing was deducted. Try again.');
+      return;   // abort: server did nothing (atomic) — no hold, no request
     }
-    // Back office confirmed the request → now hold the funds and record it locally.
-    balance-=v; syncSportsBal();
+    // Server held the funds + created the request. Adopt the server balance (NO client delta).
+    AlpexaSync.db.from('accounts').select('balance').eq('acct_no',acct).maybeSingle().then(function(r){ if(r&&!r.error&&r.data){ balance=+r.data.balance||0; window.__sbLocalTs=0; window.__sbLastPushed=balance; try{sportsSrv().bal=balance;}catch(e){} try{localStorage.setItem('alpexa.sportsBalance',String(balance));}catch(e){} updateWallet(); } });
     const reqs=loadWithdrawals(); reqs.unshift(req); saveWithdrawals(reqs);
     txns.unshift({ts:Date.now(),ic:'⬆️',t1:'Withdraw',t2:`USDT (${wdNet}) → ${addr.slice(0,6)}…${addr.slice(-4)} · Pending approval`,amt:-v,reqId:wid});
     btn.disabled=false; btn.style.opacity='1'; btn.textContent=oldTxt;
