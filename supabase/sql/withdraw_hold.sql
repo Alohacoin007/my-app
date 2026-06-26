@@ -12,8 +12,9 @@
 --
 -- Invariant: a withdrawal only ever moves money through the server. The client
 --   can neither hold nor refund its own balance.
--- Works for balance-backed servers (sports, fx). Crypto withdraws debit
---   crypto_holdings and are handled separately.
+-- SPORTS ONLY. FX already debits on approval (apply_fx_withdraw_balance) and its
+--   client does NOT hold on request — so FX is already correct, leave it. Crypto
+--   debits crypto_holdings on approval — also separate.
 -- ============================================================================
 
 -- ① HOLD: atomic balance check + request + debit (idempotent on p_id)
