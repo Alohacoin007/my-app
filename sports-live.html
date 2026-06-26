@@ -2011,7 +2011,7 @@
     }).join('');
     const isSingle=(b.legs&&b.legs.length===1);
     const badgeCls=isSingle?'single':(b.cls||'');
-    const badgeTxt=isSingle?'Single':`${b.type}${b.legs.length>1?' '+b.legs.length+'legs':''}`;
+    const badgeTxt=isSingle?'Single':`${b.type}${b.legs.length>1?' '+b.legs.length+' legs':''}`;
     const head=`<div class="th"><span class="badge ${badgeCls}">${badgeTxt}</span>
       <span class="res ${isOpen?'open':b.result}">${isOpen?'Open':b.result==='won'?'Won':b.result==='cashed'?'Cashed Out':'Lost'}</span></div>`+
       ((b.ticket||b.placedTs)?`<div style="font-family:ui-monospace,monospace;font-size:9.5px;color:var(--dim);padding:0 2px 4px">${b.ticket||''}${b.ticket&&b.placedTs?' · ':''}${b.placedTs?fmtStamp(b.placedTs):''}</div>`:'');
@@ -2054,9 +2054,13 @@
     // shrink ALL values together to one uniform size so the four cells always match —
     // numbers must never spill outside their box, and the font must stay consistent.
     var cells=el.querySelectorAll('.bs-v');
-    var fs=14;
-    function overflowing(){ for(var i=0;i<cells.length;i++){ if(cells[i].scrollWidth>cells[i].clientWidth+1) return true; } return false; }
-    while(overflowing() && fs>9){ fs-=0.5; for(var i=0;i<cells.length;i++) cells[i].style.fontSize=fs+'px'; }
+    // Skip when off-screen (clientWidth 0) — otherwise everything would shrink to 9px;
+    // renderStats re-runs when the bets page is shown, so it sizes correctly then.
+    if(cells.length && cells[0].clientWidth){
+      var fs=14;
+      var overflowing=function(){ for(var i=0;i<cells.length;i++){ if(cells[i].scrollWidth>cells[i].clientWidth+1) return true; } return false; };
+      while(overflowing() && fs>9){ fs-=0.5; for(var i=0;i<cells.length;i++) cells[i].style.fontSize=fs+'px'; }
+    }
   }
   // event delegation: works regardless of re-render / tab switches
   document.getElementById('tickets').addEventListener('click',e=>{

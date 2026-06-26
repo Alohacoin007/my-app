@@ -1,12 +1,15 @@
 /* Alpexa PWA service worker.
-   Strategy: NETWORK-FIRST. Online always fetches the live build (so the app is
-   never stale — important for a trading/betting app with frequent updates and
-   ?v= cache-busting). A copy of successful same-origin GETs is cached purely as
-   an OFFLINE fallback; the cache is only consulted when the network fails. */
-const CACHE = 'alpexa-v1';
+   Money/trading app → freshness matters more than offline.
+   - HTML documents (navigations): NETWORK-ONLY. The app is never served from
+     cache while online, so a stale (possibly wrong-account) balances/odds page
+     can never appear. Fully offline → fall back to the precached login shell.
+   - Static assets (js/css/img/fonts): network-first, cache copy for offline.
+   - Cross-origin (Supabase, CDNs): untouched. */
+const CACHE = 'alpexa-v2';
+const SHELL = './login.html';
 
-self.addEventListener('install', function () {
-  // Activate the new worker immediately instead of waiting for old tabs to close.
+self.addEventListener('install', function (e) {
+  e.waitUntil(caches.open(CACHE).then(function (c) { return c.add(SHELL).catch(function () {}); }));
   self.skipWaiting();
 });
 
@@ -23,24 +26,30 @@ self.addEventListener('activate', function (e) {
 
 self.addEventListener('fetch', function (e) {
   var req = e.request;
-  if (req.method !== 'GET') return;                 // only cache GETs
-  var url;
-  try { url = new URL(req.url); } catch (err) { return; }
-  if (url.origin !== self.location.origin) return;  // skip cross-origin (CDNs, Supabase)
+  if (req.method !== 'GET') return;                 // only GETs
+  var url; try { url = new URL(req.url); } catch (err) { return; }
+  if (url.origin !== self.location.origin) return;  // skip cross-origin (Supabase, CDNs)
 
+  // Is this an HTML document/navigation? Those must always be fresh.
+  var isDoc = req.mode === 'navigate' ||
+    (req.headers.get('accept') || '').indexOf('text/html') >= 0;
+
+  if (isDoc) {
+    // Network-only; offline → login shell. Never serve a cached app page.
+    e.respondWith(fetch(req).catch(function () { return caches.match(SHELL); }));
+    return;
+  }
+
+  // Static assets: network-first with cache fallback for offline.
   e.respondWith(
     fetch(req)
       .then(function (res) {
-        // Stash a copy for offline use; never block the response on caching.
         if (res && res.status === 200 && res.type === 'basic') {
           var copy = res.clone();
           caches.open(CACHE).then(function (c) { c.put(req, copy); }).catch(function () {});
         }
         return res;
       })
-      .catch(function () {
-        // Offline: serve the cached copy, or fall back to the login shell.
-        return caches.match(req).then(function (r) { return r || caches.match('./login.html'); });
-      })
+      .catch(function () { return caches.match(req); })
   );
 });
