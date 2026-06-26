@@ -272,30 +272,24 @@ function genDepositAddresses(seed) {
     for (let i = 0; i < n; i++) s += A[Math.floor(rnd() * A.length)];
     return s;
   };
+  // FIXED company receive addresses (same for every user). Real, owner-controlled:
+  //   BTC/SOL = Coinbase, ETH + USDT(ERC-20) = MetaMask. NO Tron (TRC-20) address →
+  //   TRC-20 deposits are NOT offered (was a randomly-generated fake = fund loss).
   return {
-    BTC:        'bc1q'  + hex(38),
+    BTC:        '3DHnJCHr5t4eWDJqc7iFJdTUW7NAESsgB9',
     ETH:        '0x6B1c8941698Affc56757eF9Be1723Ec43F720966',
     USDT_ERC20: '0x6B1c8941698Affc56757eF9Be1723Ec43F720966',
-    USDT_TRC20: 'T'     + b58(33),
-    SOL:        b58(43),
+    SOL:        'AJHVFiAYhJKBfV625PLCHSeF1NSQ2BZLMZwiNKUQygUC',
   };
 }
 
 // Cache one generator's output per AppRoot mount so all readers see the same address.
 let _addrCache = null;
 function getDepositAddresses() {
-  const REAL='0x6B1c8941698Affc56757eF9Be1723Ec43F720966';
-  if (_addrCache) { _addrCache.ETH=REAL; _addrCache.USDT_ERC20=REAL; return _addrCache; }
-  try {
-    const saved = window.localStorage.getItem('alpexa.depositAddrs');
-    if (saved) { _addrCache = JSON.parse(saved); _addrCache.ETH=REAL; _addrCache.USDT_ERC20=REAL; return _addrCache; }
-  } catch (_) {}
-  const seed = (() => {
-    try { return window.localStorage.getItem('alpexa.userEmail') || 'demo'; }
-    catch (_) { return 'demo'; }
-  })();
-  _addrCache = genDepositAddresses(seed);
-  try { window.localStorage.setItem('alpexa.depositAddrs', JSON.stringify(_addrCache)); } catch (_) {}
+  // Addresses are fixed company-wide now (not per-user). Always return the canonical
+  // real set and IGNORE any stale per-device cache, so an old fake address can never show.
+  _addrCache = genDepositAddresses('');
+  try { window.localStorage.removeItem('alpexa.depositAddrs'); } catch (_) {}
   return _addrCache;
 }
 
@@ -3394,7 +3388,7 @@ function Receive({ onBack, balances = {}, onReceived }) {
   const HANDLE = '@jordan';
   const EXTERNAL = {
     USDT: { address: '0x6B1c8941698Affc56757eF9Be1723Ec43F720966', network: 'ERC-20 · Ethereum' },
-    BTC:  { address: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh', network: 'Bitcoin Network' },
+    BTC:  { address: '3DHnJCHr5t4eWDJqc7iFJdTUW7NAESsgB9', network: 'Bitcoin Network' },
     ETH:  { address: '0x6B1c8941698Affc56757eF9Be1723Ec43F720966', network: 'Ethereum Network' },
   };
   const isInternal = mode === 'internal';
@@ -8867,7 +8861,7 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
     // Crypto
     'crypto-wallet-btc':  { title: 'Bitcoin (BTC) wallet', intro: 'Use this address to deposit BTC into your Alpexa account.' },
     'crypto-wallet-eth':  { title: 'Ethereum (ETH) wallet', intro: 'Send ETH and supported ERC-20 tokens to this address.' },
-    'crypto-wallet-usdt': { title: 'Tether (USDT) wallet', intro: 'Send USDT on Ethereum (ERC-20), Tron (TRC-20), or Solana (SPL). Choose the correct network — wrong network may result in permanent loss.' },
+    'crypto-wallet-usdt': { title: 'Tether (USDT) wallet', intro: 'Send USDT on Ethereum (ERC-20) ONLY, to the address below. Sending on any other network (Tron/TRC-20, Solana) or sending a different token may result in permanent loss.' },
     'crypto-network':     { title: 'Default network', intro: 'Which network to pre-select for deposits and withdrawals.' },
     'crypto-memo':        { title: 'Memo on deposits', intro: 'Require memo/tag fields on deposit confirmations.' },
     'crypto-allowlist':   { title: 'Address allowlist', intro: 'Only allow withdrawals to pre-approved addresses with a 24-hour delay.' },
