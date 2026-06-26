@@ -13366,7 +13366,7 @@ function App() {
   };
 
   // Deduct USD from a source asset; called by Send.
-  const onSendConfirmed = (assetId, usdAmount, recipient) => {
+  const onSendConfirmed = async (assetId, usdAmount, recipient) => {
     const finalize = (toLabel) => {
       setBalances((b) => ({ ...b, [assetId]: Math.max(0, (b[assetId] || 0) - usdAmount) }));
       pushTx({ type: 'send', sym: assetId, usd: usdAmount, to: toLabel });
@@ -13389,16 +13389,23 @@ function App() {
       return;
     }
     // External wallet send (0x…) → create a back-office payout request (owner pays via MetaMask).
-    if (recipient && recipient.type === 'wallet' && recipient.address && window.AlpexaSync) {
+    if (recipient && recipient.type === 'wallet' && recipient.address) {
+      // Server-first: the payout request must reach the back office (requests table) BEFORE
+      // we deduct any coins. No silent local-only withdrawals.
+      if (!(window.AlpexaSync && AlpexaSync.pushRequest)) { try { alert('No server connection — withdrawal not submitted. Please try again.'); } catch (e) {} return; }
       // Use ONE id for both the tx and the request so the reject-sync can match them and
       // refund. Mark optimistic:true so a rejected payout re-credits the deducted coins.
       const reqId = 'cr-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+      let res; try {
+        res = await AlpexaSync.pushRequest({ id: reqId,
+          type: 'withdraw', server: 'crypto', amount: usdAmount, net: usdAmount, fee: 0,
+          asset: assetId, network: 'ERC-20', address: recipient.address, status: 'pending' });
+      } catch (e) { res = { error: e }; }
+      if (!res || res.skipped || res.error) { try { alert('Withdrawal not submitted — couldn’t reach the server. Nothing was deducted. Please try again.'); } catch (e) {} return; }
+      // Back office confirmed → now deduct and record the optimistic tx.
       setBalances((b) => ({ ...b, [assetId]: Math.max(0, (b[assetId] || 0) - usdAmount) }));
       pushTx({ id: reqId, type: 'withdraw', sym: assetId, asset: assetId, usd: usdAmount, gross: usdAmount, to: recipient.address, optimistic: true });
       flashAsset(assetId);
-      try { AlpexaSync.pushRequest({ id: reqId,
-        type: 'withdraw', server: 'crypto', amount: usdAmount, net: usdAmount, fee: 0,
-        asset: assetId, network: 'ERC-20', address: recipient.address, status: 'pending' }); } catch (e) {}
       return;
     }
     // @username isn't linked to an account → not deliverable; don't deduct.

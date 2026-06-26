@@ -2516,8 +2516,7 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
     if(kind==='withdraw'&&(method==='wallet'||method==='crypto')&&!/^0x[0-9a-fA-F]{40}$/.test((wAddr||'').trim())){
       alert('Enter a valid USDT (ERC-20) wallet address (0x…).'); return; }
     setStep('processing');
-    setTimeout(()=>{
-      setStep('done');
+    setTimeout(async ()=>{
       // Record funding transactions to history (skip 'report' since it's not a money move)
       if(kind==='deposit'||kind==='withdraw'||kind==='transfer'){
         const METHOD_NOTE={card:'Card payment',bank:kind==='withdraw'?'KEB Hana •••• 4982':'Bank Wire · UBS',crypto:'USDT (ERC-20)',wallet:'USDT (ERC-20)',live:'From FX'};
@@ -2542,12 +2541,25 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
             },function(){});
           }
           try{ window.alpexaNotify&&alpexaNotify({type:'transfer',pref:'deposit',title:'Transfer complete · $'+amt.toLocaleString()}); }catch(e){}
+          setStep('done');
+        } else if(kind==='withdraw'){
+          // Server-first: the withdrawal must reach the back office (requests table) BEFORE we
+          // show success. No silent local-only withdrawals.
+          if(!(window.AlpexaSync&&AlpexaSync.pushRequest)){ setStep('form'); try{alert('No server connection — withdrawal not submitted. Please try again.');}catch(e){} return; }
+          let res; try{ res=await AlpexaSync.pushRequest({id:reqId,type:'withdraw',server:'FX',amount:amt,asset:'USD',network:method,address:((method==='wallet'||method==='crypto')?(wAddr||'').trim():'')}); }catch(e){ res={error:e}; }
+          if(!res||res.skipped||res.error){ setStep('form'); try{alert('Withdrawal not submitted — couldn’t reach the server. Nothing was deducted. Please try again.');}catch(e){} return; }
+          try{pushFundingHistory({id:reqId,kind,method,amount:amt,currency:'USD',ref:REF_PREFIX.withdraw+Math.floor(10000000+Math.random()*89999999),note,account:(account||'live'),status:'pending'});}catch(e){}
+          try{ window.alpexaNotify&&alpexaNotify({type:'withdraw',pref:'withdrawal',title:'Withdrawal requested · $'+amt.toLocaleString()+' · pending approval'}); }catch(e){}
+          setStep('done');
         } else {
-          // Deposit/withdraw stay pending until the back office approves.
+          // Deposit — record + push (unchanged fire-and-forget; only withdraw is server-gated).
           try{pushFundingHistory({id:reqId,kind,method,amount:amt,currency:'USD',ref:REF_PREFIX[kind]+Math.floor(10000000+Math.random()*89999999),note,account:(account||'live'),status:'pending'});}catch(e){}
           try{window.AlpexaSync&&AlpexaSync.pushRequest({id:reqId,type:kind,server:'FX',amount:amt,asset:'USD',network:method,address:((method==='wallet'||method==='crypto')?(wAddr||'').trim():'')});}catch(e){}
-          try{ window.alpexaNotify&&alpexaNotify({type:kind,pref:(kind==='withdraw'?'withdrawal':'deposit'),title:(kind==='deposit'?'Deposit':'Withdrawal')+' requested · $'+amt.toLocaleString()+' · pending approval'}); }catch(e){}
+          try{ window.alpexaNotify&&alpexaNotify({type:kind,pref:'deposit',title:'Deposit requested · $'+amt.toLocaleString()+' · pending approval'}); }catch(e){}
+          setStep('done');
         }
+      } else {
+        setStep('done');
       }
     },1300);
   }
