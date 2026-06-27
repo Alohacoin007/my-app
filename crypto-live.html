@@ -1775,7 +1775,9 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
         window.__balPush = window.__balPush || {};
         if (acct && now - (window.__balPush.crypto || 0) > 3000 && Math.abs((window.__balPush.cryptoVal||0) - anchorTotal) > 0.01) {
           window.__balPush.crypto = now; window.__balPush.cryptoVal = anchorTotal;
-          AlpexaSync.db.from('accounts').update({ balance: Math.round(anchorTotal * 100) / 100 }).eq('acct_no', acct).then(function(){}, function(){});
+          // SERVER-AUTHORITATIVE (A6 closed): the server recomputes accounts.balance(crypto)
+          // from crypto_holdings × prices (+ stakes). The client can no longer set the number.
+          AlpexaSync.db.rpc('sync_crypto_balance', { p_acct: acct }).then(function(){}, function(){});
         }
       }
     } catch (e) {}
