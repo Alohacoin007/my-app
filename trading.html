@@ -57,8 +57,12 @@ setTimeout(function(){
 (function(){try{ if(/[?&]clearhist=1/.test(location.search)){ ['alpexa.funding','alpexa.txns','alpexa.transactions','alpexa.withdrawals'].forEach(function(k){ localStorage.removeItem(k); }); location.replace(location.pathname); } }catch(e){}})();
 /* Restore identity from the URL (#alpexa=...) so a home-screen install can inherit the account created in Safari (iOS isolates their storage) - no re-login. */
 (function(){try{var m=(location.hash||"").match(/alpexa=([^&]+)/);if(m){var id=JSON.parse(decodeURIComponent(atob(m[1])));if(id&&id.accts){localStorage.setItem("alpexa.me",JSON.stringify(id));}}}catch(e){}})();
-/* ACCOUNT GUARD: wipe cache from a DIFFERENT account so balances/holdings don't bleed across accounts in one browser. Re-adopts from server. (Tabs share storage — use incognito for a 2nd account.) */
-(function(){try{var _me=JSON.parse(localStorage.getItem("alpexa.me")||"null");var _cur=(_me&&_me.custId)||"";var _own=localStorage.getItem("alpexa.cacheOwner")||"";if(_cur&&_own&&_own!==_cur){["alpexa.serverBalances","alpexa.balances","alpexa.cryptoHoldings","alpexa.staked","alpexa.sportsBalance","alpexa.cryptoBalance","alpexa.fxLive","alpexa.openBets","alpexa.settledBets","alpexa.withdrawals","alpexa.transactions","alpexa.funding","alpexa.txns","alpexa.appliedTransfers","alpexa.customer","alpexa.openDeposit","alpexa.ownerFunded"].forEach(function(k){try{localStorage.removeItem(k);}catch(e){}});}if(_cur)localStorage.setItem("alpexa.cacheOwner",_cur);}catch(e){}})();
+/* #5: money/balance/holdings/positions are NEVER truth in localStorage — they live on
+   the server (accounts.balance / positions) and in memory only. So there is no money
+   cache to "guard": PURGE any legacy money-truth keys on every load (no cacheOwner
+   owner-tracking — that pattern kept money local and leaked it across accounts).
+   alpexa.funding/transactions/txns are DISPLAY history (not money truth) and stay. */
+(function(){try{["alpexa.serverBalances","alpexa.balances","alpexa.cryptoHoldings","alpexa.staked","alpexa.sportsBalance","alpexa.cryptoBalance","alpexa.fxLive","alpexa.openBets","alpexa.settledBets","alpexa.positions","alpexa.cacheOwner","alpexa.ownerFunded"].forEach(function(k){try{localStorage.removeItem(k);}catch(e){}});}catch(e){}})();
 /* Login gate (real service): no anonymous guest trading. Require a logged-in identity (email or authId); guests/empty go to login. */
 (function(){try{var m=JSON.parse(localStorage.getItem("alpexa.me")||"null");if(!(m&&m.accts&&(m.email||m.authId))){location.replace("login.html");}}catch(e){location.replace("login.html");}})();
 </script>
@@ -507,47 +511,14 @@ function pushFundingHistory(rec){
 }
 window.getFundingHistory=getFundingHistory;window.pushFundingHistory=pushFundingHistory;
 // ── Account balances (live → updated by deposit/withdraw/transfer) ──
-// === Manager Sync — broadcast positions/balances to manager dashboard via localStorage ===
-function getCurrentUser(){try{const raw=localStorage.getItem('alpexa_current_user');if(raw){return JSON.parse(raw);}}catch(e){}return {clientId:'c026'};}
-function getMgrPositions(){try{const raw=localStorage.getItem('alpexa.positions');if(raw){const arr=JSON.parse(raw);if(Array.isArray(arr))return arr;}}catch(e){}return [];}
-function setMgrPositions(arr){try{localStorage.setItem('alpexa.positions',JSON.stringify(arr.slice(0,500)));}catch(e){}window.dispatchEvent(new Event('alpexa-positions-change'));}
-function broadcastPositionOpen(order, account){
-  // account is 'live'|'crypto'|'sports'. Map to tag.
-  const tag = account==='crypto'?'CRYPTO':account==='sports'?'SPORTS':'FX';
-  const user = getCurrentUser();
-  const cid = user.clientId || 'c026';
-  // Build accountId from the user's profile (signup creates a_<cid>_<srv> ids)
-  const acctIdMap = {
-    live:   'a_' + cid + '_fx',
-    crypto: 'a_' + cid + '_crypto',
-    sports: 'a_' + cid + '_sports'
-  };
-  // For c026 sample, use the original ids
-  if (cid === 'c026') { acctIdMap.live='a029'; acctIdMap.crypto='a032'; acctIdMap.sports='sw013'; }
-  const rec = {
-    id: 'pX_' + order.id,
-    clientId: cid,
-    accountId: acctIdMap[account] || acctIdMap.live,
-    serverTag: tag,
-    sym: order.sym, side: order.side, vol: order.vol,
-    open: order.open, current: order.open, pnl: 0,
-    opened: new Date().toISOString().slice(0,16).replace('T',' '),
-    status: 'open',
-    source: 'trading.html'
-  };
-  const all = getMgrPositions();
-  setMgrPositions([rec, ...all]);
-}
-function broadcastPositionClose(orderId, closePrice, pnl){
-  const all = getMgrPositions();
-  const i = all.findIndex(p => p.id === 'pX_' + orderId);
-  if (i >= 0) {
-    all[i] = {...all[i], status:'closed', closed: new Date().toISOString().slice(0,16).replace('T',' '), close: closePrice, pnl};
-    setMgrPositions(all);
-  }
-}
-window.broadcastPositionOpen = broadcastPositionOpen;
-window.broadcastPositionClose = broadcastPositionClose;
+// === Manager Sync — DISABLED (#5) ===
+// The manager dashboard reads open positions straight from the SERVER `positions`
+// table (created by fx_open, closed by fx_close — see manager-mobile.html), so it
+// sees EVERY customer's positions via admin RLS. The old localStorage `alpexa.positions`
+// mirror only worked inside one browser and put money/position state in localStorage,
+// so it's removed. These hooks stay as no-ops so call sites don't throw.
+window.broadcastPositionOpen = function(){};
+window.broadcastPositionClose = function(){};
 
 // ── Pending orders: server-backed (fx_pending table). localStorage stays as a fast
 // cache/fallback; these helpers mirror every create/cancel/modify/fill to the server
