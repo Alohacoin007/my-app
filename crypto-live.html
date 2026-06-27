@@ -13953,9 +13953,13 @@ function App() {
       return { ok: true };
     };
     const acct = cryptoAcctRef.current;
-    const isSec = (s) => (typeof PORTFOLIO !== 'undefined') && PORTFOLIO.securities && PORTFOLIO.securities.some((x) => x.sym === s);
-    // Server can't price securities → client path; also offline / no account.
-    if (isSec(fromSym) || isSec(toSym) || !(window.AlpexaSync && AlpexaSync.db && acct)) {
+    // SERVER-AUTHORITATIVE: route every swap through swap_crypto (incl. ALPXS — the
+    // server prices it via the stock-prices feed). Only offline / no-account uses the
+    // client path. Assets the server can't price fall back below via the 'no price' handler.
+    // (Previously securities like ALPXS were pre-routed to clientSwap; that produced a
+    //  phantom balance gain that the A4 RLS lock then reverted — confusing, and the only
+    //  reason it wasn't an arbitrage was the lock. Now the fill is the server's truth.)
+    if (!(window.AlpexaSync && AlpexaSync.db && acct)) {
       return Promise.resolve(clientSwap());
     }
     const mkP = Math.max(0, Math.min(50, (window.__alpexaCryptoMarks && +window.__alpexaCryptoMarks[fromSym]) || 0));
