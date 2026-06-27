@@ -3200,6 +3200,20 @@
     }).catch(function(){});
   }
   syncBalancesFromServer();
+  // Resilient first-load: directly fetch THIS account's server balance and retry until
+  // the session/account is ready, so the balance never sticks on the "···" dash (e.g.
+  // right after a different account logs in and its session is still settling).
+  // #5: server-only — reads accounts.balance, no localStorage seed.
+  (function loadBal(n){
+    if(window.__sbLoaded) return;
+    var acct=(typeof meSportsAcct==='function')?meSportsAcct():'';
+    if(window.AlpexaSync&&AlpexaSync.db&&acct){
+      AlpexaSync.db.from('accounts').select('balance').eq('acct_no',acct).maybeSingle().then(function(r){
+        if(r&&!r.error&&r.data&&r.data.balance!=null){ balance=+r.data.balance||0; window.__sbLoaded=true; try{updateWallet();}catch(e){} }
+        else if((n||0)<40){ setTimeout(function(){loadBal((n||0)+1);}, 1200); }
+      },function(){ if((n||0)<40) setTimeout(function(){loadBal((n||0)+1);}, 1200); });
+    } else if((n||0)<40){ setTimeout(function(){loadBal((n||0)+1);}, 800); }
+  })(0);
   setInterval(function(){ if(!document.hidden) syncBalancesFromServer(); }, 10000);
   document.addEventListener('visibilitychange',function(){ if(!document.hidden) syncBalancesFromServer(); });
   // ── REALTIME: when the server-side settler credits a win (accounts.balance changes),
