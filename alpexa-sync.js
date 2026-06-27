@@ -246,11 +246,41 @@ window.AlpexaSync = (function () {
       .then(function (r) { return r; }, function () {});
   }
 
+  // IDENTITY GUARD — a customer app may only show/transact the account whose OWNER's
+  // auth_id equals the current session uid. The display identity (alpexa.me) and the
+  // Supabase auth session can drift apart (e.g. an admin session bleeding into the
+  // browser): the app then reads another account via admin RLS but the server rejects
+  // every money move ("not your account") — confusing AND it let the old client bet
+  // bypass write a free bet. This forces a clean re-login on a CONFIRMED mismatch, so
+  // you can never act on an account you aren't authenticated as. Conservative: it only
+  // redirects when a player row for this uid EXISTS and its cust_id differs from the
+  // displayed one — query errors / offline / no-row never lock the user out.
+  function assertIdentity() {
+    try {
+      if (!db || !db.auth) return;
+      var m = null; try { m = JSON.parse(localStorage.getItem('alpexa.me') || 'null'); } catch (e) { return; }
+      if (!(m && m.custId)) return;
+      if (sessionStorage.getItem('alpexa.idChecked')) return; // per-tab: prevents redirect loops
+      db.auth.getUser().then(function (r) {
+        var uid = r && r.data && r.data.user && r.data.user.id;
+        if (!uid) return; // no session → the expired-session guard handles it
+        db.from('players').select('cust_id').eq('auth_id', uid).maybeSingle().then(function (rr) {
+          if (rr && !rr.error && rr.data && rr.data.cust_id && rr.data.cust_id !== m.custId) {
+            sessionStorage.setItem('alpexa.idChecked', '1'); // set BEFORE redirect → cannot loop
+            try { localStorage.removeItem('alpexa.me'); } catch (e) {}
+            location.replace('login.html?switch=1');
+          }
+        }, function () {});
+      }, function () {});
+    } catch (e) {}
+  }
+
   return { db: db, me: me, acctFor: acctFor, pushRequest: pushRequest,
            pullAll: pullAll, pullMine: pullMine, setStatus: setStatus,
            updateRequest: updateRequest, deleteRequest: deleteRequest,
            sendPayment: sendPayment, pullIncoming: pullIncoming, claimPayment: claimPayment,
            pullIncomingTransfers: pullIncomingTransfers, normSrv: normSrv,
            logActivity: logActivity, pullBalances: pullBalances,
-           loadUserData: loadUserData, saveUserData: saveUserData };
+           loadUserData: loadUserData, saveUserData: saveUserData,
+           assertIdentity: assertIdentity };
 })();

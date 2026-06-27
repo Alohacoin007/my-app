@@ -157,7 +157,7 @@
    manual Dark/Light choice in Account → Appearance is respected. */
 (function(){try{if(!localStorage.getItem("alpexa.themeDefaultLight")){localStorage.setItem("alpexa.theme",JSON.stringify("light"));localStorage.setItem("alpexa.themeDefaultLight","1");}}catch(e){}})();
 </script>
-<script src="alpexa-sync.js?v=10"></script>
+<script src="alpexa-sync.js?v=12"></script>
 <script>
 /* Session guard. The identity gate above only checks alpexa.me (a local name tag).
    But reading your OWN holdings/positions needs a real Supabase auth SESSION —
@@ -179,6 +179,8 @@
         location.replace("login.html?expired=1");
       }
     }).catch(function(){ /* Supabase unreachable → stay in local degraded mode */ });
+    // Identity guard: if the auth session doesn't OWN this displayed account, re-login.
+    AlpexaSync.assertIdentity();
   } catch(e) {}
 })();
 </script>
