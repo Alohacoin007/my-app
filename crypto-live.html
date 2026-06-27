@@ -2184,8 +2184,9 @@ function SendAvatar({ initials, color, size = 40 }) {
   );
 }
 
-// QR scanner — opens camera, runs jsQR on frames. Gracefully falls back to
-// a demo address when the camera isn't available (e.g. file:// or denied).
+// QR scanner — opens camera, runs jsQR on frames. When the camera isn't
+// available (e.g. file:// or denied), it tells the user to enter the address
+// manually instead (no demo/sample address is ever injected).
 function QrScanner({ onResult, onClose }) {
   const videoRef  = React.useRef(null);
   const canvasRef = React.useRef(null);
@@ -2249,11 +2250,6 @@ function QrScanner({ onResult, onClose }) {
 
     return () => stopAll();
   }, []);
-
-  const useDemoAddress = () => {
-    onResult('bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh');
-    onClose();
-  };
 
   return (
     <div style={{
@@ -2331,12 +2327,12 @@ function QrScanner({ onResult, onClose }) {
           letterSpacing: 0.4, marginBottom: needsFallback ? 12 : 0,
         }}>{status}</div>
         {needsFallback ? (
-          <button onClick={useDemoAddress} style={{
+          <button onClick={onClose} style={{
             background: RH.green, color: '#000',
             border: 'none', borderRadius: 999,
             padding: '10px 18px',
             fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
-          }}>Use demo address</button>
+          }}>Close · enter address manually</button>
         ) : null}
       </div>
     </div>
