@@ -2732,22 +2732,35 @@
   function updateWdSummary(){
     syncSportsBal();
     const bal=sportsSrv().bal, v=parseFloat(wdAmt.value)||0;
+    // WITHDRAWABLE = balance − welcome bonus (server-computed). The welcome bonus and any
+    // locked funds can't be withdrawn; the server also auto-rejects over-withdrawal.
+    const wAvail=(typeof window.__sportsWithdrawable==='number')?window.__sportsWithdrawable:bal;
     document.getElementById('wdSrcBal').textContent=usd(bal);
-    document.getElementById('wdAvail').textContent='Available '+usd(bal);
+    document.getElementById('wdAvail').textContent='Withdrawable '+usd(wAvail);
     const fee=v>0?wdFee():0, net=Math.max(0,v-fee);
     document.getElementById('wdSummary').innerHTML=`
       <div class="r"><span class="k">Withdrawal Amount</span><span class="v">${usd(v)}</span></div>
       <div class="r"><span class="k">Network Fee</span><span class="v">${fee>0?'-'+usd(fee):'Free'}</span></div>
       <div class="r t"><span class="k">You Receive</span><span class="v">${usd(net)}</span></div>`;
     const note=document.getElementById('wdNote');
-    if(v>bal){
-      note.innerHTML=`Amount exceeds your Sports balance. Lower the amount, or move funds into Sports first.`;
+    if(v>wAvail){
+      note.innerHTML=`Amount exceeds your withdrawable balance (${usd(wAvail)}). The welcome bonus and locked funds can't be withdrawn.`;
       note.classList.add('show');
     } else note.classList.remove('show');
+  }
+  function refreshWithdrawable(){
+    try{ var me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); var acct=me&&me.accts&&me.accts.sports;
+      if(window.AlpexaSync&&AlpexaSync.db&&acct){
+        AlpexaSync.db.rpc('withdrawable_for',{p_acct:acct}).then(function(r){
+          if(r&&!r.error&&r.data!=null){ window.__sportsWithdrawable=+r.data; updateWdSummary(); }
+        },function(){});
+      }
+    }catch(e){}
   }
   function openWithdraw(){
     syncSportsBal();
     updateWdSummary();
+    refreshWithdrawable();   // server-computed withdrawable (balance − bonus)
     wdSheet.classList.add('show');wdOverlay.classList.add('show');
   }
   function closeWithdraw(){wdSheet.classList.remove('show');wdOverlay.classList.remove('show');}
@@ -2808,7 +2821,9 @@
     syncSportsBal();
     const v=parseFloat(wdAmt.value)||0,addr=wdAddr.value.trim();
     if(v<=0){showToast('⚠️','Enter a withdrawal amount');return;}
-    if(v>sportsSrv().bal){showToast('⚠️','Insufficient balance','Exceeds your Sports balance');return;}
+    // Block over-withdrawal client-side (the server also auto-rejects via withdrawable_for).
+    var _wAvail=(typeof window.__sportsWithdrawable==='number')?window.__sportsWithdrawable:sportsSrv().bal;
+    if(v>_wAvail){showToast('⚠️','Exceeds withdrawable',`Max withdrawable is ${usd(_wAvail)} (bonus & locked funds excluded)`);return;}
     if(addr.length<8){showToast('⚠️','Invalid wallet address','Enter a valid USDT address');return;}
     const fee=wdFee(); if(v<=fee){showToast('⚠️','Amount too low','Must exceed the network fee '+usd(fee));return;} const net=v-fee;
     // SERVER-AUTHORITATIVE: the withdraw_hold RPC atomically re-checks the balance,
