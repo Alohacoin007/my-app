@@ -1161,10 +1161,13 @@
     renderGames();
   }
 
-  // open bets (with cashout) + settled history — persisted (real mode)
-  let openBets = (function(){try{const s=localStorage.getItem('alpexa.openBets');return s?JSON.parse(s):[];}catch(e){return [];}})();
-  let settledBets = (function(){try{const s=localStorage.getItem('alpexa.settledBets');return s?JSON.parse(s):[];}catch(e){return [];}})();
-  function saveBets(){try{localStorage.setItem('alpexa.openBets',JSON.stringify(openBets));localStorage.setItem('alpexa.settledBets',JSON.stringify(settledBets));}catch(e){}}
+  // #5 SERVER-ONLY: bets are never seeded from localStorage (that's how another account's
+  // bets bled in). Start empty; pullServerBets() (positions) + pullServerSettled()
+  // (settlements) fill them from the server on load. A just-placed bet bridges <15s in
+  // memory (recentLocal) until its own server row lands.
+  let openBets = [];
+  let settledBets = [];
+  function saveBets(){ /* #5: bets are server-only — not persisted to localStorage */ }
   // Back-office force-void: refund the stake and remove the open bet.
   function voidBetById(id){
     var b=null; for(var i=0;i<openBets.length;i++){ if(String(openBets[i].id)===String(id)){ b=openBets[i]; break; } }
@@ -3549,7 +3552,7 @@
   }
   setTimeout(push,2000); setInterval(function(){ if(!document.hidden){ push(); } else { window.__bgPosPush=window.__bgPosPush||0; if(Date.now()-window.__bgPosPush>9000){ window.__bgPosPush=Date.now(); push(); } } },3000);
   // Instant: when a bet is placed/settled (id list changes), push right away.
-  function posSig(){try{var a=JSON.parse(localStorage.getItem('alpexa.openBets')||'[]')||[];return a.map(function(b){return b&&b.id;}).join(',');}catch(e){return'';}}
+  function posSig(){try{return openBets.map(function(b){return b&&b.id;}).join(',');}catch(e){return'';}}  /* #5: in-memory, not localStorage */
   var _psig=posSig();
   setInterval(function(){var n=posSig(); if(n!==_psig){_psig=n; if(!document.hidden)push();}},700);
   // Lightweight presence heartbeat — runs even in the background.
