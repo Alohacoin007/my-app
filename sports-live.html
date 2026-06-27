@@ -1252,7 +1252,6 @@
         ${toggleRow('liveStart','Live game start','When tracked games begin')}
         ${toggleRow('betResults','Bet results','Won, lost, or cashout')}
         ${toggleRow('deposits','Deposits & Withdrawals','Confirm successful transactions')}
-        ${toggleRow('promos','Promos & Cashback','Weekly offers and credits')}
         ${toggleRow('sound','Sound','Tone on bet placed/won')}
       </div></div>
       <div class="s-sec"><div class="s-sec-title">Responsible Gaming</div><div class="s-card">
@@ -3521,6 +3520,20 @@
     loadLive(false);
     setInterval(()=>{ if(!document.hidden) loadLive(true); }, 30000);   // full refresh + odds
     setInterval(()=>{ if(!document.hidden) watchLiveScores(); }, 9000); // fast score-suspend
+    // "Live game start" alert: notify ONCE when a game you have an OPEN bet on goes live
+    // (gated by the Settings 'liveStart' toggle). Decoupled from the feed merge so it
+    // catches the transition no matter which refresh set g.live.
+    const _liveStartNotified = new Set();
+    function checkLiveStarts(){
+      try{ if(!openBets.length) return;
+        openBets.forEach(b=>{ if(!b||!b.legs)return; b.legs.forEach(l=>{
+          if(!l||!l.gid||_liveStartNotified.has(l.gid))return;
+          const g=GAMES.find(x=>x.id===l.gid);
+          if(g&&g.live){ _liveStartNotified.add(l.gid); notify('🔴','Game started',(l.gm||l.game||'Your game')+' is now live','liveStart'); }
+        });});
+      }catch(e){}
+    }
+    setInterval(()=>{ if(!document.hidden) checkLiveStarts(); }, 8000);
     // re-render when a suspension lapses so the 🔒 clears on its own
     setInterval(()=>{ if(!document.hidden && window.__alpexaLiveBetting && typeof renderGames==='function'){
       var anyLive=GAMES.some(g=>g.live&&g.suspendUntil); if(anyLive) renderGames(); } }, 4000);
