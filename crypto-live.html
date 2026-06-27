@@ -13501,7 +13501,11 @@ function App() {
         holdingsSyncRef.current.prev = seen;
         holdingsSyncRef.current.srvSig = sig; // this device is now the source of truth
         window.__cbLocalTs = Date.now();
-        AlpexaSync.db.from('crypto_holdings').upsert(out, { onConflict: 'acct_no,asset' }).then(function () {}, function () {});
+        // WRITE-BACK REMOVED (A4): crypto_holdings is RLS-locked to admin/RPC. Every
+        // balance change goes through a server RPC (crypto_trade/swap/stake/unstake) or
+        // a deposit/withdraw trigger; this client mirror is dead (denied) and is dropped.
+        // The adopt loop below pulls the authoritative server holdings. (`out` kept for the
+        // optimistic local display + busy flag only.) void out;
       } catch (e) {}
     }, 1200);
     return () => clearTimeout(tmr);
@@ -13580,7 +13584,9 @@ function App() {
         stakeSyncRef.current.prev = seen;
         stakeSyncRef.current.srvSig = sig;
         window.__cbLocalTs = Date.now();
-        if (out.length) AlpexaSync.db.from('crypto_stakes').upsert(out, { onConflict: 'acct_no,asset' }).then(function () {}, function () {});
+        // WRITE-BACK REMOVED (A5): crypto_stakes is RLS-locked to admin/RPC. Stake/unstake
+        // go through stake_crypto/unstake_crypto RPCs; this client mirror is dead (denied).
+        void out;
       } catch (e) {}
     }, 1200);
     return () => clearTimeout(tmr);
