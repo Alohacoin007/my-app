@@ -31,7 +31,7 @@ create or replace function public.place_bet(
 declare
   v_player uuid; v_cust text; v_bal numeric;
   v_games jsonb; v_legs jsonb; v_leg jsonb; v_game jsonb;
-  v_gid text; v_mk text; v_sel text; v_srv_am numeric; v_dec numeric;
+  v_gid text; v_mk text; v_key text; v_sel text; v_srv_am numeric; v_dec numeric;
   v_combo numeric := 1; v_nlegs int := 0; v_gid0 text; v_all_same boolean := true;
   v_new_legs jsonb := '[]'::jsonb; v_potential numeric;
   c_haircut constant numeric := 0.25;
@@ -60,12 +60,21 @@ begin
 
   for v_leg in select value from jsonb_array_elements(v_legs) loop
     v_gid := v_leg->>'gid'; v_mk := v_leg->>'market'; v_sel := v_leg->>'sel';
-    if v_mk not in ('ml','spread','total') then
-      return jsonb_build_object('ok',false,'error','market not offered: '||coalesce(v_mk,'?')); end if;
+    -- The app sends the market LABEL ('Moneyline'/'Spread'/'Total'); live_games keys the
+    -- arrays as ml/spread/total. Map it. Anything else (player props, etc.) → reject:
+    -- props aren't in live_games so they can't be server-validated.
+    v_key := case lower(coalesce(v_mk,''))
+               when 'moneyline' then 'ml'
+               when 'spread'    then 'spread'
+               when 'total'     then 'total'
+               else null end;
+    if v_key is null then return jsonb_build_object('ok',false,'error','market not offered: '||coalesce(v_mk,'?')); end if;
     select g.value into v_game from jsonb_array_elements(v_games) g where g.value->>'gid' = v_gid limit 1;
     if v_game is null then return jsonb_build_object('ok',false,'error','game not available'); end if;
+    if jsonb_typeof(v_game->v_key) is distinct from 'array' then
+      return jsonb_build_object('ok',false,'error','market not available for this game'); end if;
     select (e.value->>'am')::numeric into v_srv_am
-      from jsonb_array_elements(v_game->v_mk) e where e.value->>'sel' = v_sel limit 1;
+      from jsonb_array_elements(v_game->v_key) e where e.value->>'sel' = v_sel limit 1;
     if v_srv_am is null or v_srv_am = 0 then
       return jsonb_build_object('ok',false,'error','line not offered'); end if;
     v_dec := case when v_srv_am > 0 then 1 + v_srv_am/100.0 else 1 + 100.0/(-v_srv_am) end;

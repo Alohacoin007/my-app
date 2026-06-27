@@ -16,10 +16,14 @@ const GAMES = [
   { gid: 'NBA_2', ml: [{ sel: 'GSW ML', am: -200 }, { sel: 'DEN ML', am: 170 }] },
 ];
 
+// The app sends the market LABEL ('Moneyline'/'Spread'/'Total'), but live_games keys
+// the arrays as ml/spread/total — place_bet must MAP label → key (the bug this catches).
+const MK = { Moneyline: 'ml', Spread: 'spread', Total: 'total' };
 // server line lookup; returns null if the selection isn't offered (→ reject, fail-safe)
-function serverAm(games, gid, market, sel) {
+function serverAm(games, gid, marketLabel, sel) {
+  const key = MK[marketLabel]; if (!key) return null;            // props/unknown label → reject
   const g = games.find((x) => x.gid === gid); if (!g) return null;
-  const arr = g[market]; if (!Array.isArray(arr)) return null;
+  const arr = g[key]; if (!Array.isArray(arr)) return null;
   const e = arr.find((x) => x.sel === sel); return e ? e.am : null;
 }
 // re-price: ignore client am entirely; combine SERVER decimals; SGP haircut if one game
@@ -38,7 +42,7 @@ function reprice(legs, games, stake) {
 console.log('\n=== RED: client inflates odds → server ignores them ===');
 {
   // attacker sends LAL ML at +100000 instead of the real -140
-  const cheat = [{ gid: 'NBA_1', market: 'ml', sel: 'LAL ML', am: 100000 }];
+  const cheat = [{ gid: 'NBA_1', market: 'Moneyline', sel: 'LAL ML', am: 100000 }];
   const r = reprice(cheat, GAMES, 20);
   ok('re-priced from SERVER -140, not client +100000', r.ok && r.potential === Math.round(20 * decOf(-140) * 100) / 100);
   ok('payout is ~$34.3 not $20,020', r.potential < 40);
@@ -46,23 +50,23 @@ console.log('\n=== RED: client inflates odds → server ignores them ===');
 
 console.log('\n=== GREEN: honest single + parlay price correctly ===');
 {
-  const single = [{ gid: 'NBA_1', market: 'ml', sel: 'BOS ML', am: 120 }];
+  const single = [{ gid: 'NBA_1', market: 'Moneyline', sel: 'BOS ML', am: 120 }];
   ok('single BOS ML +120 on $20 → $44', reprice(single, GAMES, 20).potential === 44);
-  const parlay = [{ gid: 'NBA_1', market: 'ml', sel: 'LAL ML', am: -140 },
-                  { gid: 'NBA_2', market: 'ml', sel: 'GSW ML', am: -200 }];
+  const parlay = [{ gid: 'NBA_1', market: 'Moneyline', sel: 'LAL ML', am: -140 },
+                  { gid: 'NBA_2', market: 'Moneyline', sel: 'GSW ML', am: -200 }];
   const exp = Math.round(20 * decOf(-140) * decOf(-200) * 100) / 100;   // different games → no haircut
   ok('2-game parlay uses product (no haircut)', reprice(parlay, GAMES, 20).potential === exp);
 }
 
 console.log('\n=== SGP haircut + fail-safe ===');
 {
-  const sgp = [{ gid: 'NBA_1', market: 'ml', sel: 'LAL ML', am: -140 },
-               { gid: 'NBA_1', market: 'total', sel: 'Over 220.5', am: -110 }];
+  const sgp = [{ gid: 'NBA_1', market: 'Moneyline', sel: 'LAL ML', am: -140 },
+               { gid: 'NBA_1', market: 'Total', sel: 'Over 220.5', am: -110 }];
   const raw = decOf(-140) * decOf(-110);
   const exp = Math.round(20 * (1 + (raw - 1) * (1 - HAIRCUT)) * 100) / 100;
   ok('same-game SGP gets the 25% haircut', reprice(sgp, GAMES, 20).potential === exp);
-  ok('unknown selection → REJECT (fail safe)', reprice([{ gid: 'NBA_1', market: 'ml', sel: 'FAKE ML', am: -110 }], GAMES, 20).ok === false);
-  ok('unknown game → REJECT', reprice([{ gid: 'NBA_9', market: 'ml', sel: 'LAL ML', am: -110 }], GAMES, 20).ok === false);
+  ok('unknown selection → REJECT (fail safe)', reprice([{ gid: 'NBA_1', market: 'Moneyline', sel: 'FAKE ML', am: -110 }], GAMES, 20).ok === false);
+  ok('unknown game → REJECT', reprice([{ gid: 'NBA_9', market: 'Moneyline', sel: 'LAL ML', am: -110 }], GAMES, 20).ok === false);
   ok('prop market (not in live_games) → REJECT', reprice([{ gid: 'NBA_1', market: 'prop_pts', sel: 'X 25+', am: -110 }], GAMES, 20).ok === false);
 }
 
