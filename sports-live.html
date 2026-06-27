@@ -1993,7 +1993,16 @@
         }
         _pushedBets[betId]=true;   // place_bet already created the server row → skip the insertBetRow auto-push
         AlpexaSync.db.from('accounts').select('balance').eq('acct_no',acct).maybeSingle().then(function(r){ if(r&&!r.error&&r.data){ balance=+r.data.balance||0; window.__sbLocalTs=0; window.__sbLastPushed=balance; try{sportsSrv().bal=balance;}catch(e){} /* #5: balance is server-only — not written to localStorage */ updateWallet(); } });
-      }, function(){ /* network error: keep optimistic bet; insertBetRow auto-push will create the row, balance reconciles on next adopt */ });
+      }, function(){
+        // #5: a bet exists ONLY if place_bet debited its stake server-side. There is NO
+        // client-side fallback that creates the row (that path raced place_bet and let the
+        // server skip the debit via its idempotency guard → free bets). On a network
+        // failure we roll the optimistic bet back and the user retries — no money-less bet.
+        openBets=openBets.filter(x=>x.id!==betId);
+        const nb3=document.getElementById('navBadge'); if(nb3){nb3.textContent=openBets.length||'';nb3.style.display=openBets.length?'flex':'none';}
+        showToast('🔌','Bet not placed','Connection issue — please try again');
+        renderTickets(); updateWallet();
+      });
     })();
     // (Recent Activity bet rows are derived from openBets in renderTxns — not stored here.)
     try{window.AlpexaSync&&AlpexaSync.logActivity({server:'sports',kind:'bet',symbol:betType,amount:stake,ticket:spTicket,detail:((legs&&legs[0]&&(legs[0].game||legs[0].gm))||'')+(legCount>1?(' +'+(legCount-1)+' legs'):'')});}catch(e){}
@@ -2245,23 +2254,15 @@
       symbol:(b.type||'Bet')+(pick?(' · '+pick+more):''), side:'', stake:+b.stake||0,
       potential:+b.potential||0, status:'open', game:game, pick:pick, odds:odds, size:nlegs, meta:meta };
   }
-  function insertBetRow(b){
-    if(!(window.AlpexaSync&&AlpexaSync.db)) return; const cust=meCust(); if(!cust) return;
-    const row=betToRow(b); if(!row) return;
-    // delete-then-insert by THIS bet's id only (idempotent, never touches others)
-    AlpexaSync.db.from('positions').delete().eq('cust_id',cust).eq('server','sports').eq('local_id',String(b.id)).then(function(){
-      AlpexaSync.db.from('positions').insert(row).then(function(res){ if(!(res&&res.error))_pushedBets[b.id]=true; },function(){});
-    },function(){});
-  }
-  function syncOwnBets(){
-    if(!(window.AlpexaSync&&AlpexaSync.db)) return; const cust=meCust(); if(!cust) return;
-    openBets.forEach(function(b){
-      // Only the device that has the bet locally (and hasn't pulled it) inserts it.
-      // Pulled bets (fromServer) already live on the server — don't re-insert.
-      if(!b||b.fromServer||_pushedBets[b.id]) return;
-      insertBetRow(b);
-    });
-  }
+  // #5 STRUCTURAL FIX: the client must NEVER create a bet position. A sports bet exists on
+  // the server ONLY when place_bet debited its stake (ledger betstake-<id>). The old
+  // insertBetRow/syncOwnBets inserted the position DIRECTLY (no debit); racing place_bet,
+  // the client could win and place_bet's idempotency guard would then skip the debit →
+  // a position with no debit (free bet / money-print, exactly what we saw on SP-895264).
+  // Both are now no-ops. place_bet is the single source of truth; pullServerBets (read)
+  // still mirrors the server's bets to every device.
+  function insertBetRow(){ /* removed (#5): bets are created only by place_bet (server, atomic debit) */ }
+  function syncOwnBets(){ /* removed (#5): no client-side position writes */ }
   function deleteServerBet(id){ claimServerBet(id); }
   function pullServerBets(){
     if(!(window.AlpexaSync&&AlpexaSync.db)) return; const cust=meCust(); if(!cust) return;
