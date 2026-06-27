@@ -2074,23 +2074,24 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
               </span>}
               count={`${Object.keys(staked).filter((k) => (staked[k] && staked[k].usd) > 0).length} positions`}
             />
-            {Object.entries(staked).filter(([, v]) => v && v.usd > 0).map(([sym, info]) => {
+            {Object.entries(staked).filter(([, v]) => v && v.usd > 0).map(([key, info]) => {
               const usd    = info.usd;
               const period = info.period || 'flexible';
-              const meta   = (PORTFOLIO.securities.find((x) => x.sym === sym))
-                          || (PORTFOLIO.assets.find((x) => x.sym === sym))
-                          || { sym, seed: 100, chg: 0 };
-              const stakeMeta = (typeof STAKE_ASSETS !== 'undefined') ? STAKE_ASSETS[sym] : null;
-              const apy = stakePeriodApy(sym, period);
-              const name = meta.name || (stakeMeta && stakeMeta.name) || sym;
+              const asset  = info.asset || key.split('|')[0];   // composite key: `asset|period`
+              const meta   = (PORTFOLIO.securities.find((x) => x.sym === asset))
+                          || (PORTFOLIO.assets.find((x) => x.sym === asset))
+                          || { sym: asset, seed: 100, chg: 0 };
+              const stakeMeta = (typeof STAKE_ASSETS !== 'undefined') ? STAKE_ASSETS[asset] : null;
+              const apy = stakePeriodApy(asset, period);
+              const name = meta.name || (stakeMeta && stakeMeta.name) || asset;
               return (
                 <AssetRow
-                  key={'staked-' + sym}
-                  a={{ ...meta, sym, name, mine: usd, qty: usd / (meta.price || 1), apy, isStakedRow: true, lockPeriod: period }}
+                  key={'staked-' + key}
+                  a={{ ...meta, sym: asset, name, mine: usd, qty: usd / (meta.price || 1), apy, isStakedRow: true, lockPeriod: period }}
                   kind="security"
                   liveValue={usd}
-                  pulse={pulseAsset === sym}
-                  onTap={() => onTapAsset && onTapAsset('staked', sym)}
+                  pulse={pulseAsset === asset}
+                  onTap={() => onTapAsset && onTapAsset('staked', key)}
                 />
               );
             })}
@@ -3864,13 +3865,16 @@ function Stake({ onBack, balances = {}, staked = {}, onStaked, initialAssetId })
   const [assetId, setAssetId]     = React.useState(initialAssetId || 'ALPXS');
   const [assetOpen, setAssetOpen] = React.useState(false);
   const [amountStr, setAmountStr] = React.useState('0');
-  const [periodId, setPeriodId]   = React.useState('flexible');
+  // Per-asset terms: ALPXS = 1-year ONLY (hard lock). USDT (and any other) = flexible / 90d / 1y.
+  const allowedPeriods = (a) => (a === 'ALPXS' ? ['1y'] : ['flexible', '90d', '1y']);
+  const [periodId, setPeriodId]   = React.useState((initialAssetId === 'ALPXS') ? '1y' : 'flexible');
   const [confirmed, setConfirmed] = React.useState(false);
-  // One stake term per coin: if this coin is already staked, you can only add to
-  // the SAME term (unstake first to switch terms). Lock the picker to that term.
-  const existingStake = (staked[assetId] && staked[assetId].usd > 0) ? staked[assetId] : null;
-  const lockedTerm = existingStake ? existingStake.period : null;
-  React.useEffect(() => { if (lockedTerm) setPeriodId(lockedTerm); }, [assetId, lockedTerm]);
+  const lockedTerm = null;  // multi-term staking — a coin can hold several terms at once
+  // Switching asset snaps the period to a valid term for that asset.
+  React.useEffect(() => {
+    const allowed = allowedPeriods(assetId);
+    setPeriodId((p) => (allowed.indexOf(p) >= 0 ? p : (assetId === 'ALPXS' ? '1y' : 'flexible')));
+  }, [assetId]);
 
 
 
@@ -4066,7 +4070,7 @@ function Stake({ onBack, balances = {}, staked = {}, onStaked, initialAssetId })
         <div style={{ margin: '0 22px 12px', display: 'flex', gap: 6 }}>
           {STAKE_PERIODS.map((p) => {
             const active = p.id === periodId;
-            const disabled = lockedTerm && p.id !== lockedTerm;
+            const disabled = allowedPeriods(assetId).indexOf(p.id) < 0;   // ALPXS → 1y only
             return (
               <button
                 key={p.id}
@@ -10678,24 +10682,29 @@ function HeroConfirm({ heroColor, label, sublabel, rows = [], footnote, onDone, 
 // Locked & before maturity: hard-locked — cannot unstake until the term ends.
 function Unstake({ onBack, sym, staked = {}, onUnstaked }) {
   const info = staked[sym] || { usd: 0, period: 'flexible' };
-  const meta = PORTFOLIO.securities.find((s) => s.sym === sym)
-            || PORTFOLIO.assets.find((a) => a.sym === sym)
-            || { sym, name: sym, price: 1, apy: 5 };
-  const apy = stakePeriodApy(sym, info.period);
-  const principal = info.usd;
-  // Real accrual — principal × APY × time staked.
+  const asset = info.asset || (sym.indexOf('|') >= 0 ? sym.split('|')[0] : sym);   // composite `asset|period`
+  const meta = PORTFOLIO.securities.find((s) => s.sym === asset)
+            || PORTFOLIO.assets.find((a) => a.sym === asset)
+            || { sym: asset, name: asset, price: 1, apy: 5 };
+  const apy = stakePeriodApy(asset, info.period);
   const accrued = stakeAccruedUsd(info, apy);
-  // Hard lock: 90-day / 1-year terms cannot be unstaked before maturity.
-  const locked = stakeIsLocked(info);
+  const principalVal = (info.principal != null ? +info.principal : info.usd);
+  // Term rules: ALPXS locked = HARD lock (no early exit). USDT locked = early exit
+  // allowed but forfeits accrued interest (principal only). flexible/matured = full.
+  const beforeMaturity = stakeIsLocked(info);
+  const hardLocked = beforeMaturity && asset === 'ALPXS';
+  const earlyExit  = beforeMaturity && asset !== 'ALPXS';
+  const locked = hardLocked;                       // only ALPXS hard-blocks the button
   const unlockDate = info.since ? new Date(stakeMaturity(info)).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}) : '';
   const periodLabel = (STAKE_PERIODS.find(function(p){return p.id===info.period;})||{}).label || '';
-  const finalAmt = principal + accrued;   // full principal + rewards (only when unlocked)
+  const finalAmt = earlyExit ? principalVal : (info.usd + accrued);   // early → principal only
+  const forfeited = earlyExit ? Math.max(0, (info.usd + accrued) - principalVal) : 0;
 
   const [confirmed, setConfirmed] = React.useState(false);
   const doUnstake = () => {
-    if (locked) return;                    // can't unstake before maturity
+    if (hardLocked) return;                // ALPXS can't exit before maturity
     if (typeof AudioFX !== 'undefined') AudioFX.success();
-    if (onUnstaked) onUnstaked(sym, finalAmt, accrued, principal);
+    if (onUnstaked) onUnstaked(sym, finalAmt, earlyExit ? 0 : accrued, principalVal);
     setConfirmed(true);
   };
 
@@ -10707,7 +10716,7 @@ function Unstake({ onBack, sym, staked = {}, onUnstaked }) {
         label={`$${finalAmt.toFixed(2)} unstaked`}
         sublabel={`${coinAmt.toFixed(6).replace(/\.?0+$/, '')} ${sym}`}
         rows={[
-          { label: 'Principal',   value: `$${principal.toFixed(2)}` },
+          { label: 'Principal',   value: `$${principalVal.toFixed(2)}` },
           { label: 'Accrued APY', value: `+$${accrued.toFixed(2)}` },
           { label: 'To wallet',   value: `$${finalAmt.toFixed(2)}` },
         ]}
@@ -10761,7 +10770,7 @@ function Unstake({ onBack, sym, staked = {}, onUnstaked }) {
         {/* Breakdown */}
         <div style={{ marginTop: 14, padding: 14, background: RH.surface, border: `1px solid ${RH.line}`, borderRadius: 12 }}>
           <BreakRow label="Principal staked"
-                    value={`$${principal.toFixed(2)}`} />
+                    value={`$${principalVal.toFixed(2)}`} />
           <BreakRow label={`Accrued APY (${apy.toFixed(1)}%)`}
                     value={`+$${accrued.toFixed(2)}`}
                     colorValue={RH.green}/>
@@ -10778,6 +10787,18 @@ function Unstake({ onBack, sym, staked = {}, onUnstaked }) {
             color: RH.red, letterSpacing: 0.4, textAlign: 'center',
           }}>
             Locked until {unlockDate} — funds release with full rewards
+          </div>
+        ) : null}
+
+        {earlyExit ? (
+          <div style={{
+            marginTop: 10, padding: 10,
+            background: RH.red + '12', border: `1px solid ${RH.red}44`,
+            borderRadius: 10,
+            fontFamily: 'Geist Mono, monospace', fontSize: 11,
+            color: RH.red, letterSpacing: 0.3, textAlign: 'center', lineHeight: 1.5,
+          }}>
+            Early unstake before {unlockDate} — accrued interest (−${forfeited.toFixed(2)}) is forfeited. You get your principal ${principalVal.toFixed(2)} back.
           </div>
         ) : null}
 
@@ -11004,11 +11025,14 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
   const [, forceAccrue] = React.useState(0);
   React.useEffect(() => { const iv = setInterval(() => forceAccrue((x) => x + 1), 60000); return () => clearInterval(iv); }, []);
 
-  const cryptoMeta = PORTFOLIO.assets.find((a) => a.sym === sym);
-  const secMeta    = PORTFOLIO.securities.find((s) => s.sym === sym);
-  const marketMeta = (typeof MARKET !== 'undefined') ? MARKET.find((m) => m.sym === sym) : null;
-  const meta = cryptoMeta || secMeta || marketMeta || { sym, name: sym, price: 1, seed: 100, chg: 0 };
   const isStaked   = kind === 'staked';
+  // A staked position's `sym` is the composite `asset|period` key — resolve the real
+  // coin so the name / chart / price lookups work.
+  const lookSym = isStaked ? ((staked[sym] && staked[sym].asset) || (sym.indexOf('|') >= 0 ? sym.split('|')[0] : sym)) : sym;
+  const cryptoMeta = PORTFOLIO.assets.find((a) => a.sym === lookSym);
+  const secMeta    = PORTFOLIO.securities.find((s) => s.sym === lookSym);
+  const marketMeta = (typeof MARKET !== 'undefined') ? MARKET.find((m) => m.sym === lookSym) : null;
+  const meta = cryptoMeta || secMeta || marketMeta || { sym: lookSym, name: lookSym, price: 1, seed: 100, chg: 0 };
   const isSecurity = kind === 'security' && !isStaked;
   const isCrypto   = kind === 'crypto';
   const isALPXS    = sym === 'ALPXS';
@@ -13602,10 +13626,12 @@ function App() {
         if (document.hidden) return;
         const acct = cryptoAcctRef.current; if (!acct) return;
         if (Date.now() - (window.__cbLocalTs || 0) < 7000) return; // device busy
-        AlpexaSync.db.from('crypto_stakes').select('asset,usd,period,since').eq('acct_no', acct).then((sr) => {
+        AlpexaSync.db.from('crypto_stakes').select('asset,usd,principal,period,since,staked_at').eq('acct_no', acct).then((sr) => {
           if (stop || !sr || sr.error || !sr.data) return;
           const next = {};
-          sr.data.forEach((r) => { const usd = +r.usd || 0; if (usd > 0.005) next[r.asset] = { usd: usd, period: r.period || 'flexible', since: +r.since || 0 }; });
+          // Multi-term: key by `asset|period` so a coin can hold several terms at once.
+          sr.data.forEach((r) => { const usd = +r.usd || 0; const per = r.period || 'flexible';
+            if (usd > 0.005) next[r.asset + '|' + per] = { usd: usd, principal: (+r.principal || usd), period: per, since: +r.since || 0, staked_at: (+r.staked_at || +r.since || 0), asset: r.asset }; });
           const sig = cryptoStakeSig(next);
           if (sig === stakeSyncRef.current.srvSig) return; // unchanged
           stakeSyncRef.current.srvSig = sig;
@@ -13633,26 +13659,27 @@ function App() {
   // Move USD from balance → staked. Stores period alongside USD so the
   // Dashboard can render the lock-period chip.
   const onStakeConfirmed = (assetId, usdAmount, period = 'flexible') => {
-    const prevPeriod = (staked[assetId] && staked[assetId].usd > 0) ? staked[assetId].period : period;
+    // Multi-term: each (asset, period) is its own stake. Key local state by `asset|period`.
+    const key = assetId + '|' + period;
     // Client path (offline / no account) — original optimistic behaviour.
     const clientStake = () => {
       setBalances((b) => ({ ...b, [assetId]: Math.max(0, (b[assetId] || 0) - usdAmount) }));
       setStaked((s) => {
-        const prev = s[assetId]; const now = Date.now();
-        if (prev && prev.usd) return { ...s, [assetId]: { usd: prev.usd + usdAmount, period: prev.period, since: prev.since || now } };
-        return { ...s, [assetId]: { usd: usdAmount, period, since: now } };
+        const prev = s[key]; const now = Date.now();
+        if (prev && prev.usd) return { ...s, [key]: { ...prev, usd: prev.usd + usdAmount, principal: (prev.principal || 0) + usdAmount } };
+        return { ...s, [key]: { usd: usdAmount, principal: usdAmount, period, since: now, staked_at: now, asset: assetId } };
       });
-      pushTx({ type: 'stake', sym: assetId, usd: usdAmount, period: prevPeriod });
+      pushTx({ type: 'stake', sym: assetId, usd: usdAmount, period });
       flashAsset(assetId);
       return { ok: true };
     };
     const acct = cryptoAcctRef.current;
     if (!(window.AlpexaSync && AlpexaSync.db && acct)) return Promise.resolve(clientStake());
-    // SERVER-AUTHORITATIVE stake — debits USDT and records the stake on the server.
+    // SERVER-AUTHORITATIVE stake — debits the coin and records the (asset, period) stake.
     window.__cbLocalTs = Date.now();
     return AlpexaSync.db.rpc('stake_crypto', {
       p_ref: 'stk-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
-      p_acct: acct, p_asset: assetId, p_usd: usdAmount, p_period: prevPeriod,
+      p_acct: acct, p_asset: assetId, p_usd: usdAmount, p_period: period,
     }).then((r) => {
       const d = r && r.data;
       if (!d || d.ok !== true) {
@@ -13836,23 +13863,26 @@ function App() {
 
   // Unstake → adds USD back to the asset balance, clears staked slot.
   const onUnstakeConfirmed = (sym, amount, accrued, principal) => {
+    // `sym` is the composite `asset|period` key from the staked row.
+    const asset  = (sym.indexOf('|') >= 0) ? sym.split('|')[0] : sym;
+    const period = (sym.indexOf('|') >= 0) ? sym.split('|')[1] : ((staked[sym] && staked[sym].period) || 'flexible');
     var _acc = +accrued || 0, _prin = (principal != null ? +principal : (amount - _acc));
     // Record the principal returned + the staking reward (interest) as its own history line.
-    const recordTx = () => { pushTx({ type: 'unstake', sym, usd: _prin }); if (_acc > 0.005) pushTx({ type: 'reward', sym, usd: _acc, detail: 'Staking reward' }); };
+    const recordTx = () => { pushTx({ type: 'unstake', sym: asset, usd: _prin }); if (_acc > 0.005) pushTx({ type: 'reward', sym: asset, usd: _acc, detail: 'Staking reward' }); };
     // Client path (offline / no account) — original optimistic behaviour.
     const clientUnstake = () => {
-      setBalances((b) => ({ ...b, [sym]: (b[sym] || 0) + amount }));
+      setBalances((b) => ({ ...b, [asset]: (b[asset] || 0) + amount }));
       setStaked((s) => { const next = { ...s }; delete next[sym]; return next; });
-      recordTx(); flashAsset(sym);
+      recordTx(); flashAsset(asset);
       return { ok: true };
     };
     const acct = cryptoAcctRef.current;
     if (!(window.AlpexaSync && AlpexaSync.db && acct)) return Promise.resolve(clientUnstake());
-    // SERVER-AUTHORITATIVE unstake — enforces the lock + credits the coins server-side.
+    // SERVER-AUTHORITATIVE unstake — enforces the lock/penalty + credits the coins server-side.
     window.__cbLocalTs = Date.now();
     return AlpexaSync.db.rpc('unstake_crypto', {
       p_ref: 'unstk-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
-      p_acct: acct, p_asset: sym,
+      p_acct: acct, p_asset: asset, p_period: period,
     }).then((r) => {
       const d = r && r.data;
       if (!d || d.ok !== true) {
@@ -13864,7 +13894,7 @@ function App() {
       setStaked((s) => { const next = { ...s }; delete next[sym]; return next; });
       recordTx();
       forceCryptoAdopt();
-      flashAsset(sym);
+      flashAsset(asset);
       return { ok: true };
     }, () => ({ ok: false, error: 'network error' }));
   };
