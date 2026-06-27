@@ -136,6 +136,17 @@
     if(accs.length){ q=q.or('cust_id.eq.'+custId+',acct_no.in.('+accs.join(',')+')'); }
     else { q=q.eq('cust_id',custId); }
     q.limit(200).then(function(r){ if(r&&r.data){ POS_BY_CUST[custId]=r.data; if(!busyEditing())render(); } },function(){}); }
+  // #5/B: crypto holdings & stakes come from the SERVER tables (crypto_holdings /
+  // crypto_stakes) directly — not the retired client positions mirror. Needs the
+  // is_admin read policy on both tables (see supabase/sql/crypto_admin_read.sql).
+  var CRYPTO_BY_CUST={};
+  function pullCustCrypto(custId, cryptoAcct){
+    if(!window.AlpexaSync||!AlpexaSync.db||!custId||!cryptoAcct||cryptoAcct==='—') return;
+    CRYPTO_BY_CUST[custId]={holdings:[],stakes:[]};
+    AlpexaSync.db.from('crypto_holdings').select('asset,qty').eq('acct_no',cryptoAcct).then(function(r){
+      if(r&&r.data){ CRYPTO_BY_CUST[custId].holdings=r.data.filter(function(x){return (+x.qty||0)>0;}); if(!busyEditing())render(); } },function(){});
+    AlpexaSync.db.from('crypto_stakes').select('asset,usd,period').eq('acct_no',cryptoAcct).then(function(r){
+      if(r&&r.data){ CRYPTO_BY_CUST[custId].stakes=r.data.filter(function(x){return (+x.usd||0)>0;}); if(!busyEditing())render(); } },function(){}); }
   // Shared renderer for one open position/bet/holding (with Close/Void control).
   function posRowHTML(x){
     var s=x.server, who=custName(x.cust_id)||x.cust_id||'';
@@ -830,6 +841,15 @@
           h+='<div class="lbl" style="margin-top:12px">Open positions ('+op.length+')</div>';
           if(!op.length){ h+='<div class="req-meta" style="margin:4px 0">None open.</div>'; }
           op.forEach(function(x){ h+=posRowHTML(x); });
+          // Crypto holdings/stakes — read DIRECTLY from crypto_holdings/crypto_stakes (#5/B),
+          // not the retired positions mirror. Identified by the customer's crypto account.
+          var cAcct=an('crypto');
+          if(CRYPTO_BY_CUST[cid]===undefined){ CRYPTO_BY_CUST[cid]={holdings:[],stakes:[]}; pullCustCrypto(cid,cAcct); }
+          var cb=CRYPTO_BY_CUST[cid]||{holdings:[],stakes:[]};
+          h+='<div class="lbl" style="margin-top:12px">Crypto holdings ('+(cb.holdings.length+cb.stakes.length)+')</div>';
+          if(!cb.holdings.length&&!cb.stakes.length){ h+='<div class="req-meta" style="margin:4px 0">None.</div>'; }
+          cb.holdings.forEach(function(x){ h+='<div class="row"><span><b>'+(x.asset||'')+'</b> <span class="muted" style="font-size:10.5px">Holding</span></span><b class="muted">'+(+x.qty||0)+'</b></div>'; });
+          cb.stakes.forEach(function(x){ h+='<div class="row"><span><b>'+(x.asset||'')+'</b> <span class="muted" style="font-size:10.5px">Staked'+(x.period?(' · '+esc(x.period)):'')+'</span></span><b class="muted">'+usd(+x.usd||0)+'</b></div>'; });
           var KINDS2={fx_close:'FX close',bet_won:'Bet won',bet_lost:'Bet lost',bet_cashout:'Cashout',bet_void:'Void',crypto_fee:'Fee'};
           var tr=SRV_SETTLE.filter(function(x){ return x.cust_id===cid; }).slice(0,15);
           h+='<div class="lbl" style="margin-top:12px">Recent trades ('+tr.length+')</div>';

@@ -14352,22 +14352,15 @@ function alpexaPortfolioSeries(range, n, endValue) {
     AlpexaSync.db.from('settlements').insert({cust_id:m.custId,acct_no:(m.accts&&m.accts[rec.server])||'',server:rec.server||'',kind:rec.kind||'',local_id:String(rec.local_id||''),ticket:String(rec.ticket||''),symbol:rec.symbol||'',stake:Math.round((+rec.stake||0)*100)/100,pnl:Math.round((+rec.pnl||0)*100)/100,detail:rec.detail||''}).then(function(){},function(){});
   }catch(e){} };
   function push(){
+    // #5/B: crypto holdings & stakes truth lives in crypto_holdings / crypto_stakes
+    // (server, RPC-only writes). The old localStorage→positions mirror is RETIRED — it
+    // read now-empty localStorage and DELETED crypto positions every cycle. The back
+    // office reads the real tables directly. This is now just the presence heartbeat.
     if(!window.AlpexaSync||!AlpexaSync.db)return;
-    var m=meX(); if(!m||!m.accts.crypto)return; var cust=m.custId, acct=m.accts.crypto;
+    var m=meX(); if(!m||!m.accts.crypto)return; var cust=m.custId;
     AlpexaSync.db.from('players').update({last_seen:new Date().toISOString(),last_app:'crypto'}).eq('cust_id',cust).then(function(){},function(){});
-    var items=[];
-    try{var h=JSON.parse(localStorage.getItem('alpexa.cryptoHoldings')||'{}')||{};
-      Object.keys(h).forEach(function(sym){ if(sym==='USDT')return; var v=+h[sym]||0; if(v<=0)return;
-        items.push({cust_id:cust,acct_no:acct,server:'crypto',kind:'holding',local_id:sym,symbol:sym,side:'',stake:v,status:'open'});});
-      var st=JSON.parse(localStorage.getItem('alpexa.staked')||'{}')||{};
-      Object.keys(st).forEach(function(sym){ var info=st[sym]; var v=info&&info.usd?+info.usd:0; if(v<=0)return;
-        items.push({cust_id:cust,acct_no:acct,server:'crypto',kind:'stake',local_id:'stk-'+sym,symbol:sym,side:'STAKE',stake:v,status:'open'});});
-    }catch(e){}
-    AlpexaSync.db.from('positions').delete().eq('cust_id',cust).eq('server','crypto').then(function(){
-      if(items.length)AlpexaSync.db.from('positions').insert(items).then(function(){},function(){});
-    },function(){});
   }
-  setTimeout(push,2000); setInterval(function(){ if(!document.hidden){ push(); } else { window.__bgPosPush=window.__bgPosPush||0; if(Date.now()-window.__bgPosPush>9000){ window.__bgPosPush=Date.now(); push(); } } },3000);
+  setTimeout(push,2000); setInterval(function(){ if(!document.hidden) push(); },8000);
   // Dealing-desk: per-coin buy/sell markup % set in the back office.
   window.__alpexaCryptoMarks=window.__alpexaCryptoMarks||{};
   function pullCryptoMarks(){ if(!window.AlpexaSync||!AlpexaSync.db)return;
@@ -14381,12 +14374,8 @@ function alpexaPortfolioSeries(range, n, endValue) {
     AlpexaSync.db.from('controls').select('val').eq('key','trading_halt').limit(1).then(function(r){
       window.__alpexaHalt=!!(r&&r.data&&r.data[0]&&r.data[0].val==='1'); },function(){}); }
   setTimeout(pullHalt,1500); setInterval(function(){ if(!document.hidden) pullHalt(); },5000);
-  // Instant: when holdings/stakes change (a trade happened), push right away.
-  // Amounts rounded to cents so price ticks don't fire it.
-  function posSig(){try{var h=JSON.parse(localStorage.getItem('alpexa.cryptoHoldings')||'{}')||{};var st=JSON.parse(localStorage.getItem('alpexa.staked')||'{}')||{};
-    return Object.keys(h).map(function(k){return k+':'+Math.round((+h[k]||0)*100);}).join(',')+'|'+Object.keys(st).join(',');}catch(e){return'';}}
-  var _psig=posSig();
-  setInterval(function(){var n=posSig(); if(n!==_psig){_psig=n; if(!document.hidden)push();}},700);
+  // (Removed the holdings-change→push trigger and its localStorage posSig — the positions
+  //  mirror it fed is retired (B). crypto_holdings/crypto_stakes are the server truth.)
   // Lightweight presence heartbeat — runs even in the background.
   function beat(){ if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m)return;
     var patch={last_seen:new Date().toISOString(),last_app:'crypto'};
