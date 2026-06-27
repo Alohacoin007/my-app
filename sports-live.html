@@ -2024,11 +2024,15 @@
       <div style="text-align:right;white-space:nowrap"><span class="odd">${fmtAm(l.am)}</span>${resTag}</div></div>`;
     }).join('');
     const isSingle=(b.legs&&b.legs.length===1);
+    // A bet graded "won" by the server but whose payout ≤ stake made NO profit — it is a
+    // PUSH/REFUND (stake returned), e.g. a single moneyline Draw-No-Bet push. The server
+    // marks it "won" (!anyLost); money-wise it's a refund. Show it as such, not "Won".
+    const dispRes = (!isOpen && b.result==='won' && (+b.payout||0) <= (+b.stake||0)+0.001) ? 'refunded' : b.result;
     const tw=String(b.type||'Bet').split(' · ')[0];   // bet-type word only (server symbol is "Parlay · pick +N")
     const badgeCls=isSingle?'single':(b.cls||(/same game/i.test(tw)?'sgp':'parlay'));
     const badgeTxt=isSingle?'Single':`${tw}${b.legs.length>1?' '+b.legs.length+' legs':''}`;
     const head=`<div class="th"><span class="badge ${badgeCls}">${badgeTxt}</span>
-      <span class="res ${isOpen?'open':b.result}">${isOpen?'Open':b.result==='won'?'Won':b.result==='cashed'?'Cashed Out':'Lost'}</span></div>`+
+      <span class="res ${isOpen?'open':dispRes}">${isOpen?'Open':dispRes==='won'?'Won':dispRes==='cashed'?'Cashed Out':dispRes==='refunded'?'Push':'Lost'}</span></div>`+
       ((b.ticket||b.placedTs)?`<div style="font-family:ui-monospace,monospace;font-size:9.5px;color:var(--dim);padding:0 2px 4px">${b.ticket||''}${b.ticket&&b.placedTs?' · ':''}${b.placedTs?fmtStamp(b.placedTs):''}</div>`:'');
     // Open-ticket status: Live (a leg is playing) > Awaiting result (a leg has kicked off /
     // finished but isn't settled yet — finished games drop out of the GAMES feed) > Upcoming
@@ -2057,8 +2061,8 @@
     else if(isOpen){foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b>Est. ${usd(b.potential)}</b></div>
       ${statusTag}</div>`;/* cash-out hidden until real live-odds feed is wired up — buttons & doCashout kept in code to re-enable later */}
     else if(b.result==='cashed'){foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b class="c">Cashed ${usd(b.payout)}</b></div>${b.ts?`<div style="font-size:10px;color:var(--dim);padding:3px 2px 0">Settled · ${fmtStamp(b.ts)}</div>`:''}</div>`;}
-    else{foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b class="${b.result==='won'?'g':'l'}">${b.result==='won'?'Win '+usd(b.payout):'Loss '+usd(b.stake)}</b></div>${b.ts?`<div style="font-size:10px;color:var(--dim);padding:3px 2px 0">Settled · ${fmtStamp(b.ts)}</div>`:''}</div>`;}
-    return `<div class="ticket ${isOpen?'':b.result}">${head}${legsH}${foot}</div>`;
+    else{foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b class="${dispRes==='won'?'g':dispRes==='refunded'?'':'l'}">${dispRes==='won'?'Win '+usd(b.payout):dispRes==='refunded'?'Refund '+usd(b.payout):'Loss '+usd(b.stake)}</b></div>${b.ts?`<div style="font-size:10px;color:var(--dim);padding:3px 2px 0">Settled · ${fmtStamp(b.ts)}</div>`:''}</div>`;}
+    return `<div class="ticket ${isOpen?'':dispRes}">${head}${legsH}${foot}</div>`;
   }
   function renderTickets(){
     saveBets();
@@ -2193,14 +2197,12 @@
   // No delete-all anywhere → bets never disappear or resurrect across devices.
   function meCust(){ try{ return (JSON.parse(localStorage.getItem('alpexa.me')||'null')||{}).custId||null; }catch(e){ return null; } }
   function meSportsAcct(){ try{ return ((JSON.parse(localStorage.getItem('alpexa.me')||'null')||{}).accts||{}).sports||''; }catch(e){ return ''; } }
-  // SERVER-OWNS-BALANCE: post a signed delta to the ledger. A DB trigger applies it
-  // to accounts.balance. The app NEVER overwrites the balance → no clobber, ever.
-  function ledgerPost(kind, amount, ref){
-    if(!(window.AlpexaSync&&AlpexaSync.db)) return;
-    var cust=meCust(), acct=meSportsAcct(); if(!cust||!acct) return;
-    amount=Math.round((+amount||0)*100)/100; if(Math.abs(amount)<0.005) return;
-    AlpexaSync.db.from('ledger').insert({acct_no:acct,cust_id:cust,server:'sports',kind:kind||'sports_app',amount:amount,ref:ref||('s'+Date.now()+Math.random().toString(36).slice(2,6))}).then(function(){},function(){});
-  }
+  // [REMOVED] ledgerPost() — a client-side `ledger` INSERT helper. It had ZERO callers
+  // (the A2/A8 closure removed them) and the ledger RLS lock (ledger_admin_ins) blocks
+  // any non-admin insert anyway. Deleting it removes the landmine entirely: there is now
+  // no code path, dead or alive, by which the app writes to the ledger. All sports money
+  // moves through server RPCs (place_bet/cash_out/app_transfer/withdraw_hold/admin_*) and
+  // the sports-settle Edge. (Caught by tests/diagnose.js — defect class A2.)
   const _pushedBets={}; // local_id -> true (rows we put on the server)
   // Atomically "claim" a bet by deleting its server row. Returns true ONLY if THIS
   // device actually removed it — so two devices can't both credit the same bet.

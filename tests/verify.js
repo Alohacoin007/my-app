@@ -68,6 +68,19 @@ for (const t of tests) {
   }
 }
 
+// ---- (3) defect-prevention scan (poka-yoke for shipped bug-classes) ----
+console.log('\n── DIAGNOSE: defect-class scan ───────────────────────');
+{
+  const d = cp.spawnSync(process.execPath, [path.join(testDir, 'diagnose.js')], { encoding: 'utf8' });
+  if (d.status !== 0) {
+    fail++;
+    ((d.stdout || '') + (d.stderr || '')).split('\n')
+      .filter(l => /🔴|🟠/.test(l)).slice(0, 12).forEach(l => console.log('  ' + l.trim()));
+  } else {
+    console.log('  ✅ diagnose clean (no known defect class present)');
+  }
+}
+
 console.log('\n' + (fail === 0
   ? '🟢 VERIFY PASSED — safe to say done'
   : `🔴 VERIFY FAILED — ${fail} problem(s). DO NOT claim done.`) + '\n');
