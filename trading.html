@@ -3643,11 +3643,11 @@ function App(){
         if(lvl<50&&worst&&!sltpHits.some(h=>h.id===worst.id)){ // stop out: liquidate the worst-losing live position (skip if it's already being SL/TP-closed this tick → no double close)
           closeOrder(worst.id);
           try{window.alpexaNotify&&alpexaNotify({type:'marginCall',pref:'marginCall',title:'Stop out · '+worst.sym+' liquidated at '+Math.round(lvl)+'% margin'});}catch(e){}
-          setToast({error:true,icon:'warning',msg:'Stop out — '+Math.round(lvl)+'%',sub:worst.sym+' liquidated to protect your account'});
+          setToast({error:true,soft:true,icon:'warning',msg:'Stop out — '+Math.round(lvl)+'%',sub:worst.sym+' liquidated to protect your account'});
           setTimeout(()=>setToast(null),4000);
         } else if(lvl<100){ if(!marginCallRef.current){ marginCallRef.current=true;
           try{window.alpexaNotify&&alpexaNotify({type:'marginCall',pref:'marginCall',title:'Margin call · level '+Math.round(lvl)+'% — add funds or reduce positions'});}catch(e){}
-          setToast({error:true,icon:'warning',msg:'Margin call — '+Math.round(lvl)+'%',sub:'Add funds or close positions to avoid stop out (50%)'});
+          setToast({error:true,soft:true,icon:'warning',msg:'Margin call — '+Math.round(lvl)+'%',sub:'Add funds or close positions to avoid stop out (50%)'});
           setTimeout(()=>setToast(null),4500);
         } } else if(lvl>=120){ marginCallRef.current=false; } // re-arm once safely recovered
       } else { marginCallRef.current=false; }
@@ -3891,7 +3891,23 @@ function App(){
       <AccountSheet open={acctSheet} current={account} onPick={setAccount} onClose={()=>setAcctSheet(false)}/>
       {notifOpen&&<NotificationSheet notifications={notifications} setNotifications={setNotifications} onClose={()=>setNotifOpen(false)}/>}
       {menuOpen&&<AppMenu indicators={indicators} setIndicators={setIndicators} liveOrders={liveOrders} closedHistory={closedHistory} onClose={()=>setMenuOpen(false)}/>}
-      {toast&&toast.error&&(
+      {toast&&toast.error&&toast.soft&&(
+        // Non-blocking warning banner for AUTOMATIC alerts (margin call / stop out). A
+        // blocking modal here re-fired every price tick and trapped the user — unable to
+        // close the very position causing it. This banner sits on top, auto-dismisses,
+        // and never covers the close controls.
+        <div style={{position:'absolute',top:96,left:14,right:14,zIndex:560,background:'var(--surface)',borderRadius:11,padding:'12px 14px',boxShadow:'var(--shadow-lg)',display:'flex',alignItems:'center',gap:10,animation:'tIn 0.3s cubic-bezier(0.2,0.8,0.2,1)',borderLeft:'4px solid #E04141'}}>
+          <div style={{width:32,height:32,borderRadius:16,background:'#FFEBEE',color:'#E04141',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+            <Mi name={toast.icon||'warning'} size={18} fill/>
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:700,letterSpacing:0.2,color:'var(--ink)'}}>{toast.msg}</div>
+            {toast.sub?<div style={{fontSize:10.5,color:'var(--text-2)',marginTop:2}}>{toast.sub}</div>:null}
+          </div>
+          <button onClick={()=>setToast(null)} style={{color:'var(--text-3)',flexShrink:0}}><Mi name="close" size={16}/></button>
+        </div>
+      )}
+      {toast&&toast.error&&!toast.soft&&(
         <div onClick={()=>setToast(null)} style={{position:'absolute',inset:0,zIndex:600,background:'rgba(10,14,26,0.55)',display:'flex',alignItems:'center',justifyContent:'center',padding:24,animation:'tFade .18s ease'}}>
           <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:300,background:'var(--surface)',borderRadius:18,padding:'24px 22px 18px',textAlign:'center',boxShadow:'0 20px 60px rgba(0,0,0,0.4)',animation:'tPop .22s cubic-bezier(0.34,1.56,0.64,1)'}}>
             <div style={{width:60,height:60,borderRadius:30,background:'#FFEBEE',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 14px'}}>
