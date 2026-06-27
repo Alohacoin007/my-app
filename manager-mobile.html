@@ -266,7 +266,7 @@
       // Older DB without the profile columns — fall back to the core fields.
       AlpexaSync.db.from('players').select('id,cust_id,name,email,created_at').then(function(r2){ if(r2&&r2.data){SRV_PLAYERS=r2.data; if((cur==='players'||cur==='watch')&&!busyEditing())render();} },function(){});
     });
-    AlpexaSync.db.from('accounts').select('player_id,server,acct_no,balance').then(function(r){
+    AlpexaSync.db.from('accounts').select('player_id,server,acct_no,balance,bonus').then(function(r){
       if(r&&r.data){ SRV_ACCOUNTS=r.data; if((cur==='players'||cur==='watch')&&!busyEditing())render(); }
     },function(){});
   }
@@ -283,17 +283,19 @@
   // the server records can EXPLAIN: a generous demo opening + approved deposits −
   // withdrawals + recorded trade P&L. A large positive gap = more money than the
   // records justify → likely localStorage tampering. Tune the two constants.
-  var INTEGRITY_OPENING=100;     // legit starting funds per customer: Sports $100 (Crypto $0 + FX $0)
   var INTEGRITY_FLAG_GAP=50000;  // flag if actual exceeds explained by more than this
   function acctIntegrity(p){
     if(!p) return {actual:0,explained:0,gap:0,flagged:false};
-    var cid=p.cust_id, dep=0, wd=0, pnl=0, actual=0;
+    var cid=p.cust_id, dep=0, wd=0, pnl=0, actual=0, opening=0;
     SRV_REQS.forEach(function(r){ if(r.cust_id!==cid||r.status!=='approved')return;
       if(r.type==='deposit')dep+=(+r.amount||0); else if(r.type==='withdraw')wd+=(+r.amount||0); });
     SRV_SETTLE.forEach(function(s){ if(s.cust_id===cid)pnl+=(+s.pnl||0); });
-    SRV_ACCOUNTS.forEach(function(a){ if(a.player_id===p.id)actual+=(+a.balance||0); });
-    var explained=INTEGRITY_OPENING+dep-wd+pnl, gap=actual-explained;
-    return {actual:actual,explained:explained,gap:gap,dep:dep,wd:wd,pnl:pnl,opening:INTEGRITY_OPENING,flagged:gap>INTEGRITY_FLAG_GAP};
+    // opening = sum of each account's welcome bonus (non-withdrawable) — the REAL starting
+    // funds (Sports $100 + FX $100 + Crypto $0). Was a stale $100 constant that ignored the
+    // FX welcome, so a fresh account showed a false +$100 integrity gap.
+    SRV_ACCOUNTS.forEach(function(a){ if(a.player_id===p.id){ actual+=(+a.balance||0); opening+=(+a.bonus||0); } });
+    var explained=opening+dep-wd+pnl, gap=actual-explained;
+    return {actual:actual,explained:explained,gap:gap,dep:dep,wd:wd,pnl:pnl,opening:opening,flagged:gap>INTEGRITY_FLAG_GAP};
   }
   // Withdrawal guard: a WITHDRAW approval is risky if the customer's balance can't
   // be explained by their records (possible ledger tampering / self-credit, 🚩).
