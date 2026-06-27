@@ -11035,17 +11035,25 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
   const meta = cryptoMeta || secMeta || marketMeta || { sym: lookSym, name: lookSym, price: 1, seed: 100, chg: 0 };
   const isSecurity = kind === 'security' && !isStaked;
   const isCrypto   = kind === 'crypto';
-  const isALPXS    = sym === 'ALPXS';
+  const isALPXS    = lookSym === 'ALPXS';
   const fullName = meta.name
                 || (typeof COIN_NAMES !== 'undefined' && COIN_NAMES[sym])
                 || sym;
 
   // Live tick + chart series
-  const livePrice = useLiveTick(meta.price || 1, tickProfile(sym));
+  const tickedPrice = useLiveTick(meta.price || 1, tickProfile(sym));
+  // ALPXS is a deterministic, server-priced token (1.00 × 1.02^months). Show its EXACT
+  // value — no simulated wobble — so the display matches the price trades execute at.
+  const livePrice = (isALPXS && typeof alpxsPrice === 'function') ? alpxsPrice() : tickedPrice;
   const RANGE_POINTS = { '1m': 60, '5m': 60, '30m': 60, '1h': 60, '4h': 96, '1D': 78, '1W': 84 };
   const RANGE_OPEN   = { '1m': 0.9998, '5m': 0.999, '30m': 0.997, '1h': 0.995, '4h': 0.99, '1D': 0.981, '1W': 0.965 };
+  const RANGE_DAYS   = { '1m': 1/1440, '5m': 5/1440, '30m': 30/1440, '1h': 1/24, '4h': 4/24, '1D': 1, '1W': 7 };
   const close = livePrice;
-  const open  = (meta.price || 1) * (sym === 'ALPXS' ? 0.9 : (RANGE_OPEN[range] || 0.98));
+  // ALPXS: open = value one range-window ago at the real +2%/month rate (tiny, realistic
+  // change). Others keep the simulated open.
+  const open  = isALPXS
+    ? (livePrice / Math.pow(1.02, (RANGE_DAYS[range] || 1) / 30))
+    : ((meta.price || 1) * (RANGE_OPEN[range] || 0.98));
 
   // Real historical chart data (CoinGecko) for the wider ranges; falls back
   // to the synthetic series for very short ranges or if the fetch fails.
