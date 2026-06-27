@@ -39,10 +39,11 @@ const r8 = (n: number) => Math.round(n * 1e8) / 1e8;
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   const url = new URL(req.url);
-  // B8 (deferred): currently FAIL-OPEN to match production. To close B8, switch to
-  // fail-closed (return 503 when !CRON_SECRET) + set the secret + cron ?token=.
+  // B8 CLOSED — FAIL-CLOSED. No CRON_SECRET → 503 (a misconfig is loud, not silently
+  // world-callable). With the secret set, require ?token=<CRON_SECRET> (cron_secure.sql).
   const CRON_SECRET = Deno.env.get("CRON_SECRET");
-  if (CRON_SECRET && url.searchParams.get("token") !== CRON_SECRET) return json({ ok: false, error: "unauthorized" }, 401);
+  if (!CRON_SECRET) return json({ ok: false, error: "CRON_SECRET not configured (fail-closed)" }, 503);
+  if (url.searchParams.get("token") !== CRON_SECRET) return json({ ok: false, error: "unauthorized" }, 401);
 
   const SB_URL = Deno.env.get("SUPABASE_URL");
   const SB_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
