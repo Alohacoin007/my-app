@@ -200,7 +200,13 @@ Deno.serve(async (req) => {
       if (!Array.isArray(claimed) || !claimed.length) continue; // someone else settled it
 
       const won = !anyLost;
-      const payout = won ? Math.round(stake * decMul * 100) / 100 : 0;
+      // SGP correlation haircut (D1): a same-game parlay (all legs share one gid) is
+      // correlated, so the naive odds product over-pays. Shave the combined multiplier
+      // by the same factor the app shows. MUST match sports-live.html SGP_HAIRCUT.
+      const SGP_HAIRCUT = 0.25;
+      const isSGP = legs.length >= 2 && legs.every((l: any) => l.gid && l.gid === legs[0].gid);
+      const mult = (won && isSGP) ? 1 + (decMul - 1) * (1 - SGP_HAIRCUT) : decMul;
+      const payout = won ? Math.round(stake * mult * 100) / 100 : 0;
       const ref = "betpay-" + String(p.local_id || p.id);
 
       // 4a) Credit the payout to the ledger (winners only). Idempotent via ref.

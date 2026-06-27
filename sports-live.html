@@ -1589,6 +1589,12 @@
   // Decimal odds with the back-office house margin baked in (lowers payouts).
   const dec=a=>{ var d=a>0?1+a/100:1+100/(-a); var m=Math.max(0,Math.min(15,+(window.__alpexaSportsMargin||0)))/100; return 1+(d-1)*(1-m); };
   const toAm=d=>Math.round(d>=2?(d-1)*100:-100/(d-1));
+  // SGP correlation haircut (D1): same-game-parlay legs are correlated, so the naive
+  // product of independent odds OVER-pays the house. Detect SGP = all legs share one
+  // game (gid) and shave the COMBINED odds. MUST match sports-settle's SGP_HAIRCUT.
+  const SGP_HAIRCUT=Math.max(0,Math.min(0.9,(window.__alpexaSgpHaircut!=null?+window.__alpexaSgpHaircut:0.25)));
+  const isSGP=ls=>!!(ls&&ls.length>=2&&ls.every(l=>l.gid&&l.gid===ls[0].gid));
+  const comboDec=ls=>{ var d=ls.reduce((a,l)=>a*dec(l.am),1); return isSGP(ls)?1+(d-1)*(1-SGP_HAIRCUT):d; };
   // relative time: turns a timestamp into "Just now / 5m ago / 2h ago"
   function ago(ts){
     if(!ts)return null;
@@ -1923,7 +1929,7 @@
       document.getElementById('payout').textContent=usd(tot+win);document.getElementById('barMode').textContent='Singles';
       document.getElementById('barOdds').textContent=n+'x';document.getElementById('barPayout').textContent=usd(tot+win);
       place.disabled=!n||tot<=0;place.textContent=n?`${usd(tot)} Place Bet`:'Place Bet';
-    }else{const d=legs.reduce((a,l)=>a*dec(l.am),1),stake=parseInt(stakeInput.value)||0,am=n?toAm(d):0,win=n?stake*(d-1):0;
+    }else{const d=comboDec(legs),stake=parseInt(stakeInput.value)||0,am=n?toAm(d):0,win=n?stake*(d-1):0;
       document.getElementById('oddsLabel').textContent=(mode==='sgp'?'SGP Odds':'Parlay Odds')+` (${n}legs)`;
       document.getElementById('totalOdds').textContent=fmtAm(am);document.getElementById('payout').textContent=usd(stake+win);
       document.getElementById('barMode').textContent=mode==='sgp'?'SGP':'Parlay';document.getElementById('barOdds').textContent=fmtAm(am);
@@ -1936,7 +1942,7 @@
     if(window.__alpexaHalt){showToast('🔒','Trading paused','Betting is temporarily disabled. Try again shortly.');return;}
     if(isLocked()){showToast('🔒','Account locked','Self-exclusion is active');return;}
     if(checkLossLimit()){showToast('🛡️','Loss limit reached',`Daily limit ${usd(settings.lossLimit)} hit`);return;}
-    const d=legs.reduce((a,l)=>a*dec(l.am),1),stake=parseInt(stakeInput.value)||legs.reduce((a,l)=>a+l.stake,0);
+    const d=comboDec(legs),stake=parseInt(stakeInput.value)||legs.reduce((a,l)=>a+l.stake,0);
     const pot = mode==='single'? legs.reduce((a,l)=>a+l.stake*dec(l.am),0) : stake*d;
     if(stake>balance){showToast('⚠️','Insufficient balance','Transfer funds to Sports first');return;}
     // Operator max-bet cap (server `controls`, set in back office). 0 = no cap.
@@ -1946,7 +1952,7 @@
     const betType=legs.length===1?'Single':mode==='single'?'Singles':mode==='sgp'?'Same Game':'Parlay';
     const legCount=legs.length;
     // baseline decimal-odds product at placement (for live cashout calc)
-    const d0=legs.reduce((a,l)=>a*dec(l.am),1);
+    const d0=comboDec(legs);
     const baseCash=Math.round(stake*0.92*100)/100;
     var spTicket; try{var _k='alpexa.seq.sp',_n=parseInt(localStorage.getItem(_k)||'100000',10)+1;localStorage.setItem(_k,String(_n));spTicket='SP-'+_n;}catch(e){spTicket='SP-'+Math.floor(100000+Math.random()*900000);}
     const betId='b'+Date.now();
@@ -3117,7 +3123,7 @@
   // backfill cashout baselines for pre-seeded open bets
   openBets.forEach(b=>{
     if(!b.d0){
-      b.d0=b.legs.reduce((a,l)=>a*dec(l.am),1);
+      b.d0=comboDec(b.legs);   // SGP haircut included (migration of old bets)
       b.baseCash=b.cashout;
       b.legs.forEach(l=>{if(l.am0===undefined)l.am0=l.am;});
     }
