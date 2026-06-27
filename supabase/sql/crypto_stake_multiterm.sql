@@ -19,6 +19,12 @@ end $$;
 alter table public.crypto_stakes alter column period set not null;
 alter table public.crypto_stakes add constraint crypto_stakes_pkey primary key (acct_no, asset, period);
 
+-- principal = original staked amount (NOT compounded). `usd` keeps the accrued value.
+-- Early exit of a locked USDT stake forfeits the interest (usd − principal) and pays
+-- principal only. Backfill existing rows: principal = usd (no penalty for pre-existing).
+alter table public.crypto_stakes add column if not exists principal numeric;
+update public.crypto_stakes set principal = usd where principal is null;
+
 -- ② stake_crypto: on-conflict now targets (acct_no, asset, period) so a new term
 --    creates a SEPARATE row instead of merging into the existing one.
 create or replace function public.stake_crypto(p_ref text, p_acct text, p_asset text, p_usd numeric, p_period text DEFAULT 'flexible'::text)
@@ -57,10 +63,11 @@ begin
   update public.crypto_holdings set qty = round((qty - v_qty)::numeric,8), updated_at=now()
     where acct_no=p_acct and asset=p_asset;
 
-  insert into public.crypto_stakes(acct_no, asset, usd, period, since, staked_at, updated_at)
-    values (p_acct, p_asset, round(p_usd,2), p_period, v_now, v_now, now())
+  insert into public.crypto_stakes(acct_no, asset, usd, principal, period, since, staked_at, updated_at)
+    values (p_acct, p_asset, round(p_usd,2), round(p_usd,2), p_period, v_now, v_now, now())
     on conflict (acct_no, asset, period) do update
       set usd = round((public.crypto_stakes.usd + excluded.usd)::numeric,2),
+          principal = round((coalesce(public.crypto_stakes.principal,0) + excluded.principal)::numeric,2),
           staked_at = coalesce(public.crypto_stakes.staked_at, excluded.staked_at),
           updated_at = now();
 
@@ -73,8 +80,8 @@ create or replace function public.unstake_crypto(p_ref text, p_acct text, p_asse
  RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
 AS $function$
 declare v_uid uuid := auth.uid(); v_acct public.accounts%rowtype; v_cust text;
-        v_st public.crypto_stakes%rowtype; v_lockdays int; v_mat bigint;
-        v_price numeric; v_pts timestamptz; v_qty numeric;
+        v_st public.crypto_stakes%rowtype; v_lockdays int; v_mat bigint; v_early boolean := false;
+        v_price numeric; v_pts timestamptz; v_qty numeric; v_payout numeric; v_forfeit numeric := 0;
         v_now bigint := (extract(epoch from now())*1000)::bigint;
 begin
   if v_uid is null then return jsonb_build_object('ok',false,'error','not authenticated'); end if;
@@ -90,11 +97,25 @@ begin
   if v_st.acct_no is null or coalesce(v_st.usd,0) <= 0 then
     return jsonb_build_object('ok',false,'error','no stake'); end if;
 
+  -- maturity / early-exit
   v_lockdays := case v_st.period when '90d' then 90 when '1y' then 365 else 0 end;
   if v_lockdays > 0 then
     v_mat := coalesce(v_st.staked_at, v_st.since) + v_lockdays::bigint * 86400000;
-    if v_now < v_mat then
+    if v_now < v_mat then v_early := true; end if;
+  end if;
+
+  -- PAYOUT RULES:
+  --   ALPXS locked term, before maturity → HARD LOCK, cannot exit at all.
+  --   USDT (or any non-ALPXS) locked, before maturity → early exit pays PRINCIPAL only
+  --     (accrued interest = usd − principal is forfeited).
+  --   flexible OR matured → pay full accrued usd.
+  if v_early then
+    if p_asset = 'ALPXS' then
       return jsonb_build_object('ok',false,'error','still locked','maturity',v_mat); end if;
+    v_payout  := round(coalesce(v_st.principal, v_st.usd), 2);   -- principal only
+    v_forfeit := round(coalesce(v_st.usd,0) - v_payout, 2);
+  else
+    v_payout := round(coalesce(v_st.usd,0), 2);                  -- full value
   end if;
 
   if p_asset = 'USDT' then v_price := 1; else
@@ -104,10 +125,10 @@ begin
       return jsonb_build_object('ok',false,'error','price unavailable (stale)'); end if;
   end if;
 
-  v_qty := round((coalesce(v_st.usd,0) / v_price)::numeric, 8);
+  v_qty := round((v_payout / v_price)::numeric, 8);
 
   insert into public.crypto_trades(ref,cust_id,acct_no,asset,side,usd,qty,price,fee)
-    values (p_ref, v_cust, p_acct, p_asset, 'unstake', coalesce(v_st.usd,0), v_qty, v_price, 0);
+    values (p_ref, v_cust, p_acct, p_asset, 'unstake', v_payout, v_qty, v_price, 0);
 
   insert into public.crypto_holdings(acct_no, asset, qty, updated_at)
     values (p_acct, p_asset, v_qty, now())
@@ -115,5 +136,6 @@ begin
       set qty = round((public.crypto_holdings.qty + excluded.qty)::numeric,8), updated_at=now();
   delete from public.crypto_stakes where acct_no=p_acct and asset=p_asset and period=p_period;
 
-  return jsonb_build_object('ok',true,'usd',coalesce(v_st.usd,0),'qty',v_qty,'asset',p_asset,'period',p_period);
+  return jsonb_build_object('ok',true,'usd',v_payout,'qty',v_qty,'asset',p_asset,'period',p_period,
+                            'early',v_early,'forfeited',v_forfeit);
 end;$function$;
