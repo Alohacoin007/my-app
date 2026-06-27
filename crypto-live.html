@@ -13530,8 +13530,10 @@ function App() {
           const sqMap = {}; data.forEach((h) => { sqMap[h.asset] = +h.qty || 0; });
           holdingsSyncRef.current.serverQty = sqMap;
           const sig = cryptoQtySig(data);
-          if (sig === holdingsSyncRef.current.srvSig) return; // server unchanged
-          if (!data.length) { holdingsSyncRef.current.srvSig = ''; return; } // server empty — enable writes, nothing to adopt
+          if (!data.length) { holdingsSyncRef.current.srvSig = ''; return; } // server empty — nothing to adopt
+          // Re-derive USD value from server qty × CURRENT price on EVERY idle tick (not only
+          // when qty changes) so a holding's market value tracks the live price between trades.
+          // (Previously returned early when qty was unchanged → the value froze at last trade.)
           const next = {};
           data.forEach((h) => {
             const q = +h.qty || 0;
