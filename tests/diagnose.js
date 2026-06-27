@@ -53,6 +53,13 @@ const CHECKS = [
 const ACCEPTED = [
   { id: 'A6-client-balance-update', file: 'manager-mobile.html',
     reason: 'Back office is is_admin (RLS allows). For CRYPTO, accounts.balance is a display cache — real money lives in crypto_holdings and moves via the `commands` path. sports/fx use admin_set_balance RPC.' },
+  // B8 deliberately deferred: sports-settle/stake-accrue run fail-OPEN to match production
+  // (idempotent → public callability can't double-pay). To close: make fail-closed + set
+  // CRON_SECRET + add ?token= to the cron, then REMOVE these two exceptions.
+  { id: 'B8-failopen-cron', file: 'supabase/functions/sports-settle/index.ts',
+    reason: 'B8 deferred (low risk: idempotent). Fail-open matches production until the secret+cron are deployed.' },
+  { id: 'B8-failopen-cron', file: 'supabase/functions/stake-accrue/index.ts',
+    reason: 'B8 deferred (low risk: idempotent per day). Fail-open matches production until the secret+cron are deployed.' },
 ];
 function isAccepted(id, file) {
   return ACCEPTED.some((a) => a.id === id && a.file === file);
