@@ -779,6 +779,7 @@ function alpxsPrice(){ var mo=(Date.now()-ALPXS_EPOCH)/2629800000; return ALPXS_
 function useLiveTick(baseValue, { interval = 1800, vol = 0.0006, swayPct = 0.024, jumpProb = 0, jumpSize = 0.04, reversion = 0.18 } = {}) {
   const [v, setV] = React.useState(baseValue);
   React.useEffect(() => {
+    setV(baseValue);   // snap to the new base when the asset/price changes — no cross-asset drift
     let phase = Math.random() * Math.PI * 2;
     const id = setInterval(() => {
       phase += 0.16;                                              // ~40s full cycle
@@ -5860,9 +5861,11 @@ function Swap({ onBack, balances = {}, onSwapped }) {
   const fromMeta = SWAP_UNIVERSE.find((a) => a.sym === fromSym) || SWAP_UNIVERSE[0];
   const toMeta   = SWAP_UNIVERSE.find((a) => a.sym === toSym)   || SWAP_UNIVERSE[1];
 
-  // Live price ticks on both sides.
-  const fromLive = useLiveTick(fromMeta.price || 1, { interval: 1800, vol: 0.0008 });
-  const toLive   = useLiveTick(toMeta.price   || 1, { interval: 1800, vol: 0.0008 });
+  // Use the REAL price for each side (stable, exact) — NOT a simulated useLiveTick, which
+  // could drift across asset switches and show absurd rates (e.g. 1 USDT = 8000 ALPXS).
+  // USDT = exactly 1; ALPXS = its deterministic formula value; others = the live market.
+  const fromLive = (typeof cryptoPriceOf === 'function') ? cryptoPriceOf(fromSym) : (fromMeta.price || 1);
+  const toLive   = (typeof cryptoPriceOf === 'function') ? cryptoPriceOf(toSym)   : (toMeta.price   || 1);
 
   const fromBalanceUsd = balances[fromSym] || 0;
   const fromBalanceCoin = fromLive > 0 ? fromBalanceUsd / fromLive : 0;
