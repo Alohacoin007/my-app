@@ -977,7 +977,7 @@
       <div class="sgp-note" data-i18n="sgp_note">Same Game Parlay (SGP): combine multiple markets from one game.</div>
       <div class="legs" id="legs"><div class="empty">Tap odds to add to your slip</div></div>
       <div class="summary">
-        <div class="stake-row"><label>Wager</label><input type="number" id="stake" value="20" min="0" step="5"></div>
+        <div class="stake-row"><label>Wager</label><input type="number" id="stake" value="20" min="1" step="5"></div>
         <div class="chips" id="chips">
           <div class="chip" data-add="10">+$10</div><div class="chip" data-add="25">+$25</div>
           <div class="chip" data-add="100">+$100</div><div class="chip" data-set="0">Clear</div>
@@ -1945,7 +1945,11 @@
     const d=comboDec(legs),stake=parseInt(stakeInput.value)||legs.reduce((a,l)=>a+l.stake,0);
     const pot = mode==='single'? legs.reduce((a,l)=>a+l.stake*dec(l.am),0) : stake*d;
     if(stake>balance){showToast('⚠️','Insufficient balance','Transfer funds to Sports first');return;}
-    // Operator max-bet cap (server `controls`, set in back office). 0 = no cap.
+    // Operator min/max-bet caps (server `controls`, set in back office). max 0 = no cap.
+    // NOTE: this is a UX guard only — the AUTHORITATIVE min/max re-validation must live in
+    // place_bet (D6). A modified client can bypass this; the server must reject out-of-range.
+    const _minBet=+((window.__alpexaCtrl&&window.__alpexaCtrl.minBet)||1);
+    if(stake<_minBet){showToast('🛡️','Minimum bet',`Minimum is ${usd(_minBet)} per bet`);return;}
     const _maxBet=+((window.__alpexaCtrl&&window.__alpexaCtrl.maxBet)||0);
     if(_maxBet>0 && stake>_maxBet){showToast('🛡️','Max bet exceeded',`Limit is ${usd(_maxBet)} per bet`);return;}
     // single tap: place immediately
