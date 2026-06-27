@@ -186,6 +186,7 @@ input:-webkit-autofill:active{
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="compliance.js"></script>
 </head>
 <body>
 <div id="wrap">
@@ -274,6 +275,11 @@ const COUNTRIES = [
   { code:'PL', flag:'🇵🇱', name:'Poland',         dial:'+48'  },
   { code:'RU', flag:'🇷🇺', name:'Russia',         dial:'+7'   },
   { code:'UA', flag:'🇺🇦', name:'Ukraine',        dial:'+380' },
+  { code:'BY', flag:'🇧🇾', name:'Belarus',        dial:'+375' },
+  { code:'CU', flag:'🇨🇺', name:'Cuba',           dial:'+53'  },
+  { code:'IR', flag:'🇮🇷', name:'Iran',           dial:'+98'  },
+  { code:'KP', flag:'🇰🇵', name:'North Korea',    dial:'+850' },
+  { code:'SY', flag:'🇸🇾', name:'Syria',          dial:'+963' },
   { code:'OT', flag:'🌐',     name:'Other…',          dial:''     },
 ];
 
@@ -350,7 +356,9 @@ function showMissing(which){
     if (data.phone.trim().length < 7) miss.push('phone');
     if (!data.dob) miss.push('date of birth');
     if (!data.country) miss.push('country');
-    if (miss.length) msg = 'Missing: ' + miss.join(', ');
+    if (miss.length) { msg = 'Missing: ' + miss.join(', '); }
+    else if (data.dob && !ageOk(data.dob)) { msg = 'You must be at least ' + ((window.AlpexaCompliance&&AlpexaCompliance.MIN_AGE)||18) + ' years old to open an account.'; }
+    else if (data.country && countryBlocked(data.country)) { msg = 'Sorry — Alpexa is not available in ' + data.country + '.'; }
   } else if (which === 3) {
     const miss = [];
     if (data.password.length < 8) miss.push('password (8+ chars)');
@@ -543,13 +551,13 @@ function step3(){
         <div class="term-cb ${data.termsMain?'on':''}"><span class="msi">check</span></div>
         <div class="term-text">
           <span class="req">[Required]</span> I have read and agree to the
-          <span class="term-link">Terms of Service</span> and <span class="term-link">Privacy Policy</span>.
+          <a class="term-link" href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Terms of Service</a> and <a class="term-link" href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Privacy Policy</a>.
         </div>
       </div>
       <div class="term-row" onclick="toggleTerm('termsRisk')">
         <div class="term-cb ${data.termsRisk?'on':''}"><span class="msi">check</span></div>
         <div class="term-text">
-          <span class="req">[Required]</span> I understand the <span class="term-link">Risk Disclosure</span>.
+          <span class="req">[Required]</span> I understand the <a class="term-link" href="risk.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Risk Disclosure</a>.
           Trading leveraged products carries risk of loss exceeding deposits.
         </div>
       </div>
@@ -599,7 +607,17 @@ function validPersonal(){
   return data.firstName.trim() && data.lastName.trim()
     && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)
     && data.phone.trim().length >= 7
-    && data.dob && data.country;
+    && data.dob && data.country
+    && ageOk(data.dob)            // C2: 18+ only
+    && !countryBlocked(data.country);  // C3: no sanctioned jurisdiction
+}
+// Compliance gates (logic lives in compliance.js — single source w/ tests). Fail
+// CLOSED if the module didn't load: better to block signup than to skip a legal gate.
+function ageOk(dob){
+  return !!(window.AlpexaCompliance && AlpexaCompliance.meetsMinAge(dob));
+}
+function countryBlocked(name){
+  return !window.AlpexaCompliance || AlpexaCompliance.isSanctionedName(name);
 }
 function validSecurity(){
   return data.password.length >= 8 && data.pin.length === 4
@@ -889,6 +907,12 @@ function filterCountries(q){
   ));
 }
 function selectCountry(name, dial){
+  // C3 geo gate: refuse a sanctioned jurisdiction outright (don't even set it).
+  if (countryBlocked(name)) {
+    closeCountrySheet({target:{id:'csheetBg'}});
+    showToast('Sorry — Alpexa is not available in ' + name + '.');
+    return;
+  }
   data.country = name;
   if (!data.phone.trim() && dial) {
     data.phone = dial + ' ';
