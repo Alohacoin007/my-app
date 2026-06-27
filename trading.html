@@ -3686,11 +3686,21 @@ function App(){
             };
             // Trigger watching stays client-side (real-time); the FILL is server-
             // authoritative via fx_open, so a triggered order's entry can't be forged.
+            const rejectFill=function(why){
+              // #5/F: a triggered pending order fills ONLY if fx_open opens it server-side.
+              // If the server refuses (margin / price / spec / offline) it does NOT open
+              // client-side — show a non-blocking banner (the order was consumed; re-place).
+              setToast({error:true,soft:true,icon:'warning',msg:p.sym+' not filled',sub:(p.otype||'Order')+' triggered, but '+why});
+              setTimeout(()=>setToast(null),4500);
+            };
             if(window.AlpexaSync&&AlpexaSync.db&&me&&me.accts&&me.accts.fx){
               AlpexaSync.db.rpc('fx_open',{p_local_id:String(p.id),p_symbol:p.sym,p_side:p.side,p_size:p.vol}).then(function(r){
-                const d=r&&r.data; addLive(d&&d.ok&&d.open!=null?+d.open:tg.fillPx);
-              }, function(){ addLive(tg.fillPx); });
-            } else { addLive(tg.fillPx); }
+                const d=r&&r.data;
+                if(d&&d.ok&&d.open!=null){ addLive(+d.open); return; }
+                var err=String((d&&d.error)||'');
+                rejectFill(/margin|insufficient|balance/i.test(err)?'insufficient margin':/stale|price/i.test(err)?'price unavailable':/spec/i.test(err)?'not tradeable now':'try again');
+              }, function(){ rejectFill('connection issue'); });
+            } else { rejectFill('no server connection'); }
           });
         }
         return stillPending;
@@ -3774,17 +3784,25 @@ function App(){
     if(window.AlpexaSync&&AlpexaSync.db&&_me&&_me.accts&&_me.accts.fx){
       AlpexaSync.db.rpc('fx_open',{p_local_id:String(id),p_symbol:orderData.sym,p_side:orderData.side,p_size:orderData.vol}).then(function(r){
         const d=r&&r.data;
-        // HARD REJECT on a server margin/balance refusal (D13). NEVER show a position the
-        // server refused — that bypassed the margin gate (over-leverage / the "0.01 BTC
-        // opened on $100" bug). Only no-spec/stale/offline keep the client-fill fallback.
-        if(d&&d.ok===false&&/margin|insufficient|balance/i.test(String(d.error||''))){
-          setToast({error:true,icon:'warning',msg:'Order rejected — margin',sub:(d.required!=null?('Needs $'+d.required+' margin · free $'+(d.free!=null?d.free:'?')):String(d.error||''))});
-          setTimeout(()=>setToast(null),3500);
-          return;
-        }
-        finalize(d&&d.ok&&d.open!=null ? +d.open : fillPx);
-      }, function(){ finalize(fillPx); });
-    } else { finalize(fillPx); }
+        if(d&&d.ok&&d.open!=null){ finalize(+d.open); return; }   // server CREATED it → show
+        // #5/F ONE-WAY: fx_open is the ONLY creator of a position. ANY non-ok (margin / no
+        // price / stale / no spec) → REJECT — never a client-side open (that was the bypass:
+        // over-leverage, un-priced symbols). Tell the user why instead of faking a fill.
+        var err=String((d&&d.error)||'');
+        var sub=/margin|insufficient|balance/i.test(err) ? (d.required!=null?('Needs $'+d.required+' margin · free $'+(d.free!=null?d.free:'?')):'Insufficient margin')
+              : /stale|price/i.test(err) ? 'Price unavailable right now — try again'
+              : /spec/i.test(err) ? (orderData.sym+' isn’t available to trade right now')
+              : (err||'Order could not be placed — try again');
+        setToast({error:true,icon:'warning',msg:'Order rejected',sub:sub});
+        setTimeout(()=>setToast(null),3800);
+      }, function(){
+        setToast({error:true,icon:'warning',msg:'Order not placed',sub:'Connection issue — please try again'});
+        setTimeout(()=>setToast(null),3800);
+      });
+    } else {
+      setToast({error:true,icon:'lock',msg:'Order not placed',sub:'No server connection — try again'});
+      setTimeout(()=>setToast(null),3800);
+    }
   }
 
   function cancelPending(id){setPendingOrders(prev=>prev.filter(p=>p.id!==id));fxPendingDelete(id);}
