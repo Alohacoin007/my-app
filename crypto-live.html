@@ -149,8 +149,7 @@
 (function(){try{ if(/[?&]reset=1/.test(location.search)){ ['alpexa.cryptoHoldings','alpexa.staked','alpexa.serverBalances','alpexa.balances','alpexa.me'].forEach(function(k){ localStorage.removeItem(k); }); location.replace('login.html?switch=1'); } }catch(e){}})();
 /* Restore identity from the URL (#alpexa=...) so a home-screen install can inherit the account created in Safari (iOS isolates their storage) - no re-login. */
 (function(){try{var m=(location.hash||"").match(/alpexa=([^&]+)/);if(m){var id=JSON.parse(decodeURIComponent(atob(m[1])));if(id&&id.accts){localStorage.setItem("alpexa.me",JSON.stringify(id));}}}catch(e){}})();
-/* ACCOUNT GUARD: wipe cache from a DIFFERENT account so balances/holdings don't bleed across accounts in one browser. Re-adopts from server. (Tabs share storage — use incognito for a 2nd account.) */
-(function(){try{var _me=JSON.parse(localStorage.getItem("alpexa.me")||"null");var _cur=(_me&&_me.custId)||"";var _own=localStorage.getItem("alpexa.cacheOwner")||"";if(_cur&&_own&&_own!==_cur){["alpexa.serverBalances","alpexa.balances","alpexa.cryptoHoldings","alpexa.staked","alpexa.sportsBalance","alpexa.cryptoBalance","alpexa.fxLive","alpexa.openBets","alpexa.settledBets","alpexa.withdrawals","alpexa.transactions","alpexa.funding","alpexa.txns","alpexa.appliedTransfers","alpexa.customer","alpexa.openDeposit","alpexa.ownerFunded"].forEach(function(k){try{localStorage.removeItem(k);}catch(e){}});}if(_cur)localStorage.setItem("alpexa.cacheOwner",_cur);}catch(e){}})();
+/* (removed cacheOwner guard — #5: holdings/stakes are no longer in localStorage, so there's nothing to bleed; the adopt loop pulls server holdings.) */
 /* Login gate (real service): no anonymous guest trading. Require a logged-in identity (email or authId); guests/empty go to login. */
 (function(){try{var m=JSON.parse(localStorage.getItem("alpexa.me")||"null");if(!(m&&m.accts&&(m.email||m.authId))){location.replace("login.html");}}catch(e){location.replace("login.html");}})();
 /* Default to the light (white) theme. One-time migration flips existing devices
@@ -13125,8 +13124,11 @@ function App() {
   // ── Wallet state (persisted) ─────────────────────────────────────
   // No fake seed — holdings are adopted from the server (crypto_holdings). Starts
   // empty; the adopt loop fills real balances. (No more fake $10,000 USDT.)
-  const [balances, setBalances] = usePersistedState('alpexa.cryptoHoldings', () => ({}));
-  const [staked, setStaked] = usePersistedState('alpexa.staked', {});
+  // #5 SERVER-ONLY: holdings + stakes are NOT persisted to localStorage (that bled one
+  // account's coins into another). Start empty; the adopt loop fills `balances` from
+  // crypto_holdings and `staked` from crypto_stakes on load (+ 8s poll + realtime).
+  const [balances, setBalances] = React.useState(() => ({}));
+  const [staked, setStaked] = React.useState({});
   const [pendingOrders, setPendingOrders] = usePersistedState('alpexa.pendingOrders', []);
   const [detail, setDetail] = React.useState(null); // { kind, sym } | null
   const [tab, setTab] = React.useState('home');     // home | trade | discover | account
