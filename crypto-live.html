@@ -1542,7 +1542,7 @@ function ServerSwitcher({ cryptoBal }) {
     return () => window.removeEventListener('alpexa-crypto-live', h);
   }, []);
   let SB = { crypto: 0, fx: 0, sports: 0 };
-  try { SB = Object.assign(SB, JSON.parse(localStorage.getItem('alpexa.serverBalances') || '{}')); } catch (e) {}
+  try { SB = Object.assign(SB, window.__srvBal || {}); } catch (e) {}  // #5: cross-app balances in memory only (populated by pullBalances), never localStorage
   // Prefer the live wallet total (matches the home hero, updates every tick); fall
   // back to the value passed in, then the persisted balance.
   // Single shared live value so the dropdown and the Accounts row always MATCH (the
@@ -1760,10 +1760,10 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
   React.useEffect(() => {
     window.__cryptoLiveUsd = heroLive;
     try {
-      const sb = JSON.parse(localStorage.getItem('alpexa.serverBalances') || '{}') || {};
+      const sb = window.__srvBal || {};
       if (Math.abs((sb.crypto || 0) - anchorTotal) > 0.005) {
         sb.crypto = anchorTotal;
-        localStorage.setItem('alpexa.serverBalances', JSON.stringify(sb));
+        window.__srvBal = sb;   // #5: memory only
       }
     } catch (e) {}
     window.dispatchEvent(new Event('alpexa-crypto-live'));
@@ -13215,7 +13215,7 @@ function App() {
         try { forceCryptoAdopt(); } catch (e) {}
         // Refresh ALL cross-server balances now so the destination (FX/Sports) shows
         // the new amount immediately in the switcher — not after the next poll.
-        try { AlpexaSync.pullBalances && AlpexaSync.pullBalances().then(function (b) { if (!b) return; setServerBalances(function (s) { const n = { ...s }; if (b.fx != null) n.fx = b.fx; if (b.sports != null) n.sports = b.sports; if (b.crypto != null) n.crypto = b.crypto; return n; }); try { var o = JSON.parse(localStorage.getItem('alpexa.serverBalances') || '{}') || {}; if (b.fx != null) o.fx = b.fx; if (b.sports != null) o.sports = b.sports; if (b.crypto != null) o.crypto = b.crypto; localStorage.setItem('alpexa.serverBalances', JSON.stringify(o)); } catch (e) {} }); } catch (e) {}
+        try { AlpexaSync.pullBalances && AlpexaSync.pullBalances().then(function (b) { if (!b) return; setServerBalances(function (s) { const n = { ...s }; if (b.fx != null) n.fx = b.fx; if (b.sports != null) n.sports = b.sports; if (b.crypto != null) n.crypto = b.crypto; return n; }); try { var o = window.__srvBal || {}; if (b.fx != null) o.fx = b.fx; if (b.sports != null) o.sports = b.sports; if (b.crypto != null) o.crypto = b.crypto; window.__srvBal = o; } catch (e) {} }); } catch (e) {}
       } else {
         // RPC rejected — tell the user instead of failing silently. Most common cause:
         // transfers send USDT CASH, and the crypto USDT balance is lower than the total
@@ -14307,9 +14307,9 @@ function alpexaPortfolioSeries(range, n, endValue) {
     if(!(window.AlpexaSync&&AlpexaSync.pullBalances)) return;
     AlpexaSync.pullBalances().then(function(b){
       if(!b) return;
-      try{ var o=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{};
+      try{ var o=window.__srvBal||{};
         if(b.fx!=null)o.fx=b.fx; if(b.sports!=null)o.sports=b.sports; if(b.crypto!=null)o.crypto=b.crypto;
-        localStorage.setItem('alpexa.serverBalances',JSON.stringify(o));
+        window.__srvBal=o;
         window.dispatchEvent(new Event('alpexa-balance-change')); }catch(e){}
     }).catch(function(){});
   }

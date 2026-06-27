@@ -813,26 +813,16 @@ async function createOnServer(){
       }
     }
   }catch(e){}
-  // A new signup is always a fresh account — clear any previous account's cached
-  // money data on this device so balances/positions don't carry over.
-  try{ ['alpexa.serverBalances','alpexa.balances','alpexa.cryptoHoldings','alpexa.staked','alpexa.sportsBalance','alpexa.cryptoBalance','alpexa.fxLive','alpexa.openBets','alpexa.settledBets','alpexa.withdrawals','alpexa.transactions','alpexa.funding','alpexa.txns','alpexa.appliedTransfers','alpexa.customer','alpexa.openDeposit','alpexa.ownerFunded'].forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
-  // Welcome bonus ($300): Sports $100 (cash), FX $100 (cash), Crypto $100 as a 1-year
-  // ALPXS stake (locked, 18% APY). The crypto stake itself is created server-side by the
-  // trg_seed_crypto_welcome trigger; this just seeds the local display before sync.
-  try{
-    // Crypto cash = $0 (the $100 crypto bonus is the ALPXS stake, not spendable cash).
-    localStorage.setItem('alpexa.balances', JSON.stringify({live:100, crypto:0, sports:100}));
-    localStorage.setItem('alpexa.serverBalances', JSON.stringify({fx:100, crypto:0, sports:100}));
-    localStorage.setItem('alpexa.sportsBalance', '100');
-    localStorage.setItem('alpexa.cryptoHoldings', JSON.stringify({USDT:0}));
-    localStorage.setItem('alpexa.staked', JSON.stringify({ALPXS:{usd:100, period:'1y', since:Date.now()}}));
-  }catch(e){}
+  // A new signup is always a fresh account — clear any previous account's cached money
+  // data on this device so balances/positions don't carry over.
+  try{ ['alpexa.serverBalances','alpexa.balances','alpexa.cryptoHoldings','alpexa.staked','alpexa.sportsBalance','alpexa.cryptoBalance','alpexa.fxLive','alpexa.openBets','alpexa.settledBets','alpexa.positions','alpexa.cacheOwner','alpexa.withdrawals','alpexa.transactions','alpexa.funding','alpexa.txns','alpexa.appliedTransfers','alpexa.customer','alpexa.openDeposit','alpexa.ownerFunded'].forEach(function(k){ try{localStorage.removeItem(k);}catch(e){} }); }catch(e){}
+  // #5: the welcome bonus (Sports $100, FX $100, Crypto $100 as a 1-year ALPXS stake) is
+  // created SERVER-SIDE (signup RPC + trg_seed_crypto_welcome). We do NOT seed it into
+  // localStorage — the apps fetch the real opening balances from the server on load.
   // Remember who this is on the device so the apps can tag their transactions.
   try{ localStorage.setItem('alpexa.me', JSON.stringify({
     custId:cust, name:fullName, email:data.email, authId:authId,
     accts:data.accts })); }catch(e){}
-  // Stamp cache owner so the apps' ACCOUNT GUARD keeps this fresh account's welcome cache.
-  try{ localStorage.setItem('alpexa.cacheOwner', cust); }catch(e){}
   // Remember the chosen server so Login defaults back to it.
   try{ localStorage.setItem('alpexa.lastServer', data.server==='demo'?'sports':data.server==='stocks'?'crypto':'fx'); }catch(e){}
   // Carry the chosen FX leverage into the FX app (crypto/sports are spot 1:1).

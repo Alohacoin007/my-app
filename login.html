@@ -231,25 +231,15 @@ async function doLogin(){
     // If a DIFFERENT customer signs in on this device, wipe the previous
     // account's cached money data so balances/positions don't bleed across
     // accounts (the app then re-adopts this account's real balance from server).
+    // #5: money/balance/holdings are SERVER-ONLY. On login we (a) wipe any stale caches
+    // from a DIFFERENT account so nothing bleeds across accounts, and (b) do NOT seed
+    // balances into localStorage — the seeds were the cross-account "$90 showed in B"
+    // source. No cacheOwner stamp (we don't keep money local, so there's nothing to
+    // "own"/"guard"). Each app re-adopts its real balance from the server on load.
     try{ var _prev=JSON.parse(localStorage.getItem('alpexa.me')||'null');
       if(!_prev||_prev.custId!==player.cust_id){
-        ['alpexa.serverBalances','alpexa.balances','alpexa.cryptoHoldings','alpexa.staked','alpexa.sportsBalance','alpexa.cryptoBalance','alpexa.fxLive','alpexa.openBets','alpexa.settledBets','alpexa.withdrawals','alpexa.transactions','alpexa.funding','alpexa.txns','alpexa.appliedTransfers','alpexa.customer','alpexa.openDeposit','alpexa.ownerFunded'].forEach(function(k){ localStorage.removeItem(k); });
+        ['alpexa.serverBalances','alpexa.balances','alpexa.cryptoHoldings','alpexa.staked','alpexa.sportsBalance','alpexa.cryptoBalance','alpexa.fxLive','alpexa.openBets','alpexa.settledBets','alpexa.positions','alpexa.cacheOwner','alpexa.withdrawals','alpexa.transactions','alpexa.funding','alpexa.txns','alpexa.appliedTransfers','alpexa.customer','alpexa.openDeposit','alpexa.ownerFunded'].forEach(function(k){ try{localStorage.removeItem(k);}catch(e){} });
       }
-      // Stamp the cache owner so the apps' ACCOUNT GUARD knows this cache is this
-      // account's (and won't re-wipe the balances we adopt from the server below).
-      localStorage.setItem('alpexa.cacheOwner', player.cust_id);
-    }catch(e){}
-    // Adopt the SERVER's balances as the source of truth on login. This stops the
-    // app from pushing stale device caches back up (which is how a fresh $100/$500
-    // account could get overwritten). serverBalances/balances/sportsBalance always
-    // follow the server; crypto per-coin holdings are only seeded from the server
-    // total when this device has no existing breakdown (fresh / different customer).
-    try{
-      localStorage.setItem('alpexa.serverBalances', JSON.stringify({fx:bals.fx,crypto:bals.crypto,sports:bals.sports}));
-      localStorage.setItem('alpexa.balances', JSON.stringify({live:bals.fx,crypto:bals.crypto,sports:bals.sports}));
-      localStorage.setItem('alpexa.sportsBalance', String(bals.sports));
-      var _hadH=false; try{var _h=JSON.parse(localStorage.getItem('alpexa.cryptoHoldings')||'null'); _hadH=_h&&Object.keys(_h).length>0;}catch(e){}
-      if(!_hadH){ localStorage.setItem('alpexa.cryptoHoldings', JSON.stringify({USDT:bals.crypto})); }
     }catch(e){}
     // Restore identity on THIS device so the apps show the right account.
     localStorage.setItem('alpexa.me', JSON.stringify({custId:player.cust_id,name:player.name,email:player.email,authId:authId,accts:accts}));

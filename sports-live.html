@@ -2420,27 +2420,22 @@
   let totalLost=0;   // cumulative net losses (for 5% cashback credit)
   const CASHBACK_RATE=0.05;
   function syncSportsBal(){window.__sbLocalTs=Date.now();sportsSrv().bal=balance;/* #5: balance is server-only — not written to localStorage */
-    try{var o=Object.assign({crypto:0,fx:0,sports:0},JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}'));o.sports=balance;localStorage.setItem('alpexa.serverBalances',JSON.stringify(o));}catch(e){}
+    try{var o=Object.assign({crypto:0,fx:0,sports:0},window.__srvBal||{});o.sports=balance;window.__srvBal=o;}catch(e){}
     // DISPLAY ONLY. The client NO LONGER posts balance deltas to the ledger — that path
     // let a modified client self-credit (and caused the double-debit bug). Every balance
     // change now goes through a server RPC (place_bet, cash_out, app_transfer, withdraw_hold,
     // admin_*) or the sports-settle Edge; the client just adopts the server balance.
     window.__sbLastPushed=balance;}
-  function saveCryptoBal(){try{const c=SERVERS.find(s=>s.key==='crypto');if(c){localStorage.setItem('alpexa.cryptoBalance',String(c.bal));var o={};try{o=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{};}catch(e){o={};}o.crypto=c.bal;localStorage.setItem('alpexa.serverBalances',JSON.stringify(o));}}catch(e){}}
-  // The Crypto app's real wallet is cryptoHoldings (USDT cash). Adjust it too so a
-  // Crypto↔Sports transfer survives re-opening the Crypto app (which recomputes its
-  // balance from holdings and would otherwise wipe a serverBalances-only change).
-  function adjustCryptoUsdt(delta){try{var h=JSON.parse(localStorage.getItem('alpexa.cryptoHoldings')||'{}')||{};h.USDT=Math.max(0,(+h.USDT||0)+delta);localStorage.setItem('alpexa.cryptoHoldings',JSON.stringify(h));}catch(e){}}
-  // Mirror a Crypto-side transfer into the Crypto app's own transaction ledger so
-  // it shows in that app's report (same shape the Crypto app writes itself).
-  function pushCryptoTx(entry){try{var a=JSON.parse(localStorage.getItem('alpexa.transactions')||'[]');if(!Array.isArray(a))a=[];a.unshift(Object.assign({id:'tx'+Date.now()+Math.random().toString(36).slice(2,6),ts:Date.now()},entry));localStorage.setItem('alpexa.transactions',JSON.stringify(a));}catch(e){}}
+  // (Removed dead helpers saveCryptoBal / adjustCryptoUsdt / pushCryptoTx — #5: they wrote
+  //  crypto balance/holdings to localStorage for an OLD client-side transfer reconciliation.
+  //  Transfers now move money via the app_transfer RPC server-side and each app re-pulls
+  //  from the server, so these were never called. Confirmed 0 call sites.)
   // Read the REAL per-server balances written by the Crypto and FX apps so the
   // switcher never shows stale demo numbers.
   (function(){try{
-    var sb={};try{sb=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{};}catch(e){sb={};}
-    var legacy=localStorage.getItem('alpexa.cryptoBalance');
+    var sb=window.__srvBal||{};
     var c=SERVERS.find(x=>x.key==='crypto');
-    if(c){ if(typeof sb.crypto==='number') c.bal=sb.crypto; else if(legacy!==null) c.bal=parseFloat(legacy); }
+    if(c && typeof sb.crypto==='number') c.bal=sb.crypto;
     var lv=SERVERS.find(x=>x.key==='live');
     if(lv && typeof sb.fx==='number') lv.bal=sb.fx;
   }catch(e){}})();
@@ -2501,7 +2496,7 @@
   // Re-read the latest per-server balances so the dropdown is always current
   // (the Crypto/FX apps write these to localStorage as they change).
   function refreshSrvBalances(){
-    try{var sb=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{};
+    try{var sb=window.__srvBal||{};
       var c=SERVERS.find(x=>x.key==='crypto'); if(c&&typeof sb.crypto==='number')c.bal=sb.crypto;
       var lv=SERVERS.find(x=>x.key==='live'); if(lv&&typeof sb.fx==='number')lv.bal=sb.fx;
       var sp=SERVERS.find(x=>x.key==='sports'); if(sp)sp.bal=balance;
@@ -2686,7 +2681,7 @@
     syncSportsBal();
     // Refresh the Crypto/Live source balances from the latest values written by
     // those apps, so the transfer screen never shows a stale amount.
-    try{var sb=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{};
+    try{var sb=window.__srvBal||{};
       var c=srvByKey('crypto'); if(c&&typeof sb.crypto==='number')c.bal=sb.crypto;
       var lv=srvByKey('live'); if(lv&&typeof sb.fx==='number')lv.bal=sb.fx;}catch(e){}
     // Default to Sports → Crypto (user preference); user can swap either way.
@@ -3183,9 +3178,9 @@
     if(!(window.AlpexaSync&&AlpexaSync.pullBalances)) return;
     AlpexaSync.pullBalances().then(function(b){
       if(!b) return;
-      try{ var o=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{};
+      try{ var o=window.__srvBal||{};
         if(b.fx!=null)o.fx=b.fx; if(b.crypto!=null)o.crypto=b.crypto; if(b.sports!=null)o.sports=b.sports;
-        localStorage.setItem('alpexa.serverBalances',JSON.stringify(o)); }catch(e){}
+        window.__srvBal=o; }catch(e){}
       if(b.sports!=null){
         // First server response after load → adopt IMMEDIATELY (kills the $0 flash since
         // balance starts at 0 with no localStorage seed). After that, the 7s guard protects
