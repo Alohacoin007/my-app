@@ -3180,8 +3180,14 @@
       try{ var o=JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}')||{};
         if(b.fx!=null)o.fx=b.fx; if(b.crypto!=null)o.crypto=b.crypto; if(b.sports!=null)o.sports=b.sports;
         localStorage.setItem('alpexa.serverBalances',JSON.stringify(o)); }catch(e){}
-      if(b.sports!=null && Math.abs(b.sports-balance)>0.01 && (Date.now()-(window.__sbLocalTs||0))>7000){
-        balance=b.sports; window.__sbLastPushed=b.sports; /* #5: balance is server-only — not written to localStorage */
+      if(b.sports!=null){
+        // First server response after load → adopt IMMEDIATELY (kills the $0 flash since
+        // balance starts at 0 with no localStorage seed). After that, the 7s guard protects
+        // a just-placed bet from being briefly reverted before its own change lands.
+        if(Math.abs(b.sports-balance)>0.01 && (!window.__sbLoaded || (Date.now()-(window.__sbLocalTs||0))>7000)){
+          balance=b.sports; window.__sbLastPushed=b.sports; /* #5: server-only */
+        }
+        window.__sbLoaded=true;
       }
       try{ refreshSrvBalances&&refreshSrvBalances(); }catch(e){}
       try{ updateWallet(); }catch(e){}
