@@ -37,9 +37,9 @@ returns trigger language plpgsql security definer set search_path to 'public' as
 declare v_now bigint := (extract(epoch from now())*1000)::bigint;
 begin
   if NEW.server = 'crypto' and not public.is_admin() then
-    insert into public.crypto_stakes(acct_no, asset, usd, period, since, staked_at, updated_at)
-      values (NEW.acct_no, 'ALPXS', 100, '1y', v_now, v_now, now())
-      on conflict (acct_no, asset) do nothing;
+    insert into public.crypto_stakes(acct_no, asset, usd, principal, period, since, staked_at, updated_at)
+      values (NEW.acct_no, 'ALPXS', 100, 100, '1y', v_now, v_now, now())
+      on conflict (acct_no, asset, period) do nothing;
   end if;
   return NEW;
 end;$$;
