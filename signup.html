@@ -773,17 +773,30 @@ async function createOnServer(){
   var who=await window._db.auth.getUser();
   var authId=(who && who.data && who.data.user) ? who.data.user.id : null;
   if(!authId) throw new Error('Your email is not verified yet — go back and enter the code.');
-  // 2) Save the profile, linked to that auth user.
-  var playerRow={cust_id:cust,name:fullName,email:data.email,auth_id:authId,
-    phone:data.phone||'',dob:data.dob||'',country:data.country||'',
-    server:data.server||'',leverage:data.leverage||'',currency:data.currency||''};
-  var r1=await window._db.from('players').insert(playerRow).select().single();
-  // Fallback: if extended columns aren't there yet, save the core fields.
-  if(r1&&r1.error){ r1=await window._db.from('players').insert({cust_id:cust,name:fullName,email:data.email,auth_id:authId}).select().single(); }
-  if(r1.error) throw r1.error;
-  var rows=[{player_id:r1.data.id,server:'sports',acct_no:data.accts.sports,balance:100},{player_id:r1.data.id,server:'crypto',acct_no:data.accts.crypto,balance:0},{player_id:r1.data.id,server:'fx',acct_no:data.accts.fx,balance:0}];
-  var r2=await window._db.from('accounts').insert(rows);
-  if(r2.error) throw r2.error;
+  // 2) ONE PLAYER PER AUTH USER (email). If this auth user already has a profile, REUSE it —
+  //    re-signing up with the same email must NOT create a duplicate account; it just logs
+  //    into the existing one. (This was the cause of 8 accounts for one email.)
+  var existing=await window._db.from('players').select('id,cust_id').eq('auth_id',authId).limit(1);
+  if(existing && existing.data && existing.data.length){
+    var pid=existing.data[0].id;
+    data.custId=existing.data[0].cust_id;
+    var ea=await window._db.from('accounts').select('server,acct_no').eq('player_id',pid);
+    var am={}; (ea.data||[]).forEach(function(a){ if(a.server) am[a.server]=a.acct_no; });
+    data.accts={sports:am.sports||'',crypto:am.crypto||'',fx:am.fx||''}; data.acctNum=data.accts.sports;
+  } else {
+    // New auth user → create the profile + its three accounts.
+    var playerRow={cust_id:cust,name:fullName,email:data.email,auth_id:authId,
+      phone:data.phone||'',dob:data.dob||'',country:data.country||'',
+      server:data.server||'',leverage:data.leverage||'',currency:data.currency||''};
+    var r1=await window._db.from('players').insert(playerRow).select().single();
+    // Fallback: if extended columns aren't there yet, save the core fields.
+    if(r1&&r1.error){ r1=await window._db.from('players').insert({cust_id:cust,name:fullName,email:data.email,auth_id:authId}).select().single(); }
+    if(r1.error) throw r1.error;
+    var rows=[{player_id:r1.data.id,server:'sports',acct_no:data.accts.sports,balance:100},{player_id:r1.data.id,server:'crypto',acct_no:data.accts.crypto,balance:0},{player_id:r1.data.id,server:'fx',acct_no:data.accts.fx,balance:0}];
+    var r2=await window._db.from('accounts').insert(rows);
+    if(r2.error) throw r2.error;
+  }
+  cust=data.custId;   // downstream (referral, alpexa.me) must use the REAL player cust_id
   // Referral: if a valid agent code was entered, auto-link this customer to
   // that agent (100% share). Never blocks signup if anything goes wrong.
   try{
