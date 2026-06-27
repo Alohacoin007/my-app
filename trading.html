@@ -3773,7 +3773,16 @@ function App(){
     let _me; try{_me=JSON.parse(localStorage.getItem('alpexa.me')||'null');}catch(e){}
     if(window.AlpexaSync&&AlpexaSync.db&&_me&&_me.accts&&_me.accts.fx){
       AlpexaSync.db.rpc('fx_open',{p_local_id:String(id),p_symbol:orderData.sym,p_side:orderData.side,p_size:orderData.vol}).then(function(r){
-        const d=r&&r.data; finalize(d&&d.ok&&d.open!=null ? +d.open : fillPx);
+        const d=r&&r.data;
+        // HARD REJECT on a server margin/balance refusal (D13). NEVER show a position the
+        // server refused — that bypassed the margin gate (over-leverage / the "0.01 BTC
+        // opened on $100" bug). Only no-spec/stale/offline keep the client-fill fallback.
+        if(d&&d.ok===false&&/margin|insufficient|balance/i.test(String(d.error||''))){
+          setToast({error:true,icon:'warning',msg:'Order rejected — margin',sub:(d.required!=null?('Needs $'+d.required+' margin · free $'+(d.free!=null?d.free:'?')):String(d.error||''))});
+          setTimeout(()=>setToast(null),3500);
+          return;
+        }
+        finalize(d&&d.ok&&d.open!=null ? +d.open : fillPx);
       }, function(){ finalize(fillPx); });
     } else { finalize(fillPx); }
   }
