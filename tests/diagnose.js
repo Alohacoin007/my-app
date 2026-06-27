@@ -44,6 +44,9 @@ const CHECKS = [
   { id: 'B8-failopen-cron', sev: 'HIGH', files: MONEY_EDGE.map((f) => `supabase/functions/${f}/index.ts`),
     re: /if\s*\(\s*CRON_SECRET\s*&&/,
     why: 'Money edge function fail-OPEN: unset CRON_SECRET → world-callable payout. Must fail closed (503).' },
+  { id: 'D5-store-password', sev: 'HIGH', files: ['login.html'],
+    re: /alpexa\.cred[^\n]*\bpw\b/,
+    why: 'Storing the password in localStorage (alpexa.cred) — base64 is plaintext-grade. Persist the Supabase session instead.' },
 ];
 
 // ── Reviewed-OK exceptions (Six-Sigma control plan). Suppressed but always printed. ──

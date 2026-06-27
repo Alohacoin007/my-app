@@ -254,7 +254,10 @@ async function doLogin(){
     // If "Save password" is on, keep the login on THIS device so it can be
     // pre-filled and used by Face ID / fingerprint quick login next time.
     try{
-      if(savePw){ localStorage.setItem('alpexa.cred', btoa(unescape(encodeURIComponent(JSON.stringify({login:login,pw:pw,server:selServer}))))); }
+      // SECURITY (D5): never store the password (base64 is plaintext-grade). Keep only
+      // the non-secret login id + server for prefill; "stay signed in" rides the
+      // persisted Supabase session (refresh token) — revocable, unlike a stored password.
+      if(savePw){ localStorage.setItem('alpexa.cred', btoa(unescape(encodeURIComponent(JSON.stringify({login:login,server:selServer}))))); }
       else { localStorage.removeItem('alpexa.cred'); }
     }catch(e){}
     document.getElementById('sucSub').innerHTML=`${SERVERS[selServer].name}<br>Signed in as ${player.name||player.cust_id}`;
@@ -368,12 +371,20 @@ async function quickLogin(){
     if(/cancel|not allowed|NotAllowed/i.test(msg)){ return; } // user cancelled — stay silent
     showErr('Face ID 확인 실패. 비밀번호로 로그인해 주세요.'); return;
   }
-  // Biometric OK → fill saved login and sign in.
+  // Biometric OK → resume the persisted Supabase session (no stored password).
   document.getElementById('loginInput').value=cred.login||'';
-  document.getElementById('pwInput').value=cred.pw||'';
   if(cred.server!=null) selectServer(cred.server);
+  var hasSession=false;
+  try{ var s=await window._db.auth.getSession(); hasSession=!!(s&&s.data&&s.data.session); }catch(e){}
   txt.textContent=old; btn.style.opacity='1';
-  doLogin();
+  if(hasSession){
+    var dest=cred.server===1?'crypto-live.html':cred.server===2?'sports-live.html':'trading.html';
+    window.location.href=dest;
+  } else {
+    // Session expired (or revoked) — fall back to a one-time password login. Never a lockout.
+    showErr('세션이 만료됐어요 — 비밀번호로 한 번만 로그인해 주세요.');
+    try{ document.getElementById('pwInput').focus(); }catch(e){}
+  }
 }
 
 // On load: pre-fill the saved login + server, and offer the Face ID button.
@@ -382,8 +393,7 @@ async function quickLogin(){
     var cred=getSavedCred();
     if(cred){
       if(cred.login) document.getElementById('loginInput').value=cred.login;
-      if(cred.pw)    document.getElementById('pwInput').value=cred.pw;
-      if(cred.server!=null) selectServer(cred.server);
+      if(cred.server!=null) selectServer(cred.server);   // (D5) no password prefill — not stored
       // Show Face ID button only if the platform supports a built-in authenticator.
       var ok=false;
       try{ if(window.PublicKeyCredential&&PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable){ ok=await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable(); } }catch(e){ ok=false; }
