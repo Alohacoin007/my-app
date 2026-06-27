@@ -2542,8 +2542,11 @@
   }
   function updateWallet(){
     syncSportsBal();
-    document.getElementById('walletBal').textContent=usd(totalAssets());
-    document.getElementById('balbarVal').textContent=usd(balance);
+    // Until the server balance has loaded (#5: no localStorage seed), show a loading
+    // dash instead of a misleading $0.00.
+    var _loaded=!!window.__sbLoaded;
+    document.getElementById('walletBal').textContent=_loaded?usd(totalAssets()):'···';
+    document.getElementById('balbarVal').textContent=_loaded?usd(balance):'···';
     const pend=pendingTotal();
     // header micro-stats
     const bp=document.getElementById('balPending'); if(bp)bp.textContent=usd(pend);
