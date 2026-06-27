@@ -8,7 +8,18 @@ window.AlpexaSync = (function () {
   var KEY = 'sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu';
   var db = null;
   try {
-    if (window.supabase && window.supabase.createClient) db = window.supabase.createClient(URL, KEY);
+    if (window.supabase && window.supabase.createClient) {
+      // Back office (manager) sets window.ALPEXA_ADMIN_SESSION=true BEFORE this script
+      // loads so its admin login lives in its OWN storage slot — isolated from every
+      // customer app's session. One browser, one shared default key for customers, a
+      // separate key for admin → signing in as admin never logs a customer out (and
+      // vice-versa). Without the flag (all customer apps) the default key is used, so
+      // they keep sharing one customer session as before.
+      var opts = window.ALPEXA_ADMIN_SESSION
+        ? { auth: { storageKey: 'alpexa-admin-auth', persistSession: true, autoRefreshToken: true } }
+        : undefined;
+      db = window.supabase.createClient(URL, KEY, opts);
+    }
   } catch (e) { db = null; }
 
   function rnd(p) { return p + '-' + Math.floor(100000 + Math.random() * 900000); }
