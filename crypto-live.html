@@ -8389,21 +8389,9 @@ function TransferHistoryPanel({ kind, transactions, setTransactions, flashAndClo
     // Find the tx and apply the balance change on approval (demo: credit/deduct now).
     const tx = (transactions || []).find((x) => x.id === txId);
     if (tx && !tx.approvedAt) {
-      try {
-        const bRaw = window.localStorage.getItem('alpexa.cryptoHoldings');
-        const bal  = bRaw ? JSON.parse(bRaw) : { USDT: 0 };
-        const sRaw = window.localStorage.getItem('alpexa.serverBalances');
-        const srv  = sRaw ? JSON.parse(sRaw) : { crypto: 0, fx: 0, sports: 0 };
-        if (tx.type === 'deposit') {
-          if (tx.dest === 'crypto') bal.USDT = (bal.USDT || 0) + tx.usd;
-          srv[tx.dest] = (srv[tx.dest] || 0) + tx.usd;
-        } else if (tx.type === 'withdraw') {
-          if (tx.source === 'crypto') bal.USDT = Math.max(0, (bal.USDT || 0) - tx.gross);
-          srv[tx.source] = Math.max(0, (srv[tx.source] || 0) - tx.gross);
-        }
-        window.localStorage.setItem('alpexa.cryptoHoldings', JSON.stringify(bal));
-        window.localStorage.setItem('alpexa.serverBalances', JSON.stringify(srv));
-      } catch (_) {}
+      // #5/#3: do NOT credit/debit money in localStorage. The real deposit/withdraw is
+      // applied SERVER-side (requests → approval → apply_crypto_*_holding trigger) and the
+      // adopt loop reflects it. This demo handler only marks the tx approved + reloads.
     }
     setTransactions((list) => list.map((x) => x.id === txId ? { ...x, approvedAt: Date.now() } : x));
     if (typeof AudioFX !== 'undefined') AudioFX.cash();
@@ -8942,10 +8930,8 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
       const NETWORK = { BTC: 'Bitcoin', ETH: 'Ethereum · ERC-20', USDT: 'Ethereum · ERC-20', SOL: 'Solana' };
       const credit = (usd) => {
         try {
-          const raw = window.localStorage.getItem('alpexa.cryptoHoldings');
-          const b = raw ? JSON.parse(raw) : { USDT: 0 };
-          b[sym] = (b[sym] || 0) + usd;
-          window.localStorage.setItem('alpexa.cryptoHoldings', JSON.stringify(b));
+          // #5/#3: no money credited in localStorage — a real deposit credits crypto_holdings
+          // server-side (requests → approval trigger); the adopt loop reflects it.
           // Add an incoming transaction record
           const txRaw = window.localStorage.getItem('alpexa.transactions') || '[]';
           const txArr = JSON.parse(txRaw);
@@ -9233,21 +9219,8 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
         if (!ok || !setTransactions) return;
         const tx = (transactions || []).find((x) => x.id === txId);
         if (tx && !tx.approvedAt) {
-          try {
-            const bRaw = window.localStorage.getItem('alpexa.cryptoHoldings');
-            const bal  = bRaw ? JSON.parse(bRaw) : { USDT: 0 };
-            const sRaw = window.localStorage.getItem('alpexa.serverBalances');
-            const srv  = sRaw ? JSON.parse(sRaw) : { crypto: 0, fx: 0, sports: 0 };
-            if (tx.type === 'deposit') {
-              if (tx.dest === 'crypto') bal.USDT = (bal.USDT || 0) + tx.usd;
-              srv[tx.dest] = (srv[tx.dest] || 0) + tx.usd;
-            } else if (tx.type === 'withdraw') {
-              if (tx.source === 'crypto') bal.USDT = Math.max(0, (bal.USDT || 0) - tx.gross);
-              srv[tx.source] = Math.max(0, (srv[tx.source] || 0) - tx.gross);
-            }
-            window.localStorage.setItem('alpexa.cryptoHoldings', JSON.stringify(bal));
-            window.localStorage.setItem('alpexa.serverBalances', JSON.stringify(srv));
-          } catch (_) {}
+          // #5/#3: no money in localStorage. Real deposit/withdraw is server-side
+          // (requests → approval → apply_crypto_*_holding trigger); adopt loop reflects it.
         }
         setTransactions((list) => list.map((x) => x.id === txId ? { ...x, approvedAt: Date.now() } : x));
         if (typeof AudioFX !== 'undefined') AudioFX.cash();
