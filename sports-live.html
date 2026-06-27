@@ -1161,20 +1161,6 @@
     renderGames();
   }
 
-  // ACCOUNT GUARD: if this device's cached money/bets belong to a DIFFERENT customer
-  // than the one now logged in (alpexa.me), wipe the stale cache so we never show
-  // another account's balance/bets (multi-account in one browser). The app then
-  // re-adopts THIS account's real balance from the server. Tabs sharing one browser
-  // still share localStorage — use a separate/incognito window for a 2nd account.
-  (function(){ try{
-    var _me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); var _cur=(_me&&_me.custId)||'';
-    var _own=localStorage.getItem('alpexa.cacheOwner')||'';
-    if(_cur && _own && _own!==_cur){
-      ['alpexa.serverBalances','alpexa.balances','alpexa.cryptoHoldings','alpexa.staked','alpexa.sportsBalance','alpexa.cryptoBalance','alpexa.fxLive','alpexa.openBets','alpexa.settledBets','alpexa.withdrawals','alpexa.transactions','alpexa.funding','alpexa.txns','alpexa.appliedTransfers','alpexa.customer','alpexa.openDeposit','alpexa.ownerFunded'].forEach(function(k){ try{localStorage.removeItem(k);}catch(e){} });
-    }
-    if(_cur) localStorage.setItem('alpexa.cacheOwner', _cur);
-  }catch(e){} })();
-
   // open bets (with cashout) + settled history — persisted (real mode)
   let openBets = (function(){try{const s=localStorage.getItem('alpexa.openBets');return s?JSON.parse(s):[];}catch(e){return [];}})();
   let settledBets = (function(){try{const s=localStorage.getItem('alpexa.settledBets');return s?JSON.parse(s):[];}catch(e){return [];}})();
@@ -2003,7 +1989,7 @@
           renderTickets(); updateWallet(); return;
         }
         _pushedBets[betId]=true;   // place_bet already created the server row → skip the insertBetRow auto-push
-        AlpexaSync.db.from('accounts').select('balance').eq('acct_no',acct).maybeSingle().then(function(r){ if(r&&!r.error&&r.data){ balance=+r.data.balance||0; window.__sbLocalTs=0; window.__sbLastPushed=balance; try{sportsSrv().bal=balance;}catch(e){} try{localStorage.setItem('alpexa.sportsBalance',String(balance));}catch(e){} updateWallet(); } });
+        AlpexaSync.db.from('accounts').select('balance').eq('acct_no',acct).maybeSingle().then(function(r){ if(r&&!r.error&&r.data){ balance=+r.data.balance||0; window.__sbLocalTs=0; window.__sbLastPushed=balance; try{sportsSrv().bal=balance;}catch(e){} /* #5: balance is server-only — not written to localStorage */ updateWallet(); } });
       }, function(){ /* network error: keep optimistic bet; insertBetRow auto-push will create the row, balance reconciles on next adopt */ });
     })();
     // (Recent Activity bet rows are derived from openBets in renderTxns — not stored here.)
@@ -2165,7 +2151,7 @@
     // (it would post another ledger row = a second credit).
     try{ const me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); const acct=me&&me.accts&&me.accts.sports;
       if(acct){ AlpexaSync.db.from('accounts').select('balance').eq('acct_no',acct).maybeSingle().then(function(r){
-        if(r&&!r.error&&r.data){ balance=+r.data.balance||0; window.__sbLocalTs=0; window.__sbLastPushed=balance; try{sportsSrv().bal=balance;}catch(e){} try{localStorage.setItem('alpexa.sportsBalance',String(balance));}catch(e){} renderTickets(); updateWallet(); } }); }
+        if(r&&!r.error&&r.data){ balance=+r.data.balance||0; window.__sbLocalTs=0; window.__sbLastPushed=balance; try{sportsSrv().bal=balance;}catch(e){} /* #5: balance is server-only — not written to localStorage */ renderTickets(); updateWallet(); } }); }
     }catch(e){}
     renderTickets();updateWallet();
     notify('💵',partial?'Partial cash out':'Bet cashed out',`${b.type} · +${usd(payAmt)}`,'betResults');
@@ -2422,12 +2408,15 @@
   const srvMenu=document.getElementById('srvMenu');
   const sportsSrv=()=>SERVERS.find(s=>s.key==='sports');
   // 'balance' = Sports server balance (where bets/cashouts occur)
-  let balance=(function(){try{const s=localStorage.getItem('alpexa.sportsBalance');return s!==null?parseFloat(s):sportsSrv().bal;}catch(e){return sportsSrv().bal;}})();
+  // #5 SERVER-ONLY MONEY: never seed the balance from localStorage. Start at 0 and let
+  // syncBalancesFromServer() (called on load) fill it from accounts.balance. This kills
+  // the cross-account/stale-cache bleed at its root (no money lives in localStorage).
+  let balance=0;
   window.__sbLastPushed=balance;  // delta baseline for the ledger (server-owns-balance)
   let credit=0.00; // real mode — no demo welcome credit
   let totalLost=0;   // cumulative net losses (for 5% cashback credit)
   const CASHBACK_RATE=0.05;
-  function syncSportsBal(){window.__sbLocalTs=Date.now();sportsSrv().bal=balance;try{localStorage.setItem('alpexa.sportsBalance',String(balance));}catch(e){}
+  function syncSportsBal(){window.__sbLocalTs=Date.now();sportsSrv().bal=balance;/* #5: balance is server-only — not written to localStorage */
     try{var o=Object.assign({crypto:0,fx:0,sports:0},JSON.parse(localStorage.getItem('alpexa.serverBalances')||'{}'));o.sports=balance;localStorage.setItem('alpexa.serverBalances',JSON.stringify(o));}catch(e){}
     // DISPLAY ONLY. The client NO LONGER posts balance deltas to the ledger — that path
     // let a modified client self-credit (and caused the double-debit bug). Every balance
@@ -2872,7 +2861,7 @@
       return;   // abort: server did nothing (atomic) — no hold, no request
     }
     // Server held the funds + created the request. Adopt the server balance (NO client delta).
-    AlpexaSync.db.from('accounts').select('balance').eq('acct_no',acct).maybeSingle().then(function(r){ if(r&&!r.error&&r.data){ balance=+r.data.balance||0; window.__sbLocalTs=0; window.__sbLastPushed=balance; try{sportsSrv().bal=balance;}catch(e){} try{localStorage.setItem('alpexa.sportsBalance',String(balance));}catch(e){} updateWallet(); } });
+    AlpexaSync.db.from('accounts').select('balance').eq('acct_no',acct).maybeSingle().then(function(r){ if(r&&!r.error&&r.data){ balance=+r.data.balance||0; window.__sbLocalTs=0; window.__sbLastPushed=balance; try{sportsSrv().bal=balance;}catch(e){} /* #5: balance is server-only — not written to localStorage */ updateWallet(); } });
     const reqs=loadWithdrawals(); reqs.unshift(req); saveWithdrawals(reqs);
     txns.unshift({ts:Date.now(),ic:'⬆️',t1:'Withdraw',t2:`USDT (${wdNet}) → ${addr.slice(0,6)}…${addr.slice(-4)} · Pending approval`,amt:-v,reqId:wid});
     btn.disabled=false; btn.style.opacity='1'; btn.textContent=oldTxt;
@@ -3192,7 +3181,7 @@
         if(b.fx!=null)o.fx=b.fx; if(b.crypto!=null)o.crypto=b.crypto; if(b.sports!=null)o.sports=b.sports;
         localStorage.setItem('alpexa.serverBalances',JSON.stringify(o)); }catch(e){}
       if(b.sports!=null && Math.abs(b.sports-balance)>0.01 && (Date.now()-(window.__sbLocalTs||0))>7000){
-        balance=b.sports; window.__sbLastPushed=b.sports; try{localStorage.setItem('alpexa.sportsBalance',String(balance));}catch(e){}
+        balance=b.sports; window.__sbLastPushed=b.sports; /* #5: balance is server-only — not written to localStorage */
       }
       try{ refreshSrvBalances&&refreshSrvBalances(); }catch(e){}
       try{ updateWallet(); }catch(e){}
