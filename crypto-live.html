@@ -4479,16 +4479,18 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
   // Server-computed WITHDRAWABLE per account (balance − welcome bonus; crypto = spendable
   // USDT). Summed across the 3 servers. The welcome bonus and locked funds are NOT
   // withdrawable, and the server auto-rejects any over-withdrawal request.
-  const [withdrawableTotal, setWithdrawableTotal] = React.useState(null);
+  const [withdrawableBy, setWithdrawableBy] = React.useState(null); // {sports, fx, crypto}
   React.useEffect(() => {
     try {
       const me = JSON.parse(localStorage.getItem('alpexa.me') || 'null');
       const accts = me && me.accts;
       if (!(window.AlpexaSync && AlpexaSync.db && accts)) return;
-      const ids = [accts.sports, accts.fx, accts.crypto].filter(Boolean);
-      Promise.all(ids.map((a) => AlpexaSync.db.rpc('withdrawable_for', { p_acct: a })
-        .then((r) => (r && !r.error && r.data != null) ? +r.data : 0, () => 0)))
-        .then((vals) => setWithdrawableTotal(vals.reduce((s, v) => s + (+v || 0), 0)));
+      const map = { sports: 0, fx: 0, crypto: 0 };
+      Promise.all(['sports', 'fx', 'crypto'].map((srv) => {
+        const a = accts[srv]; if (!a) return Promise.resolve();
+        return AlpexaSync.db.rpc('withdrawable_for', { p_acct: a })
+          .then((r) => { map[srv] = (r && !r.error && r.data != null) ? +r.data : 0; }, () => {});
+      })).then(() => setWithdrawableBy(Object.assign({}, map)));
     } catch (e) {}
   }, []);
 
@@ -4510,8 +4512,11 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
   const wireValid = wireBank.trim().length >= 2 && wireHolder.trim().length >= 2 && (wireSwift.trim().length >= 8 || /^\d{9}$/.test(wireSwift)) && wireAccount.trim().length >= 4;
 
   const totalUsd = (serverBalances.crypto || 0) + effBal('fx', serverBalances.fx || 0) + (serverBalances.sports || 0);
-  const availUsd = (withdrawableTotal != null) ? withdrawableTotal : totalUsd;   // withdrawable (bonus/locked excluded)
-  const srcBal   = effBal(sourceId, serverBalances[sourceId] || 0);
+  const withdrawableTotal = withdrawableBy ? ((+withdrawableBy.sports||0) + (+withdrawableBy.fx||0) + (+withdrawableBy.crypto||0)) : null;
+  const availUsd = (withdrawableBy != null) ? withdrawableTotal : totalUsd;   // total withdrawable (bonus/locked excluded)
+  const fullBal  = effBal(sourceId, serverBalances[sourceId] || 0);
+  // srcBal here = the WITHDRAWABLE for the selected source (falls back to full balance until loaded).
+  const srcBal   = (withdrawableBy != null) ? (+withdrawableBy[sourceId] || 0) : fullBal;
 
   const METHODS = [
     { id: 'card', label: 'Debit card',    sub: `Instant · ${(fees.withdrawCardBps/100).toFixed(2)}% fee`,
@@ -4675,7 +4680,7 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
           }}>
             {['crypto','fx','sports'].map((sid) => {
               const active = sourceId === sid;
-              const bal = effBal(sid, serverBalances[sid] || 0);
+              const bal = (withdrawableBy != null) ? (+withdrawableBy[sid] || 0) : effBal(sid, serverBalances[sid] || 0);
               return (
                 <button key={sid} onClick={() => setSourceId(sid)} style={{
                   background: active ? RH.surfaceUp : 'transparent', border: 'none',
