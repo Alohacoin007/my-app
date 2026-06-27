@@ -1161,6 +1161,20 @@
     renderGames();
   }
 
+  // ACCOUNT GUARD: if this device's cached money/bets belong to a DIFFERENT customer
+  // than the one now logged in (alpexa.me), wipe the stale cache so we never show
+  // another account's balance/bets (multi-account in one browser). The app then
+  // re-adopts THIS account's real balance from the server. Tabs sharing one browser
+  // still share localStorage — use a separate/incognito window for a 2nd account.
+  (function(){ try{
+    var _me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); var _cur=(_me&&_me.custId)||'';
+    var _own=localStorage.getItem('alpexa.cacheOwner')||'';
+    if(_cur && _own && _own!==_cur){
+      ['alpexa.serverBalances','alpexa.balances','alpexa.cryptoHoldings','alpexa.staked','alpexa.sportsBalance','alpexa.cryptoBalance','alpexa.fxLive','alpexa.openBets','alpexa.settledBets','alpexa.withdrawals','alpexa.transactions','alpexa.funding','alpexa.txns','alpexa.appliedTransfers','alpexa.customer','alpexa.openDeposit','alpexa.ownerFunded'].forEach(function(k){ try{localStorage.removeItem(k);}catch(e){} });
+    }
+    if(_cur) localStorage.setItem('alpexa.cacheOwner', _cur);
+  }catch(e){} })();
+
   // open bets (with cashout) + settled history — persisted (real mode)
   let openBets = (function(){try{const s=localStorage.getItem('alpexa.openBets');return s?JSON.parse(s):[];}catch(e){return [];}})();
   let settledBets = (function(){try{const s=localStorage.getItem('alpexa.settledBets');return s?JSON.parse(s):[];}catch(e){return [];}})();

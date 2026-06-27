@@ -234,7 +234,11 @@ async function doLogin(){
     try{ var _prev=JSON.parse(localStorage.getItem('alpexa.me')||'null');
       if(!_prev||_prev.custId!==player.cust_id){
         ['alpexa.serverBalances','alpexa.balances','alpexa.cryptoHoldings','alpexa.staked','alpexa.sportsBalance','alpexa.cryptoBalance','alpexa.fxLive','alpexa.openBets','alpexa.settledBets','alpexa.withdrawals','alpexa.transactions','alpexa.funding','alpexa.txns','alpexa.appliedTransfers','alpexa.customer','alpexa.openDeposit','alpexa.ownerFunded'].forEach(function(k){ localStorage.removeItem(k); });
-      } }catch(e){}
+      }
+      // Stamp the cache owner so the apps' ACCOUNT GUARD knows this cache is this
+      // account's (and won't re-wipe the balances we adopt from the server below).
+      localStorage.setItem('alpexa.cacheOwner', player.cust_id);
+    }catch(e){}
     // Adopt the SERVER's balances as the source of truth on login. This stops the
     // app from pushing stale device caches back up (which is how a fresh $100/$500
     // account could get overwritten). serverBalances/balances/sportsBalance always
