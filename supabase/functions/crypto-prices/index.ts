@@ -49,7 +49,9 @@ async function fromBinance(): Promise<Row[]> {
   for (const t of tickers) { if (t && t.symbol) px[t.symbol] = +t.price; }
   const rows: Row[] = [];
   for (const sym of Object.keys(STABLES)) rows.push(px2row(sym, STABLES[sym]));
-  for (const sym of Object.keys(PAIRS)) { const p = px[PAIRS[sym]]; if (p > 0) rows.push(px2row(sym, p)); }
+  // Write BOTH the short symbol (BTC — crypto spot app) AND the USD pair (BTCUSD — the FX
+  // app's fx_open, so crypto CFDs are server-priced and pass the margin gate, no bypass).
+  for (const sym of Object.keys(PAIRS)) { const p = px[PAIRS[sym]]; if (p > 0) { rows.push(px2row(sym, p)); rows.push(px2row(sym + "USD", p)); } }
   if (rows.length <= Object.keys(STABLES).length) throw new Error("binance.vision empty");
   return rows;
 }
@@ -61,7 +63,7 @@ async function fromCoinGecko(): Promise<Row[]> {
   const data = await res.json();
   const rows: Row[] = [];
   for (const sym of Object.keys(STABLES)) rows.push(px2row(sym, STABLES[sym]));
-  for (const sym of Object.keys(CG_IDS)) { const p = data[CG_IDS[sym]] && +data[CG_IDS[sym]].usd; if (p > 0) rows.push(px2row(sym, p)); }
+  for (const sym of Object.keys(CG_IDS)) { const p = data[CG_IDS[sym]] && +data[CG_IDS[sym]].usd; if (p > 0) { rows.push(px2row(sym, p)); rows.push(px2row(sym + "USD", p)); } }
   if (rows.length <= Object.keys(STABLES).length) throw new Error("coingecko empty");
   return rows;
 }
