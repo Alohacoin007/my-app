@@ -13626,19 +13626,29 @@ function App() {
         if (document.hidden) return;
         const acct = cryptoAcctRef.current; if (!acct) return;
         if (Date.now() - (window.__cbLocalTs || 0) < 7000) return; // device busy
-        AlpexaSync.db.from('crypto_stakes').select('asset,usd,principal,period,since,staked_at').eq('acct_no', acct).then((sr) => {
+        // Select only columns guaranteed to exist (asset,usd,period,since) — selecting a
+        // not-yet-deployed column (e.g. staked_at) errors the whole query and hides ALL
+        // stakes. principal is requested too but fenced behind a fallback. Maturity uses
+        // `since`; the SERVER enforces the real lock/penalty regardless of the client.
+        AlpexaSync.db.from('crypto_stakes').select('asset,usd,period,since,principal').eq('acct_no', acct).then((sr) => {
+          if (stop || sr && sr.error) { // retry without principal if that column is missing
+            AlpexaSync.db.from('crypto_stakes').select('asset,usd,period,since').eq('acct_no', acct).then((sr2) => { applyStakes(sr2); }, function () {}); return;
+          }
+          applyStakes(sr);
+        }, function () {});
+        function applyStakes(sr) {
           if (stop || !sr || sr.error || !sr.data) return;
           const next = {};
           // Multi-term: key by `asset|period` so a coin can hold several terms at once.
           sr.data.forEach((r) => { const usd = +r.usd || 0; const per = r.period || 'flexible';
-            if (usd > 0.005) next[r.asset + '|' + per] = { usd: usd, principal: (+r.principal || usd), period: per, since: +r.since || 0, staked_at: (+r.staked_at || +r.since || 0), asset: r.asset }; });
+            if (usd > 0.005) next[r.asset + '|' + per] = { usd: usd, principal: (+r.principal || usd), period: per, since: +r.since || 0, staked_at: (+r.since || 0), asset: r.asset }; });
           const sig = cryptoStakeSig(next);
           if (sig === stakeSyncRef.current.srvSig) return; // unchanged
           stakeSyncRef.current.srvSig = sig;
           const seen = {}; Object.keys(next).forEach((k) => { seen[k] = true; });
           stakeSyncRef.current.prev = seen;
           setStaked(next);
-        }, function () {});
+        }
       } catch (e) {}
     };
     const iv = setInterval(() => { if (!document.hidden) tick(); }, 8000);
