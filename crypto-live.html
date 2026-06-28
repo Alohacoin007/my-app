@@ -6846,7 +6846,7 @@ function MailingAddressPanel({ onSaved }) {
     </>
   );
 }
-function AcctTextarea({ label, placeholder, rows = 4 }) {
+function AcctTextarea({ label, placeholder, rows = 4, value, onChange }) {
   return (
     <div style={{ padding: '12px 16px', fontFamily: 'Geist, Inter, system-ui' }}>
       <div style={{
@@ -6854,13 +6854,36 @@ function AcctTextarea({ label, placeholder, rows = 4 }) {
         fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2,
         textTransform: 'uppercase', fontWeight: 700, marginBottom: 6,
       }}>{label}</div>
-      <textarea placeholder={placeholder} rows={rows} style={{
+      <textarea placeholder={placeholder} rows={rows} value={value} onChange={onChange} style={{
         width: '100%', background: 'transparent', border: 'none',
         color: RH.text, fontSize: 14, fontWeight: 500,
         outline: 'none', padding: 0, resize: 'none',
         fontFamily: 'Geist, Inter, system-ui',
       }}/>
     </div>
+  );
+}
+// Contact form: captures the message (was discarded) and sends it for real via the user's
+// email app (mailto) — no fake "Sent" with no backend. Its own component so useState is a
+// top-level hook (not a conditional hook inside the page switch).
+function SupportContactPanel({ flashAndClose }) {
+  const email = React.useContext(IdentityContext).email;
+  const [msg, setMsg] = React.useState('');
+  const send = () => {
+    const body = encodeURIComponent((msg || '').trim() + (email ? '\n\n— ' + email : ''));
+    try { window.location.href = 'mailto:support@alpexa.com?subject=' + encodeURIComponent('Alpexa support request') + '&body=' + body; } catch (e) {}
+    flashAndClose('Opening your email app…');
+  };
+  return (
+    <>
+      <AcctSection title="Message">
+        <AcctTextarea label="Tell us more" placeholder="How can we help?" rows={6} value={msg} onChange={(e) => setMsg(e.target.value)}/>
+      </AcctSection>
+      <div style={{ fontSize: 11.5, color: RH.textDim, padding: '0 4px', marginBottom: 12 }}>
+        We will reply to {email} within 24 hours.
+      </div>
+      <AcctSaveButton label="Send" onClick={() => { if ((msg || '').trim()) send(); }}/>
+    </>
   );
 }
 function AcctPolicyText({ children }) {
@@ -7260,7 +7283,7 @@ function SupportChatPanel() {
       const ans = findAnswer(text);
       const aiMsg = ans
         ? { role: 'ai', text: ans.text, source: ans.source, kind: ans.type }
-        : { role: 'ai', text: `I'm not sure about that one. You can browse the Help center for related articles, or tap "Connect to human" below to chat with a live agent.`, kind: 'fallback' };
+        : { role: 'ai', text: `I'm not sure about that one. You can browse the Help center for related articles, or tap "Talk to a human" below and our team will follow up by email.`, kind: 'fallback' };
       setMessages((m) => [...m, aiMsg]);
       setTyping(false);
     }, 600 + Math.min(text.length * 12, 1200));
@@ -7390,12 +7413,12 @@ function SupportChatPanel() {
         </button>
       </div>
 
-      <button onClick={() => setMessages((m) => [...m, { role: 'ai', text: 'Connecting to a human agent… average wait is about 3 minutes. You can continue chatting with me while you wait.', kind: 'escalate' }])} style={{
+      <button onClick={() => setMessages((m) => [...m, { role: 'ai', text: 'For account-specific help from our team, tap "Contact us" in the Support menu — we reply by email within 24 hours.', kind: 'escalate' }])} style={{
         marginTop: 12, padding: '10px 0', borderRadius: 999,
         background: 'transparent', border: `1px solid ${RH.line}`,
         color: RH.textDim, fontSize: 12, fontWeight: 600, cursor: 'pointer',
         fontFamily: 'Geist, Inter, system-ui',
-      }}>Connect to human agent</button>
+      }}>Talk to a human</button>
     </div>
   );
 }
@@ -8963,7 +8986,7 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
     // Help
     'support-help':       { title: 'Help center',  intro: 'Browse articles by topic.' },
     'support-contact':    { title: 'Contact us',    intro: 'Send us a message. Most replies arrive within 24 hours.' },
-    'support-chat':       { title: 'Chat with support', intro: 'Live · average 3-minute wait.' },
+    'support-chat':       { title: 'AI assistant', intro: 'Instant answers, any time. For account-specific help, use Contact us.' },
     'support-version':    { title: 'App version',   intro: 'You are on the latest version.' },
     'support-tos':        { title: 'Terms of service', intro: 'Updated May 1, 2026' },
     'support-privacy':    { title: 'Privacy policy',   intro: 'Updated May 1, 2026' },
@@ -9529,21 +9552,7 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
 
     // Support forms
     if (id === 'support-contact') {
-      const isContact = id === 'support-contact';
-      const placeholder = isContact ? 'How can we help?'
-                       : isFeedback ? 'What should we build next?'
-                       : 'Describe what happened. Include steps to reproduce if possible.';
-      return (
-        <>
-          <AcctSection title="Message">
-            <AcctTextarea label="Tell us more" placeholder={placeholder} rows={6}/>
-          </AcctSection>
-          <div style={{ fontSize: 11.5, color: RH.textDim, padding: '0 4px', marginBottom: 12 }}>
-            We will reply to {React.useContext(IdentityContext).email} within 24 hours.
-          </div>
-          <AcctSaveButton label="Send" onClick={() => flashAndClose("Sent")}/>
-        </>
-      );
+      return <SupportContactPanel flashAndClose={flashAndClose}/>;
     }
     if (id === 'support-chat') {
       return <SupportChatPanel/>;
@@ -9858,7 +9867,7 @@ function AccountSubPageContent({ subPage, setSubSub, transactions = [], setTrans
           <AcctDivider/>
           <AcctRow label="Contact us" sub="Email · response in 24h" onClick={go('support-contact')}/>
           <AcctDivider/>
-          <AcctRow label="Chat with support" sub="Live · avg 3 min wait" status="Online" statusColor={RH.green} onClick={go('support-chat')}/>
+          <AcctRow label="AI assistant" sub="Instant answers · 24/7" status="Online" statusColor={RH.green} onClick={go('support-chat')}/>
         </AcctSection>
         <AcctSection title="About">
           <AcctRow label="App version" value="v2026.5.29" onClick={go('support-version')}/>
