@@ -13213,7 +13213,10 @@ function App() {
   const [pulseAsset, setPulseAsset] = React.useState(null); // sym briefly highlighted after action
   // Server-level pool balances shown in the header server picker.
   // Server pool balances (header picker) — from the server (pullBalances). No fake seed.
-  const [serverBalances, setServerBalances] = usePersistedState('alpexa.serverBalances', {
+  // #5/#20 MEMORY-ONLY: never persisted to localStorage (was usePersistedState → cross-account
+  // bleed + the second source behind #20 drift). Each load fetches fresh from the server;
+  // window.__srvBal mirrors this in memory. localStorage holds NO money.
+  const [serverBalances, setServerBalances] = React.useState({
     crypto: 0,
     fx:     0,
     sports: 0,
