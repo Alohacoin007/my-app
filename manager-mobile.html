@@ -349,10 +349,11 @@
   function CO_ADDR(){return localStorage.getItem('alpexa.companyAddr')||'0x6B1c8941698Affc56757eF9Be1723Ec43F720966';}
   // demo customer identity + 3 account numbers (generated once; real server issues these per user)
   function customer(){
+    // Back-office: when a request carries no customer name/acct, show an honest "—"
+    // placeholder. Never fabricate a demo identity (was 'Player #1001 / demo@alpexa.io',
+    // which leaked fake names + random account numbers into the approvals queue).
     var c=getJSON('alpexa.customer',null);
-    if(!c){ function n(p){return p+'-'+Math.floor(100000+Math.random()*900000);}
-      c={id:'P-1001',name:'Player #1001',email:'demo@alpexa.io',acct:{sports:n('SP'),crypto:n('CR'),fx:n('FX')}};
-      setJSON('alpexa.customer',c); }
+    if(!c) return {id:'—',name:'—',email:'',acct:{sports:'—',crypto:'—',fx:'—'}};
     return c;
   }
 

@@ -2426,8 +2426,10 @@ function SupportPanel(){
   return(
     <div style={{flex:1,overflowY:'auto',padding:'4px 16px 18px'}}>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:14}}>
-        {[{icon:'forum',label:'Live Chat',sub:'Avg 2 min wait'},{icon:'call',label:'Phone',sub:'+41 22 555 9900'},{icon:'mail',label:'Email',sub:'support@alpexa.com'},{icon:'help',label:'Help Center',sub:'Browse articles'}].map(o=>(
-          <button key={o.label} style={{padding:'14px 12px',borderRadius:10,background:'var(--bg)',border:'1px solid var(--line)',display:'flex',flexDirection:'column',alignItems:'flex-start',gap:4,textAlign:'left'}}>
+        {/* Only the channels that actually work with no backend: real phone + email links.
+            (Live Chat / Help Center removed — no chat server or articles site to point to.) */}
+        {[{icon:'call',label:'Phone',sub:'+41 22 555 9900',href:'tel:+41225559900'},{icon:'mail',label:'Email',sub:'support@alpexa.com',href:'mailto:support@alpexa.com'}].map(o=>(
+          <button key={o.label} onClick={()=>{ window.location.href=o.href; }} style={{padding:'14px 12px',borderRadius:10,background:'var(--bg)',border:'1px solid var(--line)',display:'flex',flexDirection:'column',alignItems:'flex-start',gap:4,textAlign:'left',cursor:'pointer'}}>
             <div style={{width:30,height:30,borderRadius:7,background:'var(--acc-3)',color:'var(--acc-2)',display:'flex',alignItems:'center',justifyContent:'center'}}><Mi name={o.icon} size={16}/></div>
             <div style={{fontSize:12.5,fontWeight:700,color:'var(--ink)',marginTop:4}}>{o.label}</div>
             <div style={{fontSize:10,color:'var(--text-3)'}}>{o.sub}</div>
@@ -2444,7 +2446,7 @@ function SupportPanel(){
         <option value="other">Other</option>
       </select>
       <textarea value={msg} onChange={e=>setMsg(e.target.value)} placeholder="Describe your issue…" style={{width:'100%',padding:'10px 12px',borderRadius:8,border:'1px solid var(--line-2)',background:'var(--surface)',fontSize:13,color:'var(--ink)',minHeight:90,outline:'none',resize:'vertical',fontFamily:'inherit',marginBottom:10}}/>
-      <button disabled={!topic||!msg} style={{width:'100%',padding:'12px 0',borderRadius:10,fontSize:13,fontWeight:700,color:'#fff',background:(topic&&msg)?'var(--acc)':'var(--muted)',display:'flex',alignItems:'center',justifyContent:'center',gap:6,cursor:(topic&&msg)?'pointer':'not-allowed'}}><Mi name="send" size={14}/>Submit Ticket</button>
+      <button disabled={!topic||!msg} onClick={()=>{ if(!topic||!msg) return; const subj=encodeURIComponent('ALPEXA Support — '+topic); const body=encodeURIComponent(msg+'\n\n— sent from ALPEXA FX'); window.location.href='mailto:support@alpexa.com?subject='+subj+'&body='+body; }} style={{width:'100%',padding:'12px 0',borderRadius:10,fontSize:13,fontWeight:700,color:'#fff',background:(topic&&msg)?'var(--acc)':'var(--muted)',display:'flex',alignItems:'center',justifyContent:'center',gap:6,cursor:(topic&&msg)?'pointer':'not-allowed'}}><Mi name="send" size={14}/>Submit Ticket</button>
       <div style={{fontSize:10.5,color:'var(--text-3)',textAlign:'center',marginTop:8}}>Typical response time: 4 hours · 24/7 support</div>
     </div>
   );
@@ -2483,13 +2485,15 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
   const [reportType,setReportType]=useState('monthly');
   const [reportFormat,setReportFormat]=useState('pdf');
   const [step,setStep]=useState('form');
+  const [err,setErr]=useState('');  // inline form error (replaces native alert() — better mobile UX)
   const TITLES={deposit:{title:'Deposit Funds',sub:'Funds available immediately for trading'},withdraw:{title:'Withdraw Funds',sub:'Processed within 1–3 business days'},transfer:{title:'Transfer Between Accounts',sub:'Instant, no fees'},report:{title:'Account Report',sub:'Statement of your trading activity'}};
   const t=TITLES[kind];
   function submit(){
+    setErr('');
     if(kind!=='report'&&!amount)return;
     // Crypto (USDT) withdrawal must have a valid 0x… address (else the back office can't pay it).
     if(kind==='withdraw'&&(method==='wallet'||method==='crypto')&&!/^0x[0-9a-fA-F]{40}$/.test((wAddr||'').trim())){
-      alert('Enter a valid USDT (ERC-20) wallet address (0x…).'); return; }
+      setErr('Enter a valid USDT (ERC-20) wallet address (0x…).'); return; }
     setStep('processing');
     setTimeout(async ()=>{
       // Record funding transactions to history (skip 'report' since it's not a money move)
@@ -2520,9 +2524,9 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
         } else if(kind==='withdraw'){
           // Server-first: the withdrawal must reach the back office (requests table) BEFORE we
           // show success. No silent local-only withdrawals.
-          if(!(window.AlpexaSync&&AlpexaSync.pushRequest)){ setStep('form'); try{alert('No server connection — withdrawal not submitted. Please try again.');}catch(e){} return; }
+          if(!(window.AlpexaSync&&AlpexaSync.pushRequest)){ setStep('form'); setErr('No server connection — withdrawal not submitted. Please try again.'); return; }
           let res; try{ res=await AlpexaSync.pushRequest({id:reqId,type:'withdraw',server:'FX',amount:amt,asset:'USD',network:method,address:((method==='wallet'||method==='crypto')?(wAddr||'').trim():'')}); }catch(e){ res={error:e}; }
-          if(!res||res.skipped||res.error){ setStep('form'); try{alert('Withdrawal not submitted — couldn’t reach the server. Nothing was deducted. Please try again.');}catch(e){} return; }
+          if(!res||res.skipped||res.error){ setStep('form'); setErr('Withdrawal not submitted — couldn’t reach the server. Nothing was deducted. Please try again.'); return; }
           try{pushFundingHistory({id:reqId,kind,method,amount:amt,currency:'USD',ref:REF_PREFIX.withdraw+Math.floor(10000000+Math.random()*89999999),note,account:(account||'live'),status:'pending'});}catch(e){}
           try{ window.alpexaNotify&&alpexaNotify({type:'withdraw',pref:'withdrawal',title:'Withdrawal requested · $'+amt.toLocaleString()+' · pending approval'}); }catch(e){}
           setStep('done');
@@ -2716,6 +2720,7 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
               )}
             </div>
             <div style={{padding:'10px 16px 16px',background:'var(--surface)',borderTop:'1px solid var(--line)'}}>
+              {err&&(<div style={{display:'flex',alignItems:'flex-start',gap:7,padding:'9px 11px',marginBottom:10,borderRadius:7,background:'rgba(232,74,74,0.10)',border:'1px solid rgba(232,74,74,0.35)',color:'var(--sell)',fontSize:11.5,fontWeight:600,lineHeight:1.4}}><Mi name="error" size={14}/><span>{err}</span></div>)}
               <button onClick={submit} disabled={step==='processing'||(kind!=='report'&&!amount)} style={{width:'100%',padding:'13px 0',borderRadius:3,fontSize:14,fontWeight:700,color:'#fff',background:(step==='processing'||(kind!=='report'&&!amount))?'var(--muted)':'linear-gradient(180deg,#2D5478 0%,#1B3955 100%)',display:'flex',alignItems:'center',justifyContent:'center',gap:8,border:'1px solid '+((step==='processing'||(kind!=='report'&&!amount))?'var(--muted)':'#0F2742'),boxShadow:(step==='processing'||(kind!=='report'&&!amount))?'none':'0 1px 0 rgba(255,255,255,0.18) inset,0 2px 4px rgba(0,0,0,0.15)',textShadow:(step==='processing'||(kind!=='report'&&!amount))?'none':'0 1px 1px rgba(0,0,0,0.15)',letterSpacing:0.5}}>
                 {step==='processing'?(<><div style={{width:16,height:16,border:'2.5px solid rgba(255,255,255,0.35)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>Processing…</>):(<><Mi name={kind==='report'?'send':kind==='transfer'?'swap_horiz':kind==='withdraw'?'north':'south'} size={16}/>{kind==='deposit'&&(method==='card'?"I've paid":method==='bank'?"I've sent the wire":'Confirm Deposit')}{kind==='withdraw'&&'Request Withdrawal'}{kind==='transfer'&&'Transfer Now'}{kind==='report'&&'Generate Report'}</>)}
               </button>

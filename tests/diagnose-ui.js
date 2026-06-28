@@ -53,6 +53,8 @@ const ACCEPTED = [
     reason: 'C1: honest "On-chain {coin} — coming soon" panel — the correct 100% behavior (no fake external address) until per-user deposit addresses (C2) exist.' },
   { id: 'UI-stub-marker', file: 'crypto-live.html', match: 'micro-deposits are simulated',
     reason: 'B1: bank micro-deposit verification is honestly labelled "Demo only" — deferred to the Plaid backend (🟥), not pretending to work.' },
+  { id: 'UI-stub-marker', file: 'crypto-live.html', match: 'Price alerts — coming soon',
+    reason: 'E2: the "Create alert" screen honestly says "coming soon" instead of a fake form — real price alerts need a server-side price watcher + push delivery (not built). Correct 100% behavior.' },
 ];
 function isAccepted(id, file, line, text) {
   return ACCEPTED.some((a) => a.id === id && a.file === file &&

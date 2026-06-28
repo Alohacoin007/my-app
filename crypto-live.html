@@ -8094,8 +8094,8 @@ function PersonalEmailPanel({ onSaved }) {
 
 function PersonalPhonePanel({ onSaved }) {
   const [stored, setStored] = React.useState(() => {
-    try { return window.localStorage.getItem('alpexa.userPhone') || '+1 (415) 555 0182'; }
-    catch (_) { return '+1 (415) 555 0182'; }
+    try { return window.localStorage.getItem('alpexa.userPhone') || ''; }
+    catch (_) { return ''; }
   });
   const [phone, setPhone] = React.useState(stored);
   const digits = phone.replace(/\D/g, '');
@@ -8127,7 +8127,7 @@ function PersonalPhonePanel({ onSaved }) {
           }}>Phone</div>
           <input value={phone} onChange={(e) => setPhone(format(e.target.value))}
             type="tel" autoComplete="tel" inputMode="tel"
-            placeholder="+1 (415) 555 0182"
+            placeholder="+1 (000) 000-0000"
             style={{
               width: '100%', boxSizing: 'border-box',
               background: RH.surfaceUp,
@@ -9152,7 +9152,14 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
     if (id === 'security-signout-all') {
       return (
         <div style={{ padding: '24px 12px', textAlign: 'center' }}>
-          <button onClick={() => flashAndClose('Other devices signed out')} style={{
+          <button onClick={async () => {
+            // REAL sign-out of every OTHER session (Supabase global revoke, current device kept).
+            try {
+              const auth = window.AlpexaSync && AlpexaSync.db && AlpexaSync.db.auth;
+              if (auth) await auth.signOut({ scope: 'others' });
+              flashAndClose('Other devices signed out');
+            } catch (e) { flashAndClose('Could not sign out other devices — try again'); }
+          }} style={{
             padding: '14px 28px', borderRadius: 999,
             background: RH.red, color: '#fff', border: 'none',
             fontSize: 14, fontWeight: 700, letterSpacing: 0.2, cursor: 'pointer',
@@ -9162,15 +9169,15 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
       );
     }
     if (id === 'alerts-create') {
+      // Honest "준비중": real price alerts need a server-side price watcher + push/email
+      // delivery (E2, not built). Show a truthful placeholder, not a fake form.
       return (
         <AcctSection title="New alert">
-          <AcctRow label="Asset" value="BTC"/>
-          <AcctDivider/>
-          <AcctRow label="Condition" value="Above"/>
-          <AcctDivider/>
-          <AcctRow label="Price" value="$80,000.00"/>
-          <AcctDivider/>
-          <AcctRow label="Notify via" value="Push, email"/>
+          <div style={{ padding: '24px 18px', textAlign: 'center' }}>
+            <div style={{ fontSize: 30, marginBottom: 10 }}>🔔</div>
+            <div style={{ fontSize: 14.5, fontWeight: 800, color: RH.text, marginBottom: 6 }}>Price alerts — coming soon</div>
+            <div style={{ fontSize: 12.5, color: RH.textDim, lineHeight: 1.5 }}>We're building real-time price alerts that ping you the moment an asset crosses your target. Not available just yet.</div>
+          </div>
         </AcctSection>
       );
     }
@@ -9701,18 +9708,16 @@ function AccountSubPageContent({ subPage, setSubSub, transactions = [], setTrans
             } catch (_) { return 'Recommended every 90 days'; }
           })()} onClick={go('security-password')}/>
           <AcctDivider/>
-          <AcctToggle label="Two-factor authentication" sub="SMS to +1 ••• 0182" on={twofa} onChange={setTwofa}/>
+          <AcctToggle label="Two-factor authentication" sub="Verification code on withdrawals" on={twofa} onChange={setTwofa}/>
           <AcctDivider/>
           <AcctToggle label="Biometric unlock" sub="Face ID for orders > $1,000" on={bio} onChange={setBio}/>
           <AcctDivider/>
           <AcctToggle label="Auto-lock after 5 min" on={autoLock} onChange={setAutoLock}/>
         </AcctSection>
         <AcctSection title="Devices & sessions">
-          <AcctRow label="iPhone 17 Pro" sub="This device · San Francisco" status="Active" statusColor={RH.green} onClick={go('security-iphone')}/>
+          <AcctRow label="This device" sub="Signed in now" status="Active" statusColor={RH.green} chevron={false}/>
           <AcctDivider/>
-          <AcctRow label="MacBook Pro" sub="Last used 2h ago" onClick={go('security-macbook')}/>
-          <AcctDivider/>
-          <AcctRow label="Sign out all other devices" status="Action" statusColor={RH.red} chevron={false}/>
+          <AcctRow label="Sign out all other devices" status="Action" statusColor={RH.red} onClick={go('security-signout-all')}/>
         </AcctSection>
         <AcctSection title="Privacy">
           <AcctRow label="Data sharing" onClick={go('security-data-sharing')}/>
@@ -9777,6 +9782,11 @@ function AccountSubPageContent({ subPage, setSubSub, transactions = [], setTrans
   if (subPage === 'rewards') {
     return (
       <>
+        {/* Hardcoded "0.00 ALPXS rewards" card hidden: it's an orphan of the unbuilt
+            referral-rewards program (hidden below) and contradicted the "Earned 100 ALPXS"
+            row in Promotions. No live source to read the real number here — show nothing
+            rather than a wrong/static balance. Restore once referral rewards are wired. */}
+        {false && (
         <AcctSection>
           <div style={{ padding: '18px 16px', textAlign: 'center' }}>
             <div style={{
@@ -9790,6 +9800,7 @@ function AccountSubPageContent({ subPage, setSubSub, transactions = [], setTrans
             <div style={{ marginTop: 4, fontSize: 12, color: RH.textDim }}>≈ $0.00</div>
           </div>
         </AcctSection>
+        )}
         {/* Referral / "Invite & earn" — HIDDEN until the backend is fully built:
             record_referral RPC (track who joined), a real "My referrals" count, and the
             referrer $20 reward. Today only Redeem-a-code works; the rest is not wired, so
@@ -9821,7 +9832,7 @@ function AccountSubPageContent({ subPage, setSubSub, transactions = [], setTrans
     return (
       <>
         <AcctSection title="Channels">
-          <AcctToggle label="Push notifications" sub="iPhone 17 Pro" on={push} onChange={setPush}/>
+          <AcctToggle label="Push notifications" sub="This device" on={push} onChange={setPush}/>
           <AcctDivider/>
           <AcctToggle label="Email" sub={React.useContext(IdentityContext).email} on={email} onChange={setEmail}/>
         </AcctSection>
@@ -9833,11 +9844,7 @@ function AccountSubPageContent({ subPage, setSubSub, transactions = [], setTrans
           <AcctToggle label="Market summaries" sub="Daily digest at 9am local" on={market} onChange={setMarket}/>
         </AcctSection>
         <AcctSection title="Active alerts">
-          <AcctRow label="BTC > $80,000" sub="Above price" onClick={go('alerts-btc')}/>
-          <AcctDivider/>
-          <AcctRow label="ETH < $1,800" sub="Below price" onClick={go('alerts-eth')}/>
-          <AcctDivider/>
-          <AcctRow label="Create alert" status="New" statusColor={RH.accent} chevron={false} onClick={go('alerts-create')}/>
+          <AcctRow label="Create alert" status="Soon" statusColor={RH.textDim} chevron={false} onClick={go('alerts-create')}/>
         </AcctSection>
       </>
     );
