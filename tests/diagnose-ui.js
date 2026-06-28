@@ -29,22 +29,34 @@ const CHECKS = [
     reCI: /coming soon|not implemented|\bdemo[- ]only\b|\bplaceholder data\b/i,
     reCS: /\bTODO\b|\bFIXME\b/,
     why: 'A stub / "demo only" marker in a shipped app — the feature around it may look active but be unfinished or fake.' },
+  // "Temporary / replace-me / sample" markers — data that LOOKS real but is flagged as
+  // placeholder/unverified (the "sample Alpexa bank coordinates (replace later)" / N2 class).
+  // The data may actually be real (just a stale comment) OR a true placeholder — either way,
+  // REVIEW: confirm it's real and fix the comment, or replace the placeholder.
+  { id: 'UI-replace-me', sev: 'REVIEW', files: DEPLOYED,
+    reCI: /replace later|replace me\b|replace this|fill ?in later|update later|change later|sample [a-z]+ (coordinates|details|address|data|info)|hardcoded (sample|demo|placeholder|test)/i,
+    why: 'A "replace later / sample / placeholder" marker on shipped data — confirm the value is REAL (fix the stale comment) or replace the placeholder before launch.' },
 ];
 
 // Lines that are i18n translation tables or our own fix-describing comments → never findings.
 function skipLine(ln) {
   if (/^\s*[a-z]{2}\s*:\s*\{\s*"/.test(ln)) return true;             // en:{"...":"..."} translation row
-  if (/no hardcoded|never .*demo|not the demo|removed .*demo|not a fake|show 0|#5/i.test(ln)) return true;
+  if (/no hardcoded|never .*demo|not the demo|removed .*demo|not a fake|show 0|#5|instead of a shared|coming soon" instead/i.test(ln)) return true;
   if (/^\s*\/\//.test(ln) && /hardcoded demo value/i.test(ln)) return true; // our fix comment
   return false;
 }
 
-// Reviewed-OK (verified safe seed / intentional). Printed but not failed.
+// Reviewed-OK (verified-safe / intentional honest "coming soon"). Printed but not failed.
+// `match` = a stable substring of the line (so it survives line-number shifts).
 const ACCEPTED = [
-  // (add entries here as: { id, file, line?, reason } once each finding is triaged)
+  { id: 'UI-stub-marker', file: 'crypto-live.html', match: 'On-chain',
+    reason: 'C1: honest "On-chain {coin} — coming soon" panel — the correct 100% behavior (no fake external address) until per-user deposit addresses (C2) exist.' },
+  { id: 'UI-stub-marker', file: 'crypto-live.html', match: 'micro-deposits are simulated',
+    reason: 'B1: bank micro-deposit verification is honestly labelled "Demo only" — deferred to the Plaid backend (🟥), not pretending to work.' },
 ];
-function isAccepted(id, file, line) {
-  return ACCEPTED.some((a) => a.id === id && a.file === file && (a.line == null || a.line === line));
+function isAccepted(id, file, line, text) {
+  return ACCEPTED.some((a) => a.id === id && a.file === file &&
+    (a.line == null || a.line === line) && (a.match == null || (text || '').includes(a.match)));
 }
 
 const findings = [];
@@ -54,10 +66,10 @@ for (const c of CHECKS) {
     if (!fs.existsSync(fp)) continue;
     fs.readFileSync(fp, 'utf8').split('\n').forEach((ln, i) => {
       if (skipLine(ln)) return;
-      const reMatch = c.re ? c.re.test(ln) : (c.reCI.test(ln) || c.reCS.test(ln));
+      const reMatch = c.re ? c.re.test(ln) : (c.reCI.test(ln) || (c.reCS && c.reCS.test(ln)));
       if (reMatch) {
         findings.push({ id: c.id, sev: c.sev, why: c.why, file: rel, line: i + 1,
-          text: ln.trim().slice(0, 90), accepted: isAccepted(c.id, rel, i + 1) });
+          text: ln.trim().slice(0, 90), accepted: isAccepted(c.id, rel, i + 1, ln) });
       }
     });
   }
