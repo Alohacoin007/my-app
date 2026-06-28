@@ -1518,6 +1518,12 @@
     var rg=agRange();
     var h='<div class="sec" style="display:flex;align-items:center;justify-content:space-between">Agents · '+SRV_AGENTS.length+
       '<button data-agnew="1" style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:5px 11px;font:700 11px system-ui;color:var(--ink);cursor:pointer">＋ New agent</button></div>';
+    // Commission window filter (handler [data-agr] at wire() was orphaned — buttons were never rendered).
+    var AGR=[['today','Today'],['7d','7d'],['30d','30d'],['all','All']];
+    h+='<div style="display:flex;gap:6px;margin:8px 12px 4px">'+AGR.map(function(x){ var on=AG_RANGE===x[0];
+      return '<button data-agr="'+x[0]+'" style="flex:1;background:'+(on?'var(--acc)':'#F1F3F6')+';color:'+(on?'#fff':'var(--dim)')+';border-radius:4px;padding:8px 0;font:700 11.5px system-ui;border:none;cursor:pointer">'+x[1]+'</button>';
+    }).join('')+'</div>';
+    h+='<div class="hint" style="margin:0 14px 8px">Commission window: '+rg.label+'</div>';
     // Pending commission payout requests from the partner portal.
     var pendP=SRV_APAY.filter(function(p){ return p.status==='pending'; });
     if(pendP.length){

@@ -747,7 +747,14 @@ function startOTPTimer(){
     const m = Math.floor(sec/60), s = sec%60;
     const el = document.getElementById('otpTimer');
     if (el) el.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-    if (sec <= 0) clearInterval(otpTimerInt);
+    if (sec <= 0) {
+      clearInterval(otpTimerInt);
+      // Code expired → say so and let them resend immediately (don't leave a frozen 00:00).
+      if (el) { el.textContent = 'expired'; el.style.color = '#e53935'; }
+      const rb = document.getElementById('resendBtn');
+      if (rb) { rb.disabled = false; rb.textContent = 'Resend code'; }
+      if (resendTimer) { clearInterval(resendTimer); resendTimer = null; }
+    }
   }, 1000);
 }
 
