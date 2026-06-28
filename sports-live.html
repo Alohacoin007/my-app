@@ -1386,23 +1386,15 @@
     const active=settings.selfExcludeUntil&&settings.selfExcludeUntil>Date.now();
     if(active){
       const d=Math.ceil((settings.selfExcludeUntil-Date.now())/86400000);
-      return `<div class="s-note">You're currently self-excluded for ${d} more day${d===1?'':'s'}. The exclusion cannot be lifted early. (Demo: you can cancel for testing.)</div>
-        <button class="s-action-btn ghost" id="seCancel">Cancel (demo only)</button>`;
+      return `<div class="s-note">You're currently self-excluded for ${d} more day${d===1?'':'s'}. The exclusion <b>cannot be lifted early</b> — it ends automatically at maturity.</div>`;
     }
     return `<div class="s-note">Lock your account from placing bets and depositing for a chosen period. Once activated, the lock cannot be lifted early.</div>
       ${SE_OPTS.map(o=>`<button class="s-opt" data-set-se="${o.v}">
         <div class="s-opt-l">${o.lbl}</div><span class="s-opt-radio"></span></button>`).join('')}`;
   }
   function bindSESheet(){
-    const cancel=document.getElementById('seCancel');
-    if(cancel){
-      cancel.onclick=()=>{
-        settings.selfExcludeUntil=0;saveSettings();
-        const v=document.getElementById('vSE'); if(v){v.textContent='Not active';v.className='v';}
-        document.getElementById('seBlock').classList.remove('show');
-        closeSSheet();
-      };
-    }
+    // #B2: self-exclusion CANNOT be lifted early (responsible gaming) — no cancel control.
+    // It ends automatically at maturity; the server also enforces self_exclude_until.
     document.querySelectorAll('[data-set-se]').forEach(b=>b.onclick=()=>{
       const days=+b.dataset.setSe;
       if(!confirm(`Self-exclude for ${days} day${days===1?'':'s'}? This cannot be undone.`))return;
