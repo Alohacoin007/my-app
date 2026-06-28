@@ -4557,10 +4557,11 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
   const achValid  = achBank.trim().length >= 2 && achHolder.trim().length >= 2 && /^\d{9}$/.test(achRouting) && /^\d{4,17}$/.test(achAccount);
   const wireValid = wireBank.trim().length >= 2 && wireHolder.trim().length >= 2 && (wireSwift.trim().length >= 8 || /^\d{9}$/.test(wireSwift)) && wireAccount.trim().length >= 4;
 
-  const totalUsd = (serverBalances.crypto || 0) + effBal('fx', serverBalances.fx || 0) + (serverBalances.sports || 0);
+  const _xsb = Object.assign({}, serverBalances, (typeof window !== 'undefined' && window.__srvBal) || {});  // #20 single source (matches the server switcher)
+  const totalUsd = (_xsb.crypto || 0) + effBal('fx', _xsb.fx || 0) + (_xsb.sports || 0);
   const withdrawableTotal = withdrawableBy ? ((+withdrawableBy.sports||0) + (+withdrawableBy.fx||0) + (+withdrawableBy.crypto||0)) : null;
   const availUsd = (withdrawableBy != null) ? withdrawableTotal : totalUsd;   // total withdrawable (bonus/locked excluded)
-  const fullBal  = effBal(sourceId, serverBalances[sourceId] || 0);
+  const fullBal  = effBal(sourceId, _xsb[sourceId] || 0);
   // srcBal here = the WITHDRAWABLE for the selected source (falls back to full balance until loaded).
   const srcBal   = (withdrawableBy != null) ? (+withdrawableBy[sourceId] || 0) : fullBal;
 
@@ -10122,10 +10123,15 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
     }, 700);
     return () => clearInterval(iv);
   }, [_cryptoAnchor]);
+  // #20 SINGLE SOURCE: cross-app (FX / Sports) balances come from window.__srvBal — the SAME
+  // source the server switcher reads (~1561) — overlaid on the prop. Reading the bare
+  // serverBalances prop here let the breakdown/total drift from the switcher (Sport $0 vs
+  // $254). __srvBal wins; the prop is only a fallback before the first pull populates it.
+  const _xsb = Object.assign({}, serverBalances, (typeof window !== 'undefined' && window.__srvBal) || {});
   const effBalances = {
     crypto: (typeof window.__cryptoLiveUsd === 'number' && window.__cryptoLiveUsd > 0) ? window.__cryptoLiveUsd : _cryptoAnchor,
-    fx:     effBal('fx', serverBalances.fx || 0),
-    sports: serverBalances.sports || 0,
+    fx:     effBal('fx', _xsb.fx || 0),
+    sports: _xsb.sports || 0,
   };
   // Portfolio total — sums Crypto wallet (balances + staked) + non-crypto
   // server pools (FX + Sports). Shows the full multi-account picture.
@@ -10133,8 +10139,8 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
     let t = 0;
     Object.values(balances).forEach((v) => { t += (v || 0); });
     Object.values(staked).forEach((s) => { if (s && s.usd) t += s.usd; });
-    t += effBal('fx', serverBalances.fx || 0);
-    t += (serverBalances.sports || 0);
+    t += effBal('fx', _xsb.fx || 0);
+    t += (_xsb.sports || 0);
     return t;
   }, [balances, staked, serverBalances]);
   // Live total — moves gently with the market.

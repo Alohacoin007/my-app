@@ -36,6 +36,13 @@ const CHECKS = [
   { id: 'UI-replace-me', sev: 'REVIEW', files: DEPLOYED,
     reCI: /replace later|replace me\b|replace this|fill ?in later|update later|change later|sample [a-z]+ (coordinates|details|address|data|info)|hardcoded (sample|demo|placeholder|test)/i,
     why: 'A "replace later / sample / placeholder" marker on shipped data — confirm the value is REAL (fix the stale comment) or replace the placeholder before launch.' },
+  // #20 — DISPLAY DRIFT: a cross-app balance (sports/fx/crypto) read straight off the
+  // `serverBalances` prop can disagree with window.__srvBal (the source the server switcher
+  // reads). That's how the Account page showed Sport $0 while the switcher showed $254.
+  // The single source is window.__srvBal (overlay it on the prop). Each hit = unify or verify.
+  { id: 'UI-balance-dual-source', sev: 'REVIEW', files: DEPLOYED,
+    re: /serverBalances\.(sports|fx|crypto)\s*(\|\||!=)|serverBalances\[[a-zA-Z]+\]\s*\|\|/,
+    why: 'Cross-app balance read from the serverBalances prop — can DRIFT from the single source window.__srvBal that the server switcher uses (#20: Account showed Sport $0 vs switcher $254). Read from a window.__srvBal-merged source instead, or confirm this surface is safe.' },
 ];
 
 // Lines that are i18n translation tables or our own fix-describing comments → never findings.
