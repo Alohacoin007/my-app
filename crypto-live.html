@@ -297,20 +297,24 @@ function getDepositAddresses() {
 }
 
 // Portfolio snapshot — May 26, 2026 (lifted from canvas.png intact)
+// #5/A2: MONEY fields are seed-only and are overwritten by the real `balances`/server at
+// render time (liveAssets/liveSecurities read balances[sym], fallback 0 — never these).
+// Zeroed so a pre-load render can never flash a fake total/holding ($33k, $21,903 BTC…).
+// price/chg/seed stay — they're chart anchors the live feed overwrites in ~80ms.
 const PORTFOLIO = {
-  balance: 33472.99,
-  changeUsd: 638.57,
-  changePct: 1.95,
-  buyingPower: 894.41,  // USDT
+  balance: 0,
+  changeUsd: 0,
+  changePct: 0,
+  buyingPower: 0,  // USDT
   assets: [
-    { sym: 'BTC',  name: 'Bitcoin',   qty: 0.2845, price: 76988.90, chg:  2.48, mine: 21903.33, seed: 5421 },
-    { sym: 'ETH',  name: 'Ethereum',  qty: 1.082,  price:  2116.51, chg:  3.63, mine:  2290.07, seed: 1822 },
-    { sym: 'SOL',  name: 'Solana',    qty: 8.21,   price:    86.26, chg:  3.75, mine:   708.19, seed: 8311 },
-    { sym: 'USDT', name: 'Tether',    qty: 894.41, price:     1.00, chg:  0.00, mine:   894.41, seed:   12, stable: true },
-    { sym: 'LINK', name: 'Chainlink', qty: 7.50,   price:     9.60, chg:  4.68, mine:    72.00, seed: 7102 },
+    { sym: 'BTC',  name: 'Bitcoin',   qty: 0, price: 76988.90, chg:  2.48, mine: 0, seed: 5421 },
+    { sym: 'ETH',  name: 'Ethereum',  qty: 0, price:  2116.51, chg:  3.63, mine: 0, seed: 1822 },
+    { sym: 'SOL',  name: 'Solana',    qty: 0, price:    86.26, chg:  3.75, mine: 0, seed: 8311 },
+    { sym: 'USDT', name: 'Tether',    qty: 0, price:     1.00, chg:  0.00, mine: 0, seed:   12, stable: true },
+    { sym: 'LINK', name: 'Chainlink', qty: 0, price:     9.60, chg:  4.68, mine: 0, seed: 7102 },
   ],
   securities: [
-    { sym: 'ALPXS',    name: 'Alpexa Token',             qty: 100,  price:   1.50, mine:  150.00, apy: 18.0, seed: 8801, chg: 4.20, stakeable: true },
+    { sym: 'ALPXS',    name: 'Alpexa Token',             qty: 0,  price:   1.50, mine: 0, apy: 18.0, seed: 8801, chg: 4.20, stakeable: true },
   ],
 };
 
@@ -472,9 +476,11 @@ const SERVERS = {
 };
 
 // Stake — stakeable assets, base APYs, period-bonus structure
+// #5/A3: balance/balanceUsd are seed-only — the stake screen reads the REAL stakeable
+// amount from `balances[assetId]` (not these). Zeroed so no demo balance can show.
 const STAKE_ASSETS = {
-  ALPXS:{ name: 'Alpexa Token', symbol: 'A', color: '#1E40AF', balance: 100,    balanceUsd:  150.00, apy: 18.0 },
-  USDT: { name: 'Tether',       symbol: '₮', color: '#26A17B', balance: 894.41, balanceUsd:  894.41, apy:  9.8 },
+  ALPXS:{ name: 'Alpexa Token', symbol: 'A', color: '#1E40AF', balance: 0, balanceUsd: 0, apy: 18.0 },
+  USDT: { name: 'Tether',       symbol: '₮', color: '#26A17B', balance: 0, balanceUsd: 0, apy:  9.8 },
 };
 // Staking TERM sets the APY and a hard lock: Flexible = unstake anytime (7%);
 // 90 days (10%) and 1 year (18%) are LOCKED until maturity — no early exit.
@@ -1872,7 +1878,7 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
                 }}>Switch server</div>
 
                 {[
-                  { id: 'crypto', label: 'Alpexa Crypto', desc: 'Crypto · securities', balance: serverBalances.crypto != null ? serverBalances.crypto : PORTFOLIO.buyingPower, code: 'CR' },
+                  { id: 'crypto', label: 'Alpexa Crypto', desc: 'Crypto · securities', balance: serverBalances.crypto != null ? serverBalances.crypto : 0, code: 'CR' },
                   { id: 'fx',     label: 'Alpexa FX',   desc: 'FX · Stocks · Indices', balance: effBal('fx', serverBalances.fx != null ? serverBalances.fx : 12480.50), code: 'FX' },
                   { id: 'sports', label: 'Alpexa Sports', desc: 'Sports markets',      balance: serverBalances.sports != null ? serverBalances.sports :  2340.00,           code: 'SP' },
                 ].map((s) => {
@@ -3401,7 +3407,10 @@ function Receive({ onBack, balances = {}, onReceived }) {
 
   const asset = SEND_ASSETS[assetId];
   // Internal handle works for any asset; external addresses are per-chain.
-  const HANDLE = '@jordan';
+  // #5/A1: the internal-receive identifier is THIS user's real crypto account number
+  // (e.g. CR-123456), which detectRecipient() accepts for internal sends — never a demo
+  // '@jordan'. Falls back to email (also a valid recipient), else blank.
+  const HANDLE = (() => { try { const m = JSON.parse(localStorage.getItem('alpexa.me') || 'null'); return (m && m.accts && m.accts.crypto) || (m && m.email) || ''; } catch (_) { return ''; } })();
   const EXTERNAL = {
     USDT: { address: '0x6B1c8941698Affc56757eF9Be1723Ec43F720966', network: 'ERC-20 · Ethereum' },
     BTC:  { address: '3DHnJCHr5t4eWDJqc7iFJdTUW7NAESsgB9', network: 'Bitcoin Network' },
