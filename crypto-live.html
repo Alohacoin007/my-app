@@ -8309,6 +8309,7 @@ function RecurringPanel({ isBuy, linkedBanks = [], onSaved }) {
 function TransferHistoryPanel({ kind, transactions, setTransactions, flashAndClose }) {
   const alpexa = React.useContext(ModalContext);
   const [dateFilter, setDateFilter] = React.useState('all');
+  const [q, setQ] = React.useState('');   // #E3 free-text search (amount / recipient / memo / address)
   const DATE_RANGES = [
     { id: 'all', label: 'All' },
     { id: '24h', label: '24h' },
@@ -8328,7 +8329,10 @@ function TransferHistoryPanel({ kind, transactions, setTransactions, flashAndClo
   }, [dateFilter]);
 
   const allByKind = transactions.filter((t) => t.type === kind);
-  const items = allByKind.filter((t) => dateCutoff === 0 || t.ts >= dateCutoff);
+  const items = allByKind
+    .filter((t) => dateCutoff === 0 || t.ts >= dateCutoff)
+    .filter((t) => { if (!q.trim()) return true; const s = q.trim().toLowerCase();
+      return [t.amount, t.recipient, t.memo, t.address, t.note, t.to, t.from, t.handle].some((f) => String(f == null ? '' : f).toLowerCase().includes(s)); });
 
   const [dateMenuOpen, setDateMenuOpen] = React.useState(false);
   const dateLabelRaw = (DATE_RANGES.find((r) => r.id === dateFilter) || DATE_RANGES[0]).label;
@@ -8372,6 +8376,7 @@ function TransferHistoryPanel({ kind, transactions, setTransactions, flashAndClo
           </div>
         ) : null}
       </div>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" style={{ marginLeft: 'auto', flex: '0 1 130px', minWidth: 0, background: RH.surface, border: `1px solid ${RH.line}`, borderRadius: 999, padding: '5px 12px', fontSize: 12, color: RH.text, outline: 'none', fontFamily: 'Geist, Inter, system-ui' }}/>
     </div>
   );
 
