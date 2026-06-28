@@ -339,7 +339,7 @@
   .srvbal .nm .n2{font-size:11px;color:var(--dim);font-weight:600;margin-top:2px}
   .srvbal .v{font-size:16px;font-weight:700}
   .txn{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
-  .txn .ic{width:30px;height:38px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .txn .ic{width:30px;height:38px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;color:var(--text);opacity:.62}
   .txn .ic svg{width:24px;height:24px}
   /* transaction filters (minimal text + date pill) */
   .txn-filters{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px}
@@ -2525,18 +2525,26 @@
     });
   }
   // wabi-sabi style transaction icons (hand-drawn, ink stroke, weight 2.2)
-  function txIcon(ic){
+  function txIcon(t){
+    // Robinhood-style monoline set, distinct per type. Keyed off the (stable) row TITLE
+    // first — emoji fallback was lossy (pending/rejected ⏳⛔↩️ weren't mapped → wrong icon).
     const P={
-      bet:'<path d="M3.4 9.6c-.1-1 .6-1.7 1.6-1.7 5 .3 9.9.2 14.9 0 1 0 1.8.6 1.6 1.7-.2 1.1.4 1.9 1.3 2.1.1 0 .1.1.1.3 0 .9-.6 1.6-1.4 1.8-.9.2-1.4 1-1.2 2 .2 1-.5 1.7-1.5 1.6-4.9-.2-9.8-.2-14.7 0-1 .1-1.7-.6-1.6-1.6.2-1-.4-1.8-1.3-2-.1 0-.1-.1-.1-.3.1-.9.7-1.5 1.5-1.7.8-.2 1.4-1 1.3-2.1Z"/>',
-      cashout:'<path d="M12 4.2c4.3-.1 7.7 3.4 7.8 7.7.1 4.3-3.4 7.9-7.6 8C7.8 20 4.2 16.5 4.2 12.2 4.1 7.9 7.6 4.3 12 4.2Z"/><path d="M12 9.4c1.3-.1 2.5 1 2.6 2.4.1 1.4-1 2.6-2.4 2.7-1.4 0-2.6-1.1-2.6-2.5 0-1.4 1-2.5 2.4-2.6Z"/>',
-      credit:'<path d="M5 10.5c4.6-.3 9.3-.3 14 0 .6 0 1 .5 1 1.1-.1 2.4-.1 4.7 0 7.1 0 .6-.4 1.1-1 1.1-4.6.3-9.2.3-13.8 0-.7 0-1.1-.5-1.1-1.1.1-2.4.1-4.7 0-7.1 0-.6.3-1 .9-1.1Z"/><path d="M12 10.4c-1.4-.6-3.4-1.4-3.2-3.2.2-1.5 1.8-1.4 2.5-.6.6.8.8 2.3.7 3.8Zm0 0c1.4-.6 3.4-1.4 3.2-3.2-.2-1.5-1.8-1.4-2.5-.6-.6.8-.8 2.3-.7 3.8Zm0 0v10.3"/>',
-      deposit:'<path d="M12 3.4c.2 3.6.2 7.2 0 10.8m0 0c1-1.1 2.1-2.2 3.3-3.2M12 14.2c-1.1-1-2.2-2.1-3.3-3.1"/><path d="M4.8 16.4c-.1 1.4.3 3 1.8 3.6 1.8.6 8.9.6 10.7 0 1.5-.6 1.9-2.2 1.8-3.6"/>',
-      withdraw:'<path d="M12 20.6c.2-3.6.2-7.2 0-10.8m0 0c1 1.1 2.1 2.2 3.3 3.2M12 9.8c-1.1 1-2.2 2.1-3.3 3.1"/><path d="M4.8 7.6c-.1-1.4.3-3 1.8-3.6 1.8-.6 8.9-.6 10.7 0 1.5.6 1.9 2.2 1.8 3.6"/>',
-      transfer:'<path d="M4 8.8c4.4-.3 8.8-.3 13.2 0m0 0c-1.1-1-2.2-2-3.3-3.1M17.2 8.8c-1.1 1-2.2 2-3.3 3"/><path d="M20 15.4c-4.4.3-8.8.3-13.2 0m0 0c1.1 1 2.2 2 3.3 3.1M6.8 15.4c1.1-1 2.2-2 3.3-3"/>',
+      deposit:'<path d="M4 13v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/><path d="M12 3v10"/><path d="M8 9l4 4 4-4"/>',
+      withdraw:'<path d="M4 13v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/><path d="M12 13V3"/><path d="M8 7l4-4 4 4"/>',
+      transfer:'<path d="M4 9h12"/><path d="M13 6l3 3-3 3"/><path d="M20 15H8"/><path d="M11 12l-3 3 3 3"/>',
+      bet:'<path d="M4 7.5h16a1 1 0 0 1 1 1V11a1.6 1.6 0 0 0 0 3v2.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V14a1.6 1.6 0 0 0 0-3V8.5a1 1 0 0 1 1-1Z"/><path d="M14.5 8v8" stroke-dasharray="1.5 2.4"/>',
+      cashout:'<circle cx="12" cy="12" r="8.2"/><path d="M12 7.6v8.8"/><path d="M14.4 9.4c0-1-1.1-1.6-2.4-1.6s-2.4.6-2.4 1.6c0 1 .9 1.4 2.4 1.8s2.4.8 2.4 1.8-1.1 1.6-2.4 1.6-2.4-.6-2.4-1.6"/>',
+      reward:'<rect x="4" y="9.5" width="16" height="10.5" rx="1.2"/><path d="M4 13.5h16"/><path d="M12 9.5v10.5"/><path d="M12 9.5C10.8 6.7 7 7 7.5 9.2c.3 1.3 3 1.4 4.5.3Z"/><path d="M12 9.5C13.2 6.7 17 7 16.5 9.2c-.3 1.3-3 1.4-4.5.3Z"/>',
     };
-    const map={'🎫':'bet','💵':'cashout','💸':'withdraw','🎁':'credit','⬇️':'deposit','⬆️':'withdraw','🔄':'transfer','🎉':'credit'};
-    const key=map[ic]||'bet';
-    return `<svg viewBox="0 0 24 24" fill="none" stroke="#3a3531" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${P[key]}</svg>`;
+    const title=((t&&t.t1)||'').toLowerCase();
+    let key;
+    if(/bet/.test(title)) key='bet';
+    else if(/deposit/.test(title)) key='deposit';
+    else if(/withdraw/.test(title)) key='withdraw';
+    else if(/transfer/.test(title)) key='transfer';
+    else if(/cash ?out/.test(title)) key='cashout';
+    else { const m={'🎫':'bet','💵':'cashout','💸':'withdraw','🎁':'reward','⬇️':'deposit','⬆️':'withdraw','🔄':'transfer','🎉':'reward'}; key=m[(t&&t.ic)]||'reward'; }
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${P[key]}</svg>`;
   }
   function updateWallet(){
     syncSportsBal();
@@ -2591,7 +2599,7 @@
     if(!list.length){el.innerHTML='<div class="txn-empty">No transactions in this range</div>';return;}
     el.innerHTML=list.map(t=>{
       const t2=t.ts?(/Just now|ago/.test(t.t2)?t.t2.replace(/Just now/,ago(t.ts)):t.t2+' · '+ago(t.ts)):t.t2;
-      return `<div class="txn"><div class="ic">${txIcon(t.ic)}</div>
+      return `<div class="txn"><div class="ic">${txIcon(t)}</div>
       <div class="d"><div class="t1">${t.t1}</div><div class="t2">${t2}</div></div>
       <div class="amt ${t.transfer?'n':(t.amt>0?'p':'n')}">${t.transfer?'':(t.amt>0?'+':'-')}${usd(Math.abs(t.amt))}</div></div>`;}).join('');
   }
