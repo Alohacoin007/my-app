@@ -1153,18 +1153,16 @@ function AssetRow({ a, kind, liveValue, onTap }) {
       const q = (typeof a.qty === 'number' && isFinite(a.qty))
         ? a.qty.toLocaleString('en-US', { maximumFractionDigits: a.qty < 1 ? 4 : 2 })
         : null;
-      // Staked rows show the INTEREST EARNED so far here (the APY rate sits on the right).
-      // Plain holding rows of a stakeable token show nothing extra (APY applies only when
-      // staked); a non-stakeable asset with an apy keeps showing its rate.
-      let extraTxt = '';
+      // Staked rows: show interest EARNED on the LEFT. Drop the long token name so it fits
+      // the narrow phone subline (the APY rate sits on the right).
       if (a.isStakedRow) {
         const earned = +a.earnedUsd || 0;
-        extraTxt = ` · +$${earned.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} earned`;
-      } else {
-        const showApy = typeof a.apy === 'number' && !(a.stakeable && !a.isStakedRow);
-        if (showApy) extraTxt = ` · ${a.apy.toFixed(1)}% APY`;
+        const earnedTxt = `+$${earned.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} earned`;
+        return q != null ? `${q} held · ${earnedTxt}` : earnedTxt;
       }
-      return q != null ? `${fullName} · ${q} held${extraTxt}` : `${fullName}${extraTxt}`;
+      const showApy = typeof a.apy === 'number' && !(a.stakeable && !a.isStakedRow);
+      const apyTxt = showApy ? ` · ${a.apy.toFixed(1)}% APY` : '';
+      return q != null ? `${fullName} · ${q} held${apyTxt}` : `${fullName}${apyTxt}`;
     }
     return `${fullName} · ${a.qty.toLocaleString('en-US', { maximumFractionDigits: 4 })} held`;
   })();
@@ -2094,7 +2092,10 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
                           || { sym: asset, seed: 100, chg: 0 };
               const stakeMeta = (typeof STAKE_ASSETS !== 'undefined') ? STAKE_ASSETS[asset] : null;
               const apy = stakePeriodApy(asset, period);
-              const earnedUsd = stakeAccruedUsd(info, apy);   // interest earned so far ($)
+              // Interest earned so far = COMPOUNDED part (usd has grown above principal via
+              // the daily stake-accrue cron) + the PENDING sub-day accrual not yet credited.
+              const principalVal = (info.principal != null ? +info.principal : +info.usd) || 0;
+              const earnedUsd = Math.max(0, (+info.usd || 0) - principalVal) + stakeAccruedUsd(info, apy);
               const name = meta.name || (stakeMeta && stakeMeta.name) || asset;
               return (
                 <AssetRow
