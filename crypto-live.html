@@ -3417,8 +3417,13 @@ function Receive({ onBack, balances = {}, onReceived }) {
     ETH:  { address: '0x6B1c8941698Affc56757eF9Be1723Ec43F720966', network: 'Ethereum Network' },
   };
   const isInternal = mode === 'internal';
-  const address = isInternal ? HANDLE : EXTERNAL[assetId].address;
-  const network = isInternal ? 'Alpexa · Internal' : EXTERNAL[assetId].network;
+  // #C1: INTERNAL (@handle) receives ANY coin — server book transfer, no on-chain address.
+  // EXTERNAL on-chain is USDT-only for now: real PER-USER deposit addresses aren't built
+  // (the EXTERNAL table is a shared company address — C2/C3, 🚨). So we NEVER show a
+  // shared/placeholder address for other coins on-chain — internal is the safe path.
+  const extReady = isInternal || assetId === 'USDT';
+  const address = isInternal ? HANDLE : ((EXTERNAL[assetId] && EXTERNAL[assetId].address) || '');
+  const network = isInternal ? 'Alpexa · Internal' : ((EXTERNAL[assetId] && EXTERNAL[assetId].network) || '');
   const display = address;
 
   const onCopy = () => {
@@ -3532,9 +3537,9 @@ function Receive({ onBack, balances = {}, onReceived }) {
             background: RH.surface, border: `1px solid ${RH.line}`,
             borderRadius: 12, padding: 4,
           }}>
-            {/* USDT-only deposits: only USDT is receivable (BTC/ETH/SOL disabled —
-                re-enable by removing this .filter to restore the full list). */}
-            {Object.entries(SEND_ASSETS).filter(([id]) => id === 'USDT').map(([id, a]) => {
+            {/* #C1: list all coins — INTERNAL receives any of them; EXTERNAL gates to USDT
+                (others show "coming soon" instead of a shared/fake on-chain address). */}
+            {Object.entries(SEND_ASSETS).map(([id, a]) => {
               const active = id === assetId;
               return (
                 <button key={id} onClick={() => { setAssetId(id); setAssetOpen(false); }} style={{
@@ -3622,12 +3627,19 @@ function Receive({ onBack, balances = {}, onReceived }) {
               position: 'absolute', inset: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <div style={{
-                background: '#fff', padding: 12, borderRadius: 8,
-                boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
-              }}>
-                <QrPattern data={isInternal ? (requestAmount > 0 ? ('alpexa:' + encodeURIComponent(address) + '?amt=' + requestAmount + '&asset=' + assetId) : address) : address} size={150} dark="#000" light="#FFF"/>
-              </div>
+              {extReady ? (
+                <div style={{
+                  background: '#fff', padding: 12, borderRadius: 8,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+                }}>
+                  <QrPattern data={isInternal ? (requestAmount > 0 ? ('alpexa:' + encodeURIComponent(address) + '?amt=' + requestAmount + '&asset=' + assetId) : address) : address} size={150} dark="#000" light="#FFF"/>
+                </div>
+              ) : (
+                <div style={{ background: 'rgba(255,255,255,0.10)', padding: '30px 22px', borderRadius: 12, textAlign: 'center', maxWidth: 210 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: '#fff', marginBottom: 7 }}>On-chain {assetId} — coming soon</div>
+                  <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.78)', lineHeight: 1.45 }}>Receive {assetId} via the <b>Internal</b> tab (@handle) for now. External on-chain deposits are USDT-only.</div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -3636,7 +3648,7 @@ function Receive({ onBack, balances = {}, onReceived }) {
             Internal tab is just @handle on Alpexa's network, fully encoded in
             the QR above, so the rows would be redundant. */}
         <div style={{ margin: '0 22px' }}>
-          {!isInternal ? (
+          {!isInternal && extReady ? (
             <>
               <div style={{
                 padding: '12px 14px',
@@ -3702,7 +3714,7 @@ function Receive({ onBack, balances = {}, onReceived }) {
               </div>
             </>
           ) : null}
-          {!isInternal ? (
+          {!isInternal && extReady ? (
             <div style={{
               marginTop: 10, padding: '10px 14px',
               background: `${RH.accent}10`, border: `1px solid ${RH.accent}40`,
@@ -3718,7 +3730,7 @@ function Receive({ onBack, balances = {}, onReceived }) {
               </div>
             </div>
           ) : null}
-          {!isInternal ? (
+          {!isInternal && extReady ? (
             <div style={{
               marginTop: 10, padding: '12px 14px',
               background: RH.surface, border: `1px solid ${RH.line}`,
