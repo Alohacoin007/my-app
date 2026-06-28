@@ -158,7 +158,7 @@
     var sub = s==='fx' ? ((x.side||'')+' '+(x.size||0)+' @ '+_opTxt)
             : s==='sports' ? ('Stake '+usd(x.stake||0))
             : (x.kind==='stake'?'Staked':'Holding');
-    var esc=function(v){return String(v==null?'':v).replace(/"/g,'&quot;');};
+    var esc=function(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');};
     var label=s==='sports'?'Void':'Close';
     return '<div class="row"><span><b>'+(x.symbol||'')+'</b>'+
       '<div class="req-meta" style="margin:2px 0 0">👤 '+who+' · '+(x.acct_no||'')+'</div>'+
@@ -772,7 +772,7 @@
       var cid=p.cust_id;
       var open=(PLAYER_OPEN===cid);
       var editing=(open && PLAYER_EDIT===cid);
-      var esc=function(s){return String(s==null?'':s).replace(/"/g,'&quot;');};
+      var esc=function(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');};
       var bn=function(s){ return m[s]?(+m[s].balance||0):0; };
       var kyc=p.kyc||'pending', stt=p.status||'active';
       h+='<div class="card" style="padding:9px 12px">'+
@@ -995,7 +995,7 @@
   }
   function viewRisk(f){
     if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Risk</div><div class="card"><div class="empty">Not connected to server.</div></div>';
-    var esc=function(v){return String(v==null?'':v).replace(/"/g,'&quot;');};
+    var esc=function(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');};
     var pos=RISK_POS.slice();
     var singles=pos.filter(function(x){return (+x.size||1)<=1;});
     var parlays=pos.filter(function(x){return (+x.size||1)>1;});
@@ -1541,7 +1541,7 @@
       var code=a.code, open=(AGENT_OPEN===code);
       var links=SRV_ALINKS.filter(function(l){ return l.agent_code===code; });
       var c=agentCommission(code,rg.lo,rg.hi);
-      var esc=function(s){return String(s==null?'':s).replace(/"/g,'&quot;');};
+      var esc=function(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');};
       h+='<div class="card">'+
         '<div class="row" data-agopen="'+esc(code)+'" style="border:none;padding:0 0 6px;cursor:pointer"><b>'+(a.name||code)+' <span class="muted" style="font-weight:600;font-size:11px">'+(open?'▲':'▼')+'</span></b>'+
         '<b class="'+(c.total>=0?'pos':'neg')+'">'+(c.total<0?'-':'')+usd(Math.abs(c.total))+'</b></div>'+
