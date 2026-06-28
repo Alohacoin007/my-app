@@ -548,7 +548,7 @@ window.__cryptoLiveMap = window.__cryptoLiveMap || {};
     if(CHG[sym]!=null) rec.chg=CHG[sym]; rec.ts=now;
   }
   function setSrc(src,sym,p){ if(!(+p>0))return; var s=SRC[sym]||(SRC[sym]={}); s[src]={p:+p,ts:Date.now()}; aggregate(sym);
-    var now=Date.now(); if(now-lastApply>300){ lastApply=now; applyLive(); } }
+    var now=Date.now(); if(now-lastApply>80){ lastApply=now; applyLive(); } }  // 80ms ≈ 12 updates/s (snappy real-time; data itself is already ms-level)
   function applyLive(){
     for(var i=0;i<MARKET.length;i++){ var e=MARKET[i], d=map[e.sym]; if(d){ if(d.price>0)e.price=d.price; if(typeof d.chg==='number')e.chg=d.chg; } }
     for(var j=0;j<WATCHLIST.length;j++){ var w=WATCHLIST[j], d2=map[w.sym]; if(d2){ if(d2.price>0)w.price=d2.price; if(typeof d2.chg==='number')w.chg=d2.chg; } }
