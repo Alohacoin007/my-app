@@ -2807,6 +2807,18 @@ function Send({ onBack, balances = {}, onSent }) {
   const [introMode, setIntroMode] = React.useState('qr'); // qr | scan toggle
   const [recipient, setRecipient] = React.useState({ id: 'none', name: 'Enter recipient', handle: 'wallet address, @user, or email', initials: '+', color: '#9AA0AB', type: 'none' });
   const [recipientOpen, setRecipientOpen] = React.useState(true);  // open by default so the custom address input is visible
+  // #E1 Address book: "Recent" recipients you've actually sent to (per-device convenience,
+  // NOT money — local is fine per #5). Populated on a successful send, shown in the picker.
+  const [recents, setRecents] = React.useState(() => { try { return JSON.parse(localStorage.getItem('alpexa.recipients') || '[]') || []; } catch (e) { return []; } });
+  const rememberRecipient = (r) => {
+    if (!r || r.type === 'none' || !r.name || r.name === 'Enter recipient') return;
+    setRecents((prev) => {
+      const key = (x) => String((x && (x.account || x.handle || x.name)) || '').toLowerCase();
+      const next = [r, ...(prev || []).filter((x) => key(x) !== key(r))].slice(0, 8);
+      try { localStorage.setItem('alpexa.recipients', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+  };
   const [assetId, setAssetId] = React.useState('USDT');
   const [assetOpen, setAssetOpen] = React.useState(false);
   const [amountStr, setAmountStr] = React.useState('0');
@@ -3071,6 +3083,7 @@ function Send({ onBack, balances = {}, onSent }) {
             setTimeout(() => {
               setSendState('sent');
               if (typeof AudioFX !== 'undefined') AudioFX.success();
+              try { rememberRecipient(recipient); } catch (e) {}   // #E1: save to "Recent"
               if (onSent) onSent(assetId, amount, recipient);
             }, 900);
           }}
@@ -3199,7 +3212,7 @@ function Send({ onBack, balances = {}, onSent }) {
               </div>
             ) : null}
             {/* Section label */}
-            {RECENT_RECIPIENTS.length > 0 ? (<div style={{
+            {recents.length > 0 ? (<div style={{
               padding: '14px 22px 6px',
               fontFamily: 'Geist Mono, monospace',
               fontSize: 10.5, color: RH.textDim,
@@ -3209,7 +3222,7 @@ function Send({ onBack, balances = {}, onSent }) {
             overflowX: 'auto', paddingLeft: 22, paddingRight: 22,
           }}>
             <div style={{ display: 'flex', gap: 8, width: 'max-content' }}>
-              {RECENT_RECIPIENTS.map((r) => {
+              {recents.map((r) => {
                 const active = r.id === recipient.id;
                 const firstName = r.name.split(' ')[0];
                 return (
