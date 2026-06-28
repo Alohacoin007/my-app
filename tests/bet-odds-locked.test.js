@@ -18,6 +18,9 @@ if (/\bl\.am\s*=\s*cur\b/.test(src))
 // (b) the ticket leg-odds must render from the LOCKED am0.
 if (!/class="odd">\$\{fmtAm\(l\.am0/.test(src))
   fails.push("ticket leg odds not rendered from the locked am0 (shows live l.am)");
+// (c) the full cash-out settled record must carry the LOCKED odds, not bare live l.am.
+if (/result:'cashed'[\s\S]{0,220}am:l\.am\b/.test(src))
+  fails.push("full cash-out settled leg stores live l.am instead of the locked am0");
 
 if (fails.length) {
   console.error('🔴 FAIL: placed-bet odds can drift from the locked price:\n  - ' + fails.join('\n  - '));
