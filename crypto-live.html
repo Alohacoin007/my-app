@@ -1660,6 +1660,7 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
   const [scrubIdx, setScrubIdx] = React.useState(null);
   const [server, setServer]     = React.useState('crypto');     // 'crypto' | 'fx' | 'sports'
   const [serverMenuOpen, setServerMenuOpen] = React.useState(false);
+  const _xsb = Object.assign({}, serverBalances, (typeof window !== 'undefined' && window.__srvBal) || {});  // #20 single source (matches the server switcher)
   const serverMenuRef = React.useRef(null);
   React.useEffect(() => {
     if (!serverMenuOpen) return;
@@ -1878,9 +1879,9 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
                 }}>Switch server</div>
 
                 {[
-                  { id: 'crypto', label: 'Alpexa Crypto', desc: 'Crypto · securities', balance: serverBalances.crypto != null ? serverBalances.crypto : 0, code: 'CR' },
-                  { id: 'fx',     label: 'Alpexa FX',   desc: 'FX · Stocks · Indices', balance: effBal('fx', serverBalances.fx != null ? serverBalances.fx : 12480.50), code: 'FX' },
-                  { id: 'sports', label: 'Alpexa Sports', desc: 'Sports markets',      balance: serverBalances.sports != null ? serverBalances.sports :  2340.00,           code: 'SP' },
+                  { id: 'crypto', label: 'Alpexa Crypto', desc: 'Crypto · securities', balance: _xsb.crypto || 0, code: 'CR' },
+                  { id: 'fx',     label: 'Alpexa FX',   desc: 'FX · Stocks · Indices', balance: effBal('fx', _xsb.fx || 0), code: 'FX' },
+                  { id: 'sports', label: 'Alpexa Sports', desc: 'Sports markets',      balance: _xsb.sports || 0, code: 'SP' },
                 ].map((s) => {
                   const active = server === s.id;
                   return (
@@ -4727,7 +4728,7 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
           }}>
             {['crypto','fx','sports'].map((sid) => {
               const active = sourceId === sid;
-              const bal = (withdrawableBy != null) ? (+withdrawableBy[sid] || 0) : effBal(sid, serverBalances[sid] || 0);
+              const bal = (withdrawableBy != null) ? (+withdrawableBy[sid] || 0) : effBal(sid, _xsb[sid] || 0);
               return (
                 <button key={sid} onClick={() => setSourceId(sid)} style={{
                   background: active ? RH.surfaceUp : 'transparent', border: 'none',
@@ -5043,6 +5044,7 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
   const [bfHolder,  setBfHolder]  = React.useState('');
   const [step, setStep]           = React.useState('pick');     // pick | card | ach | wire
   const [destId, setDestId]       = React.useState('crypto');
+  const _xsb = Object.assign({}, serverBalances, (typeof window !== 'undefined' && window.__srvBal) || {});  // #20 single source (matches the server switcher)
   const [destOpen, setDestOpen]   = React.useState(false);
   const [amountStr, setAmountStr] = React.useState('0');
   const [confirmed, setConfirmed] = React.useState(false);
@@ -5332,7 +5334,7 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
             <div style={{
               fontSize: 11, color: RH.textDim, marginTop: 1,
               fontVariantNumeric: 'tabular-nums',
-            }}>${(serverBalances[destId] || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            }}>${(_xsb[destId] || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </div>
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={RH.textDim} strokeWidth="2.4">
             <path d="M6 9l6 6 6-6"/>
@@ -5700,7 +5702,7 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
                 <div style={{ width: 24, height: 24, borderRadius: 12, background: RH.surfaceUp, border: '1px solid ' + RH.line, color: RH.text, fontWeight: 700, fontSize: 9, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{SERVERS[destId].code}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: RH.text }}>{SERVERS[destId].label}</div>
-                  <div style={{ fontSize: 11, color: RH.textDim, marginTop: 1, fontVariantNumeric: 'tabular-nums' }}>${(serverBalances[destId] || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                  <div style={{ fontSize: 11, color: RH.textDim, marginTop: 1, fontVariantNumeric: 'tabular-nums' }}>${(_xsb[destId] || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 </div>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={RH.textDim} strokeWidth="2.4"><path d="M6 9l6 6 6-6"/></svg>
               </div>
