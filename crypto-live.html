@@ -1153,11 +1153,18 @@ function AssetRow({ a, kind, liveValue, onTap }) {
       const q = (typeof a.qty === 'number' && isFinite(a.qty))
         ? a.qty.toLocaleString('en-US', { maximumFractionDigits: a.qty < 1 ? 4 : 2 })
         : null;
-      // Stakeable tokens (e.g. ALPXS) earn APY ONLY when staked — hide it on the
-      // plain holding row, show it on the Staked section row.
-      const showApy = typeof a.apy === 'number' && !(a.stakeable && !a.isStakedRow);
-      const apyTxt = showApy ? ` · ${a.apy.toFixed(1)}% APY` : '';
-      return q != null ? `${fullName} · ${q} held${apyTxt}` : `${fullName}${apyTxt}`;
+      // Staked rows show the INTEREST EARNED so far here (the APY rate sits on the right).
+      // Plain holding rows of a stakeable token show nothing extra (APY applies only when
+      // staked); a non-stakeable asset with an apy keeps showing its rate.
+      let extraTxt = '';
+      if (a.isStakedRow) {
+        const earned = +a.earnedUsd || 0;
+        extraTxt = ` · +$${earned.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} earned`;
+      } else {
+        const showApy = typeof a.apy === 'number' && !(a.stakeable && !a.isStakedRow);
+        if (showApy) extraTxt = ` · ${a.apy.toFixed(1)}% APY`;
+      }
+      return q != null ? `${fullName} · ${q} held${extraTxt}` : `${fullName}${extraTxt}`;
     }
     return `${fullName} · ${a.qty.toLocaleString('en-US', { maximumFractionDigits: 4 })} held`;
   })();
@@ -2087,11 +2094,12 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
                           || { sym: asset, seed: 100, chg: 0 };
               const stakeMeta = (typeof STAKE_ASSETS !== 'undefined') ? STAKE_ASSETS[asset] : null;
               const apy = stakePeriodApy(asset, period);
+              const earnedUsd = stakeAccruedUsd(info, apy);   // interest earned so far ($)
               const name = meta.name || (stakeMeta && stakeMeta.name) || asset;
               return (
                 <AssetRow
                   key={'staked-' + key}
-                  a={{ ...meta, sym: asset, name, mine: usd, qty: usd / (meta.price || 1), apy, isStakedRow: true, lockPeriod: period }}
+                  a={{ ...meta, sym: asset, name, mine: usd, qty: usd / (meta.price || 1), apy, earnedUsd, isStakedRow: true, lockPeriod: period }}
                   kind="security"
                   liveValue={usd}
                   pulse={pulseAsset === asset}
