@@ -33,7 +33,7 @@
   /* Balance areas use the blue accent in light mode; in dark, swap to an
      elegant dark card so they blend with the dark UI (white text stays). */
   body.dark .header{background:var(--surface);box-shadow:0 8px 24px rgba(0,0,0,.28)}
-  body.dark .bal-card{background:linear-gradient(135deg,#1d2740,#141a28);border:1px solid rgba(79,110,247,.32);box-shadow:0 10px 26px -14px rgba(0,0,0,.6)}
+  body.dark .bal-card{box-shadow:0 10px 26px -10px rgba(0,0,0,.5)}
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   /* slim, app-like scrollbars */
   *{scrollbar-width:thin;scrollbar-color:rgba(95,99,104,.35) transparent}
@@ -305,11 +305,14 @@
 
   /* wallet */
   .wallet{padding:0 16px 150px;overflow-y:auto}
-  .bal-card{background:var(--accent);border:1px solid var(--line);border-radius:6px;padding:20px;margin-bottom:16px}
-  .bal-card .lbl{font-size:12px;color:rgba(255,255,255,.8);font-weight:700}
-  .bal-card .big{font-size:34px;font-weight:700;letter-spacing:-1px;margin:6px 0 4px;color:#fff}
+  .bal-card{background:linear-gradient(140deg,#3B5BDB 0%,#2742C9 100%);border:none;border-radius:16px;padding:20px 20px 16px;margin-bottom:12px;box-shadow:0 10px 26px -10px rgba(39,66,201,.5)}
+  .bal-card .lbl{font-size:10px;color:rgba(255,255,255,.72);font-weight:700;letter-spacing:1px;text-transform:uppercase}
+  .bal-card .big{font-size:36px;font-weight:800;letter-spacing:-1.4px;margin:7px 0 0;color:#fff;line-height:1;font-variant-numeric:tabular-nums}
   .bal-card .sub{font-size:12px;color:rgba(255,255,255,.8);font-weight:600}
   .bal-card .sub b{color:#fff}
+  .bal-split{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:18px;padding-top:14px;border-top:1px solid rgba(255,255,255,.16)}
+  .bsp-k{font-size:10.5px;color:rgba(255,255,255,.7);font-weight:600}
+  .bsp-v{font-size:14px;color:#fff;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums}
   /* cashback card */
   .cashback-card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:16px;box-shadow:0 1px 2px rgba(60,64,67,.08)}
   .cb-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
@@ -324,9 +327,15 @@
   .cb-row b.pos{color:var(--pos)}
   .cb-row b.accent{color:var(--accent)}
   .cb-note{font-size:11px;line-height:1.5;color:var(--dim);font-weight:500;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
-  .wbtns{display:flex;gap:8px;margin-bottom:20px}
-  .wbtn{flex:1;padding:11px 8px;border-radius:6px;font-size:13px;font-weight:500;letter-spacing:.2px;font-family:inherit;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--accent);transition:.15s}
-  .wbtn.active{background:var(--accent);color:#fff;border-color:transparent;box-shadow:0 1px 2px rgba(60,64,67,.3),0 1px 3px 1px rgba(60,64,67,.15)}
+  .wbtns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px}
+  .wbtn{display:flex;align-items:center;justify-content:center;gap:7px;padding:13px 6px;border-radius:12px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--accent);transition:.15s;box-shadow:0 1px 2px rgba(60,64,67,.05)}
+  .wbtn .wb-ic{width:20px;height:20px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .wbtn .wb-ic svg{width:20px;height:20px}
+  .wbtn:active{transform:scale(.97)}
+  .wbtn.active{background:rgba(47,107,246,.10);border-color:rgba(47,107,246,.30)}
+  .ra-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 2px rgba(60,64,67,.05);padding:4px 16px 8px;margin-bottom:8px}
+  .ra-head{padding:14px 0 10px}
+  .ra-card .wsec{font-size:15px;color:var(--text);font-weight:800}
   .wsec{font-size:13px;font-weight:700;color:var(--dim);margin-bottom:10px}
   /* server balance rows */
   .srvbal{display:flex;align-items:center;gap:12px;padding:13px 14px;background:var(--surface);border:1px solid var(--line);border-radius:6px;margin-bottom:8px}
@@ -778,11 +787,16 @@
         <div class="bal-card">
           <div class="lbl" data-i18n="total_assets">Total Assets (all servers)</div>
           <div class="big" id="walletBal">$500.00</div>
+          <div class="bal-split">
+            <div class="bsp"><div class="bsp-k">Sports</div><div class="bsp-v" id="balSports">···</div></div>
+            <div class="bsp"><div class="bsp-k">Crypto</div><div class="bsp-v" id="balCrypto">···</div></div>
+            <div class="bsp"><div class="bsp-k">FX</div><div class="bsp-v" id="balFx">···</div></div>
+          </div>
         </div>
         <div class="wbtns">
-          <button class="wbtn dep" id="depBtn" data-i18n="btn_deposit">Deposit</button>
-          <button class="wbtn wd" id="wdBtn" data-i18n="btn_withdraw">Withdraw</button>
-          <button class="wbtn tf" id="tfBtn" data-i18n="btn_transfer">Transfer</button>
+          <button class="wbtn dep" id="depBtn"><span class="wb-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/><path d="M12 3v10"/><path d="M8 9l4 4 4-4"/></svg></span><span data-i18n="btn_deposit">Deposit</span></button>
+          <button class="wbtn wd" id="wdBtn"><span class="wb-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/><path d="M12 13V3"/><path d="M8 7l4-4 4 4"/></svg></span><span data-i18n="btn_withdraw">Withdraw</span></button>
+          <button class="wbtn tf" id="tfBtn"><span class="wb-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h12"/><path d="M13 6l3 3-3 3"/><path d="M20 15H8"/><path d="M11 12l-3 3 3 3"/></svg></span><span data-i18n="btn_transfer">Transfer</span></button>
         </div>
         <div class="cashback-card" style="display:none"><!-- CASHBACK DISABLED (security): hidden until rebuilt server-side -->
           <div class="cb-head"><span class="cb-title"><span class="cb-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#80cbc4" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 10.5c4.6-.3 9.3-.3 14 0 .6 0 1 .5 1 1.1-.1 2.4-.1 4.7 0 7.1 0 .6-.4 1.1-1 1.1-4.6.3-9.2.3-13.8 0-.7 0-1.1-.5-1.1-1.1.1-2.4.1-4.7 0-7.1 0-.6.3-1 .9-1.1Z"/><path d="M12 10.4c-1.4-.6-3.4-1.4-3.2-3.2.2-1.5 1.8-1.4 2.5-.6.6.8.8 2.3.7 3.8Zm0 0c1.4-.6 3.4-1.4 3.2-3.2-.2-1.5-1.8-1.4-2.5-.6-.6.8-.8 2.3-.7 3.8Zm0 0v10.3"/></svg></span><span data-i18n="loss_cashback">Loss Cashback</span></span><span class="cb-rate">5%</span></div>
@@ -793,7 +807,8 @@
           </div>
           <div class="cb-note" data-i18n="cb_note">You earn 5% of your net losses back as withdrawable credit.</div>
         </div>
-        <div class="wsec" data-i18n="recent_activity">Recent Activity</div>
+        <div class="ra-card">
+        <div class="ra-head"><span class="wsec" data-i18n="recent_activity">Recent Activity</span></div>
         <div class="txn-filters">
           <div class="tf-type" id="txnType">
             <button class="tft active" data-type="all" data-i18n="f_all">All</button>
@@ -810,6 +825,7 @@
           <button class="tfp" data-days="0" data-lbl="All time">All time</button>
         </div>
         <div id="txns"></div>
+        </div>
       </div>
     </div>
 
@@ -2553,6 +2569,10 @@
     var _loaded=!!window.__sbLoaded;
     document.getElementById('walletBal').textContent=_loaded?usd(totalAssets()):'···';
     document.getElementById('balbarVal').textContent=_loaded?usd(balance):'···';
+    // Per-server breakdown in the hero card (display only — same source as totalAssets).
+    (function(){ var sbV=function(k){ var s=SERVERS.find(x=>x.key===k); return (s&&!s.locked)?(+s.bal||0):0; };
+      var put=function(id,k){ var el=document.getElementById(id); if(el) el.textContent=_loaded?usd(sbV(k)):'···'; };
+      put('balSports','sports'); put('balCrypto','crypto'); put('balFx','live'); })();
     const pend=pendingTotal();
     // header micro-stats
     const bp=document.getElementById('balPending'); if(bp)bp.textContent=usd(pend);
