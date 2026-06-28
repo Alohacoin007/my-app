@@ -12604,7 +12604,7 @@ const BackInterceptorContext = React.createContext({ register: () => () => {} })
 
 // Globally-accessible identity holder so any child can read the current name/email.
 const IdentityContext = React.createContext({
-  name: 'Jordan Reyes', email: 'admin@alpexa-suisse.com',
+  name: '', email: '',   // #N3: no demo identity default — the Provider supplies the real one
   setName: () => {}, setEmail: () => {},
 });
 
@@ -13051,8 +13051,11 @@ function AlpexaModal({ item, onClose }) {
 // AppRoot — owns identity + modal state, wraps everything in providers so any
 // descendant (App and below) can read identity or fire alpexa.alert/confirm.
 function AppRoot() {
-  const [userName,  setUserName]  = usePersistedState('alpexa.userName',  'Jordan Reyes');
-  const [userEmail, setUserEmail] = usePersistedState('alpexa.userEmail', 'admin@alpexa-suisse.com');
+  // #N3: default the name/email from the REAL account (alpexa.me), blank if not loaded yet —
+  // never a demo 'Jordan Reyes' / admin email that could flash or stick for a real user.
+  const _meId = (() => { try { return JSON.parse(localStorage.getItem('alpexa.me') || 'null') || {}; } catch (e) { return {}; } })();
+  const [userName,  setUserName]  = usePersistedState('alpexa.userName',  _meId.name  || '');
+  const [userEmail, setUserEmail] = usePersistedState('alpexa.userEmail', _meId.email || '');
   // One-time migration of the old demo email so anyone with a stale value sees the new default.
   React.useEffect(() => {
     if (userEmail === 'demo@alpexa.app') setUserEmail('admin@alpexa-suisse.com');
