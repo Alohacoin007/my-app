@@ -81,6 +81,17 @@ console.log('\n── DIAGNOSE: defect-class scan ──────────
   }
 }
 
+// ---- (4) UI / feature-completeness scan (REVIEW only — does NOT fail the gate) ----
+// Surfaces "looks active but isn't" candidates: demo/seed balances shown as real, stub
+// markers. These are triage prompts (fix or ACCEPT), not hard errors — so they inform but
+// never block. Run `node tests/diagnose-ui.js` for the full list.
+console.log('\n── UI SCAN: feature-completeness (review, non-blocking) ──');
+{
+  const u = cp.spawnSync(process.execPath, [path.join(testDir, 'diagnose-ui.js')], { encoding: 'utf8' });
+  const line = ((u.stdout || '') + (u.stderr || '')).split('\n').find(l => /review findings|UI scan clean/.test(l));
+  console.log('  ' + (line ? line.trim() : 'ui scan ran') + '   (details: node tests/diagnose-ui.js)');
+}
+
 console.log('\n' + (fail === 0
   ? '🟢 VERIFY PASSED — safe to say done'
   : `🔴 VERIFY FAILED — ${fail} problem(s). DO NOT claim done.`) + '\n');
