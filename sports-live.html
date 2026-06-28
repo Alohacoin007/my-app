@@ -2057,7 +2057,7 @@
                  : '';
       return `<div class="tleg ${l.st}"><div class="left"><span class="dot"></span>
       <div class="info"><div class="pk">${l.pk||l.sel||b.type||'Selection'}</div>${gmLine}</div></div>
-      <div style="text-align:right;white-space:nowrap"><span class="odd">${fmtAm(l.am)}</span>${resTag}</div></div>`;
+      <div style="text-align:right;white-space:nowrap"><span class="odd">${fmtAm(l.am0!=null?l.am0:l.am)}</span>${resTag}</div></div>`;
     }).join('');
     const isSingle=(b.legs&&b.legs.length===1);
     // A bet graded "won" by the server but whose payout ≤ stake made NO profit — it is a
@@ -3101,8 +3101,10 @@
         let cur=null;
         GAMES.forEach(g=>{[...g.core.spread,...g.core.total,...g.core.ml].forEach(o=>{if(o.sel===l.pk)cur=o.am;});
           g.props.forEach(p=>p.o.forEach(o=>{if(o.sel===l.pk)cur=o.am;}));});
-        if(cur!==null){l.am=cur;found=true;}
-        dNow*=dec(l.am);
+        // #21 cash-out math uses LIVE odds via a local var only — must NOT overwrite l.am,
+        // or the ticket shows wobbling live odds instead of the LOCKED placement price.
+        if(cur!==null)found=true;
+        dNow*=dec(cur!==null?cur:l.am);
       });
       if(found&&b.d0){
         // odds shorten (more likely) -> dNow<d0 -> cashout up; lengthen -> down
