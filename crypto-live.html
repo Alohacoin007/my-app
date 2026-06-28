@@ -602,10 +602,13 @@ function alpexaFetchChart(sym, range){
 
 // Send screen — recent recipients + asset balances used in the Send flow
 const RECENT_RECIPIENTS = [];  // no fake sample recipients (real send-history could populate this later)
+// #5: metadata only (name/color/symbol). Amounts ALWAYS come from the real `balances`
+// (crypto_holdings) at render time — no hardcoded demo balances (those showed a fake
+// $21,903 BTC / $2,290 ETH in the Send list for accounts that held neither).
 const SEND_ASSETS = {
-  USDT: { name: 'US Dollar (USDT)', balance: 894.41,  color: '#26A17B', symbol: '₮' },
-  BTC:  { name: 'Bitcoin',          balance: 0.2845,  balanceUsd: 21903.33, color: '#F7931A', symbol: '₿' },
-  ETH:  { name: 'Ethereum',         balance: 1.082,   balanceUsd:  2290.07, color: '#627EEA', symbol: 'Ξ' },
+  USDT: { name: 'US Dollar (USDT)', balance: 0, color: '#26A17B', symbol: '₮' },
+  BTC:  { name: 'Bitcoin',          balance: 0, balanceUsd: 0, color: '#F7931A', symbol: '₿' },
+  ETH:  { name: 'Ethereum',         balance: 0, balanceUsd: 0, color: '#627EEA', symbol: 'Ξ' },
 };
 
 // Seeded RNG so the same range always produces the same chart
@@ -2880,9 +2883,9 @@ function Send({ onBack, balances = {}, onSent }) {
 
   const asset = SEND_ASSETS[assetId];
   const amount = parseFloat(amountStr) || 0;
-  // Real spendable balance (cryptoHoldings), not the hardcoded demo value.
-  const availableUsd = (balances && balances[assetId] != null) ? balances[assetId]
-    : (assetId === 'USDT' ? asset.balance : asset.balanceUsd);
+  // #5: real spendable balance from crypto_holdings (balances). NEVER fall back to the
+  // hardcoded demo value — if holdings haven't loaded yet show 0, not a fake amount.
+  const availableUsd = (balances && balances[assetId] != null) ? balances[assetId] : 0;
   const insufficient = amount > availableUsd;
   const valid = amount > 0 && !insufficient && recipient && recipient.type !== 'none';
 
@@ -3275,9 +3278,10 @@ function Send({ onBack, balances = {}, onSent }) {
             background: RH.surface, border: `1px solid ${RH.line}`,
             borderRadius: 12, padding: 4,
           }}>
-            {Object.entries(SEND_ASSETS).map(([id, a]) => {
+            {Object.entries(SEND_ASSETS).filter(([id]) => ((balances && balances[id]) || 0) > 0.005).map(([id, a]) => {
               const active = id === assetId;
-              const avail = id === 'USDT' ? a.balance : a.balanceUsd;
+              // #5: show the REAL holding (balances ← crypto_holdings), never the demo seed.
+              const avail = (balances && balances[id] != null) ? balances[id] : 0;
               return (
                 <button key={id} onClick={() => { setAssetId(id); setAssetOpen(false); }} style={{
                   width: '100%', textAlign: 'left',
