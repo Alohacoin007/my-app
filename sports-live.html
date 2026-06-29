@@ -774,6 +774,7 @@
       </div>
       <div class="sports">
         <div class="sport active" data-sport="NBA">🏀 NBA</div>
+        <div class="sport" data-sport="NCAAB">🎓 NCAAB</div>
         <div class="sport" data-sport="NFL">🏈 NFL</div>
         <div class="sport" data-sport="MLB">⚾ MLB</div>
         <div class="sport" data-sport="NHL">🏒 NHL</div>
@@ -1739,7 +1740,7 @@
       }
       const isPinned=pinnedGames.has(g.id);
       const pinBtn=`<button class="pin-btn${isPinned?' pinned':''}" data-pin="${g.id}" title="${isPinned?'Unpin':'Pin to top'}">★</button>`;
-      return `<div class="card${isPinned?' pinned':''}"><div class="ch"><span class="lg">${({NBA:'🏀',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽',UFC:'🥊'})[g.lg]||'🏈'} ${g.lg==='SOC'?'Soccer':g.lg}</span>
+      return `<div class="card${isPinned?' pinned':''}"><div class="ch"><span class="lg">${({NBA:'🏀',NCAAB:'🎓',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽',UFC:'🥊'})[g.lg]||'🏈'} ${g.lg==='SOC'?'Soccer':g.lg}</span>
         <div class="ch-r"><span class="st${g.live?' live':''}">${g.live?'LIVE '+g.time:gameTimeLabel(g)}</span>${pinBtn}</div></div>
         <div class="matrix">${row(g.away,1)}${row(g.home,0)}</div>
         ${playHTML}
@@ -1863,7 +1864,7 @@
       document.body.appendChild(el);
       el.querySelector('#lcovBack').onclick=closeCoverage;
     }
-    const lgIcon=({NBA:'🏀',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽',UFC:'🥊'})[g.lg]||'🏈';
+    const lgIcon=({NBA:'🏀',NCAAB:'🎓',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽',UFC:'🥊'})[g.lg]||'🏈';
     el.querySelector('.lcov-hd-lg').textContent=lgIcon+' '+(g.lg==='SOC'?'Soccer':g.lg);
     el.classList.add('open');
     renderCoverage();
@@ -2082,7 +2083,7 @@
       const liveSc=(g&&g.live&&g.home&&g.away);
       // league source: live game → stored on leg → gid prefix (real gids are "<LG>_<espnId>").
       // The gid fallback only counts if it's a known league, so demo gids ("KC_BUF") give no false icon.
-      var ICONS={NBA:'🏀',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽',UFC:'🥊'};
+      var ICONS={NBA:'🏀',NCAAB:'🎓',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽',UFC:'🥊'};
       var gidLg=String(l.gid||'').split('_')[0];
       const lgKey=(g&&g.lg)||l.lg||(ICONS[gidLg]?gidLg:'');
       const lgIcon=lgKey?(ICONS[lgKey]||'🏈'):'';
@@ -3049,6 +3050,7 @@
     const L={
       MLB:[`${nm} base hit`,'Strikeout swinging','Full count',`${nm} walks`,'Fly out to center','Ground out 6-3',`${nm} doubles to the gap`,'Pitching change',`${nm} steals second`,'Foul ball'],
       NBA:[`${nm} bucket`,`${nm} misses the three`,'Turnover',`${nm} grabs the rebound`,'Trip to the line',`Timeout · ${nm}`,`Fast break · ${nm}`,'Shot clock violation',`${nm} and-one!`],
+      NCAAB:[`${nm} bucket`,`${nm} misses the three`,'Turnover',`${nm} grabs the rebound`,'Trip to the line',`Timeout · ${nm}`,`Fast break · ${nm}`,'Shot clock violation',`${nm} and-one!`],
       NFL:[`${nm} 1st down`,'Incomplete pass',`${nm} run up the middle`,'Punt','Sack!','Field goal is good',`${nm} 3rd & long`,'Flag on the play',`${nm} deep shot`,'Two-minute warning'],
       NHL:[`${nm} shot on goal`,'Big save!',`Faceoff won by ${nm}`,`${nm} on the power play`,'Icing',`${nm} hit along the boards`,'Puck behind the net',`${nm} breakaway!`]
     };
@@ -3338,6 +3340,11 @@
     const LEAGUES = [
       { lg:'NFL', path:'football/nfl' },
       { lg:'NBA', path:'basketball/nba' },
+      // 🎓 NCAAB — same team/score/clock shape as NBA (mapEvent handles it as-is).
+      // ESPN reports halves ("2nd 8:42" / "Halftime") in status.shortDetail, so the
+      // clock label renders correctly without special-casing. In season Nov–Apr;
+      // off-season the tab is honestly empty ("No upcoming games").
+      { lg:'NCAAB', path:'basketball/mens-college-basketball' },
       { lg:'MLB', path:'baseball/mlb' },
       { lg:'NHL', path:'hockey/nhl' },
       // ⚽ Soccer — one "Soccer" tab aggregates several competitions so there are
@@ -3460,7 +3467,7 @@
       throw (lastE || new Error('failed'));
     }
     // ---- Real bookmaker odds (The Odds API) -------------------------------
-    const ODDS_SPORT = { NFL:'americanfootball_nfl', NBA:'basketball_nba', MLB:'baseball_mlb', NHL:'icehockey_nhl' };
+    const ODDS_SPORT = { NFL:'americanfootball_nfl', NBA:'basketball_nba', NCAAB:'basketball_ncaab', MLB:'baseball_mlb', NHL:'icehockey_nhl' };
     function nick(name){ return String(name||'').trim().toLowerCase().split(/\s+/).pop(); }
     // Odds come from OUR server now: the sports-odds Edge Function polls The Odds
     // API (key kept server-side) and stores the raw odds in the sports_odds table.
