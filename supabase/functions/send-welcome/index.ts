@@ -5,15 +5,17 @@
 // from Alpexa Sports <info@alpexa-sports.com>.
 //
 // Secrets (Supabase → Edge Functions → Secrets):
-//   RESEND_API_KEY   — your Resend API key (same account already used for auth email).
-//   WELCOME_SECRET   — a random token; the trigger must pass ?token=<this>. Fail-closed if unset.
+//   RESEND_API_KEY   — your Resend API key (same Resend account used for auth email).
+//   gate token       — reuses your existing CRON_SECRET (already set for the cron functions);
+//                      the trigger passes ?token=<CRON_SECRET>. WELCOME_SECRET also accepted as
+//                      an override if you'd rather use a dedicated one. Fail-closed if neither set.
 //
 // Deploy: supabase functions deploy send-welcome   (USER runs this).
 // NOTE: sending from info@alpexa-sports.com only works once alpexa-sports.com is VERIFIED in
-//       Resend (add the domain there, then add the DKIM/SPF records it shows to Cloudflare DNS).
+//       Resend (already done — domain shows Verified).
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
-const WELCOME_SECRET = Deno.env.get("WELCOME_SECRET") || "";
+const GATE_SECRET = Deno.env.get("CRON_SECRET") || Deno.env.get("WELCOME_SECRET") || "";
 const FROM = "Alpexa Sports <info@alpexa-sports.com>";
 const SUBJECT = "Welcome to Alpexa — your account is ready";
 
@@ -48,12 +50,12 @@ function welcomeHtml(name: string): string {
 
 Deno.serve(async (req: Request): Promise<Response> => {
   // Fail-closed: no secret configured → refuse (never world-callable to send mail).
-  if (!WELCOME_SECRET) return new Response("welcome secret not configured", { status: 503 });
+  if (!GATE_SECRET) return new Response("gate secret not configured", { status: 503 });
   if (!RESEND_API_KEY) return new Response("resend key not configured", { status: 503 });
 
   const url = new URL(req.url);
   const token = url.searchParams.get("token") || req.headers.get("x-welcome-token") || "";
-  if (token !== WELCOME_SECRET) return new Response("forbidden", { status: 403 });
+  if (token !== GATE_SECRET) return new Response("forbidden", { status: 403 });
 
   let body: { email?: string; name?: string } = {};
   try { body = await req.json(); } catch (_) { /* ignore */ }

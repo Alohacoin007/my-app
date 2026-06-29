@@ -6,10 +6,9 @@
 --
 -- Before running:
 --   1) Deploy the function:  supabase functions deploy send-welcome
---   2) Set secrets:  RESEND_API_KEY  +  WELCOME_SECRET (a random token)
---   3) Replace <WELCOME_SECRET> below with the SAME token (same convention as <CRON_SECRET>).
---   4) Verify alpexa-sports.com in Resend (add its DKIM/SPF records to Cloudflare) or the
---      send will be rejected by Resend.
+--   2) Secrets: RESEND_API_KEY is set; the gate reuses your existing CRON_SECRET (already set).
+--   3) Replace <CRON_SECRET> below with your CRON_SECRET value (same one used in cron_secure.sql).
+--   4) alpexa-sports.com is verified in Resend (done) so info@ can send.
 -- Then run this whole file in the Supabase SQL editor (idempotent).
 
 create or replace function public.notify_welcome_email()
@@ -20,7 +19,7 @@ begin
     return NEW;
   end if;
   perform net.http_post(
-    url:='https://grxnbgtfnaayeluenvqh.supabase.co/functions/v1/send-welcome?token=<WELCOME_SECRET>',
+    url:='https://grxnbgtfnaayeluenvqh.supabase.co/functions/v1/send-welcome?token=<CRON_SECRET>',
     headers:='{"Content-Type":"application/json","Authorization":"Bearer sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu"}'::jsonb,
     body:=jsonb_build_object('email', NEW.email, 'name', coalesce(NEW.name, ''))
   );
