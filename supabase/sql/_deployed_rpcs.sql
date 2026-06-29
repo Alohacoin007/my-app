@@ -68,6 +68,17 @@ begin
     select coalesce((select qty from crypto_holdings where acct_no=p_from and asset='USDT'),0) into v_bal;
   else v_bal := coalesce(v_from.balance,0); end if;
   if v_bal < p_amount then return json_build_object('ok',false,'error','insufficient balance','balance',v_bal); end if;
+  -- Bonus is NON-TRANSFERABLE (#24): the non-withdrawable welcome bonus must stay on its
+  -- originating sports/fx account. Without this a user could move it to crypto (which has no
+  -- bonus lock) and withdraw it — bypassing guard_withdraw_request. Cap the outbound amount at
+  -- the withdrawable = max(0, balance − bonus), so only real money (deposits + winnings) leaves.
+  if v_from.server in ('sports','fx')
+     and p_amount > greatest(0, round((coalesce(v_from.balance,0) - coalesce(v_from.bonus,0))::numeric, 2)) then
+    return json_build_object('ok',false,
+      'error','Amount exceeds transferable balance — the welcome bonus is non-transferable',
+      'transferable',greatest(0, round((coalesce(v_from.balance,0) - coalesce(v_from.bonus,0))::numeric, 2)),
+      'bonus',coalesce(v_from.bonus,0));
+  end if;
   insert into requests(local_id,cust_id,name,acct_no,server,type,amount,net,from_label,to_label,status,decided_at)
     values (p_ref, v_cust, v_name, p_from, v_from.server, 'transfer', p_amount, p_amount, initcap(v_from.server), initcap(v_to.server), 'approved', now());
   if v_from.server = 'crypto' then

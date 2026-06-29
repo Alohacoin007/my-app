@@ -2738,6 +2738,13 @@
   function srvByKey(k){return SERVERS.find(s=>s.key===k);}
   // Live source balance: Sports uses the running `balance`, others use their server pool.
   function balOf(k){return k==='sports'?balance:(srvByKey(k)?srvByKey(k).bal:0);}
+  // Transferable OUT of a server (#24): the non-withdrawable welcome bonus must stay on its
+  // sports/fx account, so it's the withdrawable (balance − bonus); crypto has no bonus → full.
+  // This mirrors the server app_transfer cap (UX only — the server is the real gate).
+  function transferableOf(k){
+    if(k==='sports'){ var w=window.__sportsWithdrawable; return (typeof w==='number')?w:balance; }
+    return balOf(k);
+  }
   function renderTfSelectors(){
     const tfServers=TF_KEYS.map(k=>SERVERS.find(s=>s.key===k)).filter(Boolean);
     const build=(elId,selKey,otherKey,isFrom)=>{
@@ -2755,10 +2762,11 @@
     build('tfTo',tfTo,tfFrom,false);
   }
   function updateTfAvail(){
-    document.getElementById('tfAvail').textContent='Available '+usd(balOf(tfFrom));
+    document.getElementById('tfAvail').textContent='Available '+usd(transferableOf(tfFrom));
   }
   function openTransfer(){
     syncSportsBal();
+    try{ refreshWithdrawable(); }catch(e){}   // freshen __sportsWithdrawable so the bonus is excluded
     // Refresh the Crypto/Live source balances from the latest values written by
     // those apps, so the transfer screen never shows a stale amount.
     try{var sb=window.__srvBal||{};
@@ -2777,14 +2785,19 @@
   tfOverlay.onclick=closeTransfer;
   document.getElementById('tfSwap').onclick=()=>{[tfFrom,tfTo]=[tfTo,tfFrom];renderTfSelectors();updateTfAvail();};
   document.getElementById('tfChips').onclick=e=>{const c=e.target.closest('.chip');if(!c)return;
-    tfAmt.value=Math.floor(balOf(tfFrom)*(+c.dataset.pct)/100);};
+    tfAmt.value=Math.floor(transferableOf(tfFrom)*(+c.dataset.pct)/100);};
   function tfAcct(k){ try{ var a=(JSON.parse(localStorage.getItem('alpexa.me')||'{}').accts)||{}; if(k==='sports')return a.sports; if(k==='crypto')return a.crypto; return a.fx; }catch(e){ return ''; } }
   document.getElementById('tfConfirm').onclick=()=>{
     const v=parseFloat(tfAmt.value)||0,from=srvByKey(tfFrom),to=srvByKey(tfTo);
     if(from.locked||to.locked){showToast('🔒','Locked server','Cannot be used for transfers');return;}
     if(tfFrom===tfTo){showToast('⚠️','Select different servers');return;}
     if(v<=0){showToast('⚠️','Enter an amount');return;}
-    if(v>balOf(tfFrom)){showToast('⚠️','Insufficient balance',`${from.short.replace('Alpexa ','')} is too low`);return;}
+    var _tf=transferableOf(tfFrom);
+    if(v>_tf+1e-9){
+      if(tfFrom==='sports'&&v<=balOf(tfFrom)+1e-9) showToast('🔒','Bonus is non-transferable',`Transferable: ${usd(_tf)}`);
+      else showToast('⚠️','Insufficient balance',`${from.short.replace('Alpexa ','')} is too low`);
+      return;
+    }
     if(!(window.AlpexaSync&&AlpexaSync.db)){showToast('⚠️','No server connection');return;}
     const fromAcct=tfAcct(tfFrom), toAcct=tfAcct(tfTo);
     if(!fromAcct||!toAcct){showToast('⚠️','Account not found','Re-login and try again');return;}

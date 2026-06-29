@@ -4240,6 +4240,24 @@ function Transfer({ onBack, serverBalances = {}, onTransferred }) {
   const [confirmed, setConfirmed] = React.useState(false);
   const [transferQuick, setTransferQuick] = React.useState(null);
 
+  // Transferable per account (#24): the non-withdrawable welcome bonus must stay on its
+  // sports/fx account, so what can leave = withdrawable (balance − bonus). Crypto has no bonus.
+  // Mirrors the server app_transfer cap (UX only — the RPC is the real gate).
+  const [withdrawableBy, setWithdrawableBy] = React.useState(null); // {sports, fx, crypto}
+  React.useEffect(() => {
+    try {
+      const me = JSON.parse(localStorage.getItem('alpexa.me') || 'null');
+      const accts = me && me.accts;
+      if (!(window.AlpexaSync && AlpexaSync.db && accts)) return;
+      const map = { sports: 0, fx: 0, crypto: 0 };
+      Promise.all(['sports', 'fx', 'crypto'].map((srv) => {
+        const a = accts[srv]; if (!a) return Promise.resolve();
+        return AlpexaSync.db.rpc('withdrawable_for', { p_acct: a })
+          .then((r) => { map[srv] = (r && !r.error && r.data != null) ? +r.data : 0; }, () => {});
+      })).then(() => setWithdrawableBy(Object.assign({}, map)));
+    } catch (e) {}
+  }, []);
+
   // Note: confirmation handled via HeroConfirm below, no auto-timeout.
 
   // Swap from/to if user picks same on both
@@ -4253,10 +4271,14 @@ function Transfer({ onBack, serverBalances = {}, onTransferred }) {
   } }, [toId]);
 
   const fromBal = effBal(fromId, serverBalances[fromId] != null ? serverBalances[fromId] : 0);
+  // What can actually leave fromId: sports/fx exclude the welcome bonus (#24); crypto = full.
+  const transferable = (fromId === 'crypto')
+    ? fromBal
+    : (withdrawableBy ? (+withdrawableBy[fromId] || 0) : fromBal);
   const amount  = parseFloat(amountStr) || 0;
-  const insufficient = amount > fromBal;
+  const insufficient = amount > transferable + 1e-9;
   // Don't let a stale/zero cached balance disable the button — the app_transfer RPC
-  // is the real guard (checks live USDT cash server-side) and reports the reason.
+  // is the real guard (checks live cash + bonus server-side) and reports the reason.
   const valid = amount > 0 && fromId !== toId;
 
   const onKey = (k) => {
@@ -4269,7 +4291,7 @@ function Transfer({ onBack, serverBalances = {}, onTransferred }) {
       return s + k;
     });
   };
-  const setQuick = (frac) => { setAmountStr(Math.round(fromBal * frac * 100) / 100 + ''); };
+  const setQuick = (frac) => { setAmountStr(Math.round(transferable * frac * 100) / 100 + ''); };
   const swapServers = () => { const a = fromId; setFromId(toId); setToId(a); };
 
   const [intPart, fracPart] = amountStr.includes('.') ? amountStr.split('.') : [amountStr, null];
@@ -4445,8 +4467,8 @@ function Transfer({ onBack, serverBalances = {}, onTransferred }) {
             fontVariantNumeric: 'tabular-nums', letterSpacing: 0.6,
           }}>
             {insufficient
-              ? `Insufficient — only $${fromBal.toFixed(2)} available`
-              : `Available · $${fromBal.toFixed(2)} in ${SERVERS[fromId].label}`}
+              ? `Insufficient — only $${transferable.toFixed(2)} transferable`
+              : `Available · $${transferable.toFixed(2)} in ${SERVERS[fromId].label}`}
           </div>
         </div>
 
