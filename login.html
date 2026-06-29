@@ -77,21 +77,15 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>try{var _ss=null;try{if(window.sessionStorage){window.sessionStorage.getItem('__probe');_ss=window.sessionStorage;}}catch(e){}window._db=window.supabase.createClient('https://grxnbgtfnaayeluenvqh.supabase.co','sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu',_ss?{auth:{storage:_ss,persistSession:true,autoRefreshToken:true}}:undefined);}catch(e){console.error('supabase init',e);}</script><!-- session in sessionStorage (per-tab) — MUST match alpexa-sync.js so login carries to the app -->
 <script>
-/* Stay-signed-in: if this device is already logged in, skip the login form and
-   go straight to the app the user last used. Add ?switch=1 to force the form
-   (used by "다른 계정으로 로그인"). */
-(function(){try{
-  if(/[?&]switch=1/.test(location.search)) return;
-  // Skip auto-pass when arriving from a password-reset email (recovery link) so
-  // the user can set a new password instead of being bounced into the app.
-  if(/(type=recovery|access_token|error_description)/.test(location.hash)) return;
-  var m=JSON.parse(localStorage.getItem('alpexa.me')||'null');
-  if(m&&m.accts&&(m.email||m.authId)){
-    var ls=(localStorage.getItem('alpexa.lastServer')||'').toLowerCase();
-    var dest= ls==='sports'?'sports-live.html': ls==='fx'||ls==='live'?'trading.html':'crypto-live.html';
-    location.replace(dest);
-  }
-}catch(e){}})();
+/* NO auto-login. The login page is ALWAYS the login form — never bounce straight
+   into the app off a stored name tag. (#30) Why: `alpexa.me` is a PERSISTENT
+   localStorage tag (survives tab/browser close), but the real auth SESSION lives
+   in sessionStorage (per-tab, cleared when the browser closes). The old
+   "stay-signed-in" jump trusted the tag, so a closed-then-reopened browser (no
+   session) auto-forwarded into the app → phantom logged-out state (■■■ balance,
+   "No upcoming games") and, via the expired-redirect loop, got stuck there.
+   A returning user simply logs in again — that's the banking-app contract the
+   15-min idle auto-logout assumes. Do NOT re-add an auto-forward here. */
 </script>
 <script>
 /* Login always renders in the light (white) theme. */

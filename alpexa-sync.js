@@ -328,6 +328,11 @@ window.AlpexaSync = (function () {
         hideWarning();
         if (timer) { clearInterval(timer); timer = null; }
         try { if (db && db.auth) db.auth.signOut(); } catch (e) {}
+        // Clear the local identity tag too (same keys as the manual Sign out). The
+        // auth SESSION is in sessionStorage; alpexa.me is a PERSISTENT localStorage
+        // tag — if we leave it, the app's load gate still thinks "logged in" and
+        // shows a phantom session with no data. Idle logout must fully sign out. (#30)
+        try { ['alpexa.me', 'alpexa.userName', 'alpexa.userEmail'].forEach(function (k) { localStorage.removeItem(k); }); } catch (e) {}
         try { location.replace('login.html?switch=1&idle=1'); } catch (e) { try { location.href = 'login.html?switch=1&idle=1'; } catch (_) {} }
       }
       function showWarning() {
