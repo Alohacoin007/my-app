@@ -32,7 +32,12 @@ window.AlpexaSync = (function () {
 
   function rnd(p) { return p + '-' + Math.floor(100000 + Math.random() * 900000); }
 
-  // Who is using this device. Set at signup; falls back to a demo guest.
+  // Who is using this device. Set at signup / login (writes alpexa.me). If it's missing
+  // we return a throwaway in-memory placeholder so callers don't crash — but we NEVER
+  // persist it. Persisting a fake "Guest" with random SP-/CR-/FX- numbers used to seed
+  // demo accounts into localStorage that then lingered and leaked (CLAUDE.md #5). The
+  // app's load guard redirects to login.html whenever a real alpexa.me is absent, so a
+  // logged-in app always reads the real one here; this placeholder is just a safety net.
   function me() {
     var m = null;
     try { m = JSON.parse(localStorage.getItem('alpexa.me') || 'null'); } catch (e) {}
@@ -40,7 +45,7 @@ window.AlpexaSync = (function () {
       var n = Math.floor(1000 + Math.random() * 9000);
       m = { custId: 'P-' + n, name: 'Guest ' + n, email: '',
             accts: { sports: rnd('SP'), crypto: rnd('CR'), fx: rnd('FX') } };
-      try { localStorage.setItem('alpexa.me', JSON.stringify(m)); } catch (e) {}
+      // intentionally NOT persisted — no fake account is ever written to localStorage.
     }
     return m;
   }

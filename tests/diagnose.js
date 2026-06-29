@@ -56,6 +56,9 @@ const CHECKS = [
   { id: 'D5-store-password', sev: 'HIGH', files: ['login.html'],
     re: /alpexa\.cred[^\n]*\bpw\b/,
     why: 'Storing the password in localStorage (alpexa.cred) — base64 is plaintext-grade. Persist the Supabase session instead.' },
+  { id: 'DEMO-login-creds', sev: 'HIGH', files: ['login.html', 'signup.html'],
+    re: /getElementById\(\s*['"]pwInput['"]\s*\)\.value\s*=\s*['"][^'"]|Demo account credentials/,
+    why: 'A demo account is hardcoded into the login form (e.g. fillDemo: pwInput.value=\'1234\'). Real users saw another (demo) account / local data on the login page. No fake credentials in shipped login — the field stays empty.' },
 ];
 
 // ── Reviewed-OK exceptions (Six-Sigma control plan). Suppressed but always printed. ──

@@ -260,7 +260,6 @@ async function doLogin(){
     setTimeout(()=>{window.location.href=dest;},1200);
   }catch(err){ fail((err&&err.message)||'Login failed. Please try again.'); }
 }
-function fillDemo(){document.getElementById('loginInput').value='44219982330';document.getElementById('pwInput').value='1234';selServer=2;const sv=document.getElementById('serverVal');sv.textContent=SERVERS[2].name;sv.style.color='#212121';syncSrvUI();clearErr();showToast('Demo account credentials filled in');}
 function switchTab(t){document.getElementById('tab-login').className='tab-btn'+(t==='login'?' active':'');document.getElementById('tab-qr').className='tab-btn'+(t==='qr'?' active':'');document.getElementById('loginForm').style.display=t==='login'?'block':'none';document.getElementById('qrForm').style.display=t==='qr'?'block':'none';if(t==='qr')startQR();else stopQR();}
 function buildQR(){const p=[1,1,1,1,1,1,1,0,1,0,0,0,0,0,1,0,1,0,1,1,1,0,1,1,1,0,1,0,1,0,1,0,1,0,1,1,1,0,1,1,1,0,0,0,0,0,1,0,1,1,1,1,1,1,1,0,0,1,0,1,0,0,0,1];const box=document.getElementById('qrBox');if(box)box.innerHTML=p.map(c=>`<div class="qr-cell" style="background:${c?'#212121':'transparent'}"></div>`).join('');}
 function startQR(){buildQR();qrSec=60;document.getElementById('qrTimer').textContent=qrSec;qrInterval=setInterval(()=>{qrSec--;const el=document.getElementById('qrTimer');if(el)el.textContent=qrSec;if(qrSec<=0){buildQR();qrSec=60;}},1000);}
@@ -387,8 +386,16 @@ async function quickLogin(){
 (async function(){
   try{
     var cred=getSavedCred();
+    // One-time cleanup: purge the legacy hardcoded demo account if it was ever saved on
+    // this device (it used to leak into the login field). Real accounts are untouched.
+    if(cred && cred.login==='44219982330'){
+      try{ localStorage.removeItem('alpexa.cred'); localStorage.removeItem('alpexa.bio'); localStorage.removeItem('alpexa.me'); }catch(e){}
+      cred=null;
+    }
     if(cred){
-      if(cred.login) document.getElementById('loginInput').value=cred.login;
+      // Do NOT pre-fill the account number — keep the login field empty (banking-app
+      // style) so a previous/other account never shows. Face ID still uses the saved
+      // cred internally; the number is only filled AFTER a successful Face ID auth.
       if(cred.server!=null) selectServer(cred.server);   // (D5) no password prefill — not stored
       // Show Face ID button only if the platform supports a built-in authenticator.
       var ok=false;
