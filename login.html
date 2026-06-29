@@ -317,6 +317,8 @@ buildQR();
 // Default the server to the one chosen at signup (so login lands on the same app).
 try{ var _ls=localStorage.getItem('alpexa.lastServer'); var _idx={fx:0,live:0,crypto:1,sports:2}[_ls]; if(_idx!=null) selectServer(_idx); }catch(e){}
 syncSrvUI();
+// Came here via idle auto-logout (alpexa-sync startIdleLogout) — tell the user why.
+try{ if(/[?&]idle=1/.test(location.search)){ setTimeout(function(){ showToast('보안을 위해 자동 로그아웃되었습니다. 다시 로그인해 주세요.'); }, 350); } }catch(e){}
 
 /* ── Saved login + Face ID / fingerprint quick login ──────────────────────── */
 function getSavedCred(){ try{ var s=localStorage.getItem('alpexa.cred'); if(!s) return null; return JSON.parse(decodeURIComponent(escape(atob(s)))); }catch(e){ return null; } }

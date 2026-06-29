@@ -283,6 +283,67 @@ window.AlpexaSync = (function () {
     } catch (e) {}
   }
 
+  // IDLE AUTO-LOGOUT — like banking apps. After a window of NO interaction the customer
+  // session is signed out and the app returns to the login form (same flow as the manual
+  // "Sign out": auth.signOut() → login.html?switch=1, so it never auto-bounces back in).
+  // Per-tab (session lives in sessionStorage), so only the inactive tab is affected. The
+  // back office (admin sets ALPEXA_ADMIN_SESSION) is skipped — it has its own login surface.
+  // Default 15 min idle + 30 s warning; back office can tune via window.__alpexaCtrl.idleMin.
+  // This touches the auth SESSION only — no money/balance logic — and money stays server-only.
+  function startIdleLogout() {
+    try {
+      if (window.ALPEXA_ADMIN_SESSION) return;        // admin handled separately
+      if (window.__alpexaIdleStarted) return;         // once per page
+      window.__alpexaIdleStarted = true;
+      var IDLE_MIN = 15, WARN_SEC = 30;
+      try { var c = window.__alpexaCtrl && window.__alpexaCtrl.idleMin; if (c != null && +c > 0) IDLE_MIN = +c; } catch (e) {}
+      var IDLE_MS = IDLE_MIN * 60000, WARN_MS = WARN_SEC * 1000;
+      var last = Date.now(), overlay = null, secEl = null, timer = null;
+
+      function onActivity() { last = Date.now(); if (overlay) hideWarning(); }
+      function hideWarning() { if (overlay) { try { overlay.remove(); } catch (e) {} } overlay = null; secEl = null; }
+      function logout() {
+        hideWarning();
+        if (timer) { clearInterval(timer); timer = null; }
+        try { if (db && db.auth) db.auth.signOut(); } catch (e) {}
+        try { location.replace('login.html?switch=1&idle=1'); } catch (e) { try { location.href = 'login.html?switch=1&idle=1'; } catch (_) {} }
+      }
+      function showWarning() {
+        if (overlay || !document.body) return;
+        overlay = document.createElement('div');
+        overlay.setAttribute('role', 'alertdialog');
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(8,12,20,.55);display:flex;align-items:center;justify-content:center;padding:24px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;';
+        overlay.innerHTML = '<div style="max-width:340px;width:100%;background:#fff;border-radius:18px;padding:24px 22px;box-shadow:0 20px 60px rgba(0,0,0,.35);text-align:center;">' +
+          '<div style="width:48px;height:48px;border-radius:50%;background:#eef1fe;color:#2742C9;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">' +
+            '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>' +
+          '<div style="font-size:17px;font-weight:800;color:#0b0d12;letter-spacing:-.2px;">Still there?</div>' +
+          '<div style="font-size:13.5px;color:#6b7686;margin-top:8px;line-height:1.5;">For your security you\'ll be signed out in <b id="alpexaIdleSec" style="color:#2742C9;">' + Math.ceil(WARN_MS / 1000) + '</b>s.</div>' +
+          '<button id="alpexaIdleStay" style="margin-top:18px;width:100%;background:#2742C9;color:#fff;border:none;border-radius:12px;padding:14px 0;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;">Stay logged in</button>' +
+          '<button id="alpexaIdleOut" style="margin-top:8px;width:100%;background:transparent;color:#8a94a6;border:none;border-radius:12px;padding:10px 0;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">Sign out now</button>' +
+        '</div>';
+        document.body.appendChild(overlay);
+        secEl = document.getElementById('alpexaIdleSec');
+        // Stay must beat the activity-cancel race: stopPropagation so the click doesn't also count as generic activity timing
+        document.getElementById('alpexaIdleStay').addEventListener('click', function (e) { e.stopPropagation(); onActivity(); });
+        document.getElementById('alpexaIdleOut').addEventListener('click', function (e) { e.stopPropagation(); logout(); });
+      }
+
+      timer = setInterval(function () {
+        var idle = Date.now() - last;
+        if (idle >= IDLE_MS) { logout(); return; }
+        if (idle >= IDLE_MS - WARN_MS) {
+          if (!overlay) showWarning();
+          if (secEl) secEl.textContent = Math.max(0, Math.ceil((IDLE_MS - idle) / 1000));
+        }
+      }, 1000);
+
+      ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'touchmove', 'click', 'wheel']
+        .forEach(function (ev) { window.addEventListener(ev, onActivity, { passive: true, capture: true }); });
+      document.addEventListener('visibilitychange', function () { if (!document.hidden) onActivity(); });
+    } catch (e) {}
+  }
+  try { startIdleLogout(); } catch (e) {}
+
   return { db: db, me: me, acctFor: acctFor, pushRequest: pushRequest,
            pullAll: pullAll, pullMine: pullMine, setStatus: setStatus,
            updateRequest: updateRequest, deleteRequest: deleteRequest,
@@ -290,5 +351,5 @@ window.AlpexaSync = (function () {
            pullIncomingTransfers: pullIncomingTransfers, normSrv: normSrv,
            logActivity: logActivity, pullBalances: pullBalances,
            loadUserData: loadUserData, saveUserData: saveUserData,
-           assertIdentity: assertIdentity };
+           assertIdentity: assertIdentity, startIdleLogout: startIdleLogout };
 })();
