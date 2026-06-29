@@ -2819,7 +2819,10 @@
   wdOverlay.onclick=closeWithdraw;
   wdAmt.oninput=updateWdSummary;
   document.getElementById('wdChips').onclick=e=>{const c=e.target.closest('.chip');if(!c)return;
-    wdAmt.value=Math.floor(sportsSrv().bal*(+c.dataset.pct)/100);updateWdSummary();};
+    // % of the WITHDRAWABLE (balance − bonus − locked), not the full balance — so Max never
+    // exceeds what can actually be withdrawn. Matches wAvail in updateWdSummary.
+    var _wa=(typeof window.__sportsWithdrawable==='number')?window.__sportsWithdrawable:sportsSrv().bal;
+    wdAmt.value=Math.floor(_wa*(+c.dataset.pct)/100);updateWdSummary();};
   let wdNet='ERC-20';
   document.getElementById('wdNet').onclick=e=>{const p=e.target.closest('.wd-net-pill');if(!p)return;
     document.querySelector('.wd-net-pill.on').classList.remove('on');p.classList.add('on');wdNet=p.dataset.net;};
