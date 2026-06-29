@@ -2645,19 +2645,19 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
                   <SheetLabel>Your Bank Details</SheetLabel>
                   <div style={{background:'var(--bg)',borderRadius:9,padding:'12px',marginBottom:14}}>
                     <div style={{fontSize:10,fontWeight:700,color:'var(--text-3)',letterSpacing:0.5,textTransform:'uppercase',marginBottom:5}}>Account Holder</div>
-                    <input placeholder="Full legal name" defaultValue="Christian Kang" style={{width:'100%',padding:'10px 12px',border:'1px solid var(--line-2)',borderRadius:6,background:'#fff',fontSize:13,outline:'none',marginBottom:10}}/>
+                    <input placeholder="Full legal name" style={{width:'100%',padding:'10px 12px',border:'1px solid var(--line-2)',borderRadius:6,background:'#fff',fontSize:13,outline:'none',marginBottom:10}}/>
                     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
                       <div>
                         <div style={{fontSize:10,fontWeight:700,color:'var(--text-3)',letterSpacing:0.5,textTransform:'uppercase',marginBottom:5}}>Bank Name</div>
-                        <input placeholder="e.g. KEB Hana" defaultValue="KEB Hana Bank" style={{width:'100%',padding:'8px 10px',border:'1px solid var(--line-2)',borderRadius:6,background:'#fff',fontSize:12,outline:'none'}}/>
+                        <input placeholder="e.g. KEB Hana" style={{width:'100%',padding:'8px 10px',border:'1px solid var(--line-2)',borderRadius:6,background:'#fff',fontSize:12,outline:'none'}}/>
                       </div>
                       <div>
                         <div style={{fontSize:10,fontWeight:700,color:'var(--text-3)',letterSpacing:0.5,textTransform:'uppercase',marginBottom:5}}>SWIFT/BIC</div>
-                        <input placeholder="ABCDKRSE" defaultValue="HNBNKRSE" style={{width:'100%',padding:'8px 10px',border:'1px solid var(--line-2)',borderRadius:6,background:'#fff',fontFamily:'JetBrains Mono, monospace',fontSize:11,outline:'none',textTransform:'uppercase'}}/>
+                        <input placeholder="ABCDKRSE" style={{width:'100%',padding:'8px 10px',border:'1px solid var(--line-2)',borderRadius:6,background:'#fff',fontFamily:'JetBrains Mono, monospace',fontSize:11,outline:'none',textTransform:'uppercase'}}/>
                       </div>
                     </div>
                     <div style={{fontSize:10,fontWeight:700,color:'var(--text-3)',letterSpacing:0.5,textTransform:'uppercase',marginBottom:5}}>Account Number / IBAN</div>
-                    <input placeholder="0000-000-000000" defaultValue="•••• •••• 4982" style={{width:'100%',padding:'10px 12px',border:'1px solid var(--line-2)',borderRadius:6,background:'#fff',fontFamily:'JetBrains Mono, monospace',fontSize:12,outline:'none'}}/>
+                    <input placeholder="0000-000-000000" style={{width:'100%',padding:'10px 12px',border:'1px solid var(--line-2)',borderRadius:6,background:'#fff',fontFamily:'JetBrains Mono, monospace',fontSize:12,outline:'none'}}/>
                   </div>
                 </>)}
 
@@ -2682,9 +2682,9 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
                   </div>
                 </>)}
 
-                <AmountField amount={amount} setAmount={setAmount} quick={[100,500,1000,'MAX']} currency="USD" max={11248}/>
+                <AmountField amount={amount} setAmount={setAmount} quick={[100,500,1000,'MAX']} currency="USD" max={Math.max(0,Math.floor(getBalances().live||0))}/>
                 <div style={{background:'var(--bg)',borderRadius:9,padding:'10px 12px',fontSize:11.5,color:'var(--text-2)'}}>
-                  <Row2 l="Available" v="$11,248.10"/><Row2 l="Amount" v={amount?'$'+amount:'—'}/><Row2 l="Fee" v="$0.00"/><Row2 l="You'll receive" v={amount?'$'+parseFloat(amount).toFixed(2):'—'} bold/>
+                  <Row2 l="Available" v={'$'+(getBalances().live||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}/><Row2 l="Amount" v={amount?'$'+amount:'—'}/><Row2 l="Fee" v="$0.00"/><Row2 l="You'll receive" v={amount?'$'+parseFloat(amount).toFixed(2):'—'} bold/>
                 </div></>
               )}
               {kind==='transfer'&&(()=>{
@@ -2852,9 +2852,9 @@ function LotsPopover({lots,setLots,cls='FX',onClose}){
 
 // ── Account switcher (3 servers) ──
 const ACCOUNTS=[
-  {id:'live',   name:'Alpexa FX',   url:'fx.alpexa.com:443',     tag:'FX Stock', tags:[{t:'FX',c:'#15A36C'},{t:'Stock',c:'#2D6CDF'}], acct:'FX-50112847',  type:'Standard',   balance:'€25,000.00',color:'#15A36C'},
-  {id:'crypto', name:'Alpexa Crypto', url:'crypto.alpexa.com:443', tag:'CRYPTO', acct:'BNX-2841759',  type:'Crypto', balance:'$5,000.00',color:'#F59E0B'},
-  {id:'sports', name:'Alpexa Sports', url:'sports.alpexa.com:443', tag:'SPORTS', acct:'SP-194820',    type:'Sports',     balance:'$500.00',color:'#7C3AED'},
+  {id:'live',   name:'Alpexa FX',   url:'fx.alpexa.com:443',     tag:'FX Stock', tags:[{t:'FX',c:'#15A36C'},{t:'Stock',c:'#2D6CDF'}], acct:'FX-50112847',  type:'Standard',   balance:'€0.00',color:'#15A36C'},
+  {id:'crypto', name:'Alpexa Crypto', url:'crypto.alpexa.com:443', tag:'CRYPTO', acct:'BNX-2841759',  type:'Crypto', balance:'$0.00',color:'#F59E0B'},
+  {id:'sports', name:'Alpexa Sports', url:'sports.alpexa.com:443', tag:'SPORTS', acct:'SP-194820',    type:'Sports',     balance:'$0.00',color:'#7C3AED'},
 ];
 // Logged-in customers see their REAL account numbers (issued at signup, same as
 // the back office); the hardcoded ones above are only the logged-out fallback.
@@ -3988,7 +3988,7 @@ function Root(){
   useEffect(()=>{
     // Auth is handled by Supabase (login.html). This screen only needs a non-null
     // user object to render; real identity/accounts come from alpexa.me + AlpexaSync.
-    setUser({ email:'demo@alpexa.com', displayName:'Demo User', uid:'demo' });
+    setUser({ email:'', displayName:'', uid:'' });  // non-null render gate only; real identity = alpexa.me
   },[]);
 
   if(user===undefined||!user){

@@ -19,6 +19,13 @@ const DEPLOYED = ['crypto-live.html', 'sports-live.html', 'trading.html', 'index
                   'login.html', 'signup.html', 'manager-mobile.html', 'compliance.js',
                   'alpexa-sync.js'];
 const MONEY_EDGE = ['sports-settle', 'stake-accrue'];   // edge fns that MOVE money (must fail-closed)
+// Every page a customer could ever load (shipped apps + landing + the parked site/ mirror) —
+// scanned so hardcoded FAKE BALANCES / demo emails can't sneak back (the 2026-06 cleanup class).
+const DEMO_FILES = DEPLOYED.concat([
+  'agent.html', 'manager.html', 'manager-app.html',
+  'site/index.html', 'site/wallet.html', 'site/settings.html', 'site/dashboard.html',
+  'site/my-bets.html', 'site/sports.html', 'site/promotions.html',
+  'site/introducing-broker.html', 'site/legal.html', 'site/login.html', 'site/signup.html']);
 
 // ── Defect classes (each = a bug we shipped before) ──────────────────────────
 const CHECKS = [
@@ -59,6 +66,12 @@ const CHECKS = [
   { id: 'CRYPTO-client-holdings-write', sev: 'CRITICAL', files: DEPLOYED,
     re: /from\(\s*['"]crypto_holdings['"]\s*\)\s*\.\s*(insert|update|upsert|delete)/,
     why: 'Client writing crypto_holdings directly bypasses the server RPCs that are the sole owner of coin qty (#25). Internal P2P sends, trades, stakes, transfers all move crypto_holdings via SECURITY DEFINER RPCs (crypto_send_internal / crypto_trade / app_transfer …) — the client only SELECTs and displays. A direct client write = money printing / cross-account write.' },
+  { id: 'DEMO-hardcoded-balance', sev: 'HIGH', files: DEMO_FILES,
+    re: /\$\d{1,3}(,\d{3})+\.\d{2}/,
+    why: 'A hardcoded money amount with thousands separators ($1,187,077.40 / $11,248.10 / $5,000.00) — a FAKE balance/price literal. Money must come from the server (usd(...) / ${...}), never a static number, or a real user sees a phantom "demo account" balance.' },
+  { id: 'DEMO-fake-email', sev: 'HIGH', files: DEMO_FILES,
+    re: /alpexa-demo\.com|@alpexa\.app\b|demo@alpexa/i,
+    why: 'A demo/test email (alpexa-demo.com / @alpexa.app / demo@alpexa) hardcoded in a shipped page — a real user could copy a fake payment address, or the app renders a demo identity.' },
   { id: 'DEMO-login-creds', sev: 'HIGH', files: ['login.html', 'signup.html'],
     re: /getElementById\(\s*['"]pwInput['"]\s*\)\.value\s*=\s*['"][^'"]|Demo account credentials/,
     why: 'A demo account is hardcoded into the login form (e.g. fillDemo: pwInput.value=\'1234\'). Real users saw another (demo) account / local data on the login page. No fake credentials in shipped login — the field stays empty.' },
@@ -68,6 +81,10 @@ const CHECKS = [
 const ACCEPTED = [
   { id: 'A6-client-balance-update', file: 'manager-mobile.html',
     reason: 'Back office is is_admin (RLS allows). For CRYPTO, accounts.balance is a display cache — real money lives in crypto_holdings and moves via the `commands` path. sports/fx use admin_set_balance RPC.' },
+  { id: 'DEMO-fake-email', file: 'crypto-live.html',
+    reason: 'One-time migration that REMOVES the legacy demo@alpexa.app value for stale users — references the string only to clear it, never displays it.' },
+  { id: 'DEMO-fake-email', file: 'manager-mobile.html',
+    reason: 'A code COMMENT documenting the anti-pattern ("Never fabricate a demo identity (was demo@alpexa.io)") — not a real address.' },
   // B8 CLOSED: sports-settle/stake-accrue are now FAIL-CLOSED (no CRON_SECRET → 503), so the
   // fail-open exceptions are removed — any future `if (CRON_SECRET &&` regression now fails
   // the gate again. (User deploys: set CRON_SECRET + redeploy + cron_secure.sql.)
