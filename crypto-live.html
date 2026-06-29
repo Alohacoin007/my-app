@@ -2212,8 +2212,34 @@ function SendAvatar({ initials, color, size = 40 }) {
 function QrScanner({ onResult, onClose }) {
   const videoRef  = React.useRef(null);
   const canvasRef = React.useRef(null);
+  const fileRef   = React.useRef(null);
   const [status, setStatus] = React.useState('Requesting camera…');
   const [needsFallback, setNeedsFallback] = React.useState(false);
+
+  // Photo fallback — works even where live camera (getUserMedia) is blocked, e.g. in-app
+  // browsers/webviews (KakaoTalk, Instagram…). The OS camera opens via the file input's
+  // capture attr; we decode the photo with jsQR. Pay still completes without a real browser.
+  const decodeFromFile = (file) => {
+    if (!file) return;
+    if (!window.jsQR) { setStatus('Scanner still loading — try again'); return; }
+    setStatus('Reading photo…');
+    const img = new Image();
+    img.onload = () => {
+      const c = canvasRef.current || document.createElement('canvas');
+      const MAX = 1000;
+      const sc = Math.min(1, MAX / Math.max(img.width, img.height));
+      c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      const data = ctx.getImageData(0, 0, c.width, c.height);
+      const code = window.jsQR(data.data, c.width, c.height, { inversionAttempts: 'attemptBoth' });
+      try { URL.revokeObjectURL(img.src); } catch (_) {}
+      if (code && code.data) { onResult(code.data.trim()); onClose(); }
+      else setStatus('No QR found in that photo — move closer and retry');
+    };
+    img.onerror = () => setStatus('Could not read that image');
+    img.src = URL.createObjectURL(file);
+  };
 
   React.useEffect(() => {
     let stream;
@@ -2231,9 +2257,14 @@ function QrScanner({ onResult, onClose }) {
       const v = videoRef.current;
       const c = canvasRef.current;
       if (v && c && v.videoWidth) {
-        c.width  = v.videoWidth;
-        c.height = v.videoHeight;
-        const ctx = c.getContext('2d');
+        // Downscale to ≤640px on the long side — jsQR is far faster on a small frame, so the
+        // code is caught in a frame or two instead of lagging on full-res mobile video (pay
+        // must finish in seconds). willReadFrequently speeds up getImageData too.
+        const MAX = 640;
+        const sc = Math.min(1, MAX / Math.max(v.videoWidth, v.videoHeight));
+        c.width  = Math.round(v.videoWidth * sc);
+        c.height = Math.round(v.videoHeight * sc);
+        const ctx = c.getContext('2d', { willReadFrequently: true });
         ctx.drawImage(v, 0, 0, c.width, c.height);
         const img = ctx.getImageData(0, 0, c.width, c.height);
         const code = window.jsQR && window.jsQR(img.data, c.width, c.height, { inversionAttempts: 'attemptBoth' });
@@ -2254,9 +2285,11 @@ function QrScanner({ onResult, onClose }) {
         return;
       }
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' }, audio: false,
-        });
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+        } catch (eEnv) {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });   // any camera
+        }
         if (stopped) { stream.getTracks().forEach((t) => t.stop()); return; }
         const v = videoRef.current;
         v.srcObject = stream;
@@ -2348,14 +2381,20 @@ function QrScanner({ onResult, onClose }) {
           fontSize: 12.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace',
           letterSpacing: 0.4, marginBottom: needsFallback ? 12 : 0,
         }}>{status}</div>
-        {needsFallback ? (
-          <button onClick={onClose} style={{
-            background: RH.green, color: '#000',
-            border: 'none', borderRadius: 999,
-            padding: '10px 18px',
-            fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
-          }}>Close · enter address manually</button>
-        ) : null}
+        <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+          onChange={(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; decodeFromFile(f); }}/>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button onClick={() => { try { fileRef.current && fileRef.current.click(); } catch (_) {} }} style={{
+            background: 'rgba(255,255,255,0.16)', color: '#fff', border: 'none', borderRadius: 999,
+            padding: '10px 18px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+          }}>📷 Scan from photo</button>
+          {needsFallback ? (
+            <button onClick={onClose} style={{
+              background: RH.green, color: '#000', border: 'none', borderRadius: 999,
+              padding: '10px 18px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+            }}>Enter address manually</button>
+          ) : null}
+        </div>
       </div>
     </div>
   );
@@ -3375,38 +3414,15 @@ function Send({ onBack, balances = {}, onSent }) {
 // ─── Receive screen ───────────────────────────────────────────────
 // Pseudo-QR pattern (looks like a real QR, generated from a seed of the address).
 function QrPattern({ data, size = 220, dark = '#000', light = '#FFF' }) {
-  const cells = 25;
-  const cellSize = size / cells;
-  let h = 0;
-  for (let i = 0; i < data.length; i++) h = (h * 31 + data.charCodeAt(i)) >>> 0;
-  let s = h || 1;
-  const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
-  const grid = Array.from({ length: cells }, () =>
-    Array.from({ length: cells }, () => rnd() > 0.5 ? 1 : 0));
-  // QR position markers (top-left, top-right, bottom-left)
-  const drawMarker = (cx, cy) => {
-    for (let i = -3; i <= 3; i++) {
-      for (let j = -3; j <= 3; j++) {
-        const x = cx + i, y = cy + j;
-        if (x < 0 || x >= cells || y < 0 || y >= cells) continue;
-        const onRing = (Math.abs(i) === 3 || Math.abs(j) === 3) && Math.abs(i) <= 3 && Math.abs(j) <= 3;
-        const onDot  = Math.abs(i) <= 1 && Math.abs(j) <= 1;
-        grid[y][x] = onRing || onDot ? 1 : 0;
-      }
-    }
-  };
-  drawMarker(3, 3);
-  drawMarker(cells - 4, 3);
-  drawMarker(3, cells - 4);
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: 'block' }}>
-      <rect x="0" y="0" width={size} height={size} fill={light}/>
-      {grid.flatMap((row, y) => row.map((v, x) => v ? (
-        <rect key={`${x}-${y}`} x={x * cellSize} y={y * cellSize}
-          width={cellSize} height={cellSize} fill={dark}/>
-      ) : null))}
-    </svg>
-  );
+  // REAL, scannable QR via the qrserver image API (same source as the pay-QR hero). The old
+  // body drew a RANDOM decorative pattern that encoded NOTHING — no scanner could read it,
+  // which is why Receive / deposit QRs wouldn't scan. data is a plain address or an
+  // `alpexa:<addr>?amt=&asset=` URI (decoded by parseAlpexaPay on the scanning device).
+  const px = Math.max(120, Math.round(size));
+  const src = 'https://api.qrserver.com/v1/create-qr-code/?size=' + (px * 2) + 'x' + (px * 2) +
+    '&qzone=2&data=' + encodeURIComponent(String(data || ''));
+  return <img src={src} width={px} height={px} alt="QR code"
+    style={{ display: 'block', width: px, height: px, borderRadius: 2, background: light }}/>;
 }
 
 function Receive({ onBack, balances = {}, onReceived }) {
