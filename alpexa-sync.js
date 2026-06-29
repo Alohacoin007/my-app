@@ -361,7 +361,20 @@ window.AlpexaSync = (function () {
 
       ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'touchmove', 'click', 'wheel']
         .forEach(function (ev) { window.addEventListener(ev, onActivity, { passive: true, capture: true }); });
-      document.addEventListener('visibilitychange', function () { if (!document.hidden) onActivity(); });
+      // Returning to the app is NOT "activity" (do not reset the clock). Mobile browsers
+      // throttle/pause timers while backgrounded, so the interval can't count down with the
+      // screen off; instead, on every resume we check the REAL elapsed time and sign out
+      // immediately if it already exceeded the limit (banking-app behavior). If we're still
+      // within the window, the resumed interval keeps counting and a real touch resets it.
+      function checkOnResume() {
+        if (document.hidden) return;
+        var idle = Date.now() - last;
+        if (idle >= IDLE_MS) { logout(); }
+        else if (idle >= IDLE_MS - WARN_MS && !overlay) { showWarning(); }
+      }
+      document.addEventListener('visibilitychange', checkOnResume);
+      window.addEventListener('focus', checkOnResume);
+      window.addEventListener('pageshow', checkOnResume);
     } catch (e) {}
   }
   try { startIdleLogout(); } catch (e) {}
