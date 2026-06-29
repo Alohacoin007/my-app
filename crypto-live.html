@@ -2838,7 +2838,7 @@ function Row({ label, value, strong }) {
   );
 }
 
-function Send({ onBack, balances = {}, onSent }) {
+function Send({ onBack, balances = {}, holdingsQty = {}, onSent }) {
   const { fees } = React.useContext(FeeConfigContext);
   // Send flow has two phases:
   //   'intro' — scan-first hero with QR card + Enter Manually CTA (new)
@@ -3337,7 +3337,7 @@ function Send({ onBack, balances = {}, onSent }) {
             background: RH.surface, border: `1px solid ${RH.line}`,
             borderRadius: 12, padding: 4,
           }}>
-            {Object.entries(SEND_ASSETS).filter(([id]) => ((balances && balances[id]) || 0) > 0.005).map(([id, a]) => {
+            {Object.entries(SEND_ASSETS).filter(([id]) => id === 'USDT' || ((holdingsQty && holdingsQty[id]) || 0) > 0).map(([id, a]) => {
               const active = id === assetId;
               // #5: show the REAL holding (balances ← crypto_holdings), never the demo seed.
               const avail = (balances && balances[id] != null) ? balances[id] : 0;
@@ -13521,9 +13521,13 @@ function App() {
     };
     // #25: internal sends move REAL coins via the crypto_send_internal RPC (server truth).
     // Convert the entered USD to COIN QTY — crypto_holdings stores qty (USDT qty == USD 1:1).
+    // Need a REAL loaded price to convert USD→qty; cryptoPriceOf falls back to 1, which would
+    // send e.g. 100 "coins" for a $100 BTC order. Block until the price feed is in.
+    const _realPrice = (assetId === 'USDT') || (typeof cryptoHasRealPrice === 'function' && cryptoHasRealPrice(assetId));
     const _px = (assetId === 'USDT') ? 1 : (typeof cryptoPriceOf === 'function' ? +cryptoPriceOf(assetId) : 0);
     const _coinQty = (assetId === 'USDT') ? usdAmount : (_px > 0 ? usdAmount / _px : 0);
     const deliverInternal = async (toAcct, toLabel) => {
+      if (!_realPrice) { try { alert('Price for ' + assetId + ' is still loading — wait a moment and try again. Nothing was sent.'); } catch (e) {} return; }
       if (!(_coinQty > 0)) { try { alert('Could not price this coin right now — nothing was sent.'); } catch (e) {} return; }
       let res; try { res = await AlpexaSync.cryptoSendInternal({ to: toAcct, asset: assetId, qty: _coinQty }); }
       catch (e) { res = { ok: false, error: 'send failed' }; }
@@ -14162,7 +14166,7 @@ function App() {
     return <Account serverBalances={serverBalances} balances={balances} staked={staked} transactions={transactions} setTransactions={setTransactions} savedCards={savedCards} setSavedCards={setSavedCards} linkedBanks={linkedBanks} setLinkedBanks={setLinkedBanks} whitelist={whitelist} setWhitelist={setWhitelist} beneficiaries={beneficiaries} setBeneficiaries={setBeneficiaries} tabBar={TB}/>;
   }
 
-  if (screen === 'send')     return <Send     onBack={() => { setTab('home'); onBack(); }} balances={balances} onSent={onSendConfirmed}/>;
+  if (screen === 'send')     return <Send     onBack={() => { setTab('home'); onBack(); }} balances={balances} holdingsQty={holdingsSyncRef.current.serverQty || {}} onSent={onSendConfirmed}/>;
   if (screen === 'receive')  return <Receive  onBack={() => { setTab('home'); onBack(); }} balances={balances} onReceived={onReceiveSimulated}/>;
   if (screen === 'stake')    return <Stake    onBack={() => { setStakeInitial(null); setTab('home'); onBack(); }} balances={balances} staked={staked} onStaked={onStakeConfirmed} initialAssetId={stakeInitial}/>;
   if (screen === 'stakeinfo' && stakeInfoSym) return <StakeInfo
