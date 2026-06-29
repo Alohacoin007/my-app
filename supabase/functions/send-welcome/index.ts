@@ -15,7 +15,9 @@
 //       Resend (already done — domain shows Verified).
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
-const GATE_SECRET = Deno.env.get("CRON_SECRET") || Deno.env.get("WELCOME_SECRET") || "";
+// Accept EITHER secret — set WELCOME_SECRET to a value you control and pass it from the trigger.
+const SEC_WELCOME = Deno.env.get("WELCOME_SECRET") || "";
+const SEC_CRON = Deno.env.get("CRON_SECRET") || "";
 const FROM = "Alpexa Sports <info@alpexa-sports.com>";
 const SUBJECT = "Welcome to Alpexa — your account is ready";
 
@@ -50,12 +52,13 @@ function welcomeHtml(name: string): string {
 
 Deno.serve(async (req: Request): Promise<Response> => {
   // Fail-closed: no secret configured → refuse (never world-callable to send mail).
-  if (!GATE_SECRET) return new Response("gate secret not configured", { status: 503 });
+  if (!SEC_WELCOME && !SEC_CRON) return new Response("gate secret not configured", { status: 503 });
   if (!RESEND_API_KEY) return new Response("resend key not configured", { status: 503 });
 
   const url = new URL(req.url);
   const token = url.searchParams.get("token") || req.headers.get("x-welcome-token") || "";
-  if (token !== GATE_SECRET) return new Response("forbidden", { status: 403 });
+  const okToken = !!token && (token === SEC_WELCOME || token === SEC_CRON);
+  if (!okToken) return new Response("forbidden", { status: 403 });
 
   let body: { email?: string; name?: string } = {};
   try { body = await req.json(); } catch (_) { /* ignore */ }
