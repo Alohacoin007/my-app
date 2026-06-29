@@ -426,6 +426,31 @@
   .dp-addr{flex:1;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;word-break:break-all;color:var(--text)}
   .dp-copy{flex:0 0 auto;background:var(--accent);color:#fff;border:none;border-radius:6px;padding:8px 13px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
   .dp-warn{font-size:11.5px;color:#b06a00;background:#fff6e6;border-radius:6px;padding:7px 10px;margin-bottom:12px}
+  /* deposit C2 redesign — segmented Card/Crypto + premium-minimal */
+  .dp-seg{display:flex;background:var(--surface-2);border-radius:11px;padding:3px;margin:2px 0 14px}
+  .dp-seg button{flex:1;border:none;background:transparent;font-family:inherit;font-size:13.5px;font-weight:700;color:var(--dim);padding:9px 0;border-radius:9px;cursor:pointer;transition:.15s}
+  .dp-seg button.on{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(16,24,40,.14)}
+  .dp-amt-big{text-align:center;padding:6px 0 2px}
+  .dp-amt-big .lab{font-size:11px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;color:var(--dim)}
+  .dp-amt-big .row{display:flex;align-items:baseline;justify-content:center;gap:5px;margin-top:9px}
+  .dp-amt-big .cur{font-size:23px;font-weight:800;color:var(--dim);align-self:center}
+  .dp-amt-big input{border:none;background:transparent;outline:none;font-size:44px;font-weight:800;letter-spacing:-2px;text-align:center;width:auto;max-width:200px;color:var(--text);font-family:inherit;padding:0}
+  .dp-amt-big input::-webkit-outer-spin-button,.dp-amt-big input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .dp-amt-big input{-moz-appearance:textfield}
+  .dp-amt-big .u{font-size:16px;font-weight:700;color:var(--dim)}
+  .dp-prov{margin:4px 0 0}
+  .pbtn{display:flex;align-items:center;gap:12px;width:100%;border-radius:13px;padding:13px 14px;border:none;cursor:pointer;font-family:inherit;text-align:left;margin-top:10px}
+  .pbtn.primary{background:var(--accent);color:#fff}
+  .pbtn.alt{background:var(--surface);border:1.5px solid var(--line);color:var(--text)}
+  .pbtn .pic{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;font-size:17px;background:rgba(255,255,255,.16)}
+  .pbtn.alt .pic{background:var(--surface-2)}
+  .pbtn .pt{flex:1;min-width:0}
+  .pbtn .t1{display:block;font-size:14px;font-weight:800;letter-spacing:-.2px}
+  .pbtn .t2{display:block;font-size:11px;font-weight:600;opacity:.72;margin-top:2px}
+  .pbtn .chev{opacity:.5;flex:0 0 auto}
+  .dp-step{display:flex;align-items:center;gap:10px;margin:18px 0 12px}
+  .dp-step .ln{flex:1;height:1px;background:var(--line)}
+  .dp-step .w{font-size:10.5px;font-weight:800;letter-spacing:.5px;color:var(--dim)}
   .dp-method{flex:1;display:flex;flex-direction:row;align-items:center;gap:11px;padding:12px 14px;border-radius:6px;background:var(--surface);border:1.5px solid var(--line);cursor:pointer;transition:.15s}
   .dp-method.on{border-color:var(--accent);background:rgba(71,159,246,.06)}
   .dpm-ic{width:34px;height:34px;border-radius:50%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;color:var(--text);flex:0 0 auto}
@@ -946,25 +971,42 @@
       <div class="grip"></div>
       <div class="sh"><h3 data-i18n="sheet_deposit">Deposit</h3><button class="close" id="dpCloseBtn">✕</button></div>
       <div class="tf-body">
-        <div class="tf-field"><label>Buy USDT with your card</label></div>
-        <button class="place" id="dpMoonpay" style="margin-bottom:8px">Buy USDT with card</button>
-        <button id="dpMetamask" style="display:block;margin:0 auto 12px;background:none;border:none;color:var(--dim);font-size:13px;font-weight:600;cursor:pointer">or use MetaMask</button>
-        <div class="wd-info" data-i18n-html="dp_help">First time only, the provider verifies your ID. Then send the USDT to the <b>company deposit address</b> below and submit — already have USDT? Just send it. Credited once the back office confirms receipt.</div>
-        <div class="tf-field"><label>Network</label></div>
-        <div class="wd-net" id="dpNet">
-          <button class="wd-net-pill on" data-net="ERC-20">USDT · ERC-20 (Ethereum)</button>
+        <div class="dp-seg">
+          <button id="dpTabCard" class="on">Card</button>
+          <button id="dpTabCrypto">Crypto</button>
         </div>
-        <div class="tf-field"><label>Company deposit address (send USDT here)</label></div>
-        <div class="dp-addr-box"><span class="dp-addr" id="dpAddr">—</span><button class="dp-copy" id="dpCopy">Copy</button></div>
-        <div class="tf-field">
-          <label>Amount sent (USDT)</label>
-          <input type="number" id="dpAmt" value="100" min="0" step="10">
+
+        <div class="dp-amt-big">
+          <div class="lab" id="dpAmtLab">Amount</div>
+          <div class="row"><span class="cur">$</span><input type="number" id="dpAmt" value="100" min="0" step="10"><span class="u">USDT</span></div>
         </div>
         <div class="tf-chips" id="dpChips">
           <div class="chip" data-set="50">$50</div><div class="chip" data-set="100">$100</div>
           <div class="chip" data-set="500">$500</div><div class="chip" data-set="1000">$1,000</div>
         </div>
-        <button class="place" id="dpConfirm">Submit deposit request</button>
+
+        <div class="dp-prov" id="dpCardSec">
+          <button class="pbtn primary" id="dpMoonpay">
+            <span class="pic">💳</span>
+            <span class="pt"><span class="t1">Buy with card · MoonPay</span><span class="t2">Instant · Visa, Mastercard, Apple Pay</span></span>
+            <svg class="chev" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+          <button class="pbtn alt" id="dpMetamask">
+            <span class="pic">🦊</span>
+            <span class="pt"><span class="t1">MetaMask</span><span class="t2">If MoonPay isn't available in your region</span></span>
+            <svg class="chev" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+
+        <div class="dp-step"><span class="ln"></span><span class="w" id="dpStepW">THEN SEND TO US</span><span class="ln"></span></div>
+
+        <div class="wd-net" id="dpNet">
+          <button class="wd-net-pill on" data-net="ERC-20">USDT · ERC-20 (Ethereum)</button>
+        </div>
+        <div class="dp-addr-box"><span class="dp-addr" id="dpAddr">—</span><button class="dp-copy" id="dpCopy">Copy</button></div>
+
+        <button class="place" id="dpConfirm" style="margin-top:14px">Submit deposit request</button>
+        <div class="wd-info" data-i18n-html="dp_help" style="margin-top:12px;margin-bottom:0">First time only, the provider verifies your ID. Then send the USDT to the <b>company deposit address</b> above and submit — already have USDT? Just send it. Credited once the back office confirms receipt.</div>
       </div>
     </div>
 
@@ -2647,6 +2689,7 @@
     if(isLocked()){showToast('🔒','Account locked','Self-exclusion is active');return;}
     syncSportsBal();
     updateDpAddr();
+    try{setDpTab('card');}catch(e){}
     dpSheet.classList.add('show');dpOverlay.classList.add('show');
   }
   function closeDeposit(){dpSheet.classList.remove('show');dpOverlay.classList.remove('show');}
@@ -2663,6 +2706,18 @@
   // it to the company address and submits (same as crypto/FX apps).
   (function(){var mp=document.getElementById('dpMoonpay');if(mp)mp.onclick=function(){try{window.open('https://www.moonpay.com/buy','_blank');}catch(e){try{location.href='https://www.moonpay.com/buy';}catch(_){}}};
    var mm=document.getElementById('dpMetamask');if(mm)mm.onclick=function(){try{window.open('https://portfolio.metamask.io/buy','_blank');}catch(e){try{location.href='https://portfolio.metamask.io/buy';}catch(_){}}};})();
+  // Deposit Card/Crypto tab toggle — pure UI (shows providers on Card; hides on Crypto). No money logic.
+  function setDpTab(which){
+    var isCard=which!=='crypto';
+    var tc=document.getElementById('dpTabCard'),tx=document.getElementById('dpTabCrypto');
+    var card=document.getElementById('dpCardSec'),stepW=document.getElementById('dpStepW'),amtLab=document.getElementById('dpAmtLab');
+    if(tc)tc.classList.toggle('on',isCard);if(tx)tx.classList.toggle('on',!isCard);
+    if(card)card.style.display=isCard?'':'none';
+    if(stepW)stepW.textContent=isCard?'THEN SEND TO US':'SEND USDT TO THIS ADDRESS';
+    if(amtLab)amtLab.textContent=isCard?'Amount':'Amount sent';
+  }
+  (function(){var tc=document.getElementById('dpTabCard'),tx=document.getElementById('dpTabCrypto');
+   if(tc)tc.onclick=function(){setDpTab('card');};if(tx)tx.onclick=function(){setDpTab('crypto');};})();
   document.getElementById('dpConfirm').onclick=()=>{
     const v=parseFloat(dpAmt.value)||0;
     if(v<=0){showToast('⚠️','Enter a deposit amount');return;}
