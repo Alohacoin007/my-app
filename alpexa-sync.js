@@ -15,9 +15,17 @@ window.AlpexaSync = (function () {
       // separate key for admin → signing in as admin never logs a customer out (and
       // vice-versa). Without the flag (all customer apps) the default key is used, so
       // they keep sharing one customer session as before.
+      // Customer session lives in sessionStorage = PER-TAB (not shared across tabs), so two
+      // different accounts can be open in two tabs of the same browser. Trade-off: a NEW tab
+      // starts logged out (session isn't shared); refresh within a tab keeps it. (Money is
+      // still server-only; this only moves the auth TOKEN's storage — CLAUDE.md #5 allows
+      // session tokens client-side.) Falls back to default (localStorage) if sessionStorage
+      // is unavailable. Admin keeps its own isolated localStorage key (back office is single).
+      var perTab = null;
+      try { if (window.sessionStorage) { window.sessionStorage.getItem('__probe'); perTab = window.sessionStorage; } } catch (e) { perTab = null; }
       var opts = window.ALPEXA_ADMIN_SESSION
         ? { auth: { storageKey: 'alpexa-admin-auth', persistSession: true, autoRefreshToken: true } }
-        : undefined;
+        : (perTab ? { auth: { storage: perTab, persistSession: true, autoRefreshToken: true } } : undefined);
       db = window.supabase.createClient(URL, KEY, opts);
     }
   } catch (e) { db = null; }
