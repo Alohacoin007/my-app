@@ -162,7 +162,24 @@ window.AlpexaSync = (function () {
       }, function (e) { console.warn('AlpexaSync setStatus failed', e); return { error: e }; });
   }
 
-  // ── Peer-to-peer payments (internal users send crypto to each other) ──
+  // ── Internal crypto P2P transfer (#25) — REAL server money move (qty in crypto_holdings).
+  //    Sender is the caller's own crypto account (server derives it from auth). p.qty is COIN
+  //    UNITS (USDT qty == USD 1:1; other coins are coin units — the app converts USD→qty).
+  //    Idempotent by p.ref. This is the source of truth; sendPayment() below is notify-only.
+  function cryptoSendInternal(p) {
+    if (!db) return Promise.resolve({ error: 'offline' });
+    var ref = (p && p.ref) || ('csend-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7));
+    return db.rpc('crypto_send_internal', {
+      p_ref: ref,
+      p_to_acct: String((p && p.to) || '').trim().toUpperCase(),
+      p_asset: (p && p.asset) || 'USDT',
+      p_qty: +((p && p.qty)) || 0
+    }).then(function (r) { return (r && r.data) || (r && r.error ? { ok: false, error: (r.error.message || 'rpc error') } : { ok: false, error: 'no response' }); },
+            function (e) { return { ok: false, error: (e && e.message) || 'rpc failed' }; });
+  }
+
+  // ── Peer-to-peer payment NOTIFICATION (no money — the recipient's "you received X" toast).
+  //    The real coins move via cryptoSendInternal(); this row only carries the notification.
   function sendPayment(p) {
     if (!db) return Promise.resolve({ error: 'offline' });
     var m = me();
@@ -352,7 +369,8 @@ window.AlpexaSync = (function () {
   return { db: db, me: me, acctFor: acctFor, pushRequest: pushRequest,
            pullAll: pullAll, pullMine: pullMine, setStatus: setStatus,
            updateRequest: updateRequest, deleteRequest: deleteRequest,
-           sendPayment: sendPayment, pullIncoming: pullIncoming, claimPayment: claimPayment,
+           sendPayment: sendPayment, cryptoSendInternal: cryptoSendInternal,
+           pullIncoming: pullIncoming, claimPayment: claimPayment,
            pullIncomingTransfers: pullIncomingTransfers, normSrv: normSrv,
            logActivity: logActivity, pullBalances: pullBalances,
            loadUserData: loadUserData, saveUserData: saveUserData,

@@ -157,7 +157,7 @@
    manual Dark/Light choice in Account → Appearance is respected. */
 (function(){try{if(!localStorage.getItem("alpexa.themeDefaultLight")){localStorage.setItem("alpexa.theme",JSON.stringify("light"));localStorage.setItem("alpexa.themeDefaultLight","1");}}catch(e){}})();
 </script>
-<script src="alpexa-sync.js?v=14"></script>
+<script src="alpexa-sync.js?v=15"></script>
 <script>
 /* Session guard. The identity gate above only checks alpexa.me (a local name tag).
    But reading your OWN holdings/positions needs a real Supabase auth SESSION —
@@ -13503,20 +13503,30 @@ function App() {
       pushTx({ type: 'send', sym: assetId, usd: usdAmount, to: toLabel });
       flashAsset(assetId);
     };
-    // Internal: send to another Alpexa user by ACCOUNT NUMBER → deliver instantly.
+    // #25: internal sends move REAL coins via the crypto_send_internal RPC (server truth).
+    // Convert the entered USD to COIN QTY — crypto_holdings stores qty (USDT qty == USD 1:1).
+    const _px = (assetId === 'USDT') ? 1 : (typeof cryptoPriceOf === 'function' ? +cryptoPriceOf(assetId) : 0);
+    const _coinQty = (assetId === 'USDT') ? usdAmount : (_px > 0 ? usdAmount / _px : 0);
+    const deliverInternal = async (toAcct, toLabel) => {
+      if (!(_coinQty > 0)) { try { alert('Could not price this coin right now — nothing was sent.'); } catch (e) {} return; }
+      let res; try { res = await AlpexaSync.cryptoSendInternal({ to: toAcct, asset: assetId, qty: _coinQty }); }
+      catch (e) { res = { ok: false, error: 'send failed' }; }
+      if (!res || !res.ok) { try { alert('Send failed — ' + ((res && res.error) || 'please try again') + '. Nothing was deducted.'); } catch (e) {} return; }
+      finalize(toLabel);                                   // optimistic; the adopt loop reconciles to server truth
+      try { AlpexaSync.sendPayment({ to: toAcct, amount: usdAmount, asset: assetId }); } catch (e) {}  // notify only (no money)
+    };
+    // Internal: send to another Alpexa user by ACCOUNT NUMBER.
     if (recipient && recipient.type === 'alpexa' && window.AlpexaSync && AlpexaSync.db) {
-      finalize(recipient.account);
-      try { AlpexaSync.sendPayment({ to: recipient.account, amount: usdAmount, asset: assetId }); } catch (e) {}
+      await deliverInternal(recipient.account, recipient.account);
       return;
     }
-    // Internal: send by EMAIL → look up that user's crypto account (RLS-safe RPC), then deliver.
+    // Internal: send by EMAIL → resolve to that user's crypto account, then deliver.
     if (recipient && recipient.type === 'email' && window.AlpexaSync && AlpexaSync.db) {
-      AlpexaSync.db.rpc('acct_for_email', { p_email: recipient.name }).then((r) => {
-        const acct = r && r.data;
-        if (!acct) { try { alert('No Alpexa user found with that email — nothing was sent.'); } catch (e) {} return; }
-        finalize(recipient.name);
-        try { AlpexaSync.sendPayment({ to: acct, amount: usdAmount, asset: assetId }); } catch (e) {}
-      }, () => { try { alert('Could not look up that email — nothing was sent.'); } catch (e) {} });
+      let _acct = null;
+      try { const r = await AlpexaSync.db.rpc('acct_for_email', { p_email: recipient.name }); _acct = r && r.data; }
+      catch (e) { try { alert('Could not look up that email — nothing was sent.'); } catch (_) {} return; }
+      if (!_acct) { try { alert('No Alpexa user found with that email — nothing was sent.'); } catch (e) {} return; }
+      await deliverInternal(_acct, recipient.name);
       return;
     }
     // External wallet send (0x…) → create a back-office payout request (owner pays via MetaMask).
@@ -13569,8 +13579,9 @@ function App() {
           if (cbApplied[key]) return;
           cbApplied[key] = 1; saveCbApplied();
           const sym = r.asset || 'USDT';
-          window.__cbLocalTs = Date.now();   // mark busy so the adopt loop doesn't revert this credit
-          setBalances((b) => ({ ...b, [sym]: (b[sym] || 0) + amt }));
+          // #25: the coins were already credited to crypto_holdings server-side by the sender's
+          // crypto_send_internal RPC. This device only SHOWS the receipt — the balance comes from
+          // the crypto_holdings adopt loop (server truth). Do NOT setBalances here (would double).
           pushTx({ type: 'receive', sym: sym, usd: amt, from: r.from_name || r.from_cust });
           try { cryptoNotify({ type: 'fill', title: 'Payment received', body: '+' + fmtUsd(amt) + ' ' + sym + ((r.from_name || r.from_cust) ? (' from ' + (r.from_name || r.from_cust)) : '') }); } catch (e) {}
           if (typeof AudioFX !== 'undefined') { try { AudioFX.cash(); } catch (e) {} }
