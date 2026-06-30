@@ -1302,6 +1302,8 @@
   function renderSettings(){
     const oddsLbl=ODDS_OPTS.find(o=>o.v===settings.oddsFormat)?.lbl||'American';
     const seActive=settings.selfExcludeUntil&&settings.selfExcludeUntil>Date.now();
+    let acctNo='', myName='', myEmail='';
+    try{ const m=JSON.parse(localStorage.getItem('alpexa.me')||'null')||{}; acctNo=(m.accts&&m.accts.sports)||''; myName=m.name||''; myEmail=m.email||''; }catch(e){}
     const html=`
       <div class="s-sec"><div class="s-sec-title">Display</div><div class="s-card">
         <div class="s-row" data-theme-toggle>
@@ -1326,6 +1328,10 @@
         ${actionRow('lang','App language','',`<span class="v" id="vLang">${LANG_LABEL[settings.language]||'English'}</span>`)}
       </div></div>
       <div class="s-sec"><div class="s-sec-title">Account</div><div class="s-card">
+        <div class="s-row" id="acctNoRow" style="cursor:pointer">
+          <div class="s-row-l"><span class="s-row-lbl">Account number</span><span class="s-row-sub">${myName?myName.replace(/</g,'&lt;'):'Alpexa Sports'} · Tap to copy</span></div>
+          <div class="s-row-r"><span class="v" style="font-family:ui-monospace,monospace;letter-spacing:.3px">${acctNo||'—'}</span></div></div>
+        ${myEmail?`<div class="s-row"><div class="s-row-l"><span class="s-row-lbl">Email</span></div><div class="s-row-r"><span class="s-row-sub">${myEmail.replace(/</g,'&lt;')}</span></div></div>`:''}
         <button id="signOutBtn" style="width:100%;padding:15px 0;border:none;background:transparent;color:#e5484d;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">Sign out</button>
       </div></div>
       <div class="s-foot">Alpexa Sports v1.2.64</div>`;
@@ -1344,6 +1350,13 @@
   function bindSettings(){
     var _so=document.getElementById('signOutBtn');
     if(_so) _so.onclick=function(){ if(confirm('Sign out of Alpexa?')) doSignOut(); };
+    var _an=document.getElementById('acctNoRow');
+    if(_an) _an.onclick=function(){
+      var no=(_an.querySelector('.v')||{}).textContent||'';
+      if(!no||no==='—') return;
+      try{ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(no); }catch(e){}
+      try{ showToast('📋','Copied','Account number '+no); }catch(e){}
+    };
     var _tt=document.querySelector('#settingsBody [data-theme-toggle]');
     if(_tt) _tt.onclick=function(){
       settings.theme=(settings.theme==='dark')?'light':'dark';
