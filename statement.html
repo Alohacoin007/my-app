@@ -23,6 +23,10 @@
   .txname{font-size:14.5px;font-weight:700;color:#1c1c1e;}
   .txsub{font-size:12px;font-weight:500;margin-top:2px;}
   .pill{display:block;background:#2F54EB;color:#fff;font-size:15px;font-weight:800;padding:15px 0;border-radius:999px;text-align:center;}
+  .cards{display:flex;flex-wrap:wrap;gap:8px;}
+  .gcell{flex:1 1 calc(50% - 4px);min-width:calc(50% - 4px);box-sizing:border-box;background:#f7f8fa;border-radius:12px;padding:12px 13px;}
+  .gcell .k{font-size:11.5px;font-weight:600;} .gcell .v{font-size:16px;font-weight:800;margin-top:3px;}
+  .netbar{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:12px 15px;background:#0b1020;border-radius:12px;color:#fff;}
   .navbtn{font-size:13px;font-weight:700;color:#2F54EB;padding:6px 10px;border:1px solid #e7e9ee;border-radius:999px;cursor:pointer;background:#fff;}
   .navbtn[disabled]{color:#c7cad1;border-color:#f0f1f4;cursor:default;}
   #loading,#err{padding:60px 26px;text-align:center;color:#9b9ba1;font-size:14px;}
@@ -100,41 +104,72 @@
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
     return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); }
 
+  // Map exact ledger kinds into the 4 statement buckets (+ Other for fx/swap/stake/etc).
+  // bet = staked (−), bet_won = winnings (+), withdraw* = out, crypto/transfer/bonus = in.
+  // Every kind lands in exactly one bucket, so the buckets sum to net_change (no drift).
+  function bucketize(by_kind){
+    var b = { deposits:0, withdrawals:0, bets:0, winnings:0, other:0 };
+    (by_kind||[]).forEach(function(k){ var t=Number(k.total)||0;
+      if(k.kind==='bet') b.bets += t;
+      else if(k.kind==='bet_won' || k.kind==='betpay' || k.kind==='win') b.winnings += t;
+      else if(k.kind==='withdraw' || k.kind==='withdraw_hold') b.withdrawals += t;
+      else if(k.kind==='crypto' || k.kind==='transfer' || k.kind==='bonus') b.deposits += t;
+      else b.other += t;
+    });
+    return b;
+  }
+  // Small inline sparkline of running balance (decorative, from the same tx the RPC returns).
+  function sparkSmall(opening, tx, W, H){
+    if(!tx || tx.length < 2) return '';
+    var pts=[Number(opening)||0], run=Number(opening)||0, chron=tx.slice().reverse();
+    for(var i=0;i<chron.length;i++){ run += Number(chron[i].amount)||0; pts.push(run); }
+    var min=Math.min.apply(null,pts), max=Math.max.apply(null,pts), span=(max-min)||1, n=pts.length-1, d='';
+    for(var j=0;j<pts.length;j++){ var x=Math.round(j/n*W), y=Math.round(H-4-((pts[j]-min)/span)*(H-8)); d+=(j?' L':'M')+x+','+y; }
+    return '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">'
+      + '<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2F54EB" stop-opacity=".16"/><stop offset="1" stop-color="#2F54EB" stop-opacity="0"/></linearGradient></defs>'
+      + '<path d="'+d+'" fill="none" stroke="#2F54EB" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'
+      + '<path d="'+d+' L'+W+','+H+' L0,'+H+' Z" fill="url(#g)"/></svg>';
+  }
+
   function render(s, month, acct){
     var up = (Number(s.net_change)||0) >= 0;
+    var b = bucketize(s.by_kind);
+    var spark = sparkSmall(s.opening, s.tx, 120, 48);
     var html = '';
     // Header
-    html += '<div class="pad" style="display:flex;justify-content:space-between;align-items:center;padding-top:22px;padding-bottom:6px;">'
-      + '<div><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#2F54EB;margin-right:8px;"></span>'
-      + '<span style="font-size:15px;font-weight:800;letter-spacing:-.2px;">Alpexa Sports</span></div>'
-      + '<div class="mut" style="font-size:13px;font-weight:600;">'+esc(monthTitle(month))+'</div></div>';
-    // Hero
-    html += '<div class="pad" style="padding-top:26px;padding-bottom:4px;">'
-      + '<div class="mut" style="font-size:13px;font-weight:600;">Account value</div>'
-      + '<div class="tnum" style="font-size:52px;font-weight:800;letter-spacing:-2px;line-height:1;margin-top:6px;">'+money(s.closing)+'</div>'
-      + '<div class="tnum '+(up?'up':'dn')+'" style="font-size:15px;font-weight:700;margin-top:12px;">'
+    html += '<div class="pad" style="display:flex;justify-content:space-between;align-items:center;padding-top:18px;">'
+      + '<div><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#2F54EB;margin-right:7px;vertical-align:middle;"></span>'
+      + '<span style="font-size:14px;font-weight:800;letter-spacing:-.2px;vertical-align:middle;">Alpexa Sports</span></div>'
+      + '<div class="mut" style="font-size:12.5px;font-weight:600;">'+esc(monthTitle(month))+'</div></div>';
+    // Hero: value + change on the left, small sparkline on the right
+    html += '<div class="pad" style="display:flex;justify-content:space-between;align-items:flex-end;padding-top:14px;"><div>'
+      + '<div class="mut" style="font-size:12.5px;font-weight:600;">Account value</div>'
+      + '<div class="tnum" style="font-size:38px;font-weight:800;letter-spacing:-1.4px;line-height:1;margin-top:4px;">'+money(s.closing)+'</div>'
+      + '<div class="tnum '+(up?'up':'dn')+'" style="font-size:13.5px;font-weight:700;margin-top:8px;">'
       + (up?'▲':'▼')+' '+signed(s.net_change)+'<span style="opacity:.85;">'+pct(s.net_change, s.opening)+'</span> '
-      + '<span class="mut" style="font-weight:600;">'+esc(monthTitle(month).split(' ')[0])+'</span></div></div>';
-    // Sparkline
-    var spark = sparkline(s.opening, s.tx);
-    if(spark) html += '<div class="pad" style="padding:18px 18px 6px;">'+spark+'</div>';
-    // This month — by_kind breakdown (exact; reconciles to net)
-    html += '<div class="pad" style="padding-top:18px;padding-bottom:4px;">'
-      + '<div style="font-size:13px;font-weight:700;margin-bottom:4px;">This month</div>';
-    html += '<div class="row"><div class="l mut">Opening balance</div><div class="r tnum" style="color:#1c1c1e;">'+money(s.opening)+'</div></div>';
-    (s.by_kind||[]).forEach(function(k){
-      html += '<div class="row"><div class="l mut">'+esc(kindLabel(k.kind))
-        + ' <span class="mut" style="font-size:12px;">×'+(k.count||0)+'</span></div>'
-        + '<div class="r tnum" style="color:#1c1c1e;">'+signed(k.total)+'</div></div>';
-    });
-    html += '<div style="display:flex;justify-content:space-between;padding:14px 0;">'
-      + '<div style="font-weight:700;">Net change</div>'
-      + '<div class="tnum '+(up?'up':'dn')+'" style="font-weight:800;">'+signed(s.net_change)+'</div></div>';
-    html += '<div class="row" style="border-bottom:none;"><div class="l" style="font-weight:700;">Closing balance</div>'
-      + '<div class="r tnum" style="font-weight:800;">'+money(s.closing)+'</div></div></div>';
-    // Activity. Default to the 8 most recent (keeps the page short); everything else is
-    // collapsed behind "Show all N" so the full month is still here on demand.
-    var TX = s.tx || [], CAP = 8;
+      + '<span class="mut" style="font-weight:600;">'+esc(monthTitle(month).split(' ')[0])+'</span></div></div>'
+      + (spark||'') + '</div>';
+    // Summary cards — only non-zero buckets (they always sum to Net), then a dark Net bar
+    var cards = [
+      { k:'Deposits',    v:b.deposits,    cls:b.deposits>=0?'up':'dn' },
+      { k:'Winnings',    v:b.winnings,    cls:'up' },
+      { k:'Bets staked', v:b.bets,        cls:'' },
+      { k:'Withdrawals', v:b.withdrawals, cls:'' },
+      { k:'Other',       v:b.other,       cls:b.other>=0?'up':'' }
+    ].filter(function(c){ return Math.abs(c.v) >= 0.005; });
+    html += '<div class="pad" style="padding-top:16px;">';
+    if(cards.length){
+      html += '<div class="cards">';
+      cards.forEach(function(c){ html += '<div class="gcell"><div class="k mut">'+c.k+'</div>'
+        + '<div class="v '+(c.cls)+'">'+signed(c.v)+'</div></div>'; });
+      html += '</div>';
+    }
+    html += '<div class="netbar"><span style="font-size:13px;font-weight:600;opacity:.8;">Net change · '+esc(monthTitle(month).split(' ')[0])+'</span>'
+      + '<span class="tnum" style="font-size:17px;font-weight:800;color:'+(up?'#7ea2ff':'#ff8a5c')+';">'+signed(s.net_change)+'</span></div>';
+    html += '<div style="display:flex;justify-content:space-between;font-size:12px;margin-top:10px;" class="mut">'
+      + '<span>Opening '+money(s.opening)+'</span><span>Closing '+money(s.closing)+'</span></div></div>';
+    // Activity. Default to the 5 most recent (keeps the page short); rest behind "Show all".
+    var TX = s.tx || [], CAP = 5;
     function txRow(t){ var pos=(Number(t.amount)||0)>=0;
       return '<div class="row"><div class="l"><div class="txname">'+esc(kindLabel(t.kind))+'</div>'
         + '<div class="txsub mut">'+esc(dayLabel(t.at))+'</div></div>'
