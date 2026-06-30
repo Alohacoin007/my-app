@@ -201,8 +201,14 @@
             <label for="notes">Audience / notes <span style="color:#6b7488">(optional)</span></label>
             <textarea id="notes" name="notes" placeholder="Tell us about your network or how you plan to refer customers."></textarea>
           </div>
-          <button type="submit" class="submit">Submit application</button>
-          <div class="note">18+. By applying you agree to our partner terms. This is a demo form — submissions are not stored or sent.</div>
+          <!-- honeypot: real users never see/fill this; bots do → server drops it -->
+          <div style="position:absolute;left:-9999px;top:-9999px;" aria-hidden="true">
+            <label for="company">Company</label>
+            <input type="text" id="company" name="company" tabindex="-1" autocomplete="off">
+          </div>
+          <button type="submit" class="submit" id="submitBtn">Submit application</button>
+          <div class="err" id="formErr" style="display:none;margin-top:10px;color:#ff6b6b;font-size:13px;">Something went wrong. Please try again, or email info@alpexa-sports.com.</div>
+          <div class="note">18+. By applying you agree to our partner terms. We'll review your application and reach out by email.</div>
         </form>
       </div>
 
@@ -250,16 +256,35 @@
     var email=document.getElementById('email');
     var fName=document.getElementById('f-name');
     var fEmail=document.getElementById('f-email');
+    var notes=document.getElementById('notes');
+    var company=document.getElementById('company');
+    var btn=document.getElementById('submitBtn');
+    var formErr=document.getElementById('formErr');
     var re=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // Server-authoritative: the form POSTs to the broker-apply Edge function which
+    // stores the application (broker_applications) AND emails the back office.
+    var ENDPOINT='https://grxnbgtfnaayeluenvqh.supabase.co/functions/v1/broker-apply';
     form.addEventListener('submit',function(e){
       e.preventDefault();
+      formErr.style.display='none';
       var ok=true;
       if(!name.value.trim()){fName.classList.add('invalid');ok=false;} else {fName.classList.remove('invalid');}
       if(!re.test(email.value.trim())){fEmail.classList.add('invalid');ok=false;} else {fEmail.classList.remove('invalid');}
       if(!ok) return;
-      document.getElementById('successMsg').textContent='Thanks, '+name.value.trim()+'! We’ll review your application and reach out to '+email.value.trim()+' soon.';
-      document.getElementById('formWrap').style.display='none';
-      document.getElementById('success').style.display='block';
+      btn.disabled=true; btn.textContent='Submitting…';
+      fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name:name.value.trim(),email:email.value.trim(),notes:notes.value.trim(),company:company.value})})
+        .then(function(r){return r.json().catch(function(){return {ok:r.ok};});})
+        .then(function(d){
+          if(!d||!d.ok){throw new Error((d&&d.error)||'submit failed');}
+          document.getElementById('successMsg').textContent='Thanks, '+name.value.trim()+'! We’ll review your application and reach out to '+email.value.trim()+' soon.';
+          document.getElementById('formWrap').style.display='none';
+          document.getElementById('success').style.display='block';
+        })
+        .catch(function(){
+          btn.disabled=false; btn.textContent='Submit application';
+          formErr.style.display='block';
+        });
     });
     [name,email].forEach(function(el){el.addEventListener('input',function(){el.closest('.field').classList.remove('invalid');});});
   })();
