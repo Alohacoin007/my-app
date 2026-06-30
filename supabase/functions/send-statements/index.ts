@@ -15,6 +15,9 @@
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const CRON_SECRET    = Deno.env.get("CRON_SECRET") || "";
+// Accept WELCOME_SECRET too (a value you control/know) — Supabase can't reveal a saved
+// CRON_SECRET, so this lets you test/trigger with a known token. Either gates the function.
+const ALT_SECRET     = Deno.env.get("WELCOME_SECRET") || "";
 const SB_URL         = Deno.env.get("SUPABASE_URL") || "";
 const SB_SERVICE     = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const FROM = "Alpexa Sports <info@alpexa-sports.com>";
@@ -129,11 +132,11 @@ async function rpc(fn: string, body: unknown): Promise<unknown> {
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
-  if (!CRON_SECRET) return new Response("gate secret not configured", { status: 503 });
+  if (!CRON_SECRET && !ALT_SECRET) return new Response("gate secret not configured", { status: 503 });
   if (!RESEND_API_KEY || !SB_URL || !SB_SERVICE) return new Response("server not configured", { status: 503 });
   const url = new URL(req.url);
   const token = url.searchParams.get("token") || req.headers.get("x-cron-token") || "";
-  if (token !== CRON_SECRET) return new Response("forbidden", { status: 403 });
+  if (!token || (token !== CRON_SECRET && token !== ALT_SECRET)) return new Response("forbidden", { status: 403 });
 
   const month = (url.searchParams.get("month") || "").match(/^\d{4}-\d{2}$/) ? url.searchParams.get("month")! : lastMonthPDT();
   const only = url.searchParams.get("only") || "";
