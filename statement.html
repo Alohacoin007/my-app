@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Statement — Alpexa Sports</title>
+<!-- Monthly account statement (web, full list). Confirmed Robinhood-style design
+     (samples/statement-robinhood.html), fed by the get_statement RPC — the SINGLE
+     source of truth shared with the monthly email. No client money math: every number
+     comes from the RPC, which sums `ledger` (balance = opening + Σledger). -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  body{margin:0;padding:0;background:#ffffff;-webkit-text-size-adjust:100%;
+       font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,system-ui,sans-serif;color:#1c1c1e;}
+  .wrap{width:100%;max-width:480px;margin:0 auto;padding:8px 0 48px;}
+  .pad{padding-left:26px;padding-right:26px;}
+  .tnum{font-variant-numeric:tabular-nums;}
+  .up{color:#2F54EB;} .dn{color:#FF5000;} .mut{color:#9b9ba1;}
+  a{text-decoration:none;}
+  .row{display:flex;justify-content:space-between;align-items:flex-start;padding:13px 0;border-bottom:1px solid #f0f0f2;}
+  .row .l{font-size:15px;} .row .r{font-size:15px;font-weight:600;}
+  .txname{font-size:14.5px;font-weight:700;color:#1c1c1e;}
+  .txsub{font-size:12px;font-weight:500;margin-top:2px;}
+  .pill{display:block;background:#2F54EB;color:#fff;font-size:15px;font-weight:800;padding:15px 0;border-radius:999px;text-align:center;}
+  .navbtn{font-size:13px;font-weight:700;color:#2F54EB;padding:6px 10px;border:1px solid #e7e9ee;border-radius:999px;cursor:pointer;background:#fff;}
+  .navbtn[disabled]{color:#c7cad1;border-color:#f0f1f4;cursor:default;}
+  #loading,#err{padding:60px 26px;text-align:center;color:#9b9ba1;font-size:14px;}
+  #err{color:#c0392b;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="loading">Loading your statement…</div>
+  <div id="err" style="display:none"></div>
+  <div id="doc" style="display:none"></div>
+</div>
+
+<script src="alpexa-sync.js?v=16"></script>
+<script>
+(function(){
+  'use strict';
+  var $ = function(id){ return document.getElementById(id); };
+
+  function fail(msg){ $('loading').style.display='none'; $('doc').style.display='none';
+    var e=$('err'); e.style.display='block'; e.textContent = msg || 'Could not load this statement.'; }
+
+  // ── Money / date formatting ───────────────────────────────────────────────
+  function money(n){ var v=Math.abs(Number(n)||0);
+    return '$' + v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function signed(n){ var v=Number(n)||0; var s = v<0 ? '−' : (v>0 ? '+' : ''); return s + money(v); }
+  function pct(part, base){ base=Number(base)||0; if(!base) return '';
+    return ' (' + (part>=0?'+':'−') + Math.abs(Math.round(part/base*100)) + '%)'; }
+  // Las Vegas / PDT date label from an ISO timestamp.
+  function dayLabel(iso){ try{ return new Date(iso).toLocaleDateString('en-US',
+    {month:'short',day:'numeric',timeZone:'America/Los_Angeles'}); }catch(e){ return ''; } }
+  function monthTitle(m){ try{ var p=m.split('-');
+    return new Date(Date.UTC(+p[0],+p[1]-1,1)).toLocaleDateString('en-US',{month:'long',year:'numeric',timeZone:'UTC'});
+  }catch(e){ return m; } }
+
+  // Friendly label per ledger `kind`. Unknown kinds fall back to a tidy capitalisation,
+  // so the summary always reconciles (Σ by_kind = net) without sign-based guessing.
+  var KIND = { bonus:'Welcome bonus', crypto:'Crypto', transfer:'Transfers',
+    withdraw:'Withdrawal', withdraw_hold:'Withdrawal (held)', bet:'Bets staked',
+    betpay:'Winnings & returns', win:'Winnings', fx:'FX trade', fx_close:'FX close',
+    swap:'Swap', stake:'Staking', unstake:'Unstaking', void:'Bet void (refund)',
+    fix:'Adjustment', adj:'Adjustment' };
+  function kindLabel(k){ if(KIND[k]) return KIND[k];
+    return k ? (k.charAt(0).toUpperCase()+k.slice(1).replace(/_/g,' ')) : 'Other'; }
+
+  // ── Current month in PDT (default when ?m= is absent) ─────────────────────
+  function curMonthPDT(){ var s=new Date().toLocaleDateString('en-CA',
+    {year:'numeric',month:'2-digit',timeZone:'America/Los_Angeles'}); return s.slice(0,7); }
+  function shiftMonth(m, d){ var p=m.split('-'); var dt=new Date(Date.UTC(+p[0],+p[1]-1+d,1));
+    return dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0'); }
+
+  function qs(k){ var m=location.search.match(new RegExp('[?&]'+k+'=([^&]+)')); return m?decodeURIComponent(m[1]):''; }
+
+  // Mini sparkline of running balance across the month's transactions (chronological),
+  // starting from opening. Decorative but truthful — drawn from the same tx the RPC returns.
+  function sparkline(opening, tx){
+    if(!tx || tx.length < 2) return '';
+    var pts=[Number(opening)||0], run=Number(opening)||0;
+    var chron = tx.slice().reverse(); // RPC returns newest-first
+    for(var i=0;i<chron.length;i++){ run += Number(chron[i].amount)||0; pts.push(run); }
+    var min=Math.min.apply(null,pts), max=Math.max.apply(null,pts), span=(max-min)||1;
+    var W=444,H=96, n=pts.length-1;
+    var d='', area='';
+    for(var j=0;j<pts.length;j++){ var x=Math.round(j/n*W), y=Math.round(H-8-((pts[j]-min)/span)*(H-16));
+      d += (j?' L':'M')+x+','+y; }
+    area = d + ' L'+W+','+H+' L0,'+H+' Z';
+    return '<svg width="100%" height="96" viewBox="0 0 444 96" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">'
+      + '<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">'
+      + '<stop offset="0" stop-color="#2F54EB" stop-opacity="0.18"/><stop offset="1" stop-color="#2F54EB" stop-opacity="0"/>'
+      + '</linearGradient></defs>'
+      + '<path d="'+d+'" fill="none" stroke="#2F54EB" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+      + '<path d="'+area+'" fill="url(#g)"/></svg>';
+  }
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); }
+
+  function render(s, month, acct){
+    var up = (Number(s.net_change)||0) >= 0;
+    var html = '';
+    // Header
+    html += '<div class="pad" style="display:flex;justify-content:space-between;align-items:center;padding-top:22px;padding-bottom:6px;">'
+      + '<div><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#2F54EB;margin-right:8px;"></span>'
+      + '<span style="font-size:15px;font-weight:800;letter-spacing:-.2px;">Alpexa Sports</span></div>'
+      + '<div class="mut" style="font-size:13px;font-weight:600;">'+esc(monthTitle(month))+'</div></div>';
+    // Hero
+    html += '<div class="pad" style="padding-top:26px;padding-bottom:4px;">'
+      + '<div class="mut" style="font-size:13px;font-weight:600;">Account value</div>'
+      + '<div class="tnum" style="font-size:52px;font-weight:800;letter-spacing:-2px;line-height:1;margin-top:6px;">'+money(s.closing)+'</div>'
+      + '<div class="tnum '+(up?'up':'dn')+'" style="font-size:15px;font-weight:700;margin-top:12px;">'
+      + (up?'▲':'▼')+' '+signed(s.net_change)+'<span style="opacity:.85;">'+pct(s.net_change, s.opening)+'</span> '
+      + '<span class="mut" style="font-weight:600;">'+esc(monthTitle(month).split(' ')[0])+'</span></div></div>';
+    // Sparkline
+    var spark = sparkline(s.opening, s.tx);
+    if(spark) html += '<div class="pad" style="padding:18px 18px 6px;">'+spark+'</div>';
+    // This month — by_kind breakdown (exact; reconciles to net)
+    html += '<div class="pad" style="padding-top:18px;padding-bottom:4px;">'
+      + '<div style="font-size:13px;font-weight:700;margin-bottom:4px;">This month</div>';
+    html += '<div class="row"><div class="l mut">Opening balance</div><div class="r tnum" style="color:#1c1c1e;">'+money(s.opening)+'</div></div>';
+    (s.by_kind||[]).forEach(function(k){
+      html += '<div class="row"><div class="l mut">'+esc(kindLabel(k.kind))
+        + ' <span class="mut" style="font-size:12px;">×'+(k.count||0)+'</span></div>'
+        + '<div class="r tnum" style="color:#1c1c1e;">'+signed(k.total)+'</div></div>';
+    });
+    html += '<div style="display:flex;justify-content:space-between;padding:14px 0;">'
+      + '<div style="font-weight:700;">Net change</div>'
+      + '<div class="tnum '+(up?'up':'dn')+'" style="font-weight:800;">'+signed(s.net_change)+'</div></div>';
+    html += '<div class="row" style="border-bottom:none;"><div class="l" style="font-weight:700;">Closing balance</div>'
+      + '<div class="r tnum" style="font-weight:800;">'+money(s.closing)+'</div></div></div>';
+    // Full activity (web = ALL transactions)
+    html += '<div class="pad" style="padding-top:24px;">'
+      + '<div style="display:flex;justify-content:space-between;"><div style="font-size:13px;font-weight:700;">Activity</div>'
+      + '<div class="mut" style="font-size:12px;font-weight:600;">'+((s.tx||[]).length)+' this month</div></div>';
+    if(!(s.tx||[]).length){
+      html += '<div class="mut" style="padding:26px 0;text-align:center;font-size:14px;">No activity this month.</div>';
+    } else {
+      s.tx.forEach(function(t){
+        var pos=(Number(t.amount)||0)>=0;
+        html += '<div class="row"><div class="l"><div class="txname">'+esc(kindLabel(t.kind))+'</div>'
+          + '<div class="txsub mut">'+esc(dayLabel(t.at))+'</div></div>'
+          + '<div class="r tnum '+(pos?'up':'')+'" style="'+(pos?'':'color:#1c1c1e;')+'">'+signed(t.amount)+'</div></div>';
+      });
+    }
+    html += '</div>';
+    // Month nav (prev/next) — next disabled if it would exceed the current month
+    var cur=curMonthPDT();
+    var prev=shiftMonth(month,-1), next=shiftMonth(month,1);
+    var nextDisabled = next > cur;
+    html += '<div class="pad" style="display:flex;justify-content:space-between;padding-top:22px;">'
+      + '<button class="navbtn" onclick="location.search=\'?m='+prev+'&acct='+esc(acct)+'\'">‹ '+esc(monthTitle(prev))+'</button>'
+      + (nextDisabled ? '<button class="navbtn" disabled>'+esc(monthTitle(next))+' ›</button>'
+                      : '<button class="navbtn" onclick="location.search=\'?m='+next+'&acct='+esc(acct)+'\'">'+esc(monthTitle(next))+' ›</button>')
+      + '</div>';
+    // Back to app
+    html += '<div class="pad" style="padding-top:18px;"><a class="pill" href="sports-live.html">Back to Alpexa →</a></div>';
+    // Footer
+    html += '<div class="pad mut" style="padding-top:22px;padding-bottom:34px;text-align:center;font-size:11.5px;line-height:1.6;">'
+      + 'For your records — figures reconcile to your account ledger.<br>'
+      + 'Alpexa Sports is a subsidiary of Alpexa Suisse · <a href="mailto:info@alpexa-sports.com" style="color:#9b9ba1;">info@alpexa-sports.com</a></div>';
+
+    $('doc').innerHTML = html;
+    $('loading').style.display='none';
+    $('doc').style.display='block';
+  }
+
+  function meAccts(){ try{ var m=JSON.parse(localStorage.getItem('alpexa.me')||'null'); return (m&&m.accts)||{}; }catch(e){ return {}; } }
+
+  function start(){
+    if(!(window.AlpexaSync && AlpexaSync.db)){ return fail('Could not connect. Please reopen from the app.'); }
+    var db = AlpexaSync.db;
+    db.auth.getSession().then(function(r){
+      var sess = r && r.data && r.data.session;
+      if(!sess){ location.replace('login.html?expired=1'); return; }
+      var month = qs('m'); if(!/^\d{4}-\d{2}$/.test(month)) month = curMonthPDT();
+      var accts = meAccts();
+      var acct = qs('acct') || accts.sports || accts.crypto || accts.fx || '';
+      if(!acct){ return fail('No account found for your login.'); }
+      db.rpc('get_statement', { p_acct: acct, p_month: month }).then(function(res){
+        if(res.error){ return fail('Could not load statement: '+res.error.message); }
+        var s = res.data;
+        if(!s || s.ok===false){ return fail((s&&s.error) ? ('Statement: '+s.error) : 'Statement unavailable.'); }
+        render(s, month, acct);
+      }).catch(function(e){ fail('Could not load statement.'); });
+    }).catch(function(){ location.replace('login.html?expired=1'); });
+  }
+  if(document.readyState!=='loading') start(); else document.addEventListener('DOMContentLoaded', start);
+})();
+</script>
+</body>
+</html>
