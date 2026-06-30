@@ -42,7 +42,15 @@ const LEAGUES = [
 type Result = { hs: number; as: number; homeNm: string; awayNm: string; homeAb: string; awayAb: string };
 
 async function fetchLeagueResults(L: { lg: string; path: string }, out: Record<string, Result>) {
-  const direct = `https://site.api.espn.com/apis/site/v2/sports/${L.path}/scoreboard`;
+  // CATCH-UP WINDOW (#33): ESPN's default scoreboard returns ONLY the current day. A game that
+  // finished but wasn't settled the same day (settle downtime / late finish) fell off the feed
+  // → its still-open bet could never settle and was orphaned forever (the daily audit's C1
+  // "묵은 미정산" catches these — that's how this was found). Fetch the last 6 days via a dates
+  // range so recently-finished games are re-included and still settle (self-heal).
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const ymd = (d: Date) => `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}`;
+  const today = new Date(); const from = new Date(today.getTime() - 6 * 86400000);
+  const direct = `https://site.api.espn.com/apis/site/v2/sports/${L.path}/scoreboard?dates=${ymd(from)}-${ymd(today)}`;
   const tries = [direct, "https://corsproxy.io/?url=" + encodeURIComponent(direct)];
   for (const u of tries) {
     try {
@@ -79,7 +87,11 @@ async function fetchLeagueResults(L: { lg: string; path: string }, out: Record<s
 // winner gets score 1, loser 0, so the shared gradeLeg moneyline (my>op) works.
 // gid = "UFC_" + bout id, mirroring the app's mapUFC so legs line up.
 async function fetchUFCResults(out: Record<string, Result>) {
-  const direct = `https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard`;
+  // Same catch-up window (#33) — a UFC card a couple days old must still settle.
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const ymd = (d: Date) => `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}`;
+  const today = new Date(); const from = new Date(today.getTime() - 6 * 86400000);
+  const direct = `https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard?dates=${ymd(from)}-${ymd(today)}`;
   const tries = [direct, "https://corsproxy.io/?url=" + encodeURIComponent(direct)];
   for (const u of tries) {
     try {
