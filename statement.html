@@ -26,7 +26,7 @@
   .cards{display:flex;flex-wrap:wrap;gap:8px;}
   .gcell{flex:1 1 calc(50% - 4px);min-width:calc(50% - 4px);box-sizing:border-box;background:#f7f8fa;border-radius:12px;padding:12px 13px;}
   .gcell .k{font-size:11.5px;font-weight:600;} .gcell .v{font-size:16px;font-weight:800;margin-top:3px;}
-  .netbar{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:12px 15px;background:#0b1020;border-radius:12px;color:#fff;}
+  .netbar{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:14px 16px;border-radius:12px;border:1px solid #eceef3;}
   .navbtn{font-size:13px;font-weight:700;color:#2F54EB;padding:6px 10px;border:1px solid #e7e9ee;border-radius:999px;cursor:pointer;background:#fff;}
   .navbtn[disabled]{color:#c7cad1;border-color:#f0f1f4;cursor:default;}
   #loading,#err{padding:60px 26px;text-align:center;color:#9b9ba1;font-size:14px;}
@@ -80,27 +80,6 @@
 
   function qs(k){ var m=location.search.match(new RegExp('[?&]'+k+'=([^&]+)')); return m?decodeURIComponent(m[1]):''; }
 
-  // Mini sparkline of running balance across the month's transactions (chronological),
-  // starting from opening. Decorative but truthful — drawn from the same tx the RPC returns.
-  function sparkline(opening, tx){
-    if(!tx || tx.length < 2) return '';
-    var pts=[Number(opening)||0], run=Number(opening)||0;
-    var chron = tx.slice().reverse(); // RPC returns newest-first
-    for(var i=0;i<chron.length;i++){ run += Number(chron[i].amount)||0; pts.push(run); }
-    var min=Math.min.apply(null,pts), max=Math.max.apply(null,pts), span=(max-min)||1;
-    var W=444,H=96, n=pts.length-1;
-    var d='', area='';
-    for(var j=0;j<pts.length;j++){ var x=Math.round(j/n*W), y=Math.round(H-8-((pts[j]-min)/span)*(H-16));
-      d += (j?' L':'M')+x+','+y; }
-    area = d + ' L'+W+','+H+' L0,'+H+' Z';
-    return '<svg width="100%" height="96" viewBox="0 0 444 96" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">'
-      + '<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">'
-      + '<stop offset="0" stop-color="#2F54EB" stop-opacity="0.18"/><stop offset="1" stop-color="#2F54EB" stop-opacity="0"/>'
-      + '</linearGradient></defs>'
-      + '<path d="'+d+'" fill="none" stroke="#2F54EB" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
-      + '<path d="'+area+'" fill="url(#g)"/></svg>';
-  }
-
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
     return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); }
 
@@ -118,37 +97,22 @@
     });
     return b;
   }
-  // Small inline sparkline of running balance (decorative, from the same tx the RPC returns).
-  function sparkSmall(opening, tx, W, H){
-    if(!tx || tx.length < 2) return '';
-    var pts=[Number(opening)||0], run=Number(opening)||0, chron=tx.slice().reverse();
-    for(var i=0;i<chron.length;i++){ run += Number(chron[i].amount)||0; pts.push(run); }
-    var min=Math.min.apply(null,pts), max=Math.max.apply(null,pts), span=(max-min)||1, n=pts.length-1, d='';
-    for(var j=0;j<pts.length;j++){ var x=Math.round(j/n*W), y=Math.round(H-4-((pts[j]-min)/span)*(H-8)); d+=(j?' L':'M')+x+','+y; }
-    return '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">'
-      + '<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2F54EB" stop-opacity=".16"/><stop offset="1" stop-color="#2F54EB" stop-opacity="0"/></linearGradient></defs>'
-      + '<path d="'+d+'" fill="none" stroke="#2F54EB" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'
-      + '<path d="'+d+' L'+W+','+H+' L0,'+H+' Z" fill="url(#g)"/></svg>';
-  }
-
   function render(s, month, acct){
     var up = (Number(s.net_change)||0) >= 0;
     var b = bucketize(s.by_kind);
-    var spark = sparkSmall(s.opening, s.tx, 120, 48);
     var html = '';
     // Header
     html += '<div class="pad" style="display:flex;justify-content:space-between;align-items:center;padding-top:18px;">'
       + '<div><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#2F54EB;margin-right:7px;vertical-align:middle;"></span>'
       + '<span style="font-size:14px;font-weight:800;letter-spacing:-.2px;vertical-align:middle;">Alpexa Sports</span></div>'
       + '<div class="mut" style="font-size:12.5px;font-weight:600;">'+esc(monthTitle(month))+'</div></div>';
-    // Hero: value + change on the left, small sparkline on the right
-    html += '<div class="pad" style="display:flex;justify-content:space-between;align-items:flex-end;padding-top:14px;"><div>'
+    // Hero: value + change (no chart)
+    html += '<div class="pad" style="padding-top:16px;">'
       + '<div class="mut" style="font-size:12.5px;font-weight:600;">Account value</div>'
-      + '<div class="tnum" style="font-size:38px;font-weight:800;letter-spacing:-1.4px;line-height:1;margin-top:4px;">'+money(s.closing)+'</div>'
-      + '<div class="tnum '+(up?'up':'dn')+'" style="font-size:13.5px;font-weight:700;margin-top:8px;">'
+      + '<div class="tnum" style="font-size:42px;font-weight:800;letter-spacing:-1.6px;line-height:1;margin-top:5px;">'+money(s.closing)+'</div>'
+      + '<div class="tnum '+(up?'up':'dn')+'" style="font-size:14px;font-weight:700;margin-top:9px;">'
       + (up?'▲':'▼')+' '+signed(s.net_change)+'<span style="opacity:.85;">'+pct(s.net_change, s.opening)+'</span> '
-      + '<span class="mut" style="font-weight:600;">'+esc(monthTitle(month).split(' ')[0])+'</span></div></div>'
-      + (spark||'') + '</div>';
+      + '<span class="mut" style="font-weight:600;">'+esc(monthTitle(month).split(' ')[0])+'</span></div></div>';
     // Summary cards — only non-zero buckets (they always sum to Net), then a dark Net bar
     var cards = [
       { k:'Deposits',    v:b.deposits,    cls:b.deposits>=0?'up':'dn' },
@@ -164,8 +128,8 @@
         + '<div class="v '+(c.cls)+'">'+signed(c.v)+'</div></div>'; });
       html += '</div>';
     }
-    html += '<div class="netbar"><span style="font-size:13px;font-weight:600;opacity:.8;">Net change · '+esc(monthTitle(month).split(' ')[0])+'</span>'
-      + '<span class="tnum" style="font-size:17px;font-weight:800;color:'+(up?'#7ea2ff':'#ff8a5c')+';">'+signed(s.net_change)+'</span></div>';
+    html += '<div class="netbar" style="background:'+(up?'#f3f6ff':'#fff5f0')+';"><span style="font-size:13px;font-weight:700;color:#5a6473;">Net change · '+esc(monthTitle(month).split(' ')[0])+'</span>'
+      + '<span class="tnum '+(up?'up':'dn')+'" style="font-size:18px;font-weight:800;">'+signed(s.net_change)+'</span></div>';
     html += '<div style="display:flex;justify-content:space-between;font-size:12px;margin-top:10px;" class="mut">'
       + '<span>Opening '+money(s.opening)+'</span><span>Closing '+money(s.closing)+'</span></div></div>';
     // Activity. Default to the 5 most recent (keeps the page short); rest behind "Show all".
