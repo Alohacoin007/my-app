@@ -1782,10 +1782,11 @@
         '<input class="in" id="coAddrIn" spellcheck="false" autocomplete="off">'+
         '<div style="display:flex;gap:8px"><button class="save" id="coSave">Save</button><button class="save ghost" id="coCopy">Copy</button></div>'+
         cfgRow('Withdrawal network fee (USDT)','cfgFee',cnum('wdFee',5))+'<button class="save" id="saveFee">Save fee</button>'+
-        '<div class="hint">Match Coinbase\'s current send fee.</div></div>'+
-      '<div class="sec">Danger zone</div>'+
-      '<div class="card"><button class="save danger" id="resetBtn">🗑 Reset all demo data</button>'+
-        '<div class="hint">Temporary · clears balances, bets, requests & activity (keeps config).</div></div>';
+        '<div class="hint">Match Coinbase\'s current send fee.</div></div>';
+      // "Reset all demo data" REMOVED: it was a leftover from the localStorage-money era. Money
+      // is server-only now, so it reset nothing real — but it cleared every alpexa* localStorage
+      // key INCLUDING the back office's own admin session (alpexa-admin-auth), silently logging
+      // the operator out → empty back office. A footgun with a misleading "$50,000 fresh" message.
   }
 
   function toast(msg,bad){var t=document.getElementById('mtoast');if(!t){t=document.createElement('div');t.id='mtoast';t.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99999;padding:10px 16px;border-radius:4px;font:600 13px system-ui;color:#fff;max-width:90%;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.25)';document.body.appendChild(t);}t.textContent=msg;t.style.background=bad?'#C62828':'#1B5E20';t.style.display='block';clearTimeout(window.__mt);window.__mt=setTimeout(function(){t.style.display='none';},3500);}
@@ -1926,9 +1927,7 @@
     var ai=document.getElementById('coAddrIn'); if(ai)ai.value=CO_ADDR();
     if(g=document.getElementById('coSave'))g.onclick=function(){var v=(ai.value||'').trim();if(v){setControl('companyAddr',v);localStorage.setItem('alpexa.companyAddr',v);}flash(g);};
     if(g=document.getElementById('coCopy'))g.onclick=function(){copy((ai.value||'').trim());flash(g,'Copied!');};
-    if(g=document.getElementById('resetBtn'))g.onclick=function(){if(!confirm('Reset ALL demo data? Clears balances, bets, requests & activity.'))return;
-      Object.keys(localStorage).forEach(function(k){var keep=(k==='alpexa.companyAddr'||k==='alpexa.wdFee'||k==='alpexa.maxBet'||k==='alpexa.maxDeposit'||k==='alpexa.maxWithdraw'||k==='alpexa.margin'||k==='alpexa.cashback');if(k.indexOf('alpexa')===0 && !keep)localStorage.removeItem(k);});
-      alert('Done. Apps start fresh — Sports $50,000.');render();};
+    // resetBtn removed — see the Config view note (footgun that wiped the admin session).
   }
 
   // Don't redraw while the operator is mid-edit or typing a search (would lose input).

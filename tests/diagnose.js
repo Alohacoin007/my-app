@@ -75,6 +75,9 @@ const CHECKS = [
   { id: 'DEMO-login-creds', sev: 'HIGH', files: ['login.html', 'signup.html'],
     re: /getElementById\(\s*['"]pwInput['"]\s*\)\.value\s*=\s*['"][^'"]|Demo account credentials/,
     why: 'A demo account is hardcoded into the login form (e.g. fillDemo: pwInput.value=\'1234\'). Real users saw another (demo) account / local data on the login page. No fake credentials in shipped login — the field stays empty.' },
+  { id: 'LS-wipe-all-keys', sev: 'HIGH', files: DEPLOYED,
+    re: /Object\.keys\(\s*localStorage\s*\)/,
+    why: 'Iterating ALL localStorage keys to remove them (a "reset all" loop) nukes more than intended — it deletes the Supabase SESSION token and the back-office admin session (alpexa-admin-auth), silently logging the user/operator out → empty screens. (The "Reset all demo data" button did exactly this; removed.) Remove only specific, named keys — never sweep every key by prefix.' },
 ];
 
 // ── Reviewed-OK exceptions (Six-Sigma control plan). Suppressed but always printed. ──
