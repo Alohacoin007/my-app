@@ -984,22 +984,27 @@ function parseAlpexaPay(s){
 ═══════════════════════════════════════════════════════════════ -->
 <script type="text/babel" data-presets="react">
 
+// Vertical scale for the portfolio chart — isolated + named so tests/chart-scale.test.js can
+// lock the two render bugs we shipped: (1) min==max collapsing the line to an edge, and (2) a
+// negligible change being amplified to fill the whole height (the −0.00% corner-to-corner line
+// that even flipped on tick jitter). Floors the visible span at ±1% of the value → tiny moves
+// stay near center, only real moves (deposits, big price swings) use the full height.
+function chartYScale(series, baseline, H, padY) {
+  const all = series.concat([baseline]);
+  const min = Math.min.apply(null, all);
+  const max = Math.max.apply(null, all);
+  const mid = (min + max) / 2;
+  const half = Math.max((max - min) / 2, Math.abs(mid) * 0.01, 1e-6);
+  const lo = mid - half;
+  return (v) => H - padY - ((v - lo) / (2 * half)) * (H - padY * 2);
+}
+
 function Chart({ series, color, baseline, scrubIdx, onScrub }) {
   const W = 390, H = 220;
   const padLeft = 16, padRight = 56, padY = 22;
 
-  const min = Math.min(...series, baseline);
-  const max = Math.max(...series, baseline);
-  const mid = (min + max) / 2;
-  // Floor the visible span at ±1% of the value. Without this, a negligible change
-  // (a cash wallet's −0.00% / a few $ on millions) gets normalized to fill the whole
-  // height — a dramatic corner-to-corner line that even flips direction on live-tick
-  // jitter. With the floor, tiny moves render as a gentle near-flat line (truthful),
-  // and only real moves (deposits, big price swings) use the full height.
-  const half = Math.max((max - min) / 2, Math.abs(mid) * 0.01, 1e-6);
-  const lo = mid - half;
   const xAt = (i) => padLeft + (i / (series.length - 1)) * (W - padLeft - padRight);
-  const yAt = (v) => H - padY - ((v - lo) / (2 * half)) * (H - padY * 2);
+  const yAt = chartYScale(series, baseline, H, padY);
 
   // Line path
   const linePath = series.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i).toFixed(2)} ${yAt(v).toFixed(2)}`).join(' ');

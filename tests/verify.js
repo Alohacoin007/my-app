@@ -92,6 +92,23 @@ console.log('\n── UI SCAN: feature-completeness (review, non-blocking) ─�
   console.log('  ' + (line ? line.trim() : 'ui scan ran') + '   (details: node tests/diagnose-ui.js)');
 }
 
+// ---- (5) live render smoke (headless Chromium — catches render crashes / chart NaN) ----
+// The executable arm of 시각-감사-프롬프트.md. Skips cleanly (exit 0) where it can't run
+// (no playwright-core / no Chromium / blocked CDN) so the gate is never fragile; fails only
+// when a page it actually rendered threw an uncaught error or drew a broken chart.
+console.log('\n── RENDER: live page smoke (headless) ────────────────');
+{
+  const v = cp.spawnSync(process.execPath, [path.join(testDir, 'visual-smoke.js')], { encoding: 'utf8', timeout: 180000 });
+  if (v.status !== 0) {
+    fail++;
+    ((v.stdout || '') + (v.stderr || '')).split('\n')
+      .filter(l => /🔴|uncaught|non-finite/.test(l)).slice(0, 10).forEach(l => console.log('  ' + l.trim()));
+  } else {
+    const line = ((v.stdout || '') + (v.stderr || '')).split('\n').find(l => /visual-smoke:|SKIP visual-smoke/.test(l));
+    console.log('  ' + (line ? line.trim().replace(/^[🟢⏭️ ]+/, '') : 'render smoke ran'));
+  }
+}
+
 console.log('\n' + (fail === 0
   ? '🟢 VERIFY PASSED — safe to say done'
   : `🔴 VERIFY FAILED — ${fail} problem(s). DO NOT claim done.`) + '\n');
