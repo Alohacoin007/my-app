@@ -78,6 +78,9 @@ const CHECKS = [
   { id: 'LS-wipe-all-keys', sev: 'HIGH', files: DEPLOYED,
     re: /Object\.keys\(\s*localStorage\s*\)/,
     why: 'Iterating ALL localStorage keys to remove them (a "reset all" loop) nukes more than intended — it deletes the Supabase SESSION token and the back-office admin session (alpexa-admin-auth), silently logging the user/operator out → empty screens. (The "Reset all demo data" button did exactly this; removed.) Remove only specific, named keys — never sweep every key by prefix.' },
+  { id: 'CHART-fabricated-portfolio-history', sev: 'HIGH', files: ['crypto-live.html', 'trading.html'],
+    re: /RANGE_BASIS|(?<![A-Z_])RANGE_OPEN_MULT/,
+    why: 'A per-range multiplier that fabricates a portfolio chart\'s STARTING value from the current total (open = total × RANGE_BASIS/RANGE_OPEN_MULT, e.g. ALL=0.10 → a fake 10× gain) — i.e. INVENTED money-chart history with no real-data source. A wallet/total value chart must show REAL movement (holdings × real prices) or a flat line at the current value — never a synthesized random walk off a faked opening (#5 fake-motion). (Coin PRICE charts use BUY_RANGE_OPEN_MULT only as a loading placeholder AFTER fetching real CoinGecko data — excluded by the regex.)' },
 ];
 
 // ── Reviewed-OK exceptions (Six-Sigma control plan). Suppressed but always printed. ──
