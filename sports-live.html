@@ -2141,11 +2141,26 @@
     else{foot=`<div class="tfoot"><div class="amt">Stake ${usd(b.stake)}<b class="${dispRes==='won'?'g':dispRes==='refunded'?'':'l'}">${dispRes==='won'?'Win '+usd(b.payout):dispRes==='refunded'?'Refund '+usd(b.payout):'Loss '+usd(b.stake)}</b></div>${b.ts?`<div style="font-size:10px;color:var(--dim);padding:3px 2px 0">Settled · ${fmtStamp(b.ts)}</div>`:''}</div>`;}
     return `<div class="ticket ${isOpen?'':dispRes}">${head}${legsH}${foot}</div>`;
   }
+  // Is any leg of this ticket currently in play? (live game in the feed, or a live snapshot.)
+  function ticketIsLive(b){ try{ return (b.legs||[]).some(function(l){
+    var g=(l.gid&&typeof GAMES!=='undefined'&&GAMES)?GAMES.find(function(x){return x.id===l.gid;}):null;
+    return !!(g&&g.live) || !!l.live; }); }catch(e){ return false; } }
+  // Earliest kickoff across the ticket's legs (ms). Unknown → Infinity so it sorts last.
+  function ticketKick(b){ var min=Infinity; (b.legs||[]).forEach(function(l){
+    var g=(l.gid&&typeof GAMES!=='undefined'&&GAMES)?GAMES.find(function(x){return x.id===l.gid;}):null;
+    var kt=l.kt||(g&&g.kickoff)||''; var t=kt?Date.parse(kt):NaN; if(!isNaN(t)&&t<min)min=t; }); return min; }
+  // Open tickets: LIVE (in-play) first, then by soonest kickoff. Sort a COPY — openBets order
+  // is used elsewhere (find/remove by id), so we must not mutate it.
+  function sortedOpen(){ return openBets.slice().sort(function(a,b){
+    var la=ticketIsLive(a), lb=ticketIsLive(b); if(la!==lb) return la?-1:1;
+    var ka=ticketKick(a), kb=ticketKick(b); if(ka!==kb) return ka-kb;
+    return (b.placedTs||0)-(a.placedTs||0); }); }   // tie → newest placed first
+
   function renderTickets(){
     saveBets();
     const el=document.getElementById('tickets');
     if(seg==='open'){
-      el.innerHTML=openBets.length?openBets.map(b=>ticketHTML(b,true)).join(''):'<div class="empty empty-cta"><div class="ec-ic">🎫</div><div class="ec-t">No open bets</div><div class="ec-s">Place a bet to see it here</div><button class="ec-btn" id="ecGo">Browse games</button></div>';
+      el.innerHTML=openBets.length?sortedOpen().map(b=>ticketHTML(b,true)).join(''):'<div class="empty empty-cta"><div class="ec-ic">🎫</div><div class="ec-t">No open bets</div><div class="ec-s">Place a bet to see it here</div><button class="ec-btn" id="ecGo">Browse games</button></div>';
       const go=document.getElementById('ecGo'); if(go)go.onclick=()=>document.querySelector('[data-page="home"]').click();
     }else{ const sl=settledList(); el.innerHTML=sl.length?sl.map(b=>ticketHTML(b,false)).join(''):`<div class="empty">${tr('settled_empty')}</div>`; }
     renderStats();
