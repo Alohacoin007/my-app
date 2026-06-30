@@ -990,9 +990,13 @@ function Chart({ series, color, baseline, scrubIdx, onScrub }) {
 
   const min = Math.min(...series, baseline);
   const max = Math.max(...series, baseline);
-  const range = Math.max(0.0001, max - min);
+  // A cash-only wallet has no movement (min≈max). Don't divide by ~0 (that collapses the
+  // line to the bottom edge) — render a clean CENTERED flat line instead.
+  const vspan = max - min;
+  const flat  = vspan < Math.max(1e-6, Math.abs(max) * 1e-7);
+  const denom = flat ? 1 : vspan;
   const xAt = (i) => padLeft + (i / (series.length - 1)) * (W - padLeft - padRight);
-  const yAt = (v) => H - padY - ((v - min) / range) * (H - padY * 2);
+  const yAt = (v) => flat ? (H / 2) : (H - padY - ((v - min) / denom) * (H - padY * 2));
 
   // Line path
   const linePath = series.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i).toFixed(2)} ${yAt(v).toFixed(2)}`).join(' ');
@@ -1659,6 +1663,24 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
   const [range, setRange]       = React.useState('1D');
   const [scrubIdx, setScrubIdx] = React.useState(null);
   const [server, setServer]     = React.useState('crypto');     // 'crypto' | 'fx' | 'sports'
+  // REAL portfolio history (portfolio_snapshots via get_portfolio_history). null = still
+  // loading → fall back to the live-derived series; [] = loaded-but-empty (no history yet).
+  const [histPts, setHistPts] = React.useState(null);
+  React.useEffect(() => {
+    let cancelled = false; setHistPts(null);
+    try {
+      const me = JSON.parse(localStorage.getItem('alpexa.me') || 'null');
+      const acct = me && me.accts && me.accts.crypto;
+      if (acct && window.AlpexaSync && AlpexaSync.db) {
+        AlpexaSync.db.rpc('get_portfolio_history', { p_acct: acct, p_range: range }).then((r) => {
+          if (cancelled) return;
+          const pts = (r && r.data && r.data.ok && Array.isArray(r.data.points)) ? r.data.points : [];
+          setHistPts(pts.map((p) => +p.v || 0));
+        }, () => { if (!cancelled) setHistPts([]); });
+      } else { setHistPts([]); }
+    } catch (e) { setHistPts([]); }
+    return () => { cancelled = true; };
+  }, [range]);
   const [serverMenuOpen, setServerMenuOpen] = React.useState(false);
   const _xsb = Object.assign({}, serverBalances, (typeof window !== 'undefined' && window.__srvBal) || {});  // #20 single source (matches the server switcher)
   const serverMenuRef = React.useRef(null);
@@ -1806,18 +1828,24 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
   // moves with the tick.
   const series = React.useMemo(() => {
     const m = RANGE_META[range];
+    // REAL recorded history wins: portfolio_snapshots are the actual account value over time
+    // (deposits show as true steps). Append the live current total as the tip so it ticks.
+    if (histPts && histPts.length >= 1) return histPts.concat([liveClose]);
+    // Still loading (null) or none recorded ([]) → fall back to the live-derived series.
     const real = (typeof alpexaPortfolioSeries === 'function')
       ? alpexaPortfolioSeries(range, m.points, liveClose) : null;
     if (real && real.length > 3) return real;
     const seedByRange = { '1D': 7771, '1W': 442, '1M': 9118, '3M': 3344, 'YTD': 5099, '1Y': 1822, 'ALL': 2233 };
     return makeChartSeries(open, liveClose, m.points, seedByRange[range]);
-  }, [range, open, liveClose]);
+  }, [range, open, liveClose, histPts]);
 
-  const baseline      = open;
+  // With real history the range's starting value IS the first recorded point; otherwise the
+  // synthesized open. Change/% are measured against that start.
+  const baseline      = (histPts && histPts.length >= 1) ? series[0] : open;
   // Hero number = live total (moves with the market), matching the live rows.
   const scrubValue    = scrubIdx !== null ? series[scrubIdx] : heroLive;
   const change        = scrubValue - baseline;
-  const changePct     = (change / baseline) * 100;
+  const changePct     = baseline ? (change / baseline) * 100 : 0;
   const isUp          = change >= 0;
   const color         = isUp ? RH.green : RH.red;
   const sym           = isUp ? '▲' : '▼';

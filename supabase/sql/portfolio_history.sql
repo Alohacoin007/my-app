@@ -1,17 +1,19 @@
 -- portfolio_history — REAL per-account value history for the wallet chart.
 --
 -- Replaces the synthesized "scale current total by a coin-price shape" chart (which never
--- showed deposits) with TRUE recorded values. Two truthful sources, no fabricated movement:
---   1. backfill_portfolio_snapshots(): for each past day that had ledger activity, the
---      end-of-day value = current balance − Σ(ledger after that day) — the SAME backward
---      derivation get_statement uses, so it ties exactly to accounts.balance. A $1M deposit
---      shows as a real step. (Crypto's past intraday PRICE drift is not reconstructable from
---      our data, so it's omitted — cashflow only. We do not invent it.)
+-- showed deposits) with TRUE recorded values. No fabricated movement:
+--   1. backfill_portfolio_snapshots(): one point per LEDGER EVENT = the running balance right
+--      after it (value = current balance − Σ(ledger after that event)) + a leading "opening"
+--      point before the first event. Same backward derivation as get_statement, so it ties to
+--      accounts.balance — a deposit shows as a real step. (Crypto's past intraday PRICE drift
+--      isn't reconstructable from our data, so it's omitted — cashflow only; we don't invent it.)
 --   2. snapshot_portfolios(): a daily cron appends today's live accounts.balance, so from now
---      on the history includes price moves too.
+--      on the history also captures price moves. Idempotent via a 6h guard (no daily-unique
+--      index, because the backfill stores multiple points per day).
 --
 -- Read-only history — moves NO money. RLS: a user reads only their own account's snapshots.
--- Deploy: run in Supabase SQL editor (USER). Then schedule the daily cron (see bottom).
+-- Deploy: run in Supabase SQL editor (USER). Then `select backfill_portfolio_snapshots();`
+-- once, and schedule the daily cron (see bottom).
 
 create table if not exists public.portfolio_snapshots (
   id        bigint generated always as identity primary key,
@@ -21,9 +23,6 @@ create table if not exists public.portfolio_snapshots (
   ts        timestamptz not null default now()
 );
 create index if not exists idx_psnap_acct_ts on public.portfolio_snapshots (acct_no, ts);
--- One row per account per Las Vegas day → the cron/backfill are idempotent (re-run = upsert).
-create unique index if not exists uq_psnap_acct_day
-  on public.portfolio_snapshots (acct_no, (date(ts at time zone 'America/Los_Angeles')));
 
 alter table public.portfolio_snapshots enable row level security;
 drop policy if exists psnap_owner_read on public.portfolio_snapshots;
@@ -33,7 +32,7 @@ create policy psnap_owner_read on public.portfolio_snapshots for select using (
 );
 -- No client INSERT/UPDATE/DELETE: only the SECURITY DEFINER functions / service_role write.
 
--- ── Daily snapshot (cron calls this) ─────────────────────────────────────────
+-- ── Daily snapshot (cron). 6h guard = idempotent without a unique index. ──────
 create or replace function public.snapshot_portfolios()
 returns integer language plpgsql security definer set search_path = public as $$
 declare v_n integer;
@@ -42,36 +41,36 @@ begin
     select a.acct_no, a.server, round(coalesce(a.balance,0),2), now()
       from public.accounts a
      where coalesce(a.balance,0) <> 0
-  on conflict (acct_no, (date(ts at time zone 'America/Los_Angeles')))
-    do update set value_usd = excluded.value_usd, ts = excluded.ts;
+       and not exists (select 1 from public.portfolio_snapshots ps
+                        where ps.acct_no = a.acct_no and ps.ts > now() - interval '6 hours');
   get diagnostics v_n = row_count;
   return v_n;
 end $$;
 
--- ── One-time backfill from the ledger (truthful cashflow history) ─────────────
+-- ── One-time backfill: per-ledger-event running balance + leading opening point ─
 create or replace function public.backfill_portfolio_snapshots()
 returns integer language plpgsql security definer set search_path = public as $$
 declare v_n integer;
 begin
   insert into public.portfolio_snapshots (acct_no, server, value_usd, ts)
-  select x.acct_no, x.server, x.val,
-         -- store at noon of that Las Vegas day so date(ts at tz) = the day
-         ((x.day::timestamp + interval '12 hours') at time zone 'America/Los_Angeles')
-  from (
-    select a.acct_no, a.server, d.day,
-           round(coalesce(a.balance,0) - coalesce((
-             select sum(l2.amount) from public.ledger l2
-              where l2.acct_no = a.acct_no
-                and l2.created_at >= (((d.day + 1)::timestamp) at time zone 'America/Los_Angeles')
-           ),0), 2) as val
-      from public.accounts a
-      join lateral (
-        select distinct date(l.created_at at time zone 'America/Los_Angeles') as day
-          from public.ledger l where l.acct_no = a.acct_no
-      ) d on true
+  with ev as (
+    select l.acct_no, a.server, coalesce(a.balance,0) as bal, l.amount, l.created_at, l.id
+      from public.ledger l join public.accounts a on a.acct_no = l.acct_no
      where coalesce(a.balance,0) <> 0
-  ) x
-  on conflict (acct_no, (date(ts at time zone 'America/Los_Angeles'))) do nothing;
+       and not exists (select 1 from public.portfolio_snapshots ps where ps.acct_no = l.acct_no)
+  ),
+  run as (
+    select acct_no, server, created_at, id,
+           round(bal - coalesce(sum(amount) over (partition by acct_no
+                   order by created_at, id rows between 1 following and unbounded following),0),2) as val,
+           round(bal - coalesce(sum(amount) over (partition by acct_no),0),2) as opening,
+           row_number() over (partition by acct_no order by created_at, id) as rn,
+           min(created_at) over (partition by acct_no) as first_at
+      from ev
+  )
+  select acct_no, server, val, created_at from run
+  union all
+  select distinct acct_no, server, opening, first_at - interval '1 second' from run where rn = 1;
   get diagnostics v_n = row_count;
   return v_n;
 end $$;
@@ -105,19 +104,12 @@ end $$;
 
 revoke all on function public.get_portfolio_history(text, text) from public, anon;
 grant execute on function public.get_portfolio_history(text, text) to authenticated, service_role;
--- snapshot/backfill are backend-only (cron / you in the SQL editor) — not granted to anon/authenticated.
 revoke all on function public.snapshot_portfolios()          from public, anon, authenticated;
 revoke all on function public.backfill_portfolio_snapshots() from public, anon, authenticated;
 grant execute on function public.snapshot_portfolios()          to service_role;
 grant execute on function public.backfill_portfolio_snapshots() to service_role;
 
--- ── After deploying, run ONCE to seed past history from the ledger: ───────────
---   select public.backfill_portfolio_snapshots();
--- Then verify a real account got a curve:
---   select ts, value_usd from public.portfolio_snapshots
---    where acct_no = (select acct_no from public.accounts order by balance desc limit 1)
---    order by ts;
---
--- ── Schedule the daily snapshot (pg_cron). 00:05 PDT = 07:05 UTC (PDT, summer): ─
+-- After deploying:  select public.backfill_portfolio_snapshots();   -- seed past (run once)
+-- Daily cron (pg_cron) — 00:05 PDT = 07:05 UTC:
 --   select cron.schedule('portfolio-snapshot-daily', '5 7 * * *',
 --                        $$ select public.snapshot_portfolios(); $$);
