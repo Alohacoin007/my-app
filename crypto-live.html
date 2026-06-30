@@ -990,13 +990,16 @@ function Chart({ series, color, baseline, scrubIdx, onScrub }) {
 
   const min = Math.min(...series, baseline);
   const max = Math.max(...series, baseline);
-  // A cash-only wallet has no movement (min≈max). Don't divide by ~0 (that collapses the
-  // line to the bottom edge) — render a clean CENTERED flat line instead.
-  const vspan = max - min;
-  const flat  = vspan < Math.max(1e-6, Math.abs(max) * 1e-7);
-  const denom = flat ? 1 : vspan;
+  const mid = (min + max) / 2;
+  // Floor the visible span at ±1% of the value. Without this, a negligible change
+  // (a cash wallet's −0.00% / a few $ on millions) gets normalized to fill the whole
+  // height — a dramatic corner-to-corner line that even flips direction on live-tick
+  // jitter. With the floor, tiny moves render as a gentle near-flat line (truthful),
+  // and only real moves (deposits, big price swings) use the full height.
+  const half = Math.max((max - min) / 2, Math.abs(mid) * 0.01, 1e-6);
+  const lo = mid - half;
   const xAt = (i) => padLeft + (i / (series.length - 1)) * (W - padLeft - padRight);
-  const yAt = (v) => flat ? (H / 2) : (H - padY - ((v - min) / denom) * (H - padY * 2));
+  const yAt = (v) => H - padY - ((v - lo) / (2 * half)) * (H - padY * 2);
 
   // Line path
   const linePath = series.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i).toFixed(2)} ${yAt(v).toFixed(2)}`).join(' ');
@@ -1829,15 +1832,21 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
   const series = React.useMemo(() => {
     const m = RANGE_META[range];
     // REAL recorded history wins: portfolio_snapshots are the actual account value over time
-    // (deposits show as true steps). Append the live current total as the tip so it ticks.
-    if (histPts && histPts.length >= 1) return histPts.concat([liveClose]);
+    // (deposits show as true steps). Tip = anchorTotal (the STABLE current total, NOT the
+    // simulated liveClose tick) — appending a jittering tip made a flat cash wallet's line
+    // flip up/down every tick (fake movement). Only append it when it's a real, distinct value.
+    if (histPts && histPts.length >= 1) {
+      const tip = +anchorTotal || 0;
+      const lastPt = histPts[histPts.length - 1];
+      return (Math.abs(tip - lastPt) > 0.005) ? histPts.concat([tip]) : histPts.slice();
+    }
     // Still loading (null) or none recorded ([]) → fall back to the live-derived series.
     const real = (typeof alpexaPortfolioSeries === 'function')
       ? alpexaPortfolioSeries(range, m.points, liveClose) : null;
     if (real && real.length > 3) return real;
     const seedByRange = { '1D': 7771, '1W': 442, '1M': 9118, '3M': 3344, 'YTD': 5099, '1Y': 1822, 'ALL': 2233 };
     return makeChartSeries(open, liveClose, m.points, seedByRange[range]);
-  }, [range, open, liveClose, histPts]);
+  }, [range, open, liveClose, histPts, anchorTotal]);
 
   // With real history the range's starting value IS the first recorded point; otherwise the
   // synthesized open. Change/% are measured against that start.
