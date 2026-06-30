@@ -128,7 +128,10 @@ async function rpc(fn: string, body: unknown): Promise<unknown> {
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`${fn} ${res.status}: ${await res.text()}`);
-  return res.json();
+  // VOID-returning RPCs (mark_statement_sent) reply with an EMPTY body — res.json() on that
+  // throws "Unexpected end of JSON input". Parse only when there's a body.
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
