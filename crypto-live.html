@@ -1827,30 +1827,59 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
     } catch (e) {}
   }, [heroLive, anchorTotal]);
 
-  // Per-range seeded series. Last point uses live close so the chart's tip
-  // moves with the tick.
+  // REAL price-movement series (1D/1W): value(t) = Σ(my volatile holding qty × that coin's
+  // REAL price sparkline) + flat base (stablecoins + securities + staked). This is what makes
+  // an ETH-heavy wallet actually move like ETH — the shape is real CoinGecko prices applied to
+  // YOUR real holdings (not demo qty, not a random walk). Stable. Anchored so the tip = the
+  // real current total. Returns null when no usable price history → caller uses cashflow history.
+  const priceSeries = React.useMemo(() => {
+    if (range !== '1D' && range !== '1W') return null;
+    const spark = (typeof window !== 'undefined' && window.__alpexaSpark) || {};
+    let len = 0;
+    liveAssets.forEach((a) => { if (!a.stable) { const s = spark[a.sym]; if (s && s.length > len) len = s.length; } });
+    if (len < 6) return null;
+    let base = 0;
+    liveAssets.forEach((a) => { if (a.stable) base += (a.mine || 0); });
+    liveSecurities.forEach((s) => { base += (s.mine || 0); });
+    Object.values(staked).forEach((s) => { if (s && s.usd > 0) base += s.usd; });
+    const W = new Array(len).fill(base);
+    liveAssets.forEach((a) => {
+      if (a.stable) return;
+      const s = spark[a.sym]; if (!s || !s.length) return;
+      for (let i = 0; i < len; i++) W[i] += (a.qty || 0) * s[Math.round(i * (s.length - 1) / (len - 1))];
+    });
+    let out = (range === '1D' && W.length > 30) ? W.slice(-30) : W;
+    const last = out[out.length - 1] || 1;
+    const f = (anchorTotal && last) ? anchorTotal / last : 1;   // anchor tip to the real total
+    return out.map((v) => v * f);
+  }, [range, liveAssets, liveSecurities, staked, anchorTotal]);
+
   const series = React.useMemo(() => {
     const m = RANGE_META[range];
-    // REAL recorded history wins: portfolio_snapshots are the actual account value over time
-    // (deposits show as true steps). Tip = anchorTotal (the STABLE current total, NOT the
-    // simulated liveClose tick) — appending a jittering tip made a flat cash wallet's line
-    // flip up/down every tick (fake movement). Only append it when it's a real, distinct value.
+    // 1) Real price movement of MY holdings (1D/1W) — moves like the coins I actually hold.
+    if (priceSeries && priceSeries.length >= 2) return priceSeries;
+    // 2) Else real recorded value history from the ledger (deposits/withdrawals as true steps).
+    //    Tip = anchorTotal (STABLE current total, not the simulated liveClose — that jitter made
+    //    a flat wallet's line flip every tick). Append only when it's a real, distinct value.
     if (histPts && histPts.length >= 1) {
       const tip = +anchorTotal || 0;
       const lastPt = histPts[histPts.length - 1];
       return (Math.abs(tip - lastPt) > 0.005) ? histPts.concat([tip]) : histPts.slice();
     }
-    // Still loading (null) or none recorded ([]) → fall back to the live-derived series.
+    // 3) Still loading / nothing recorded → live-derived fallback.
     const real = (typeof alpexaPortfolioSeries === 'function')
       ? alpexaPortfolioSeries(range, m.points, liveClose) : null;
     if (real && real.length > 3) return real;
     const seedByRange = { '1D': 7771, '1W': 442, '1M': 9118, '3M': 3344, 'YTD': 5099, '1Y': 1822, 'ALL': 2233 };
     return makeChartSeries(open, liveClose, m.points, seedByRange[range]);
-  }, [range, open, liveClose, histPts, anchorTotal]);
+  }, [range, open, liveClose, histPts, anchorTotal, priceSeries]);
 
-  // With real history the range's starting value IS the first recorded point; otherwise the
-  // synthesized open. Change/% are measured against that start.
-  const baseline      = (histPts && histPts.length >= 1) ? series[0] : open;
+  // With real data the range's starting value IS the first point of the series (price-movement
+  // start, or first recorded ledger value); otherwise the synthesized open. Change/% measure
+  // against that start — using series[0] keeps it sane (fixes the −100% when a big same-day
+  // withdrawal made the old ledger baseline blow up).
+  const hasReal       = (priceSeries && priceSeries.length >= 2) || (histPts && histPts.length >= 1);
+  const baseline      = hasReal ? series[0] : open;
   // Hero number = live total (moves with the market), matching the live rows.
   const scrubValue    = scrubIdx !== null ? series[scrubIdx] : heroLive;
   const change        = scrubValue - baseline;
