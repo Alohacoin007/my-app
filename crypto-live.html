@@ -4636,8 +4636,11 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
   const srcBal   = (withdrawableBy != null) ? (+withdrawableBy[sourceId] || 0) : fullBal;
 
   const METHODS = [
-    { id: 'card', label: 'Debit card',    sub: `Instant · ${(fees.withdrawCardBps/100).toFixed(2)}% fee`,
-      feeBps: fees.withdrawCardBps, feeFlat: fees.withdrawCardFee, badge: 'Instant',    accent: RH.accent },
+    // Card payouts go through MoonPay's Sell (off-ramp) — Alpexa doesn't hold a card-payout
+    // license, so this hands off to the licensed partner (mirrors the MoonPay buy on deposit)
+    // instead of faking an in-app "instant card" flow that could never settle.
+    { id: 'card', label: 'Debit card',    sub: 'Instant to your card · via MoonPay',
+      feeBps: 0, feeFlat: 0, badge: 'Instant', accent: RH.accent, external: 'https://www.moonpay.com/sell' },
     { id: 'wire', label: 'Wire transfer', sub: `Same business day · $${fees.withdrawWireFee} flat`,
       feeBps: fees.withdrawWireBps, feeFlat: fees.withdrawWireFee, badge: 'Same day',   accent: RH.text },
   ];
@@ -4682,7 +4685,7 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
           <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 8 }}>How would you like to receive?</div>
 
           {METHODS.map((m, i) => (
-            <button key={m.id} onClick={() => { setMethodUsed(m); setStep(m.id); }} style={{
+            <button key={m.id} onClick={() => { if (m.external) { try { window.open(m.external, '_blank', 'noopener'); } catch (e) {} return; } setMethodUsed(m); setStep(m.id); }} style={{
               width: '100%', textAlign: 'left',
               background: RH.surface, border: `1px solid ${RH.line}`,
               borderRadius: 14, padding: '14px 16px',
