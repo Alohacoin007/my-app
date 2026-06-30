@@ -75,30 +75,52 @@ begin
   return v_n;
 end $$;
 
--- ── Read history for the chart (owner-only; service_role for backend) ─────────
+-- ── Read history for the chart — computed LIVE from the ledger (owner-only) ───
+-- Reads the running balance after each ledger event in the range (value after event e =
+-- current balance − Σ(amounts after e), same backward derivation as get_statement), plus a
+-- leading "opening" point. This always reflects the LATEST transactions instantly — no
+-- snapshot lag — so a fresh deposit/withdrawal shows as a real step the moment it happens.
+-- (The snapshot table/cron above remain available for future price-aware daily points.)
 create or replace function public.get_portfolio_history(p_acct text, p_range text)
 returns jsonb language plpgsql security definer set search_path = public as $$
-declare v_uid uuid := auth.uid(); v_acct public.accounts%rowtype; v_since timestamptz; v_rows jsonb;
+declare
+  v_uid uuid := auth.uid(); v_acct public.accounts%rowtype;
+  v_since timestamptz; v_bal numeric; v_first timestamptz; v_open numeric; v_rows jsonb;
 begin
   select * into v_acct from public.accounts where acct_no = p_acct;
   if not found then return jsonb_build_object('ok', false, 'error', 'account not found'); end if;
-  if v_uid is not null then
-    if not exists (select 1 from public.players pl where pl.id = v_acct.player_id and pl.auth_id = v_uid)
-      then return jsonb_build_object('ok', false, 'error', 'forbidden'); end if;
-  end if;
+  if v_uid is not null and not exists (
+       select 1 from public.players pl where pl.id = v_acct.player_id and pl.auth_id = v_uid)
+    then return jsonb_build_object('ok', false, 'error', 'forbidden'); end if;
+
   v_since := case upper(p_range)
-    when '1D'  then now() - interval '2 days'
-    when '1W'  then now() - interval '8 days'
-    when '1M'  then now() - interval '1 month'
-    when '3M'  then now() - interval '3 months'
+    when '1D'  then now() - interval '1 day'      when '1W'  then now() - interval '7 days'
+    when '1M'  then now() - interval '1 month'    when '3M'  then now() - interval '3 months'
     when 'YTD' then (date_trunc('year', now() at time zone 'America/Los_Angeles') at time zone 'America/Los_Angeles')
-    when '1Y'  then now() - interval '1 year'
-    else '-infinity'::timestamptz  -- ALL
-  end;
-  select coalesce(jsonb_agg(jsonb_build_object('ts', ts, 'v', round(value_usd,2)) order by ts), '[]'::jsonb)
-    into v_rows
-    from public.portfolio_snapshots
-   where acct_no = p_acct and ts >= v_since;
+    when '1Y'  then now() - interval '1 year'     else '-infinity'::timestamptz end;
+
+  v_bal := round(coalesce(v_acct.balance,0),2);
+  select min(created_at), round(v_bal - coalesce(sum(amount),0),2)
+    into v_first, v_open
+    from public.ledger where acct_no = p_acct and created_at >= v_since;
+
+  with ev as (
+    select l.created_at as ts,
+           round(v_bal - coalesce(sum(l.amount) over (
+                   order by l.created_at, l.id rows between 1 following and unbounded following),0),2) as v
+      from public.ledger l
+     where l.acct_no = p_acct and l.created_at >= v_since
+  ),
+  pts as (
+    select ts, v from ev
+    union all
+    select (v_first - interval '1 second'), v_open where v_first is not null
+    union all
+    select now(), v_bal where v_first is null
+  )
+  select coalesce(jsonb_agg(jsonb_build_object('ts', ts, 'v', v) order by ts), '[]'::jsonb)
+    into v_rows from pts;
+
   return jsonb_build_object('ok', true, 'acct', p_acct, 'range', upper(p_range), 'points', v_rows);
 end $$;
 
