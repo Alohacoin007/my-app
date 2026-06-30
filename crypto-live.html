@@ -1860,31 +1860,20 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
   }, [range, liveAssets, liveSecurities, staked, anchorTotal]);
 
   const series = React.useMemo(() => {
-    const m = RANGE_META[range];
     // 1) Real price movement of MY holdings (1D/1W) — moves like the coins I actually hold.
     if (priceSeries && priceSeries.length >= 2) return priceSeries;
-    // 2) Else real recorded value history from the ledger (deposits/withdrawals as true steps).
-    //    Tip = anchorTotal (STABLE current total, not the simulated liveClose — that jitter made
-    //    a flat wallet's line flip every tick). Append only when it's a real, distinct value.
-    if (histPts && histPts.length >= 1) {
-      const tip = +anchorTotal || 0;
-      const lastPt = histPts[histPts.length - 1];
-      return (Math.abs(tip - lastPt) > 0.005) ? histPts.concat([tip]) : histPts.slice();
-    }
-    // 3) Still loading / nothing recorded → live-derived fallback.
-    const real = (typeof alpexaPortfolioSeries === 'function')
-      ? alpexaPortfolioSeries(range, m.points, liveClose) : null;
-    if (real && real.length > 3) return real;
-    const seedByRange = { '1D': 7771, '1W': 442, '1M': 9118, '3M': 3344, 'YTD': 5099, '1Y': 1822, 'ALL': 2233 };
-    return makeChartSeries(open, liveClose, m.points, seedByRange[range]);
-  }, [range, open, liveClose, histPts, anchorTotal, priceSeries]);
+    // 2) Older ranges: a crypto wallet's value = coins × price, which we do NOT store
+    //    historically — so there is no truthful older history to draw. Render a flat line at
+    //    the current value. (We do NOT use the ledger here: the ledger omits price gains, so
+    //    balance ≠ opening+Σledger for crypto and reconstructing it gives wrong/negative values.
+    //    And we do NOT synthesize a random walk — that's fake movement on a money screen.)
+    const cur = (+anchorTotal || +liveClose || 0);
+    return [cur, cur];
+  }, [range, priceSeries, anchorTotal, liveClose]);
 
-  // With real data the range's starting value IS the first point of the series (price-movement
-  // start, or first recorded ledger value); otherwise the synthesized open. Change/% measure
-  // against that start — using series[0] keeps it sane (fixes the −100% when a big same-day
-  // withdrawal made the old ledger baseline blow up).
-  const hasReal       = (priceSeries && priceSeries.length >= 2) || (histPts && histPts.length >= 1);
-  const baseline      = hasReal ? series[0] : open;
+  // The range's starting value IS the first point of the series (real price-movement start, or
+  // the flat current value when there's no older history). Change/% measure against that start.
+  const baseline      = series[0];
   // Hero number = live total (moves with the market), matching the live rows.
   const scrubValue    = scrubIdx !== null ? series[scrubIdx] : heroLive;
   const change        = scrubValue - baseline;
