@@ -32,9 +32,10 @@ declare
   verdict text;
 begin
   -- C1 · 묵은 미정산 (경기 끝났는데 open 36h+) 🔴
+  -- positions엔 created_at이 없고 updated_at만 있음 → 36h+ 손 안 댄 open = 묵은 베팅.
   begin
     select count(*) into v from public.positions
-      where server='sports' and status='open' and created_at < now() - interval '36 hours';
+      where server='sports' and status='open' and updated_at < now() - interval '36 hours';
     rep := rep || jsonb_build_object('C1', jsonb_build_object('label','묵은 미정산','sev', case when v>0 then 'red' else 'green' end,'count',v));
     if v>0 then red := red+1; end if;
   exception when others then rep := rep || jsonb_build_object('C1', jsonb_build_object('label','묵은 미정산','sev','error','count',0,'err',SQLERRM)); end;
@@ -61,15 +62,19 @@ begin
     if (v+v2)>0 then red := red+1; end if;
   exception when others then rep := rep || jsonb_build_object('C3', jsonb_build_object('label','차감 누락','sev','error','count',0,'err',SQLERRM)); end;
 
-  -- C4 · 잔고 불변식 (balance == opening + Σledger) 🔴🚨
+  -- C4 · 잔고 불변식 🔴🚨
+  -- accounts엔 opening_balance 컬럼이 없음(가입 시 force_opening_balance 트리거가 잔고에 직접
+  -- 세팅; 그 외 모든 변동은 ledger). 그래서 "잔고 − Σledger = 묵시적 오프닝(=가입 웰컴액)" 이
+  -- 성립해야 함. 오프닝은 0~웰컴상한(≤$700)이라, 음수(손실 우회로 잔고가 ledger보다 낮음)거나
+  -- 비상식적으로 큼(>$1000 = 머니프린팅 우회로 잔고가 ledger보다 과하게 높음)이면 드리프트.
   begin
     select count(*) into v from (
-      select a.acct_no
+      select round(coalesce(a.balance,0) - coalesce(sum(l.amount),0), 2) as implied_open
         from public.accounts a
         left join public.ledger l on l.acct_no = a.acct_no
        where a.server='sports'
-       group by a.acct_no, a.balance, a.opening_balance
-      having a.balance <> a.opening_balance + coalesce(sum(l.amount),0)) q;
+       group by a.acct_no, a.balance) q
+     where implied_open < -0.005 or implied_open > 1000;
     rep := rep || jsonb_build_object('C4', jsonb_build_object('label','잔고 불변식','sev', case when v>0 then 'red' else 'green' end,'count',v));
     if v>0 then red := red+1; end if;
   exception when others then rep := rep || jsonb_build_object('C4', jsonb_build_object('label','잔고 불변식','sev','error','count',0,'err',SQLERRM)); end;
