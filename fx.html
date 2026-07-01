@@ -414,6 +414,7 @@
   /* ── Hero (landing) — left: strengths ad · right: live quotes ── */
   .hero{max-width:1180px;margin:0 auto;padding:78px 36px 64px;display:grid;
     grid-template-columns:1.15fr .85fr;gap:88px;align-items:start}
+  .h-left{min-width:0}
   .h-eyebrow{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11px;letter-spacing:3px;
     text-transform:uppercase;color:var(--accent);margin-bottom:22px}
   .h-title{font-family:var(--font-display);font-size:clamp(34px,4.4vw,56px);font-weight:600;line-height:1.02;
@@ -426,6 +427,14 @@
   .num-r{padding-bottom:0}
   .nk{font-family:var(--font-display);font-size:clamp(34px,5.1vw,68px);font-weight:700;line-height:.95;letter-spacing:-2px;text-transform:uppercase;color:var(--text)}
   .nu{margin-top:9px;font-size:10.5px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted)}
+  /* rotating slogan slides (slide 1 fixed content; slide 2 = 500:1) */
+  .h-slides{position:relative;overflow:hidden}
+  .h-track{display:flex;transition:transform .6s cubic-bezier(.4,0,.2,1)}
+  .h-slide{min-width:100%;flex:none}
+  .big0.n2{font-size:clamp(60px,8.8vw,132px);letter-spacing:-3px}
+  .h-dots{margin-top:30px;display:flex;gap:9px}
+  .h-dots button{width:9px;height:9px;border-radius:50%;border:none;background:#cfd6e2;cursor:pointer;padding:0;transition:width .25s,background .25s}
+  .h-dots button.on{background:var(--accent);width:26px;border-radius:5px}
   .h-cta{margin-top:30px;display:flex;gap:14px;flex-wrap:wrap}
   .btn-lg{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:700;letter-spacing:.2px;
     padding:13px 24px;border-radius:5px;text-decoration:none;transition:filter .15s,background .15s,color .15s}
@@ -534,11 +543,22 @@
 
   <section class="hero" id="top">
     <div class="h-left">
-      <div class="h-eyebrow">Raw ECN pricing</div>
-      <div class="numwrap">
-        <div class="big0">0.0</div>
-        <div class="num-r"><div class="nk">Tight<br>spreads.</div></div>
-      </div>
+      <div class="h-slides" id="hslides"><div class="h-track" id="htrack">
+        <div class="h-slide">
+          <div class="h-eyebrow">Raw ECN pricing</div>
+          <div class="numwrap">
+            <div class="big0">0.0</div>
+            <div class="num-r"><div class="nk">Tight<br>spreads.</div></div>
+          </div>
+        </div>
+        <div class="h-slide">
+          <div class="h-eyebrow">Capital efficiency</div>
+          <div class="numwrap">
+            <div class="big0 n2">500:1</div>
+            <div class="num-r"><div class="nk">Max<br>leverage.</div></div>
+          </div>
+        </div>
+      </div></div>
       <div class="h-strength">Up to 500:1 leverage<span class="dot">·</span>ECN execution<span class="dot">·</span>Swiss custody</div>
       <div class="h-cta">
         <a class="btn-lg solid" href="signup.html" target="_blank" rel="noopener">Open account</a>
@@ -549,6 +569,7 @@
         <span class="achip">Indices</span><span class="achip">Metals</span><span class="achip">Commodities</span>
         <span class="cnt">10,000+<small>Instruments</small></span>
       </div>
+      <div class="h-dots" id="hdots"><button class="on" aria-label="Slide: tight spreads"></button><button aria-label="Slide: 500:1 leverage"></button></div>
     </div>
     <div class="h-right">
       <div class="quotes" id="quotes">
@@ -694,6 +715,23 @@
   <script>
   /* FX site is white-only — force the light theme regardless of any stored preference. */
   try{ document.body.classList.add('light'); }catch(e){}
+  </script>
+  <script>
+  /* Rotating hero slogans — left side only (quotes widget stays fixed). 5s auto-advance,
+     pause on hover, dot controls, and respect prefers-reduced-motion (no auto-advance). */
+  (function(){
+    var track=document.getElementById('htrack'), host=document.getElementById('hslides'), dotsEl=document.getElementById('hdots');
+    if(!track||!dotsEl) return;
+    var dots=dotsEl.querySelectorAll('button'), n=track.children.length, idx=0, timer=null, paused=false, reduce=false;
+    try{ reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
+    function paint(){ track.style.transform='translateX(-'+(idx*100)+'%)'; for(var i=0;i<dots.length;i++){ dots[i].classList.toggle('on', i===idx); } }
+    function go(i){ idx=(i+n)%n; paint(); }
+    function start(){ if(reduce) return; stop(); timer=setInterval(function(){ if(!paused) go(idx+1); }, 5000); }
+    function stop(){ if(timer){ clearInterval(timer); timer=null; } }
+    for(var i=0;i<dots.length;i++){ (function(k){ dots[k].addEventListener('click',function(){ go(k); start(); }); })(i); }
+    if(host){ host.addEventListener('mouseenter',function(){ paused=true; }); host.addEventListener('mouseleave',function(){ paused=false; }); }
+    paint(); start();
+  })();
   </script>
 </body>
 </html>
