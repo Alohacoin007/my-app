@@ -497,6 +497,34 @@
   .ft-risk{font-size:11px;color:var(--muted);max-width:640px;line-height:1.5;opacity:.85}
   @media(max-width:820px){ .ft-in{grid-template-columns:1fr 1fr;gap:30px 24px;padding:44px 20px 24px} .ft-bot{padding:20px 20px 34px} }
 
+  /* ── ECN aggregator section (living flow diagram) ── */
+  .ecn-sec{padding:100px 36px;position:relative;overflow:hidden;border-top:1px solid var(--line)}
+  .ecn-in{max-width:1160px;margin:0 auto}
+  .ecn-diagram{margin-top:40px}
+  .ecn-diagram svg{display:block;width:100%;height:auto;overflow:visible}
+  .ecn-cap{margin-top:6px;font-size:11px;color:var(--muted);opacity:.7;letter-spacing:.2px}
+  .ecn-trust{margin-top:30px;display:flex;align-items:center;font-size:13px;font-weight:600;color:var(--muted);flex-wrap:wrap}
+  .ecn-trust .d{color:var(--accent);margin:0 12px}
+  .rg-name{font-family:var(--font-display);font-weight:700;font-size:15px;fill:var(--text);letter-spacing:.3px}
+  .rg-city{font-family:'Inter',sans-serif;font-weight:600;font-size:11px;fill:#3a4658}
+  .ln-flow{stroke:#c2ccde;stroke-width:1.5;fill:none}
+  .ln-globe{stroke:#eef1f7;stroke-width:1.2;fill:none}
+  .ecn-ring0{stroke:#e7ebf2;stroke-width:1.2;fill:none}
+  .ic{stroke:var(--text);stroke-width:1.5;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .ic.acc{stroke:var(--accent)}
+  .agg-label{font-family:var(--font-display);font-weight:700;font-size:13px;letter-spacing:1.5px;fill:var(--text);text-transform:uppercase}
+  .agg-sub{font-family:'Inter',sans-serif;font-weight:600;font-size:11px;fill:var(--muted)}
+  .ecn-big0{font-family:var(--font-display);font-size:150px;font-weight:600;letter-spacing:-8px;fill:var(--accent)}
+  .ecn-pips{font-family:var(--font-display);font-weight:700;font-size:20px;letter-spacing:1px;fill:var(--text);text-transform:uppercase}
+  .ecn-usub{font-family:'Inter',sans-serif;font-weight:600;font-size:12.5px;fill:var(--muted)}
+  .sun-arc{stroke:#dfe5ef;stroke-width:1.6;fill:none}
+  .sun-on{stroke:var(--accent);stroke-width:1.6;fill:none}
+  .sun-t{font-family:ui-monospace,monospace;font-size:9.5px;font-weight:700;fill:var(--muted);letter-spacing:.5px}
+  .h24{font-family:var(--font-display);font-weight:700;font-size:12px;fill:var(--accent);letter-spacing:1px}
+  .pulse{fill:var(--accent)}
+  @media(prefers-reduced-motion:reduce){ .pulse,.ping{display:none} }
+  @media(max-width:720px){ .ecn-sec{padding:64px 20px} }
+
   /* ── Forex section ── */
   .fx-sec{padding:104px 36px;position:relative}
   .wrap{max-width:1040px;margin:0 auto}
@@ -582,6 +610,103 @@
       </div>
       <div class="ls-grid" id="qbody"></div>
       <div class="ls-foot"><span id="qtime">—</span><a href="#forex">Full list →</a></div>
+    </div>
+  </section>
+
+  <!-- ECN aggregator — living interbank flow diagram -->
+  <section class="ecn-sec" id="how">
+    <div class="ecn-in">
+      <div class="eyebrow2">Interbank ECN · Aggregated liquidity</div>
+      <h2 class="sec-h">The world's banks,<br><span style="color:var(--accent)">one price.</span></h2>
+      <p class="sec-sub">Live quotes from Tier‑1 institutions across four regions, aggregated 24/5 into a single best bid and best ask — spreads that collapse toward zero.</p>
+
+      <div class="ecn-diagram">
+        <svg id="ecn-svg" viewBox="0 0 1240 430" role="img" aria-label="Interbank quotes from Europe, the Americas, Asia and Australia aggregated by an ECN into near-zero spreads">
+          <!-- faint globe -->
+          <g class="ln-globe">
+            <circle cx="215" cy="215" r="190"/>
+            <ellipse cx="215" cy="215" rx="190" ry="70"/>
+            <ellipse cx="215" cy="215" rx="190" ry="130"/>
+            <ellipse cx="215" cy="215" rx="80" ry="190"/>
+            <ellipse cx="215" cy="215" rx="150" ry="190"/>
+            <line x1="25" y1="215" x2="405" y2="215"/>
+          </g>
+
+          <!-- follow-the-sun 24h ribbon -->
+          <g transform="translate(470,-6)">
+            <path class="sun-arc" d="M0 40 A 150 40 0 0 1 300 40"/>
+            <path id="sunpath" fill="none" stroke="none" d="M0 40 A 150 40 0 0 1 300 40"/>
+            <path class="sun-on" d="M0 40 A 150 40 0 0 1 150 6"/>
+            <circle cx="0" cy="40" r="4" fill="#1e40d8"/><circle cx="80" cy="14" r="4" fill="#1e40d8"/>
+            <circle class="ic" cx="220" cy="14" r="4"/><circle class="ic" cx="300" cy="40" r="4"/>
+            <text class="sun-t" x="-8" y="58" text-anchor="middle">SYD</text>
+            <text class="sun-t" x="80" y="4" text-anchor="middle">TYO</text>
+            <text class="sun-t" x="220" y="4" text-anchor="middle">LDN</text>
+            <text class="sun-t" x="308" y="58" text-anchor="middle">NYC</text>
+            <text class="h24" x="150" y="-2" text-anchor="middle">24 / 5 CONTINUOUS</text>
+            <circle class="pulse" r="4"><animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"><mpath href="#sunpath"/></animateMotion></circle>
+          </g>
+
+          <!-- flow paths (region -> aggregator) -->
+          <path id="flowE"  class="ln-flow" d="M405 90  C 480 90, 505 205, 600 215"/>
+          <path id="flowAm" class="ln-flow" d="M405 175 C 490 175, 515 210, 600 215"/>
+          <path id="flowAs" class="ln-flow" d="M405 258 C 490 258, 515 220, 600 215"/>
+          <path id="flowAu" class="ln-flow" d="M405 343 C 480 343, 505 225, 600 215"/>
+          <path id="flowOut" class="ln-flow" d="M700 215 C 780 215, 800 215, 872 215" stroke-width="2"/>
+          <path class="ic acc" d="M864 207 l10 8 l-10 8"/>
+
+          <!-- flowing pulses -->
+          <circle class="pulse" r="3.6"><animateMotion dur="2.4s" begin="0s"    repeatCount="indefinite" calcMode="linear"><mpath href="#flowE"/></animateMotion></circle>
+          <circle class="pulse" r="3.6"><animateMotion dur="2.4s" begin="0.6s"  repeatCount="indefinite" calcMode="linear"><mpath href="#flowAm"/></animateMotion></circle>
+          <circle class="pulse" r="3.6"><animateMotion dur="2.4s" begin="1.2s"  repeatCount="indefinite" calcMode="linear"><mpath href="#flowAs"/></animateMotion></circle>
+          <circle class="pulse" r="3.6"><animateMotion dur="2.4s" begin="1.8s"  repeatCount="indefinite" calcMode="linear"><mpath href="#flowAu"/></animateMotion></circle>
+          <circle class="pulse" r="4.4"><animateMotion dur="1.4s" begin="0.3s"  repeatCount="indefinite" calcMode="linear"><mpath href="#flowOut"/></animateMotion></circle>
+
+          <!-- region rows -->
+          <g transform="translate(70,64)">
+            <g class="ic"><path d="M2 16 L20 4 L38 16"/><line x1="4" y1="16" x2="36" y2="16"/><line x1="9" y1="18" x2="9" y2="32"/><line x1="17" y1="18" x2="17" y2="32"/><line x1="23" y1="18" x2="23" y2="32"/><line x1="31" y1="18" x2="31" y2="32"/><line x1="4" y1="34" x2="36" y2="34"/></g>
+            <text class="rg-name" x="52" y="14">EUROPE</text>
+            <text class="rg-city" x="52" y="30">UBS · Deutsche Bank · Barclays · HSBC</text>
+          </g>
+          <g transform="translate(70,149)">
+            <g class="ic"><path d="M2 16 L20 4 L38 16"/><line x1="4" y1="16" x2="36" y2="16"/><line x1="9" y1="18" x2="9" y2="32"/><line x1="17" y1="18" x2="17" y2="32"/><line x1="23" y1="18" x2="23" y2="32"/><line x1="31" y1="18" x2="31" y2="32"/><line x1="4" y1="34" x2="36" y2="34"/></g>
+            <text class="rg-name" x="52" y="14">AMERICAS</text>
+            <text class="rg-city" x="52" y="30">JPMorgan · Citi · Goldman Sachs · BofA</text>
+          </g>
+          <g transform="translate(70,232)">
+            <g class="ic"><path d="M2 16 L20 4 L38 16"/><line x1="4" y1="16" x2="36" y2="16"/><line x1="9" y1="18" x2="9" y2="32"/><line x1="17" y1="18" x2="17" y2="32"/><line x1="23" y1="18" x2="23" y2="32"/><line x1="31" y1="18" x2="31" y2="32"/><line x1="4" y1="34" x2="36" y2="34"/></g>
+            <text class="rg-name" x="52" y="14">ASIA</text>
+            <text class="rg-city" x="52" y="30">MUFG · Nomura · Mizuho · DBS</text>
+          </g>
+          <g transform="translate(70,317)">
+            <g class="ic"><path d="M2 16 L20 4 L38 16"/><line x1="4" y1="16" x2="36" y2="16"/><line x1="9" y1="18" x2="9" y2="32"/><line x1="17" y1="18" x2="17" y2="32"/><line x1="23" y1="18" x2="23" y2="32"/><line x1="31" y1="18" x2="31" y2="32"/><line x1="4" y1="34" x2="36" y2="34"/></g>
+            <text class="rg-name" x="52" y="14">AUSTRALIA</text>
+            <text class="rg-city" x="52" y="30">ANZ · Westpac · NAB · CommBank</text>
+          </g>
+
+          <!-- center: ECN aggregator -->
+          <g class="ping"><circle cx="650" cy="215" r="46" fill="none" stroke="#1e40d8" stroke-width="1.4"><animate attributeName="r" values="46;92" dur="2.8s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.45;0" dur="2.8s" repeatCount="indefinite"/></circle></g>
+          <g transform="translate(650,215)">
+            <circle class="ecn-ring0" r="78"/>
+            <polygon class="ic acc" points="0,-50 43,-25 43,25 0,50 -43,25 -43,-25" stroke-width="1.8"/>
+            <circle class="ic acc" cx="0" cy="0" r="7" fill="#eef1ff"/>
+            <line class="ic acc" x1="0" y1="0" x2="0" y2="-34"/><line class="ic acc" x1="0" y1="0" x2="30" y2="17"/><line class="ic acc" x1="0" y1="0" x2="-30" y2="17"/>
+            <circle class="ic acc" cx="0" cy="-34" r="3.5"/><circle class="ic acc" cx="30" cy="17" r="3.5"/><circle class="ic acc" cx="-30" cy="17" r="3.5"/>
+            <text class="agg-label" x="0" y="92" text-anchor="middle">ECN Aggregator</text>
+            <text class="agg-sub" x="0" y="110" text-anchor="middle">best bid × best ask</text>
+          </g>
+
+          <!-- right: 0.0 result -->
+          <g transform="translate(892,0)">
+            <text class="ecn-big0" x="0" y="270">0.0</text>
+            <text class="ecn-pips" x="4" y="300">Pips · from</text>
+            <text class="ecn-usub" x="4" y="322">Aggregated best price · 24/5</text>
+          </g>
+        </svg>
+        <div class="ecn-cap">Representative Tier‑1 institutions — illustrative of aggregated interbank liquidity.</div>
+      </div>
+
+      <div class="ecn-trust">No dealing desk<span class="d">·</span>Straight‑through processing<span class="d">·</span>Swiss custody</div>
     </div>
   </section>
 
