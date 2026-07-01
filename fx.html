@@ -492,6 +492,21 @@
   .cn-widget{height:480px}
   .cn-widget .tradingview-widget-container,.cn-widget .tradingview-widget-container__widget{height:100%}
   .cn-note{margin-top:14px;font-size:11px;color:var(--muted);opacity:.7}
+  /* custom economic calendar (free feed) */
+  .cal-headrow,.cal-row{display:grid;grid-template-columns:50px 40px 1fr 48px 56px 56px;gap:10px;align-items:center;padding:11px 20px;border-bottom:1px solid var(--line)}
+  .cal-headrow{font-size:9.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+  .cal-row{font-size:13px}
+  .calbody{max-height:474px;overflow:auto}
+  .cal-day{padding:7px 20px;background:var(--surface2);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)}
+  .cal-time{font-family:ui-monospace,monospace;color:var(--muted)}
+  .cal-cur{font-weight:700;color:var(--text)}
+  .cal-ev{color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cal-imp{display:flex;gap:3px}
+  .cal-imp i{width:5px;height:5px;border-radius:50%;background:#e5484d}
+  .cal-imp i.m{background:#f5a623}.cal-imp i.l{background:#3a9bdc}.cal-imp i.o{background:#e2e6ee}
+  .cal-v{font-family:ui-monospace,monospace;text-align:right;color:var(--text);font-weight:600;font-size:12.5px}
+  .cal-v.f{color:var(--muted);font-weight:500}
+  .cal-empty{padding:44px 20px;text-align:center;color:var(--muted);font-size:13px}
   @media(max-width:820px){ .calnews{padding:52px 20px 12px} .cn-grid{grid-template-columns:1fr} }
 
   /* ── Footer (sports-style wordmark, white version) ── */
@@ -576,15 +591,9 @@
     <h2 class="cn-h">Economic calendar &amp; news</h2>
     <div class="cn-grid">
       <div class="cn-card">
-        <div class="cn-head"><span class="cn-title"><span class="cn-dot"></span>Economic Calendar</span><span class="cn-sub">Live · this week</span></div>
-        <div class="cn-widget">
-          <div class="tradingview-widget-container">
-            <div class="tradingview-widget-container__widget"></div>
-            <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
-            {"colorTheme":"light","isTransparent":true,"width":"100%","height":"480","locale":"en","importanceFilter":"0,1","countryFilter":"us,eu,jp,gb,au,ca,ch,nz"}
-            </script>
-          </div>
-        </div>
+        <div class="cn-head"><span class="cn-title"><span class="cn-dot"></span>Economic Calendar</span><span class="cn-sub">This week · Las Vegas time</span></div>
+        <div class="cal-headrow"><span>Time</span><span>Cur</span><span>Event</span><span>Impact</span><span>Fcst</span><span>Prev</span></div>
+        <div id="calbody" class="calbody"><div class="cal-empty">Loading…</div></div>
       </div>
       <div class="cn-card">
         <div class="cn-head"><span class="cn-title"><span class="cn-dot"></span>Market News</span><span class="cn-sub">Live feed</span></div>
@@ -598,7 +607,7 @@
         </div>
       </div>
     </div>
-    <div class="cn-note">Market data &amp; news provided by TradingView.</div>
+    <div class="cn-note">Economic calendar via Forex Factory · Market news via TradingView.</div>
   </section>
 
   <footer class="site-foot">
@@ -703,6 +712,46 @@
     host.addEventListener('mouseenter',function(){ paused=true; });
     host.addEventListener('mouseleave',function(){ paused=false; });
     paint(); start();
+  })();
+  </script>
+
+  <script>
+  /* Economic calendar — real data from a free public forex-calendar feed (this week,
+     no API key). Rendered in our own clean UI. Times shown in Las Vegas (PT). All
+     feed values are HTML-escaped before insertion; falls back gracefully if the feed
+     is unreachable. */
+  (function(){
+    var body=document.getElementById('calbody');
+    if(!body) return;
+    var FEED='https://nfs.faireconomy.media/ff_calendar_thisweek.json';
+    var MAJORS={USD:1,EUR:1,GBP:1,JPY:1,AUD:1,CAD:1,CHF:1,NZD:1};
+    function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+    function dots(imp){ var n=imp==='High'?3:imp==='Medium'?2:1, cls=imp==='High'?'':imp==='Medium'?'m':'l', s='';
+      for(var i=0;i<3;i++){ s+='<i class="'+(i<n?cls:'o')+'"></i>'; } return s; }
+    function tzTime(iso){ try{ return new Date(iso).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'America/Los_Angeles'}); }catch(e){ return '—'; } }
+    function tzDay(iso){ try{ return new Date(iso).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',timeZone:'America/Los_Angeles'}); }catch(e){ return ''; } }
+    fetch(FEED).then(function(r){ if(!r.ok) throw 0; return r.json(); }).then(function(data){
+      if(!Array.isArray(data)) throw 0;
+      var now=Date.now()-3600000;
+      var rows=data.filter(function(e){ return MAJORS[e.country] && (e.impact==='High'||e.impact==='Medium'); });
+      var up=rows.filter(function(e){ return new Date(e.date).getTime()>=now; });
+      rows=(up.length?up:rows).slice(0,10);
+      if(!rows.length){ body.innerHTML='<div class="cal-empty">No major events scheduled.</div>'; return; }
+      var lastDay='', html='';
+      rows.forEach(function(e){
+        var day=tzDay(e.date);
+        if(day!==lastDay){ html+='<div class="cal-day">'+esc(day)+'</div>'; lastDay=day; }
+        html+='<div class="cal-row">'
+          +'<span class="cal-time">'+esc(tzTime(e.date))+'</span>'
+          +'<span class="cal-cur">'+esc(e.country)+'</span>'
+          +'<span class="cal-ev" title="'+esc(e.title)+'">'+esc(e.title)+'</span>'
+          +'<span class="cal-imp">'+dots(e.impact)+'</span>'
+          +'<span class="cal-v f">'+esc(e.forecast||'—')+'</span>'
+          +'<span class="cal-v f">'+esc(e.previous||'—')+'</span>'
+          +'</div>';
+      });
+      body.innerHTML=html;
+    }).catch(function(){ body.innerHTML='<div class="cal-empty">Calendar unavailable right now.</div>'; });
   })();
   </script>
 </body>
