@@ -10147,6 +10147,22 @@ function ActivityList({ transactions = [] }) {
 
 function Account({ serverBalances = {}, balances = {}, staked = {}, transactions = [], setTransactions, savedCards = [], setSavedCards, linkedBanks = [], setLinkedBanks, whitelist = [], setWhitelist, beneficiaries = [], setBeneficiaries, tabBar }) {
   const [range, setRange] = React.useState('1D');
+  // REAL multi-account history (portfolio_snapshots via get_portfolio_total_history). null =
+  // loading, [] = loaded-but-empty (fall back to flat). Drives the truthful moving chart.
+  const [totalHist, setTotalHist] = React.useState(null);
+  React.useEffect(() => {
+    let cancelled = false; setTotalHist(null);
+    try {
+      if (typeof window !== 'undefined' && window.AlpexaSync && AlpexaSync.db) {
+        AlpexaSync.db.rpc('get_portfolio_total_history', { p_range: range }).then((r) => {
+          if (cancelled) return;
+          const pts = (r && r.data && r.data.ok && Array.isArray(r.data.points)) ? r.data.points : [];
+          setTotalHist(pts.map((p) => +p.v || 0));
+        }, () => { if (!cancelled) setTotalHist([]); });
+      } else { setTotalHist([]); }
+    } catch (e) { setTotalHist([]); }
+    return () => { cancelled = true; };
+  }, [range]);
   const [subPage, setSubPage] = React.useState(null);
   const [subSub, setSubSub] = React.useState(null);
   const [alertsOpen, setAlertsOpen] = React.useState(false);
@@ -10196,12 +10212,24 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
   // ("ALL starts at 10% of today" → implies a fake 10× gain). The big number is the real,
   // steady total (no simulated tick/sway). No invented change %.
   const total = baseTotal;
-  const series = React.useMemo(() => { const cur = +baseTotal || 0; return [cur, cur]; }, [baseTotal]);
+  // REAL history from portfolio_snapshots. With ≥2 recorded points we draw them and anchor the
+  // tip to the LIVE total (so the line ends exactly at the big number); otherwise a flat line at
+  // the current total — honest, never fabricated movement (#5). Change % is derived from the real
+  // first→last, so it only appears once real history exists.
+  const series = React.useMemo(() => {
+    const cur = +baseTotal || 0;
+    if (Array.isArray(totalHist) && totalHist.length >= 2) {
+      const arr = totalHist.map((v) => +v || 0);
+      arr[arr.length - 1] = cur;            // anchor tip to the live total
+      return arr;
+    }
+    return [cur, cur];
+  }, [baseTotal, totalHist]);
   const baseline = series[0];
-  const change = 0;
-  const changePct = 0;
-  const isUp = true;
-  const accent = RH.green;
+  const change = +(series[series.length - 1] - baseline).toFixed(2);
+  const changePct = baseline ? +((change / baseline) * 100).toFixed(2) : 0;
+  const isUp = change >= 0;
+  const accent = isUp ? RH.green : RH.red;
 
   const SERVER_ROWS = ['crypto', 'fx', 'sports'].map((id) => ({
     id,
