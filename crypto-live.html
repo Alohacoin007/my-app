@@ -10220,8 +10220,13 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
     const cur = +baseTotal || 0;
     if (Array.isArray(totalHist) && totalHist.length >= 2) {
       const arr = totalHist.map((v) => +v || 0);
-      arr[arr.length - 1] = cur;            // anchor tip to the live total
-      return arr;
+      const last = arr[arr.length - 1];
+      // Anchor the recorded shape to the live total by SCALING the whole series (tip = big
+      // number). Scaling leaves every relative move — and the % change — exactly as recorded;
+      // it does NOT invent a jump the way moving only the last point did (that turned the
+      // server↔live valuation gap into a fake gain). #5: no fabricated movement.
+      const f = (cur > 0 && last > 0) ? cur / last : 1;
+      return arr.map((v) => v * f);
     }
     return [cur, cur];
   }, [baseTotal, totalHist]);

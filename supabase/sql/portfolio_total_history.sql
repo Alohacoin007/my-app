@@ -27,7 +27,7 @@ begin
         else coalesce(a.balance, 0) end, 2) as val
       from public.accounts a
      where not exists (select 1 from public.portfolio_snapshots ps
-                        where ps.acct_no = a.acct_no and ps.ts > v_ts - interval '5 minutes')
+                        where ps.acct_no = a.acct_no and ps.ts > v_ts - interval '50 seconds')
   ) q
   where q.val > 0.005;
   get diagnostics v_n = row_count;
