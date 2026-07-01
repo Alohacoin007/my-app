@@ -437,23 +437,33 @@
   .h-assets .cnt{font-family:var(--font-display);font-size:14px;font-weight:700;color:var(--text)}
   .h-assets .cnt small{display:block;font-family:inherit;font-size:10px;font-weight:600;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase}
 
-  /* live quotes widget */
-  .quotes{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface);
-    box-shadow:0 16px 44px rgba(16,24,40,.06)}
-  .q-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line)}
-  .q-title{font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text)}
-  .q-live{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;letter-spacing:1px;
-    text-transform:uppercase;color:var(--muted)}
-  .q-live .dot{width:7px;height:7px;border-radius:50%;background:#16a34a;box-shadow:0 0 0 0 rgba(22,163,74,.5);animation:qp 1.8s infinite}
-  @keyframes qp{0%{box-shadow:0 0 0 0 rgba(22,163,74,.45)}70%{box-shadow:0 0 0 7px rgba(22,163,74,0)}100%{box-shadow:0 0 0 0 rgba(22,163,74,0)}}
-  .q-row{display:grid;grid-template-columns:1.1fr 1fr 1fr .8fr;gap:8px;padding:12px 18px;align-items:center;border-bottom:1px solid var(--line)}
+  /* live quotes widget — dark trading panel (reference-style) */
+  .quotes{background:#161923;border:1px solid #262b3a;border-radius:12px;overflow:hidden;box-shadow:0 22px 54px rgba(16,24,40,.22)}
+  .q-tabs{display:flex}
+  .q-tab{flex:1;padding:14px 8px;font-family:inherit;font-size:11.5px;font-weight:700;letter-spacing:.8px;
+    text-transform:uppercase;color:#8890a3;background:#1b1f2b;border:none;cursor:pointer;transition:.15s}
+  .q-tab.on{color:#fff;background:#161923}
+  .q-tab.spreads.on{background:#c0392b;color:#fff}
+  .q-row{display:grid;grid-template-columns:1.15fr 1fr 1fr .7fr;gap:8px;padding:13px 18px;align-items:center;border-bottom:1px solid #20242f}
   .q-row:last-child{border-bottom:none}
-  .q-colh{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
-  .q-pair{font-size:14px;font-weight:700;color:var(--text)}
-  .q-px{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:13.5px;font-weight:600;color:var(--text);text-align:right;font-variant-numeric:tabular-nums}
-  .q-px .last{color:var(--accent)}
-  .q-sp{font-family:ui-monospace,monospace;font-size:13px;font-weight:700;color:var(--text);text-align:right}
-  .q-foot{padding:10px 18px;font-size:11px;color:var(--muted);border-top:1px solid var(--line);display:flex;justify-content:space-between}
+  .q-sub{border-bottom:1px solid #262b3a}
+  .q-toggle{display:inline-flex;align-items:center;gap:9px;font-size:11px;font-weight:700;letter-spacing:.5px;color:#aeb4c6;cursor:pointer;user-select:none}
+  .q-sw{width:34px;height:18px;border-radius:10px;background:#3a4152;position:relative;transition:background .2s;flex:none}
+  .q-sw::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .2s}
+  .q-sw.on{background:#16a34a}
+  .q-sw.on::after{left:18px}
+  .q-colh{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#6d7488}
+  .q-pair{font-size:13.5px;font-weight:700;color:#e8ebf2}
+  .q-px{font-family:ui-monospace,Menlo,monospace;font-size:13.5px;font-weight:600;color:#e8ebf2;text-align:right;font-variant-numeric:tabular-nums;transition:color .5s}
+  .q-px .pip{font-size:10px;vertical-align:top;color:#98a0b4;margin-left:1px}
+  .q-px.up{color:#3ddc84}
+  .q-px.dn{color:#ff5c5c}
+  .q-sp{font-family:ui-monospace,monospace;font-size:13px;font-weight:700;color:#5b8def;text-align:right}
+  .quotes.mode-spreads .col-ba{display:none}
+  .quotes.mode-spreads .q-row{grid-template-columns:1.6fr .5fr}
+  .quotes.mode-spreads .q-sp{font-size:15px}
+  .q-foot{padding:10px 18px;font-size:10.5px;color:#6d7488;border-top:1px solid #262b3a;display:flex;justify-content:space-between}
+  .q-foot a{color:#5b8def;text-decoration:none;font-weight:700}
   @media(max-width:900px){ .hero{grid-template-columns:1fr;gap:40px;padding:52px 20px} }
 
   /* ── Footer ── */
@@ -537,17 +547,19 @@
       </div>
     </div>
     <div class="h-right">
-      <div class="quotes">
-        <div class="q-head">
-          <span class="q-title">Live spreads</span>
-          <span class="q-live"><span class="dot"></span> Live</span>
+      <div class="quotes" id="quotes">
+        <div class="q-tabs">
+          <button class="q-tab on" data-view="quotes">Quotes</button>
+          <button class="q-tab spreads" data-view="spreads">Spreads (avg, pip)</button>
         </div>
-        <div class="q-row">
-          <span class="q-colh">Pair</span><span class="q-colh" style="text-align:right">Bid</span>
-          <span class="q-colh" style="text-align:right">Ask</span><span class="q-colh" style="text-align:right">Spread</span>
+        <div class="q-row q-sub">
+          <span class="q-toggle" id="qToggle"><span class="q-sw on" id="qSw"></span> Live</span>
+          <span class="q-colh col-ba" style="text-align:right">Bid</span>
+          <span class="q-colh col-ba" style="text-align:right">Ask</span>
+          <span class="q-colh" style="text-align:right">Spread</span>
         </div>
         <div id="qbody"></div>
-        <div class="q-foot"><span id="qtime">—</span><a href="#forex" style="color:var(--accent);text-decoration:none;font-weight:700">Full list →</a></div>
+        <div class="q-foot"><span id="qtime">—</span><a href="#forex">Full list →</a></div>
       </div>
     </div>
   </section>
@@ -638,33 +650,42 @@
       {sym:'USDCAD',disp:'USD/CAD',pip:0.0001,sprd:1.2,dp:5,mid:1.42181},
       {sym:'AUDUSD',disp:'AUD/USD',pip:0.0001,sprd:1.0,dp:5,mid:0.68867}
     ];
-    var live=false, sb=null;
+    var live=true, connected=false, sb=null, timer=null, prev={};
     try{ if(window.supabase&&window.supabase.createClient) sb=window.supabase.createClient(URL_,KEY_); }catch(e){}
-    var body=document.getElementById('qbody');
+    var body=document.getElementById('qbody'), quotesEl=document.getElementById('quotes');
+    function px(v,dp){ var s=v.toFixed(dp); return '<span>'+s.slice(0,-1)+'</span><span class="pip">'+s.slice(-1)+'</span>'; }
     function render(){
       if(!body) return;
       body.innerHTML=PAIRS.map(function(p){
         var half=p.pip*p.sprd/2, bid=p.mid-half, ask=p.mid+half;
+        var d = (prev[p.sym]!=null) ? (bid>prev[p.sym]?' up':bid<prev[p.sym]?' dn':'') : '';
         return '<div class="q-row"><span class="q-pair">'+p.disp+'</span>'
-          +'<span class="q-px">'+bid.toFixed(p.dp)+'</span>'
-          +'<span class="q-px">'+ask.toFixed(p.dp)+'</span>'
+          +'<span class="q-px col-ba'+d+'">'+px(bid,p.dp)+'</span>'
+          +'<span class="q-px col-ba'+d+'">'+px(ask,p.dp)+'</span>'
           +'<span class="q-sp">'+p.sprd.toFixed(1)+'</span></div>';
       }).join('');
+      setTimeout(function(){ var f=body.querySelectorAll('.q-px.up,.q-px.dn'); for(var i=0;i<f.length;i++){ f[i].classList.remove('up','dn'); } }, 650);
+      PAIRS.forEach(function(p){ prev[p.sym]=p.mid-p.pip*p.sprd/2; });
     }
-    function badge(){
-      var b=document.querySelector('.q-live'); var t=document.getElementById('qtime');
-      if(b){ b.innerHTML = live ? '<span class="dot"></span> Live' : 'Indicative'; if(!live) b.style.color='var(--muted)'; }
-      if(t){ var d=new Date(); t.textContent=(live?'Live · ':'Indicative · ')+d.toUTCString().replace('GMT','GMT'); }
-    }
+    function foot(){ var t=document.getElementById('qtime'); if(t){ var d=new Date(); t.textContent=(connected?'Live · ':'Indicative · ')+d.toUTCString(); } }
     function pull(){
-      if(!sb) return;
+      if(!sb||!live) return;
       sb.rpc('get_fx_quotes').then(function(r){
         if(r&&r.data){ var m={}; (r.data||[]).forEach(function(x){ m[x.symbol]=+x.mid; });
           var got=false; PAIRS.forEach(function(p){ if(m[p.sym]>0){ p.mid=m[p.sym]; got=true; } });
-          if(got){ live=true; render(); badge(); } }
+          if(got){ connected=true; render(); foot(); } }
       }, function(){});
     }
-    render(); badge(); pull(); setInterval(pull, 4000);
+    function start(){ if(timer) clearInterval(timer); timer=setInterval(pull,3000); }
+    var tabs=document.querySelectorAll('.q-tab');
+    for(var i=0;i<tabs.length;i++){ tabs[i].addEventListener('click',function(){
+      for(var j=0;j<tabs.length;j++){ tabs[j].classList.remove('on'); } this.classList.add('on');
+      if(quotesEl) quotesEl.classList.toggle('mode-spreads', this.getAttribute('data-view')==='spreads');
+    }); }
+    var tog=document.getElementById('qToggle'), sw=document.getElementById('qSw');
+    if(tog) tog.addEventListener('click',function(){ live=!live; if(sw) sw.classList.toggle('on',live);
+      if(live){ pull(); start(); } else if(timer){ clearInterval(timer); } foot(); });
+    render(); foot(); pull(); start();
   })();
   </script>
   <script>
