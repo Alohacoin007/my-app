@@ -35,6 +35,7 @@ declare
   v_combo numeric := 1; v_nlegs int := 0; v_gid0 text; v_all_same boolean := true;
   v_new_legs jsonb := '[]'::jsonb; v_potential numeric;
   c_haircut constant numeric := 0.25;
+  c_max_liab constant numeric := 25000;   -- max house exposure (payout − stake) per bet
 begin
   -- 1) ownership
   select player_id into v_player from accounts where acct_no=p_acct and server='sports';
@@ -87,6 +88,15 @@ begin
   -- SGP correlation haircut when all legs share one game (matches app + settle)
   if v_nlegs >= 2 and v_all_same then v_combo := 1 + (v_combo - 1) * (1 - c_haircut); end if;
   v_potential := round(p_stake * v_combo, 2);
+
+  -- 4b) MAX LIABILITY guard — cap the house's exposure per bet (payout − stake = the
+  --     profit the book pays if the bet wins). Blocks oversized action (e.g. a $100k
+  --     single at -140 = ~$71k liability) that would put the book on the hook for more
+  --     than c_max_liab. Change the constant above to adjust the ceiling.
+  if (v_potential - p_stake) > c_max_liab then
+    return jsonb_build_object('ok',false,'error',
+      'Bet exceeds the maximum liability of $'||to_char(c_max_liab,'FM999,999')||' per bet. Please reduce your stake.');
+  end if;
 
   -- 5) balance
   select balance into v_bal from accounts where acct_no=p_acct and server='sports';
