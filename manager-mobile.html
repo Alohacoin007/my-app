@@ -582,10 +582,10 @@
       var t=w.type||'withdraw', label=t==='deposit'?'DEPOSIT':t==='transfer'?'TRANSFER':'WITHDRAW';
       var meta=t==='transfer'?((w.from||'Sports')+' → '+(w.to||'Crypto')):((w.asset||'USDT')+(w.network?' ('+w.network+')':''));
       h+='<div class="card"><div class="row" style="border:none;padding:0 0 6px"><span class="badge '+t+'">'+label+'</span><span class="req-amt">'+usd(w.amount)+'</span></div>'+
-        '<div class="req-meta">👤 '+(w.custName||cust.name||cust.id)+' · '+(w.acctNo||cust.acct.sports)+(w.custId?(' · '+w.custId):'')+'</div>'+
-        '<div class="req-meta">'+w.server+' · '+meta+' · '+ago(w.ts)+'</div>'+
+        '<div class="req-meta">👤 '+esc(w.custName||cust.name||cust.id)+' · '+esc(w.acctNo||cust.acct.sports)+(w.custId?(' · '+esc(w.custId)):'')+'</div>'+
+        '<div class="req-meta">'+esc(w.server)+' · '+meta+' · '+ago(w.ts)+'</div>'+
         (t==='withdraw'?'<div class="req-meta">You receive (after fee): <b>'+usd(w.net)+'</b></div>':'')+
-        (w.address?('<div class="req-addr-lbl">'+(t==='withdraw'?'▶ Send '+usd(w.net)+' USDT to · user wallet':'Deposit address')+'</div><div class="req-addr" data-copy="'+w.address+'">'+w.address+'</div>'):'')+
+        (w.address?('<div class="req-addr-lbl">'+(t==='withdraw'?'▶ Send '+usd(w.net)+' USDT to · user wallet':'Deposit address')+'</div><div class="req-addr" data-copy="'+esc(w.address)+'">'+esc(w.address)+'</div>'):'')+
         (t==='withdraw'
           ? '<input class="in" id="tx_'+w.id+'" spellcheck="false" autocomplete="off" placeholder="Paste tx hash (txid) after sending" style="margin-top:8px;font-family:ui-monospace,monospace;font-size:11.5px">'+
             '<div class="btns"><button class="ok" data-paid="'+w.id+'">Mark Paid ✓</button><button class="no" data-no="'+w.id+'">Reject</button></div>'+
@@ -668,13 +668,13 @@
         var p=w.pnl, bcls=w.kindL==='Void'?'open':(p>=0?'won':'lost');
         h+='<div class="card" style="padding:8px 12px">'+
           '<div class="row" data-hopen="'+key+'" style="border:none;padding:0;cursor:pointer">'+
-          '<span style="display:flex;align-items:center;gap:6px;min-width:0">'+caret+'<span class="badge '+bcls+'">'+w.kindL.toUpperCase()+'</span><b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px">'+(w.custName||w.custId||'—')+'</b></span>'+
+          '<span style="display:flex;align-items:center;gap:6px;min-width:0">'+caret+'<span class="badge '+bcls+'">'+w.kindL.toUpperCase()+'</span><b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px">'+esc(w.custName||w.custId||'—')+'</b></span>'+
           '<b class="'+(p>=0?'pos':'neg')+'" style="white-space:nowrap;padding-left:8px">'+(p<0?'-':'+')+usd(Math.abs(p))+'</b></div>';
         if(open){
-          h+='<div class="req-meta" style="margin-top:6px">👤 '+(w.custName||w.custId||'—')+(w.acctNo?(' · '+w.acctNo):'')+(w.custId?(' · '+w.custId):'')+'</div>'+
-          (w.ticket?'<div class="req-meta" style="font-family:ui-monospace,monospace">🎫 '+w.ticket+'</div>':'')+
-          '<div class="req-meta">'+w.server+' · '+(w.symbol||'')+' · stake '+usd(w.stake)+' · '+(w.ts?new Date(w.ts).toLocaleString():'')+'</div>'+
-          (w.detail?'<div class="req-meta" style="font-family:ui-monospace,monospace">'+w.detail+'</div>':'');
+          h+='<div class="req-meta" style="margin-top:6px">👤 '+esc(w.custName||w.custId||'—')+(w.acctNo?(' · '+esc(w.acctNo)):'')+(w.custId?(' · '+esc(w.custId)):'')+'</div>'+
+          (w.ticket?'<div class="req-meta" style="font-family:ui-monospace,monospace">🎫 '+esc(w.ticket)+'</div>':'')+
+          '<div class="req-meta">'+esc(w.server)+' · '+esc(w.symbol||'')+' · stake '+usd(w.stake)+' · '+(w.ts?new Date(w.ts).toLocaleString():'')+'</div>'+
+          (w.detail?'<div class="req-meta" style="font-family:ui-monospace,monospace">'+esc(w.detail)+'</div>':'');
           if(String(TRADE_EDIT)===String(w.sid)){
             h+='<label class="lbl" style="display:block;margin-top:8px">P&amp;L (USD) — customer view (+ = customer won)</label>'+
               '<input class="in" id="tEdPnl" type="number" step="0.01" value="'+(+w.pnl||0)+'">'+
@@ -692,7 +692,7 @@
       var meta=w.type==='transfer'?((w.from||'?')+' → '+(w.to||'?')):((w.asset||'')+(w.network?' ('+w.network+')':''));
       if(EDIT_ID===w.id){
         h+='<div class="card" style="border:2px solid var(--acc)">'+
-          '<div class="row" style="border:none;padding:0 0 6px"><span class="badge '+(w.type||'')+'">'+typeLabel(w.type).toUpperCase()+'</span><span class="req-meta">'+(w.custName||'')+' · '+(w.acctNo||'')+'</span></div>'+
+          '<div class="row" style="border:none;padding:0 0 6px"><span class="badge '+(w.type||'')+'">'+typeLabel(w.type).toUpperCase()+'</span><span class="req-meta">'+esc(w.custName||'')+' · '+esc(w.acctNo||'')+'</span></div>'+
           '<label class="lbl">Status</label>'+
           '<select class="in" id="edStatus"><option value="pending"'+(w.status==='pending'?' selected':'')+'>Pending</option><option value="approved"'+(w.status==='approved'?' selected':'')+'>Approved</option><option value="rejected"'+(w.status==='rejected'?' selected':'')+'>Rejected</option></select>'+
           '<label class="lbl" style="display:block;margin-top:8px">Amount (USD)</label>'+
@@ -704,10 +704,10 @@
       } else {
         h+='<div class="card" style="padding:8px 12px">'+
           '<div class="row" data-hopen="'+key+'" style="border:none;padding:0;cursor:pointer">'+
-          '<span style="display:flex;align-items:center;gap:6px;min-width:0">'+caret+'<span class="badge '+(w.type||'')+'">'+typeLabel(w.type).toUpperCase()+'</span><b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px">'+(w.custName||'—')+'</b></span>'+
+          '<span style="display:flex;align-items:center;gap:6px;min-width:0">'+caret+'<span class="badge '+(w.type||'')+'">'+typeLabel(w.type).toUpperCase()+'</span><b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px">'+esc(w.custName||'—')+'</b></span>'+
           '<b style="white-space:nowrap;padding-left:8px">'+usd(w.amount)+'</b></div>';
         if(open){
-          h+='<div class="req-meta" style="margin-top:6px">👤 '+(w.custName||'—')+' · '+(w.acctNo||'')+(w.custId?(' · '+w.custId):'')+'</div>'+
+          h+='<div class="req-meta" style="margin-top:6px">👤 '+esc(w.custName||'—')+' · '+esc(w.acctNo||'')+(w.custId?(' · '+esc(w.custId)):'')+'</div>'+
           '<div class="req-meta">'+(w.server||'')+' · '+meta+' · '+ago(w.ts)+'</div>'+
           (w.txid?('<div class="req-meta">✅ Paid · <a href="https://etherscan.io/tx/'+w.txid+'" target="_blank" rel="noopener" style="color:var(--acc);font-weight:700">View on Etherscan ↗</a></div>'):'')+
           '<div class="row" style="border:none;padding:6px 0 0"><span>'+statusBadge(w.status)+'</span><button class="save ghost" data-edit="'+w.id+'" style="margin-top:0;padding:7px 14px">Edit</button></div>';
@@ -897,7 +897,7 @@
     ONLINE.forEach(function(p){
       var ts=p.last_seen?Date.parse(p.last_seen):0;
       var app=APP[p.last_app]||p.last_app||'';
-      h+='<div class="row"><span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#22C55E;margin-right:8px;vertical-align:middle"></span><b>'+(p.name||p.cust_id||'—')+'</b>'+
+      h+='<div class="row"><span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#22C55E;margin-right:8px;vertical-align:middle"></span><b>'+esc(p.name||p.cust_id||'—')+'</b>'+
         '<div class="req-meta" style="margin:2px 0 0 17px">'+(app?app+' · ':'')+(p.cust_id||'')+' · '+ago(ts)+'</div></span>'+
         '<button class="save ghost" data-pcust="'+(p.cust_id||'').replace(/"/g,'&quot;')+'" style="margin-top:0;padding:6px 12px">View</button></div>';
     });
@@ -1079,7 +1079,7 @@
       matches.forEach(function(p){
         if(POS_BY_CUST[p.cust_id]===undefined){ POS_BY_CUST[p.cust_id]=[]; pullCustPos(p.cust_id); }
         var list=(POS_BY_CUST[p.cust_id]||[]).filter(srvOK);
-        h+='<div class="sec">'+(p.name||p.cust_id)+' · '+list.length+' open</div><div class="card">';
+        h+='<div class="sec">'+esc(p.name||p.cust_id)+' · '+list.length+' open</div><div class="card">';
         if(!list.length) h+='<div class="empty">No open positions.</div>';
         list.forEach(function(x){ h+=posRowHTML(x); });
         h+='</div>';
@@ -1120,7 +1120,7 @@
     h+='<div class="card">';
     LOGS.forEach(function(l){
       var ts=l.created_at?Date.parse(l.created_at):0;
-      var who=l.target_cust?(' · '+custName(l.target_cust)):'';
+      var who=l.target_cust?(' · '+esc(custName(l.target_cust))):'';
       h+='<div class="row"><span><b>'+actionLabel(l.action)+'</b>'+who+
         (l.detail?('<div class="req-meta" style="margin:2px 0 0">'+l.detail+'</div>'):'')+'</span>'+
         '<span class="muted" style="font-size:11px;white-space:nowrap">'+ago(ts)+'</span></div>';
@@ -1234,8 +1234,8 @@
     pendWd.forEach(function(w){
       var ok=WAL.acct && /^0x[0-9a-fA-F]{40}$/.test((w.address||'').trim());
       h+='<div class="card" style="padding:9px 12px"><div class="row" style="border:none;padding:0">'+
-        '<span style="min-width:0"><b style="font-size:12.5px">'+(w.custName||w.custId||'—')+'</b>'+
-        '<div class="req-meta" style="margin:2px 0 0">'+shortAddr(w.address)+' · net '+usd(w.net||w.amount)+'</div></span>'+
+        '<span style="min-width:0"><b style="font-size:12.5px">'+esc(w.custName||w.custId||'—')+'</b>'+
+        '<div class="req-meta" style="margin:2px 0 0">'+esc(shortAddr(w.address))+' · net '+usd(w.net||w.amount)+'</div></span>'+
         '<button data-wpay="'+w.id+'" style="background:'+(ok?'var(--pos)':'#c8cfd8')+';color:#fff;border:none;border-radius:4px;padding:8px 14px;font:700 12px system-ui;cursor:pointer;white-space:nowrap" '+(ok?'':'disabled')+'>Pay ▸</button></div></div>';
     });
     if(pendWd.length && !WAL.acct) h+='<div class="hint" style="margin:0 14px 8px">Connect a wallet above to enable Pay.</div>';
@@ -1246,7 +1246,7 @@
       WAL.ins.forEach(function(t){ var m=matchOf(t);
         h+='<div class="row"><span style="min-width:0"><b class="pos">+'+usd(t.amt)+'</b>'+
           '<div class="req-meta" style="margin:2px 0 0">from '+shortAddr(t.from)+' · <a href="https://etherscan.io/tx/'+t.tx+'" target="_blank" rel="noopener" style="color:var(--acc)">tx ↗</a>'+
-          (m?(' · matches <b>'+(m.custName||m.custId)+'</b> deposit'):'')+'</div></span>'+
+          (m?(' · matches <b>'+esc(m.custName||m.custId)+'</b> deposit'):'')+'</div></span>'+
           (m?('<button data-ok="'+m.id+'" style="background:var(--pos);color:#fff;border:none;border-radius:4px;padding:7px 12px;font:700 11.5px system-ui;cursor:pointer;white-space:nowrap">Credit ✓</button>'):'')+
         '</div>'; });
       h+='</div>'; }
