@@ -1,0 +1,185 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Sports Data Analyzer · Alpexa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#f4f6fb;--surface:#fff;--surface2:#eef1f7;--line:#e7ebf2;--text:#0e1726;--muted:#5a6478;--accent:#1e40d8;--red:#e5484d;--amber:#f5a623;--green:#16a34a;--fd:'Space Grotesk',sans-serif}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);font-family:'Inter',system-ui,sans-serif;color:var(--text);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1200px;margin:0 auto;padding:26px 24px 60px}
+  .top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+  .h{font-family:var(--fd);font-size:24px;font-weight:700;letter-spacing:-.5px;display:flex;align-items:center;gap:10px}
+  .h .mk{width:26px;height:26px;border-radius:7px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
+  .h small{font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+  .nav{display:flex;align-items:center;gap:8px}
+  .nav button{border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:8px;height:36px;padding:0 12px;font-size:13px;font-weight:600;cursor:pointer}
+  .nav button:hover{border-color:var(--accent);color:var(--accent)}
+  .nav .day{font-family:var(--fd);font-weight:700;font-size:15px;min-width:150px;text-align:center}
+  .badges{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px}
+  .badge{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .badge .n{font-family:var(--fd);font-size:30px;font-weight:700;letter-spacing:-1px;line-height:1}
+  .badge .k{margin-top:8px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+  .badge.red .n{color:var(--red)} .badge.amber .n{color:var(--amber)} .badge.green .n{color:var(--green)} .badge.acc .n{color:var(--accent)}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:20px}
+  .panel-h{padding:15px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+  .panel-h .t{font-size:12.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+  .panel-h .s{font-size:11px;color:var(--muted)}
+  .anom{padding:12px 20px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:12px;font-size:13.5px}
+  .anom:last-child{border-bottom:none}
+  .anom .dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex:none}
+  .anom.red .dot{background:var(--red)} .anom.amber .dot{background:var(--amber)}
+  .anom .ty{font-weight:700;margin-right:6px}
+  .anom .gid{font-family:ui-monospace,monospace;font-size:11px;color:var(--muted);background:var(--surface2);padding:2px 6px;border-radius:4px;margin-left:auto;flex:none}
+  .thead,.trow{display:grid;grid-template-columns:56px 1.6fr 88px 88px 56px 96px 128px;gap:10px;align-items:center;padding:11px 20px;border-bottom:1px solid var(--line);font-size:13px}
+  .thead{font-size:9.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+  .trow:last-child{border-bottom:none}
+  .lg{font-weight:700;font-size:11px;color:var(--accent);letter-spacing:.5px}
+  .match{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .match .vs{color:var(--muted);font-weight:500;margin:0 5px}
+  .tt{font-family:ui-monospace,monospace;font-size:12px;color:var(--muted)}
+  .up{font-family:ui-monospace,monospace;font-size:12px;text-align:center}
+  .sc{font-family:ui-monospace,monospace;font-weight:700}
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px;white-space:nowrap}
+  .chip.ok{background:#e7f6ec;color:#137a37} .chip.live{background:#eef1ff;color:var(--accent)} .chip.pre{background:var(--surface2);color:var(--muted)}
+  .chip.unres{background:#fdeaea;color:#c0362f} .chip.synth{background:#fff3df;color:#8a5a10}
+  .note{font-size:11.5px;color:var(--muted);margin-top:8px}
+  .sample-flag{display:inline-block;font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#8a5a10;background:#fff3df;padding:4px 9px;border-radius:6px}
+  .empty{padding:50px 20px;text-align:center;color:var(--muted);font-size:14px}
+  @media(max-width:760px){ .thead,.trow{grid-template-columns:44px 1.4fr 70px 88px} .thead span:nth-child(n+5),.trow span:nth-child(n+5){display:none} }
+</style></head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="h"><span class="mk">A</span>Sports Data Analyzer <small id="tzlbl">Las Vegas</small></div>
+    <div class="nav">
+      <button id="prev">◀</button>
+      <span class="day" id="dayLbl">—</span>
+      <button id="next">▶</button>
+      <button id="today">Today</button>
+      <button id="reload">↻</button>
+    </div>
+  </div>
+
+  <div id="sampleFlag"></div>
+  <div class="badges" id="badges"></div>
+
+  <div class="panel" id="anomPanel" style="display:none">
+    <div class="panel-h"><span class="t">Anomalies</span><span class="s" id="anomCount"></span></div>
+    <div id="anomBody"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-h"><span class="t">Games shown this day</span><span class="s" id="gamesSub">—</span></div>
+    <div class="thead">
+      <span>LG</span><span>Match (Away @ Home)</span><span>First seen</span><span>Last update</span><span>Upd</span><span>Score</span><span>Result</span>
+    </div>
+    <div id="gamesBody"><div class="empty">Loading…</div></div>
+  </div>
+
+  <div class="note" id="foot"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+/* Sports Data Analyzer — reads a per-day integrity report from the server RPC
+   get_game_day(p_day). The RPC is SECURITY DEFINER + is_admin()-gated, so data
+   returns only for admins. When the RPC/feed is unavailable, a clearly-labelled
+   SAMPLE dataset renders so the layout is reviewable. No fake data is ever shown
+   unlabelled. Times shown in Las Vegas (PT). */
+(function(){
+  var SB_URL='https://grxnbgtfnaayeluenvqh.supabase.co';
+  var SB_KEY='sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu';
+  var sb=null; try{ if(window.supabase&&window.supabase.createClient) sb=window.supabase.createClient(SB_URL,SB_KEY); }catch(e){}
+  var TZ='America/Los_Angeles';
+  var cur=new Date();
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function dayStr(d){ return d.toLocaleDateString('en-CA',{timeZone:TZ}); } // YYYY-MM-DD
+  function dayLabel(d){ return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',timeZone:TZ}); }
+  function tmt(iso){ try{ return new Date(iso).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:TZ}); }catch(e){ return '—'; } }
+
+  function resultChip(g){
+    if(g.synthetic) return '<span class="chip synth">🚫 Synthetic</span>';
+    if(g.resolved)  return '<span class="chip ok">✅ Resolved</span>';
+    if(g.last_status==='in') return '<span class="chip live">● Live</span>';
+    if(g.unresolved) return '<span class="chip unres">❌ Unresolved</span>';
+    return '<span class="chip pre">Scheduled</span>';
+  }
+  function badge(n,k,cls){ return '<div class="badge '+(cls||'')+'"><div class="n">'+n+'</div><div class="k">'+k+'</div></div>'; }
+
+  function render(rep, isSample){
+    document.getElementById('sampleFlag').innerHTML = isSample
+      ? '<div style="margin-bottom:16px"><span class="sample-flag">Sample preview — no live data yet</span></div>' : '';
+    var s=rep.summary||{};
+    document.getElementById('badges').innerHTML =
+      badge(s.tracked||0,'Games tracked','acc')+
+      badge(s.updates||0,'Feed updates','')+
+      badge((s.gaps||0),'Feed gaps',(s.gaps>0?'amber':'green'))+
+      badge((s.synthetic||0),'Synthetic',(s.synthetic>0?'red':'green'))+
+      badge((s.unresolved||0),'Unresolved',(s.unresolved>0?'red':'green'))+
+      badge((s.resolved||0),'Resolved','green');
+
+    var an=rep.anomalies||[];
+    var ap=document.getElementById('anomPanel');
+    if(an.length){ ap.style.display='';
+      document.getElementById('anomCount').textContent=an.length+' flagged';
+      document.getElementById('anomBody').innerHTML=an.map(function(a){
+        return '<div class="anom '+(a.sev==='red'?'red':'amber')+'"><span class="dot"></span><span><span class="ty">'+esc(a.type)+'</span>'+esc(a.detail)+'</span><span class="gid">'+esc(a.gid||'')+'</span></div>';
+      }).join('');
+    } else { ap.style.display='none'; }
+
+    var gs=rep.games||[];
+    document.getElementById('gamesSub').textContent = gs.length+' games';
+    document.getElementById('gamesBody').innerHTML = gs.length ? gs.map(function(g){
+      var sc=(g.home_sc!=null&&g.away_sc!=null)?(g.away_sc+'–'+g.home_sc):'—';
+      return '<div class="trow"><span class="lg">'+esc(g.lg||'')+'</span>'
+        +'<span class="match">'+esc(g.away||'')+'<span class="vs">@</span>'+esc(g.home||'')+'</span>'
+        +'<span class="tt">'+tmt(g.first_seen)+'</span><span class="tt">'+tmt(g.last_seen)+'</span>'
+        +'<span class="up">'+(g.updates||0)+'</span><span class="sc">'+sc+'</span>'
+        +'<span>'+resultChip(g)+'</span></div>';
+    }).join('') : '<div class="empty">No games recorded for this day.</div>';
+
+    var f=rep.feed||{};
+    document.getElementById('foot').textContent = (f.first? ('Feed active '+tmt(f.first)+' → '+tmt(f.last)+' · '+(s.updates||0)+' updates'):'')
+      + (isSample?'  (sample)':'');
+  }
+
+  function sampleReport(day){
+    return { day:day, summary:{tracked:7,updates:842,gaps:1,synthetic:1,unresolved:1,resolved:5},
+      anomalies:[
+        {sev:'red',type:'Synthetic game ',detail:'bettable card not from the ESPN feed — cannot auto-settle',gid:'DEMO_KC_BUF'},
+        {sev:'red',type:'Unresolved ',detail:'shown all day, past start, never reached a final result',gid:'NBA_401585120'},
+        {sev:'amber',type:'Feed gap ',detail:'no updates for 7 min (11:02–11:09) — feed stalled',gid:''}
+      ],
+      games:[
+        {gid:'NFL_401547439',lg:'NFL',away:'BUF',home:'KC',first_seen:day+'T09:31:00-07:00',last_seen:day+'T13:12:00-07:00',updates:214,home_sc:27,away_sc:24,last_status:'post',resolved:true,synthetic:false},
+        {gid:'NBA_401585118',lg:'NBA',away:'GSW',home:'LAL',first_seen:day+'T10:00:00-07:00',last_seen:day+'T12:40:00-07:00',updates:198,home_sc:112,away_sc:118,last_status:'post',resolved:true,synthetic:false},
+        {gid:'NBA_401585120',lg:'NBA',away:'BOS',home:'MIA',first_seen:day+'T10:00:00-07:00',last_seen:day+'T12:05:00-07:00',updates:151,home_sc:88,away_sc:90,last_status:'in',resolved:false,unresolved:true,synthetic:false},
+        {gid:'MLB_401472880',lg:'MLB',away:'NYY',home:'BOS',first_seen:day+'T11:05:00-07:00',last_seen:day+'T14:20:00-07:00',updates:176,home_sc:3,away_sc:5,last_status:'post',resolved:true,synthetic:false},
+        {gid:'NHL_401559072',lg:'NHL',away:'TOR',home:'BOS',first_seen:day+'T09:31:00-07:00',last_seen:day+'T09:31:00-07:00',updates:1,home_sc:null,away_sc:null,last_status:'pre',resolved:false,synthetic:false},
+        {gid:'SOC_704321',lg:'SOC',away:'ARS',home:'MCI',first_seen:day+'T07:30:00-07:00',last_seen:day+'T09:20:00-07:00',updates:101,home_sc:1,away_sc:1,last_status:'post',resolved:true,synthetic:false},
+        {gid:'DEMO_KC_BUF',lg:'NFL',away:'BUF',home:'KC',first_seen:day+'T09:31:00-07:00',last_seen:day+'T13:12:00-07:00',updates:88,home_sc:null,away_sc:null,last_status:'pre',resolved:false,synthetic:true}
+      ],
+      feed:{first:day+'T07:30:00-07:00',last:day+'T14:20:00-07:00',gaps:[{from:'11:02',to:'11:09',mins:7}]} };
+  }
+
+  function load(){
+    var day=dayStr(cur);
+    document.getElementById('dayLbl').textContent=dayLabel(cur);
+    document.getElementById('gamesBody').innerHTML='<div class="empty">Loading…</div>';
+    if(!sb){ render(sampleReport(day), true); return; }
+    sb.rpc('get_game_day',{p_day:day}).then(function(r){
+      if(r&&!r.error&&r.data&&(r.data.games||r.data.summary)){ render(r.data, false); }
+      else { render(sampleReport(day), true); }
+    }, function(){ render(sampleReport(day), true); });
+  }
+
+  document.getElementById('prev').onclick=function(){ cur.setDate(cur.getDate()-1); load(); };
+  document.getElementById('next').onclick=function(){ cur.setDate(cur.getDate()+1); load(); };
+  document.getElementById('today').onclick=function(){ cur=new Date(); load(); };
+  document.getElementById('reload').onclick=load;
+  load();
+})();
+</script>
+</body></html>
