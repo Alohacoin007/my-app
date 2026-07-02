@@ -48,8 +48,32 @@
   .sample-flag{display:inline-block;font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#8a5a10;background:#fff3df;padding:4px 9px;border-radius:6px}
   .empty{padding:50px 20px;text-align:center;color:var(--muted);font-size:14px}
   @media(max-width:760px){ .thead,.trow{grid-template-columns:44px 1.4fr 70px 88px} .thead span:nth-child(n+5),.trow span:nth-child(n+5){display:none} }
+  /* admin login gate */
+  .lock{position:fixed;inset:0;background:rgba(244,246,251,.72);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;z-index:50}
+  .lock.on{display:flex}
+  .lock-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 20px 60px rgba(16,24,40,.12);padding:30px 28px;width:340px;max-width:92vw}
+  .lock-card .lh{font-family:var(--fd);font-size:19px;font-weight:700;margin-bottom:4px}
+  .lock-card .ls{font-size:12.5px;color:var(--muted);margin-bottom:20px}
+  .lock-card input{width:100%;height:42px;border:1px solid var(--line);border-radius:9px;padding:0 13px;font-size:14px;margin-bottom:11px;outline:none}
+  .lock-card input:focus{border-color:var(--accent)}
+  .lock-card button{width:100%;height:44px;border:none;border-radius:9px;background:var(--accent);color:#fff;font-size:14px;font-weight:700;cursor:pointer}
+  .lock-card button:disabled{opacity:.6}
+  .lock-msg{font-size:12px;margin-top:12px;text-align:center;min-height:16px}
+  .lock-msg.err{color:var(--red)} .lock-msg.ok{color:var(--green)}
+  .lock-preview{display:block;text-align:center;margin-top:14px;font-size:12px;color:var(--muted);text-decoration:underline;cursor:pointer}
 </style></head>
 <body>
+<div class="lock on" id="lock">
+  <div class="lock-card">
+    <div class="lh">Admin sign-in</div>
+    <div class="ls">Sports Data Analyzer · admins only</div>
+    <input id="lgEmail" type="email" placeholder="Admin email" autocomplete="username">
+    <input id="lgPw" type="password" placeholder="Password" autocomplete="current-password">
+    <button id="lgBtn">Sign in</button>
+    <div class="lock-msg" id="lgMsg"></div>
+    <span class="lock-preview" id="lgPreview">View sample layout (no data)</span>
+  </div>
+</div>
 <div class="wrap">
   <div class="top">
     <div class="h"><span class="mk">A</span>Sports Data Analyzer <small id="tzlbl">Las Vegas</small></div>
@@ -91,7 +115,11 @@
 (function(){
   var SB_URL='https://grxnbgtfnaayeluenvqh.supabase.co';
   var SB_KEY='sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu';
-  var sb=null; try{ if(window.supabase&&window.supabase.createClient) sb=window.supabase.createClient(SB_URL,SB_KEY); }catch(e){}
+  // Share the back office's ISOLATED admin session (same storageKey) so one admin
+  // login covers both manager + analyzer. is_admin() (server) is the real gate.
+  var sb=null; try{ if(window.supabase&&window.supabase.createClient)
+    sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{storageKey:'alpexa-admin-auth',persistSession:true,autoRefreshToken:true}}); }catch(e){}
+  var isAdmin=false;
   var TZ='America/Los_Angeles';
   var cur=new Date();
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
@@ -175,11 +203,35 @@
     }, function(){ render(sampleReport(day), true); });
   }
 
+  function setMsg(t,cls){ var m=document.getElementById('lgMsg'); m.textContent=t||''; m.className='lock-msg'+(cls?(' '+cls):''); }
+  function showLock(t){ document.getElementById('lock').classList.add('on'); if(t) setMsg(t,'err'); }
+  function hideLock(){ document.getElementById('lock').classList.remove('on'); }
+  function checkAdmin(){ if(!sb){ showLock('Supabase unavailable'); return; }
+    sb.rpc('is_admin').then(function(r){
+      if(r&&r.data===true){ isAdmin=true; hideLock(); load(); }
+      else { showLock('This account is not an admin.'); }
+    }, function(){ showLock('Admin check failed.'); }); }
+  function signIn(){
+    var e=document.getElementById('lgEmail').value.trim(), p=document.getElementById('lgPw').value;
+    if(!e||!p){ setMsg('Enter email and password','err'); return; }
+    var btn=document.getElementById('lgBtn'); btn.disabled=true; setMsg('Signing in…');
+    sb.auth.signInWithPassword({email:e,password:p}).then(function(r){ btn.disabled=false;
+      if(r.error){ setMsg(r.error.message||'Sign-in failed','err'); } else { setMsg('Checking admin…','ok'); checkAdmin(); }
+    }, function(){ btn.disabled=false; setMsg('Sign-in failed','err'); }); }
+  function boot(){
+    document.getElementById('dayLbl').textContent=dayLabel(cur);
+    if(!sb){ showLock('Supabase unavailable'); return; }
+    sb.auth.getUser().then(function(res){ if(res&&res.data&&res.data.user){ checkAdmin(); } else { showLock(); } }, function(){ showLock(); });
+  }
+
+  document.getElementById('lgBtn').onclick=signIn;
+  document.getElementById('lgPw').addEventListener('keydown',function(e){ if(e.key==='Enter') signIn(); });
+  document.getElementById('lgPreview').onclick=function(){ hideLock(); render(sampleReport(dayStr(cur)), true); };
   document.getElementById('prev').onclick=function(){ cur.setDate(cur.getDate()-1); load(); };
   document.getElementById('next').onclick=function(){ cur.setDate(cur.getDate()+1); load(); };
   document.getElementById('today').onclick=function(){ cur=new Date(); load(); };
   document.getElementById('reload').onclick=load;
-  load();
+  boot();
 })();
 </script>
 </body></html>
