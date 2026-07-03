@@ -139,16 +139,16 @@
   .ot-dot2{width:6px;height:6px;border-radius:50%;background:#5b7bff;flex:none}
   .ot-dot2.live{animation:otpulse 1.7s infinite}
   @keyframes otpulse{0%{box-shadow:0 0 0 0 rgba(91,123,255,.5)}70%{box-shadow:0 0 0 6px rgba(91,123,255,0)}100%{box-shadow:0 0 0 0 rgba(91,123,255,0)}}
-  .ot-lg{font:800 9px ui-monospace,monospace;letter-spacing:.5px;color:#8b96af;background:rgba(255,255,255,.06);padding:3px 7px;border-radius:4px}
-  .ot-team{color:#e7ebf5;font-weight:600}
+  .ot-lg{font:800 9px ui-monospace,monospace;letter-spacing:.5px;color:#fff;padding:3px 7px;border-radius:4px}  /* bg set per sport inline */
+  .ot-team{color:#f3f6fc;font-weight:700}
   .ot-scr{color:#fff;font:800 13px ui-monospace,monospace;font-variant-numeric:tabular-nums}
-  .ot-scr.win{color:#39d98a}
-  .ot-dash{color:#5b6883}
-  .ot-time{font:700 10.5px ui-monospace,monospace;color:#39d98a;letter-spacing:.3px}
-  .ot-time.up{color:#e7a13c}
-  .ot-sep{color:#38455f}
-  .ot-odd{font:800 13px ui-monospace,monospace;color:#c6cddb;font-variant-numeric:tabular-nums}
-  .ot-odd.up{color:#39d98a}.ot-odd.dn{color:#ff6b6b}
+  .ot-scr.win{color:#4ee6a0}
+  .ot-dash{color:#7c88a5}
+  .ot-time{font:700 10.5px ui-monospace,monospace;color:#4ee6a0;letter-spacing:.3px}
+  .ot-time.up{color:#f2b14e}
+  .ot-sep{color:#5a6785}
+  .ot-odd{font:800 13px ui-monospace,monospace;color:#e7edf8;font-variant-numeric:tabular-nums}
+  .ot-odd.up{color:#4ee6a0}.ot-odd.dn{color:#ff7b7b}
   @media (prefers-reduced-motion:reduce){.ot-track{animation:none}}
   .hero h1{font-size:clamp(48px,7.8vw,88px);font-weight:700;letter-spacing:-2.8px;line-height:1.0;margin-bottom:22px}
   .hero .sub{color:var(--muted);font-size:clamp(15px,1.7vw,17px);line-height:1.6;margin-bottom:30px;max-width:400px}
@@ -802,6 +802,15 @@
   function renderTicker(){
     var t=document.getElementById('otTrack'); if(!t||!G.length) return;
     function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+    // Per-sport league-tag colour (matches the "Pick your game" tiles).
+    function lgColor(lg){lg=String(lg||'').toUpperCase();
+      if(/NFL|NCAAF|CFB|FOOTBALL/.test(lg))return '#2b4d86';
+      if(/NBA|NCAAB|WNBA|EUROLEAGUE|BASKET/.test(lg))return '#c05a2e';
+      if(/MLB|NPB|KBO|BASEBALL/.test(lg))return '#2668bf';
+      if(/EPL|UCL|UEL|LALIGA|SERIE|BUNDES|LIGUE|MLS|SOCCER|FOOT/.test(lg))return '#219a67';
+      if(/ATP|WTA|TENNIS|SLAM/.test(lg))return '#6a9a26';
+      if(/NHL|HOCKEY/.test(lg))return '#3a6ea5';
+      return '#3a4a66';}
     function chip(g,gi){
       var isL=!!g.live;
       // Single clean line: [● league] away score – score home · time · odds
@@ -818,7 +827,7 @@
       var time='<span class="ot-time'+(isL?'':' up')+'">'+esc(isL?(g.time||'Live'):(g.time||'').toUpperCase())+'</span>';
       var d=dir[gi+'|ml|h'], vc=d==='up'?' up':d==='down'?' dn':'', ar=d?(' '+(d==='up'?'▲':'▼')):'';
       var odd='<span class="ot-odd'+vc+'">'+(+g.ml.h).toFixed(2)+ar+'</span>';
-      return '<span class="ot-chip">'+dot+'<span class="ot-lg">'+esc(g.league)+'</span>'+mu
+      return '<span class="ot-chip">'+dot+'<span class="ot-lg" style="background:'+lgColor(g.league)+'">'+esc(g.league)+'</span>'+mu
         +'<span class="ot-sep">·</span>'+time+'<span class="ot-sep">·</span>'+odd+'</span>';
     }
     // Only rebuild when the game set/score changes (not on every odds tick) so the
