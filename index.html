@@ -21,6 +21,7 @@
   :root{
     --bg:#05070f;--surface:#0c1120;--surface2:#141a2c;--line:rgba(255,255,255,.09);
     --text:#f4f6fb;--muted:#9aa3b8;--accent:#1e40d8;--accent2:#3a5bf0;
+    --sport-ln:rgba(200,214,255,.07);
     --font-display:'Space Grotesk',-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   }
   h1,h2{font-family:var(--font-display)}
@@ -28,7 +29,7 @@
   .kicker .kline{width:28px;height:1px;background:#1e40d8;flex:none}
   *{box-sizing:border-box;margin:0;padding:0}
   /* ===== Light (white) theme ===== */
-  body.light{--bg:#f4f6fb;--surface:#ffffff;--surface2:#eef1f7;--line:#e7ebf2;--text:#0e1726;--muted:#5a6478}
+  body.light{--bg:#f4f6fb;--surface:#ffffff;--surface2:#eef1f7;--line:#e7ebf2;--text:#0e1726;--muted:#5a6478;--sport-ln:rgba(14,23,38,.09)}
   body.light .glow{display:none}
   body.light::after{background:radial-gradient(1100px 620px at 72% 6%,rgba(30,64,216,.08),transparent 58%),linear-gradient(180deg,#f6f8fd,#eef2f8)}
   body.light header{background:rgba(255,255,255,.82)}
@@ -110,7 +111,12 @@
   .pill .arrow svg{display:block}
 
   /* Hero */
-  .hero{max-width:1120px;margin:0 auto;padding:80px 28px 64px;display:grid;grid-template-columns:1.1fr .9fr;gap:56px;align-items:center}
+  .hero{position:relative;max-width:1120px;margin:0 auto;padding:80px 28px 64px;display:grid;grid-template-columns:1.1fr .9fr;gap:56px;align-items:center}
+  /* Subtle sports motif behind the hero (line-art, theme-aware, fades toward the text). */
+  .hero>div:not(.hero-sport){position:relative;z-index:1}
+  .hero-sport{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .hero-sport svg{position:absolute;right:-40px;top:50%;transform:translateY(-50%);height:150%;fill:none;stroke:var(--sport-ln)}
+  .hero-sport::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,var(--bg) 30%,transparent 78%)}
   .hero h1{font-size:clamp(48px,7.8vw,88px);font-weight:700;letter-spacing:-2.8px;line-height:1.0;margin-bottom:22px}
   .hero .sub{color:var(--muted);font-size:clamp(15px,1.7vw,17px);line-height:1.6;margin-bottom:30px;max-width:400px}
   .hero-cta{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
@@ -417,6 +423,19 @@
   </header>
 
   <section class="hero">
+    <div class="hero-sport" aria-hidden="true">
+      <svg viewBox="0 0 600 600">
+        <g stroke-width="2" opacity="0.7">
+          <line x1="40" y1="90" x2="90" y2="90"/><line x1="40" y1="150" x2="90" y2="150"/><line x1="40" y1="210" x2="90" y2="210"/><line x1="40" y1="270" x2="90" y2="270"/><line x1="40" y1="330" x2="90" y2="330"/><line x1="40" y1="390" x2="90" y2="390"/><line x1="40" y1="450" x2="90" y2="450"/><line x1="40" y1="510" x2="90" y2="510"/>
+        </g>
+        <g transform="translate(330,300) rotate(-28)">
+          <ellipse cx="0" cy="0" rx="185" ry="105" stroke-width="4"/>
+          <path d="M-120 0 Q0 -55 120 0 Q0 55 -120 0" stroke-width="2.5" opacity="0.6"/>
+          <line x1="-52" y1="0" x2="52" y2="0" stroke-width="5"/>
+          <line x1="-40" y1="-14" x2="-40" y2="14"/><line x1="-20" y1="-16" x2="-20" y2="16"/><line x1="0" y1="-17" x2="0" y2="17"/><line x1="20" y1="-16" x2="20" y2="16"/><line x1="40" y1="-14" x2="40" y2="14"/>
+        </g>
+      </svg>
+    </div>
     <div>
       <h1><span class="gradient-text">Bet on football.<br>Anywhere.</span></h1>
       <p class="sub">The clean, fast sportsbook — live odds and two-tap bets with zero clutter.</p>
