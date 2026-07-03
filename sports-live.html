@@ -1094,127 +1094,7 @@
   function tr(k){ try{ const lng=(typeof settings!=='undefined'&&settings.language)||'en'; const d=I18N[lng]||I18N.en; return d[k]!=null?d[k]:(I18N.en[k]!=null?I18N.en[k]:k); }catch(e){ return k; } }
 
   // ---------- data ----------
-  const GAMES = [
-    { id:'KC_BUF', lg:'NFL', live:true, time:"3Q 8:42", clk:{type:'clock',period:3,max:4,sec:522,plen:900}, home:{ab:'KC',nm:'Chiefs',sc:17}, away:{ab:'BUF',nm:'Bills',sc:14},
-      core:{ spread:[{ln:'-2.5',am:-110,sel:'Chiefs -2.5'},{ln:'+2.5',am:-110,sel:'Bills +2.5'}],
-             total:[{ln:'Over 48.5',am:-110,sel:'Over 48.5'},{ln:'Under 48.5',am:-110,sel:'Under 48.5'}],
-             ml:[{ln:'',am:-140,sel:'Chiefs ML'},{ln:'',am:+120,sel:'Bills ML'}] },
-      props:[
-        {mkt:'Passing Yards · P. Mahomes',o:[{ln:'Over 274.5',am:-115,sel:'Mahomes Pass Yds Over 274.5'},{ln:'Under 274.5',am:-105,sel:'Mahomes Pass Yds Under 274.5'}]},
-        {mkt:'Passing TDs · P. Mahomes',o:[{ln:'Over 1.5',am:-130,sel:'Mahomes Pass TD Over 1.5'},{ln:'Under 1.5',am:+105,sel:'Mahomes Pass TD Under 1.5'}]},
-        {mkt:'Passing Yards · J. Allen',o:[{ln:'Over 262.5',am:-112,sel:'Allen Pass Yds Over 262.5'},{ln:'Under 262.5',am:-108,sel:'Allen Pass Yds Under 262.5'}]},
-        {mkt:'Receiving Yards · T. Kelce',o:[{ln:'Over 68.5',am:-114,sel:'Kelce Rec Yds Over 68.5'},{ln:'Under 68.5',am:-106,sel:'Kelce Rec Yds Under 68.5'}]},
-        {mkt:'Anytime Touchdown · T. Kelce',o:[{ln:'Yes',am:+130,sel:'Kelce Anytime TD'}]},
-        {mkt:'Anytime Touchdown · J. Cook',o:[{ln:'Yes',am:+115,sel:'Cook Anytime TD'}]},
-        {mkt:'1st Touchdown Scorer · T. Kelce',o:[{ln:'Yes',am:+750,sel:'Kelce 1st TD'}]},
-        {mkt:'Alternate Spread · Chiefs',o:[{ln:'-6.5',am:+175,sel:'Chiefs -6.5 alt'},{ln:'-1.5',am:-150,sel:'Chiefs -1.5 alt'}]},
-        {mkt:'1st Half · Moneyline',o:[{ln:'Chiefs',am:-135,sel:'Chiefs 1H ML'},{ln:'Bills',am:+115,sel:'Bills 1H ML'}]},
-        {mkt:'Team Total · Chiefs',o:[{ln:'Over 24.5',am:-110,sel:'Chiefs Team Total Over 24.5'},{ln:'Under 24.5',am:-110,sel:'Chiefs Team Total Under 24.5'}]},
-        {mkt:'Both Teams 25+ Points',o:[{ln:'Yes',am:+140,sel:'KC BUF Both 25+'},{ln:'No',am:-170,sel:'KC BUF Both 25+ No'}]},
-      ]},
-    { id:'LAL_GSW', lg:'NBA', live:true, time:"3Q 5:10", clk:{type:'clock',period:3,max:4,sec:310,plen:720}, home:{ab:'LAL',nm:'Lakers',sc:78}, away:{ab:'GSW',nm:'Warriors',sc:81},
-      core:{ spread:[{ln:'+3.5',am:-110,sel:'Lakers +3.5'},{ln:'-3.5',am:-110,sel:'Warriors -3.5'}],
-             total:[{ln:'Over 224.5',am:-108,sel:'Over 224.5'},{ln:'Under 224.5',am:-112,sel:'Under 224.5'}],
-             ml:[{ln:'',am:+125,sel:'Lakers ML'},{ln:'',am:-148,sel:'Warriors ML'}] },
-      props:[
-        {mkt:'Points · L. James',o:[{ln:'Over 26.5',am:-115,sel:'LeBron Over 26.5 Pts'},{ln:'Under 26.5',am:-105,sel:'LeBron Under 26.5 Pts'}]},
-        {mkt:'Pts+Reb+Ast · L. James',o:[{ln:'Over 42.5',am:-110,sel:'LeBron PRA Over 42.5'},{ln:'Under 42.5',am:-110,sel:'LeBron PRA Under 42.5'}]},
-        {mkt:'Points · S. Curry',o:[{ln:'Over 28.5',am:-112,sel:'Curry Over 28.5 Pts'},{ln:'Under 28.5',am:-108,sel:'Curry Under 28.5 Pts'}]},
-        {mkt:'3-Pointers Made · S. Curry',o:[{ln:'Over 4.5',am:-120,sel:'Curry 3PM Over 4.5'},{ln:'Under 4.5',am:+100,sel:'Curry 3PM Under 4.5'}]},
-        {mkt:'Rebounds · A. Davis',o:[{ln:'Over 11.5',am:-115,sel:'Davis Reb Over 11.5'},{ln:'Under 11.5',am:-105,sel:'Davis Reb Under 11.5'}]},
-        {mkt:'Assists · S. Curry',o:[{ln:'Over 5.5',am:-118,sel:'Curry Ast Over 5.5'},{ln:'Under 5.5',am:-102,sel:'Curry Ast Under 5.5'}]},
-        {mkt:'Double-Double · A. Davis',o:[{ln:'Yes',am:-160,sel:'Davis DD'}]},
-        {mkt:'Alternate Spread · Warriors',o:[{ln:'-7.5',am:+165,sel:'Warriors -7.5 alt'},{ln:'-1.5',am:-145,sel:'Warriors -1.5 alt'}]},
-        {mkt:'Highest Scoring Quarter',o:[{ln:'1st',am:+320,sel:'LALGSW Q1 high'},{ln:'4th',am:+210,sel:'LALGSW Q4 high'}]},
-        {mkt:'Team Total · Warriors',o:[{ln:'Over 114.5',am:-110,sel:'GSW Team Total Over 114.5'},{ln:'Under 114.5',am:-110,sel:'GSW Team Total Under 114.5'}]},
-      ]},
-    { id:'DAL_PHI', lg:'NFL', time:"Sun 1:00", home:{ab:'DAL',nm:'Cowboys'}, away:{ab:'PHI',nm:'Eagles'},
-      core:{ spread:[{ln:'+3.5',am:-108,sel:'Cowboys +3.5'},{ln:'-3.5',am:-112,sel:'Eagles -3.5'}],
-             total:[{ln:'Over 45.5',am:-110,sel:'Over 45.5'},{ln:'Under 45.5',am:-110,sel:'Under 45.5'}],
-             ml:[{ln:'',am:+148,sel:'Cowboys ML'},{ln:'',am:-176,sel:'Eagles ML'}] },
-      props:[
-        {mkt:'Rushing Yards · J. Hurts',o:[{ln:'Over 39.5',am:-114,sel:'Hurts Rush Over 39.5'},{ln:'Under 39.5',am:-106,sel:'Hurts Rush Under 39.5'}]},
-        {mkt:'Passing Yards · D. Prescott',o:[{ln:'Over 248.5',am:-112,sel:'Prescott Pass Over 248.5'},{ln:'Under 248.5',am:-108,sel:'Prescott Pass Under 248.5'}]},
-        {mkt:'Receiving Yards · CeeDee Lamb',o:[{ln:'Over 84.5',am:-114,sel:'Lamb Rec Over 84.5'},{ln:'Under 84.5',am:-106,sel:'Lamb Rec Under 84.5'}]},
-        {mkt:'Anytime Touchdown · A.J. Brown',o:[{ln:'Yes',am:+105,sel:'Brown Anytime TD'}]},
-        {mkt:'Anytime Touchdown · CeeDee Lamb',o:[{ln:'Yes',am:+120,sel:'Lamb Anytime TD'}]},
-        {mkt:'1st Touchdown Scorer · A.J. Brown',o:[{ln:'Yes',am:+650,sel:'Brown 1st TD'}]},
-        {mkt:'1st Half · Winner',o:[{ln:'Cowboys',am:+135,sel:'Cowboys 1H'},{ln:'Eagles',am:-160,sel:'Eagles 1H'}]},
-        {mkt:'Alternate Spread · Eagles',o:[{ln:'-7.5',am:+180,sel:'Eagles -7.5 alt'},{ln:'-1.5',am:-145,sel:'Eagles -1.5 alt'}]},
-        {mkt:'Team Total · Eagles',o:[{ln:'Over 24.5',am:-110,sel:'PHI Team Total Over 24.5'},{ln:'Under 24.5',am:-110,sel:'PHI Team Total Under 24.5'}]},
-      ]},
-    { id:'SF_SEA', lg:'NFL', time:"Sun 4:25", home:{ab:'SF',nm:'49ers'}, away:{ab:'SEA',nm:'Seahawks'},
-      core:{ spread:[{ln:'-6.5',am:-110,sel:'49ers -6.5'},{ln:'+6.5',am:-110,sel:'Seahawks +6.5'}],
-             total:[{ln:'Over 43.5',am:-105,sel:'Over 43.5'},{ln:'Under 43.5',am:-115,sel:'Under 43.5'}],
-             ml:[{ln:'',am:-280,sel:'49ers Moneyline'},{ln:'',am:+230,sel:'Seahawks ML'}] },
-      props:[
-        {mkt:'Rushing Yards · C. McCaffrey',o:[{ln:'Over 88.5',am:-110,sel:'McCaffrey Rush Over 88.5'},{ln:'Under 88.5',am:-110,sel:'McCaffrey Rush Under 88.5'}]},
-        {mkt:'Receptions · C. McCaffrey',o:[{ln:'Over 4.5',am:-130,sel:'McCaffrey Rec Over 4.5'},{ln:'Under 4.5',am:+105,sel:'McCaffrey Rec Under 4.5'}]},
-        {mkt:'Passing Yards · G. Smith',o:[{ln:'Over 235.5',am:-112,sel:'Smith Pass Over 235.5'},{ln:'Under 235.5',am:-108,sel:'Smith Pass Under 235.5'}]},
-        {mkt:'Anytime Touchdown · C. McCaffrey',o:[{ln:'Yes',am:-115,sel:'McCaffrey Anytime TD'}]},
-        {mkt:'Anytime Touchdown · D. Metcalf',o:[{ln:'Yes',am:+140,sel:'Metcalf Anytime TD'}]},
-        {mkt:'Alternate Spread · 49ers',o:[{ln:'-10.5',am:+185,sel:'SF -10.5 alt'},{ln:'-3.5',am:-135,sel:'SF -3.5 alt'}]},
-        {mkt:'1st Half · Total',o:[{ln:'Over 23.5',am:-110,sel:'SFSEA 1H Over 23.5'},{ln:'Under 23.5',am:-110,sel:'SFSEA 1H Under 23.5'}]},
-        {mkt:'Team Total · 49ers',o:[{ln:'Over 27.5',am:-110,sel:'SF Team Total Over 27.5'},{ln:'Under 27.5',am:-110,sel:'SF Team Total Under 27.5'}]},
-      ]},
-    { id:'NYY_BOS', lg:'MLB', live:true, time:"Top 7th", clk:{type:'inning',inning:7,half:0,max:9}, home:{ab:'NYY',nm:'Yankees',sc:4}, away:{ab:'BOS',nm:'Red Sox',sc:3},
-      core:{ spread:[{ln:'-1.5',am:+128,sel:'Yankees -1.5'},{ln:'+1.5',am:-152,sel:'Red Sox +1.5'}],
-             total:[{ln:'Over 8.5',am:-105,sel:'Over 8.5'},{ln:'Under 8.5',am:-115,sel:'Under 8.5'}],
-             ml:[{ln:'',am:-138,sel:'Yankees ML'},{ln:'',am:+118,sel:'Red Sox ML'}] },
-      props:[
-        {mkt:'Strikeouts · G. Cole',o:[{ln:'Over 7.5',am:-130,sel:'Cole K Over 7.5'},{ln:'Under 7.5',am:+110,sel:'Cole K Under 7.5'}]},
-        {mkt:'Hits + Runs + RBIs · A. Judge',o:[{ln:'Over 1.5',am:-140,sel:'Judge HRR Over 1.5'},{ln:'Under 1.5',am:+115,sel:'Judge HRR Under 1.5'}]},
-        {mkt:'Total Bases · A. Judge',o:[{ln:'Over 1.5',am:+105,sel:'Judge TB Over 1.5'},{ln:'Under 1.5',am:-130,sel:'Judge TB Under 1.5'}]},
-        {mkt:'Home Run · A. Judge',o:[{ln:'Yes',am:+265,sel:'Judge Home Run'}]},
-        {mkt:'Home Run · R. Devers',o:[{ln:'Yes',am:+310,sel:'Devers Home Run'}]},
-        {mkt:'Hits · R. Devers',o:[{ln:'Over 0.5',am:-185,sel:'Devers Hits Over 0.5'},{ln:'Under 0.5',am:+150,sel:'Devers Hits Under 0.5'}]},
-        {mkt:'Run Line · Yankees',o:[{ln:'-1.5',am:+125,sel:'NYY -1.5 RL'},{ln:'+1.5',am:-150,sel:'BOS +1.5 RL'}]},
-        {mkt:'1st 5 Innings · Winner',o:[{ln:'Yankees',am:-125,sel:'NYY F5'},{ln:'Red Sox',am:+105,sel:'BOS F5'}]},
-        {mkt:'Team Total · Yankees',o:[{ln:'Over 4.5',am:-110,sel:'Yankees Team Total Over 4.5'},{ln:'Under 4.5',am:-110,sel:'Yankees Team Total Under 4.5'}]},
-      ]},
-    { id:'COL_VGK', lg:'NHL', live:true, time:"2P 11:20", clk:{type:'clock',period:2,max:3,sec:680,plen:1200}, home:{ab:'COL',nm:'Avalanche',sc:2}, away:{ab:'VGK',nm:'Golden Knights',sc:2},
-      core:{ spread:[{ln:'-1.5',am:+165,sel:'Avalanche -1.5'},{ln:'+1.5',am:-198,sel:'Golden Knights +1.5'}],
-             total:[{ln:'Over 6.5',am:+102,sel:'Over 6.5'},{ln:'Under 6.5',am:-122,sel:'Under 6.5'}],
-             ml:[{ln:'',am:-125,sel:'Avalanche ML'},{ln:'',am:+105,sel:'Golden Knights ML'}] },
-      props:[
-        {mkt:'Shots on Goal · C. Makar',o:[{ln:'Over 3.5',am:-120,sel:'Makar Shots Over 3.5'},{ln:'Under 3.5',am:+100,sel:'Makar Shots Under 3.5'}]},
-        {mkt:'Points · N. MacKinnon',o:[{ln:'Over 1.5',am:+115,sel:'MacKinnon Pts Over 1.5'},{ln:'Under 1.5',am:-140,sel:'MacKinnon Pts Under 1.5'}]},
-        {mkt:'Anytime Goal · N. MacKinnon',o:[{ln:'Yes',am:+120,sel:'MacKinnon Anytime Goal'}]},
-        {mkt:'Anytime Goal · J. Eichel',o:[{ln:'Yes',am:+135,sel:'Eichel Anytime Goal'}]},
-        {mkt:'Total Saves · Goalie (COL)',o:[{ln:'Over 27.5',am:-115,sel:'COL Saves Over 27.5'},{ln:'Under 27.5',am:-105,sel:'COL Saves Under 27.5'}]},
-        {mkt:'Puck Line · Avalanche',o:[{ln:'-1.5',am:+155,sel:'COL -1.5 PL'},{ln:'+1.5',am:-185,sel:'VGK +1.5 PL'}]},
-        {mkt:'Both Teams To Score 3+',o:[{ln:'Yes',am:-130,sel:'COLVGK Both 3+'},{ln:'No',am:+110,sel:'COLVGK Both 3+ No'}]},
-        {mkt:'Team Total · Avalanche',o:[{ln:'Over 3.5',am:-110,sel:'COL Team Total Over 3.5'},{ln:'Under 3.5',am:-110,sel:'COL Team Total Under 3.5'}]},
-      ]},
-    { id:'BOS_MIA', lg:'NBA', live:true, time:"2Q 3:48", clk:{type:'clock',period:2,max:4,sec:228,plen:720}, home:{ab:'BOS',nm:'Celtics',sc:54}, away:{ab:'MIA',nm:'Heat',sc:49},
-      core:{ spread:[{ln:'-5.5',am:-110,sel:'Celtics -5.5'},{ln:'+5.5',am:-110,sel:'Heat +5.5'}],
-             total:[{ln:'Over 215.5',am:-110,sel:'Over 215.5'},{ln:'Under 215.5',am:-110,sel:'Under 215.5'}],
-             ml:[{ln:'',am:-210,sel:'Celtics ML'},{ln:'',am:+175,sel:'Heat ML'}] },
-      props:[
-        {mkt:'Points · J. Tatum',o:[{ln:'Over 28.5',am:-114,sel:'Tatum Over 28.5 Pts'},{ln:'Under 28.5',am:-106,sel:'Tatum Under 28.5 Pts'}]},
-        {mkt:'Pts+Reb+Ast · J. Tatum',o:[{ln:'Over 44.5',am:-110,sel:'Tatum PRA Over 44.5'},{ln:'Under 44.5',am:-110,sel:'Tatum PRA Under 44.5'}]},
-        {mkt:'3-Pointers Made · J. Tatum',o:[{ln:'Over 3.5',am:-125,sel:'Tatum 3PM Over 3.5'},{ln:'Under 3.5',am:+105,sel:'Tatum 3PM Under 3.5'}]},
-        {mkt:'Points · J. Brown',o:[{ln:'Over 23.5',am:-112,sel:'Brown Over 23.5 Pts'},{ln:'Under 23.5',am:-108,sel:'Brown Under 23.5 Pts'}]},
-        {mkt:'Rebounds · B. Adebayo',o:[{ln:'Over 9.5',am:-118,sel:'Adebayo Reb Over 9.5'},{ln:'Under 9.5',am:-102,sel:'Adebayo Reb Under 9.5'}]},
-        {mkt:'Double-Double · B. Adebayo',o:[{ln:'Yes',am:-150,sel:'Adebayo DD'}]},
-        {mkt:'Alternate Spread · Celtics',o:[{ln:'-9.5',am:+170,sel:'BOS -9.5 alt'},{ln:'-2.5',am:-140,sel:'BOS -2.5 alt'}]},
-        {mkt:'Team Total · Celtics',o:[{ln:'Over 116.5',am:-110,sel:'BOS Team Total Over 116.5'},{ln:'Under 116.5',am:-110,sel:'BOS Team Total Under 116.5'}]},
-      ]},
-    { id:'GB_MIN', lg:'NFL', live:true, time:"2Q 0:52", clk:{type:'clock',period:2,max:4,sec:52,plen:900}, home:{ab:'GB',nm:'Packers',sc:10}, away:{ab:'MIN',nm:'Vikings',sc:13},
-      core:{ spread:[{ln:'+1.5',am:-108,sel:'Packers +1.5'},{ln:'-1.5',am:-112,sel:'Vikings -1.5'}],
-             total:[{ln:'Over 47.5',am:-110,sel:'Over 47.5'},{ln:'Under 47.5',am:-110,sel:'Under 47.5'}],
-             ml:[{ln:'',am:+102,sel:'Packers ML'},{ln:'',am:-122,sel:'Vikings ML'}] },
-      props:[
-        {mkt:'Passing Yards · J. Love',o:[{ln:'Over 245.5',am:-112,sel:'Love Pass Over 245.5'},{ln:'Under 245.5',am:-108,sel:'Love Pass Under 245.5'}]},
-        {mkt:'Receiving Yards · J. Jefferson',o:[{ln:'Over 82.5',am:-115,sel:'Jefferson Over 82.5 Rec'},{ln:'Under 82.5',am:-105,sel:'Jefferson Under 82.5 Rec'}]},
-        {mkt:'Receptions · J. Jefferson',o:[{ln:'Over 6.5',am:-125,sel:'Jefferson Rec Over 6.5'},{ln:'Under 6.5',am:+105,sel:'Jefferson Rec Under 6.5'}]},
-        {mkt:'Anytime Touchdown · J. Jefferson',o:[{ln:'Yes',am:+110,sel:'Jefferson Anytime TD'}]},
-        {mkt:'Anytime Touchdown · J. Addison',o:[{ln:'Yes',am:+155,sel:'Addison Anytime TD'}]},
-        {mkt:'1st Half · Winner',o:[{ln:'Packers',am:+120,sel:'GB 1H'},{ln:'Vikings',am:-145,sel:'MIN 1H'}]},
-        {mkt:'Alternate Spread · Vikings',o:[{ln:'-6.5',am:+175,sel:'MIN -6.5 alt'},{ln:'-1.5',am:-140,sel:'MIN -1.5 alt'}]},
-        {mkt:'Team Total · Vikings',o:[{ln:'Over 23.5',am:-110,sel:'MIN Team Total Over 23.5'},{ln:'Under 23.5',am:-110,sel:'MIN Team Total Under 23.5'}]},
-      ]},
-  ];
+  const GAMES = [];  // empty seed — real games load from the server (no fake placeholder flash)
 
   // pinned games — user can star games to keep them at the top (persisted in localStorage)
   let pinnedGames = new Set();
@@ -1790,7 +1670,7 @@
     const emptyMsg=gameQuery?`No games match "${gameQuery}"`:'No upcoming games';
     document.getElementById('list').innerHTML=gameRowsHTML(base,false)||`<div class="empty">${emptyMsg}</div>`;
     const liveGames=GAMES.filter(g=>g.live&&matchGame(g)).slice().sort(sortByPin);
-    document.getElementById('liveList').innerHTML=gameRowsHTML(liveGames,true);
+    document.getElementById('liveList').innerHTML=gameRowsHTML(liveGames,true)||'<div class="empty">No live games right now</div>';
     document.getElementById('liveCount').textContent=liveGames.length;
     bindBets();
   }
