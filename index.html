@@ -125,6 +125,24 @@
   body.light .hero-photo .img{opacity:.18}
   /* Duotone navy tint concentrated around the phone. */
   .hero-photo .tint{position:absolute;inset:0;background:radial-gradient(48% 62% at 76% 48%,rgba(30,64,216,.12),transparent 78%)}
+
+  /* ===== Live odds ticker (fed by the same live_games feed as the board) ===== */
+  .odds-ticker{position:relative;background:#0e1726;overflow:hidden;border-bottom:1px solid rgba(0,0,0,.25)}
+  body.light .odds-ticker{border-bottom:1px solid #dfe4ee}
+  .odds-ticker::before{content:"LIVE";position:absolute;left:0;top:0;bottom:0;z-index:3;display:flex;align-items:center;padding:0 15px 0 20px;background:#e0403f;color:#fff;font:800 11px ui-monospace,monospace;letter-spacing:1.2px}
+  .odds-ticker::after{content:"";position:absolute;left:78px;top:0;bottom:0;width:26px;z-index:3;background:linear-gradient(90deg,#e0403f,transparent);pointer-events:none}
+  .ot-track{display:flex;width:max-content;white-space:nowrap;padding:10px 0 10px 96px;animation:otscroll 46s linear infinite}
+  .odds-ticker:hover .ot-track{animation-play-state:paused}
+  @keyframes otscroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  .ot-chip{display:inline-flex;align-items:center;gap:9px;padding:0 20px;border-right:1px solid rgba(255,255,255,.08);font-size:12.5px}
+  .ot-live{width:6px;height:6px;border-radius:50%;background:#39d98a;flex:none;box-shadow:0 0 0 0 rgba(57,217,138,.6);animation:otpulse 1.7s infinite}
+  @keyframes otpulse{0%{box-shadow:0 0 0 0 rgba(57,217,138,.5)}70%{box-shadow:0 0 0 6px rgba(57,217,138,0)}100%{box-shadow:0 0 0 0 rgba(57,217,138,0)}}
+  .ot-lg{font:800 9.5px ui-monospace,monospace;letter-spacing:.5px;color:#7d88a1;background:rgba(255,255,255,.06);padding:3px 7px;border-radius:4px}
+  .ot-mt{color:#e7ebf5;font-weight:600}
+  .ot-sc{color:#aeb7c9;font-variant-numeric:tabular-nums}
+  .ot-od{font-family:ui-monospace,monospace;font-weight:700;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;gap:3px}
+  .ot-up{color:#39d98a}.ot-dn{color:#ff6b6b}.ot-fl{color:#c6cddb}
+  @media (prefers-reduced-motion:reduce){.ot-track{animation:none}}
   .hero h1{font-size:clamp(48px,7.8vw,88px);font-weight:700;letter-spacing:-2.8px;line-height:1.0;margin-bottom:22px}
   .hero .sub{color:var(--muted);font-size:clamp(15px,1.7vw,17px);line-height:1.6;margin-bottom:30px;max-width:400px}
   .hero-cta{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
@@ -429,6 +447,9 @@
     <a href="login.html?switch=1" rel="noopener" style="font-size:13px;font-weight:600;color:var(--muted);margin-right:2px">Log in</a>
     <button class="pill" onclick="window.open('signup.html','_blank','noopener')">Sign up<span class="arrow"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></button>
   </header>
+
+  <!-- Live odds ticker — populated from the same live_games feed as the board. -->
+  <div class="odds-ticker" id="oddsTicker" aria-label="Live odds"><div class="ot-track" id="otTrack"></div></div>
 
   <section class="hero">
     <div class="hero-photo" aria-hidden="true">
@@ -767,6 +788,21 @@
       return '<div class="lb-game">'+top+head+rowH+rowA+'</div>';
     }).join('');
     [].slice.call(board.querySelectorAll('.lb-odd')).forEach(function(el){ el.addEventListener('click',function(){ toggle(el.dataset); }); });
+    renderTicker();
+  }
+  // Live odds ticker: one chip per game (same G data as the board), duplicated once
+  // so the CSS -50% scroll loops seamlessly. Odds arrow/colour reuse the board's `dir`.
+  function renderTicker(){
+    var t=document.getElementById('otTrack'); if(!t||!G.length) return;
+    function chip(g,gi){
+      var live=g.live?'<span class="ot-live"></span>':'';
+      var sc=(g.live&&g.home.sc!=null&&g.away.sc!=null)?'<span class="ot-sc">'+g.away.sc+'–'+g.home.sc+'</span>':'';
+      var d=dir[gi+'|ml|h'], arr=d?(' <span class="ot-'+(d==='up'?'up':'dn')+'">'+(d==='up'?'▲':'▼')+'</span>'):'';
+      var oc=d==='up'?'ot-up':d==='down'?'ot-dn':'ot-fl';
+      return '<span class="ot-chip">'+live+'<span class="ot-lg">'+g.league+'</span><span class="ot-mt">'+g.away.name+' — '+g.home.name+'</span>'+sc+'<span class="ot-od '+oc+'">'+g.home.name+' '+g.ml.h.toFixed(2)+arr+'</span></span>';
+    }
+    var one=G.map(chip).join('');
+    t.innerHTML=one+one;
   }
   function labelFor(g,mk,sd){ if(mk==='spread')return (sd==='h'?g.home.name+' '+g.spread.hl:g.away.name+' '+g.spread.al); if(mk==='total')return (sd==='o'?'Over '+g.total.ln:'Under '+g.total.ln); return (sd==='h'?g.home.name:g.away.name)+' ML'; }
   function oddFor(g,mk,sd){ if(mk==='spread')return sd==='h'?g.spread.ho:g.spread.ao; if(mk==='total')return sd==='o'?g.total.o:g.total.u; return sd==='h'?g.ml.h:g.ml.a; }
