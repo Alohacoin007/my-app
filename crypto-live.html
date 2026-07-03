@@ -7743,6 +7743,26 @@ function WhitelistPanel({ list = [], setList }) {
   const [fName, setFName] = React.useState('');
   const [fNetwork, setFNetwork] = React.useState('BTC');
   const [fAddress, setFAddress] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+
+  // SERVER is the source of truth (crypto_allowlist table). The 24h activation timer
+  // and the enforcement live server-side — the client only mirrors it for display, so
+  // a tampered client can't pre-approve an address or shortcut the delay.
+  const db = () => (window.AlpexaSync && AlpexaSync.db) ? AlpexaSync.db : null;
+  const myCust = () => { try { return String((JSON.parse(localStorage.getItem('alpexa.me') || 'null') || {}).custId || ''); } catch (e) { return ''; } };
+  const reload = React.useCallback(() => {
+    const d = db(); if (!d) return;
+    d.from('crypto_allowlist').select('id,label,address,network,created_at,active_at').order('created_at', { ascending: false })
+      .then((r) => {
+        if (!r || r.error || !r.data) return;
+        setList(r.data.map((x) => ({
+          id: x.id, name: x.label || '(unnamed)', network: x.network || 'ETH', address: x.address || '',
+          ts: x.created_at ? new Date(x.created_at).getTime() : Date.now(),
+          activeAt: x.active_at ? new Date(x.active_at).getTime() : null,
+        })));
+      }, () => {});
+  }, [setList]);
+  React.useEffect(() => { reload(); }, [reload]);
 
   // Only networks we actually pay out on. Tron (TRC-20) is NOT supported — payouts go via
   // MetaMask/Bitcoin/Solana only, so offering Tron was a fund-loss trap (a saved T... address
@@ -7760,14 +7780,16 @@ function WhitelistPanel({ list = [], setList }) {
     return Math.round(m / 1440) + 'd ago';
   };
   const statusOf = (e) => {
-    const ageH = (Date.now() - e.ts) / 3600000;
-    if (ageH >= 24) return { label: 'Approved', color: RH.green };
-    const hLeft = 24 - ageH;
+    // Use the SERVER active_at when present; fall back to created+24h for legacy rows.
+    const activeAt = e.activeAt || (e.ts + 24 * 3600000);
+    if (Date.now() >= activeAt) return { label: 'Active', color: RH.green };
+    const hLeft = (activeAt - Date.now()) / 3600000;
     const label = hLeft < 1 ? Math.ceil(hLeft * 60) + 'm' : Math.ceil(hLeft) + 'h';
     return { label: 'Pending · ' + label, color: RH.accent };
   };
 
-  const submit = () => {
+  const submit = async () => {
+    if (busy) return;
     if (fName.trim().length < 2 || fAddress.trim().length < 10) return;
     // Validate the address actually matches the chosen network — stops a wrong-chain address
     // (e.g. a Tron "T..." USDT address pasted into ERC-20) from being saved and later lost.
@@ -7777,21 +7799,27 @@ function WhitelistPanel({ list = [], setList }) {
       try { alert(`That doesn't look like a ${net.label} address (expected ${net.example}). Funds sent to the wrong network are lost — please double-check.`); } catch (_) {}
       return;
     }
-    setList((l) => [...l, {
-      id: 'wl-' + Date.now(),
-      name: fName.trim(),
-      network: fNetwork,
-      address: addr,
-      ts: Date.now(),
-    }]);
+    const d = db(); const cust = myCust();
+    if (!d || !cust) { try { alert('No server connection — the destination was not saved. Please try again.'); } catch (e) {} return; }
+    setBusy(true);
+    // Server insert; the force_allowlist_delay trigger stamps active_at = now + 24h.
+    const r = await d.from('crypto_allowlist').insert({ cust_id: cust, label: fName.trim(), address: addr, network: fNetwork }).then((x) => x, (e) => ({ error: e }));
+    setBusy(false);
+    if (r && r.error) { try { alert('Could not add this destination — ' + ((r.error && r.error.message) || 'please try again') + '.'); } catch (e) {} return; }
     if (typeof AudioFX !== 'undefined') AudioFX.success();
     setFName(''); setFNetwork('BTC'); setFAddress('');
     setFormOpen(false);
+    reload();
   };
 
   const remove = async (id, name) => {
     const ok = await alpexa.confirm(`Remove "${name}" from your whitelist?`, { title: 'Remove destination' });
-    if (ok) setList((l) => l.filter((x) => x.id !== id));
+    if (!ok) return;
+    const d = db();
+    if (!d) { try { alert('No server connection — please try again.'); } catch (e) {} return; }
+    const r = await d.from('crypto_allowlist').delete().eq('id', id).then((x) => x, (e) => ({ error: e }));
+    if (r && r.error) { try { alert('Could not remove — ' + ((r.error && r.error.message) || 'please try again') + '.'); } catch (e) {} return; }
+    reload();
   };
 
   if (formOpen) {
@@ -7873,7 +7901,7 @@ function WhitelistPanel({ list = [], setList }) {
         }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: RH.accent, fontFamily: 'Geist Mono, monospace', letterSpacing: 1, textTransform: 'uppercase' }}>24-hour delay</div>
           <div style={{ marginTop: 3, fontSize: 11.5, color: RH.text, lineHeight: 1.5 }}>
-            New destinations are held for 24 hours before becoming usable. You'll get an email immediately so you can cancel if it wasn't you.
+            New destinations are held for 24 hours before they can receive a withdrawal. If it wasn't you, remove it before the timer ends.
           </div>
         </div>
 
@@ -7936,7 +7964,7 @@ function WhitelistPanel({ list = [], setList }) {
         borderRadius: 12, fontSize: 11.5, color: RH.textDim, lineHeight: 1.55,
         fontFamily: 'Geist, Inter, system-ui',
       }}>
-        Withdrawals can only go to addresses on this list once you enable allowlisting. New entries are held 24h to prevent attackers from quickly adding their own.
+        External crypto withdrawals can only go to an address on this list (and 2-factor verification is required at withdrawal). New entries are held 24h to prevent an attacker from quickly adding their own.
       </div>
     </>
   );
@@ -9469,19 +9497,9 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
       return <TogglesPanel title="Memo enforcement" labels={['Require memo on deposits', 'Require memo on withdrawals']} initial={[true, true]}/>;
     }
     if (id === 'crypto-allowlist') {
-      return (
-        <>
-          <AcctSection title="Status">
-            <AcctRow label="Allowlist mode" status="Off" statusColor={RH.textDim} chevron={false}/>
-            <AcctDivider/>
-            <AcctRow label="24-hour cooldown" status="Off" statusColor={RH.textDim} chevron={false}/>
-          </AcctSection>
-          <AcctSection title="Addresses">
-            <div style={{ padding: '36px 12px', textAlign: 'center', color: RH.textDim, fontSize: 13 }}>No allowlisted addresses</div>
-          </AcctSection>
-          <AcctSaveButton label="Add address" onClick={() => flashAndClose("Added")}/>
-        </>
-      );
+      // Same server-backed allowlist as "Whitelisted destinations" — external crypto
+      // withdrawals are gated on it (enforced server-side, always on).
+      return <WhitelistPanel list={whitelist} setList={setWhitelist}/>;
     }
 
     // Transfers — recurring buy only (deposit removed with bank-link feature)
@@ -13571,6 +13589,11 @@ function App() {
       // Server-first: the payout request must reach the back office (requests table) BEFORE
       // we deduct any coins. No silent local-only withdrawals.
       if (!(window.AlpexaSync && AlpexaSync.pushRequest)) { try { alert('No server connection — withdrawal not submitted. Please try again.'); } catch (e) {} return; }
+      // MANDATORY 2FA — passing TOTP elevates this session to AAL2, which the server
+      // (guard_crypto_withdraw_security) REQUIRES before it will accept the request.
+      // Client 2FA alone is bypassable; the elevated session is what the server checks.
+      const ok2 = await alpexa.twofa();
+      if (!ok2) { try { alert('2-factor verification is required to withdraw to an external address. Nothing was deducted.'); } catch (e) {} return; }
       // Use ONE id for both the tx and the request so the reject-sync can match them and
       // refund. Mark optimistic:true so a rejected payout re-credits the deducted coins.
       const reqId = 'cr-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
@@ -13579,7 +13602,17 @@ function App() {
           type: 'withdraw', server: 'crypto', amount: usdAmount, net: usdAmount, fee: 0,
           asset: assetId, network: 'ERC-20', address: recipient.address, status: 'pending' });
       } catch (e) { res = { error: e }; }
-      if (!res || res.skipped || res.error) { try { alert('Withdrawal not submitted — couldn’t reach the server. Nothing was deducted. Please try again.'); } catch (e) {} return; }
+      if (!res || res.skipped || res.error) {
+        // Surface WHY the server rejected (allowlist / 2FA) so the user can fix it.
+        const emsg = String((res && res.error && (res.error.message || res.error.hint)) || '');
+        const friendly = /allowlist/i.test(emsg)
+            ? 'This address isn’t on your active allowlist yet. Add it in Account → Security → Whitelisted destinations, then wait 24 hours before withdrawing. Nothing was deducted.'
+          : /two-?factor|2fa|aal2/i.test(emsg)
+            ? 'Please complete 2-factor verification and try again. Nothing was deducted.'
+            : 'Withdrawal not submitted — nothing was deducted. Please try again.';
+        try { alert(friendly); } catch (e) {}
+        return;
+      }
       // Back office confirmed → now deduct and record the optimistic tx.
       setBalances((b) => ({ ...b, [assetId]: Math.max(0, (b[assetId] || 0) - usdAmount) }));
       pushTx({ id: reqId, type: 'withdraw', sym: assetId, asset: assetId, usd: usdAmount, gross: usdAmount, to: recipient.address, optimistic: true });
