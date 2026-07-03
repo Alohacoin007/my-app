@@ -129,8 +129,9 @@
   /* ===== Live odds ticker (fed by the same live_games feed as the board) ===== */
   .odds-ticker{position:relative;background:#0e1726;overflow:hidden;border-bottom:1px solid rgba(0,0,0,.25)}
   body.light .odds-ticker{border-bottom:1px solid #dfe4ee}
-  .odds-ticker::before{content:"LIVE";position:absolute;left:0;top:0;bottom:0;z-index:3;display:flex;align-items:center;padding:0 15px 0 20px;background:#e0403f;color:#fff;font:800 11px ui-monospace,monospace;letter-spacing:1.2px}
-  .odds-ticker::after{content:"";position:absolute;left:78px;top:0;bottom:0;width:26px;z-index:3;background:linear-gradient(90deg,#e0403f,transparent);pointer-events:none}
+  .ot-label{position:absolute;left:0;top:0;bottom:0;z-index:3;display:flex;align-items:center;padding:0 15px 0 20px;color:#fff;font:800 11px ui-monospace,monospace;letter-spacing:1.2px;--lc:#e0403f;background:var(--lc)}
+  .ot-label.soon{--lc:#2b4d86}
+  .ot-label::after{content:"";position:absolute;left:100%;top:0;bottom:0;width:26px;background:linear-gradient(90deg,var(--lc),transparent);pointer-events:none}
   .ot-track{display:flex;width:max-content;white-space:nowrap;padding:10px 0;animation:otscroll 46s linear infinite}
   .odds-ticker:hover .ot-track{animation-play-state:paused}
   @keyframes otscroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
@@ -456,7 +457,7 @@
   </header>
 
   <!-- Live odds ticker — populated from the same live_games feed as the board. -->
-  <div class="odds-ticker" id="oddsTicker" aria-label="Live odds"><div class="ot-track" id="otTrack"></div></div>
+  <div class="odds-ticker" id="oddsTicker" aria-label="Live odds" style="display:none"><span class="ot-label" id="otLabel">LIVE</span><div class="ot-track" id="otTrack"></div></div>
 
   <section class="hero">
     <div class="hero-photo" aria-hidden="true">
@@ -795,12 +796,23 @@
       return '<div class="lb-game">'+top+head+rowH+rowA+'</div>';
     }).join('');
     [].slice.call(board.querySelectorAll('.lb-odd')).forEach(function(el){ el.addEventListener('click',function(){ toggle(el.dataset); }); });
-    renderTicker();
   }
-  // Live odds ticker: one chip per game (same G data as the board), duplicated once
-  // so the CSS -50% scroll loops seamlessly. Odds arrow/colour reuse the board's `dir`.
+  // ── Live odds ticker — REAL games only (from live_games), live first then upcoming.
+  // Driven by updateTicker() from loadReal, NOT the demo board. Hidden when the server
+  // has no games (never shows the demo showcase games).
+  var TG=[];
+  function updateTicker(rows){
+    var bar=document.getElementById('oddsTicker'), lbl=document.getElementById('otLabel');
+    var real=(rows||[]).filter(Boolean).slice();
+    real.sort(function(a,b){return (b.live?1:0)-(a.live?1:0);});     // live first, upcoming after
+    TG=real.slice(0,16);
+    var anyLive=TG.some(function(g){return g.live;});
+    if(lbl){ lbl.textContent=anyLive?'LIVE':'TODAY'; lbl.className='ot-label'+(anyLive?'':' soon'); }
+    if(bar){ bar.style.display=TG.length?'':'none'; }
+    renderTicker._sig=''; renderTicker();
+  }
   function renderTicker(){
-    var t=document.getElementById('otTrack'); if(!t||!G.length) return;
+    var t=document.getElementById('otTrack'); if(!t||!TG.length) return;
     function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
     // Per-sport league-tag colour (matches the "Pick your game" tiles).
     function lgColor(lg){lg=String(lg||'').toUpperCase();
@@ -833,10 +845,10 @@
     // Only rebuild when the game set/score changes (not on every odds tick) so the
     // scroll doesn't jump. Fill the track WIDER than the viewport, then duplicate that
     // filled half — translateX(-50%) then loops with no gap regardless of game count.
-    var sig=G.map(function(g){return g.league+'~'+g.away.name+'~'+g.home.name+'~'+(g.live?'L':'')+'~'+g.away.sc+'~'+g.home.sc;}).join('|');
+    var sig=TG.map(function(g){return g.league+'~'+g.away.name+'~'+g.home.name+'~'+(g.live?'L':'')+'~'+g.away.sc+'~'+g.home.sc;}).join('|');
     if(sig===renderTicker._sig) return;
     renderTicker._sig=sig;
-    var pass=G.map(chip).join('');
+    var pass=TG.map(chip).join('');
     t.innerHTML=pass;                                   // measure one pass
     var contW=(t.parentNode&&t.parentNode.clientWidth)||1200;
     var passW=t.scrollWidth||contW;
@@ -896,15 +908,16 @@
     try{
       var db=window.supabase.createClient('https://grxnbgtfnaayeluenvqh.supabase.co','sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu');
       db.from('live_games').select('data').eq('id','all').maybeSingle().then(function(r){
-        var games=(r&&r.data&&r.data.data)||[]; if(!Array.isArray(games)||!games.length) return;
-        var rows=[]; games.forEach(function(g){try{var x=toLB(g);if(x)rows.push(x);}catch(e){}});
-        if(!rows.length) return;
+        var games=(r&&r.data&&r.data.data)||[];
+        var rows=[]; if(Array.isArray(games)) games.forEach(function(g){try{var x=toLB(g);if(x)rows.push(x);}catch(e){}});
+        updateTicker(rows);                       // ticker = REAL games only (hidden if none)
+        if(!rows.length) return;                  // board keeps its demo showcase if no real games
         rows.sort(function(a,b){return (b.live?1:0)-(a.live?1:0);}); // live games first
         var wasReal=realLoaded;
         G.length=0; rows.slice(0,SHOW_N).forEach(function(x){G.push(x);});
         realLoaded=true; if(!wasReal) slip=[];
         render(); renderSlip(); seedSlip();
-      },function(){});
+      },function(){ updateTicker([]); });
     }catch(e){}
   }
   loadReal(); setInterval(loadReal,60000);
