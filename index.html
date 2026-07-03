@@ -134,7 +134,21 @@
   .ot-track{display:flex;width:max-content;white-space:nowrap;padding:10px 0;animation:otscroll 46s linear infinite}
   .odds-ticker:hover .ot-track{animation-play-state:paused}
   @keyframes otscroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-  .ot-chip{display:inline-flex;align-items:center;gap:9px;padding:0 20px;border-right:1px solid rgba(255,255,255,.08);font-size:12.5px}
+  .ot-chip{display:inline-flex;align-items:center;gap:13px;padding:0 20px;border-right:1px solid rgba(255,255,255,.08)}
+  .ot-meta{display:flex;flex-direction:column;gap:2px;align-items:flex-start}
+  .ot-tm{font:700 10px ui-monospace,monospace;letter-spacing:.3px;color:#e7a13c}
+  .ot-tm.live{color:#39d98a;display:inline-flex;align-items:center;gap:5px}
+  .ot-tm.live .ot-p{width:5px;height:5px;border-radius:50%;background:#39d98a;animation:otpulse 1.7s infinite}
+  .ot-mt2{display:flex;flex-direction:column;gap:3px}
+  .ot-tr{display:flex;align-items:center;gap:8px;font-size:12px}
+  .ot-tn{color:#e7ebf5;font-weight:600;min-width:74px}
+  .ot-ts{color:#fff;font:800 12px ui-monospace,monospace;font-variant-numeric:tabular-nums;min-width:16px;text-align:right}
+  .ot-tr.win .ot-ts{color:#39d98a}
+  .ot-ods{display:flex;gap:7px}
+  .ot-od2{display:flex;flex-direction:column;align-items:center;gap:1px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:3px 8px}
+  .ot-od2 .k{font:800 8px ui-monospace,monospace;letter-spacing:.3px;color:#7d88a1;text-transform:uppercase}
+  .ot-od2 .v{font:800 11px ui-monospace,monospace;color:#c6cddb;font-variant-numeric:tabular-nums}
+  .ot-od2 .v.up{color:#39d98a}.ot-od2 .v.dn{color:#ff6b6b}
   .ot-live{width:6px;height:6px;border-radius:50%;background:#39d98a;flex:none;box-shadow:0 0 0 0 rgba(57,217,138,.6);animation:otpulse 1.7s infinite}
   @keyframes otpulse{0%{box-shadow:0 0 0 0 rgba(57,217,138,.5)}70%{box-shadow:0 0 0 6px rgba(57,217,138,0)}100%{box-shadow:0 0 0 0 rgba(57,217,138,0)}}
   .ot-lg{font:800 9.5px ui-monospace,monospace;letter-spacing:.5px;color:#7d88a1;background:rgba(255,255,255,.06);padding:3px 7px;border-radius:4px}
@@ -794,12 +808,27 @@
   // so the CSS -50% scroll loops seamlessly. Odds arrow/colour reuse the board's `dir`.
   function renderTicker(){
     var t=document.getElementById('otTrack'); if(!t||!G.length) return;
+    function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
     function chip(g,gi){
-      var live=g.live?'<span class="ot-live"></span>':'';
-      var sc=(g.live&&g.home.sc!=null&&g.away.sc!=null)?'<span class="ot-sc">'+g.away.sc+'–'+g.home.sc+'</span>':'';
-      var d=dir[gi+'|ml|h'], arr=d?(' <span class="ot-'+(d==='up'?'up':'dn')+'">'+(d==='up'?'▲':'▼')+'</span>'):'';
-      var oc=d==='up'?'ot-up':d==='down'?'ot-dn':'ot-fl';
-      return '<span class="ot-chip">'+live+'<span class="ot-lg">'+g.league+'</span><span class="ot-mt">'+g.away.name+' — '+g.home.name+'</span>'+sc+'<span class="ot-od '+oc+'">'+g.home.name+' '+g.ml.h.toFixed(2)+arr+'</span></span>';
+      var isL=!!g.live;
+      // league + time (live: period/clock, green pulse · upcoming: date/time, amber)
+      var tm=isL ? '<span class="ot-tm live"><span class="ot-p"></span>'+esc(g.time||'Live')+'</span>'
+                 : '<span class="ot-tm">'+esc((g.time||'').toUpperCase())+'</span>';
+      var hi=(isL&&g.home.sc!=null&&g.away.sc!=null&&g.home.sc!==g.away.sc)?Math.max(g.home.sc,g.away.sc):null;
+      function trow(t){
+        var sc=(isL&&t.sc!=null)?t.sc:'—';
+        var win=(hi!=null&&t.sc===hi)?' win':'';
+        return '<span class="ot-tr'+win+'"><span class="ot-tn">'+esc(t.name)+'</span><span class="ot-ts">'+sc+'</span></span>';
+      }
+      function obox(mk,sd,lbl,val){
+        var d=dir[gi+'|'+mk+'|'+sd], vc=d==='up'?'up':d==='down'?'dn':'', ar=d?(' '+(d==='up'?'▲':'▼')):'';
+        return '<span class="ot-od2"><span class="k">'+esc(lbl)+'</span><span class="v '+vc+'">'+(+val).toFixed(2)+ar+'</span></span>';
+      }
+      return '<span class="ot-chip">'
+        +'<span class="ot-meta"><span class="ot-lg">'+esc(g.league)+'</span>'+tm+'</span>'
+        +'<span class="ot-mt2">'+trow(g.away)+trow(g.home)+'</span>'
+        +'<span class="ot-ods">'+obox('ml','h','ML',g.ml.h)+obox('total','o','O '+g.total.ln,g.total.o)+'</span>'
+        +'</span>';
     }
     // Only rebuild when the game set/score changes (not on every odds tick) so the
     // scroll doesn't jump. Fill the track WIDER than the viewport, then duplicate that
