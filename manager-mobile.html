@@ -1400,24 +1400,24 @@
     var q=(PRICE_FILTER||'').toLowerCase();
     var list=FX_INSTR.filter(function(r){ return (PRICE_CLS==='ALL'||r[2]===PRICE_CLS) && (!q||((r[0]+' '+r[1]).toLowerCase().indexOf(q)>=0)); });
     h+='<div class="card" style="padding:3px 8px">'+
-      '<div class="row" style="padding:5px 0;border-bottom:1px solid var(--line)"><span class="lbl" style="width:46px;text-align:center">Sym</span><span class="lbl" style="flex:1;text-align:center">Bid</span><span class="lbl" style="width:30px;text-align:center">Spr·pt</span><span class="lbl" style="flex:1;text-align:center">Ask</span><span class="lbl" style="width:74px;text-align:center">Mk</span></div>';
+      '<div class="row" style="padding:5px 0;border-bottom:1px solid var(--line)"><span class="lbl" style="width:46px;text-align:center">Sym</span><span class="lbl" style="flex:1;text-align:center">Bid</span><span class="lbl" style="width:32px;text-align:center">Spr·pt</span><span class="lbl" style="flex:1;text-align:center">Ask</span><span class="lbl" style="width:74px;text-align:center">Mk</span></div>';
     if(!list.length) h+='<div class="empty">No instruments match.</div>';
     list.forEach(function(r){
       var sym=r[0], mid=PRICE_LIVE[sym]||r[3], dg=r[4], mk=+PRICE_MARKS[sym]||0, up=PRICE_DIR[sym]>=0;
-      var liveSprPip=PRICE_SPR[sym]||r[5];                                // raw spread in PIPS (from feed)
-      var totPip=Math.max(0.1, liveSprPip+mk);                            // raw + markup, PIPS (== server fx_open)
+      var liveSprPip=PRICE_SPR[sym]||r[5];                                // LIVE liquidity spread in PIPS (Polygon feed — floats)
+      var totPip=Math.max(0.1, liveSprPip+mk);                            // live + markup, PIPS (== server fx_open)
       var point=Math.pow(10,-dg);                                        // value of the last shown digit
-      // spread shown in POINTS; floor 1pt so bid<ask. Quotes are built to differ by
-      // EXACTLY this many points, so the on-screen (ask−bid) always equals Spr.
-      var totSprPt=Math.max(1, Math.round(totPip*fxPPP(sym,dg)));
-      var loP=Math.floor(totSprPt/2), hiP=totSprPt-loP;
-      var midR=Math.round(mid/point)*point;
-      var bid=midR-loP*point, ask=midR+hiP*point;
+      // FLOATING (liquidity) spread: base = live feed, adjusted by markup. Show 1 decimal
+      // so the real-time movement is visible (not a fixed-looking round number). Quotes
+      // = mid ± half of the live effective spread → they drift with the market.
+      var effPt=Math.max(0.1, totPip*fxPPP(sym,dg));                      // effective spread in POINTS (floats)
+      var half=(effPt*point)/2;
+      var bid=mid-half, ask=mid+half;
       var mkPt=Math.round(mk*fxPPP(sym,dg));                              // markup shown in POINTS
       h+='<div class="row" style="align-items:center;padding:6px 0">'+
         '<span style="width:46px;text-align:center;overflow:hidden"><b style="font-size:10px">'+sym+'</b></span>'+
         '<span style="flex:1;text-align:center;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+bid.toFixed(dg)+'</b></span>'+
-        '<span style="width:30px;text-align:center;font-variant-numeric:tabular-nums;font-size:10px;font-weight:700;color:'+(mk>0?'var(--neg)':mk<0?'var(--pos)':'var(--dim)')+'">'+totSprPt+'</span>'+
+        '<span style="width:32px;text-align:center;font-variant-numeric:tabular-nums;font-size:10px;font-weight:700;color:'+(mk>0?'var(--neg)':mk<0?'var(--pos)':'var(--dim)')+'">'+effPt.toFixed(1)+'</span>'+
         '<span style="flex:1;text-align:center;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+ask.toFixed(dg)+'</b></span>'+
         '<span style="width:74px;display:flex;gap:3px;justify-content:center;align-items:center">'+
           '<button data-pmk="'+sym+'|-" style="width:19px;height:19px;border:1px solid var(--line);background:#fff;border-radius:4px;font:700 12px system-ui;cursor:pointer;color:var(--ink)">−</button>'+
@@ -1429,7 +1429,7 @@
     h+='<div class="card"><div class="row" style="border:none;padding:2px 0"><span class="lbl">Total markup added</span>'+
       '<span style="display:flex;align-items:center;gap:10px"><b class="'+(totalMk>0?'neg':'pos')+'">'+(totalMk>0?'+':'')+Math.round(totalMk)+' pt</b>'+
       '<button data-preset="1" style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:6px 12px;font:700 11px system-ui;cursor:pointer;color:var(--ink)">↻ Reset all</button></span></div></div>';
-    h+='<div class="hint" style="margin:0 14px">Spr·pt = the shown (ask − bid) in points (last price digit). Markup ± the raw spread: + widens · − narrows below raw (house absorbs it). Spread floors at 1pt. Applies to every FX app within ~5s. − / + steps 1pt.</div>';
+    h+='<div class="hint" style="margin:0 14px">Spr·pt = LIVE liquidity spread + markup, in points (floats with the market — 1 decimal shows the movement). Markup ± the live spread: + widens · − narrows below raw (house absorbs it). Applies to every FX app within ~5s. − / + steps 1pt.</div>';
     return h;
   }
   function pricingMark(sym,dir){

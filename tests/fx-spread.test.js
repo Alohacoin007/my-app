@@ -102,10 +102,13 @@ console.log('\n=== BACKOFFICE DISPLAY UNIT: spread shown in POINTS == charged sp
 function fxPipOf(sym){ if(sym.endsWith('JPY'))return 0.01; if(sym==='XAUUSD')return 0.01; if(sym==='XAGUSD')return 0.001; return 0.0001; }
 function fxPPP(sym,dg){ return fxPipOf(sym)*Math.pow(10,dg); }      // points per pip
 function pointOf(dg){ return Math.pow(10,-dg); }
-// spread shown in points, from raw+markup pips (dg: EURUSD=5, USDJPY=3, XAU=2, XAG=3)
-function sprPointsShown(sym,dg,sprPip,mkPip){ return Math.max(1, Math.round((sprPip+mkPip)*fxPPP(sym,dg))); }
+// FLOATING display: the desk shows the LIVE liquidity spread + markup in points, to
+// 1 decimal (so market movement is visible) — no integer quantization. Value == the
+// live spread converted to points. dg: EURUSD=5, USDJPY=3, XAU=2, XAG=3.
+function sprPointsShown(sym,dg,sprPip,mkPip){ return +(Math.max(0.1,(sprPip+mkPip)*fxPPP(sym,dg))).toFixed(1); }
 
-check('EURUSD 1.0 pip raw → 10 pt shown', sprPointsShown('EURUSD',5,1.0,0), 10);
+check('EURUSD 1.0 pip raw → 10.0 pt shown', sprPointsShown('EURUSD',5,1.0,0), 10);
+check('EURUSD 1.04 pip live (floats) → 10.4 pt shown', sprPointsShown('EURUSD',5,1.04,0), 10.4);
 check('EURUSD 1.0 pip + 1.0 pip markup → 20 pt', sprPointsShown('EURUSD',5,1.0,1.0), 20);
 check('USDJPY 1.2 pip → 12 pt (dg3, PPP=10)', sprPointsShown('USDJPY',3,1.2,0), 12);
 check('XAUUSD 30 pip → 30 pt (dg2, PPP=1)', sprPointsShown('XAUUSD',2,30,0), 30);
