@@ -131,7 +131,7 @@
   body.light .odds-ticker{border-bottom:1px solid #dfe4ee}
   .odds-ticker::before{content:"LIVE";position:absolute;left:0;top:0;bottom:0;z-index:3;display:flex;align-items:center;padding:0 15px 0 20px;background:#e0403f;color:#fff;font:800 11px ui-monospace,monospace;letter-spacing:1.2px}
   .odds-ticker::after{content:"";position:absolute;left:78px;top:0;bottom:0;width:26px;z-index:3;background:linear-gradient(90deg,#e0403f,transparent);pointer-events:none}
-  .ot-track{display:flex;width:max-content;white-space:nowrap;padding:10px 0 10px 96px;animation:otscroll 46s linear infinite}
+  .ot-track{display:flex;width:max-content;white-space:nowrap;padding:10px 0;animation:otscroll 46s linear infinite}
   .odds-ticker:hover .ot-track{animation-play-state:paused}
   @keyframes otscroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
   .ot-chip{display:inline-flex;align-items:center;gap:9px;padding:0 20px;border-right:1px solid rgba(255,255,255,.08);font-size:12.5px}
@@ -801,8 +801,20 @@
       var oc=d==='up'?'ot-up':d==='down'?'ot-dn':'ot-fl';
       return '<span class="ot-chip">'+live+'<span class="ot-lg">'+g.league+'</span><span class="ot-mt">'+g.away.name+' — '+g.home.name+'</span>'+sc+'<span class="ot-od '+oc+'">'+g.home.name+' '+g.ml.h.toFixed(2)+arr+'</span></span>';
     }
-    var one=G.map(chip).join('');
-    t.innerHTML=one+one;
+    // Only rebuild when the game set/score changes (not on every odds tick) so the
+    // scroll doesn't jump. Fill the track WIDER than the viewport, then duplicate that
+    // filled half — translateX(-50%) then loops with no gap regardless of game count.
+    var sig=G.map(function(g){return g.league+'~'+g.away.name+'~'+g.home.name+'~'+(g.live?'L':'')+'~'+g.away.sc+'~'+g.home.sc;}).join('|');
+    if(sig===renderTicker._sig) return;
+    renderTicker._sig=sig;
+    var pass=G.map(chip).join('');
+    t.innerHTML=pass;                                   // measure one pass
+    var contW=(t.parentNode&&t.parentNode.clientWidth)||1200;
+    var passW=t.scrollWidth||contW;
+    var K=Math.max(1,Math.ceil((contW+280)/passW));     // repeat until one half fills the screen
+    var half=''; for(var i=0;i<K;i++){ half+=pass; }
+    t.innerHTML=half+half;                              // two identical halves → seamless -50% loop
+    t.style.animationDuration=Math.max(22,Math.round(passW*K/55))+'s';  // ~55px/s, steady speed
   }
   function labelFor(g,mk,sd){ if(mk==='spread')return (sd==='h'?g.home.name+' '+g.spread.hl:g.away.name+' '+g.spread.al); if(mk==='total')return (sd==='o'?'Over '+g.total.ln:'Under '+g.total.ln); return (sd==='h'?g.home.name:g.away.name)+' ML'; }
   function oddFor(g,mk,sd){ if(mk==='spread')return sd==='h'?g.spread.ho:g.spread.ao; if(mk==='total')return sd==='o'?g.total.o:g.total.u; return sd==='h'?g.ml.h:g.ml.a; }
