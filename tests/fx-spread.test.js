@@ -95,5 +95,40 @@ const customerCost = -roundTrip('EURUSD','BUY', 1.10000, 1, 10, 1.0, true);
 const houseRevenue = sprPips * (pip('EURUSD')*lot('EURUSD')) * 1.0;  // pips × $/pip/lot × size
 check('house spread revenue == customer round-trip cost', customerCost, houseRevenue);
 
+console.log('\n=== BACKOFFICE DISPLAY UNIT: spread shown in POINTS == charged spread ===');
+// The dealing desk stores spread+markup in PIPS (server unit) but DISPLAYS points
+// (last price digit). These mirror manager-mobile.html fxPipOf/fxPPP EXACTLY — if
+// they drift from the SQL pip above, the shown quote lies about what's charged.
+function fxPipOf(sym){ if(sym.endsWith('JPY'))return 0.01; if(sym==='XAUUSD')return 0.01; if(sym==='XAGUSD')return 0.001; return 0.0001; }
+function fxPPP(sym,dg){ return fxPipOf(sym)*Math.pow(10,dg); }      // points per pip
+function pointOf(dg){ return Math.pow(10,-dg); }
+// spread shown in points, from raw+markup pips (dg: EURUSD=5, USDJPY=3, XAU=2, XAG=3)
+function sprPointsShown(sym,dg,sprPip,mkPip){ return Math.max(1, Math.round((sprPip+mkPip)*fxPPP(sym,dg))); }
+
+check('EURUSD 1.0 pip raw → 10 pt shown', sprPointsShown('EURUSD',5,1.0,0), 10);
+check('EURUSD 1.0 pip + 1.0 pip markup → 20 pt', sprPointsShown('EURUSD',5,1.0,1.0), 20);
+check('USDJPY 1.2 pip → 12 pt (dg3, PPP=10)', sprPointsShown('USDJPY',3,1.2,0), 12);
+check('XAUUSD 30 pip → 30 pt (dg2, PPP=1)', sprPointsShown('XAUUSD',2,30,0), 30);
+
+// RECONCILIATION: the points the desk SHOWS, converted back to price, must equal the
+// price spread the SERVER charges (pips × pip). Same money, two labels.
+function reconcile(sym,dg,sprPip,mkPip){
+  const shownPts = sprPointsShown(sym,dg,sprPip,mkPip);
+  const shownPrice = shownPts * pointOf(dg);                 // desk quote gap in price
+  const chargedPrice = Math.max(0.1,(sprPip+mkPip)) * fxPipOf(sym);  // server v_half*2
+  return { shownPrice: round2(shownPrice/pointOf(dg)), chargedPrice: round2(chargedPrice/pointOf(dg)) };
+}
+const rc = reconcile('EURUSD',5,1.0,0);
+check('EURUSD shown-gap == charged-gap (in points)', rc.shownPrice, rc.chargedPrice);
+
+// A 1-POINT markup step must store 1/PPP pips so the server charges exactly 1 point more.
+function stepPipFor(sym,dg){ return 1/fxPPP(sym,dg); }
+check('EURUSD 1pt markup step = 0.1 pip stored', round2(stepPipFor('EURUSD',5)*100)/100, 0.1);
+check('XAUUSD 1pt markup step = 1.0 pip stored', stepPipFor('XAUUSD',2), 1);
+// stepping +1pt then charging: the extra cost equals exactly 1 point.
+const extraPip = stepPipFor('EURUSD',5);                     // pips added by one +1pt click
+const extraPointsCharged = Math.round(extraPip * fxPPP('EURUSD',5));
+check('one +1pt click charges exactly +1 pt', extraPointsCharged, 1);
+
 console.log('\n' + (pass ? '🟢 ALL CHECKS PASSED' : '🔴 CHECKS FAILED') + '\n');
 process.exit(pass ? 0 : 1);
