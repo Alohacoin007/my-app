@@ -7964,7 +7964,7 @@ function WhitelistPanel({ list = [], setList }) {
         borderRadius: 12, fontSize: 11.5, color: RH.textDim, lineHeight: 1.55,
         fontFamily: 'Geist, Inter, system-ui',
       }}>
-        External crypto withdrawals can only go to an address on this list (and 2-factor verification is required at withdrawal). New entries are held 24h to prevent an attacker from quickly adding their own.
+        Withdrawals of $5,000+ can only go to an address on this list; $1,000+ need 2-factor verification; smaller sends are unrestricted. New entries are held 24h to prevent an attacker from quickly adding their own.
       </div>
     </>
   );
@@ -13589,11 +13589,13 @@ function App() {
       // Server-first: the payout request must reach the back office (requests table) BEFORE
       // we deduct any coins. No silent local-only withdrawals.
       if (!(window.AlpexaSync && AlpexaSync.pushRequest)) { try { alert('No server connection — withdrawal not submitted. Please try again.'); } catch (e) {} return; }
-      // MANDATORY 2FA — passing TOTP elevates this session to AAL2, which the server
-      // (guard_crypto_withdraw_security) REQUIRES before it will accept the request.
-      // Client 2FA alone is bypassable; the elevated session is what the server checks.
-      const ok2 = await alpexa.twofa();
-      if (!ok2) { try { alert('2-factor verification is required to withdraw to an external address. Nothing was deducted.'); } catch (e) {} return; }
+      // Tiered 2FA — only $1,000+ needs it (matches guard_crypto_withdraw_security).
+      // Passing TOTP elevates this session to AAL2, which the server REQUIRES for the
+      // request; client 2FA alone is bypassable, the elevated session is what's checked.
+      if (usdAmount >= 1000) {
+        const ok2 = await alpexa.twofa();
+        if (!ok2) { try { alert('2-factor verification is required to withdraw $1,000 or more to an external address. Nothing was deducted.'); } catch (e) {} return; }
+      }
       // Use ONE id for both the tx and the request so the reject-sync can match them and
       // refund. Mark optimistic:true so a rejected payout re-credits the deducted coins.
       const reqId = 'cr-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);

@@ -11,23 +11,30 @@
 
 const DAY = 24 * 3600 * 1000;
 
+const TWOFA_THRESHOLD = 1000;   // must match c_2fa_threshold in the SQL trigger
+const WL_THRESHOLD    = 5000;   // must match c_wl_threshold  in the SQL trigger
+
 // The server trigger, modeled. `req` = the requests row; `ctx` = { aal, now, allowlist }.
 // allowlist = [{cust_id, address, active_at(ms)}]. Returns {ok} or {ok:false, error}.
+// Tiered by USD amount: <1000 none · ≥1000 2FA · ≥5000 2FA + active allowlist.
 function guard(req, ctx) {
   const isChain = String(req.type || '').toLowerCase() === 'withdraw'
     && String(req.address || '') !== ''
     && /^(erc|eth|btc|bitcoin|sol|trc)/i.test(String(req.network || ''));
   if (!isChain) return { ok: true, skipped: true };            // bank/card/wire/internal → not gated
+  const amt = +req.amount || 0;
 
-  if ((ctx.aal || 'aal1') !== 'aal2') {
-    return { ok: false, error: 'Two-factor verification is required to withdraw to an external address.' };
+  if (amt >= TWOFA_THRESHOLD && (ctx.aal || 'aal1') !== 'aal2') {
+    return { ok: false, error: 'Two-factor verification is required to withdraw $1000 or more to an external address.' };
   }
-  const active = (ctx.allowlist || []).some((a) =>
-    a.cust_id === req.cust_id &&
-    String(a.address).toLowerCase() === String(req.address).toLowerCase() &&
-    a.active_at <= ctx.now);
-  if (!active) {
-    return { ok: false, error: 'This address is not on your active allowlist (add it and wait 24h).' };
+  if (amt >= WL_THRESHOLD) {                                    // big money → allowlist + 24h
+    const active = (ctx.allowlist || []).some((a) =>
+      a.cust_id === req.cust_id &&
+      String(a.address).toLowerCase() === String(req.address).toLowerCase() &&
+      a.active_at <= ctx.now);
+    if (!active) {
+      return { ok: false, error: 'Withdrawals of $5000 or more must go to an address on your active allowlist (add it and wait 24h).' };
+    }
   }
   return { ok: true };
 }
@@ -42,32 +49,45 @@ function check(name, got, want) {
 const NOW = 1_700_000_000_000;
 const CUST = 'C123';
 const ADDR = '0xAbC0000000000000000000000000000000000001';
-const wd = (over) => Object.assign({ type: 'withdraw', server: 'crypto', network: 'ERC-20', address: ADDR, cust_id: CUST }, over || {});
+const wd    = (over) => Object.assign({ type: 'withdraw', server: 'crypto', network: 'ERC-20', address: ADDR, cust_id: CUST, amount: 300 }, over || {});
+const tiny  = (over) => wd(Object.assign({ amount: 300 },  over || {}));   // < $1,000
+const mid   = (over) => wd(Object.assign({ amount: 2000 }, over || {}));   // $1,000–$5,000
+const huge  = (over) => wd(Object.assign({ amount: 8000 }, over || {}));   // ≥ $5,000
 const activeEntry  = { cust_id: CUST, address: ADDR, active_at: NOW - 1 };            // added >24h ago
 const pendingEntry = { cust_id: CUST, address: ADDR, active_at: NOW + 12 * 3600000 }; // still in 24h hold
 
-console.log('\n=== RED: the two bypasses that existed before this gate ===');
-check('no 2FA (aal1) → REJECTED even if allowlisted',
-  guard(wd(), { aal: 'aal1', now: NOW, allowlist: [activeEntry] }).ok, false);
-check('2FA ok but address NOT allowlisted → REJECTED (any-address drain blocked)',
-  guard(wd(), { aal: 'aal2', now: NOW, allowlist: [] }).ok, false);
+console.log('\n=== Tier 1 (< $1,000): nothing required — frictionless ===');
+check('$300, no 2FA, no allowlist → ALLOWED',
+  guard(tiny(), { aal: 'aal1', now: NOW, allowlist: [] }).ok, true);
+check('$300 to a brand-new address, no 2FA → ALLOWED',
+  guard(tiny({ address: '0xNEW0000000000000000000000000000000000009' }), { aal: 'aal1', now: NOW, allowlist: [] }).ok, true);
 
-console.log('\n=== 24h delay: a freshly-added address cannot be used yet ===');
-check('2FA ok, address added <24h ago → REJECTED (pending)',
-  guard(wd(), { aal: 'aal2', now: NOW, allowlist: [pendingEntry] }).ok, false);
-check('same address after 24h → ALLOWED',
-  guard(wd(), { aal: 'aal2', now: NOW, allowlist: [activeEntry] }).ok, true);
+console.log('\n=== Tier 2 ($1,000–$5,000): 2FA only (no allowlist / no 24h) ===');
+check('$2,000, no 2FA (aal1) → REJECTED',
+  guard(mid(), { aal: 'aal1', now: NOW, allowlist: [] }).ok, false);
+check('$2,000, 2FA ok, NO allowlist → ALLOWED (allowlist not required yet)',
+  guard(mid(), { aal: 'aal2', now: NOW, allowlist: [] }).ok, true);
+check('exactly $1,000 → 2FA required (≥ threshold)',
+  guard(wd({ amount: 1000 }), { aal: 'aal1', now: NOW, allowlist: [] }).ok, false);
+check('$999.99 → still Tier 1, ALLOWED without 2FA',
+  guard(wd({ amount: 999.99 }), { aal: 'aal1', now: NOW, allowlist: [] }).ok, true);
 
-console.log('\n=== GREEN: the only accepted shape — 2FA + active allowlist ===');
-check('aal2 + active allowlist match → ALLOWED', guard(wd(), { aal: 'aal2', now: NOW, allowlist: [activeEntry] }), { ok: true });
-check('case-insensitive address match → ALLOWED',
-  guard(wd({ address: ADDR.toLowerCase() }), { aal: 'aal2', now: NOW, allowlist: [activeEntry] }).ok, true);
+console.log('\n=== Tier 3 (≥ $5,000): 2FA + ACTIVE allowlist ===');
+check('$8,000, no 2FA → REJECTED even if allowlisted',
+  guard(huge(), { aal: 'aal1', now: NOW, allowlist: [activeEntry] }).ok, false);
+check('$8,000, 2FA ok, NOT allowlisted → REJECTED (big-money drain blocked)',
+  guard(huge(), { aal: 'aal2', now: NOW, allowlist: [] }).ok, false);
+check('$8,000, 2FA ok, address added <24h ago → REJECTED (pending)',
+  guard(huge(), { aal: 'aal2', now: NOW, allowlist: [pendingEntry] }).ok, false);
+check('$8,000, 2FA ok, active allowlist match → ALLOWED', guard(huge(), { aal: 'aal2', now: NOW, allowlist: [activeEntry] }), { ok: true });
+check('exactly $5,000 → allowlist required (≥ threshold)',
+  guard(wd({ amount: 5000 }), { aal: 'aal2', now: NOW, allowlist: [] }).ok, false);
 
-console.log('\n=== SCOPE: non-crypto / internal are NOT gated (no false lockout) ===');
-check('bank wire withdraw (network Wire) → not gated',
-  guard(wd({ network: 'Wire', address: '12345678' }), { aal: 'aal1', now: NOW, allowlist: [] }).skipped, true);
-check("another customer's allowlist entry does NOT authorize me",
-  guard(wd(), { aal: 'aal2', now: NOW, allowlist: [{ cust_id: 'OTHER', address: ADDR, active_at: NOW - 1 }] }).ok, false);
+console.log('\n=== SCOPE: non-crypto / internal are NOT gated; no cross-account bypass ===');
+check('bank wire withdraw (network Wire), any amount → not gated',
+  guard(wd({ network: 'Wire', address: '12345678', amount: 9999 }), { aal: 'aal1', now: NOW, allowlist: [] }).skipped, true);
+check("$8,000: another customer's allowlist entry does NOT authorize me",
+  guard(huge(), { aal: 'aal2', now: NOW, allowlist: [{ cust_id: 'OTHER', address: ADDR, active_at: NOW - 1 }] }).ok, false);
 
 console.log('\n' + (pass ? '🟢 ALL CHECKS PASSED' : '🔴 CHECKS FAILED') + '\n');
 process.exit(pass ? 0 : 1);
