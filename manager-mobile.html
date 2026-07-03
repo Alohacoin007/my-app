@@ -1393,18 +1393,19 @@
     if(!list.length) h+='<div class="empty">No instruments match.</div>';
     list.forEach(function(r){
       var sym=r[0], mid=PRICE_LIVE[sym]||r[3], dg=r[4], mk=+PRICE_MARKS[sym]||0, up=PRICE_DIR[sym]>=0;
-      var liveSprPt=PRICE_SPR[sym]||r[5], totSprPt=liveSprPt+mk;          // total spread the customer sees
+      var liveSprPt=PRICE_SPR[sym]||r[5];
+      var totSprPt=Math.max(0.1, liveSprPt+mk);                           // total spread; floor 0.1pt so bid<ask (− markup narrows below raw)
       var pip=Math.pow(10,-(dg-1));                                       // value of 1 point
-      var half=(liveSprPt*pip)/2, mkAbs=mk*pip;                            // mid ± half spread, markup loads the ask
-      var bid=mid-half, ask=mid+half+mkAbs;
+      var half=(totSprPt*pip)/2;                                          // symmetric: mid ± half of the TOTAL spread
+      var bid=mid-half, ask=mid+half;
       h+='<div class="row" style="align-items:center;padding:6px 0">'+
         '<span style="width:46px;text-align:center;overflow:hidden"><b style="font-size:10px">'+sym+'</b></span>'+
         '<span style="flex:1;text-align:center;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+bid.toFixed(dg)+'</b></span>'+
-        '<span style="width:30px;text-align:center;font-variant-numeric:tabular-nums;font-size:10px;font-weight:700;color:'+(mk>0?'var(--neg)':'var(--dim)')+'">'+totSprPt.toFixed(1)+'</span>'+
+        '<span style="width:30px;text-align:center;font-variant-numeric:tabular-nums;font-size:10px;font-weight:700;color:'+(mk>0?'var(--neg)':mk<0?'var(--pos)':'var(--dim)')+'">'+totSprPt.toFixed(1)+'</span>'+
         '<span style="flex:1;text-align:center;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+ask.toFixed(dg)+'</b></span>'+
         '<span style="width:74px;display:flex;gap:3px;justify-content:center;align-items:center">'+
           '<button data-pmk="'+sym+'|-" style="width:19px;height:19px;border:1px solid var(--line);background:#fff;border-radius:4px;font:700 12px system-ui;cursor:pointer;color:var(--ink)">−</button>'+
-          '<span style="font-variant-numeric:tabular-nums;font-size:9.5px;color:'+(mk>0?'var(--neg)':'var(--dim)')+';min-width:18px;text-align:center">'+(mk>0?'+':'')+mk.toFixed(1)+'</span>'+
+          '<span style="font-variant-numeric:tabular-nums;font-size:9.5px;color:'+(mk>0?'var(--neg)':mk<0?'var(--pos)':'var(--dim)')+';min-width:18px;text-align:center">'+(mk>0?'+':'')+mk.toFixed(1)+'</span>'+
           '<button data-pmk="'+sym+'|+" style="width:19px;height:19px;border:1px solid var(--line);background:#fff;border-radius:4px;font:700 12px system-ui;cursor:pointer;color:var(--ink)">+</button>'+
         '</span></div>';
     });
@@ -1412,12 +1413,12 @@
     h+='<div class="card"><div class="row" style="border:none;padding:2px 0"><span class="lbl">Total markup added</span>'+
       '<span style="display:flex;align-items:center;gap:10px"><b class="'+(totalMk>0?'neg':'pos')+'">'+(totalMk>0?'+':'')+totalMk.toFixed(1)+' pt</b>'+
       '<button data-preset="1" style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:6px 12px;font:700 11px system-ui;cursor:pointer;color:var(--ink)">↻ Reset all</button></span></div></div>';
-    h+='<div class="hint" style="margin:0 14px">Markup widens that symbol\'s spread — applies to every customer\'s FX app within ~5s. − / + steps 0.1pt.</div>';
+    h+='<div class="hint" style="margin:0 14px">Markup ± the raw spread: + widens · − narrows below raw (house absorbs it). Total floors at 0.1pt. Applies to every FX app within ~5s. − / + steps 0.1pt.</div>';
     return h;
   }
   function pricingMark(sym,dir){
     var cur=+PRICE_MARKS[sym]||0; var nx=Math.round((cur+(dir==='+'?0.1:-0.1))*10)/10;
-    nx=Math.max(0,Math.min(50,nx)); PRICE_MARKS[sym]=nx;
+    nx=Math.max(-50,Math.min(50,nx)); PRICE_MARKS[sym]=nx;   // − allowed: narrow below raw (house absorbs)
     if(cur===nx){ render(); return; }
     render();
     AlpexaSync.db.from('pricing_marks').upsert({symbol:sym,markup_pts:nx,updated_at:new Date().toISOString()},{onConflict:'symbol'}).then(function(r){

@@ -674,8 +674,11 @@
     function pull(){
       if(!sb||!live) return;
       sb.rpc('get_fx_quotes').then(function(r){
-        if(r&&r.data){ var m={}; (r.data||[]).forEach(function(x){ m[x.symbol]={mid:+x.mid, hi:+x.hi||0, lo:+x.lo||0}; });
+        if(r&&r.data){ var m={}; (r.data||[]).forEach(function(x){ m[x.symbol]={mid:+x.mid, spr:+x.spr||0, markup:+x.markup||0, hi:+x.hi||0, lo:+x.lo||0}; });
           var got=false; PAIRS.forEach(function(p){ var q=m[p.sym]; if(q&&q.mid>0){ p.mid=q.mid;
+            // real spread = Polygon spr_pts + back-office markup, floored at 0.1pt.
+            // (Until get_fx_quotes returns spr, q.spr=0 → keep the hardcoded fallback.)
+            if(q.spr>0){ p.sprd=Math.max(0.1, q.spr + q.markup); }
             if(q.hi>0&&q.lo>0){ p.hi=q.hi; p.lo=q.lo; p.realHL=true; } got=true; } });
           if(got){ connected=true; render(); foot(); } }
       }, function(){});
