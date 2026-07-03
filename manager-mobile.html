@@ -1300,6 +1300,9 @@
   //   1 display-point = (1/pointsPerPip) pips  (the markup step, converted before storing).
   function fxPipOf(sym){ if(/JPY$/.test(sym))return 0.01; if(sym==='XAUUSD')return 0.01; if(sym==='XAGUSD')return 0.001; return 0.0001; }
   function fxPPP(sym,dg){ return fxPipOf(sym)*Math.pow(10,dg); }   // points per 1 pip
+  // MT5-style price: the last digit (the pipette / fractional pip) is rendered small
+  // and raised, so the eye reads the big figures + pips first — the classic MT5 look.
+  function mt5Px(px,dg){ var s=(+px||0).toFixed(dg); return s.slice(0,-1)+'<span style="font-size:7.5px;vertical-align:2px;opacity:.7">'+s.slice(-1)+'</span>'; }
   function cryptoTick(){ CRYPTO_INSTR.forEach(function(r){ var cur=CRYPTO_LIVE[r[0]]||r[2];
     var nx=cur*(1+(Math.random()-0.5)*2*0.0009 + (r[2]-cur)/r[2]*0.03); CRYPTO_DIR[r[0]]=nx>=cur?1:-1; CRYPTO_LIVE[r[0]]=nx; }); }
   // Real server feed (Polygon → prices table) for the dealing desk. FX/metals
@@ -1407,18 +1410,18 @@
       var liveSprPip=PRICE_SPR[sym]||r[5];                                // LIVE liquidity spread in PIPS (Polygon feed — floats)
       var totPip=Math.max(0.1, liveSprPip+mk);                            // live + markup, PIPS (== server fx_open)
       var point=Math.pow(10,-dg);                                        // value of the last shown digit
-      // FLOATING (liquidity) spread: base = live feed, adjusted by markup. Show 1 decimal
-      // so the real-time movement is visible (not a fixed-looking round number). Quotes
-      // = mid ± half of the live effective spread → they drift with the market.
-      var effPt=Math.max(0.1, totPip*fxPPP(sym,dg));                      // effective spread in POINTS (floats)
+      // MT5 floating spread: base = live feed, adjusted by markup. Spread shown as an
+      // INTEGER point value that moves with the market (6→10→8), quotes = mid ± half of
+      // the live effective spread → they drift; last price digit rendered as a pipette.
+      var effPt=Math.max(1, Math.round(totPip*fxPPP(sym,dg)));            // effective spread in POINTS (integer, floats)
       var half=(effPt*point)/2;
       var bid=mid-half, ask=mid+half;
       var mkPt=Math.round(mk*fxPPP(sym,dg));                              // markup shown in POINTS
       h+='<div class="row" style="align-items:center;padding:6px 0">'+
         '<span style="width:46px;text-align:center;overflow:hidden"><b style="font-size:10px">'+sym+'</b></span>'+
-        '<span style="flex:1;text-align:center;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+bid.toFixed(dg)+'</b></span>'+
-        '<span style="width:32px;text-align:center;font-variant-numeric:tabular-nums;font-size:10px;font-weight:700;color:'+(mk>0?'var(--neg)':mk<0?'var(--pos)':'var(--dim)')+'">'+effPt.toFixed(1)+'</span>'+
-        '<span style="flex:1;text-align:center;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+ask.toFixed(dg)+'</b></span>'+
+        '<span style="flex:1;text-align:center;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+mt5Px(bid,dg)+'</b></span>'+
+        '<span style="width:32px;text-align:center;font-variant-numeric:tabular-nums;font-size:10px;font-weight:700;color:'+(mk>0?'var(--neg)':mk<0?'var(--pos)':'var(--dim)')+'">'+effPt+'</span>'+
+        '<span style="flex:1;text-align:center;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+mt5Px(ask,dg)+'</b></span>'+
         '<span style="width:74px;display:flex;gap:3px;justify-content:center;align-items:center">'+
           '<button data-pmk="'+sym+'|-" style="width:19px;height:19px;border:1px solid var(--line);background:#fff;border-radius:4px;font:700 12px system-ui;cursor:pointer;color:var(--ink)">−</button>'+
           '<span style="font-variant-numeric:tabular-nums;font-size:9.5px;color:'+(mk>0?'var(--neg)':mk<0?'var(--pos)':'var(--dim)')+';min-width:18px;text-align:center">'+(mkPt>0?'+':'')+mkPt+'</span>'+
@@ -1429,7 +1432,7 @@
     h+='<div class="card"><div class="row" style="border:none;padding:2px 0"><span class="lbl">Total markup added</span>'+
       '<span style="display:flex;align-items:center;gap:10px"><b class="'+(totalMk>0?'neg':'pos')+'">'+(totalMk>0?'+':'')+Math.round(totalMk)+' pt</b>'+
       '<button data-preset="1" style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:6px 12px;font:700 11px system-ui;cursor:pointer;color:var(--ink)">↻ Reset all</button></span></div></div>';
-    h+='<div class="hint" style="margin:0 14px">Spr·pt = LIVE liquidity spread + markup, in points (floats with the market — 1 decimal shows the movement). Markup ± the live spread: + widens · − narrows below raw (house absorbs it). Applies to every FX app within ~5s. − / + steps 1pt.</div>';
+    h+='<div class="hint" style="margin:0 14px">MT5-style: Spr·pt = LIVE liquidity spread + markup, in whole points, floating with the market (6→10→8). Last price digit is the pipette. Markup ± the live spread: + widens · − narrows below raw (house absorbs it). Applies to every FX app within ~5s. − / + steps 1pt.</div>';
     return h;
   }
   function pricingMark(sym,dir){
