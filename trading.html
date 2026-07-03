@@ -1133,6 +1133,14 @@ function formatPriceFixed(n,digits){
   if(digits>=2)return{big:s.slice(0,-2),small:s.slice(-2)};
   return{big:s,small:''};
 }
+// MT5-style 3-tier split: big figure (normal) · the 2 pip digits (large) · the last
+// fractional-pip / pipette digit (small, raised). For 5-digit FX & 3-digit JPY/metals.
+function formatPrice3(n,digits){
+  const s=n.toLocaleString('en-US',{minimumFractionDigits:digits,maximumFractionDigits:digits});
+  if(digits>=3)return{big:s.slice(0,-3),pips:s.slice(-3,-1),pipette:s.slice(-1)};
+  if(digits===2)return{big:s.slice(0,-2),pips:s.slice(-2),pipette:''};
+  return{big:s,pips:'',pipette:''};
+}
 
 // ── Watchlist ──
 function getFavSyms(){try{return JSON.parse(localStorage.getItem('alpexa.favs')||'[]');}catch(e){return[];}}
@@ -1267,8 +1275,9 @@ function Watchlist({market,onSelect,current,onDepositCrypto}){
                 </div>
                 <span className="mono" style={{width:88,marginLeft:6,textAlign:'center',fontWeight:600,color:'#E04141',display:'flex',flexDirection:'column',alignItems:'center',gap:1,flexShrink:0}}>
                   <span style={{display:'flex',alignItems:'baseline'}}>
-                    <span style={{fontSize:13}}>{formatPriceFixed(s.last,s.digits).big}</span>
-                    <span style={{fontSize:18.5,fontWeight:700}}>{formatPriceFixed(s.last,s.digits).small}</span>
+                    <span style={{fontSize:12}}>{formatPrice3(s.last,s.digits).big}</span>
+                    <span style={{fontSize:16.5,fontWeight:800}}>{formatPrice3(s.last,s.digits).pips}</span>
+                    <span style={{fontSize:10,fontWeight:700,alignSelf:'flex-start'}}>{formatPrice3(s.last,s.digits).pipette}</span>
                   </span>
                   <span style={{fontSize:10,color:'var(--text-3)',fontWeight:500}}>L {ALPEXA_MARKET.fmt(s.low,s.digits)}</span>
                 </span>
@@ -1277,8 +1286,9 @@ function Watchlist({market,onSelect,current,onDepositCrypto}){
                 </span>
                 <span className="mono" style={{width:88,textAlign:'center',fontWeight:600,color:'#2E6FB0',display:'flex',flexDirection:'column',alignItems:'center',gap:1,flexShrink:0}}>
                   <span style={{display:'flex',alignItems:'baseline'}}>
-                    <span style={{fontSize:13}}>{formatPriceFixed(ask,s.digits).big}</span>
-                    <span style={{fontSize:18.5,fontWeight:700}}>{formatPriceFixed(ask,s.digits).small}</span>
+                    <span style={{fontSize:12}}>{formatPrice3(ask,s.digits).big}</span>
+                    <span style={{fontSize:16.5,fontWeight:800}}>{formatPrice3(ask,s.digits).pips}</span>
+                    <span style={{fontSize:10,fontWeight:700,alignSelf:'flex-start'}}>{formatPrice3(ask,s.digits).pipette}</span>
                   </span>
                   <span style={{fontSize:10,color:'var(--text-3)',fontWeight:500}}>H {ALPEXA_MARKET.fmt(s.high,s.digits)}</span>
                 </span>
@@ -1369,7 +1379,7 @@ function TradeTicket({market,sym,setSym,lots,setLots,onPlace}){
     else if(canPlace)setConfirmOpen(true);
   }
   const canPlace=(otype==='MARKET'||(otypePrice&&!isNaN(parseFloat(otypePrice))&&parseFloat(otypePrice)>0))&&(!slH||(!slH.invalid&&!slH.tooClose))&&(!tpH||(!tpH.invalid&&!tpH.tooClose));
-  const bidParts=formatPriceFixed(s.last,s.digits);const askParts=formatPriceFixed(ask,s.digits);
+  const bidParts=formatPrice3(s.last,s.digits);const askParts=formatPrice3(ask,s.digits);
   return(
     <div style={{display:'flex',flexDirection:'column',flex:1,minHeight:0,background:'var(--bg)',position:'relative'}}>
       <button onClick={()=>setPickerOpen(true)} style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',background:'var(--surface)',borderBottom:'1px solid var(--line)',textAlign:'left',width:'100%'}}>
@@ -1387,14 +1397,14 @@ function TradeTicket({market,sym,setSym,lots,setLots,onPlace}){
         <button onClick={()=>setSide('SELL')} style={{flex:1,padding:'11px 12px 13px',borderRadius:4,textAlign:'left',background:side==='SELL'?'rgba(224,65,65,0.16)':'var(--surface)',border:side==='SELL'?'1.5px solid #E04141':'1.5px solid var(--line-2)'}}>
           <div style={{fontSize:9.5,fontWeight:800,color:'#E04141',letterSpacing:0.8}}>SELL · BID</div>
           <div className="mono" style={{display:'flex',alignItems:'baseline',color:'#E04141',fontWeight:700,marginTop:6}}>
-            <span style={{fontSize:22}}>{bidParts.big}</span><span style={{fontSize:26,fontWeight:800}}>{bidParts.small}</span>
+            <span style={{fontSize:20}}>{bidParts.big}</span><span style={{fontSize:27,fontWeight:800}}>{bidParts.pips}</span><span style={{fontSize:14,fontWeight:700,alignSelf:'flex-start',marginTop:1}}>{bidParts.pipette}</span>
           </div>
           <div className="mono" style={{fontSize:10,color:'var(--text-3)',marginTop:4}}>L {ALPEXA_MARKET.fmt(s.low,s.digits)}</div>
         </button>
         <button onClick={()=>setSide('BUY')} style={{flex:1,padding:'11px 12px 13px',borderRadius:4,textAlign:'left',background:side==='BUY'?'rgba(46,111,176,0.16)':'var(--surface)',border:side==='BUY'?'1.5px solid #2E6FB0':'1.5px solid var(--line-2)'}}>
           <div style={{fontSize:9.5,fontWeight:800,color:'#2E6FB0',letterSpacing:0.8}}>BUY · ASK</div>
           <div className="mono" style={{display:'flex',alignItems:'baseline',color:'#2E6FB0',fontWeight:700,marginTop:6}}>
-            <span style={{fontSize:22}}>{askParts.big}</span><span style={{fontSize:26,fontWeight:800}}>{askParts.small}</span>
+            <span style={{fontSize:20}}>{askParts.big}</span><span style={{fontSize:27,fontWeight:800}}>{askParts.pips}</span><span style={{fontSize:14,fontWeight:700,alignSelf:'flex-start',marginTop:1}}>{askParts.pipette}</span>
           </div>
           <div className="mono" style={{fontSize:10,color:'var(--text-3)',marginTop:4}}>H {ALPEXA_MARKET.fmt(s.high,s.digits)}</div>
         </button>
