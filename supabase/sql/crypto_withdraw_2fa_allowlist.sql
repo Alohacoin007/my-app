@@ -55,7 +55,58 @@ drop policy if exists crypto_allowlist_admin on public.crypto_allowlist;
 create policy crypto_allowlist_admin on public.crypto_allowlist
   for select using (public.is_admin());
 
--- ④ ENFORCEMENT — block an on-chain crypto withdraw request unless AAL2 + active allowlist.
+-- ③b EMAIL-OTP 2FA (accessible alternative to an authenticator app) ───────────
+-- The 'withdraw-otp' Edge function emails a 6-digit code (to the account's REGISTERED
+-- email — server-decided, never client-supplied) and stores its HASH here. The user
+-- enters the code → verify_withdraw_otp() opens a short 'unlocked_until' window that
+-- the withdraw guard accepts in place of an authenticator-app AAL2 session.
+create extension if not exists pgcrypto;   -- digest() for the code hash
+create table if not exists public.withdraw_otp (
+  cust_id        text primary key,
+  code_hash      text,                 -- sha256(code); cleared on success (one-time)
+  expires_at     timestamptz,          -- code valid until (≈10 min)
+  attempts       int not null default 0,
+  unlocked_until timestamptz,          -- verified window the guard honors (≈15 min)
+  updated_at     timestamptz not null default now()
+);
+-- Service-role only: the Edge writes the code hash, the SECURITY DEFINER RPC reads it.
+-- No user policies → RLS denies all direct client access (the code hash never leaks).
+alter table public.withdraw_otp enable row level security;
+
+-- Verify the code the user typed. On match: open a 15-min unlock and burn the code.
+-- Rate-limited (max 5 tries) and time-boxed (10-min code). Returns {ok} / {ok:false,error}.
+create or replace function public.verify_withdraw_otp(p_code text)
+returns jsonb language plpgsql security definer set search_path to 'public' as $$
+declare v_uid uuid := auth.uid(); v_cust text; v_row public.withdraw_otp%rowtype;
+begin
+  if v_uid is null then return jsonb_build_object('ok',false,'error','not authenticated'); end if;
+  select cust_id into v_cust from public.players where auth_id = v_uid limit 1;
+  if v_cust is null then return jsonb_build_object('ok',false,'error','no account'); end if;
+
+  select * into v_row from public.withdraw_otp where cust_id = v_cust;
+  if v_row.cust_id is null or v_row.code_hash is null then
+    return jsonb_build_object('ok',false,'error','no code — request a new one'); end if;
+  if v_row.expires_at is null or v_row.expires_at < now() then
+    return jsonb_build_object('ok',false,'error','code expired — request a new one'); end if;
+  if coalesce(v_row.attempts,0) >= 5 then
+    return jsonb_build_object('ok',false,'error','too many attempts — request a new one'); end if;
+
+  if v_row.code_hash <> encode(digest(coalesce(p_code,''), 'sha256'), 'hex') then
+    update public.withdraw_otp set attempts = coalesce(attempts,0) + 1, updated_at = now() where cust_id = v_cust;
+    return jsonb_build_object('ok',false,'error','incorrect code');
+  end if;
+
+  -- success: open the unlock window and burn the code (one-time use)
+  update public.withdraw_otp
+     set unlocked_until = now() + interval '15 minutes', code_hash = null, expires_at = null, attempts = 0, updated_at = now()
+   where cust_id = v_cust;
+  return jsonb_build_object('ok',true,'unlocked_minutes',15);
+end;$$;
+revoke all on function public.verify_withdraw_otp(text) from public;
+grant execute on function public.verify_withdraw_otp(text) to authenticated;
+
+-- ④ ENFORCEMENT — block an on-chain crypto withdraw request unless (2FA tier) AAL2 or
+--    a fresh email-OTP unlock, and (allowlist tier) an active allowlisted destination.
 --    Runs BEFORE INSERT on requests, alongside the existing withdrawable guard.
 create or replace function public.guard_crypto_withdraw_security()
 returns trigger language plpgsql security definer set search_path to 'public' as $$
@@ -76,10 +127,14 @@ begin
     and coalesce(NEW.network,'') ~* '^(erc|eth|btc|bitcoin|sol|trc)';
   if not v_is_chain then return NEW; end if;
 
-  -- (1) 2FA at/above $1,000. The session must be AAL2 (user passed TOTP). Supabase sets
-  --     the 'aal' JWT claim to 'aal2' after mfa.verify → the client can't fake it.
+  -- (1) 2FA at/above $1,000. Accept EITHER an authenticator-app AAL2 session OR a fresh
+  --     email-OTP unlock (verify_withdraw_otp). Both are server-verified → un-bypassable.
   if v_amt >= c_2fa_threshold
-     and coalesce(auth.jwt() ->> 'aal', 'aal1') <> 'aal2' then
+     and coalesce(auth.jwt() ->> 'aal', 'aal1') <> 'aal2'
+     and not exists (
+       select 1 from public.withdraw_otp w
+        where w.cust_id = NEW.cust_id and w.unlocked_until is not null and w.unlocked_until > now()
+     ) then
     raise exception 'Two-factor verification is required to withdraw $% or more to an external address.', c_2fa_threshold
       using errcode = 'check_violation';
   end if;

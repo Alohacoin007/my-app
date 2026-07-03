@@ -24,7 +24,9 @@ function guard(req, ctx) {
   if (!isChain) return { ok: true, skipped: true };            // bank/card/wire/internal → not gated
   const amt = +req.amount || 0;
 
-  if (amt >= TWOFA_THRESHOLD && (ctx.aal || 'aal1') !== 'aal2') {
+  // 2FA tier: satisfied by an authenticator-app AAL2 session OR a fresh email-OTP unlock.
+  const otpUnlocked = !!(ctx.otpUnlockedUntil && ctx.otpUnlockedUntil > ctx.now);
+  if (amt >= TWOFA_THRESHOLD && (ctx.aal || 'aal1') !== 'aal2' && !otpUnlocked) {
     return { ok: false, error: 'Two-factor verification is required to withdraw $1000 or more to an external address.' };
   }
   if (amt >= WL_THRESHOLD) {                                    // big money → allowlist + 24h
@@ -71,6 +73,14 @@ check('exactly $1,000 → 2FA required (≥ threshold)',
   guard(wd({ amount: 1000 }), { aal: 'aal1', now: NOW, allowlist: [] }).ok, false);
 check('$999.99 → still Tier 1, ALLOWED without 2FA',
   guard(wd({ amount: 999.99 }), { aal: 'aal1', now: NOW, allowlist: [] }).ok, true);
+
+console.log('\n=== Email OTP unlock satisfies the 2FA tier (accessible alt to authenticator) ===');
+check('$2,000, no aal2 but fresh email-OTP unlock → ALLOWED',
+  guard(mid(), { aal: 'aal1', now: NOW, otpUnlockedUntil: NOW + 5 * 60000, allowlist: [] }).ok, true);
+check('$2,000, email-OTP unlock EXPIRED → REJECTED',
+  guard(mid(), { aal: 'aal1', now: NOW, otpUnlockedUntil: NOW - 1, allowlist: [] }).ok, false);
+check('$8,000, email-OTP unlock ok but NOT allowlisted → still REJECTED (allowlist tier)',
+  guard(huge(), { aal: 'aal1', now: NOW, otpUnlockedUntil: NOW + 5 * 60000, allowlist: [] }).ok, false);
 
 console.log('\n=== Tier 3 (≥ $5,000): 2FA + ACTIVE allowlist ===');
 check('$8,000, no 2FA → REJECTED even if allowlisted',

@@ -12999,6 +12999,85 @@ function TwoFAFullScreen({ item, onClose }) {
   );
 }
 
+// ─── EmailOTPFullScreen — 6-digit code emailed to the account (accessible 2FA) ──
+// Requests a code from the withdraw-otp Edge on mount, verifies via verify_withdraw_otp.
+function EmailOTPFullScreen({ item, onClose }) {
+  const [digits, setDigits] = React.useState(['', '', '', '', '', '']);
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  const [sentTo, setSentTo] = React.useState('');
+  const [sending, setSending] = React.useState(true);
+  const [cooldown, setCooldown] = React.useState(0);
+  const inputsRef = React.useRef([]);
+  const db = () => (window.AlpexaSync && AlpexaSync.db) ? AlpexaSync.db : null;
+
+  const sendCode = React.useCallback(async () => {
+    const d = db(); if (!d || !d.functions) { setErr('No server connection.'); setSending(false); return; }
+    setSending(true); setErr('');
+    try {
+      const r = await d.functions.invoke('withdraw-otp', { body: {} });
+      const data = r && r.data;
+      if (data && data.ok) { setSentTo(data.sentTo || ''); setCooldown(30); }
+      else setErr((data && data.error) || 'Could not send the code — try again.');
+    } catch (e) { setErr('Could not send the code — try again.'); }
+    setSending(false);
+  }, []);
+  React.useEffect(() => { sendCode(); const t = setTimeout(() => { if (inputsRef.current[0]) inputsRef.current[0].focus(); }, 300); return () => clearTimeout(t); }, [sendCode]);
+  React.useEffect(() => { if (cooldown <= 0) return; const t = setTimeout(() => setCooldown((c) => c - 1), 1000); return () => clearTimeout(t); }, [cooldown]);
+
+  const filled = digits.filter(Boolean).length;
+  const setDigit = (i, v) => { const c = (v || '').replace(/\D/g, '').slice(-1); setErr(''); setDigits((a) => { const n = [...a]; n[i] = c; return n; }); if (c && i < 5 && inputsRef.current[i + 1]) inputsRef.current[i + 1].focus(); };
+  const onKey = (i, e) => { if (e.key === 'Backspace' && !digits[i] && i > 0 && inputsRef.current[i - 1]) inputsRef.current[i - 1].focus(); };
+  const onPaste = (e) => { const t = ((e.clipboardData || window.clipboardData).getData('text') || '').replace(/\D/g, '').slice(0, 6); if (!t) return; e.preventDefault(); const n = ['', '', '', '', '', '']; t.split('').forEach((c, i) => { n[i] = c; }); setDigits(n); const li = Math.min(t.length, 6) - 1; if (inputsRef.current[li]) inputsRef.current[li].focus(); };
+
+  const submit = async () => {
+    if (filled !== 6 || busy) return;
+    const d = db(); if (!d) { setErr('No server connection.'); return; }
+    setBusy(true); setErr('');
+    const r = await d.rpc('verify_withdraw_otp', { p_code: digits.join('') }).then((x) => x, (e) => ({ error: e }));
+    setBusy(false);
+    const data = r && r.data;
+    if (data && data.ok) { try { if (typeof AudioFX !== 'undefined' && AudioFX.success) AudioFX.success(); } catch (e) {} onClose(true); return; }
+    setErr((data && data.error) || (r && r.error && r.error.message) || 'Incorrect code.');
+    try { if (typeof AudioFX !== 'undefined' && AudioFX.reject) AudioFX.reject(); } catch (e) {}
+    setDigits(['', '', '', '', '', '']); if (inputsRef.current[0]) inputsRef.current[0].focus();
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: RH.bg, display: 'flex', flexDirection: 'column', fontFamily: 'Geist, Inter, system-ui' }}>
+      <div style={{ padding: '20px 24px 0' }}>
+        <button onClick={() => onClose(false)} aria-label="Cancel" style={{ width: 36, height: 36, borderRadius: 18, background: RH.surface, border: `1px solid ${RH.line}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={RH.text} strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 L6 18 M6 6 L18 18"/></svg>
+        </button>
+      </div>
+      <div style={{ flex: 1, padding: '24px 26px', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: RH.textDim }}>Withdrawal verification</div>
+        <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: -0.8, color: RH.text, marginTop: 10, lineHeight: 1.1 }}>Enter the code<br/>we emailed you</div>
+        <div style={{ fontSize: 14, color: RH.textDim, lineHeight: 1.6, marginTop: 12 }}>
+          {sending ? 'Sending a 6-digit code…' : sentTo ? `We sent a 6-digit code to ${sentTo}. It expires in 10 minutes.` : 'Enter the 6-digit code from your email.'}
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 22 }}>
+          {digits.map((d, i) => (
+            <input key={i} ref={(el) => (inputsRef.current[i] = el)} type="text" inputMode="numeric" maxLength={1} value={d}
+              onChange={(e) => setDigit(i, e.target.value)} onKeyDown={(e) => onKey(i, e)} onPaste={i === 0 ? onPaste : undefined}
+              style={{ width: 44, height: 56, textAlign: 'center', background: RH.surface, border: `1.5px solid ${err ? RH.red : (d ? RH.accent : RH.line)}`, borderRadius: 12, color: err ? RH.red : RH.text, fontSize: 24, fontWeight: 700, outline: 'none', fontFamily: 'Geist Mono, monospace' }}/>
+          ))}
+        </div>
+        {err ? <div style={{ marginTop: 12, fontSize: 13, color: RH.red, fontWeight: 600 }}>{err}</div> : null}
+        <button onClick={sendCode} disabled={sending || cooldown > 0}
+          style={{ marginTop: 16, alignSelf: 'flex-start', background: 'transparent', border: 'none', color: (sending || cooldown > 0) ? RH.textMute : RH.accent, fontSize: 13, fontWeight: 700, cursor: (sending || cooldown > 0) ? 'default' : 'pointer', padding: 0 }}>
+          {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
+        </button>
+        <div style={{ flex: 1 }}/>
+        <button onClick={submit} disabled={filled !== 6 || busy}
+          style={{ width: '100%', padding: '16px 0', borderRadius: 999, background: (filled === 6 && !busy) ? RH.text : RH.surfaceUp, color: (filled === 6 && !busy) ? RH.bg : RH.textMute, border: 'none', cursor: (filled === 6 && !busy) ? 'pointer' : 'not-allowed', fontSize: 15, fontWeight: 700 }}>
+          {busy ? 'Verifying…' : 'Verify & continue'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function AlpexaModal({ item, onClose }) {
   // Soft prompt chime when modal mounts.
   React.useEffect(() => {
@@ -13019,6 +13098,7 @@ function AlpexaModal({ item, onClose }) {
   }, [item]);
   if (!item) return null;
   if (item.type === 'twofa') return <TwoFAFullScreen item={item} onClose={onClose}/>;
+  if (item.type === 'emailotp') return <EmailOTPFullScreen item={item} onClose={onClose}/>;
   const isConfirm = item.type === 'confirm';
   const isTwofa   = false;
 
@@ -13222,6 +13302,14 @@ function AppRoot() {
       setModalQueue((q) => [...q, {
         type: 'twofa',
         title: (opts && opts.title) || '2-factor authentication',
+        resolve,
+      }]);
+    }),
+    emailOtp: (opts = {}) => new Promise((resolve) => {
+      // Email a 6-digit code (accessible 2FA) — the screen sends + verifies it.
+      setModalQueue((q) => [...q, {
+        type: 'emailotp',
+        title: (opts && opts.title) || 'Verify withdrawal',
         resolve,
       }]);
     }),
@@ -13590,10 +13678,10 @@ function App() {
       // we deduct any coins. No silent local-only withdrawals.
       if (!(window.AlpexaSync && AlpexaSync.pushRequest)) { try { alert('No server connection — withdrawal not submitted. Please try again.'); } catch (e) {} return; }
       // Tiered 2FA — only $1,000+ needs it (matches guard_crypto_withdraw_security).
-      // Passing TOTP elevates this session to AAL2, which the server REQUIRES for the
-      // request; client 2FA alone is bypassable, the elevated session is what's checked.
+      // Email OTP: the screen emails a 6-digit code and calls verify_withdraw_otp, which
+      // opens the server unlock window the guard requires. Client alone can't fake it.
       if (usdAmount >= 1000) {
-        const ok2 = await alpexa.twofa();
+        const ok2 = await alpexa.emailOtp();
         if (!ok2) { try { alert('2-factor verification is required to withdraw $1,000 or more to an external address. Nothing was deducted.'); } catch (e) {} return; }
       }
       // Use ONE id for both the tx and the request so the reject-sync can match them and
