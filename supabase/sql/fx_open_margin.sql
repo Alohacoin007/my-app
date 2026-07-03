@@ -66,6 +66,7 @@ declare
   v_uid uuid := auth.uid();
   v_acct text; v_cust text; v_cls text;
   v_mid numeric; v_pts timestamptz; v_open numeric; v_side text;
+  v_spr numeric; v_mk numeric; v_pip numeric; v_half numeric := 0;
   v_bal numeric; v_lev numeric; v_notional numeric; v_new_margin numeric; v_used numeric;
 begin
   if v_uid is null then return jsonb_build_object('ok',false,'error','not authenticated'); end if;
@@ -90,7 +91,25 @@ begin
   if v_pts is null or (now() - v_pts) > interval '120 seconds' then
     return jsonb_build_object('ok',false,'error','price unavailable (stale)');
   end if;
-  v_open := v_mid;
+  -- SPREAD ON FILL (FX only): customer buys at ASK, sells at BID.
+  --   half-spread (price units) = greatest(0.1, live_spr_pts + operator_markup_pts) * pip / 2
+  --   pip = 0.01 for *JPY quotes, else 0.0001.  BUY fills above mid, SELL below.
+  -- This is where the house actually earns the spread (markup was cosmetic until now).
+  if v_cls = 'FX' then
+    select coalesce(spr_pts,0) into v_spr from public.prices where symbol = p_symbol limit 1;
+    select coalesce(markup_pts,0) into v_mk from public.pricing_marks where symbol = p_symbol limit 1;
+    -- pip MUST mirror the fx-prices Edge pip() that PRODUCED spr_pts, or the
+    -- reconstructed price spread is wrong (gold/silver off 10-100x). Source of truth:
+    -- supabase/functions/fx-prices/index.ts pip(): JPY=0.01, XAUUSD=0.01, XAGUSD=0.001, else 0.0001.
+    v_pip := case when p_symbol like '%JPY' then 0.01
+                  when p_symbol = 'XAUUSD' then 0.01
+                  when p_symbol = 'XAGUSD' then 0.001
+                  else 0.0001 end;
+    v_half := greatest(0.1, coalesce(v_spr,0) + coalesce(v_mk,0)) * v_pip / 2.0;
+    v_open := v_mid + (case when v_side = 'BUY' then v_half else -v_half end);
+  else
+    v_open := v_mid;
+  end if;
 
   -- idempotent: same local_id never creates two positions
   if exists (select 1 from public.positions where local_id = p_local_id and acct_no = v_acct and server = 'fx') then

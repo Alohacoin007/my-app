@@ -47,6 +47,7 @@ declare
   v_side text; v_open numeric; v_size numeric; v_sym text;
   v_lot numeric; v_dist numeric; v_pnlq numeric; v_pnl numeric;
   v_base text; v_quote text; v_q2usd numeric; v_qmid numeric;
+  v_spr numeric; v_mk numeric; v_pip numeric; v_half numeric := 0; v_close numeric;
 begin
   if auth.uid() is null then return jsonb_build_object('ok',false,'error','not authenticated'); end if;
 
@@ -74,9 +75,25 @@ begin
     return jsonb_build_object('ok',false,'error','price unavailable (stale)');
   end if;
 
+  -- SPREAD ON CLOSE (FX only): a BUY position is closed by SELLING at BID (mid-half),
+  -- a SELL position is closed by BUYING at ASK (mid+half). Mirrors fx_open's fill side
+  -- so a round-trip pays the full spread once. Non-FX closes at mid (v_half stays 0).
+  if v_cls = 'FX' then
+    select coalesce(spr_pts,0) into v_spr from public.prices where symbol = v_sym limit 1;
+    select coalesce(markup_pts,0) into v_mk from public.pricing_marks where symbol = v_sym limit 1;
+    -- pip MUST mirror fx-prices Edge pip() that produced spr_pts (see fx_open_margin.sql):
+    -- JPY=0.01, XAUUSD=0.01, XAGUSD=0.001, else 0.0001. Keep in lockstep with fx_open.
+    v_pip := case when v_sym like '%JPY' then 0.01
+                  when v_sym = 'XAUUSD' then 0.01
+                  when v_sym = 'XAGUSD' then 0.001
+                  else 0.0001 end;
+    v_half := greatest(0.1, coalesce(v_spr,0) + coalesce(v_mk,0)) * v_pip / 2.0;
+  end if;
+  v_close := v_mid + (case when upper(v_side) = 'BUY' then -v_half else v_half end);
+
   -- P&L (exact port of the client engine), USD
   v_lot  := case when v_sym = 'XAUUSD' then 100 when v_sym = 'XAGUSD' then 5000 when v_cls = 'FX' then 100000 else 1 end;
-  v_dist := (v_mid - v_open) * (case when upper(v_side) = 'BUY' then 1 else -1 end);
+  v_dist := (v_close - v_open) * (case when upper(v_side) = 'BUY' then 1 else -1 end);
   v_pnlq := v_dist * v_lot * v_size;
   if v_cls <> 'FX' then
     v_pnl := v_pnlq;
@@ -111,7 +128,7 @@ begin
   -- it has its own balance trigger and would double-count.)
   insert into public.settlements(cust_id, acct_no, server, kind, local_id, symbol, stake, pnl, detail)
     values (v_cust, v_acct, 'fx', 'fx_close', p_local_id, v_sym, v_size, v_pnl,
-            upper(v_side)||' '||v_size||' @ '||v_open||' -> '||round(v_mid,5));
+            upper(v_side)||' '||v_size||' @ '||v_open||' -> '||round(v_close,5));
 
-  return jsonb_build_object('ok',true,'pnl',v_pnl,'close',round(v_mid,6),'side',upper(v_side),'size',v_size);
+  return jsonb_build_object('ok',true,'pnl',v_pnl,'close',round(v_close,6),'side',upper(v_side),'size',v_size);
 end;$$;
