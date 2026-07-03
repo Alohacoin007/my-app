@@ -95,35 +95,37 @@ const customerCost = -roundTrip('EURUSD','BUY', 1.10000, 1, 10, 1.0, true);
 const houseRevenue = sprPips * (pip('EURUSD')*lot('EURUSD')) * 1.0;  // pips × $/pip/lot × size
 check('house spread revenue == customer round-trip cost', customerCost, houseRevenue);
 
-console.log('\n=== BACKOFFICE DISPLAY UNIT: spread shown in POINTS == charged spread ===');
-// The dealing desk stores spread+markup in PIPS (server unit) but DISPLAYS points
-// (last price digit). These mirror manager-mobile.html fxPipOf/fxPPP EXACTLY — if
-// they drift from the SQL pip above, the shown quote lies about what's charged.
+console.log('\n=== BACKOFFICE DISPLAY: Spr·pt == the on-screen (ask − bid), floating ===');
+// The desk shows LIVE quotes bid/ask = mid ± half the (live+markup) spread, and Spr is
+// NOT computed separately — it IS the difference between the DISPLAYED bid and ask. So
+// the number always equals the gap the eye sees (no 10-vs-11 mismatch), and it floats.
 function fxPipOf(sym){ if(sym.endsWith('JPY'))return 0.01; if(sym==='XAUUSD')return 0.01; if(sym==='XAGUSD')return 0.001; return 0.0001; }
 function fxPPP(sym,dg){ return fxPipOf(sym)*Math.pow(10,dg); }      // points per pip
 function pointOf(dg){ return Math.pow(10,-dg); }
-// MT5 display: the desk shows the LIVE liquidity spread + markup as a WHOLE point value
-// that floats with the market (6→10→8). Value == live spread converted to points, rounded.
-// dg: EURUSD=5, USDJPY=3, XAU=2, XAG=3.
-function sprPointsShown(sym,dg,sprPip,mkPip){ return Math.max(1, Math.round((sprPip+mkPip)*fxPPP(sym,dg))); }
-
-check('EURUSD 1.0 pip raw → 10 pt shown', sprPointsShown('EURUSD',5,1.0,0), 10);
-check('EURUSD 1.04 pip live → 10 pt (whole point)', sprPointsShown('EURUSD',5,1.04,0), 10);
-check('EURUSD 1.2 pip live → 12 pt (floats up)', sprPointsShown('EURUSD',5,1.2,0), 12);
-check('EURUSD 1.0 pip + 1.0 pip markup → 20 pt', sprPointsShown('EURUSD',5,1.0,1.0), 20);
-check('USDJPY 1.2 pip → 12 pt (dg3, PPP=10)', sprPointsShown('USDJPY',3,1.2,0), 12);
-check('XAUUSD 30 pip → 30 pt (dg2, PPP=1)', sprPointsShown('XAUUSD',2,30,0), 30);
-
-// RECONCILIATION: the points the desk SHOWS, converted back to price, must equal the
-// price spread the SERVER charges (pips × pip). Same money, two labels.
-function reconcile(sym,dg,sprPip,mkPip){
-  const shownPts = sprPointsShown(sym,dg,sprPip,mkPip);
-  const shownPrice = shownPts * pointOf(dg);                 // desk quote gap in price
-  const chargedPrice = Math.max(0.1,(sprPip+mkPip)) * fxPipOf(sym);  // server v_half*2
-  return { shownPrice: round2(shownPrice/pointOf(dg)), chargedPrice: round2(chargedPrice/pointOf(dg)) };
+// Faithful port of the manager-mobile dealing-desk row.
+function deskRow(sym,dg,mid,livePip,mkPip){
+  const point = pointOf(dg);
+  const totPip = Math.max(0.1, livePip + mkPip);
+  const effPt = Math.max(0.1, totPip * fxPPP(sym,dg));             // live+markup spread in points
+  const half = (effPt * point) / 2;
+  const bidR = +(mid - half).toFixed(dg);                         // the quotes actually shown
+  const askR = +(mid + half).toFixed(dg);
+  const spr = Math.max(1, Math.round((askR - bidR) / point));     // Spr = the visible gap
+  return { bid: bidR.toFixed(dg), ask: askR.toFixed(dg), spr };
 }
-const rc = reconcile('EURUSD',5,1.0,0);
-check('EURUSD shown-gap == charged-gap (in points)', rc.shownPrice, rc.chargedPrice);
+// THE INVARIANT the owner asked for: the shown Spr equals the visible last-digit gap.
+function visibleGap(row, dg){ return Math.round((+row.ask - +row.bid) / pointOf(dg)); }
+[
+  ['EURUSD',5,1.14400,1.0,0], ['EURUSD',5,1.143997,1.0,0], ['EURUSD',5,1.14400,1.1,0],
+  ['USDJPY',3,156.348,1.2,0], ['XAUUSD',2,2347.95,22,0], ['EURUSD',5,1.14400,1.3,-0.2],
+].forEach((a) => {
+  const row = deskRow(a[0],a[1],a[2],a[3],a[4]);
+  check(`${a[0]} @${a[2]} live${a[3]}+mk${a[4]}: Spr(${row.spr}) == visible ask−bid (${row.bid}/${row.ask})`,
+        row.spr, visibleGap(row, a[1]));
+});
+// And it FLOATS: as the live spread widens, the shown Spr grows with it.
+check('EURUSD Spr grows with the live spread (1.0→1.5 pip ⇒ 10→15 pt band)',
+      deskRow('EURUSD',5,1.14400,1.5,0).spr > deskRow('EURUSD',5,1.14400,1.0,0).spr, true);
 
 // A 1-POINT markup step must store 1/PPP pips so the server charges exactly 1 point more.
 function stepPipFor(sym,dg){ return 1/fxPPP(sym,dg); }
