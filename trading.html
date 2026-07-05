@@ -439,6 +439,25 @@ function ccyToUsd(code){if(code==='USD')return 1;var p=SYMBOLS.find(function(x){
 function getNotionalUSD(s,vol,price){var ls=getLotSize(s);if(s.cls!=='FX')return vol*ls*price;var base=s.sym.slice(0,3),quote=s.sym.slice(3,6);if(quote==='USD')return vol*ls*price;if(base==='USD')return vol*ls;return vol*ls*ccyToUsd(base);}
 function getMarginUSD(s,vol,price,leverage){return getNotionalUSD(s,vol,price)/leverage;}
 function getPnlUSD(s,openPx,closePx,side,vol){var dist=(closePx-openPx)*(side==='BUY'?1:-1);var ls=getLotSize(s);var pnlQuote=dist*ls*vol;if(s.cls!=='FX')return pnlQuote;var base=s.sym.slice(0,3),quote=s.sym.slice(3,6);if(quote==='USD')return pnlQuote;if(base==='USD')return pnlQuote/closePx;return pnlQuote*ccyToUsd(quote);}
+// pip size — MUST mirror fx_close.sql / fx-prices Edge pip(): JPY 0.01, XAUUSD 0.01,
+// XAGUSD 0.001, else 0.0001. Keep in lockstep with the server or floating drifts from realized.
+function fxPip(sym){return /JPY$/.test(sym)?0.01:sym==='XAUUSD'?0.01:sym==='XAGUSD'?0.001:0.0001;}
+// EXACT port of fx_close.sql v_close: a BUY closes at BID (mid−half), a SELL at ASK
+// (mid+half). ONLY FX charges the half-spread — every other class (CRYPTO/STOCK/INDEX)
+// closes at MID (half=0), exactly as the server does (v_half stays 0 when cls<>'FX').
+// So floating P&L == what fx_close will actually realize — no phantom spread/"slippage"
+// on crypto. Uses the REAL feed spread (spr_pts + markup_pts), NOT the cosmetic sim
+// m.spread, so the number matches the money the server banks.
+function fxClosePx(m,side){
+  var mid=m.last,half=0;
+  if(m.cls==='FX'){
+    var spr=+(((window.__alpexaFXFeed||{})[m.sym]||{}).spr)||0;   // spr_pts from prices
+    var mk=+((window.__alpexaFXMarks||{})[m.sym])||0;             // markup_pts from pricing_marks
+    half=Math.max(0.1,spr+mk)*fxPip(m.sym)/2;
+  }
+  return mid+(side==='BUY'?-half:half);
+}
+window.fxPip=fxPip;window.fxClosePx=fxClosePx;
 // Realistic execution slippage: the fill lands a little WORSE than the quoted
 // price (buys fill higher, sells lower). Magnitude scales with the live spread;
 // STOP orders (which trigger in fast moves) slip hardest, MARKET orders less,
@@ -465,7 +484,7 @@ const HISTORY=[];
 // News & economic calendar — no demo data (would be a real feed in production).
 const NEWS=[];
 const CALENDAR=[];
-window.ALPEXA_MARKET={SYMBOLS,createMarket,fmt,POSITIONS,HISTORY,NEWS,CALENDAR,PENDING,getLotSize,isUsdBaseFx,getNotionalUSD,getMarginUSD,getPnlUSD,getUnitLabel,fmtVol};
+window.ALPEXA_MARKET={SYMBOLS,createMarket,fmt,POSITIONS,HISTORY,NEWS,CALENDAR,PENDING,getLotSize,isUsdBaseFx,getNotionalUSD,getMarginUSD,getPnlUSD,fxPip,fxClosePx,getUnitLabel,fmtVol};
 </script>
 
 <script type="text/babel">
@@ -3624,7 +3643,7 @@ function App(){
         if(o.status!=='OPEN')return o;
         const m=marketRef.current.state.find(s=>s.sym===o.sym);
         if(!m)return o;
-        const cur=o.side==='BUY'?m.last:m.last+m.spread;
+        const cur=ALPEXA_MARKET.fxClosePx(m,o.side);   // server-mirror close price (no phantom spread)
         const pnl=ALPEXA_MARKET.getPnlUSD(m,o.open,cur,o.side,o.vol);
         // tally floating P&L + used margin for the margin-level check
         floatPnl+=pnl; usedM+=ALPEXA_MARKET.getMarginUSD(m,o.vol||0,o.open||0,(levSet[m.cls]||100));
@@ -3834,7 +3853,7 @@ function App(){
     setLiveOrders(prev=>prev.filter(o=>String(o.id)!==String(id)));   // remove from this device's UI now
     if(!order) return;
     const m=marketRef.current.state.find(s=>s.sym===order.sym);
-    const closePrice=m?(order.side==='BUY'?m.last:m.last+m.spread):order.open;
+    const closePrice=m?ALPEXA_MARKET.fxClosePx(m,order.side):order.open;   // server-mirror (matches realized)
     const pnl=order.pnl||0, acct=accountRef.current;
     const now=new Date();
     const dateStr=String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')+' '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
