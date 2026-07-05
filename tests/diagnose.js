@@ -19,6 +19,9 @@ const DEPLOYED = ['crypto-live.html', 'sports-live.html', 'trading.html', 'index
                   'login.html', 'signup.html', 'manager-mobile.html', 'compliance.js',
                   'alpexa-sync.js'];
 const MONEY_EDGE = ['sports-settle', 'stake-accrue'];   // edge fns that MOVE money (must fail-closed)
+// Price/game FEEDS: not payouts, but they WRITE market data settlements read, and a fail-open
+// endpoint is world-callable (abuse → external-API cost, stale/garbage writes). Fail-closed too.
+const FEED_EDGE = ['crypto-prices', 'fx-prices', 'sports-games', 'sports-odds', 'stock-prices'];
 // Every page a customer could ever load (shipped apps + landing + the parked site/ mirror) —
 // scanned so hardcoded FAKE BALANCES / demo emails can't sneak back (the 2026-06 cleanup class).
 const DEMO_FILES = DEPLOYED.concat([
@@ -57,9 +60,9 @@ const CHECKS = [
   { id: 'LS9-money-in-localstorage', sev: 'HIGH', files: DEPLOYED,
     re: /localStorage\.setItem\(\s*['"]alpexa\.(balances|serverBalances|cryptoBalances|cryptoHoldings|staked|sportsBalance|cryptoBalance|fxLive|openBets|settledBets|positions)\b/,
     why: 'Money/balance/holdings/positions written to localStorage as TRUTH (#5). This is the cross-account-bleed source ($90 showed in B; $60/$80 double-debit). Money is server-only; the client fetches it each load and DISPLAYS only — held in memory (window.__srvBal / React state), never persisted.' },
-  { id: 'B8-failopen-cron', sev: 'HIGH', files: MONEY_EDGE.map((f) => `supabase/functions/${f}/index.ts`),
+  { id: 'B8-failopen-cron', sev: 'HIGH', files: MONEY_EDGE.concat(FEED_EDGE).map((f) => `supabase/functions/${f}/index.ts`),
     re: /if\s*\(\s*CRON_SECRET\s*&&/,
-    why: 'Money edge function fail-OPEN: unset CRON_SECRET → world-callable payout. Must fail closed (503).' },
+    why: 'Edge function fail-OPEN: unset CRON_SECRET → world-callable (money payout, or feed-write abuse). Must fail closed (503).' },
   { id: 'D5-store-password', sev: 'HIGH', files: ['login.html'],
     re: /alpexa\.cred[^\n]*\bpw\b/,
     why: 'Storing the password in localStorage (alpexa.cred) — base64 is plaintext-grade. Persist the Supabase session instead.' },
@@ -94,9 +97,11 @@ const ACCEPTED = [
     reason: 'One-time migration that REMOVES the legacy demo@alpexa.app value for stale users — references the string only to clear it, never displays it.' },
   { id: 'DEMO-fake-email', file: 'manager-mobile.html',
     reason: 'A code COMMENT documenting the anti-pattern ("Never fabricate a demo identity (was demo@alpexa.io)") — not a real address.' },
-  // B8 CLOSED: sports-settle/stake-accrue are now FAIL-CLOSED (no CRON_SECRET → 503), so the
-  // fail-open exceptions are removed — any future `if (CRON_SECRET &&` regression now fails
-  // the gate again. (User deploys: set CRON_SECRET + redeploy + cron_secure.sql.)
+  // B8 CLOSED: the money edge fns (sports-settle/stake-accrue) AND the price/game feeds
+  // (crypto-prices, fx-prices, sports-games, sports-odds, stock-prices) are now FAIL-CLOSED
+  // (no CRON_SECRET → 503), so the fail-open exceptions are removed — any future
+  // `if (CRON_SECRET &&` regression now fails the gate again.
+  // (User deploys: set CRON_SECRET + redeploy each + cron_secure.sql.)
 ];
 function isAccepted(id, file) {
   return ACCEPTED.some((a) => a.id === id && a.file === file);

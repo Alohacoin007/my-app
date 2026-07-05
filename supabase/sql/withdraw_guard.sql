@@ -43,7 +43,7 @@ end;$$;
 -- ④ AUTO-REJECT: block any withdraw request that exceeds withdrawable, for ALL apps.
 create or replace function public.guard_withdraw_request()
 returns trigger language plpgsql security definer set search_path to 'public' as $$
-declare v_w numeric;
+declare v_w numeric; v_pending numeric;
 begin
   if lower(coalesce(NEW.type,'')) = 'withdraw' and coalesce(NEW.acct_no,'') <> '' then
     -- LOWER bound: reject zero/negative/missing amounts. (NaN/Infinity are caught by the
@@ -54,9 +54,15 @@ begin
         using errcode = 'check_violation';
     end if;
     v_w := public.withdrawable_for(NEW.acct_no);
-    if NEW.amount > v_w + 0.001 then
-      raise exception 'Amount exceeds your withdrawable balance (max $%)', v_w
-        using errcode = 'check_violation';
+    -- UPPER bound must include ALREADY-PENDING withdrawals for this account, or a user
+    -- could stack N pending requests that each pass alone but together exceed the
+    -- balance (FX/crypto debit on approval, so the funds aren't reserved at request time).
+    select coalesce(sum(amount),0) into v_pending
+      from public.requests
+     where acct_no = NEW.acct_no and lower(type) = 'withdraw' and status = 'pending';
+    if NEW.amount + coalesce(v_pending,0) > v_w + 0.001 then
+      raise exception 'Amount plus pending withdrawals ($%) exceeds your withdrawable balance (max $%)',
+        v_pending, v_w using errcode = 'check_violation';
     end if;
   end if;
   return NEW;

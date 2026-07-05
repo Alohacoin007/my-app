@@ -302,8 +302,9 @@
   // All network calls are wrapped so a blocked/failing feed never breaks the page.
   async function getJSON(url){ var r=await fetch(url,{cache:'no-store'}); if(!r.ok) throw 0; return r.json(); }
   async function getText(url){ var r=await fetch(url,{cache:'no-store'}); if(!r.ok) throw 0; return r.text(); }
-  // Paste your free finnhub.io API key here → real-time SPCX quotes.
-  var FINNHUB_TOKEN = 'd8m1h31r01qkiso50bh0d8m1h31r01qkiso50bhg';
+  // API key must NOT live in client source (scrapable). Proxy market-data calls
+  // through a server Edge function and inject the key there. Empty = feature off.
+  var FINNHUB_TOKEN = '';
   async function fetchSPCX(){   // {c:last, o:today-open}
     if(FINNHUB_TOKEN){
       try{

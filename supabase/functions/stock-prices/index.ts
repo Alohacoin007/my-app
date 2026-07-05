@@ -32,8 +32,11 @@ function json(body: unknown, status = 200) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   const url = new URL(req.url);
+  // FAIL-CLOSED: no CRON_SECRET → 503 (a misconfig is loud, not silently world-callable).
+  // With the secret set, require ?token=<CRON_SECRET>. Matches sports-settle/stake-accrue.
   const CRON_SECRET = Deno.env.get("CRON_SECRET");
-  if (CRON_SECRET && url.searchParams.get("token") !== CRON_SECRET) {
+  if (!CRON_SECRET) return json({ ok: false, error: "CRON_SECRET not configured (fail-closed)" }, 503);
+  if (url.searchParams.get("token") !== CRON_SECRET) {
     return json({ ok: false, error: "unauthorized" }, 401);
   }
   const KEY = Deno.env.get("FINNHUB_KEY");
