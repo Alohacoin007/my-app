@@ -404,6 +404,16 @@ function applyReal(state,map,trusted){
   });
   return state;
 }
+// ── Tradeable = the SERVER actually prices it (fx_open needs a fresh price) ──────
+// A symbol is feed-backed once the live feed anchored it (s.real) or it's currently
+// in the feed map. Symbols with NO server feed can't be opened (fx_open rejects) and
+// used to show only a red SIMULATED badge — we now hide them from the browse/select
+// lists entirely. Before the feed has loaded at all, show everything (no blank flash);
+// the filter engages the moment we have real data to judge against.
+function alpexaFeedReady(){ var f=(typeof window!=='undefined')&&window.__alpexaFXFeed; return !!(f&&Object.keys(f).length); }
+function alpexaHasFeed(s){ if(!s)return false; if(s.real)return true; var f=(typeof window!=='undefined'&&window.__alpexaFXFeed)||{}; var r=f[s.sym]; return !!(r&&+r.mid>0); }
+function alpexaTradable(list){ return (list&&alpexaFeedReady())? list.filter(alpexaHasFeed) : list; }
+if(typeof window!=='undefined'){ window.alpexaFeedReady=alpexaFeedReady; window.alpexaHasFeed=alpexaHasFeed; window.alpexaTradable=alpexaTradable; }
 // Market hours (so closed markets hold their price instead of drifting).
 function fxOpenUTC(){ // Forex week: Sun 17:00 ET open → Fri 17:00 ET close (DST-aware via NY tz)
   try{var d=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'})),day=d.getDay(),t=d.getHours()*60+d.getMinutes();
@@ -1189,9 +1199,12 @@ function Watchlist({market,onSelect,current,onDepositCrypto}){
     else if(!trendingSymsRef.current){ trendingSymsRef.current=['TSLA','NVDA','EURUSD','BTCUSD']; }
   })();
   function toggleFav(sym){const next=favs.includes(sym)?favs.filter(f=>f!==sym):[...favs,sym];setFavs(next);saveFavSyms(next);}
-  const cats=[{id:'FAV',label:'Favorites'},{id:'FX',label:'Forex'},{id:'STOCK',label:'Stocks'},{id:'CRYPTO',label:'Crypto'},{id:'INDEX',label:'Indices'}];
-  function catCount(id){if(id==='FAV')return market.filter(s=>favs.includes(s.sym)).length;return market.filter(s=>s.cls===id).length;}
-  const rows=market.filter(s=>{
+  const catsAll=[{id:'FAV',label:'Favorites'},{id:'FX',label:'Forex'},{id:'STOCK',label:'Stocks'},{id:'CRYPTO',label:'Crypto'},{id:'INDEX',label:'Indices'}];
+  const feedMkt=alpexaTradable(market);   // only symbols the server prices (feed-backed)
+  function catCount(id){if(id==='FAV')return feedMkt.filter(s=>favs.includes(s.sym)).length;return feedMkt.filter(s=>s.cls===id).length;}
+  // Hide a whole class tab once the feed is up and it has no tradeable symbols (e.g. no index feed).
+  const cats=catsAll.filter(c=>c.id==='FAV'||!alpexaFeedReady()||catCount(c.id)>0);
+  const rows=feedMkt.filter(s=>{
     if(filter==='FAV'){if(!favs.includes(s.sym))return false;}
     else if(s.cls!==filter)return false;
     if(search&&!s.sym.toLowerCase().includes(search.toLowerCase())&&!s.name.toLowerCase().includes(search.toLowerCase()))return false;
@@ -1229,7 +1242,7 @@ function Watchlist({market,onSelect,current,onDepositCrypto}){
       )}
       <div style={{flex:1,overflowY:'auto',overflowX:'hidden',background:'var(--surface)'}}>
         {rows.length===0&&filter==='FAV'&&(()=>{
-          const trending=trendingSymsRef.current.map(sym=>market.find(m=>m.sym===sym)).filter(Boolean);
+          const trending=trendingSymsRef.current.map(sym=>market.find(m=>m.sym===sym)).filter(Boolean).filter(m=>!alpexaFeedReady()||alpexaHasFeed(m));
           return(
             <div style={{padding:'18px 16px 20px'}}>
               <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8}}>
@@ -1525,8 +1538,9 @@ function TradeTicket({market,sym,setSym,lots,setLots,onPlace}){
       </div>
       {pickerOpen&&(()=>{
         const pickerCats=[{id:'ALL',label:'All'},{id:'FX',label:'Forex'},{id:'STOCK',label:'Stocks'},{id:'CRYPTO',label:'Crypto'},{id:'INDEX',label:'Indices'}];
-        const pickerCount=id=>id==='ALL'?market.length:market.filter(m=>m.cls===id).length;
-        const pickerRows=market.filter(m=>{
+        const feedPick=alpexaTradable(market);   // only server-priced symbols
+        const pickerCount=id=>id==='ALL'?feedPick.length:feedPick.filter(m=>m.cls===id).length;
+        const pickerRows=feedPick.filter(m=>{
           if(pickerFilter!=='ALL'&&m.cls!==pickerFilter)return false;
           if(pickerSearch&&!m.sym.toLowerCase().includes(pickerSearch.toLowerCase())&&!(m.name||'').toLowerCase().includes(pickerSearch.toLowerCase()))return false;
           return true;
@@ -2292,7 +2306,7 @@ function PriceAlertsPanel(){
         <div style={{background:'var(--bg)',borderRadius:11,padding:'12px 14px',marginBottom:14}}>
           <div style={{fontSize:10,fontWeight:700,color:'var(--text-3)',letterSpacing:0.5,marginBottom:6}}>SYMBOL</div>
           <select value={sym} onChange={e=>setSym(e.target.value)} className="mono" style={{width:'100%',padding:'9px 10px',borderRadius:8,border:'1px solid var(--line-2)',background:'var(--surface)',fontSize:13,fontWeight:600,color:'var(--ink)',marginBottom:12,outline:'none'}}>
-            {ALPEXA_MARKET.SYMBOLS.map(s=><option key={s.sym} value={s.sym}>{s.sym} — {s.name}</option>)}
+            {alpexaTradable(ALPEXA_MARKET.SYMBOLS).map(s=><option key={s.sym} value={s.sym}>{s.sym} — {s.name}</option>)}
           </select>
           <div style={{fontSize:10,fontWeight:700,color:'var(--text-3)',letterSpacing:0.5,marginBottom:6}}>CONDITION</div>
           <div style={{display:'flex',gap:6,marginBottom:12}}>
@@ -2941,7 +2955,7 @@ function AccountSheet({open,current,onPick,onClose}){
 function SymPicker({market,sym,onPick}){
   return(
     <div style={{position:'absolute',top:'100%',left:0,right:0,zIndex:200,background:'var(--surface)',borderTop:'1px solid var(--line)',borderBottom:'1px solid var(--line)',boxShadow:'var(--shadow-lg)',maxHeight:300,overflowY:'auto'}}>
-      {market.map(m=>(
+      {alpexaTradable(market).map(m=>(
         <button key={m.sym} onClick={()=>onPick(m.sym)} style={{width:'100%',display:'flex',alignItems:'center',padding:'10px 14px',borderBottom:'1px solid var(--line)',textAlign:'left',background:sym===m.sym?'var(--acc-3)':'transparent'}}>
           <div style={{flex:1,display:'flex',alignItems:'center',gap:6}}>
             <span style={{fontSize:13,fontWeight:700,color:'var(--ink)'}}>{m.sym}</span>
