@@ -812,12 +812,13 @@
     var ln=label?'<div class="ln">'+label+'</div>':'';
     return '<div class="lb-odd'+(sel?' sel':'')+'" data-key="'+key+'" data-gi="'+gi+'" data-mk="'+mk+'" data-sd="'+sd+'">'+ln+'<div class="v">'+o.toFixed(2)+arr+'</div></div>';
   }
+  function escH(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
   function render(){
     board.innerHTML=G.map(function(g,gi){
       var top='<div class="lb-gtop"><span class="lb-league">'+g.league+'</span>'+(g.live?'<span class="lb-live">LIVE · '+g.time+'</span>':'<span class="lb-time">'+g.time+'</span>')+'</div>';
       var head='<div class="lb-mkhead"><span>Match</span><span>Spread</span><span>Total</span><span>Money</span></div>';
-      var rowH='<div class="lb-r"><div class="lb-team"><span class="lb-ab" style="background:'+g.home.c+'">'+g.home.ab+'</span>'+g.home.name+(g.home.sc!==null?'<span class="lb-sc">'+g.home.sc+'</span>':'')+'</div>'+odd(gi,'spread','h',g.spread.hl,g.spread.ho)+odd(gi,'total','o','O '+g.total.ln,g.total.o)+odd(gi,'ml','h','',g.ml.h)+'</div>';
-      var rowA='<div class="lb-r"><div class="lb-team"><span class="lb-ab" style="background:'+g.away.c+'">'+g.away.ab+'</span>'+g.away.name+(g.away.sc!==null?'<span class="lb-sc">'+g.away.sc+'</span>':'')+'</div>'+odd(gi,'spread','a',g.spread.al,g.spread.ao)+odd(gi,'total','u','U '+g.total.ln,g.total.u)+odd(gi,'ml','a','',g.ml.a)+'</div>';
+      var rowH='<div class="lb-r"><div class="lb-team"><span class="lb-ab" style="background:'+g.home.c+'">'+escH(g.home.ab)+'</span>'+escH(g.home.name)+(g.home.sc!==null?'<span class="lb-sc">'+g.home.sc+'</span>':'')+'</div>'+odd(gi,'spread','h',g.spread.hl,g.spread.ho)+odd(gi,'total','o','O '+g.total.ln,g.total.o)+odd(gi,'ml','h','',g.ml.h)+'</div>';
+      var rowA='<div class="lb-r"><div class="lb-team"><span class="lb-ab" style="background:'+g.away.c+'">'+escH(g.away.ab)+'</span>'+escH(g.away.name)+(g.away.sc!==null?'<span class="lb-sc">'+g.away.sc+'</span>':'')+'</div>'+odd(gi,'spread','a',g.spread.al,g.spread.ao)+odd(gi,'total','u','U '+g.total.ln,g.total.u)+odd(gi,'ml','a','',g.ml.a)+'</div>';
       return '<div class="lb-game">'+top+head+rowH+rowA+'</div>';
     }).join('');
     [].slice.call(board.querySelectorAll('.lb-odd')).forEach(function(el){ el.addEventListener('click',function(){ toggle(el.dataset); }); });
@@ -898,7 +899,7 @@
     $('lbCnt').textContent=slip.length+' pick'+(slip.length===1?'':'s');
     if(!slip.length){ $('lbBody').innerHTML='<div class="lb-empty">Tap any odds above to add<br>your first selection.</div>'; }
     else{
-      $('lbBody').innerHTML=slip.map(function(s){ return '<div class="lb-sel"><div><div class="pk">'+s.pick+'</div><div class="sb">'+s.sub+'</div></div><div class="lb-right"><span class="so">'+s.odd.toFixed(2)+'</span><button class="rm" data-key="'+s.key+'">&times;</button></div></div>'; }).join('');
+      $('lbBody').innerHTML=slip.map(function(s){ return '<div class="lb-sel"><div><div class="pk">'+escH(s.pick)+'</div><div class="sb">'+escH(s.sub)+'</div></div><div class="lb-right"><span class="so">'+s.odd.toFixed(2)+'</span><button class="rm" data-key="'+s.key+'">&times;</button></div></div>'; }).join('');
       [].slice.call($('lbBody').querySelectorAll('.rm')).forEach(function(b){ b.addEventListener('click',function(){ userTouched=true; var i=slip.findIndex(function(s){return s.key===b.dataset.key;}); if(i>-1){slip.splice(i,1);render();renderSlip();} }); });
     }
     calc();

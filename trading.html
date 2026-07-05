@@ -544,6 +544,10 @@ function fxPendingDelete(id){ try{ if(!(window.AlpexaSync&&AlpexaSync.db))return
 const DEFAULT_BALANCES={live:0,crypto:0,sports:0};
 function getBalances(){return {...DEFAULT_BALANCES,...(window.__fxBal||{})};}
 function setBalances(obj){window.__fxLocalTs=Date.now();window.__fxBal=obj;window.dispatchEvent(new Event('alpexa-balance-change'));}
+// Withdrawable/transferable cap for FX: free margin (excludes floating losses),
+// capped at realized cash. Server (withdrawable_for) is the real gate; this is UX
+// so a user can't Max out floating-loss money that isn't really there (#24).
+function fxAvail(){var live=(window.__fxBal&&+window.__fxBal.live)||0;var f=parseFloat(localStorage.getItem('alpexa.fxFree'));return Math.max(0, isFinite(f)?Math.min(live,f):live);}
 function addBalance(acctId,delta){const b=getBalances();b[acctId]=Math.max(0,(b[acctId]||0)+delta);setBalances(b);}
 function fmtBalance(n){return '$'+(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
 window.getBalances=getBalances;window.addBalance=addBalance;window.fmtBalance=fmtBalance;
@@ -1387,6 +1391,7 @@ function TradeTicket({market,sym,setSym,lots,setLots,onPlace}){
           <div style={{display:'flex',alignItems:'center',gap:6}}>
             <span style={{fontSize:18,fontWeight:800,color:'var(--ink)',letterSpacing:0.2}}>{s.sym}</span>
             <span style={{fontSize:8.5,padding:'2px 5px',borderRadius:3,fontWeight:800,letterSpacing:0.4,background:tagBg[s.cls]||'var(--bg-2)',color:tagCol[s.cls]||'var(--text-2)'}}>{s.cls}</span>
+            {!s.real&&<span title="Indicative price — no live market feed for this symbol" style={{fontSize:8.5,padding:'2px 5px',borderRadius:3,fontWeight:800,letterSpacing:0.4,background:'#fdeaea',color:'#c0392b'}}>SIMULATED</span>}
           </div>
           <div style={{fontSize:11,color:'var(--text-3)',marginTop:2}}>{s.name}</div>
         </div>
@@ -2376,10 +2381,10 @@ function TwoFactorPanel(){
     <div style={{flex:1,overflowY:'auto',padding:'4px 16px 18px'}}>
       <div style={{background:'var(--buy-tint)',borderRadius:10,padding:'12px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:10}}>
         <Mi name="verified_user" size={20} style={{color:'var(--buy-2)'}}/>
-        <div style={{flex:1}}><div style={{fontSize:12.5,fontWeight:700,color:'var(--buy-2)'}}>2FA is Enabled</div><div style={{fontSize:10.5,color:'var(--buy-2)',opacity:0.85,marginTop:1}}>Authenticator app · Connected May 12</div></div>
+        <div style={{flex:1}}><div style={{fontSize:12.5,fontWeight:700,color:'var(--buy-2)'}}>Secure your withdrawals</div><div style={{fontSize:10.5,color:'var(--buy-2)',opacity:0.85,marginTop:1}}>Add a 2-factor verification step</div></div>
       </div>
       <div style={{fontSize:10,fontWeight:700,color:'var(--text-3)',letterSpacing:0.5,marginBottom:6}}>METHOD</div>
-      {[{v:'app',icon:'phonelink_lock',label:'Authenticator App',sub:'Google / Authy / 1Password'},{v:'sms',icon:'sms',label:'SMS Code',sub:'+82 10-•••• 8512'},{v:'email',icon:'mail',label:'Email Code',sub:'zbnyme@gmail.com'}].map(o=>(
+      {[{v:'app',icon:'phonelink_lock',label:'Authenticator App',sub:'Google / Authy / 1Password'},{v:'sms',icon:'sms',label:'SMS Code',sub:'Add a phone number'},{v:'email',icon:'mail',label:'Email Code',sub:(function(){try{var e=(JSON.parse(localStorage.getItem('alpexa.me')||'{}').email)||'';return e?e.replace(/^(.).*(@.*)$/,'$1•••$2'):'Your account email';}catch(_){return 'Your account email';}})()}].map(o=>(
         <button key={o.v} onClick={()=>setMethod(o.v)} style={{width:'100%',display:'flex',alignItems:'center',gap:12,padding:'12px',background:method===o.v?'var(--acc-3)':'var(--bg-2)',border:'1.5px solid '+(method===o.v?'var(--acc)':'transparent'),borderRadius:10,marginBottom:6,textAlign:'left'}}>
           <div style={{width:34,height:34,borderRadius:8,flexShrink:0,background:method===o.v?'var(--acc)':'var(--surface)',color:method===o.v?'var(--ink-fg)':'var(--text-2)',display:'flex',alignItems:'center',justifyContent:'center'}}><Mi name={o.icon} size={18}/></div>
           <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:'var(--ink)'}}>{o.label}</div><div style={{fontSize:10.5,color:'var(--text-3)',marginTop:1}}>{o.sub}</div></div>
@@ -2508,7 +2513,7 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
     setTimeout(async ()=>{
       // Record funding transactions to history (skip 'report' since it's not a money move)
       if(kind==='deposit'||kind==='withdraw'||kind==='transfer'){
-        const METHOD_NOTE={card:'Card payment',bank:kind==='withdraw'?'KEB Hana •••• 4982':'Bank Wire · UBS',crypto:'USDT (ERC-20)',wallet:'USDT (ERC-20)',live:'From FX'};
+        const METHOD_NOTE={card:'Card payment',bank:kind==='withdraw'?'Bank transfer':'Bank wire',crypto:'USDT (ERC-20)',wallet:'USDT (ERC-20)',live:'From FX'};
         const REF_PREFIX={deposit:'DEP-ALX-',withdraw:'WTH-ALX-',transfer:'TRF-ALX-'};
         const note=kind==='transfer'?('FX → '+(destAcct||'').toUpperCase()):(METHOD_NOTE[method]||'');
         const amt=parseFloat(amount)||0;
@@ -2649,7 +2654,7 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
               )}
               {kind==='withdraw'&&(
                 <><SheetLabel>To</SheetLabel>
-                <MethodGrid value={account==='sports'?'wallet':method} onChange={account==='sports'?(v=>setMethod('wallet')):setMethod} options={account==='sports'?[{v:'wallet',icon:'wallet',label:'USDT Wallet',sub:'Only USDT (ERC-20) accepted'}]:[{v:'bank',icon:'account_balance',label:'Bank Account',sub:'•••• 4982 · KEB Hana'},{v:'wallet',icon:'wallet',label:'Crypto Wallet',sub:'0xeB25…69C3c · USDT'}]}/>
+                <MethodGrid value={account==='sports'?'wallet':method} onChange={account==='sports'?(v=>setMethod('wallet')):setMethod} options={account==='sports'?[{v:'wallet',icon:'wallet',label:'USDT Wallet',sub:'Only USDT (ERC-20) accepted'}]:[{v:'bank',icon:'account_balance',label:'Bank Account',sub:'Enter bank details'},{v:'wallet',icon:'wallet',label:'Crypto Wallet',sub:'Enter USDT (ERC-20) address'}]}/>
 
                 {method==='bank' && (<>
                   <SheetLabel>Your Bank Details</SheetLabel>
@@ -2659,7 +2664,7 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
                     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
                       <div>
                         <div style={{fontSize:10,fontWeight:700,color:'var(--text-3)',letterSpacing:0.5,textTransform:'uppercase',marginBottom:5}}>Bank Name</div>
-                        <input placeholder="e.g. KEB Hana" style={{width:'100%',padding:'8px 10px',border:'1px solid var(--line-2)',borderRadius:6,background:'#fff',fontSize:12,outline:'none'}}/>
+                        <input placeholder="Your bank name" style={{width:'100%',padding:'8px 10px',border:'1px solid var(--line-2)',borderRadius:6,background:'#fff',fontSize:12,outline:'none'}}/>
                       </div>
                       <div>
                         <div style={{fontSize:10,fontWeight:700,color:'var(--text-3)',letterSpacing:0.5,textTransform:'uppercase',marginBottom:5}}>SWIFT/BIC</div>
@@ -2692,9 +2697,9 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
                   </div>
                 </>)}
 
-                <AmountField amount={amount} setAmount={setAmount} quick={[100,500,1000,'MAX']} currency="USD" max={Math.max(0,Math.floor(getBalances().live||0))}/>
+                <AmountField amount={amount} setAmount={setAmount} quick={[100,500,1000,'MAX']} currency="USD" max={Math.floor(fxAvail())}/>
                 <div style={{background:'var(--bg)',borderRadius:9,padding:'10px 12px',fontSize:11.5,color:'var(--text-2)'}}>
-                  <Row2 l="Available" v={'$'+(getBalances().live||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}/><Row2 l="Amount" v={amount?'$'+amount:'—'}/><Row2 l="Fee" v="$0.00"/><Row2 l="You'll receive" v={amount?'$'+parseFloat(amount).toFixed(2):'—'} bold/>
+                  <Row2 l="Available" v={'$'+fxAvail().toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}/><Row2 l="Amount" v={amount?'$'+amount:'—'}/><Row2 l="Fee" v="$0.00"/><Row2 l="You'll receive" v={amount?'$'+parseFloat(amount).toFixed(2):'—'} bold/>
                 </div></>
               )}
               {kind==='transfer'&&(()=>{
@@ -2707,7 +2712,7 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
                 </div>
                 <SheetLabel>To</SheetLabel>
                 <MethodGrid value={destAcct} onChange={setDestAcct} options={[{v:'crypto',icon:'currency_bitcoin',label:'Alpexa Crypto',sub:'#21084712 · '+fmtBalance(bal.crypto)},{v:'sports',icon:'sports_soccer',label:'Alpexa Sports',sub:'#44219982 · '+fmtBalance(bal.sports)}]}/>
-                <AmountField amount={amount} setAmount={setAmount} quick={QUICK} currency="USD" max={12847}/>
+                <AmountField amount={amount} setAmount={setAmount} quick={QUICK} currency="USD" max={Math.floor(fxAvail())}/>
                 <div style={{background:'var(--acc-3)',borderRadius:9,padding:'10px 12px',fontSize:11.5,color:'var(--acc-2)',display:'flex',alignItems:'center',gap:8}}><Mi name="info" size={14}/><span>Instant transfer · No fees · 24/7</span></div></>
                 );
               })()}
@@ -2725,7 +2730,7 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
                   ))}
                 </div>
                 <div style={{background:'var(--bg)',borderRadius:9,padding:'10px 12px',fontSize:11.5,color:'var(--text-2)'}}>
-                  <Row2 l="Type" v={({monthly:'Monthly',quarterly:'Quarterly',annual:'Annual Tax',custom:'Custom'})[reportType]}/><Row2 l="Format" v={reportFormat.toUpperCase()}/><Row2 l="Delivery" v="Email (zbnyme@gmail.com)"/><Row2 l="Generation time" v="~30 seconds"/>
+                  <Row2 l="Type" v={({monthly:'Monthly',quarterly:'Quarterly',annual:'Annual Tax',custom:'Custom'})[reportType]}/><Row2 l="Format" v={reportFormat.toUpperCase()}/><Row2 l="Delivery" v="Sent to your account email"/><Row2 l="Generation time" v="~30 seconds"/>
                 </div></>
               )}
             </div>

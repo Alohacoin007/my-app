@@ -777,9 +777,9 @@
       var bn=function(s){ return m[s]?(+m[s].balance||0):0; };
       var kyc=p.kyc||'pending', stt=p.status||'active';
       h+='<div class="card" style="padding:9px 12px">'+
-        '<div class="row" data-pl="'+esc(cid)+'" style="border:none;padding:0;cursor:pointer"><span style="display:flex;align-items:center;gap:6px;min-width:0"><span class="muted" style="font-size:10px">'+(open?'▾':'▸')+'</span><b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(p.name||cid||'—')+'</b>'+(acctIntegrity(p).flagged?' <span title="Balance exceeds what records explain — possible tampering" style="font-size:12px">🚩</span>':'')+'</span><b class="'+(tot>=0?'pos':'neg')+'" style="white-space:nowrap;padding-left:8px">'+usd(tot)+'</b></div>';
+        '<div class="row" data-pl="'+esc(cid)+'" style="border:none;padding:0;cursor:pointer"><span style="display:flex;align-items:center;gap:6px;min-width:0"><span class="muted" style="font-size:10px">'+(open?'▾':'▸')+'</span><b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.name||cid||'—')+'</b>'+(acctIntegrity(p).flagged?' <span title="Balance exceeds what records explain — possible tampering" style="font-size:12px">🚩</span>':'')+'</span><b class="'+(tot>=0?'pos':'neg')+'" style="white-space:nowrap;padding-left:8px">'+usd(tot)+'</b></div>';
       if(open){
-        h+='<div class="req-meta" style="margin-top:6px">'+(p.email||'')+(joined?(' · joined '+joined):'')+'</div>'+
+        h+='<div class="req-meta" style="margin-top:6px">'+esc(p.email||'')+(joined?(' · joined '+esc(joined)):'')+'</div>'+
         '<div style="margin:5px 0 2px">'+badgeKyc(kyc)+' '+badgeStatus(stt)+'</div>';
         var ig=acctIntegrity(p);
         h+='<div class="card" style="padding:8px 10px;margin:6px 0;background:'+(ig.flagged?'#fff6f6':'#f7f9fc')+';border:1px solid '+(ig.flagged?'#f1b0b7':'var(--line)')+'">'+
@@ -867,7 +867,7 @@
           if(!pmts.length){ h+='<div class="req-meta" style="margin:4px 0">No internal transfers.</div>'; }
           pmts.forEach(function(p){ var out=(p.from_cust===cid); var when=p.created_at?new Date(p.created_at).toLocaleString():'';
             h+='<div class="row"><span><b>'+(out?'Sent':'Received')+'</b> <span class="muted" style="font-size:10.5px">'+(p.asset||'USDT')+' · '+(p.status||'')+'</span>'+
-              '<div class="req-meta" style="margin:2px 0 0">'+(out?('to '+(p.to_acct||'')):('from '+(p.from_name||p.from_cust||'')))+' · '+when+'</div></span>'+
+              '<div class="req-meta" style="margin:2px 0 0">'+(out?('to '+esc(p.to_acct||'')):('from '+esc(p.from_name||p.from_cust||'')))+' · '+when+'</div></span>'+
               '<b class="'+(out?'neg':'pos')+'">'+(out?'-':'+')+usd(+p.amount||0)+'</b></div>'; });
           // Full activity log: buys, sells, stakes, bets, FX opens for this customer.
           var ACTLBL={buy:'Buy',sell:'Sell',stake:'Stake',unstake:'Unstake',bet:'Bet',trade_open:'FX open',send:'Send',receive:'Receive',deposit:'Deposit',withdraw:'Withdraw',swap:'Swap'};
@@ -876,8 +876,8 @@
           h+='<div class="lbl" style="margin-top:12px">Activity ('+acts.length+')</div>';
           if(!acts.length){ h+='<div class="req-meta" style="margin:4px 0">No activity recorded yet.</div>'; }
           acts.forEach(function(x){ var when=x.created_at?new Date(x.created_at).toLocaleString():'';
-            h+='<div class="row"><span style="min-width:0"><b>'+(APPIC[x.server]||'')+' '+(ACTLBL[x.kind]||x.kind||'—')+'</b> <span class="muted" style="font-size:10.5px">'+(x.symbol||'')+'</span>'+
-              '<div class="req-meta" style="margin:2px 0 0">'+(x.ticket?(x.ticket+' · '):'')+(x.detail||'')+' · '+when+'</div></span>'+
+            h+='<div class="row"><span style="min-width:0"><b>'+(APPIC[x.server]||'')+' '+(ACTLBL[x.kind]||esc(x.kind)||'—')+'</b> <span class="muted" style="font-size:10.5px">'+esc(x.symbol||'')+'</span>'+
+              '<div class="req-meta" style="margin:2px 0 0">'+(x.ticket?(esc(x.ticket)+' · '):'')+esc(x.detail||'')+' · '+when+'</div></span>'+
               '<b class="muted">'+(x.amount?usd(+x.amount):'')+'</b></div>'; });
           h+='<button class="save ghost" data-editpl="'+esc(cid)+'" style="width:100%;margin-top:10px">Edit profile &amp; balances</button>';
         }
@@ -986,9 +986,9 @@
           '<div style="display:flex;align-items:center;gap:6px">'+
             '<span style="font:800 8.5px system-ui;color:#fff;background:'+sevCol[x.sev]+';padding:1px 5px;border-radius:3px">'+sevLbl[x.sev]+'</span>'+
             (x.srv?'<span style="font:700 8.5px ui-monospace;color:var(--dim)">'+(srvPill[x.srv]||String(x.srv).toUpperCase())+'</span>':'')+
-            '<b style="font-size:12.5px">'+(x.nm||'—')+'</b>'+
+            '<b style="font-size:12.5px">'+esc(x.nm||'—')+'</b>'+
           '</div>'+
-          '<div style="font-size:11.5px;color:var(--ink);margin-top:2px">'+x.reason+'</div>'+
+          '<div style="font-size:11.5px;color:var(--ink);margin-top:2px">'+esc(x.reason)+'</div>'+
           '<div style="font-size:10px;color:var(--dim);margin-top:1px">'+(x.cust?x.cust+' · ':'')+(x.ts?ago(x.ts):'')+'</div>'+
         '</div></div>';
     }).join('');
@@ -1122,7 +1122,7 @@
       var ts=l.created_at?Date.parse(l.created_at):0;
       var who=l.target_cust?(' · '+esc(custName(l.target_cust))):'';
       h+='<div class="row"><span><b>'+actionLabel(l.action)+'</b>'+who+
-        (l.detail?('<div class="req-meta" style="margin:2px 0 0">'+l.detail+'</div>'):'')+'</span>'+
+        (l.detail?('<div class="req-meta" style="margin:2px 0 0">'+esc(l.detail)+'</div>'):'')+'</span>'+
         '<span class="muted" style="font-size:11px;white-space:nowrap">'+ago(ts)+'</span></div>';
     });
     h+='</div><div class="hint" style="margin:0 14px">Every approval, edit and force-action is recorded. (Actor = back office; real admin name once login is added.)</div>';
