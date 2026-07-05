@@ -62,8 +62,16 @@
 - 정산 이중지급 방지: 서버·앱이 `positions` 행을 **삭제로 선점(claim)** → 먼저 지운 쪽만 지급.
 - ⚠️ 알려진 약점: 클라 `syncSportsBal`이 잔고 델타를 추측해 ledger에 올림 → baseline(`__sbLastPushed`) 한 곳만 어긋나도 이중계산. **구조적 폐쇄 대상(#5).**
 
+## 🏦 금융 업계 표준 — MT5 구조 (무관용)
+> **모든 거래·정산·표시·리스크 로직은 실제 규제 브로커(MT4/MT5)와 동일한 규율·구조를 따른다. 임의 발명 금지.**
+> 손대기 전 자문 한 줄: **"규제받는 진짜 브로커가 이렇게 하나?"** — 아니면 그 자체가 결함(상식 밖 = 하면 안 됨).
+- **모든 상품에 딜링 스프레드** — FX·크립토·주식·지수 전부 스프레드 부과, 하우스 수취(무스프레드 상품 없음). 체결=서버 mid, 청산=`mid∓half`, **플로팅=서버 실현손익과 동일**(가짜 ± 금지). 스프레드 파라미터 서버·클라 **락스텝**: `fx_close.sql` v_half ↔ `trading.html` `ALPEXA_SPREAD_BPS`/`fxHalfSpread`/`fxClosePx` (FX=pip기반 `spr_pts+markup_pts`, 비FX=bps CRYPTO 10·STOCK 8·INDEX 6). **한쪽만 고치면 플로팅이 실현과 어긋난다 — 항상 양쪽.**
+- **체결가=서버 권위** (`fx_open`/`fx_close` RPC만, 클라 위조 불가) · **손익=실시간 피드 mid로 마크**(시뮬 드리프트로 P&L 금지) · **피드 없는 상품은 거래목록에서 제외**(거래불가한데 가능처럼 보이면 안 됨).
+- 마진/레버리지/스왑/마진콜·스탑아웃은 자산군별 업계 표준. → 마스터 감사 **차원 9** + `tests/fx-floating-spread.test.js`(플로팅==서버 실현).
+
 ## 🧪 테스트
 - `node tests/sports-balance.test.js` — 베팅 잔고 이중차감 회귀 테스트(프로덕션 ledger와 일치하는 RED + 수정 GREEN). 돈 로직 건드리면 반드시 통과 확인.
+- `node tests/fx-floating-spread.test.js` — FX앱 플로팅이 서버 `fx_close` 실현손익과 동일(전 상품 스프레드, 실제 mid 마크). FX 체결/스프레드 손대면 반드시 통과.
 
 ## 🚚 배포 / 운영
 - GitHub Pages는 브랜치 `claude/wizardly-ritchie-lsRnz`에서 서빙 (CNAME alpexa-sports.com). **푸시는 이 브랜치에만.**

@@ -452,22 +452,32 @@ function getPnlUSD(s,openPx,closePx,side,vol){var dist=(closePx-openPx)*(side===
 // pip size — MUST mirror fx_close.sql / fx-prices Edge pip(): JPY 0.01, XAUUSD 0.01,
 // XAGUSD 0.001, else 0.0001. Keep in lockstep with the server or floating drifts from realized.
 function fxPip(sym){return /JPY$/.test(sym)?0.01:sym==='XAUUSD'?0.01:sym==='XAGUSD'?0.001:0.0001;}
-// EXACT port of fx_close.sql v_close: a BUY closes at BID (mid−half), a SELL at ASK
-// (mid+half). ONLY FX charges the half-spread — every other class (CRYPTO/STOCK/INDEX)
-// closes at MID (half=0), exactly as the server does (v_half stays 0 when cls<>'FX').
-// So floating P&L == what fx_close will actually realize — no phantom spread/"slippage"
-// on crypto. Uses the REAL feed spread (spr_pts + markup_pts), NOT the cosmetic sim
-// m.spread, so the number matches the money the server banks.
-function fxClosePx(m,side){
-  var mid=m.last,half=0;
+// Per-class house spread for NON-FX, in bps of price (crypto/stock/index have no
+// pip-based feed spread). FULL round-trip spread; the one-way cost is bps/2.
+// MUST match fx_close.sql exactly (lockstep) or floating drifts from realized.
+var ALPEXA_SPREAD_BPS={CRYPTO:10,STOCK:8,INDEX:6};
+// Half-spread in PRICE units — EXACT mirror of fx_close.sql v_half:
+//   FX     : greatest(0.1, spr_pts + markup_pts) * pip / 2   (real feed pips)
+//   non-FX : mid * SPREAD_BPS[cls] / 10000 / 2               (% of price)
+function fxHalfSpread(m,mid){
   if(m.cls==='FX'){
     var spr=+(((window.__alpexaFXFeed||{})[m.sym]||{}).spr)||0;   // spr_pts from prices
     var mk=+((window.__alpexaFXMarks||{})[m.sym])||0;             // markup_pts from pricing_marks
-    half=Math.max(0.1,spr+mk)*fxPip(m.sym)/2;
+    return Math.max(0.1,spr+mk)*fxPip(m.sym)/2;
   }
+  return mid*((ALPEXA_SPREAD_BPS[m.cls]||0)/10000)/2;
+}
+// EXACT port of fx_close.sql v_close: BUY closes at BID (mid−half), SELL at ASK
+// (mid+half), EVERY class charged. mid = the REAL feed mid (m.bid, refreshed each
+// pull) — NOT the cosmetic sim price m.last, which drifts between pulls and used to
+// paint spurious ± P&L. So floating == what fx_close actually realizes: a fresh
+// position opens at −half (the spread), and the house earns that spread round-trip.
+function fxClosePx(m,side){
+  var mid=(m.real&&m.bid>0)?m.bid:m.last;
+  var half=fxHalfSpread(m,mid);
   return mid+(side==='BUY'?-half:half);
 }
-window.fxPip=fxPip;window.fxClosePx=fxClosePx;
+window.fxPip=fxPip;window.fxHalfSpread=fxHalfSpread;window.fxClosePx=fxClosePx;
 // Realistic execution slippage: the fill lands a little WORSE than the quoted
 // price (buys fill higher, sells lower). Magnitude scales with the live spread;
 // STOP orders (which trigger in fast moves) slip hardest, MARKET orders less,

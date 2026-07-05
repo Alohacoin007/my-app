@@ -77,7 +77,8 @@ begin
 
   -- SPREAD ON CLOSE (FX only): a BUY position is closed by SELLING at BID (mid-half),
   -- a SELL position is closed by BUYING at ASK (mid+half). Mirrors fx_open's fill side
-  -- so a round-trip pays the full spread once. Non-FX closes at mid (v_half stays 0).
+  -- so a round-trip pays the full spread once. Non-FX (crypto/stock/index) uses a
+  -- bps-of-price spread instead (see else branch) — every instrument carries a spread.
   if v_cls = 'FX' then
     select coalesce(spr_pts,0) into v_spr from public.prices where symbol = v_sym limit 1;
     select coalesce(markup_pts,0) into v_mk from public.pricing_marks where symbol = v_sym limit 1;
@@ -88,6 +89,12 @@ begin
                   when v_sym = 'XAGUSD' then 0.001
                   else 0.0001 end;
     v_half := greatest(0.1, coalesce(v_spr,0) + coalesce(v_mk,0)) * v_pip / 2.0;
+  else
+    -- NON-FX (crypto/stock/index): no pip-based feed spread exists, so the house
+    -- spread is bps of price. FULL round-trip bps; one-way cost = bps/2. This MUST
+    -- match trading.html ALPEXA_SPREAD_BPS (lockstep) or floating drifts from realized.
+    -- MT5 convention: every instrument carries a dealing spread — the house earns it.
+    v_half := v_mid * (case v_cls when 'CRYPTO' then 10 when 'STOCK' then 8 when 'INDEX' then 6 else 0 end) / 10000.0 / 2.0;
   end if;
   v_close := v_mid + (case when upper(v_side) = 'BUY' then -v_half else v_half end);
 
