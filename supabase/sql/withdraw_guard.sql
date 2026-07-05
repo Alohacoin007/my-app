@@ -46,8 +46,15 @@ returns trigger language plpgsql security definer set search_path to 'public' as
 declare v_w numeric;
 begin
   if lower(coalesce(NEW.type,'')) = 'withdraw' and coalesce(NEW.acct_no,'') <> '' then
+    -- LOWER bound: reject zero/negative/missing amounts. (NaN/Infinity are caught by the
+    -- upper-bound check below — in Postgres NaN and Infinity compare greater than any
+    -- finite withdrawable, so they fail 'amount > withdrawable'.)
+    if NEW.amount is null or NEW.amount <= 0 then
+      raise exception 'Withdrawal amount must be greater than zero.'
+        using errcode = 'check_violation';
+    end if;
     v_w := public.withdrawable_for(NEW.acct_no);
-    if coalesce(NEW.amount,0) > v_w + 0.001 then
+    if NEW.amount > v_w + 0.001 then
       raise exception 'Amount exceeds your withdrawable balance (max $%)', v_w
         using errcode = 'check_violation';
     end if;
