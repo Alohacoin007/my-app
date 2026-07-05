@@ -38,20 +38,35 @@ const CG_IDS: Record<string, string> = {
 const STABLES: Record<string, number> = { USDT: 1, USDC: 1, DAI: 1 };
 
 type Row = { symbol: string; mid: number; spr_pts: number };
+// spr_pts for CRYPTO = the REAL exchange spread in BASIS POINTS (from Binance bookTicker
+// bid/ask). fx_close.sql floors it with the house minimum (greatest(FLOOR_BPS, spr_pts)),
+// so calm markets show the house floor and volatile/illiquid pairs widen automatically.
+// Stables and the CoinGecko fallback have no order book → spr 0 → the house floor applies.
 const px2row = (sym: string, p: number): Row => ({ symbol: sym, mid: Math.round(p * 1e6) / 1e6, spr_pts: 0 });
+const bookRow = (sym: string, mid: number, sprBps: number): Row =>
+  ({ symbol: sym, mid: Math.round(mid * 1e6) / 1e6, spr_pts: Math.round(sprBps * 100) / 100 });
 
-// Source 1: Binance public data mirror (real-time, same API shape as binance.com).
+// Source 1: Binance public data mirror (real-time). bookTicker gives best bid/ask so we
+// publish the true mid AND the real exchange spread (bps).
 async function fromBinance(): Promise<Row[]> {
-  const res = await fetch("https://data-api.binance.vision/api/v3/ticker/price", { cache: "no-store", headers: { "accept": "application/json" } });
+  const res = await fetch("https://data-api.binance.vision/api/v3/ticker/bookTicker", { cache: "no-store", headers: { "accept": "application/json" } });
   if (!res.ok) throw new Error("binance.vision " + res.status);
   const tickers = await res.json();
-  const px: Record<string, number> = {};
-  for (const t of tickers) { if (t && t.symbol) px[t.symbol] = +t.price; }
+  const book: Record<string, { bid: number; ask: number }> = {};
+  for (const t of tickers) { if (t && t.symbol) book[t.symbol] = { bid: +t.bidPrice, ask: +t.askPrice }; }
   const rows: Row[] = [];
   for (const sym of Object.keys(STABLES)) rows.push(px2row(sym, STABLES[sym]));
   // Write BOTH the short symbol (BTC — crypto spot app) AND the USD pair (BTCUSD — the FX
   // app's fx_open, so crypto CFDs are server-priced and pass the margin gate, no bypass).
-  for (const sym of Object.keys(PAIRS)) { const p = px[PAIRS[sym]]; if (p > 0) { rows.push(px2row(sym, p)); rows.push(px2row(sym + "USD", p)); } }
+  for (const sym of Object.keys(PAIRS)) {
+    const b = book[PAIRS[sym]];
+    if (b && b.bid > 0 && b.ask > 0 && b.ask >= b.bid) {
+      const mid = (b.bid + b.ask) / 2;
+      const sprBps = ((b.ask - b.bid) / mid) * 1e4;   // real exchange spread, basis points
+      rows.push(bookRow(sym, mid, sprBps));
+      rows.push(bookRow(sym + "USD", mid, sprBps));
+    }
+  }
   if (rows.length <= Object.keys(STABLES).length) throw new Error("binance.vision empty");
   return rows;
 }

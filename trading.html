@@ -452,20 +452,24 @@ function getPnlUSD(s,openPx,closePx,side,vol){var dist=(closePx-openPx)*(side===
 // pip size — MUST mirror fx_close.sql / fx-prices Edge pip(): JPY 0.01, XAUUSD 0.01,
 // XAGUSD 0.001, else 0.0001. Keep in lockstep with the server or floating drifts from realized.
 function fxPip(sym){return /JPY$/.test(sym)?0.01:sym==='XAUUSD'?0.01:sym==='XAGUSD'?0.001:0.0001;}
-// Per-class house spread for NON-FX, in bps of price (crypto/stock/index have no
-// pip-based feed spread). FULL round-trip spread; the one-way cost is bps/2.
+// Per-class house FLOOR spread for NON-FX, in bps of price. The real exchange spread
+// (crypto bookTicker) passes through when WIDER than the floor (volatility/illiquid);
+// calm markets show the floor. FULL round-trip bps; one-way = bps/2.
 // MUST match fx_close.sql exactly (lockstep) or floating drifts from realized.
 var ALPEXA_SPREAD_BPS={CRYPTO:10,STOCK:8,INDEX:6};
 // Half-spread in PRICE units — EXACT mirror of fx_close.sql v_half:
-//   FX     : greatest(0.1, spr_pts + markup_pts) * pip / 2   (real feed pips)
-//   non-FX : mid * SPREAD_BPS[cls] / 10000 / 2               (% of price)
+//   FX     : greatest(0.1, spr_pts + markup_pts) * pip / 2        (real feed pips)
+//   non-FX : mid * greatest(FLOOR_BPS[cls], real_spread_bps) / 10000 / 2
 function fxHalfSpread(m,mid){
   if(m.cls==='FX'){
-    var spr=+(((window.__alpexaFXFeed||{})[m.sym]||{}).spr)||0;   // spr_pts from prices
+    var spr=+(((window.__alpexaFXFeed||{})[m.sym]||{}).spr)||0;   // spr_pts (pips) from prices
     var mk=+((window.__alpexaFXMarks||{})[m.sym])||0;             // markup_pts from pricing_marks
     return Math.max(0.1,spr+mk)*fxPip(m.sym)/2;
   }
-  return mid*((ALPEXA_SPREAD_BPS[m.cls]||0)/10000)/2;
+  // HYBRID: house floor OR the real exchange spread (bps, from the feed) if wider.
+  var floorBps=ALPEXA_SPREAD_BPS[m.cls]||0;
+  var feedBps=+(((window.__alpexaFXFeed||{})[m.sym]||{}).spr)||0; // real spread (bps) for non-FX
+  return mid*(Math.max(floorBps,feedBps)/10000)/2;
 }
 // EXACT port of fx_close.sql v_close: BUY closes at BID (mid−half), SELL at ASK
 // (mid+half), EVERY class charged. mid = the REAL feed mid (m.bid, refreshed each

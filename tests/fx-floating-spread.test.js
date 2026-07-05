@@ -15,14 +15,16 @@
 // Run: node tests/fx-floating-spread.test.js
 'use strict';
 
-// House spread for non-FX (bps of price). MUST equal fx_close.sql AND trading.html.
+// House FLOOR spread for non-FX (bps of price). The real exchange spread (spr_pts, bps)
+// passes through when WIDER. MUST equal fx_close.sql AND trading.html.
 const SPREAD_BPS = { CRYPTO: 10, STOCK: 8, INDEX: 6 };
 
 // ── SERVER: exact port of fx_close.sql v_half / v_close. ──
 function serverPip(sym){ return /JPY$/.test(sym)?0.01 : sym==='XAUUSD'?0.01 : sym==='XAGUSD'?0.001 : 0.0001; }
 function serverHalf(cls, sym, mid, spr_pts, markup_pts){
   if (cls === 'FX') return Math.max(0.1, (spr_pts||0) + (markup_pts||0)) * serverPip(sym) / 2;
-  return mid * ((SPREAD_BPS[cls]||0) / 10000) / 2;
+  // HYBRID: greater of house floor and the real exchange spread (spr_pts, bps).
+  return mid * (Math.max((SPREAD_BPS[cls]||0), (spr_pts||0)) / 10000) / 2;
 }
 function serverClosePx(cls, sym, side, mid, spr_pts, markup_pts){
   const half = serverHalf(cls, sym, mid, spr_pts, markup_pts);
@@ -37,7 +39,8 @@ function clientHalf(m, mid, feed, marks){
     const mk  = +((marks||{})[m.sym]) || 0;
     return Math.max(0.1, spr + mk) * clientPip(m.sym) / 2;
   }
-  return mid * ((SPREAD_BPS[m.cls]||0) / 10000) / 2;
+  const feedBps = +(((feed||{})[m.sym]||{}).spr) || 0;   // real exchange spread (bps)
+  return mid * (Math.max((SPREAD_BPS[m.cls]||0), feedBps) / 10000) / 2;
 }
 function clientClosePx(m, side, feed, marks){
   const mid = (m.real && m.bid > 0) ? m.bid : m.last;   // REAL feed mid, not sim drift
@@ -91,9 +94,19 @@ console.log('\n=== GREEN — every fresh position opens at a LOSS = the spread (
   });
 });
 
-console.log('\n=== GREEN — crypto spread is meaningful (0.05% one-way), not ~0 ===');
-// BTC one-way = SPREAD_BPS/2 = 5 bps = 0.05% of price.
-check('BTC half == 0.05% of mid', approx(serverHalf('CRYPTO','BTCUSD',108000,0,0), 108000*0.0005), true);
+console.log('\n=== GREEN — crypto spread is meaningful (0.05% one-way floor), not ~0 ===');
+// BTC calm: raw exchange spread ≈0 → floor wins. one-way = SPREAD_BPS/2 = 5 bps = 0.05%.
+check('BTC half == 0.05% of mid (floor)', approx(serverHalf('CRYPTO','BTCUSD',108000,0,0), 108000*0.0005), true);
+
+console.log('\n=== GREEN — HYBRID: real exchange spread passes through when WIDER than floor ===');
+// Illiquid/volatile pair: feed spr_pts = 30 bps > 10 bps floor → the 30 bps is used.
+const alt = { sym:'WIFUSD', cls:'CRYPTO', real:true, bid:2.5, last:2.5 };
+check('feed 30bps (>10 floor) → client uses 30bps',
+  approx(clientHalf(alt, 2.5, {WIFUSD:{spr:30}}, {}), 2.5*(30/10000)/2), true);
+check('feed 30bps: client == server (passthrough)',
+  approx(clientClosePx(alt,'BUY',{WIFUSD:{spr:30}},{}), serverClosePx('CRYPTO','WIFUSD','BUY',2.5,30,0)), true);
+check('feed 3bps (<10 floor) → floor 10bps wins',
+  approx(clientHalf(alt, 2.5, {WIFUSD:{spr:3}}, {}), 2.5*(10/10000)/2), true);
 
 console.log('\n' + (pass ? '🟢 ALL CHECKS PASSED' : '🔴 CHECKS FAILED') + '\n');
 process.exit(pass ? 0 : 1);

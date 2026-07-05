@@ -90,11 +90,17 @@ begin
                   else 0.0001 end;
     v_half := greatest(0.1, coalesce(v_spr,0) + coalesce(v_mk,0)) * v_pip / 2.0;
   else
-    -- NON-FX (crypto/stock/index): no pip-based feed spread exists, so the house
-    -- spread is bps of price. FULL round-trip bps; one-way cost = bps/2. This MUST
-    -- match trading.html ALPEXA_SPREAD_BPS (lockstep) or floating drifts from realized.
+    -- NON-FX (crypto/stock/index): HYBRID — the greater of the house FLOOR (bps) and the
+    -- REAL exchange spread (spr_pts, carried in BPS for these classes by crypto-prices
+    -- bookTicker; 0 when no book → floor applies). Calm markets show the floor; volatile/
+    -- illiquid pairs widen automatically. FULL round-trip bps; one-way = bps/2. MUST match
+    -- trading.html ALPEXA_SPREAD_BPS + fxHalfSpread (lockstep) or floating ≠ realized.
     -- MT5 convention: every instrument carries a dealing spread — the house earns it.
-    v_half := v_mid * (case v_cls when 'CRYPTO' then 10 when 'STOCK' then 8 when 'INDEX' then 6 else 0 end) / 10000.0 / 2.0;
+    select coalesce(spr_pts,0) into v_spr from public.prices where symbol = v_sym limit 1;
+    v_half := v_mid * greatest(
+        (case v_cls when 'CRYPTO' then 10 when 'STOCK' then 8 when 'INDEX' then 6 else 0 end),
+        coalesce(v_spr,0)
+      ) / 10000.0 / 2.0;
   end if;
   v_close := v_mid + (case when upper(v_side) = 'BUY' then -v_half else v_half end);
 
