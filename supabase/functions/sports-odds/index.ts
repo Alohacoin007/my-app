@@ -29,12 +29,19 @@ const cors = {
 // Leagues to poll, with the matching ESPN scoreboard path used to detect live games.
 const SPORTS = [
   "americanfootball_nfl", "basketball_nba", "baseball_mlb", "icehockey_nhl",
+  // Soccer — incl. the FIFA World Cup (in season). Real odds so the board no longer
+  // shows placeholder soccer prices. Smart polling only spends credits when live/stale.
+  "soccer_fifa_world_cup", "soccer_epl", "soccer_usa_mls", "soccer_uefa_champs_league",
 ];
 const ESPN_PATH: Record<string, string> = {
   americanfootball_nfl: "football/nfl",
   basketball_nba: "basketball/nba",
   baseball_mlb: "baseball/mlb",
   icehockey_nhl: "hockey/nhl",
+  soccer_fifa_world_cup: "soccer/fifa.world",
+  soccer_epl: "soccer/eng.1",
+  soccer_usa_mls: "soccer/usa.1",
+  soccer_uefa_champs_league: "soccer/uefa.champions",
 };
 const STALE_MS = 9 * 60 * 1000; // refresh an idle league's odds ~every 10 min
 

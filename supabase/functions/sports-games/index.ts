@@ -102,8 +102,17 @@ async function overlayRealOdds(games: any[], SB_URL: string, H: Record<string, s
     const bySport: Record<string, any[]> = {};
     (rows || []).forEach((row: any) => { if (row && row.sport) bySport[row.sport] = Array.isArray(row.data) ? row.data : []; });
     games.forEach((g: any) => {
-      const sk = ODDS_SPORT[g.lg]; if (!sk) return;
-      const data = bySport[sk]; if (!data || !data.length) return;
+      let data: any[] = [];
+      if (g.lg === "SOC") {
+        // Soccer competitions live under several odds keys (soccer_fifa_world_cup,
+        // soccer_epl, soccer_usa_mls, …) but all share lg:"SOC". Team names are unique,
+        // so match across every soccer_* feed at once.
+        Object.keys(bySport).forEach((k) => { if (k.indexOf("soccer_") === 0) data = data.concat(bySport[k] || []); });
+      } else {
+        const sk = ODDS_SPORT[g.lg]; if (!sk) return;
+        data = bySport[sk] || [];
+      }
+      if (!data.length) return;
       const ev = data.find((e: any) => { const s = new Set([nick(e.home_team), nick(e.away_team)]); return s.has(nick(g.home.nm)) && s.has(nick(g.away.nm)); });
       if (!ev) return;
       const core = oddsToCore(ev, g.home, g.away);
