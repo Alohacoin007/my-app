@@ -705,7 +705,7 @@
   <footer>
     <div class="foot-grid">
       <div class="foot-brand">
-        <div class="fb-logo">ALPEXA<small>SPORTS</small></div>
+        <div class="fb-logo" id="fbLogo" title="ALPEXA SPORTS">ALPEXA<small>SPORTS</small></div>
         <div class="cpy">© 2026, ALPEXA SPORTS<br><a href="site/legal.html">Responsible Gaming</a></div>
       </div>
       <div class="foot-col">
@@ -736,6 +736,20 @@
   </footer>
 
   <script>
+  // Hidden staff access: 5 clicks on the footer logo (within 2s of each other)
+  // opens the back-office. Deliberately UNLABELED and not a link, so the admin
+  // panel is never publicly discoverable on the site. (IB/agent portal is a
+  // normal public link; the back-office is not.)
+  (function(){
+    var logo=document.getElementById('fbLogo');
+    if(!logo) return;
+    var n=0,t=null;
+    logo.style.cursor='default';
+    logo.addEventListener('click',function(){
+      n++; if(t)clearTimeout(t); t=setTimeout(function(){n=0;},2000);
+      if(n>=5){ n=0; if(t)clearTimeout(t); location.href='manager-mobile.html'; }
+    });
+  })();
   (function(){
     var game=document.getElementById('liveGame');
     if(!game) return;
