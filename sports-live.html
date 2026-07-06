@@ -3375,7 +3375,12 @@
       throw (lastE || new Error('failed'));
     }
     // ---- Real bookmaker odds (The Odds API) -------------------------------
-    const ODDS_SPORT = { NFL:'americanfootball_nfl', NBA:'basketball_nba', NCAAB:'basketball_ncaab', MLB:'baseball_mlb', NHL:'icehockey_nhl' };
+    // App league → The Odds API sport key(s). Soccer spans several competitions
+    // (World Cup / EPL / MLS / UCL) under one "SOC" tab, so its value is an ARRAY —
+    // applyRealOdds merges them. MMA (UFC) has moneyline only (no spread/total).
+    const ODDS_SPORT = { NFL:'americanfootball_nfl', NBA:'basketball_nba', NCAAB:'basketball_ncaab',
+      MLB:'baseball_mlb', NHL:'icehockey_nhl', UFC:'mma_mixed_martial_arts',
+      SOC:['soccer_fifa_world_cup','soccer_epl','soccer_usa_mls','soccer_uefa_champs_league'] };
     function nick(name){ return String(name||'').trim().toLowerCase().split(/\s+/).pop(); }
     // Odds come from OUR server now: the sports-odds Edge Function polls The Odds
     // API (key kept server-side) and stores the raw odds in the sports_odds table.
@@ -3415,9 +3420,10 @@
       const leagues = Array.from(new Set(games.map(g=>g.lg).filter(l=>ODDS_SPORT[l])));
       let matched = 0;
       for (const lg of leagues){
-        let data;
-        try{ data = await fetchOdds(ODDS_SPORT[lg]); }catch(e){ continue; }
-        if (!Array.isArray(data)) continue;
+        var keys = [].concat(ODDS_SPORT[lg]);   // string or array of odds keys
+        let data = [];
+        for (const k of keys){ try{ const d = await fetchOdds(k); if(Array.isArray(d)) data = data.concat(d); }catch(e){} }
+        if (!data.length) continue;
         games.filter(g=>g.lg===lg).forEach(g=>{
           const ev = data.find(e=>{ const s=new Set([nick(e.home_team),nick(e.away_team)]); return s.has(nick(g.home.nm)) && s.has(nick(g.away.nm)); });
           if (ev){ const core=oddsToCore(ev, g.home, g.away); if (core){ g.core=Object.assign({}, g.core, core); matched++; } }
