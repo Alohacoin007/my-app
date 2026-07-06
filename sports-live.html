@@ -1647,8 +1647,16 @@
     const q=gameQuery.toLowerCase();
     return [g.home.nm,g.home.ab,g.away.nm,g.away.ab,g.lg].some(s=>s.toLowerCase().includes(q));
   }
-  // sort: pinned games first (stable for ties)
-  const sortByPin=(a,b)=>(pinnedGames.has(b.id)?1:0)-(pinnedGames.has(a.id)?1:0);
+  // sort: pinned first → LIVE → soonest kickoff (today before tomorrow before the
+  // day after) → finished last. Keeps the nearest games at the top instead of the
+  // raw ESPN feed order (which was burying today's games below later ones).
+  function _kickTs(g){ var t=Date.parse((g&&g.kickoff)||''); return isNaN(t)?Infinity:t; }
+  function _liveRank(g){ return (g&&g.live)?0:((g&&g.state==='post')?2:1); }  // live, upcoming, finished
+  const sortByPin=(a,b)=>{
+    var p=(pinnedGames.has(b.id)?1:0)-(pinnedGames.has(a.id)?1:0); if(p) return p;
+    var r=_liveRank(a)-_liveRank(b); if(r) return r;   // live first, finished last
+    return _kickTs(a)-_kickTs(b);                       // soonest kickoff first
+  };
   // ── Live (in-play) betting gate — anti-arbitrage. A live bet is allowed only
   // when ALL hold: master switch on, the game isn't suspended (its score just
   // changed → ~15s lockout), and our odds aren't stale. Pre-match is unaffected.
