@@ -846,13 +846,29 @@
   // Driven by updateTicker() from loadReal, NOT the demo board. Hidden when the server
   // has no games (never shows the demo showcase games).
   var TG=[];
+  // Order games the way a real sportsbook does: LIVE first, then the SOONEST
+  // upcoming (nearest kickoff), so it rolls tomorrow → next day → the day after.
+  // Finished games (not live, kickoff already passed) are dropped — a live-odds
+  // strip should never show yesterday's game.
+  function sortGames(rows){
+    var now=Date.now();
+    return (rows||[]).filter(Boolean).filter(function(g){
+      if(g.live) return true;                 // always keep live
+      var ts=Date.parse(g.iso||''); if(isNaN(ts)) return true;  // unknown time → keep
+      return ts >= now - 2*3600e3;            // drop games that kicked off >2h ago (finished)
+    }).sort(function(a,b){
+      if(!!a.live !== !!b.live) return a.live?-1:1;             // live first
+      var ta=Date.parse(a.iso||''); if(isNaN(ta))ta=Infinity;  // unknown time → last
+      var tb=Date.parse(b.iso||''); if(isNaN(tb))tb=Infinity;
+      return ta-tb;                            // soonest kickoff first
+    });
+  }
   function updateTicker(rows){
     var bar=document.getElementById('oddsTicker'), lbl=document.getElementById('otLabel');
-    var real=(rows||[]).filter(Boolean).slice();
-    real.sort(function(a,b){return (b.live?1:0)-(a.live?1:0);});     // live first, upcoming after
+    var real=sortGames(rows);
     TG=real.slice(0,16);
     var anyLive=TG.some(function(g){return g.live;});
-    if(lbl){ lbl.textContent=anyLive?'LIVE':'TODAY'; lbl.className='ot-label'+(anyLive?'':' soon'); }
+    if(lbl){ lbl.textContent=anyLive?'LIVE':'UPCOMING'; lbl.className='ot-label'+(anyLive?'':' soon'); }
     if(bar){ bar.style.display=TG.length?'':'none'; }
     renderTicker._sig=''; renderTicker();
   }
@@ -941,7 +957,7 @@
   function fmtShort(iso){try{var d=new Date(iso);if(isNaN(d.getTime()))return'';return d.toLocaleDateString('en-US',{weekday:'short'})+' · '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});}catch(e){return'';}}
   function toLB(g){
     var sp=g.spread||[],to=g.total||[],ml=g.ml||[]; if(sp.length<2||to.length<2||ml.length<2) return null;
-    return {league:g.lg,live:!!g.live,time:g.live?(g.time||'Live'):fmtShort(g.iso),
+    return {league:g.lg,live:!!g.live,iso:(g.iso||''),time:g.live?(g.time||'Live'):fmtShort(g.iso),
       home:{ab:g.home.ab,c:lbCol(g.home.nm),name:g.home.nm,sc:(g.home.sc!=null?g.home.sc:null)},
       away:{ab:g.away.ab,c:lbCol(g.away.nm),name:g.away.nm,sc:(g.away.sc!=null?g.away.sc:null)},
       spread:{ho:dec(sp[0].am),ao:dec(sp[1].am),hl:sp[0].ln,al:sp[1].ln},
@@ -957,7 +973,8 @@
         var rows=[]; if(Array.isArray(games)) games.forEach(function(g){try{var x=toLB(g);if(x)rows.push(x);}catch(e){}});
         updateTicker(rows);                       // ticker = REAL games only (hidden if none)
         if(!rows.length) return;                  // board keeps its demo showcase if no real games
-        rows.sort(function(a,b){return (b.live?1:0)-(a.live?1:0);}); // live games first
+        rows=sortGames(rows);                      // live first, then soonest upcoming (same as ticker)
+        if(!rows.length) return;
         var wasReal=realLoaded;
         G.length=0; rows.slice(0,SHOW_N).forEach(function(x){G.push(x);});
         realLoaded=true; if(!wasReal) slip=[];
