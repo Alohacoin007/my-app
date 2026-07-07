@@ -535,10 +535,15 @@ window.__cryptoLiveMap = window.__cryptoLiveMap || {};
   var FRESH_MS = 6000, lastApply = 0;
   function median(a){ a.sort(function(x,y){return x-y;}); var n=a.length; return n%2 ? a[(n-1)/2] : (a[n/2-1]+a[n/2])/2; }
   function aggregate(sym){
-    var s=SRC[sym]; if(!s)return; var now=Date.now(), vals=[];
-    Object.keys(s).forEach(function(k){ var q=s[k]; if(q&&q.p>0&&(now-q.ts)<FRESH_MS) vals.push(q.p); });
-    if(!vals.length)return;
-    var rec=map[sym]||(map[sym]={}); rec.price=median(vals); rec.srcs=vals.length;
+    var s=SRC[sym]; if(!s)return; var now=Date.now();
+    // PREFER BINANCE so the display matches the exchange the user watches AND the server
+    // trade price (prices table = Binance bookTicker). Coinbase is only a fallback if
+    // Binance is stale/absent. (The old median blended the two → a price between exchanges
+    // that matched NEITHER, and drifted from the actual fill price.)
+    var b=s.binance, c=s.coinbase, fresh=function(q){ return q && q.p>0 && (now-q.ts)<FRESH_MS; };
+    var use = fresh(b) ? b.p : fresh(c) ? c.p : null;
+    if(use==null)return;
+    var rec=map[sym]||(map[sym]={}); rec.price=use; rec.srcs=fresh(b)&&fresh(c)?2:1;
     if(CHG[sym]!=null) rec.chg=CHG[sym]; rec.ts=now;
   }
   function setSrc(src,sym,p){ if(!(+p>0))return; var s=SRC[sym]||(SRC[sym]={}); s[src]={p:+p,ts:Date.now()}; aggregate(sym);
