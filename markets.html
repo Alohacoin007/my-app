@@ -52,39 +52,20 @@
   .mkt .m-grp{padding:14px 16px 6px;font-size:10.5px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;
     color:var(--m-muted);display:flex;justify-content:space-between;align-items:center}
   .mkt .m-grp .c{background:#fff;border:1px solid var(--m-line);border-radius:999px;padding:1px 7px;font-size:9.5px}
-  .mkt .m-row{display:grid;grid-template-columns:1fr 52px auto;gap:10px;align-items:center;padding:9px 16px;cursor:pointer;border-left:2px solid transparent}
-  .mkt .m-spark{width:52px;height:24px}
-  .mkt .m-spark svg{display:block;width:100%;height:100%}
-  /* Excel-style quote table */
-  .mkt .qt{font-variant-numeric:tabular-nums;border-top:1px solid var(--m-line)}
-  .mkt .qt-head,.mkt .qt-row{display:grid;grid-template-columns:1fr 82px 62px 58px;align-items:center}
-  .mkt .qt-head{background:var(--m-panel2);border-bottom:1px solid var(--m-line);position:sticky;top:0;z-index:1}
-  .mkt .qt-head span{font-size:9.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--m-muted);
-    padding:7px 9px;border-right:1px solid var(--m-line);text-align:right}
-  .mkt .qt-head span:first-child{text-align:left}
-  .mkt .qt-head span:last-child,.mkt .qt-row>span:last-child{border-right:0}
-  .mkt .qt-row{cursor:pointer;border-bottom:1px solid var(--m-line)}
-  .mkt .qt-row:hover{background:var(--m-panel2)}
-  .mkt .qt-row.on{background:var(--m-accsoft)}
-  .mkt .qt-row.on .qt-sym b{color:var(--m-accent)}
-  .mkt .qt-row>span{padding:6px 9px;border-right:1px solid var(--m-line);white-space:nowrap;overflow:hidden;min-width:0}
-  .mkt .qt-sym{min-width:0}
-  .mkt .qt-sym b{display:block;font-size:12px;font-weight:700;color:var(--m-text);overflow:hidden;text-overflow:ellipsis}
-  .mkt .qt-sym small{display:block;font-size:9.5px;color:var(--m-muted);overflow:hidden;text-overflow:ellipsis}
-  .mkt .qt-last{font-family:var(--m-mono);font-weight:700;font-size:12px;color:var(--m-text);text-align:right;transition:color .3s}
-  .mkt .qt-last.up{color:var(--m-up)} .mkt .qt-last.dn{color:var(--m-down)}
-  .mkt .qt-chg{font-family:var(--m-mono);font-weight:700;font-size:11px;text-align:right}
-  .mkt .qt-chg.up{color:var(--m-up)} .mkt .qt-chg.dn{color:var(--m-down)}
-  .mkt .qt-spark{height:24px;display:flex;align-items:center}
-  .mkt .qt-spark svg{width:100%;height:20px;display:block}
-  .mkt .m-row:hover{background:#fff}
+  /* Watchlist rows — name/ticker · sparkline · price + change (Google-Finance style) */
+  .mkt .m-row{display:grid;grid-template-columns:1fr 104px 1fr;gap:12px;align-items:center;padding:10px 16px;cursor:pointer;border-left:2px solid transparent;border-bottom:1px solid var(--m-line)}
+  .mkt .m-row:hover{background:var(--m-panel2)}
   .mkt .m-row.on{background:var(--m-accsoft);border-left-color:var(--m-accent)}
-  .mkt .m-row>div:first-child{min-width:0}
-  .mkt .m-row .nm{font-weight:700;font-size:13px;color:var(--m-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .mkt .m-row .sb{font-size:10.5px;color:var(--m-muted)}
-  .mkt .m-row .rt{text-align:right}
-  .mkt .m-row .px{font-family:var(--m-mono);font-weight:700;font-size:12.5px;color:var(--m-text);transition:color .3s}
-  .mkt .m-row .px.up{color:var(--m-up)} .mkt .m-row .px.dn{color:var(--m-down)}
+  .mkt .m-nm{min-width:0}
+  .mkt .m-nm b{display:block;font-size:13.5px;font-weight:700;color:var(--m-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mkt .m-nm small{display:block;font-size:11px;color:var(--m-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mkt .m-row.on .m-nm b{color:var(--m-accent)}
+  .mkt .m-spark{height:28px;width:104px}
+  .mkt .m-spark svg{display:block;width:100%;height:100%}
+  .mkt .m-rt{text-align:right;white-space:nowrap}
+  .mkt .m-px{font-family:var(--m-mono);font-weight:700;font-size:13px;color:var(--m-text)}
+  .mkt .m-chg{font-family:var(--m-mono);font-size:11px;font-weight:700;margin-top:1px;color:var(--m-muted)}
+  .mkt .m-chg.up{color:var(--m-up)} .mkt .m-chg.dn{color:var(--m-down)}
   .mkt .mkt-main{padding:22px 24px 30px;min-width:0}
   .mkt .m-dh{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
   .mkt .m-ic{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:#fff;flex:none}
@@ -248,18 +229,17 @@
         return '<button class="m-tab'+(t.k===TAB?' on':'')+'" data-tab="'+t.k+'">'+t.label+'</button>'; }).join('')+'</div>';
       var items=CAT.filter(function(c){ return c.cls===TAB; });
       var rows=items.map(function(c){
-        var cls=c.mid>0 && prev[c.sym]!=null ? (c.mid>prev[c.sym]?'up':c.mid<prev[c.sym]?'dn':'') : '';
-        var pc=sessChg(c), chgTxt=(pc==null?'—':(pc>=0?'+':'')+pc.toFixed(2)+'%'), chgCls=(pc==null?'':(pc>=0?'up':'dn'));
-        return '<div class="qt-row'+(c.sym===CUR?' on':'')+'" role="row" tabindex="0" data-sym="'+c.sym+'">'
-          +'<span class="qt-sym"><b>'+(c.cls==='fx'?c.td:c.sym)+'</b><small>'+c.name+'</small></span>'
-          +'<span class="qt-last '+cls+'">'+(c.mid>0?(c.cls==='fx'?'':'$')+fmt(c.mid,c.dp):'—')+'</span>'
-          +'<span class="qt-chg '+chgCls+'">'+chgTxt+'</span>'
-          +'<span class="qt-spark">'+sparkSVG(c)+'</span>'
+        var pc=sessChg(c), chgTxt=(pc==null?'':(pc>=0?'+':'')+pc.toFixed(2)+'%'), chgCls=(pc==null?'':(pc>=0?'up':'dn'));
+        return '<div class="m-row'+(c.sym===CUR?' on':'')+'" role="button" tabindex="0" data-sym="'+c.sym+'">'
+          +'<div class="m-nm"><b>'+c.name+'</b><small>'+(c.cls==='fx'?c.td:c.sym)+'</small></div>'
+          +'<div class="m-spark">'+sparkSVG(c)+'</div>'
+          +'<div class="m-rt"><div class="m-px">'+(c.mid>0?(c.cls==='fx'?'':'$')+fmt(c.mid,c.dp):'—')+'</div>'
+            +'<div class="m-chg '+chgCls+'">'+chgTxt+'</div></div>'
         +'</div>';
       }).join('');
-      side.innerHTML=tabs+'<div class="qt"><div class="qt-head"><span>Symbol</span><span>Last</span><span>Chg</span><span>Chart</span></div>'+rows+'</div>';
+      side.innerHTML=tabs+rows;
       side.querySelectorAll('.m-tab').forEach(function(t){ t.onclick=function(){ switchTab(t.dataset.tab); }; });
-      side.querySelectorAll('.qt-row').forEach(function(r){
+      side.querySelectorAll('.m-row').forEach(function(r){
         var go=function(){ select(r.dataset.sym); };
         r.onclick=go; r.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } };
       });
