@@ -54,6 +54,9 @@
   .mkt .m-grp .c{background:#fff;border:1px solid var(--m-line);border-radius:999px;padding:1px 7px;font-size:9.5px}
   /* Watchlist rows — name/ticker · sparkline · price + change (Google-Finance style) */
   .mkt .m-row{display:grid;grid-template-columns:1fr 54px auto;gap:14px;align-items:center;padding:10px 16px;cursor:pointer;border-left:2px solid transparent;border-bottom:1px solid var(--m-line)}
+  /* Short names (stocks/crypto) — put the chart right beside the name, price far right */
+  .mkt-side.tab-stock .m-row,.mkt-side.tab-crypto .m-row{grid-template-columns:auto 54px 1fr}
+  .mkt-side.tab-stock .m-nm,.mkt-side.tab-crypto .m-nm{max-width:150px}
   .mkt .m-row:hover{background:var(--m-panel2)}
   .mkt .m-row.on{background:var(--m-accsoft);border-left-color:var(--m-accent)}
   .mkt .m-nm{min-width:0}
@@ -244,6 +247,7 @@
             +'<div class="m-chg '+chgCls+'">'+chgCell(pc)+'</div></div>'
         +'</div>';
       }).join('');
+      side.className='mkt-side tab-'+TAB;
       side.innerHTML=tabs+rows;
       side.querySelectorAll('.m-tab').forEach(function(t){ t.onclick=function(){ switchTab(t.dataset.tab); }; });
       side.querySelectorAll('.m-row').forEach(function(r){
