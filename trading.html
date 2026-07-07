@@ -339,17 +339,12 @@ function createMarket(){
       // shared feed is published for later server use, but we DON'T chase it on
       // every tick — that caused the wild oscillation. Same base on all devices
       // keeps quotes naturally aligned anyway.
-      const target=s.bid;
-      const meanRev=(target*(1+(PX.biasFrac||0))-s.last)/s.bid*0.06;
-      const pct=drift+meanRev;
-      let next=s.last*(1+pct);
-      // Safety clamp: tiny max move per tick (a few pips), so no glitch can spike.
-      const maxStep=s.last*(s.cls==='CRYPTO'?0.003:s.cls==='STOCK'||s.cls==='INDEX'?0.0015:0.0006);
-      if(next>s.last+maxStep)next=s.last+maxStep; else if(next<s.last-maxStep)next=s.last-maxStep;
-      // Hard band around the reference so the price stays in a realistic range.
-      const bandPct=(s.cls==='CRYPTO'?0.02:s.cls==='STOCK'||s.cls==='INDEX'?0.012:0.0025);
-      const loB=s.bid*(1-bandPct), hiB=s.bid*(1+bandPct);
-      if(next<loB)next=loB; else if(next>hiB)next=hiB;
+      // Show the REAL feed mid — track s.bid (set from the `prices` feed by applyReal). Do
+      // NOT fabricate a random walk around it: that drifted the ticker off the market (same
+      // class as the crypto sway) and off the server fill price. The feed refreshes s.bid
+      // (~10s cron); between refreshes the number holds instead of inventing movement.
+      // flash / high / low / chg below still reflect the real moves.
+      const next=s.bid;
       s.flash=next>s.last?'up':next<s.last?'down':null;
       s.last=next;
       if(next>s.high)s.high=next;
