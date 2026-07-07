@@ -1,0 +1,29 @@
+# Alpexa — daily sports feed + render health check.
+# Runs every morning (08:17 Las Vegas / 15:17 UTC) so feed/odds/render problems are
+# caught by US, not by a customer. If anything is wrong the job FAILS → GitHub emails
+# the repo owner. Also runnable on demand (Actions → this workflow → Run workflow).
+#
+# NOTE: GitHub only fires `schedule` on the repository's DEFAULT branch. If the default
+# branch isn't the one serving the app, either make it the default or merge this file
+# there. `workflow_dispatch` always works on any branch.
+name: daily sports check
+
+on:
+  schedule:
+    - cron: "17 15 * * *"   # 15:17 UTC = 08:17 PDT (off-minute on purpose)
+  workflow_dispatch: {}       # manual "run now"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install parser (for verify's JSX parse arm)
+        run: npm i @babel/parser --no-save || true
+      - name: Verify gate — render crash-isolation + unit tests + defect scan
+        run: node tests/verify.js
+      - name: Live feed health — coverage + odds (real/placeholder/missing) + TBD
+        run: node tests/sports-feed-check.js

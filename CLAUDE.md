@@ -73,6 +73,16 @@
 - `node tests/sports-balance.test.js` — 베팅 잔고 이중차감 회귀 테스트(프로덕션 ledger와 일치하는 RED + 수정 GREEN). 돈 로직 건드리면 반드시 통과 확인.
 - `node tests/fx-floating-spread.test.js` — FX앱 플로팅이 서버 `fx_close` 실현손익과 동일(전 상품 스프레드, 실제 mid 마크). FX 체결/스프레드 손대면 반드시 통과.
 
+## 🏟️ 스포츠/피드 작업 규율 (무관용 — 2026-07-07 블랙아웃에서 나옴)
+> 스포츠·피드·배당·경기목록을 손대기 전 **이 순서를 강제**한다. 안 지켜서 하루를 날렸다 (죽은 경로 수정·전종목 블랙아웃·이상배당·NFL 사라짐).
+1. **소스부터 추적 (증상 근처 금지).** "이 화면은 데이터를 **어디서** 읽나?" → 스포츠 앱 = **`live_games` 테이블** ← `sports-games` Edge ← ESPN. 클라 ESPN fetch는 **폴백(죽은 경로)**. 증상 옆 코드를 고치지 말고 **소스**를 고친다.
+2. **손대기 전/후로 현실을 본다.** 전: `node tests/sports-feed-check.js`(종목별 커버리지·배당 실/가짜/없음·TBD·broken). 후: `node tests/verify.js`(렌더 블랙아웃 차단) + feed-check 재실행. **빨강→초록을 눈으로 보기 전 "완료" 금지.**
+3. **한 번에 하나, 작게, 되돌릴 수 있게.** 4곳(배당·화면·베팅·정산) 동시 변경 = 어디서 터졌는지 모름.
+4. **한 개가 전체를 못 죽이게.** 리스트 렌더(`map`)는 **항목별 try/catch로 격리**(한 경기 에러 → 그 카드만 빈칸). `tests/sports-render.test.js`가 이걸 강제 — 지우면 verify 🔴.
+5. **배포 하위호환.** 데이터 모양 바꾸면 **옛 클라+새 클라 둘 다** 되게(예: 축구 2-way ml + 1X2 threeWay 병행). 서비스워커 캐시 때문에 옛 클라가 한동안 돈다.
+6. **배포 초록 확인 후에만 "라이브".** Pages 간헐 실패 있음 → GitHub Actions 초록 확인. 서비스워커=네트워크우선(고객 자동최신).
+- ⚙️ 도구: `tests/sports-feed-check.js`(라이브 피드 헬스, 네트워크 필요·수동/크론) · `tests/sports-render.test.js`(렌더 격리, verify 게이트) · 감사 프롬프트 `스포츠-마스터-감사.md`.
+
 ## 🚚 배포 / 운영
 - GitHub Pages는 브랜치 `claude/wizardly-ritchie-lsRnz`에서 서빙 (CNAME alpexa-sports.com). **푸시는 이 브랜치에만.**
 - 캐시: `Ctrl+Shift+R` 또는 `?v=N`. 빠른 연속 푸시는 Pages 빌드를 취소시킴.
