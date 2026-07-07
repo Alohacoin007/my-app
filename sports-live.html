@@ -1618,6 +1618,7 @@
   // ---------- render games ----------
   function gameRowsHTML(games,showPlay){
     return games.map(g=>{
+     try {
       const cell=(arr,key,i)=>{const b=arr[i];if(!b)return '<div></div>';
         const on=legs.some(l=>l.uid===g.id+'|'+b.sel);
         // Live betting: locked unless the master switch is on AND the game isn't
@@ -1660,6 +1661,7 @@
         ${playHTML}
         ${showPlay&&g.live?`<div class="watch-live" data-watch="${g.id}"><span>📺 Watch live tracker</span><span class="wl-go">›</span></div>`:''}
         ${pc>0?`<div class="more-mkt" data-expand="${g.id}">+ More Markets <span class="cnt">(${pc})</span></div>`:''}</div>`;
+     } catch(_e){ try{ console.error('card render failed', g&&g.id, _e); }catch(_){}; return ''; }  // one bad game must never blank the whole list
     }).join('');
   }
   let gameQuery='';
@@ -3336,7 +3338,7 @@
           {ln:'X',am:230,sel:'Draw'},
           {ln:'2',am:(mlAway!=null?mlAway:(homeFav?220:-120)),sel:away.nm+' ML'},
         ];
-        return { spread:[], total:[], ml:[], threeWay };
+        return { spread:[], total:[], ml, threeWay };   // keep 2-way ml for stale-client compat
       }
       return { spread, total: total2, ml };
     }

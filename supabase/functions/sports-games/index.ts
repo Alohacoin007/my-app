@@ -69,7 +69,10 @@ function mkCore(home: any, away: any, ev: any, lg: string) {
       { ln: "X", am: 230, sel: "Draw" },
       { ln: "2", am: (mlAway != null ? mlAway : (homeFav ? 220 : -120)), sel: away.nm + " ML" },
     ];
-    return { spread: [], total: [], ml: [], threeWay };
+    // BACKWARD-COMPAT: also keep the 2-way ml. New clients render 1X2 from threeWay; OLD
+    // (still-cached) clients require ml>=2 to accept a game, so leaving ml populated stops
+    // soccer from vanishing on a stale client during the deploy transition.
+    return { spread: [], total: [], ml, threeWay };
   }
   return { spread, total: total2, ml };
 }
@@ -137,9 +140,10 @@ async function overlayRealOdds(games: any[], SB_URL: string, H: Record<string, s
       const core = oddsToCore(ev, g.home, g.away);
       if (core) {
         if (g.lg === "SOC") {
-          // Soccer = 1X2 only (Home/Draw/Away). Overwrite with the real 3-way odds; the
-          // US-style spread/total from mkCore stay empty (they don't apply to soccer).
+          // Soccer 1X2 (Home/Draw/Away). Real 3-way odds → threeWay; also refresh the
+          // 2-way ml (backward-compat for stale clients). Spread/total stay empty.
           if (core.threeWay) g.threeWay = core.threeWay;
+          if (core.ml) g.ml = core.ml;
         } else {
           if (core.ml) g.ml = core.ml; if (core.spread) g.spread = core.spread; if (core.total) g.total = core.total;
         }
@@ -150,13 +154,17 @@ async function overlayRealOdds(games: any[], SB_URL: string, H: Record<string, s
 
 async function fetchLeague(L: { lg: string; sport: string; path: string }, out: any[]) {
   // Request a date RANGE (today → +8d) so live_games carries UPCOMING fixtures (e.g.
-  // tomorrow's World Cup match), not only today — ESPN's default scoreboard is today-only,
-  // which is why the app (which reads live_games) showed no future games for ANY sport.
+  // tomorrow's World Cup match), not only today — ESPN's default scoreboard is today-only.
+  // BUT if a league has NO games in that window (e.g. an off-season NFL whose next game is
+  // weeks out — the +8d range dropped it), fall back to the PLAIN scoreboard so its next
+  // scheduled games still show. Order: ranged (+mirror) → plain (+mirror). Never fewer.
   const p2 = (n: number) => String(n).padStart(2, "0");
   const ymd = (x: Date) => "" + x.getUTCFullYear() + p2(x.getUTCMonth() + 1) + p2(x.getUTCDate());
   const range = ymd(new Date()) + "-" + ymd(new Date(Date.now() + 8 * 86400000));
-  const direct = `https://site.api.espn.com/apis/site/v2/sports/${L.path}/scoreboard?dates=${range}`;
-  const tries = [direct, "https://corsproxy.io/?url=" + encodeURIComponent(direct)];
+  const base = `https://site.api.espn.com/apis/site/v2/sports/${L.path}/scoreboard`;
+  const cp = (u: string) => "https://corsproxy.io/?url=" + encodeURIComponent(u);
+  const tries = [base + "?dates=" + range, cp(base + "?dates=" + range), base, cp(base)];
+  const before = out.length;
   for (const u of tries) {
     try {
       const res = await fetch(u, { cache: "no-store" });
@@ -184,7 +192,9 @@ async function fetchLeague(L: { lg: string; sport: string; path: string }, out: 
           });
         } catch (_e) { /* skip one event */ }
       }
-      return; // got this league from a working mirror
+      if (out.length > before) return; // got games from this URL → done
+      // else: 200 OK but 0 games (an off-season league in the ranged window) → keep going
+      // so the plain (default) scoreboard fallback can add its next scheduled games.
     } catch (_e) { /* try next mirror */ }
   }
 }
