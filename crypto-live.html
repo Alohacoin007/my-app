@@ -777,27 +777,20 @@ function alpxsPrice(){ var mo=(Date.now()-ALPXS_EPOCH)/2629800000; return ALPXS_
 // Drives the dummy data feed so the balance fluctuates and the odometer animates.
 // Slow sine sway around baseValue so the close visibly swings above + below
 // the day's open — that flips the color from blue (up) to red (down).
-function useLiveTick(baseValue, { interval = 1800, vol = 0.0006, swayPct = 0.024, jumpProb = 0, jumpSize = 0.04, reversion = 0.18 } = {}) {
-  const [v, setV] = React.useState(baseValue);
+function useLiveTick(baseValue, { interval = 1200 } = {}) {
+  // Show the REAL live price. The old sine "sway" (±swayPct) + noise + jumps drifted the
+  // displayed number up to ±2.4% off the live market (Binance $63k → app $62k) — a FAKE
+  // price on a real trading screen. Now we just re-read the live base (Binance/Coinbase
+  // WebSocket → MARKET[i].price, mutated in place) on a heartbeat, so the number stays
+  // fresh WITHOUT inventing movement. No drift, matches the exchange. (MT5 rule: mark to
+  // the real feed, never a sim.)
+  const [, force] = React.useReducer((x) => x + 1, 0);
+  const baseRef = React.useRef(baseValue); baseRef.current = baseValue;
   React.useEffect(() => {
-    setV(baseValue);   // snap to the new base when the asset/price changes — no cross-asset drift
-    let phase = Math.random() * Math.PI * 2;
-    const id = setInterval(() => {
-      phase += 0.16;                                              // ~40s full cycle
-      const target = baseValue + Math.sin(phase) * swayPct * baseValue;
-      setV((cur) => {
-        const revert = (target - cur) * reversion;                // chase the sine target
-        const noise  = (Math.random() - 0.5) * 2 * vol * baseValue;
-        // Occasional bigger jump (exchange token volatility)
-        const jump = (jumpProb > 0 && Math.random() < jumpProb)
-          ? (Math.random() < 0.5 ? -1 : 1) * jumpSize * baseValue * (0.6 + Math.random() * 0.8)
-          : 0;
-        return cur + revert + noise + jump;
-      });
-    }, interval);
+    const id = setInterval(force, interval);   // heartbeat re-render → picks up the live base
     return () => clearInterval(id);
-  }, [baseValue, interval, vol, swayPct, jumpProb, jumpSize, reversion]);
-  return v;
+  }, [interval]);
+  return baseRef.current;
 }
 
 // Tick profile lookup — exchange tokens get higher vol + occasional jumps.
@@ -809,34 +802,18 @@ function tickProfile(sym) {
 
 // One tick that updates many assets at once — single interval, batched setState.
 // Each asset gets independent noise around its own base value.
-function useLiveAssetTicks(bases, { interval = 1800, vol = 0.0014 } = {}) {
-  const [vals, setVals] = React.useState(() => bases.slice());
-  // Signature of the holdings set/values — changes only on a trade/adopt, not on
-  // ticks (ticks don't change `bases`).
-  const sig = bases.map((b) => Math.round((+b || 0) * 100) / 100).join(',') + '#' + bases.length;
-  const sigRef = React.useRef(sig);
-  // Re-seed live values to the true bases whenever the set changes, so a newly
-  // adopted coin starts at its real value (no fake +900% jump) and indices can
-  // never misalign after an insert/removal.
+function useLiveAssetTicks(bases, { interval = 1200 } = {}) {
+  // Show the REAL live values — no fake noise/drift (same reason as useLiveTick). The
+  // base array is the live feed (WebSocket → MARKET[i].price). A heartbeat re-render
+  // keeps the displayed numbers fresh; we never invent movement, so nothing drifts off
+  // the exchange price.
+  const [, force] = React.useReducer((x) => x + 1, 0);
+  const basesRef = React.useRef(bases); basesRef.current = bases;
   React.useEffect(() => {
-    if (sig !== sigRef.current) { sigRef.current = sig; setVals(bases.slice()); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sig]);
-  React.useEffect(() => {
-    const id = setInterval(() => {
-      // Map over BASES (not the stale prev array) so length always matches and
-      // any missing entry seeds at its base.
-      setVals((cur) => bases.map((base, i) => {
-        const v = (cur[i] == null) ? base : cur[i];
-        const revert = (base - v) * 0.04;
-        const noise  = (Math.random() - 0.5) * 2 * vol * base;
-        return v + revert + noise;
-      }));
-    }, interval);
+    const id = setInterval(force, interval);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [interval, vol, sig]);
-  return vals;
+  }, [interval]);
+  return basesRef.current;
 }
 
 // Continuous rAF tween — eases displayed value toward target each frame.
