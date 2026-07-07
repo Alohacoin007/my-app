@@ -14,14 +14,19 @@ const GAMES = [
     spread: [{ sel: 'LAL -3.5', am: -110 }, { sel: 'BOS +3.5', am: -110 }],
     total: [{ sel: 'Over 220.5', am: -110 }, { sel: 'Under 220.5', am: -110 }] },
   { gid: 'NBA_2', ml: [{ sel: 'GSW ML', am: -200 }, { sel: 'DEN ML', am: 170 }] },
+  // ⚽ SOCCER = 1X2 (Home/Draw/Away): the app sends market='1X2'; live_games keys the
+  // array as `threeWay`. place_bet must MAP '1X2' → 'threeWay' (the bug this catches:
+  // an unmapped '1X2' rejects EVERY soccer bet at "market not offered").
+  { gid: 'SOC_1', threeWay: [{ sel: 'Argentina ML', am: -283 }, { sel: 'Draw', am: 400 }, { sel: 'Egypt ML', am: 1075 }] },
 ];
 
-// The app sends the market LABEL ('Moneyline'/'Spread'/'Total'), but live_games keys
-// the arrays as ml/spread/total — place_bet must MAP label → key (the bug this catches).
-const MK = { Moneyline: 'ml', Spread: 'spread', Total: 'total' };
+// The app sends the market LABEL ('Moneyline'/'Spread'/'Total'/'1X2'), but live_games
+// keys the arrays as ml/spread/total/threeWay — place_bet must MAP label → key (the bug
+// this catches). Matched case-insensitively (mirrors the SQL's lower(v_mk)).
+const MK = { moneyline: 'ml', spread: 'spread', total: 'total', '1x2': 'threeWay' };
 // server line lookup; returns null if the selection isn't offered (→ reject, fail-safe)
 function serverAm(games, gid, marketLabel, sel) {
-  const key = MK[marketLabel]; if (!key) return null;            // props/unknown label → reject
+  const key = MK[String(marketLabel).toLowerCase()]; if (!key) return null;   // props/unknown label → reject
   const g = games.find((x) => x.gid === gid); if (!g) return null;
   const arr = g[key]; if (!Array.isArray(arr)) return null;
   const e = arr.find((x) => x.sel === sel); return e ? e.am : null;
@@ -68,6 +73,18 @@ console.log('\n=== SGP haircut + fail-safe ===');
   ok('unknown selection → REJECT (fail safe)', reprice([{ gid: 'NBA_1', market: 'Moneyline', sel: 'FAKE ML', am: -110 }], GAMES, 20).ok === false);
   ok('unknown game → REJECT', reprice([{ gid: 'NBA_9', market: 'Moneyline', sel: 'LAL ML', am: -110 }], GAMES, 20).ok === false);
   ok('prop market (not in live_games) → REJECT', reprice([{ gid: 'NBA_1', market: 'prop_pts', sel: 'X 25+', am: -110 }], GAMES, 20).ok === false);
+}
+
+console.log('\n=== SOCCER 1X2 (regression: unmapped market rejected every soccer bet) ===');
+{
+  // A team pick (Argentina ML −283) must price from the SERVER threeWay line.
+  const teamPick = [{ gid: 'SOC_1', market: '1X2', sel: 'Argentina ML', am: -283 }];
+  ok('soccer team pick accepted + priced from server', reprice(teamPick, GAMES, 20).potential === Math.round(20 * decOf(-283) * 100) / 100);
+  // The Draw outcome (its own bettable selection) must also price.
+  const drawPick = [{ gid: 'SOC_1', market: '1X2', sel: 'Draw', am: 400 }];
+  ok('soccer Draw pick accepted + priced from server', reprice(drawPick, GAMES, 20).potential === Math.round(20 * decOf(400) * 100) / 100);
+  // A soccer selection not on the board still fails safe.
+  ok('unknown soccer selection → REJECT', reprice([{ gid: 'SOC_1', market: '1X2', sel: 'FAKE ML', am: -110 }], GAMES, 20).ok === false);
 }
 
 console.log('\n' + (pass ? '🟢 place_bet re-prices from server lines (client odds can\'t inflate)' : '🔴 odds exploit open') + '\n');

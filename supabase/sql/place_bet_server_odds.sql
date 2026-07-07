@@ -68,6 +68,7 @@ begin
                when 'moneyline' then 'ml'
                when 'spread'    then 'spread'
                when 'total'     then 'total'
+               when '1x2'       then 'threeWay'   -- ⚽ soccer 1X2 → live_games `threeWay` array (Home/Draw/Away)
                else null end;
     if v_key is null then return jsonb_build_object('ok',false,'error','market not offered: '||coalesce(v_mk,'?')); end if;
     select g.value into v_game from jsonb_array_elements(v_games) g where g.value->>'gid' = v_gid limit 1;
