@@ -3363,22 +3363,31 @@
       return res.json();
     }
     async function fetchLeague(L){
-      const direct = 'https://site.api.espn.com/apis/site/v2/sports/'+L.path+'/scoreboard';
-      const tries = [
-        direct,
-        'https://corsproxy.io/?url=' + encodeURIComponent(direct),
-        'https://api.allorigins.win/raw?url=' + encodeURIComponent(direct),
-      ];
-      let lastE;
+      // ESPN's default scoreboard returns only the CURRENT day, so once today's games
+      // finish (filtered out below) the tab looks empty and TOMORROW's fixtures (e.g. the
+      // next World Cup match) never appear. Request a date RANGE (today → +8d). If the
+      // ranged fetch errors or comes back empty, fall back to the plain (today-only)
+      // scoreboard — so this can never show FEWER games than before, only more upcoming.
+      const p2=(n)=>String(n).padStart(2,'0');
+      const ymd=(x)=>''+x.getUTCFullYear()+p2(x.getUTCMonth()+1)+p2(x.getUTCDate());
+      const range=ymd(new Date())+'-'+ymd(new Date(Date.now()+8*86400000));
+      const base='https://site.api.espn.com/apis/site/v2/sports/'+L.path+'/scoreboard';
+      const wrap=(u)=>[u,'https://corsproxy.io/?url='+encodeURIComponent(u),'https://api.allorigins.win/raw?url='+encodeURIComponent(u)];
+      const tries=[...wrap(base+'?dates='+range), ...wrap(base)];  // ranged first, today-only fallback
+      let lastE, gotEmpty=false;
       for (const u of tries){
         try { const d = await fetchJson(u);
           let mapped;
           if(L.lg==='UFC'){ mapped=[]; (d.events||[]).forEach(ev=>{ mapUFC(ev).forEach(g=>mapped.push(g)); }); }
           else { mapped=(d.events||[]).map(ev=>mapEvent(ev, L.lg)).filter(Boolean); }
           mapped.forEach(g=>{ if(g.state==='post' && typeof g.home.sc==='number' && typeof g.away.sc==='number'){ RESULTS[g.id]={completed:true,homeNm:g.home.nm,awayNm:g.away.nm,homeAb:g.home.ab,awayAb:g.away.ab,hs:g.home.sc,as:g.away.sc}; } });
-          return mapped.filter(g=>g.state!=='post'); }
+          const upcoming=mapped.filter(g=>g.state!=='post');
+          if(upcoming.length) return upcoming;   // got games → done
+          gotEmpty=true;                          // 200 but no games → try the fallbacks
+        }
         catch (e) { lastE = e; }
       }
+      if(gotEmpty) return [];                     // every source returned 0 games (genuinely none)
       if (!firstErr) firstErr = L.lg + ': ' + ((lastE && lastE.message) || 'failed');
       throw (lastE || new Error('failed'));
     }
