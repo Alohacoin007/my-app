@@ -21,8 +21,9 @@ function json(body: unknown, status = 200) {
 const PAIRS: Record<string, string> = {
   BTC: "BTCUSDT", ETH: "ETHUSDT", SOL: "SOLUSDT", LINK: "LINKUSDT", DOGE: "DOGEUSDT",
   AVAX: "AVAXUSDT", MATIC: "POLUSDT", XRP: "XRPUSDT", BNB: "BNBUSDT", ADA: "ADAUSDT",
-  DOT: "DOTUSDT", TON: "TONUSDT", NEAR: "NEARUSDT", APT: "APTUSDT", TRX: "TRXUSDT",
-  ATOM: "ATOMUSDT", AAVE: "AAVEUSDT", UNI: "UNIUSDT", MKR: "MKRUSDT", SHIB: "SHIBUSDT",
+  DOT: "DOTUSDT", NEAR: "NEARUSDT", APT: "APTUSDT", TRX: "TRXUSDT",
+  ATOM: "ATOMUSDT", AAVE: "AAVEUSDT", UNI: "UNIUSDT", SHIB: "SHIBUSDT",
+  // TON (→GRAM) / MKR (→SKY) delisted from Binance on rebrand — removed 2026-07-07.
   PEPE: "PEPEUSDT", BONK: "BONKUSDT", WIF: "WIFUSDT", WLD: "WLDUSDT", RNDR: "RENDERUSDT",
   FET: "FETUSDT", TAO: "TAOUSDT",
 };
@@ -30,8 +31,8 @@ const PAIRS: Record<string, string> = {
 const CG_IDS: Record<string, string> = {
   BTC: "bitcoin", ETH: "ethereum", SOL: "solana", LINK: "chainlink", DOGE: "dogecoin",
   AVAX: "avalanche-2", MATIC: "matic-network", XRP: "ripple", BNB: "binancecoin",
-  ADA: "cardano", DOT: "polkadot", TON: "the-open-network", NEAR: "near", APT: "aptos",
-  TRX: "tron", ATOM: "cosmos", AAVE: "aave", UNI: "uniswap", MKR: "maker",
+  ADA: "cardano", DOT: "polkadot", NEAR: "near", APT: "aptos",
+  TRX: "tron", ATOM: "cosmos", AAVE: "aave", UNI: "uniswap",
   SHIB: "shiba-inu", PEPE: "pepe", BONK: "bonk", WIF: "dogwifcoin", WLD: "worldcoin-wld",
   RNDR: "render-token", FET: "fetch-ai", TAO: "bittensor",
 };
