@@ -53,20 +53,21 @@
     color:var(--m-muted);display:flex;justify-content:space-between;align-items:center}
   .mkt .m-grp .c{background:#fff;border:1px solid var(--m-line);border-radius:999px;padding:1px 7px;font-size:9.5px}
   /* Watchlist rows — name/ticker · sparkline · price + change (Google-Finance style) */
-  .mkt .m-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:10px 16px;cursor:pointer;border-left:2px solid transparent;border-bottom:1px solid var(--m-line)}
-  .mkt .m-end{display:flex;align-items:center;gap:9px}
+  .mkt .m-row{display:grid;grid-template-columns:1fr 54px auto;gap:14px;align-items:center;padding:10px 16px;cursor:pointer;border-left:2px solid transparent;border-bottom:1px solid var(--m-line)}
   .mkt .m-row:hover{background:var(--m-panel2)}
   .mkt .m-row.on{background:var(--m-accsoft);border-left-color:var(--m-accent)}
   .mkt .m-nm{min-width:0}
   .mkt .m-nm b{display:block;font-size:13.5px;font-weight:700;color:var(--m-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .mkt .m-nm small{display:block;font-size:11px;color:var(--m-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .mkt .m-row.on .m-nm b{color:var(--m-accent)}
-  .mkt .m-spark{height:22px;width:46px}
+  .mkt .m-spark{height:26px;width:54px}
   .mkt .m-spark svg{display:block;width:100%;height:100%}
   .mkt .m-rt{text-align:right;white-space:nowrap}
-  .mkt .m-px{font-family:var(--m-mono);font-weight:700;font-size:13px;color:var(--m-text)}
-  .mkt .m-chg{font-family:var(--m-mono);font-size:11px;font-weight:700;margin-top:1px;color:var(--m-muted)}
-  .mkt .m-chg.up{color:var(--m-up)} .mkt .m-chg.dn{color:var(--m-down)}
+  .mkt .m-px{font-family:var(--m-mono);font-weight:700;font-size:15px;color:var(--m-text)}
+  .mkt .m-row .m-chg{display:flex;align-items:center;justify-content:flex-end;gap:4px;font-family:var(--m-mono);font-size:10.5px;font-weight:700;margin-top:2px;color:var(--m-muted)}
+  .mkt .m-row .m-chg.up{color:var(--m-up)} .mkt .m-row .m-chg.dn{color:var(--m-down)}
+  .mkt .m-ar{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;font-size:8px;color:#fff;flex:none}
+  .mkt .m-row .m-chg.up .m-ar{background:var(--m-up)} .mkt .m-row .m-chg.dn .m-ar{background:var(--m-down)}
   .mkt .mkt-main{padding:22px 24px 30px;min-width:0}
   .mkt .m-dh{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
   .mkt .m-ic{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:#fff;flex:none}
@@ -215,29 +216,32 @@
     // Live sparkline built from accumulated feed ticks (no extra API calls).
     function sparkSVG(c){
       var h=c.hist||[]; if(h.length<2) return '';
-      var w=46,ht=22,mn=Math.min.apply(null,h),mx=Math.max.apply(null,h); if(mx<=mn){ mx=mn+1; }
-      var n=h.length, X=function(i){ return (i/(n-1))*w; }, Y=function(v){ return 3+(1-(v-mn)/(mx-mn))*(ht-6); };
+      var w=54,ht=26,mn=Math.min.apply(null,h),mx=Math.max.apply(null,h); if(mx<=mn){ mx=mn+1; }
+      var n=h.length, X=function(i){ return (i/(n-1))*w; }, Y=function(v){ return 4+(1-(v-mn)/(mx-mn))*(ht-8); };
       var d='M'+X(0).toFixed(1)+' '+Y(h[0]).toFixed(1);
       for(var i=1;i<n;i++) d+=' L'+X(i).toFixed(1)+' '+Y(h[i]).toFixed(1);
       var col=(h[n-1]>=h[0])?'#16a34a':'#e5484d';
       var by=Y(h[0]).toFixed(1);   // dotted baseline at the session-open level
+      var area=d+' L'+w+' '+ht+' L0 '+ht+' Z';
       return '<svg viewBox="0 0 '+w+' '+ht+'" preserveAspectRatio="none">'
+        +'<path d="'+area+'" fill="'+col+'" fill-opacity="0.11"/>'
         +'<line x1="0" y1="'+by+'" x2="'+w+'" y2="'+by+'" stroke="#9aa3b8" stroke-width="1" stroke-dasharray="1.5 2"/>'
         +'<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>';
     }
 
     function sessChg(c){ var h=c.hist||[]; if(h.length<2||!(h[0]>0)) return null; return (h[h.length-1]-h[0])/h[0]*100; }
+    function chgCell(pc){ if(pc==null) return ''; var up=pc>=0; return '<span>'+(up?'+':'')+pc.toFixed(2)+'%</span><span class="m-ar">'+(up?'▲':'▼')+'</span>'; }
     function renderSide(){
       var tabs='<div class="mkt-tabs">'+TABS.map(function(t){
         return '<button class="m-tab'+(t.k===TAB?' on':'')+'" data-tab="'+t.k+'">'+t.label+'</button>'; }).join('')+'</div>';
       var items=CAT.filter(function(c){ return c.cls===TAB; });
       var rows=items.map(function(c){
-        var pc=sessChg(c), chgTxt=(pc==null?'':(pc>=0?'+':'')+pc.toFixed(2)+'%'), chgCls=(pc==null?'':(pc>=0?'up':'dn'));
+        var pc=sessChg(c), chgCls=(pc==null?'':(pc>=0?'up':'dn'));
         return '<div class="m-row'+(c.sym===CUR?' on':'')+'" role="button" tabindex="0" data-sym="'+c.sym+'">'
           +'<div class="m-nm"><b>'+c.name+'</b><small>'+(c.cls==='fx'?c.td:c.sym)+'</small></div>'
-          +'<div class="m-end"><div class="m-spark">'+sparkSVG(c)+'</div>'
-            +'<div class="m-rt"><div class="m-px">'+(c.mid>0?(c.cls==='fx'?'':'$')+fmt(c.mid,c.dp):'—')+'</div>'
-            +'<div class="m-chg '+chgCls+'">'+chgTxt+'</div></div></div>'
+          +'<div class="m-spark">'+sparkSVG(c)+'</div>'
+          +'<div class="m-rt"><div class="m-px">'+(c.mid>0?(c.cls==='fx'?'':'$')+fmt(c.mid,c.dp):'—')+'</div>'
+            +'<div class="m-chg '+chgCls+'">'+chgCell(pc)+'</div></div>'
         +'</div>';
       }).join('');
       side.innerHTML=tabs+rows;
@@ -368,7 +372,7 @@
       rows.forEach(function(r){ var c=BY[r.dataset.sym]; if(!c) return;
         var px=r.querySelector('.m-px'); if(px) px.textContent=(c.mid>0?(c.cls==='fx'?'':'$')+fmt(c.mid,c.dp):'—');
         var pc=sessChg(c), chg=r.querySelector('.m-chg');
-        if(chg){ chg.textContent=(pc==null?'':(pc>=0?'+':'')+pc.toFixed(2)+'%'); chg.className='m-chg '+(pc==null?'':(pc>=0?'up':'dn')); }
+        if(chg){ chg.innerHTML=chgCell(pc); chg.className='m-chg '+(pc==null?'':(pc>=0?'up':'dn')); }
         var sp=r.querySelector('.m-spark'); if(sp) sp.innerHTML=sparkSVG(c);
       });
     }
