@@ -53,19 +53,17 @@
     color:var(--m-muted);display:flex;justify-content:space-between;align-items:center}
   .mkt .m-grp .c{background:#fff;border:1px solid var(--m-line);border-radius:999px;padding:1px 7px;font-size:9.5px}
   /* Watchlist rows — name/ticker · sparkline · price + change (Google-Finance style) */
-  .mkt .m-row{display:grid;grid-template-columns:1fr 54px auto;gap:14px;align-items:center;padding:10px 16px;cursor:pointer;border-left:2px solid transparent;border-bottom:1px solid var(--m-line)}
-  /* Short names (stocks/crypto) — put the chart right beside the name, price far right */
-  .mkt-side.tab-stock .m-row,.mkt-side.tab-crypto .m-row{grid-template-columns:auto 54px 1fr}
-  .mkt-side.tab-stock .m-nm,.mkt-side.tab-crypto .m-nm{max-width:150px}
+  /* 3 equal cells: name | chart | price — uniform & aligned across all tabs */
+  .mkt .m-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:center;padding:10px 16px;cursor:pointer;border-left:2px solid transparent;border-bottom:1px solid var(--m-line)}
   .mkt .m-row:hover{background:var(--m-panel2)}
   .mkt .m-row.on{background:var(--m-accsoft);border-left-color:var(--m-accent)}
   .mkt .m-nm{min-width:0}
   .mkt .m-nm b{display:block;font-size:13.5px;font-weight:700;color:var(--m-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .mkt .m-nm small{display:block;font-size:11px;color:var(--m-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .mkt .m-row.on .m-nm b{color:var(--m-accent)}
-  .mkt .m-spark{height:26px;width:54px}
+  .mkt .m-spark{height:26px;width:100%;max-width:70px;justify-self:center}
   .mkt .m-spark svg{display:block;width:100%;height:100%}
-  .mkt .m-rt{text-align:right;white-space:nowrap}
+  .mkt .m-rt{text-align:right;white-space:nowrap;justify-self:end}
   .mkt .m-px{font-family:var(--m-mono);font-weight:700;font-size:15px;color:var(--m-text)}
   .mkt .m-row .m-chg{display:flex;align-items:center;justify-content:flex-end;gap:4px;font-family:var(--m-mono);font-size:10.5px;font-weight:700;margin-top:2px;color:var(--m-muted)}
   .mkt .m-row .m-chg.up{color:var(--m-up)} .mkt .m-row .m-chg.dn{color:var(--m-down)}
@@ -247,7 +245,6 @@
             +'<div class="m-chg '+chgCls+'">'+chgCell(pc)+'</div></div>'
         +'</div>';
       }).join('');
-      side.className='mkt-side tab-'+TAB;
       side.innerHTML=tabs+rows;
       side.querySelectorAll('.m-tab').forEach(function(t){ t.onclick=function(){ switchTab(t.dataset.tab); }; });
       side.querySelectorAll('.m-row').forEach(function(r){
