@@ -35,12 +35,14 @@
   .mkt{max-width:1320px;margin:0 auto;padding:20px 22px 30px;--m-accent:#1e40d8;--m-up:#16a34a;--m-down:#e5484d;
     --m-line:#e7eaf1;--m-panel:#fff;--m-panel2:#f7f8fb;--m-text:#0e1726;--m-dim:#5a6478;--m-muted:#8a94a6;
     --m-accsoft:#eef1ff;--m-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
-  .mkt .mkt-head{margin:4px 0 16px}
-  .mkt .mkt-eyebrow{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:800;letter-spacing:1.4px;
-    text-transform:uppercase;color:var(--m-accent);margin-bottom:8px}
-  .mkt .mkt-eyebrow::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--m-up);box-shadow:0 0 0 3px rgba(22,163,74,.16)}
-  .mkt .mkt-head h1{font-size:clamp(24px,3vw,30px);font-weight:800;letter-spacing:-.6px;margin:0;color:var(--m-text)}
-  .mkt .mkt-head .mkt-sub{color:var(--m-muted);font-size:13.5px;margin-top:6px}
+  .mkt .mkt-head{margin:4px 0 16px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .mkt .mkt-head h1{font-size:20px;font-weight:800;letter-spacing:-.3px;margin:0;color:var(--m-text);display:inline-flex;align-items:center;gap:9px}
+  .mkt .live-dot{width:9px;height:9px;border-radius:50%;background:var(--m-up);box-shadow:0 0 0 3px rgba(22,163,74,.16)}
+  .mkt .mkt-head .mkt-sub{color:var(--m-muted);font-size:13px}
+  .mkt .mkt-tabs{display:flex;gap:4px;padding:10px 12px;border-bottom:1px solid var(--m-line);background:var(--m-panel2)}
+  .mkt .m-tab{flex:1;font-size:12.5px;font-weight:700;color:var(--m-dim);padding:8px 6px;border:0;background:transparent;border-radius:8px;cursor:pointer;font-family:inherit}
+  .mkt .m-tab:hover{background:#fff}
+  .mkt .m-tab.on{background:var(--m-accent);color:#fff}
   /* Long, Google-Finance style: no inner scrollbars — both columns stretch to the taller
      one and the whole page scrolls. */
   .mkt .mkt-shell{display:grid;grid-template-columns:320px 1fr;gap:0;background:var(--m-panel);
@@ -110,9 +112,8 @@
 
   <main class="mkt" id="mkt">
     <div class="mkt-head">
-      <span class="mkt-eyebrow">Live markets</span>
-      <h1>Every market, one screen.</h1>
-      <div class="mkt-sub">Real FX · stock · crypto prices from the Alpexa feed — tap any symbol for its live chart.</div>
+      <h1><span class="live-dot"></span>Live markets</h1>
+      <span class="mkt-sub">Real FX · stock · crypto prices — tap any symbol for its chart</span>
     </div>
     <div class="mkt-shell">
       <aside class="mkt-side" id="mktSide"></aside>
@@ -134,12 +135,49 @@
     var sb=null; try{ if(window.supabase&&window.supabase.createClient) sb=window.supabase.createClient(URL_,KEY_); }catch(e){}
     // catalog — every symbol here exists in the server `prices` feed. td = Twelve Data symbol.
     var CAT=[
+      // ── FX (20) ──
       {sym:'EURUSD',td:'EUR/USD',name:'Euro / US Dollar',cls:'fx',dp:5},
-      {sym:'USDJPY',td:'USD/JPY',name:'US Dollar / Japanese Yen',cls:'fx',dp:3},
       {sym:'GBPUSD',td:'GBP/USD',name:'British Pound / US Dollar',cls:'fx',dp:5},
+      {sym:'USDJPY',td:'USD/JPY',name:'US Dollar / Japanese Yen',cls:'fx',dp:3},
+      {sym:'AUDUSD',td:'AUD/USD',name:'Australian Dollar / US Dollar',cls:'fx',dp:5},
       {sym:'USDCHF',td:'USD/CHF',name:'US Dollar / Swiss Franc',cls:'fx',dp:5},
       {sym:'USDCAD',td:'USD/CAD',name:'US Dollar / Canadian Dollar',cls:'fx',dp:5},
-      {sym:'AUDUSD',td:'AUD/USD',name:'Australian Dollar / US Dollar',cls:'fx',dp:5},
+      {sym:'NZDUSD',td:'NZD/USD',name:'New Zealand Dollar / US Dollar',cls:'fx',dp:5},
+      {sym:'EURJPY',td:'EUR/JPY',name:'Euro / Japanese Yen',cls:'fx',dp:3},
+      {sym:'EURGBP',td:'EUR/GBP',name:'Euro / British Pound',cls:'fx',dp:5},
+      {sym:'GBPJPY',td:'GBP/JPY',name:'British Pound / Japanese Yen',cls:'fx',dp:3},
+      {sym:'EURAUD',td:'EUR/AUD',name:'Euro / Australian Dollar',cls:'fx',dp:5},
+      {sym:'AUDJPY',td:'AUD/JPY',name:'Australian Dollar / Japanese Yen',cls:'fx',dp:3},
+      {sym:'CHFJPY',td:'CHF/JPY',name:'Swiss Franc / Japanese Yen',cls:'fx',dp:3},
+      {sym:'EURCHF',td:'EUR/CHF',name:'Euro / Swiss Franc',cls:'fx',dp:5},
+      {sym:'USDKRW',td:'USD/KRW',name:'US Dollar / Korean Won',cls:'fx',dp:2},
+      {sym:'USDCNH',td:'USD/CNH',name:'US Dollar / Chinese Yuan',cls:'fx',dp:4},
+      {sym:'USDSGD',td:'USD/SGD',name:'US Dollar / Singapore Dollar',cls:'fx',dp:5},
+      {sym:'USDMXN',td:'USD/MXN',name:'US Dollar / Mexican Peso',cls:'fx',dp:4},
+      {sym:'XAUUSD',td:'XAU/USD',name:'Gold / US Dollar',cls:'fx',dp:2},
+      {sym:'XAGUSD',td:'XAG/USD',name:'Silver / US Dollar',cls:'fx',dp:3},
+      // ── Stocks (20) ──
+      {sym:'AAPL',td:'AAPL',name:'Apple',cls:'stock',dp:2},
+      {sym:'MSFT',td:'MSFT',name:'Microsoft',cls:'stock',dp:2},
+      {sym:'NVDA',td:'NVDA',name:'NVIDIA',cls:'stock',dp:2},
+      {sym:'AMZN',td:'AMZN',name:'Amazon',cls:'stock',dp:2},
+      {sym:'GOOGL',td:'GOOGL',name:'Alphabet',cls:'stock',dp:2},
+      {sym:'META',td:'META',name:'Meta Platforms',cls:'stock',dp:2},
+      {sym:'TSLA',td:'TSLA',name:'Tesla',cls:'stock',dp:2},
+      {sym:'NFLX',td:'NFLX',name:'Netflix',cls:'stock',dp:2},
+      {sym:'AMD',td:'AMD',name:'Advanced Micro Devices',cls:'stock',dp:2},
+      {sym:'JPM',td:'JPM',name:'JPMorgan Chase',cls:'stock',dp:2},
+      {sym:'TSM',td:'TSM',name:'TSMC',cls:'stock',dp:2},
+      {sym:'INTC',td:'INTC',name:'Intel',cls:'stock',dp:2},
+      {sym:'QCOM',td:'QCOM',name:'Qualcomm',cls:'stock',dp:2},
+      {sym:'AVGO',td:'AVGO',name:'Broadcom',cls:'stock',dp:2},
+      {sym:'MU',td:'MU',name:'Micron Technology',cls:'stock',dp:2},
+      {sym:'PLTR',td:'PLTR',name:'Palantir',cls:'stock',dp:2},
+      {sym:'ARM',td:'ARM',name:'Arm Holdings',cls:'stock',dp:2},
+      {sym:'ORCL',td:'ORCL',name:'Oracle',cls:'stock',dp:2},
+      {sym:'CRM',td:'CRM',name:'Salesforce',cls:'stock',dp:2},
+      {sym:'ADBE',td:'ADBE',name:'Adobe',cls:'stock',dp:2},
+      // ── Crypto (20) ──
       {sym:'BTC',td:'BTC/USD',name:'Bitcoin',cls:'crypto',dp:2},
       {sym:'ETH',td:'ETH/USD',name:'Ethereum',cls:'crypto',dp:2},
       {sym:'SOL',td:'SOL/USD',name:'Solana',cls:'crypto',dp:2},
@@ -149,20 +187,23 @@
       {sym:'ADA',td:'ADA/USD',name:'Cardano',cls:'crypto',dp:4},
       {sym:'AVAX',td:'AVAX/USD',name:'Avalanche',cls:'crypto',dp:2},
       {sym:'LINK',td:'LINK/USD',name:'Chainlink',cls:'crypto',dp:2},
-      {sym:'NVDA',td:'NVDA',name:'NVIDIA',cls:'stock',dp:2},
-      {sym:'AAPL',td:'AAPL',name:'Apple',cls:'stock',dp:2},
-      {sym:'TSLA',td:'TSLA',name:'Tesla',cls:'stock',dp:2},
-      {sym:'MSFT',td:'MSFT',name:'Microsoft',cls:'stock',dp:2},
-      {sym:'AMD',td:'AMD',name:'Advanced Micro Devices',cls:'stock',dp:2},
-      {sym:'AMZN',td:'AMZN',name:'Amazon',cls:'stock',dp:2},
-      {sym:'PLTR',td:'PLTR',name:'Palantir',cls:'stock',dp:2},
-      {sym:'MU',td:'MU',name:'Micron Technology',cls:'stock',dp:2}
+      {sym:'DOT',td:'DOT/USD',name:'Polkadot',cls:'crypto',dp:3},
+      {sym:'MATIC',td:'MATIC/USD',name:'Polygon',cls:'crypto',dp:4},
+      {sym:'TRX',td:'TRX/USD',name:'TRON',cls:'crypto',dp:5},
+      {sym:'NEAR',td:'NEAR/USD',name:'NEAR Protocol',cls:'crypto',dp:3},
+      {sym:'APT',td:'APT/USD',name:'Aptos',cls:'crypto',dp:3},
+      {sym:'ATOM',td:'ATOM/USD',name:'Cosmos',cls:'crypto',dp:3},
+      {sym:'UNI',td:'UNI/USD',name:'Uniswap',cls:'crypto',dp:3},
+      {sym:'AAVE',td:'AAVE/USD',name:'Aave',cls:'crypto',dp:2},
+      {sym:'SHIB',td:'SHIB/USD',name:'Shiba Inu',cls:'crypto',dp:8},
+      {sym:'PEPE',td:'PEPE/USD',name:'Pepe',cls:'crypto',dp:8},
+      {sym:'FET',td:'FET/USD',name:'Artificial Superintelligence',cls:'crypto',dp:4}
     ];
     var BY={}; CAT.forEach(function(c){ BY[c.sym]=c; c.mid=0; });
-    var GROUPS=[{k:'fx',label:'FX'},{k:'crypto',label:'Crypto'},{k:'stock',label:'Stocks'}];
+    var TABS=[{k:'fx',label:'FX'},{k:'stock',label:'Stocks'},{k:'crypto',label:'Crypto'}];
     var ICON={fx:'#1e40d8',crypto:'#f59e0b',stock:'#7c3aed'}, BADGE={fx:'FX',crypto:'Crypto',stock:'Stock'};
     var TFS=[['1D','15min',96],['1W','1h',120],['1M','4h',120],['3M','1day',90],['1Y','1day',260]];
-    var CUR='BTC', TF='1D', prev={}, cache={}, curOpen=0;
+    var CUR='EURUSD', TAB='fx', TF='1D', prev={}, cache={}, curOpen=0;
     var side=document.getElementById('mktSide'), main=document.getElementById('mktMain');
 
     function fmt(v,dp){ return (v||0).toLocaleString('en-US',{minimumFractionDigits:dp,maximumFractionDigits:dp}); }
@@ -170,24 +211,26 @@
       return '<span class="'+(up?'up':'dn')+'">'+(up?'▲ ':'▼ ')+(up?'+':'')+pct.toFixed(2)+'%</span>'; }
 
     function renderSide(){
-      var h='';
-      GROUPS.forEach(function(g){
-        var items=CAT.filter(function(c){ return c.cls===g.k; });
-        h+='<div class="m-grp">'+g.label+'<span class="c">'+items.length+'</span></div>';
-        items.forEach(function(c){
-          var cls=c.mid>0 && prev[c.sym]!=null ? (c.mid>prev[c.sym]?'up':c.mid<prev[c.sym]?'dn':'') : '';
-          h+='<div class="m-row'+(c.sym===CUR?' on':'')+'" role="button" tabindex="0" data-sym="'+c.sym+'">'
-            +'<div><div class="nm">'+c.name+'</div><div class="sb">'+(c.cls==='fx'?c.td:c.sym)+'</div></div>'
-            +'<div class="rt"><div class="px '+cls+'">'+(c.mid>0?(c.cls==='fx'?'':'$')+fmt(c.mid,c.dp):'—')+'</div></div>'
-          +'</div>';
-        });
-      });
-      side.innerHTML=h;
+      var tabs='<div class="mkt-tabs">'+TABS.map(function(t){
+        return '<button class="m-tab'+(t.k===TAB?' on':'')+'" data-tab="'+t.k+'">'+t.label+'</button>'; }).join('')+'</div>';
+      var items=CAT.filter(function(c){ return c.cls===TAB; });
+      var rows=items.map(function(c){
+        var cls=c.mid>0 && prev[c.sym]!=null ? (c.mid>prev[c.sym]?'up':c.mid<prev[c.sym]?'dn':'') : '';
+        return '<div class="m-row'+(c.sym===CUR?' on':'')+'" role="button" tabindex="0" data-sym="'+c.sym+'">'
+          +'<div><div class="nm">'+c.name+'</div><div class="sb">'+(c.cls==='fx'?c.td:c.sym)+'</div></div>'
+          +'<div class="rt"><div class="px '+cls+'">'+(c.mid>0?(c.cls==='fx'?'':'$')+fmt(c.mid,c.dp):'—')+'</div></div>'
+        +'</div>';
+      }).join('');
+      side.innerHTML=tabs+rows;
+      side.querySelectorAll('.m-tab').forEach(function(t){ t.onclick=function(){ switchTab(t.dataset.tab); }; });
       side.querySelectorAll('.m-row').forEach(function(r){
         var go=function(){ select(r.dataset.sym); };
         r.onclick=go; r.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } };
       });
     }
+    function switchTab(k){ if(TAB===k) return; TAB=k;
+      var first=CAT.filter(function(c){ return c.cls===k; })[0];
+      if(first) select(first.sym); else renderSide(); }
 
     function select(sym){ if(!BY[sym]) return; CUR=sym; TF='1D'; renderSide(); renderMain(); loadChart(); }
     function renderMain(){
