@@ -46,22 +46,39 @@ function structOK(g) {
   return (g.spread || []).length >= 2 && (g.total || []).length >= 2 && (g.ml || []).length >= 2;
 }
 
+async function fetchFeed() {
+  const r = await fetch(`${URL}/rest/v1/live_games?id=eq.all&select=data,updated_at`, {
+    headers: { apikey: KEY, Authorization: 'Bearer ' + KEY },
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const rows = await r.json();
+  return (rows && rows[0]) || null;
+}
+// A game is imminent-broken if it kicks off ≤48h out but has no real odds.
+function countImminentBad(all) {
+  return all.filter((g) => {
+    const t = Date.parse(g.iso || ''); if (isNaN(t) || t > IMMINENT || t < NOW - GRACE) return false;
+    return oddsStatus(g) !== 'REAL';
+  }).length;
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 async function main() {
-  let rows;
-  try {
-    const r = await fetch(`${URL}/rest/v1/live_games?id=eq.all&select=data,updated_at`, {
-      headers: { apikey: KEY, Authorization: 'Bearer ' + KEY },
-    });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    rows = await r.json();
-  } catch (e) {
-    console.log('⏭  SKIP — Supabase 접근 불가 (' + e.message + '). 네트워크 열린 곳에서 실행.');
-    process.exit(0);
+  let row;
+  try { row = await fetchFeed(); }
+  catch (e) { console.log('⏭  SKIP — Supabase 접근 불가 (' + e.message + '). 네트워크 열린 곳에서 실행.'); process.exit(0); }
+
+  // TRANSIENT FILTER: odds arrive ~1 min before the next games-feed write, so a single
+  // read can briefly catch imminent games at placeholder. If we see that, wait one cron
+  // cycle and re-read — only a PERSISTENT gap is a real problem (daily job won't false-alarm).
+  if (row && countImminentBad((row.data) || []) > 0) {
+    console.log('  … 임박 배당 공백 감지 → 65초 후 재확인(일시적 blip 필터)');
+    await sleep(65000);
+    try { const row2 = await fetchFeed(); if (row2) row = row2; } catch (_e) { /* keep first */ }
   }
 
-  const row = rows && rows[0];
   const all = (row && row.data) || [];
-  const ageMin = row && row.updated_at ? Math.round((NOW - new Date(row.updated_at).getTime()) / 60000) : null;
+  const ageMin = row && row.updated_at ? Math.round((Date.now() - new Date(row.updated_at).getTime()) / 60000) : null;
 
   console.log('── 스포츠 피드 아침 점검 ──────────────────────────────');
   console.log(`  점검 창(rolling 7일): ${ymd(NOW)} → ${ymd(WIN_END)}  ·  live_games ${all.length}개 · ${ageMin == null ? '?' : ageMin + '분 전'} 갱신`);
