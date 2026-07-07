@@ -52,7 +52,9 @@
   .mkt .m-grp{padding:14px 16px 6px;font-size:10.5px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;
     color:var(--m-muted);display:flex;justify-content:space-between;align-items:center}
   .mkt .m-grp .c{background:#fff;border:1px solid var(--m-line);border-radius:999px;padding:1px 7px;font-size:9.5px}
-  .mkt .m-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:9px 16px;cursor:pointer;border-left:2px solid transparent}
+  .mkt .m-row{display:grid;grid-template-columns:1fr 52px auto;gap:10px;align-items:center;padding:9px 16px;cursor:pointer;border-left:2px solid transparent}
+  .mkt .m-spark{width:52px;height:24px}
+  .mkt .m-spark svg{display:block;width:100%;height:100%}
   .mkt .m-row:hover{background:#fff}
   .mkt .m-row.on{background:var(--m-accsoft);border-left-color:var(--m-accent)}
   .mkt .m-row .nm{font-weight:700;font-size:13px;color:var(--m-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -111,10 +113,6 @@
   </header>
 
   <main class="mkt" id="mkt">
-    <div class="mkt-head">
-      <h1><span class="live-dot"></span>Live markets</h1>
-      <span class="mkt-sub">Real FX · stock · crypto prices — tap any symbol for its chart</span>
-    </div>
     <div class="mkt-shell">
       <aside class="mkt-side" id="mktSide"></aside>
       <section class="mkt-main" id="mktMain"></section>
@@ -209,6 +207,17 @@
     function fmt(v,dp){ return (v||0).toLocaleString('en-US',{minimumFractionDigits:dp,maximumFractionDigits:dp}); }
     function chgHTML(pct,big){ if(pct==null||!isFinite(pct)) return ''; var up=pct>=0;
       return '<span class="'+(up?'up':'dn')+'">'+(up?'▲ ':'▼ ')+(up?'+':'')+pct.toFixed(2)+'%</span>'; }
+    // Live sparkline built from accumulated feed ticks (no extra API calls).
+    function sparkSVG(c){
+      var h=c.hist||[]; if(h.length<2) return '';
+      var w=52,ht=24,mn=Math.min.apply(null,h),mx=Math.max.apply(null,h); if(mx<=mn){ mx=mn+1; }
+      var n=h.length, X=function(i){ return (i/(n-1))*w; }, Y=function(v){ return 3+(1-(v-mn)/(mx-mn))*(ht-6); };
+      var d='M'+X(0).toFixed(1)+' '+Y(h[0]).toFixed(1);
+      for(var i=1;i<n;i++) d+=' L'+X(i).toFixed(1)+' '+Y(h[i]).toFixed(1);
+      var col=(h[n-1]>=h[0])?'#16a34a':'#e5484d';
+      return '<svg viewBox="0 0 '+w+' '+ht+'" preserveAspectRatio="none"><path d="'+d+'" fill="none" stroke="'+col
+        +'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+    }
 
     function renderSide(){
       var tabs='<div class="mkt-tabs">'+TABS.map(function(t){
@@ -218,6 +227,7 @@
         var cls=c.mid>0 && prev[c.sym]!=null ? (c.mid>prev[c.sym]?'up':c.mid<prev[c.sym]?'dn':'') : '';
         return '<div class="m-row'+(c.sym===CUR?' on':'')+'" role="button" tabindex="0" data-sym="'+c.sym+'">'
           +'<div><div class="nm">'+c.name+'</div><div class="sb">'+(c.cls==='fx'?c.td:c.sym)+'</div></div>'
+          +'<div class="m-spark">'+sparkSVG(c)+'</div>'
           +'<div class="rt"><div class="px '+cls+'">'+(c.mid>0?(c.cls==='fx'?'':'$')+fmt(c.mid,c.dp):'—')+'</div></div>'
         +'</div>';
       }).join('');
@@ -338,7 +348,8 @@
       sb.from('prices').select('symbol,mid,spr_pts').then(function(r){
         if(!r||r.error||!r.data) return;
         var m={}; r.data.forEach(function(x){ m[x.symbol]={mid:+x.mid||0,spr:+x.spr_pts||0}; });
-        CAT.forEach(function(c){ var q=m[c.sym]; if(q&&q.mid>0){ prev[c.sym]=c.mid; c.mid=q.mid; c.spr=q.spr; } });
+        CAT.forEach(function(c){ var q=m[c.sym]; if(q&&q.mid>0){ prev[c.sym]=c.mid; c.mid=q.mid; c.spr=q.spr;
+          (c.hist=c.hist||[]).push(q.mid); if(c.hist.length>36) c.hist.shift(); } });
         renderSide(); updateHeader();
       }, function(){});
     }
