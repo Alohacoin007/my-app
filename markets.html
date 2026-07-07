@@ -358,8 +358,18 @@
         var m={}; r.data.forEach(function(x){ m[x.symbol]={mid:+x.mid||0,spr:+x.spr_pts||0}; });
         CAT.forEach(function(c){ var q=m[c.sym]; if(q&&q.mid>0){ prev[c.sym]=c.mid; c.mid=q.mid; c.spr=q.spr;
           (c.hist=c.hist||[]).push(q.mid); if(c.hist.length>36) c.hist.shift(); } });
-        renderSide(); updateHeader();
+        updateSide(); updateHeader();
       }, function(){});
+    }
+    // Patch prices/change/sparkline in place (no full re-render → no chart flicker).
+    function updateSide(){
+      var rows=side.querySelectorAll('.m-row'); if(!rows.length){ renderSide(); return; }
+      rows.forEach(function(r){ var c=BY[r.dataset.sym]; if(!c) return;
+        var px=r.querySelector('.m-px'); if(px) px.textContent=(c.mid>0?(c.cls==='fx'?'':'$')+fmt(c.mid,c.dp):'—');
+        var pc=sessChg(c), chg=r.querySelector('.m-chg');
+        if(chg){ chg.textContent=(pc==null?'':(pc>=0?'+':'')+pc.toFixed(2)+'%'); chg.className='m-chg '+(pc==null?'':(pc>=0?'up':'dn')); }
+        var sp=r.querySelector('.m-spark'); if(sp) sp.innerHTML=sparkSVG(c);
+      });
     }
     if(sb){ renderSide(); renderMain(); pull(); loadChart(); setInterval(pull,3000); }
     else { if(main) main.innerHTML='<div class="m-loading">Live feed unavailable.</div>'; }
