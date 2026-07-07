@@ -60,6 +60,17 @@ function mkCore(home: any, away: any, ev: any, lg: string) {
     { ln: "", am: (mlHome != null ? mlHome : (homeFav ? -140 : 120)), sel: home.nm + " ML" },
     { ln: "", am: (mlAway != null ? mlAway : (homeFav ? 120 : -140)), sel: away.nm + " ML" },
   ];
+  if (isSoc) {
+    // Soccer = 1X2 (Home / Draw / Away) — the standard football market. US-style
+    // spread/total don't apply (left empty). Real prices come from the overlay; these
+    // are placeholders shown only until The Odds API prices load.
+    const threeWay = [
+      { ln: "1", am: (mlHome != null ? mlHome : (homeFav ? -120 : 220)), sel: home.nm + " ML" },
+      { ln: "X", am: 230, sel: "Draw" },
+      { ln: "2", am: (mlAway != null ? mlAway : (homeFav ? 220 : -120)), sel: away.nm + " ML" },
+    ];
+    return { spread: [], total: [], ml: [], threeWay };
+  }
   return { spread, total: total2, ml };
 }
 
@@ -88,11 +99,19 @@ function oddsToCore(ev: any, home: any, away: any): any {
   const core: any = {};
   const mlH = bestOutcome(ev, "h2h", (o) => nick(o.name) === nick(home.nm)), mlA = bestOutcome(ev, "h2h", (o) => nick(o.name) === nick(away.nm));
   if (mlH && mlA) core.ml = [{ ln: "", am: mlH.price, sel: home.nm + " ML" }, { ln: "", am: mlA.price, sel: away.nm + " ML" }];
+  // Soccer 1X2: the h2h market has a third "Draw" outcome. Capture it → threeWay
+  // [Home, Draw, Away]. sel = "<team> ML" / "Draw"; graded by the 1X2 settler branch.
+  const drawO = bestOutcome(ev, "h2h", (o) => /draw/i.test(o.name));
+  if (mlH && mlA && drawO) core.threeWay = [
+    { ln: "1", am: mlH.price, sel: home.nm + " ML" },
+    { ln: "X", am: drawO.price, sel: "Draw" },
+    { ln: "2", am: mlA.price, sel: away.nm + " ML" },
+  ];
   const spH = bestOutcome(ev, "spreads", (o) => nick(o.name) === nick(home.nm)), spA = bestOutcome(ev, "spreads", (o) => nick(o.name) === nick(away.nm));
   if (spH && spA && spH.point != null && spA.point != null) core.spread = [{ ln: fmtPt(spH.point), am: spH.price, sel: home.nm + " " + fmtPt(spH.point) }, { ln: fmtPt(spA.point), am: spA.price, sel: away.nm + " " + fmtPt(spA.point) }];
   const ov = bestOutcome(ev, "totals", (o) => /over/i.test(o.name)), un = bestOutcome(ev, "totals", (o) => /under/i.test(o.name));
   if (ov && un && ov.point != null && un.point != null) core.total = [{ ln: "Over " + ov.point, am: ov.price, sel: "Over " + ov.point }, { ln: "Under " + un.point, am: un.price, sel: "Under " + un.point }];
-  return (core.ml || core.spread || core.total) ? core : null;
+  return (core.ml || core.spread || core.total || core.threeWay) ? core : null;
 }
 async function overlayRealOdds(games: any[], SB_URL: string, H: Record<string, string>) {
   try {
@@ -116,7 +135,15 @@ async function overlayRealOdds(games: any[], SB_URL: string, H: Record<string, s
       const ev = data.find((e: any) => { const s = new Set([nick(e.home_team), nick(e.away_team)]); return s.has(nick(g.home.nm)) && s.has(nick(g.away.nm)); });
       if (!ev) return;
       const core = oddsToCore(ev, g.home, g.away);
-      if (core) { if (core.ml) g.ml = core.ml; if (core.spread) g.spread = core.spread; if (core.total) g.total = core.total; }
+      if (core) {
+        if (g.lg === "SOC") {
+          // Soccer = 1X2 only (Home/Draw/Away). Overwrite with the real 3-way odds; the
+          // US-style spread/total from mkCore stay empty (they don't apply to soccer).
+          if (core.threeWay) g.threeWay = core.threeWay;
+        } else {
+          if (core.ml) g.ml = core.ml; if (core.spread) g.spread = core.spread; if (core.total) g.total = core.total;
+        }
+      }
     });
   } catch (_e) { /* keep ESPN odds if the overlay fails */ }
 }
@@ -153,7 +180,7 @@ async function fetchLeague(L: { lg: string; sport: string; path: string }, out: 
             gid: L.lg + "_" + ev.id, lg: L.lg, sport: L.sport,
             live: state === "in", time: state === "in" ? (st.shortDetail || "Live") : fmtTime(ev.date),
             iso: ev.date || "", // raw kickoff time — each client renders it in the viewer's local timezone
-            home, away, spread: core.spread, total: core.total, ml: core.ml,
+            home, away, spread: core.spread, total: core.total, ml: core.ml, threeWay: core.threeWay || [],
           });
         } catch (_e) { /* skip one event */ }
       }

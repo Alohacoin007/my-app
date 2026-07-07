@@ -140,6 +140,17 @@ function gradeLeg(l: any, r: Result): string | null {
     const tot = hs + as, line = parseFloat(m[2]); if (tot === line) return "push";
     return (m[1].toLowerCase() === "over") ? (tot > line ? "won" : "lost") : (tot < line ? "won" : "lost");
   }
+  // SOCCER 1X2 (Full-Time Result: Home / Draw / Away). Unlike the 2-way "Draw No Bet"
+  // moneyline below, a DRAW is its own bettable outcome here: a TEAM pick LOSES on a draw
+  // (not push), and a "Draw" pick WINS on a draw. Routed by market='1X2' so it never
+  // collides with the classic moneyline. MUST come before the moneyline branch.
+  if (mkt.indexOf("1x2") >= 0) {
+    const s = sel.replace(/\s*ML$/i, "").trim();
+    if (/^(draw|x)$/i.test(s)) return hs === as ? "won" : "lost";
+    const side = teamSide(s, r); if (!side) return null;
+    const my = side === "home" ? hs : as, op = side === "home" ? as : hs;
+    return my > op ? "won" : "lost"; // team must WIN outright; draw = lost
+  }
   if (mkt.indexOf("money") >= 0 || / ML$/i.test(sel)) {
     const team = sel.replace(/\s*ML$/i, "").trim(), side = teamSide(team, r); if (!side) return null;
     const my = side === "home" ? hs : as, op = side === "home" ? as : hs; if (my === op) return "push"; return my > op ? "won" : "lost";

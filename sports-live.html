@@ -208,6 +208,15 @@
   .bet.sus .pr{font-size:13px}
   .bet.sel{background:var(--accent);border-color:var(--accent);box-shadow:0 1px 2px rgba(30,64,216,.4)}
   .bet.sel .ln,.bet.sel .pr{color:var(--accent-d)}
+  .bet.dis{opacity:.4;cursor:default}
+  /* Soccer 1X2 (Home / Draw / Away) — its own card layout (no US-style spread/total). */
+  .soc-hdr{display:flex;align-items:center;gap:8px;padding:9px 12px 4px;font-size:13px}
+  .soc-hdr .bd{width:26px;height:26px;border-radius:4px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--dim);flex:0 0 auto}
+  .soc-nm{flex:1;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .soc-nm b{color:var(--dim);font-weight:500;margin:0 5px}
+  .soc-sc{font-size:13px;font-weight:800;color:var(--text);background:var(--surface-2);border-radius:5px;padding:1px 7px;flex:0 0 auto}
+  .soc-sc.live{color:var(--live)}
+  .soc1x2{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:4px 12px 12px}
   .more-mkt{display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;border-top:1px solid var(--line);font-size:12px;font-weight:700;color:var(--accent);cursor:pointer}
   .more-mkt .cnt{color:var(--dim)}
   /* play-by-play ticker */
@@ -781,7 +790,7 @@
         <div class="sport" data-sport="SOC">⚽ Soccer</div>
         <div class="sport" data-sport="UFC">🥊 UFC</div>
       </div>
-      <div class="colhead-wrap"><div class="colhead"><span data-i18n="col_today">Today</span><span data-i18n="col_spread">Spread</span><span data-i18n="col_total">Total</span><span data-i18n="col_ml">Moneyline</span></div></div>
+      <div class="colhead-wrap" id="colheadUp"><div class="colhead"><span data-i18n="col_today">Today</span><span data-i18n="col_spread">Spread</span><span data-i18n="col_total">Total</span><span data-i18n="col_ml">Moneyline</span></div></div>
       <div class="list" id="list"></div>
     </div>
 
@@ -796,7 +805,7 @@
           <span></span><span></span><span></span><span></span>
         </div>
       </div>
-      <div class="colhead-wrap"><div class="colhead"><span data-i18n="col_inplay">In Play</span><span data-i18n="col_spread">Spread</span><span data-i18n="col_total">Total</span><span data-i18n="col_ml">Moneyline</span></div></div>
+      <div class="colhead-wrap" id="colheadLive"><div class="colhead"><span data-i18n="col_inplay">In Play</span><span data-i18n="col_spread">Spread</span><span data-i18n="col_total">Total</span><span data-i18n="col_ml">Moneyline</span></div></div>
       <div class="list" id="liveList"></div>
     </div>
 
@@ -1618,6 +1627,18 @@
           <span class="ln">${b.ln||'&nbsp;'}</span><span class="pr ${b.am>0?'pos':''}">${fmtAm(b.am)}</span></div>`;};
       const row=(t,i)=>`<div class="mrow"><div class="tcell"><span class="bd">${t.ab}</span><span class="tinfo"><span class="nm">${t.nm}</span>${t.sc!==undefined?`<span class="sc${g.live?' live':''}">${t.sc}</span>`:''}</span></div>
         ${cell(g.core.spread,'Spread',i)}${cell(g.core.total,'Total',i)}${cell(g.core.ml,'Moneyline',i)}</div>`;
+      // SOCCER = 1X2 (Home / Draw / Away) — the standard football market. One cell per
+      // outcome, market='1X2' (settler grades team=win-outright, draw=its own outcome).
+      const isSoc=g.lg==='SOC';
+      const c3=(b,lbl)=>{ if(!b)return '<div class="bet dis"><span class="ln">'+lbl+'</span><span class="pr">—</span></div>';
+        const on=legs.some(l=>l.uid===g.id+'|'+b.sel);
+        if(g.live&&!liveOK(g)) return `<div class="bet sus" title="${liveReason(g)}"><span class="ln">${lbl}</span><span class="pr">🔒</span></div>`;
+        return `<div class="bet${on?' sel':''}" data-game="${g.id}" data-market="1X2" data-sel="${b.sel}" data-am="${b.am}"><span class="ln">${lbl}</span><span class="pr ${b.am>0?'pos':''}">${fmtAm(b.am)}</span></div>`; };
+      const tw=g.core.threeWay||[];
+      const matrixHTML=isSoc
+        ? `<div class="soc-hdr"><span class="bd">${g.home.ab}</span><span class="soc-nm">${g.home.nm} <b>v</b> ${g.away.nm}</span>${(g.home.sc!==undefined&&g.away.sc!==undefined)?`<span class="soc-sc${g.live?' live':''}">${g.home.sc}–${g.away.sc}</span>`:''}<span class="bd">${g.away.ab}</span></div>
+           <div class="soc1x2">${c3(tw[0],'Home')}${c3(tw[1],'Draw')}${c3(tw[2],'Away')}</div>`
+        : `<div class="matrix">${row(g.away,1)}${row(g.home,0)}</div>`;
       const pc=g.props.reduce((a,p)=>a+p.o.length,0);
       // play-by-play tick (only shown on Live page; 'fresh' class triggers pulse animation once per new play)
       let playHTML='';
@@ -1635,7 +1656,7 @@
       const pinBtn=`<button class="pin-btn${isPinned?' pinned':''}" data-pin="${g.id}" title="${isPinned?'Unpin':'Pin to top'}">★</button>`;
       return `<div class="card${isPinned?' pinned':''}"><div class="ch"><span class="lg">${({NBA:'🏀',NCAAB:'🎓',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽',UFC:'🥊'})[g.lg]||'🏈'} ${g.lg==='SOC'?'Soccer':g.lg}</span>
         <div class="ch-r"><span class="st${g.live?' live':''}">${g.live?'LIVE '+g.time:gameTimeLabel(g)}</span>${pinBtn}</div></div>
-        <div class="matrix">${row(g.away,1)}${row(g.home,0)}</div>
+        ${matrixHTML}
         ${playHTML}
         ${showPlay&&g.live?`<div class="watch-live" data-watch="${g.id}"><span>📺 Watch live tracker</span><span class="wl-go">›</span></div>`:''}
         ${pc>0?`<div class="more-mkt" data-expand="${g.id}">+ More Markets <span class="cnt">(${pc})</span></div>`:''}</div>`;
@@ -1674,6 +1695,8 @@
     return 'Live betting unavailable';
   }
   function renderGames(){
+    // Soccer cards are 1X2 (self-labeled Home/Draw/Away) → hide the Spread/Total/ML header.
+    try{ var _soc=curSport==='SOC'; ['colheadUp','colheadLive'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display=_soc?'none':''; }); }catch(e){}
     const base=(gameQuery?GAMES.filter(matchGame):GAMES.filter(g=>g.lg===curSport)).slice().sort(sortByPin);
     const emptyMsg=gameQuery?`No games match "${gameQuery}"`:'No upcoming games';
     document.getElementById('list').innerHTML=gameRowsHTML(base,false)||`<div class="empty">${emptyMsg}</div>`;
@@ -1834,6 +1857,7 @@
   }
 
   function toggle(gid,market,sel,am){
+    if(!gid||!sel||!isFinite(am)) return;   // ignore blank/disabled cells (e.g. missing odds)
     const uid=gid+'|'+sel,i=legs.findIndex(l=>l.uid===uid);
     if(i>-1)legs.splice(i,1);
     else{const g=GAMES.find(x=>x.id===gid);
@@ -3304,6 +3328,16 @@
         {ln:'',am:(mlHome!=null?mlHome:(homeFav?-140:120)),sel:home.nm+' ML'},
         {ln:'',am:(mlAway!=null?mlAway:(homeFav?120:-140)),sel:away.nm+' ML'},
       ];
+      if(isSoc){
+        // Soccer = 1X2 (Home/Draw/Away). US-style spread/total don't apply (empty).
+        // Real prices come from applyRealOdds; these are placeholders until they load.
+        const threeWay=[
+          {ln:'1',am:(mlHome!=null?mlHome:(homeFav?-120:220)),sel:home.nm+' ML'},
+          {ln:'X',am:230,sel:'Draw'},
+          {ln:'2',am:(mlAway!=null?mlAway:(homeFav?220:-120)),sel:away.nm+' ML'},
+        ];
+        return { spread:[], total:[], ml:[], threeWay };
+      }
       return { spread, total: total2, ml };
     }
     function mapEvent(ev, lg){
@@ -3427,11 +3461,14 @@
       const core={};
       const mlH=best('h2h',o=>nick(o.name)===nick(home.nm)), mlA=best('h2h',o=>nick(o.name)===nick(away.nm));
       if(mlH&&mlA) core.ml=[{ln:'',am:mlH.price,sel:home.nm+' ML'},{ln:'',am:mlA.price,sel:away.nm+' ML'}];
+      // Soccer 1X2: capture the h2h "Draw" outcome → threeWay [Home, Draw, Away].
+      const drawO=best('h2h',o=>/draw/i.test(o.name));
+      if(mlH&&mlA&&drawO) core.threeWay=[{ln:'1',am:mlH.price,sel:home.nm+' ML'},{ln:'X',am:drawO.price,sel:'Draw'},{ln:'2',am:mlA.price,sel:away.nm+' ML'}];
       const spH=best('spreads',o=>nick(o.name)===nick(home.nm)), spA=best('spreads',o=>nick(o.name)===nick(away.nm));
       if(spH&&spA&&spH.point!=null&&spA.point!=null) core.spread=[{ln:fmt(spH.point),am:spH.price,sel:home.nm+' '+fmt(spH.point)},{ln:fmt(spA.point),am:spA.price,sel:away.nm+' '+fmt(spA.point)}];
       const ov=best('totals',o=>/over/i.test(o.name)), un=best('totals',o=>/under/i.test(o.name));
       if(ov&&un&&ov.point!=null&&un.point!=null) core.total=[{ln:'Over '+ov.point,am:ov.price,sel:'Over '+ov.point},{ln:'Under '+un.point,am:un.price,sel:'Under '+un.point}];
-      return (core.ml||core.spread||core.total) ? core : null;
+      return (core.ml||core.spread||core.total||core.threeWay) ? core : null;
     }
     async function applyRealOdds(games){
       const leagues = Array.from(new Set(games.map(g=>g.lg).filter(l=>ODDS_SPORT[l])));
@@ -3443,7 +3480,11 @@
         if (!data.length) continue;
         games.filter(g=>g.lg===lg).forEach(g=>{
           const ev = data.find(e=>{ const s=new Set([nick(e.home_team),nick(e.away_team)]); return s.has(nick(g.home.nm)) && s.has(nick(g.away.nm)); });
-          if (ev){ const core=oddsToCore(ev, g.home, g.away); if (core){ g.core=Object.assign({}, g.core, core); matched++; } }
+          if (ev){ const core=oddsToCore(ev, g.home, g.away); if (core){
+            // Soccer shows 1X2 only — merge just the real threeWay (leave spread/total empty).
+            if(g.lg==='SOC'){ if(core.threeWay) g.core=Object.assign({}, g.core, {threeWay:core.threeWay}); }
+            else g.core=Object.assign({}, g.core, core);
+            matched++; } }
         });
       }
       return matched;
@@ -3475,15 +3516,24 @@
 
     // Transform a server live_games entry into the app's GAMES shape.
     function lgToGame(g){
-      var sp=g.spread||[],to=g.total||[],ml=g.ml||[];
-      if(sp.length<2||to.length<2||ml.length<2) return null;
+      var sp=g.spread||[],to=g.total||[],ml=g.ml||[],tw=g.threeWay||[];
+      var isSoc=g.lg==='SOC';
+      // TRANSITION-SAFE: before the sports-games Edge redeploys, old live_games soccer rows
+      // have a 2-way ml but no threeWay — synthesize a 1X2 from it (placeholder Draw) so the
+      // Soccer tab never goes empty. After redeploy, threeWay carries real Home/Draw/Away.
+      if(isSoc && tw.length<3 && ml.length>=2){
+        tw=[{ln:'1',am:ml[0].am,sel:ml[0].sel},{ln:'X',am:230,sel:'Draw'},{ln:'2',am:ml[1].am,sel:ml[1].sel}];
+      }
+      // Soccer needs the 1X2 (threeWay); other sports need the 2-sided spread/total/ml.
+      if(isSoc){ if(tw.length<3) return null; }
+      else if(sp.length<2||to.length<2||ml.length<2) return null;
       var home={ab:(g.home&&g.home.ab)||'',nm:(g.home&&g.home.nm)||'Home'};
       var away={ab:(g.away&&g.away.ab)||'',nm:(g.away&&g.away.nm)||'Away'};
       if(g.live){ if(g.home&&g.home.sc!=null)home.sc=g.home.sc; if(g.away&&g.away.sc!=null)away.sc=g.away.sc; }
       return { id:g.gid, lg:g.lg, state:(g.live?'in':'pre'), live:!!g.live, real:true,
         kickoff:(g.live?'':(g.iso||'')),
         time:(g.live ? (g.time||'Live') : (g.iso ? (fmtKick(g.iso)||g.time||'TBD') : (g.time||'TBD'))),
-        home:home, away:away, core:{spread:sp,total:to,ml:ml}, props:[] };
+        home:home, away:away, core:{spread:sp,total:to,ml:ml,threeWay:tw}, props:[] };
     }
     async function loadLive(isRefresh){
       // SERVER-CENTRE: read the shared live_games feed (one fast query — same data as
