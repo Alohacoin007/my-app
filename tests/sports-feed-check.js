@@ -1,20 +1,29 @@
 #!/usr/bin/env node
-// Alpexa — sports feed health check (run me, don't wait for a customer).
+// Alpexa — sports feed morning check (run me, don't wait for a customer).
 //
-// Reads the LIVE `live_games` feed (the exact row the app renders) and reports, for the
-// next week, per league: how many games, spread across days, and — the part that bit us —
-// whether ODDS actually came in (REAL vs PLACEHOLDER vs MISSING), plus TBD/placeholder
-// teams and any structurally-broken entries. Catches "no future games", "odds didn't
-// load", "TBD bracket junk", and "malformed game" BEFORE a customer clicks into it.
+// Reads the LIVE `live_games` feed (the exact row the app renders) and verifies the
+// ROLLING NEXT-7-DAYS window: on Jul 8 it checks Jul 8→15, on Jul 9 it checks Jul 9→16.
+// Per league it reports game counts, how many of the 7 days are covered, and — the part
+// that bit us — whether ODDS came in (REAL vs PLACEHOLDER vs MISSING), plus TBD/bracket
+// teams and structurally-broken entries.
 //
-// Needs network to Supabase (public read). Run where that's reachable:
+// FAILS (exit 1, so the daily workflow emails the owner) only on REAL problems:
+//   empty/stale feed · broken entries · an IMMINENT game (next 48h) with no real odds.
+// Far-future placeholder odds and TBD bracket teams are just ⚠️ warnings (odds load
+// closer to kickoff) — they don't spam a daily alert.
+//
 //   node tests/sports-feed-check.js
-// Exit code: 0 = healthy / network unavailable (won't block), 1 = real problems found.
+// Exit: 0 = healthy / warnings only / network unavailable · 1 = real problems.
 
 const URL = 'https://grxnbgtfnaayeluenvqh.supabase.co';
 const KEY = 'sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu';
 
-// ── odds classification (mkCore placeholders are exact, so they're detectable) ──
+const NOW = Date.now();
+const GRACE = 6 * 3600e3;                 // count a game "in window" from 6h ago (just-started)
+const WIN_END = NOW + 7 * 86400e3;        // rolling +7 days
+const IMMINENT = NOW + 2 * 86400e3;       // next 48h — odds MUST be real by now
+const ymd = (t) => new Date(t).toISOString().slice(0, 10);
+
 function oddsStatus(g) {
   if (g.lg === 'SOC') {
     const tw = g.threeWay || [];
@@ -28,17 +37,14 @@ function oddsStatus(g) {
   if ((a === -140 && b === 120) || (a === 120 && b === -140)) return 'PLACEHOLDER';
   return 'REAL';
 }
-// TBD / bracket-placeholder teams ("RD16 W8", "QF W2", "Winner Match 3", "TBD"…)
 function isTBD(g) {
   const s = ((g.home && g.home.nm) || '') + ' ' + ((g.away && g.away.nm) || '');
   return /\b(?:rd\d|qf|sf|r16|w\d|l\d)\b|winner|loser|to be determined|\btbd\b/i.test(s);
 }
-// Would the app's lgToGame accept it? (soccer needs threeWay≥3; others need spread/total/ml≥2)
 function structOK(g) {
   if (g.lg === 'SOC') return (g.threeWay || []).length >= 3 || (g.ml || []).length >= 2;
   return (g.spread || []).length >= 2 && (g.total || []).length >= 2 && (g.ml || []).length >= 2;
 }
-function dayKey(iso) { try { return new Date(iso).toISOString().slice(0, 10); } catch (_) { return '?'; } }
 
 async function main() {
   let rows;
@@ -49,50 +55,55 @@ async function main() {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     rows = await r.json();
   } catch (e) {
-    console.log('⏭  SKIP — could not reach Supabase (' + e.message + '). Run where the network is open.');
-    process.exit(0); // network unavailable is not a feed failure — don't block
+    console.log('⏭  SKIP — Supabase 접근 불가 (' + e.message + '). 네트워크 열린 곳에서 실행.');
+    process.exit(0);
   }
 
   const row = rows && rows[0];
-  const games = (row && row.data) || [];
-  const ageMin = row && row.updated_at ? Math.round((Date.now() - new Date(row.updated_at).getTime()) / 60000) : null;
+  const all = (row && row.data) || [];
+  const ageMin = row && row.updated_at ? Math.round((NOW - new Date(row.updated_at).getTime()) / 60000) : null;
 
-  console.log('── SPORTS FEED HEALTH ─────────────────────────────────');
-  console.log(`  live_games: ${games.length} games · updated ${ageMin == null ? '?' : ageMin + ' min ago'}`);
-  if (ageMin != null && ageMin > 15) console.log('  ⚠️  feed is STALE (>15 min) — is the sports-games cron running?');
-  if (!games.length) { console.log('  🔴 live_games is EMPTY — no games for ANY sport.'); process.exit(1); }
+  console.log('── 스포츠 피드 아침 점검 ──────────────────────────────');
+  console.log(`  점검 창(rolling 7일): ${ymd(NOW)} → ${ymd(WIN_END)}  ·  live_games ${all.length}개 · ${ageMin == null ? '?' : ageMin + '분 전'} 갱신`);
+
+  const fails = [];
+  if (!all.length) { console.log('  🔴 live_games 비어있음 — 전 종목 경기 없음.'); process.exit(1); }
+  if (ageMin != null && ageMin > 15) fails.push('피드 STALE(>15분) — sports-games 크론 확인');
+
+  // window = games kicking off within [now-6h, +7d]
+  const win = all.filter((g) => { const t = Date.parse(g.iso || ''); return isNaN(t) ? true : (t >= NOW - GRACE && t <= WIN_END); });
 
   const byLg = {};
-  for (const g of games) {
+  for (const g of win) {
     const lg = g.lg || '?';
-    (byLg[lg] = byLg[lg] || { n: 0, real: 0, ph: 0, miss: 0, tbd: 0, bad: 0, days: {} }).n++;
+    const s = (byLg[lg] = byLg[lg] || { n: 0, real: 0, ph: 0, miss: 0, tbd: 0, bad: 0, days: new Set(), immBad: 0 });
+    s.n++;
     const o = oddsStatus(g);
-    if (o === 'REAL') byLg[lg].real++; else if (o === 'PLACEHOLDER') byLg[lg].ph++; else byLg[lg].miss++;
-    if (isTBD(g)) byLg[lg].tbd++;
-    if (!structOK(g)) byLg[lg].bad++;
-    byLg[lg].days[dayKey(g.iso)] = (byLg[lg].days[dayKey(g.iso)] || 0) + 1;
+    if (o === 'REAL') s.real++; else if (o === 'PLACEHOLDER') s.ph++; else s.miss++;
+    if (isTBD(g)) s.tbd++;
+    if (!structOK(g)) { s.bad++; }
+    const t = Date.parse(g.iso || ''); if (!isNaN(t)) s.days.add(ymd(t));
+    // imminent (≤48h) game must have REAL odds
+    if (!isNaN(t) && t <= IMMINENT && o !== 'REAL') s.immBad++;
   }
 
-  let problems = 0;
-  console.log('\n  league   games  realOdds  placeholder  missing  TBD  broken  days');
+  console.log('\n  종목   경기  요일  실배당 가짜 없음 TBD broken  임박48h배당X');
   for (const lg of Object.keys(byLg).sort()) {
     const s = byLg[lg];
-    const dayCount = Object.keys(s.days).filter(d => d !== '?').length;
-    const flags = [];
-    if (s.real === 0) { flags.push('NO real odds'); problems++; }
-    if (s.ph > 0) flags.push(`${s.ph} placeholder`);
-    if (s.miss > 0) { flags.push(`${s.miss} missing`); problems++; }
-    if (s.tbd > 0) flags.push(`${s.tbd} TBD`);
-    if (s.bad > 0) { flags.push(`${s.bad} broken`); problems++; }
+    const warn = [];
+    if (s.ph) warn.push(`가짜${s.ph}`);
+    if (s.tbd) warn.push(`TBD${s.tbd}`);
+    if (s.bad) { warn.push(`broken${s.bad}`); fails.push(`${lg}: broken 항목 ${s.bad}`); }
+    if (s.immBad) { warn.push(`임박배당X${s.immBad}`); fails.push(`${lg}: 48h내 경기 ${s.immBad}건 실배당 없음`); }
     console.log(
-      `  ${lg.padEnd(7)} ${String(s.n).padStart(5)} ${String(s.real).padStart(8)} ${String(s.ph).padStart(11)} ${String(s.miss).padStart(7)} ${String(s.tbd).padStart(4)} ${String(s.bad).padStart(6)}  ${dayCount}d` +
-      (flags.length ? '   ⚠️  ' + flags.join(', ') : '')
+      `  ${lg.padEnd(6)} ${String(s.n).padStart(4)} ${String(s.days.size).padStart(4)}일 ${String(s.real).padStart(5)} ${String(s.ph).padStart(4)} ${String(s.miss).padStart(4)} ${String(s.tbd).padStart(3)} ${String(s.bad).padStart(6)} ${String(s.immBad).padStart(8)}` +
+      (warn.length ? '   ⚠️ ' + warn.join(' ') : '   ✅')
     );
   }
 
   console.log('');
-  if (problems) { console.log(`  🔴 ${problems} feed problem(s) above — fix before customers see them.`); process.exit(1); }
-  console.log('  🟢 feed healthy — games present, odds real, no broken entries.');
+  if (fails.length) { console.log('  🔴 문제 ' + fails.length + '건:'); fails.forEach((f) => console.log('     - ' + f)); process.exit(1); }
+  console.log('  🟢 이상 없음 — 이번주 경기·임박 배당 정상 (가짜/TBD는 경고만, 정상 범주).');
   process.exit(0);
 }
 main();
