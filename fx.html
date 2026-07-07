@@ -546,6 +546,7 @@
       <a href="ib.html">IB</a>
       <a href="about.html">About</a>
     </nav>
+    <button class="theme-toggle" id="themebtn" aria-label="Toggle dark mode" title="Dark mode">◐</button>
     <a href="login.html?switch=1" rel="noopener" style="font-size:13px;font-weight:600;color:var(--muted)">Log in</a>
     <button class="pill" onclick="window.open('signup.html','_blank','noopener')">Sign up</button>
   </header>
@@ -720,8 +721,14 @@
   </footer>
 
     <script>
-  /* FX site is white-only — force the light theme regardless of any stored preference. */
-  try{ document.body.classList.add('light'); }catch(e){}
+  /* Default to the light (white) theme; honor the saved dark-mode preference. */
+  try{ if(localStorage.getItem('alpexa-theme')!=='dark') document.body.classList.add('light'); }catch(e){ try{document.body.classList.add('light');}catch(_){} }
+  (function(){ var t=document.getElementById('themebtn'); if(!t) return;
+    function paint(){ t.textContent=document.body.classList.contains('light')?'◐':'☀'; }
+    t.onclick=function(){ var nowLight=document.body.classList.toggle('light');
+      try{localStorage.setItem('alpexa-theme', nowLight?'light':'dark');}catch(e){} paint(); };
+    paint();
+  })();
   </script>
   <script>
   /* Crossfade hero slogans — both stacked in one grid cell, fade in place (no horizontal
