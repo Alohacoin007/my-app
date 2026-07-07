@@ -122,7 +122,13 @@ async function overlayRealOdds(games: any[], SB_URL: string, H: Record<string, s
 }
 
 async function fetchLeague(L: { lg: string; sport: string; path: string }, out: any[]) {
-  const direct = `https://site.api.espn.com/apis/site/v2/sports/${L.path}/scoreboard`;
+  // Request a date RANGE (today → +8d) so live_games carries UPCOMING fixtures (e.g.
+  // tomorrow's World Cup match), not only today — ESPN's default scoreboard is today-only,
+  // which is why the app (which reads live_games) showed no future games for ANY sport.
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  const ymd = (x: Date) => "" + x.getUTCFullYear() + p2(x.getUTCMonth() + 1) + p2(x.getUTCDate());
+  const range = ymd(new Date()) + "-" + ymd(new Date(Date.now() + 8 * 86400000));
+  const direct = `https://site.api.espn.com/apis/site/v2/sports/${L.path}/scoreboard?dates=${range}`;
   const tries = [direct, "https://corsproxy.io/?url=" + encodeURIComponent(direct)];
   for (const u of tries) {
     try {
