@@ -53,14 +53,14 @@
     color:var(--m-muted);display:flex;justify-content:space-between;align-items:center}
   .mkt .m-grp .c{background:#fff;border:1px solid var(--m-line);border-radius:999px;padding:1px 7px;font-size:9.5px}
   /* Watchlist rows — name/ticker · sparkline · price + change (Google-Finance style) */
-  .mkt .m-row{display:grid;grid-template-columns:1fr 104px 1fr;gap:12px;align-items:center;padding:10px 16px;cursor:pointer;border-left:2px solid transparent;border-bottom:1px solid var(--m-line)}
+  .mkt .m-row{display:grid;grid-template-columns:1fr 64px 1fr;gap:12px;align-items:center;padding:10px 16px;cursor:pointer;border-left:2px solid transparent;border-bottom:1px solid var(--m-line)}
   .mkt .m-row:hover{background:var(--m-panel2)}
   .mkt .m-row.on{background:var(--m-accsoft);border-left-color:var(--m-accent)}
   .mkt .m-nm{min-width:0}
   .mkt .m-nm b{display:block;font-size:13.5px;font-weight:700;color:var(--m-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .mkt .m-nm small{display:block;font-size:11px;color:var(--m-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .mkt .m-row.on .m-nm b{color:var(--m-accent)}
-  .mkt .m-spark{height:28px;width:104px}
+  .mkt .m-spark{height:24px;width:64px}
   .mkt .m-spark svg{display:block;width:100%;height:100%}
   .mkt .m-rt{text-align:right;white-space:nowrap}
   .mkt .m-px{font-family:var(--m-mono);font-weight:700;font-size:13px;color:var(--m-text)}
@@ -214,13 +214,15 @@
     // Live sparkline built from accumulated feed ticks (no extra API calls).
     function sparkSVG(c){
       var h=c.hist||[]; if(h.length<2) return '';
-      var w=52,ht=24,mn=Math.min.apply(null,h),mx=Math.max.apply(null,h); if(mx<=mn){ mx=mn+1; }
+      var w=64,ht=24,mn=Math.min.apply(null,h),mx=Math.max.apply(null,h); if(mx<=mn){ mx=mn+1; }
       var n=h.length, X=function(i){ return (i/(n-1))*w; }, Y=function(v){ return 3+(1-(v-mn)/(mx-mn))*(ht-6); };
       var d='M'+X(0).toFixed(1)+' '+Y(h[0]).toFixed(1);
       for(var i=1;i<n;i++) d+=' L'+X(i).toFixed(1)+' '+Y(h[i]).toFixed(1);
       var col=(h[n-1]>=h[0])?'#16a34a':'#e5484d';
-      return '<svg viewBox="0 0 '+w+' '+ht+'" preserveAspectRatio="none"><path d="'+d+'" fill="none" stroke="'+col
-        +'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+      var by=Y(h[0]).toFixed(1);   // dotted baseline at the session-open level
+      return '<svg viewBox="0 0 '+w+' '+ht+'" preserveAspectRatio="none">'
+        +'<line x1="0" y1="'+by+'" x2="'+w+'" y2="'+by+'" stroke="#9aa3b8" stroke-width="1" stroke-dasharray="1.5 2"/>'
+        +'<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>';
     }
 
     function sessChg(c){ var h=c.hist||[]; if(h.length<2||!(h[0]>0)) return null; return (h[h.length-1]-h[0])/h[0]*100; }
