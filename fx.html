@@ -584,56 +584,37 @@
   </section>
 
   <div class="lp-body">
-  <!-- Markets overview strip — real values + sparklines from the sparkline-cache (row id='strip').
-       The landing reads ONE cached row; it never touches a data provider itself. -->
+  <!-- Markets ticker tape — real values from the sparkline-cache (row id='strip'), indices +
+       currencies only (no crypto). One continuous sideways-flowing marquee; reads ONE cached
+       row and never touches a data provider itself. -->
   <style>
-   .idxwrap{max-width:1160px;margin:0 auto;padding:34px 20px 6px}
-   .idx-lead{margin:0 0 3px;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#1e40d8}
-   .idx-h{margin:0 0 16px;font-size:20px;font-weight:800;letter-spacing:-.4px;color:#0b1220}
-   .idx{background:#fff;border:1px solid #e4e8f2}
-   .idx-tabs{display:flex;gap:2px;padding:8px 8px 6px;overflow-x:auto;border-bottom:1px solid #e4e8f2;-webkit-overflow-scrolling:touch}
-   .idx-tab{flex:none;font-size:13.5px;font-weight:700;color:#5b6577;padding:7px 15px;border:0;background:transparent;
-     cursor:pointer;font-family:inherit;border-radius:999px;white-space:nowrap}
-   .idx-tab:hover{color:#0e1726}
-   .idx-tab.on{background:#0b1220;color:#fff}
-   .idx-cards{display:grid;grid-template-columns:repeat(5,1fr);gap:0}
-   .idx-card{padding:16px 18px 8px;border-right:1px solid #e4e8f2;cursor:pointer;transition:background .15s;
-     text-decoration:none;color:inherit;display:block;min-width:0}
-   .idx-card:last-child{border-right:0}
-   .idx-card:hover{background:#f6f8fc}
-   .idx-nm{font-size:15px;font-weight:800;letter-spacing:-.2px;color:#0b1220;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-   .idx-val{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:13.5px;color:#5b6577;margin-top:5px}
-   .idx-val .pts{font-size:12px}
-   .idx-chg{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:14px;font-weight:800;margin-top:3px;
-     display:flex;align-items:center;gap:6px}
-   .idx-chg.up{color:#16a34a} .idx-chg.dn{color:#e5484d}
-   .idx-ar{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-size:9px;color:#fff}
-   .idx-chg.up .idx-ar{background:#16a34a} .idx-chg.dn .idx-ar{background:#e5484d}
-   .idx-spark{height:44px;margin-top:8px}
-   .idx-spark svg{display:block;width:100%;height:100%}
-   .idx-empty{padding:26px 18px;color:#5b6577;font-size:13.5px;text-align:center}
-   @media(max-width:900px){ .idx-cards{grid-template-columns:repeat(3,1fr)} }
-   @media(max-width:560px){
-     .idx-cards{grid-auto-flow:column;grid-auto-columns:76%;grid-template-columns:none;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
-     .idx-card{scroll-snap-align:start;border-bottom:0}
-   }
+   .tkbar{border-top:1px solid #e4e8f2;border-bottom:1px solid #e4e8f2;background:#fff;
+     position:relative;overflow:hidden}
+   .tkbar::before,.tkbar::after{content:"";position:absolute;top:0;bottom:0;width:64px;z-index:2;pointer-events:none}
+   .tkbar::before{left:0;background:linear-gradient(90deg,#fff 20%,rgba(255,255,255,0))}
+   .tkbar::after{right:0;background:linear-gradient(270deg,#fff 20%,rgba(255,255,255,0))}
+   .tk-track{display:flex;width:max-content;will-change:transform;animation:tkflow linear infinite}
+   .tkbar:hover .tk-track{animation-play-state:paused}
+   @keyframes tkflow{from{transform:translate3d(0,0,0)}to{transform:translate3d(-50%,0,0)}}
+   .tk-item{display:flex;align-items:center;gap:9px;padding:13px 26px;white-space:nowrap;
+     border-right:1px solid #eef1f7;text-decoration:none}
+   .tk-nm{font-weight:800;font-size:13.5px;color:#0b1220;letter-spacing:-.2px}
+   .tk-v{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:13px;color:#5b6577}
+   .tk-c{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:12.5px;font-weight:800;
+     display:inline-flex;align-items:center;gap:3px}
+   .tk-c.up{color:#16a34a} .tk-c.dn{color:#e5484d}
+   .tk-c .ar{font-size:9px}
+   @media(max-width:600px){ .tk-item{padding:12px 18px;gap:7px} }
   </style>
-  <section class="idxwrap" id="idxstrip" style="display:none">
-    <p class="idx-lead">Markets</p>
-    <h2 class="idx-h">Markets overview</h2>
-    <div class="idx">
-      <div class="idx-tabs" id="idxTabs"></div>
-      <div class="idx-cards" id="idxCards"></div>
-    </div>
-  </section>
+  <div class="tkbar" id="tkbar" style="display:none">
+    <div class="tk-track" id="tkTrack"></div>
+  </div>
   <script>
   (function(){
     var URL_='https://grxnbgtfnaayeluenvqh.supabase.co';
     var KEY_='sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu';
-    var TABS=['US','Europe','Asia','Currencies','Crypto'];
-    var DATA=null, cur='US';
-    // format a value by magnitude: indices >=1000 → commas 2dp; 100-1000 → 2dp;
-    // FX 1-100 → 4dp; sub-1 → 5dp.
+    var ORDER=['US','Europe','Asia'];   // stock indices only (no fx, no crypto)
+    // format a value by magnitude: >=1000 → commas 2dp; 100-1000 → 2dp; FX 1-100 → 4dp; sub-1 → 5dp.
     function fmtVal(v){
       var a=Math.abs(v);
       if(a>=1000) return v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -641,60 +622,28 @@
       if(a>=1)    return v.toFixed(4);
       return v.toFixed(5);
     }
-    function fmtPts(d){
-      var a=Math.abs(d), s=d>=0?'+':'-';
-      if(a>=1000) return s+a.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-      if(a>=100)  return s+a.toFixed(2);
-      if(a>=1)    return s+a.toFixed(3);
-      return s+a.toFixed(4);
-    }
-    function sparkSVG(arr,up){
-      var w=150,h=44,pad=3,n=arr.length,col=up?'#16a34a':'#e5484d';
-      if(n<2) return '';
-      var mn=Math.min.apply(null,arr), mx=Math.max.apply(null,arr), rng=(mx===mn)?1:(mx-mn);
-      var X=function(i){return pad+i/(n-1)*(w-pad*2);};
-      var Y=function(v){return pad+(1-(v-mn)/rng)*(h-pad*2);};
-      var d='M'+X(0).toFixed(1)+' '+Y(arr[0]).toFixed(1);
-      for(var i=1;i<n;i++) d+=' L'+X(i).toFixed(1)+' '+Y(arr[i]).toFixed(1);
-      var area=d+' L'+X(n-1).toFixed(1)+' '+(h-pad)+' L'+X(0).toFixed(1)+' '+(h-pad)+' Z';
-      var by=Y(arr[0]).toFixed(1);
-      return '<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'
-        +'<path d="'+area+'" fill="'+col+'" fill-opacity="0.13"/>'
-        +'<line x1="0" y1="'+by+'" x2="'+w+'" y2="'+by+'" stroke="#9aa3b8" stroke-width="1" stroke-dasharray="1.5 2.5"/>'
-        +'<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>';
-    }
     function esc(s){return String(s).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
-    function render(){
-      var tabs=document.getElementById('idxTabs'), cards=document.getElementById('idxCards');
-      tabs.innerHTML=TABS.map(function(t){
-        return '<button class="idx-tab'+(t===cur?' on':'')+'" data-t="'+t+'">'+t+'</button>';
-      }).join('');
-      var rows=(DATA&&DATA[cur])||[];
-      if(!rows.length){ cards.innerHTML='<div class="idx-empty">Loading market data…</div>'; }
-      else cards.innerHTML=rows.map(function(c){
-        var pts=c.v-c.prev, pct=c.prev?(pts/c.prev*100):0, up=pts>=0, cls=up?'up':'dn';
-        return '<a class="idx-card" href="markets.html">'
-          +'<div class="idx-nm">'+esc(c.n)+'</div>'
-          +'<div class="idx-val">'+fmtVal(c.v)+' <span class="pts">('+fmtPts(pts)+')</span></div>'
-          +'<div class="idx-chg '+cls+'">'+(up?'+':'')+pct.toFixed(2)+'% <span class="idx-ar">'+(up?'▲':'▼')+'</span></div>'
-          +'<div class="idx-spark">'+sparkSVG(c.spark||[],up)+'</div></a>';
-      }).join('');
-      Array.prototype.forEach.call(document.querySelectorAll('.idx-tab'),function(b){
-        b.onclick=function(){ cur=b.dataset.t; render(); };
-      });
+    function itemHTML(c){
+      var pts=c.v-c.prev, pct=c.prev?(pts/c.prev*100):0, up=pts>=0, cls=up?'up':'dn';
+      return '<a class="tk-item" href="markets.html">'
+        +'<span class="tk-nm">'+esc(c.n)+'</span>'
+        +'<span class="tk-v">'+fmtVal(c.v)+'</span>'
+        +'<span class="tk-c '+cls+'">'+(up?'+':'')+pct.toFixed(2)+'%<span class="ar">'+(up?'▲':'▼')+'</span></span>'
+        +'</a>';
     }
     function load(){
       fetch(URL_+'/rest/v1/sparklines?id=eq.strip&select=data',{headers:{apikey:KEY_,Authorization:'Bearer '+KEY_}})
         .then(function(r){return r.ok?r.json():null;})
         .then(function(j){
           var d=j&&j[0]&&j[0].data; if(!d) return;
-          var any=TABS.some(function(t){return d[t]&&d[t].length;});
-          if(!any) return;
-          DATA=d;
-          // start on the first tab that actually has data
-          for(var i=0;i<TABS.length;i++){ if(d[TABS[i]]&&d[TABS[i]].length){ cur=TABS[i]; break; } }
-          document.getElementById('idxstrip').style.display='';
-          render();
+          var items=[];
+          ORDER.forEach(function(t){ (d[t]||[]).forEach(function(c){ if(c&&c.v>0) items.push(c); }); });
+          if(!items.length) return;
+          var one=items.map(itemHTML).join('');
+          var track=document.getElementById('tkTrack');
+          track.innerHTML=one+one;              // duplicate → seamless -50% loop
+          track.style.animationDuration=(items.length*3.2)+'s';
+          document.getElementById('tkbar').style.display='';
         }).catch(function(){});
     }
     load();
