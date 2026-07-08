@@ -583,17 +583,16 @@
     </div>
   </section>
 
-  <div class="lp-body">
-  <!-- Markets ticker tape — real values from the sparkline-cache (row id='strip'), indices +
-       currencies only (no crypto). One continuous sideways-flowing marquee; reads ONE cached
-       row and never touches a data provider itself. -->
+  <!-- Markets ticker tape — real values from the sparkline-cache (row id='strip'), indices only
+       (no fx, no crypto). One continuous sideways-flowing marquee, flush under the hero; reads
+       ONE cached row and never touches a data provider itself. -->
   <style>
-   .tkbar{border-top:1px solid #e4e8f2;border-bottom:1px solid #e4e8f2;background:#fff;
-     position:relative;overflow:hidden}
-   .tkbar::before,.tkbar::after{content:"";position:absolute;top:0;bottom:0;width:64px;z-index:2;pointer-events:none}
+   .tkbar{background:#fff;position:relative;overflow:hidden}
+   .tkbar::before,.tkbar::after{content:"";position:absolute;top:0;bottom:0;width:40px;z-index:2;pointer-events:none}
    .tkbar::before{left:0;background:linear-gradient(90deg,#fff 20%,rgba(255,255,255,0))}
    .tkbar::after{right:0;background:linear-gradient(270deg,#fff 20%,rgba(255,255,255,0))}
-   .tk-track{display:flex;width:max-content;will-change:transform;animation:tkflow linear infinite}
+   .tk-track{display:flex;width:max-content;animation:tkflow linear infinite;
+     backface-visibility:hidden;-webkit-font-smoothing:antialiased}
    .tkbar:hover .tk-track{animation-play-state:paused}
    @keyframes tkflow{from{transform:translate3d(0,0,0)}to{transform:translate3d(-50%,0,0)}}
    .tk-item{display:flex;align-items:center;gap:9px;padding:13px 26px;white-space:nowrap;
@@ -642,13 +641,15 @@
           var one=items.map(itemHTML).join('');
           var track=document.getElementById('tkTrack');
           track.innerHTML=one+one;              // duplicate → seamless -50% loop
-          track.style.animationDuration=(items.length*3.2)+'s';
+          track.style.animationDuration=(items.length*7)+'s';   // slow, readable glide
           document.getElementById('tkbar').style.display='';
         }).catch(function(){});
     }
     load();
   })();
   </script>
+
+  <div class="lp-body">
   <style>
    /* Markets cards — direction B (minimal line): white cards, black heading, blue line icon. */
    .features{position:relative}
