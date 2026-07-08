@@ -61,6 +61,10 @@ async function fetchFeed() {
   const rows = await r.json();
   return (rows && rows[0]) || null;
 }
+// Robust team match (mirrors sports-games): strip club suffixes, significant-token subset.
+const _norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\b(fc|sc|cf|afc|ac|sd|cd)\b/g, ' ').replace(/\s+/g, ' ').trim();
+const _sig = (s) => _norm(s).split(' ').filter((t) => t.length > 2);
+function teamMatch(a, b) { const A = _sig(a), B = _sig(b); if (!A.length || !B.length) return false; const [x, y] = A.length <= B.length ? [A, B] : [B, A]; return x.every((t) => y.includes(t)); }
 // A game is imminent-broken if it kicks off ≤48h out but has no real odds.
 function countImminentBad(all) {
   return all.filter((g) => {
@@ -131,6 +135,40 @@ async function main() {
       `  ${lg.padEnd(6)} ${String(s.n).padStart(4)} ${String(s.days.size).padStart(4)}일 ${String(s.real).padStart(5)} ${String(s.ph).padStart(4)} ${String(s.locked).padStart(4)} ${String(s.leak).padStart(4)} ${String(s.miss).padStart(4)} ${String(s.tbd).padStart(3)} ${String(s.bad).padStart(6)} ${String(s.immBad).padStart(8)}` +
       (s.leak ? '   🚨 ' + warn.join(' ') : warn.length ? '   ⚠️ ' + warn.join(' ') : '   ✅')
     );
+  }
+
+  // ── C7 · 오즈 테이블 신선도 + 잠금 경기 근본원인 (회수가능 vs 프로바이더에 없음) ──
+  let odds = null;
+  try {
+    const r = await fetch(`${URL}/rest/v1/sports_odds?select=sport,updated_at,data`, { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } });
+    if (r.ok) odds = await r.json();
+  } catch (_e) { /* network — skip the extra report */ }
+  if (odds) {
+    const stale = odds.filter((o) => o.updated_at && (NOW - new Date(o.updated_at).getTime()) > 15 * 60000);
+    console.log('\n  오즈 테이블(C7): ' + odds.length + '개 리그' + (stale.length ? '  ⚠️ 스테일(>15분): ' + stale.map((o) => o.sport).join(', ') + ' — sports-odds 크론 확인' : '  ✅ 전부 신선'));
+    const bySport = {}; odds.forEach((o) => { bySport[o.sport] = Array.isArray(o.data) ? o.data : []; });
+    const OK = { NFL: 'americanfootball_nfl', NBA: 'basketball_nba', MLB: 'baseball_mlb', NHL: 'icehockey_nhl' };
+    const socAll = Object.keys(bySport).filter((k) => k.indexOf('soccer_') === 0).flatMap((k) => bySport[k]);
+    const cls = {};
+    for (const g of win) {
+      if (g.oddsReal !== false) continue;
+      const c = (cls[g.lg || '?'] = cls[g.lg || '?'] || { rec: 0, abs: 0 });
+      const pool = g.lg === 'SOC' ? socAll : (bySport[OK[g.lg]] || []);
+      const gt = Date.parse(g.iso || '');
+      const hit = pool.find((e) => {
+        const ok = (teamMatch(e.home_team, g.home && g.home.nm) && teamMatch(e.away_team, g.away && g.away.nm)) ||
+                   (teamMatch(e.home_team, g.away && g.away.nm) && teamMatch(e.away_team, g.home && g.home.nm));
+        if (!ok) return false;
+        const et = Date.parse(e.commence_time || '');
+        return (isNaN(gt) || isNaN(et)) ? true : Math.abs(et - gt) <= 6 * 3600e3;
+      });
+      if (hit && (hit.bookmakers || []).length) c.rec++; else c.abs++;
+    }
+    if (Object.keys(cls).length) {
+      console.log('  잠금 분류: ' + Object.keys(cls).sort().map((lg) => `${lg} ${cls[lg].rec + cls[lg].abs}(회수${cls[lg].rec}/없음${cls[lg].abs})`).join(' · '));
+      const recTotal = Object.values(cls).reduce((a, c) => a + c.rec, 0);
+      if (recTotal) console.log(`     ⚠️ 회수가능 ${recTotal}건 — 프로바이더에 실배당 있는데 안 붙음(매칭/접미사 or sports-games 미배포). 잠긴 경기가 열릴 수 있음.`);
+    }
   }
 
   console.log('');
