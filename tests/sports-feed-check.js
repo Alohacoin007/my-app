@@ -46,6 +46,9 @@ function isTBD(g) {
   return /\b(?:rd\d|qf|sf|r16|w\d|l\d)\b|winner|loser|to be determined|\btbd\b/i.test(s);
 }
 function structOK(g) {
+  // A no-line game (oddsReal:false) is INTENTIONALLY empty — locked, not broken. Only a
+  // game that CLAIMS a real line must carry full, well-formed markets.
+  if (g.oddsReal === false) return true;
   if (g.lg === 'SOC') return (g.threeWay || []).length >= 3 || (g.ml || []).length >= 2;
   return (g.spread || []).length >= 2 && (g.total || []).length >= 2 && (g.ml || []).length >= 2;
 }
