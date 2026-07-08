@@ -381,7 +381,21 @@
         var sp=r.querySelector('.m-spark'); if(sp) sp.innerHTML=sparkSVG(c);
       });
     }
-    if(sb){ renderSide(); renderMain(); pull(); loadChart(); setInterval(pull,3000); }
+    // Seed each symbol's mini-chart from the server sparkline cache so the sparklines
+    // show a real recent trend INSTANTLY (instead of accumulating live ticks for minutes).
+    // Live pull() keeps appending after, so they stay current. Falls back to live-accumulate
+    // if the cache is empty/unavailable.
+    function loadSparkCache(){
+      if(!sb) return;
+      sb.from('sparklines').select('data').eq('id','all').maybeSingle().then(function(r){
+        if(!r||r.error||!r.data||!r.data.data) return;
+        var d=r.data.data;
+        CAT.forEach(function(c){ var arr=d[c.sym];
+          if(Array.isArray(arr)&&arr.length>=2 && (!c.hist || c.hist.length<arr.length)){ c.hist=arr.slice(-60); } });
+        updateSide();
+      }, function(){});
+    }
+    if(sb){ loadSparkCache(); renderSide(); renderMain(); pull(); loadChart(); setInterval(pull,3000); }
     else { if(main) main.innerHTML='<div class="m-loading">Live feed unavailable.</div>'; }
   })();
   </script>
