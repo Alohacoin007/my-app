@@ -90,6 +90,21 @@ function fmtTime(iso: string): string {
 // read what's stored — so the dashboard shows the SAME real odds as the app.
 const ODDS_SPORT: Record<string, string> = { NFL: "americanfootball_nfl", NBA: "basketball_nba", MLB: "baseball_mlb", NHL: "icehockey_nhl" };
 function nick(name: string): string { return String(name || "").trim().toLowerCase().split(/\s+/).pop() || ""; }
+// Robust team-name match. nick() (last word) breaks on soccer clubs whose feeds differ:
+// ESPN "Vancouver" vs Odds "Vancouver Whitecaps FC" → last words "vancouver" ≠ "fc".
+// Instead: strip club suffixes, take significant tokens (len>2), and require every token
+// of the SHORTER name to appear in the longer (subset). Safe for US sports too
+// ("Reds" ⊆ "Cincinnati Reds"); "Red Sox" ⊄ "Chicago White Sox" so no cross-match.
+function normNm(s: string): string {
+  return String(s || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\b(fc|sc|cf|afc|ac|sd|cd)\b/g, " ").replace(/\s+/g, " ").trim();
+}
+function sigToks(s: string): string[] { return normNm(s).split(" ").filter((t) => t.length > 2); }
+function teamMatch(a: string, b: string): boolean {
+  const A = sigToks(a), B = sigToks(b);
+  if (!A.length || !B.length) return false;
+  const [short, long] = A.length <= B.length ? [A, B] : [B, A];
+  return short.every((t) => long.includes(t));
+}
 function decP(p: number): number { return p > 0 ? 1 + p / 100 : 1 + 100 / (-p); }
 function fmtPt(p: number): string { return (p > 0 ? "+" : "") + p; }
 function bestOutcome(ev: any, marketKey: string, matchFn: (o: any) => boolean): any {
@@ -103,7 +118,7 @@ function bestOutcome(ev: any, marketKey: string, matchFn: (o: any) => boolean): 
 function oddsToCore(ev: any, home: any, away: any): any {
   if (!ev.bookmakers || !ev.bookmakers.length) return null;
   const core: any = {};
-  const mlH = bestOutcome(ev, "h2h", (o) => nick(o.name) === nick(home.nm)), mlA = bestOutcome(ev, "h2h", (o) => nick(o.name) === nick(away.nm));
+  const mlH = bestOutcome(ev, "h2h", (o) => teamMatch(o.name, home.nm)), mlA = bestOutcome(ev, "h2h", (o) => teamMatch(o.name, away.nm));
   if (mlH && mlA) core.ml = [{ ln: "", am: mlH.price, sel: home.nm + " ML" }, { ln: "", am: mlA.price, sel: away.nm + " ML" }];
   // Soccer 1X2: the h2h market has a third "Draw" outcome. Capture it → threeWay
   // [Home, Draw, Away]. sel = "<team> ML" / "Draw"; graded by the 1X2 settler branch.
@@ -113,7 +128,7 @@ function oddsToCore(ev: any, home: any, away: any): any {
     { ln: "X", am: drawO.price, sel: "Draw" },
     { ln: "2", am: mlA.price, sel: away.nm + " ML" },
   ];
-  const spH = bestOutcome(ev, "spreads", (o) => nick(o.name) === nick(home.nm)), spA = bestOutcome(ev, "spreads", (o) => nick(o.name) === nick(away.nm));
+  const spH = bestOutcome(ev, "spreads", (o) => teamMatch(o.name, home.nm)), spA = bestOutcome(ev, "spreads", (o) => teamMatch(o.name, away.nm));
   if (spH && spA && spH.point != null && spA.point != null) core.spread = [{ ln: fmtPt(spH.point), am: spH.price, sel: home.nm + " " + fmtPt(spH.point) }, { ln: fmtPt(spA.point), am: spA.price, sel: away.nm + " " + fmtPt(spA.point) }];
   const ov = bestOutcome(ev, "totals", (o) => /over/i.test(o.name)), un = bestOutcome(ev, "totals", (o) => /under/i.test(o.name));
   if (ov && un && ov.point != null && un.point != null) core.total = [{ ln: "Over " + ov.point, am: ov.price, sel: "Over " + ov.point }, { ln: "Under " + un.point, am: un.price, sel: "Under " + un.point }];
@@ -138,7 +153,18 @@ async function overlayRealOdds(games: any[], SB_URL: string, H: Record<string, s
         data = bySport[sk] || [];
       }
       if (!data.length) return;
-      const ev = data.find((e: any) => { const s = new Set([nick(e.home_team), nick(e.away_team)]); return s.has(nick(g.home.nm)) && s.has(nick(g.away.nm)); });
+      // Match by robust team tokens + kickoff proximity, and require a UNIQUE hit — if two
+      // events could be this game (ambiguous), attach nothing (the game stays locked) rather
+      // than risk pinning the wrong odds. gt/et within 6h when both timestamps are known.
+      const gt = Date.parse(g.iso || "");
+      const hits = data.filter((e: any) => {
+        const teamsOk = (teamMatch(e.home_team, g.home.nm) && teamMatch(e.away_team, g.away.nm)) ||
+                        (teamMatch(e.home_team, g.away.nm) && teamMatch(e.away_team, g.home.nm));
+        if (!teamsOk) return false;
+        const et = Date.parse(e.commence_time || "");
+        return (isNaN(gt) || isNaN(et)) ? true : Math.abs(et - gt) <= 6 * 3600 * 1000;
+      });
+      const ev = hits.length === 1 ? hits[0] : null;
       if (!ev) return;
       const core = oddsToCore(ev, g.home, g.away);
       if (core) {
