@@ -24,7 +24,8 @@ function allGroupedHTML(GAMES, now) {
   let html = '';
   if (live.length) html += `H(🔴 Live now)` + rows(live);
   let curKey = null, bucket = [];
-  const flush = () => { if (bucket.length) { const t = _kickTs(bucket[0]); html += `H(${isFinite(t) ? _dayLabel(t, now) : 'Scheduled'})` + rows(bucket); bucket = []; } };
+  // Today header is suppressed (the static column header already reads "Today").
+  const flush = () => { if (bucket.length) { const t = _kickTs(bucket[0]); const lbl = isFinite(t) ? _dayLabel(t, now) : 'Scheduled'; html += (lbl === 'Today' ? '' : `H(${lbl})`) + rows(bucket); bucket = []; } };
   sched.forEach((g) => { const k = _dayKey(_kickTs(g)); if (k !== curKey) { flush(); curKey = k; } bucket.push(g); });
   flush();
   return html;
@@ -48,9 +49,9 @@ console.log('\n  sequence:', out.replace(/\]\[/g, '] [') + '\n');
 
 ok('Live group is first', out.indexOf('H(🔴 Live now)') === 0);
 ok('finished game excluded', !out.includes('[done_1]'));
-ok('Today header present', out.includes('H(Today)'));
+ok('Today header SUPPRESSED (column header already says Today)', !out.includes('H(Today)'));
 ok('Tomorrow header present', out.includes('H(Tomorrow)'));
-ok('Today before Tomorrow', out.indexOf('H(Today)') < out.indexOf('H(Tomorrow)'));
+ok('today games appear before the Tomorrow header', out.indexOf('[today_2]') < out.indexOf('H(Tomorrow)'));
 ok('within Today, 4pm before 6:30pm', out.indexOf('[today_1]') < out.indexOf('[today_2]'));
 ok('within Tomorrow, 1pm before 4pm', out.indexOf('[tmr_1]') < out.indexOf('[tmr_late]'));
 ok('Tomorrow before the day-after group', out.indexOf('[tmr_late]') < out.indexOf('[day3]'));

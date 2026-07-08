@@ -1729,7 +1729,9 @@
     // scheduled games are already time-sorted → walk them, opening a new date header
     // whenever the day bucket changes.
     let curKey=null, bucket=[];
-    const flush=()=>{ if(bucket.length){ const t=_kickTs(bucket[0]); html+=_dhdr(isFinite(t)?_dayLabel(t):'Scheduled')+gameRowsHTML(bucket,false); bucket=[]; } };
+    // The static column header (#colheadUp) already reads "Today", so skip our own
+    // "Today" group header to avoid the duplicate. Tomorrow / weekday headers stay.
+    const flush=()=>{ if(bucket.length){ const t=_kickTs(bucket[0]); const lbl=isFinite(t)?_dayLabel(t):'Scheduled'; html+=(lbl==='Today'?'':_dhdr(lbl))+gameRowsHTML(bucket,false); bucket=[]; } };
     sched.forEach(g=>{ const k=_dayKey(_kickTs(g)); if(k!==curKey){ flush(); curKey=k; } bucket.push(g); });
     flush();
     return html;
