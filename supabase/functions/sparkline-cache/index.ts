@@ -38,6 +38,17 @@ const YAHOO: Record<string, string> = {
   CRM: "CRM", ADBE: "ADBE",
 };
 
+// Markets-overview strip (landing): tab -> [name, Yahoo symbol]. Cached as row id='strip'
+// with each instrument's { n, v (value), prev (prior close), spark } so the landing reads
+// ONE row and never touches a provider itself.
+const STRIP: Record<string, [string, string][]> = {
+  US: [["Dow Jones", "^DJI"], ["S&P 500", "^GSPC"], ["Nasdaq", "^IXIC"], ["Russell 2000", "^RUT"], ["VIX", "^VIX"]],
+  Europe: [["FTSE 100", "^FTSE"], ["DAX", "^GDAXI"], ["CAC 40", "^FCHI"], ["Euro STOXX 50", "^STOXX50E"], ["IBEX 35", "^IBEX"]],
+  Asia: [["Nikkei 225", "^N225"], ["Hang Seng", "^HSI"], ["Shanghai", "000001.SS"], ["KOSPI", "^KS11"], ["ASX 200", "^AXJO"]],
+  Currencies: [["EUR/USD", "EURUSD=X"], ["USD/JPY", "USDJPY=X"], ["GBP/USD", "GBPUSD=X"], ["AUD/USD", "AUDUSD=X"], ["US Dollar", "DX-Y.NYB"]],
+  Crypto: [["Bitcoin", "BTC-USD"], ["Ethereum", "ETH-USD"], ["Solana", "SOL-USD"], ["XRP", "XRP-USD"], ["BNB", "BNB-USD"]],
+};
+
 // even-sample an array down to at most N points (keeps first & last).
 function downsample(a: number[], n = N): number[] {
   const clean = a.filter((x) => typeof x === "number" && isFinite(x) && x > 0);
@@ -71,6 +82,25 @@ async function fromYahoo(sym: string): Promise<number[] | null> {
   } catch { return null; }
 }
 
+// Yahoo chart → { v (latest price), prev (prior close), spark } for the overview strip.
+async function yahooFull(ysym: string): Promise<{ v: number; prev: number; spark: number[] } | null> {
+  try {
+    const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ysym)}?range=1d&interval=15m`, {
+      cache: "no-store", headers: { "User-Agent": "Mozilla/5.0", "accept": "application/json" },
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const res = j?.chart?.result?.[0];
+    const meta = res?.meta;
+    const closes = res?.indicators?.quote?.[0]?.close;
+    if (!meta || !Array.isArray(closes)) return null;
+    const v = +meta.regularMarketPrice;
+    const prev = +(meta.chartPreviousClose ?? meta.previousClose);
+    if (!(v > 0)) return null;
+    return { v: Math.round(v * 1e6) / 1e6, prev: prev > 0 ? Math.round(prev * 1e6) / 1e6 : v, spark: downsample(closes.map((x: any) => +x)) };
+  } catch { return null; }
+}
+
 async function runPool<T>(items: T[], worker: (t: T) => Promise<void>, cap = CONCURRENCY) {
   let i = 0;
   const runners = Array.from({ length: Math.min(cap, items.length) }, async () => {
@@ -101,11 +131,25 @@ Deno.serve(async (req) => {
 
   if (!okN) return json({ ok: false, error: "no series fetched" }, 502);
 
+  // Markets-overview strip (value + prior close + sparkline per instrument, per tab).
+  const strip: Record<string, any[]> = {};
+  let stripN = 0;
+  for (const tab of Object.keys(STRIP)) {
+    const rows = await Promise.all(STRIP[tab].map(async ([nm, ysym]) => {
+      const f = await yahooFull(ysym);
+      return f ? { n: nm, v: f.v, prev: f.prev, spark: f.spark } : null;
+    }));
+    strip[tab] = rows.filter(Boolean);
+    stripN += strip[tab].length;
+  }
+
+  const now = new Date().toISOString();
+  const rows = [{ id: "all", data: out, updated_at: now }, { id: "strip", data: strip, updated_at: now }];
   const r = await fetch(`${SB_URL}/rest/v1/sparklines?on_conflict=id`, {
     method: "POST",
     headers: { ...H, "Prefer": "resolution=merge-duplicates,return=minimal" },
-    body: JSON.stringify({ id: "all", data: out, updated_at: new Date().toISOString() }),
+    body: JSON.stringify(rows),
   });
   if (!r.ok) return json({ ok: false, error: "store " + r.status + " " + (await r.text()) }, 500);
-  return json({ ok: true, symbols: okN });
+  return json({ ok: true, symbols: okN, strip: stripN });
 });
