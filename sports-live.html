@@ -176,9 +176,6 @@
 
   .list{display:flex;flex-direction:column;gap:10px;padding:0 12px 150px;overflow-y:auto}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;box-shadow:0 1px 2px rgba(60,64,67,.08)}
-  /* All-tab date group header */
-  .date-hdr{position:sticky;top:0;z-index:3;margin:14px 0 8px;padding:6px 2px;font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--dim);background:var(--bg);border-bottom:1px solid var(--line)}
-  .date-hdr:first-child{margin-top:2px}
   .ch{display:flex;align-items:center;justify-content:space-between;padding:11px 14px 8px}
   .ch-r{display:flex;align-items:center;gap:9px}
   .pin-btn{background:none;border:none;font-size:15px;line-height:1;cursor:pointer;color:rgba(95,99,104,.30);padding:2px 4px;transition:.18s;font-family:inherit;-webkit-user-select:none;user-select:none}
@@ -785,8 +782,7 @@
         <button class="search-clear" id="searchClear" style="display:none">✕</button>
       </div>
       <div class="sports">
-        <div class="sport active" data-sport="ALL">📅 All</div>
-        <div class="sport" data-sport="NBA">🏀 NBA</div>
+        <div class="sport active" data-sport="NBA">🏀 NBA</div>
         <div class="sport" data-sport="NCAAB">🎓 NCAAB</div>
         <div class="sport" data-sport="NFL">🏈 NFL</div>
         <div class="sport" data-sport="MLB">⚾ MLB</div>
@@ -1458,7 +1454,7 @@
 
   // ---------- helpers ----------
   const body=document.body;
-  let mode='parlay', legs=[], curSport='ALL';
+  let mode='parlay', legs=[], curSport='NBA';
   // ===== SETTINGS state =====
   const DEFAULT_SETTINGS={
     oddsFormat:'american',
@@ -1710,45 +1706,28 @@
     if(window.__alpexaOddsStale) return 'Odds updating — try again';
     return 'Live betting unavailable';
   }
-  // ── "All" tab: every sport, grouped by date (Live → Today → Tomorrow → weekday),
-  // each group time-sorted. Uses the viewer's chosen timezone for the day buckets.
-  function _dayKey(ts){ try{ return new Date(ts).toLocaleDateString('en-CA',{timeZone:curTZ()}); }catch(e){ return ''; } }
-  function _dayLabel(ts){
-    const z=curTZ(), k=_dayKey(ts);
-    if(k && k===_dayKey(Date.now())) return 'Today';
-    if(k && k===_dayKey(Date.now()+86400000)) return 'Tomorrow';
-    try{ const o={weekday:'long',month:'short',day:'numeric'}; if(z)o.timeZone=z; return new Date(ts).toLocaleDateString(undefined,o); }catch(e){ return k||'Scheduled'; }
-  }
-  const _dhdr=(t)=>`<div class="date-hdr">${t}</div>`;
-  function allGroupedHTML(){
-    const all=GAMES.filter(g=>g&&g.state!=='post');
-    const live=all.filter(g=>g.live).slice().sort((a,b)=>_kickTs(a)-_kickTs(b));
-    const sched=all.filter(g=>!g.live).slice().sort((a,b)=>_kickTs(a)-_kickTs(b));
-    let html='';
-    if(live.length) html+=_dhdr('🔴 Live now')+gameRowsHTML(live,false);
-    // scheduled games are already time-sorted → walk them, opening a new date header
-    // whenever the day bucket changes.
-    let curKey=null, bucket=[];
-    // The static column header (#colheadUp) already reads "Today", so skip our own
-    // "Today" group header to avoid the duplicate. Tomorrow / weekday headers stay.
-    const flush=()=>{ if(bucket.length){ const t=_kickTs(bucket[0]); const lbl=isFinite(t)?_dayLabel(t):'Scheduled'; html+=(lbl==='Today'?'':_dhdr(lbl))+gameRowsHTML(bucket,false); bucket=[]; } };
-    sched.forEach(g=>{ const k=_dayKey(_kickTs(g)); if(k!==curKey){ flush(); curKey=k; } bucket.push(g); });
-    flush();
-    return html;
+  // On first load, if the default tab (NBA) is empty, jump to the first sport tab that
+  // actually has games — so the app never opens on a blank list. Runs once; never yanks
+  // the tab the user is browsing.
+  var _autoPicked=false;
+  function autoPickSport(){
+    if(_autoPicked) return; if(!GAMES.length) return; _autoPicked=true;
+    try{
+      var have={}; GAMES.forEach(function(g){ have[g.lg]=1; });
+      if(have[curSport]) return;
+      var tabs=document.querySelectorAll('#page-home .sport');
+      for(var i=0;i<tabs.length;i++){ var s=tabs[i].dataset.sport; if(s&&have[s]){
+        var a=document.querySelector('#page-home .sport.active'); if(a)a.classList.remove('active');
+        tabs[i].classList.add('active'); curSport=s; break;
+      } }
+    }catch(e){}
   }
   function renderGames(){
     // Soccer cards are 1X2 (self-labeled Home/Draw/Away) → hide the Spread/Total/ML header.
-    // The All tab is mixed → keep the header (soccer cards self-label anyway).
     try{ var _soc=curSport==='SOC'; ['colheadUp','colheadLive'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display=_soc?'none':''; }); }catch(e){}
     const emptyMsg=gameQuery?`No games match "${gameQuery}"`:'No upcoming games';
-    let listHTML;
-    if(curSport==='ALL' && !gameQuery){
-      listHTML=allGroupedHTML();
-    } else {
-      const base=(gameQuery?GAMES.filter(matchGame):GAMES.filter(g=>g.lg===curSport)).slice().sort(sortByPin);
-      listHTML=gameRowsHTML(base,false);
-    }
-    document.getElementById('list').innerHTML=listHTML||`<div class="empty">${emptyMsg}</div>`;
+    const base=(gameQuery?GAMES.filter(matchGame):GAMES.filter(g=>g.lg===curSport)).slice().sort(sortByPin);
+    document.getElementById('list').innerHTML=gameRowsHTML(base,false)||`<div class="empty">${emptyMsg}</div>`;
     const liveGames=GAMES.filter(g=>g.live&&matchGame(g)).slice().sort(sortByPin);
     document.getElementById('liveList').innerHTML=gameRowsHTML(liveGames,true)||'<div class="empty">No live games right now</div>';
     document.getElementById('liveCount').textContent=liveGames.length;
@@ -3604,6 +3583,7 @@
               window.__alpexaOddsTs=Date.now(); refreshOddsStale();
               applySuspensions(sgames);
               GAMES.length=0; sgames.forEach(function(g){GAMES.push(g);});
+              try{ autoPickSport(); }catch(e){}
               if(typeof renderGames==='function') renderGames();
               try{ settleBets(); }catch(e){}
               if(!isRefresh){ try{ if(badge&&badge.parentNode) badge.remove(); }catch(e){} }
