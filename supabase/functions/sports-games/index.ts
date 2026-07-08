@@ -72,9 +72,13 @@ function mkCore(home: any, away: any, ev: any, lg: string) {
     // BACKWARD-COMPAT: also keep the 2-way ml. New clients render 1X2 from threeWay; OLD
     // (still-cached) clients require ml>=2 to accept a game, so leaving ml populated stops
     // soccer from vanishing on a stale client during the deploy transition.
-    return { spread: [], total: [], ml, threeWay };
+    // real = false: soccer real prices (incl. the Draw) come only from the overlay.
+    return { spread: [], total: [], ml, threeWay, real: false };
   }
-  return { spread, total: total2, ml };
+  // real = true only when ESPN actually gave a moneyline (not our -140/120 fallback).
+  // The overlay flips it true when The Odds API lines apply. A game left with real=false
+  // has a FABRICATED line and must not be bettable.
+  return { spread, total: total2, ml, real: (mlHome != null && mlAway != null) };
 }
 
 function fmtTime(iso: string): string {
@@ -142,10 +146,10 @@ async function overlayRealOdds(games: any[], SB_URL: string, H: Record<string, s
         if (g.lg === "SOC") {
           // Soccer 1X2 (Home/Draw/Away). Real 3-way odds → threeWay; also refresh the
           // 2-way ml (backward-compat for stale clients). Spread/total stay empty.
-          if (core.threeWay) g.threeWay = core.threeWay;
+          if (core.threeWay) { g.threeWay = core.threeWay; g.oddsReal = true; }
           if (core.ml) g.ml = core.ml;
         } else {
-          if (core.ml) g.ml = core.ml; if (core.spread) g.spread = core.spread; if (core.total) g.total = core.total;
+          if (core.ml) { g.ml = core.ml; g.oddsReal = true; } if (core.spread) g.spread = core.spread; if (core.total) g.total = core.total;
         }
       }
     });
@@ -189,6 +193,7 @@ async function fetchLeague(L: { lg: string; sport: string; path: string }, out: 
             live: state === "in", time: state === "in" ? (st.shortDetail || "Live") : fmtTime(ev.date),
             iso: ev.date || "", // raw kickoff time — each client renders it in the viewer's local timezone
             home, away, spread: core.spread, total: core.total, ml: core.ml, threeWay: core.threeWay || [],
+            oddsReal: core.real === true,   // false = fabricated placeholder line → not bettable
           });
         } catch (_e) { /* skip one event */ }
       }

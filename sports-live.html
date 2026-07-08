@@ -1620,6 +1620,7 @@
     return games.map(g=>{
      try {
       const cell=(arr,key,i)=>{const b=arr[i];if(!b)return '<div></div>';
+        if(!oddsReal(g)) return `<div class="bet sus" title="Odds unavailable — no market"><span class="ln">${b.ln||'&nbsp;'}</span><span class="pr">🔒</span></div>`;
         const on=legs.some(l=>l.uid===g.id+'|'+b.sel);
         // Live betting: locked unless the master switch is on AND the game isn't
         // suspended (score just changed) AND odds are fresh — anti-arbitrage.
@@ -1632,6 +1633,7 @@
       // outcome, market='1X2' (settler grades team=win-outright, draw=its own outcome).
       const isSoc=g.lg==='SOC';
       const c3=(b,lbl)=>{ if(!b)return '<div class="bet dis"><span class="ln">'+lbl+'</span><span class="pr">—</span></div>';
+        if(!oddsReal(g)) return `<div class="bet sus" title="Odds unavailable — no market"><span class="ln">${lbl}</span><span class="pr">🔒</span></div>`;
         const on=legs.some(l=>l.uid===g.id+'|'+b.sel);
         if(g.live&&!liveOK(g)) return `<div class="bet sus" title="${liveReason(g)}"><span class="ln">${lbl}</span><span class="pr">🔒</span></div>`;
         return `<div class="bet${on?' sel':''}" data-game="${g.id}" data-market="1X2" data-sel="${b.sel}" data-am="${b.am}"><span class="ln">${lbl}</span><span class="pr ${b.am>0?'pos':''}">${fmtAm(b.am)}</span></div>`; };
@@ -1683,6 +1685,11 @@
   // ── Live (in-play) betting gate — anti-arbitrage. A live bet is allowed only
   // when ALL hold: master switch on, the game isn't suspended (its score just
   // changed → ~15s lockout), and our odds aren't stale. Pre-match is unaffected.
+  // A game with NO real line (sports-games flagged oddsReal:false) is display-only —
+  // never bettable. The house won't honor a fabricated -140/120 placeholder. The
+  // server place_bet RPC enforces the same (this is UX; the RPC is the money gate).
+  // Missing flag = treat as real (backward-compat with feed rows written pre-deploy).
+  function oddsReal(g){ return !g || g.oddsReal !== false; }
   function liveOK(g){
     if(!g||!g.live) return true;
     if(!window.__alpexaLiveBetting) return false;

@@ -18,6 +18,10 @@ const GAMES = [
   // array as `threeWay`. place_bet must MAP '1X2' → 'threeWay' (the bug this catches:
   // an unmapped '1X2' rejects EVERY soccer bet at "market not offered").
   { gid: 'SOC_1', threeWay: [{ sel: 'Argentina ML', am: -283 }, { sel: 'Draw', am: 400 }, { sel: 'Egypt ML', am: 1075 }] },
+  // NO real line (The Odds API had no odds for this game): sports-games left the
+  // fabricated -140/120 placeholder and flags oddsReal:false. place_bet MUST reject
+  // any leg here — the house won't honor a made-up line (regulated-book doctrine).
+  { gid: 'MLB_PH', oddsReal: false, ml: [{ sel: 'Reds ML', am: -140 }, { sel: 'Phillies ML', am: 120 }] },
 ];
 
 // The app sends the market LABEL ('Moneyline'/'Spread'/'Total'/'1X2'), but live_games
@@ -35,6 +39,10 @@ function serverAm(games, gid, marketLabel, sel) {
 function reprice(legs, games, stake) {
   let combo = 1, gid0 = null, allSame = true;
   for (const l of legs) {
+    // GATE: reject any leg from a game with no real line (oddsReal:false). Mirrors the
+    // place_bet SQL guard — a fabricated placeholder line is never bettable.
+    const gm = games.find((x) => x.gid === l.gid);
+    if (gm && gm.oddsReal === false) return { ok: false, error: 'odds unavailable' };
     const sam = serverAm(games, l.gid, l.market, l.sel);
     if (sam === null) return { ok: false, error: 'line not offered' };  // FAIL SAFE
     combo *= decOf(sam);
@@ -85,6 +93,21 @@ console.log('\n=== SOCCER 1X2 (regression: unmapped market rejected every soccer
   ok('soccer Draw pick accepted + priced from server', reprice(drawPick, GAMES, 20).potential === Math.round(20 * decOf(400) * 100) / 100);
   // A soccer selection not on the board still fails safe.
   ok('unknown soccer selection → REJECT', reprice([{ gid: 'SOC_1', market: '1X2', sel: 'FAKE ML', am: -110 }], GAMES, 20).ok === false);
+}
+
+console.log('\n=== NO-LINE GAME (oddsReal:false) → not bettable (2026-07-08) ===');
+{
+  // RED (the bug): before the gate, a placeholder game priced like any other — the house
+  // would honor the fabricated -140 line. Prove it now REJECTS.
+  const phBet = [{ gid: 'MLB_PH', market: 'Moneyline', sel: 'Reds ML', am: -140 }];
+  ok('single leg on a no-line game → REJECT (odds unavailable)', reprice(phBet, GAMES, 20).ok === false);
+  // must also reject when hidden inside a parlay with real legs (can't launder it in)
+  const mixed = [{ gid: 'NBA_1', market: 'Moneyline', sel: 'BOS ML', am: 120 },
+                 { gid: 'MLB_PH', market: 'Moneyline', sel: 'Phillies ML', am: 120 }];
+  ok('parlay containing a no-line leg → REJECT', reprice(mixed, GAMES, 20).ok === false);
+  // GREEN: the SAME matchup, once real odds load (oddsReal:true), prices normally.
+  const REALGAMES = GAMES.map((g) => g.gid === 'MLB_PH' ? { ...g, oddsReal: true } : g);
+  ok('same game with real odds loaded → accepted + priced', reprice(phBet, REALGAMES, 20).potential === Math.round(20 * decOf(-140) * 100) / 100);
 }
 
 console.log('\n' + (pass ? '🟢 place_bet re-prices from server lines (client odds can\'t inflate)' : '🔴 odds exploit open') + '\n');

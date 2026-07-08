@@ -73,6 +73,11 @@ begin
     if v_key is null then return jsonb_build_object('ok',false,'error','market not offered: '||coalesce(v_mk,'?')); end if;
     select g.value into v_game from jsonb_array_elements(v_games) g where g.value->>'gid' = v_gid limit 1;
     if v_game is null then return jsonb_build_object('ok',false,'error','game not available'); end if;
+    -- NO-LINE GATE: sports-games flags oddsReal:false when The Odds API had no line and we
+    -- left a fabricated -140/120 placeholder. Never accept a bet on a made-up line (the
+    -- house would otherwise honor it). Missing flag = real (backward-compat pre-deploy).
+    if coalesce((v_game->>'oddsReal')::boolean, true) = false then
+      return jsonb_build_object('ok',false,'error','odds unavailable for this game'); end if;
     if jsonb_typeof(v_game->v_key) is distinct from 'array' then
       return jsonb_build_object('ok',false,'error','market not available for this game'); end if;
     select (e.value->>'am')::numeric into v_srv_am

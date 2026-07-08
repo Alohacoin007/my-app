@@ -31,6 +31,8 @@ const stubs = {
   pinnedGames: new Set(),
   liveOK: () => true,
   liveReason: () => '',
+  oddsReal: (g) => (!g || g.oddsReal !== false),   // no-line games render locked, mirrors sports-live.html
+
   fmtAm: (a) => { const n = +a; return (n > 0 ? '+' : '') + n; },
   gameTimeLabel: (g) => (g && g.time) || '',
 };
@@ -73,6 +75,15 @@ function renders(games) {
 console.log('\n=== GREEN — valid games render, list is non-empty ===');
 ok('soccer 1X2 renders (Home/Draw/Away)', renders([soc1x2]).out.includes('SOC_1'));
 ok('MLB 2-way renders', renders([mlb2way]).out.includes('MLB_1'));
+
+console.log('\n=== NO-LINE game (oddsReal:false) renders LOCKED, not bettable (2026-07-08) ===');
+{
+  const noLine = { ...mlb2way, id: 'MLB_PH', oddsReal: false };
+  const out = renders([noLine]).out;
+  ok('card still shows (game not hidden)', out.includes('MLB_PH'));
+  ok('odds cells are locked (🔒)', out.includes('🔒'));
+  ok('no bettable cell (no data-am) on a no-line game', !/data-am=/.test(out.slice(out.indexOf('MLB_PH'))));
+}
 
 console.log('\n=== GREEN — edge-case games never throw (per-card guard) ===');
 ok('empty threeWay: no throw', renders([socEmptyThreeWay]).threw === false);
