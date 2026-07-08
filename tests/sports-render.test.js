@@ -76,13 +76,21 @@ console.log('\n=== GREEN — valid games render, list is non-empty ===');
 ok('soccer 1X2 renders (Home/Draw/Away)', renders([soc1x2]).out.includes('SOC_1'));
 ok('MLB 2-way renders', renders([mlb2way]).out.includes('MLB_1'));
 
-console.log('\n=== NO-LINE game (oddsReal:false) renders LOCKED, not bettable (2026-07-08) ===');
+console.log('\n=== NO-LINE game: EMPTY odds + oddsReal:false → LOCKED, not bettable (2026-07-08) ===');
 {
-  const noLine = { ...mlb2way, id: 'MLB_PH', oddsReal: false };
+  // Post-fix shape: sports-games emits EMPTY arrays (no fabricated -140/120) + oddsReal:false.
+  const noLine = { id: 'MLB_PH', lg: 'MLB', live: false, time: 'Wed 7:00 PM',
+    home: { ab: 'CIN', nm: 'Reds' }, away: { ab: 'PHI', nm: 'Phillies' }, oddsReal: false,
+    core: { spread: [], total: [], ml: [], threeWay: [] }, props: [] };
   const out = renders([noLine]).out;
   ok('card still shows (game not hidden)', out.includes('MLB_PH'));
-  ok('odds cells are locked (🔒)', out.includes('🔒'));
+  ok('odds cells are locked (🔒) even with empty arrays', out.includes('🔒'));
   ok('no bettable cell (no data-am) on a no-line game', !/data-am=/.test(out.slice(out.indexOf('MLB_PH'))));
+  // a soccer no-line game (empty threeWay) must also render locked, not blank/dropped
+  const socNo = { id: 'SOC_NO', lg: 'SOC', live: false, time: 'x', home: { ab: 'A', nm: 'A' }, away: { ab: 'B', nm: 'B' },
+    oddsReal: false, core: { spread: [], total: [], ml: [], threeWay: [] }, props: [] };
+  const so = renders([socNo]).out;
+  ok('soccer no-line renders locked', so.includes('SOC_NO') && so.includes('🔒'));
 }
 
 console.log('\n=== GREEN — edge-case games never throw (per-card guard) ===');

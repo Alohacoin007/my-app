@@ -1619,8 +1619,10 @@
   function gameRowsHTML(games,showPlay){
     return games.map(g=>{
      try {
-      const cell=(arr,key,i)=>{const b=arr[i];if(!b)return '<div></div>';
-        if(!oddsReal(g)) return `<div class="bet sus" title="Odds unavailable — no market"><span class="ln">${b.ln||'&nbsp;'}</span><span class="pr">🔒</span></div>`;
+      const cell=(arr,key,i)=>{
+        // No real line → locked, regardless of whether a (placeholder) number exists.
+        if(!oddsReal(g)) return `<div class="bet sus" title="Odds unavailable — no market"><span class="ln">&nbsp;</span><span class="pr">🔒</span></div>`;
+        const b=arr[i];if(!b)return '<div></div>';
         const on=legs.some(l=>l.uid===g.id+'|'+b.sel);
         // Live betting: locked unless the master switch is on AND the game isn't
         // suspended (score just changed) AND odds are fresh — anti-arbitrage.
@@ -1632,8 +1634,9 @@
       // SOCCER = 1X2 (Home / Draw / Away) — the standard football market. One cell per
       // outcome, market='1X2' (settler grades team=win-outright, draw=its own outcome).
       const isSoc=g.lg==='SOC';
-      const c3=(b,lbl)=>{ if(!b)return '<div class="bet dis"><span class="ln">'+lbl+'</span><span class="pr">—</span></div>';
+      const c3=(b,lbl)=>{
         if(!oddsReal(g)) return `<div class="bet sus" title="Odds unavailable — no market"><span class="ln">${lbl}</span><span class="pr">🔒</span></div>`;
+        if(!b)return '<div class="bet dis"><span class="ln">'+lbl+'</span><span class="pr">—</span></div>';
         const on=legs.some(l=>l.uid===g.id+'|'+b.sel);
         if(g.live&&!liveOK(g)) return `<div class="bet sus" title="${liveReason(g)}"><span class="ln">${lbl}</span><span class="pr">🔒</span></div>`;
         return `<div class="bet${on?' sel':''}" data-game="${g.id}" data-market="1X2" data-sel="${b.sel}" data-am="${b.am}"><span class="ln">${lbl}</span><span class="pr ${b.am>0?'pos':''}">${fmtAm(b.am)}</span></div>`; };
@@ -3533,13 +3536,20 @@
       if(isSoc && tw.length<3 && ml.length>=2){
         tw=[{ln:'1',am:ml[0].am,sel:ml[0].sel},{ln:'X',am:230,sel:'Draw'},{ln:'2',am:ml[1].am,sel:ml[1].sel}];
       }
-      // Soccer needs the 1X2 (threeWay); other sports need the 2-sided spread/total/ml.
-      if(isSoc){ if(tw.length<3) return null; }
-      else if(sp.length<2||to.length<2||ml.length<2) return null;
+      // oddsReal=false ⇒ NO real line (The Odds API had none). We DON'T fabricate a price;
+      // the game is kept but shown LOCKED (🔒 Odds unavailable) and place_bet rejects it.
+      // Only drop a game for missing markets when it CLAIMS a real line (malformed feed).
+      var noLine = g.oddsReal===false;
+      if(!noLine){
+        // Soccer needs the 1X2 (threeWay); other sports need the 2-sided spread/total/ml.
+        if(isSoc){ if(tw.length<3) return null; }
+        else if(sp.length<2||to.length<2||ml.length<2) return null;
+      }
       var home={ab:(g.home&&g.home.ab)||'',nm:(g.home&&g.home.nm)||'Home'};
       var away={ab:(g.away&&g.away.ab)||'',nm:(g.away&&g.away.nm)||'Away'};
       if(g.live){ if(g.home&&g.home.sc!=null)home.sc=g.home.sc; if(g.away&&g.away.sc!=null)away.sc=g.away.sc; }
       return { id:g.gid, lg:g.lg, state:(g.live?'in':'pre'), live:!!g.live, real:true,
+        oddsReal: g.oddsReal!==false,   // false = no real line → render locked, not bettable
         kickoff:(g.live?'':(g.iso||'')),
         time:(g.live ? (g.time||'Live') : (g.iso ? (fmtKick(g.iso)||g.time||'TBD') : (g.time||'TBD'))),
         home:home, away:away, core:{spread:sp,total:to,ml:ml,threeWay:tw}, props:[] };

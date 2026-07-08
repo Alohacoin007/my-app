@@ -49,36 +49,35 @@ function mkCore(home: any, away: any, ev: any, lg: string) {
       if (od.awayTeamOdds && typeof od.awayTeamOdds.moneyLine === "number") mlAway = od.awayTeamOdds.moneyLine;
     }
   } catch (_e) { /* defaults below */ }
-  const sp = (spreadVal != null && spreadVal > 0) ? spreadVal : (isSoc ? 0.5 : 3.5);
-  const tot = (total != null && total > 0) ? total : (isSoc ? 2.5 : 45.5);
-  const homeFav = favAbbr ? (home.ab === favAbbr) : true;
+  // NO FABRICATION: if ESPN gave us no moneyline we emit EMPTY odds arrays and flag
+  // real:false — we never invent a -140/120 line. A fake price that leaks anywhere (the
+  // app, place_bet, a future reader) is a money risk. The overlay fills real lines and
+  // flips real:true; until then the client shows the game LOCKED and place_bet rejects it.
+  const mlReal = (mlHome != null && mlAway != null);
+  if (isSoc) {
+    // Soccer = 1X2 (Home/Draw/Away). Real prices (incl. the Draw) come only from the
+    // overlay, so real stays false here even if ESPN gave a 2-way price. No ESPN price →
+    // fully empty (no fabricated numbers at all).
+    if (!mlReal) return { spread: [], total: [], ml: [], threeWay: [], real: false };
+    const ml = [{ ln: "", am: mlHome, sel: home.nm + " ML" }, { ln: "", am: mlAway, sel: away.nm + " ML" }];
+    const threeWay = [
+      { ln: "1", am: mlHome, sel: home.nm + " ML" },
+      { ln: "X", am: 230, sel: "Draw" },   // Draw only becomes real via the overlay
+      { ln: "2", am: mlAway, sel: away.nm + " ML" },
+    ];
+    return { spread: [], total: [], ml, threeWay, real: false };
+  }
+  // Non-soccer: no real moneyline → empty everything, unbettable. No -140/120 fallback.
+  if (!mlReal) return { spread: [], total: [], ml: [], real: false };
+  const sp = (spreadVal != null && spreadVal > 0) ? spreadVal : 3.5;
+  const tot = (total != null && total > 0) ? total : 45.5;
+  const homeFav = favAbbr ? (home.ab === favAbbr) : (mlHome < mlAway);
   const spread = homeFav
     ? [{ ln: "-" + sp, am: -110, sel: home.nm + " -" + sp }, { ln: "+" + sp, am: -110, sel: away.nm + " +" + sp }]
     : [{ ln: "+" + sp, am: -110, sel: home.nm + " +" + sp }, { ln: "-" + sp, am: -110, sel: away.nm + " -" + sp }];
   const total2 = [{ ln: "Over " + tot, am: -110, sel: "Over " + tot }, { ln: "Under " + tot, am: -110, sel: "Under " + tot }];
-  const ml = [
-    { ln: "", am: (mlHome != null ? mlHome : (homeFav ? -140 : 120)), sel: home.nm + " ML" },
-    { ln: "", am: (mlAway != null ? mlAway : (homeFav ? 120 : -140)), sel: away.nm + " ML" },
-  ];
-  if (isSoc) {
-    // Soccer = 1X2 (Home / Draw / Away) — the standard football market. US-style
-    // spread/total don't apply (left empty). Real prices come from the overlay; these
-    // are placeholders shown only until The Odds API prices load.
-    const threeWay = [
-      { ln: "1", am: (mlHome != null ? mlHome : (homeFav ? -120 : 220)), sel: home.nm + " ML" },
-      { ln: "X", am: 230, sel: "Draw" },
-      { ln: "2", am: (mlAway != null ? mlAway : (homeFav ? 220 : -120)), sel: away.nm + " ML" },
-    ];
-    // BACKWARD-COMPAT: also keep the 2-way ml. New clients render 1X2 from threeWay; OLD
-    // (still-cached) clients require ml>=2 to accept a game, so leaving ml populated stops
-    // soccer from vanishing on a stale client during the deploy transition.
-    // real = false: soccer real prices (incl. the Draw) come only from the overlay.
-    return { spread: [], total: [], ml, threeWay, real: false };
-  }
-  // real = true only when ESPN actually gave a moneyline (not our -140/120 fallback).
-  // The overlay flips it true when The Odds API lines apply. A game left with real=false
-  // has a FABRICATED line and must not be bettable.
-  return { spread, total: total2, ml, real: (mlHome != null && mlAway != null) };
+  const ml = [{ ln: "", am: mlHome, sel: home.nm + " ML" }, { ln: "", am: mlAway, sel: away.nm + " ML" }];
+  return { spread, total: total2, ml, real: true };
 }
 
 function fmtTime(iso: string): string {
