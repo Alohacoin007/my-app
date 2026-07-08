@@ -8,9 +8,13 @@
 // teams and structurally-broken entries.
 //
 // FAILS (exit 1, so the daily workflow emails the owner) only on REAL problems:
-//   empty/stale feed · broken entries · an IMMINENT game (next 48h) with no real odds.
-// Far-future placeholder odds and TBD bracket teams are just ⚠️ warnings (odds load
-// closer to kickoff) — they don't spam a daily alert.
+//   empty/stale feed · broken entries · 🚨 a fabricated line that is STILL BETTABLE
+//   (oddsReal not false → the app would offer it and place_bet would honor a made-up
+//   line). That last one is the money invariant added 2026-07-08.
+// A fabricated line on a game FLAGGED oddsReal:false is fine — the app locks it and
+// place_bet rejects it, so it's just ⚠️ 잠금 (we can't force the provider to post a
+// line; we only must never OFFER a fake one). TBD/far-future placeholders = ⚠️ only.
+// (This means a provider gap no longer cries wolf daily — only a LEAKING gate does.)
 //
 //   node tests/sports-feed-check.js
 // Exit: 0 = healthy / warnings only / network unavailable · 1 = real problems.
@@ -93,34 +97,42 @@ async function main() {
   const byLg = {};
   for (const g of win) {
     const lg = g.lg || '?';
-    const s = (byLg[lg] = byLg[lg] || { n: 0, real: 0, ph: 0, miss: 0, tbd: 0, bad: 0, days: new Set(), immBad: 0 });
+    const s = (byLg[lg] = byLg[lg] || { n: 0, real: 0, ph: 0, miss: 0, tbd: 0, bad: 0, days: new Set(), locked: 0, leak: 0, immBad: 0 });
     s.n++;
     const o = oddsStatus(g);
     if (o === 'REAL') s.real++; else if (o === 'PLACEHOLDER') s.ph++; else s.miss++;
+    // A fabricated line (no real odds) is only OK if the game is FLAGGED unbettable
+    // (oddsReal:false → the app locks it, place_bet rejects it). A fake line that is
+    // still bettable (oddsReal missing/true) = the safety gate is LEAKING = hard fail.
+    if (o !== 'REAL') { if (g.oddsReal === false) s.locked++; else s.leak++; }
     if (isTBD(g)) s.tbd++;
     if (!structOK(g)) { s.bad++; }
     const t = Date.parse(g.iso || ''); if (!isNaN(t)) s.days.add(ymd(t));
-    // imminent (≤48h) game must have REAL odds
+    // imminent (≤48h) game still lacking a real line — informational once it's locked
+    // (we can't force the provider to post a line; we just must not offer a fake one).
     if (!isNaN(t) && t <= IMMINENT && o !== 'REAL') s.immBad++;
   }
 
-  console.log('\n  종목   경기  요일  실배당 가짜 없음 TBD broken  임박48h배당X');
+  console.log('\n  종목   경기  요일  실배당 가짜 잠금 🚨샘 없음 TBD broken  임박무배당');
   for (const lg of Object.keys(byLg).sort()) {
     const s = byLg[lg];
     const warn = [];
-    if (s.ph) warn.push(`가짜${s.ph}`);
+    if (s.ph || s.miss) warn.push(`가짜${s.ph + s.miss}`);
+    // THE money invariant: a fabricated line that is still bettable. Hard fail.
+    if (s.leak) { warn.push(`🚨샘${s.leak}`); fails.push(`${lg}: 가짜 라인인데 베팅 가능 ${s.leak}건 — oddsReal 미설정(sports-games 배포/플래그 확인). 하우스가 가짜 라인 honor 위험`); }
+    if (s.locked) warn.push(`잠금${s.locked}`);
     if (s.tbd) warn.push(`TBD${s.tbd}`);
     if (s.bad) { warn.push(`broken${s.bad}`); fails.push(`${lg}: broken 항목 ${s.bad}`); }
-    if (s.immBad) { warn.push(`임박배당X${s.immBad}`); fails.push(`${lg}: 48h내 경기 ${s.immBad}건 실배당 없음`); }
+    if (s.immBad) warn.push(`임박무배당${s.immBad}${s.leak ? '' : '(잠금)'}`);   // info once locked
     console.log(
-      `  ${lg.padEnd(6)} ${String(s.n).padStart(4)} ${String(s.days.size).padStart(4)}일 ${String(s.real).padStart(5)} ${String(s.ph).padStart(4)} ${String(s.miss).padStart(4)} ${String(s.tbd).padStart(3)} ${String(s.bad).padStart(6)} ${String(s.immBad).padStart(8)}` +
-      (warn.length ? '   ⚠️ ' + warn.join(' ') : '   ✅')
+      `  ${lg.padEnd(6)} ${String(s.n).padStart(4)} ${String(s.days.size).padStart(4)}일 ${String(s.real).padStart(5)} ${String(s.ph).padStart(4)} ${String(s.locked).padStart(4)} ${String(s.leak).padStart(4)} ${String(s.miss).padStart(4)} ${String(s.tbd).padStart(3)} ${String(s.bad).padStart(6)} ${String(s.immBad).padStart(8)}` +
+      (s.leak ? '   🚨 ' + warn.join(' ') : warn.length ? '   ⚠️ ' + warn.join(' ') : '   ✅')
     );
   }
 
   console.log('');
   if (fails.length) { console.log('  🔴 문제 ' + fails.length + '건:'); fails.forEach((f) => console.log('     - ' + f)); process.exit(1); }
-  console.log('  🟢 이상 없음 — 이번주 경기·임박 배당 정상 (가짜/TBD는 경고만, 정상 범주).');
+  console.log('  🟢 이상 없음 — 가짜 라인은 전부 잠김(베팅 불가). 프로바이더 공백은 정상 범주.');
   process.exit(0);
 }
 main();
