@@ -18,15 +18,44 @@
   #app{height:100vh}
   /* ── MT5-style CSS Grid: toolbar / [market-watch | 2×2 charts] / bottom bar ── */
   .terminal{display:grid;height:100vh;
-    grid-template-columns:230px 1fr;
-    grid-template-rows:40px 1fr 210px;
-    grid-template-areas:"top top" "watch charts" "bottom bottom";}
-  .top{grid-area:top;display:flex;align-items:center;gap:14px;padding:0 12px;background:linear-gradient(#0a0d12,#05070a);border-bottom:1px solid var(--cellbd)}
-  .brand{font-weight:700;letter-spacing:.3px}.brand span{color:#7fb0e0}
-  .top .conn{margin-left:auto;color:var(--dim);font-size:11px;display:flex;align-items:center;gap:6px}
+    grid-template-columns:198px 1fr;
+    grid-template-rows:23px 33px 1fr 188px;
+    grid-template-areas:"menu menu" "tools tools" "left charts" "bottom bottom";}
+  /* ── menu bar (File View …) ── */
+  .menu{grid-area:menu;display:flex;align-items:center;gap:1px;padding:0 4px;background:linear-gradient(#2c3138,#20242a);border-bottom:1px solid #0a0a0a;font-size:11px}
+  .menu .mi{padding:3px 8px;color:#d0d4da;cursor:default;border-radius:2px}.menu .mi:hover{background:#3a6ea5;color:#fff}
+  .menu .conn{margin-left:auto;color:#9aa2b0;display:flex;align-items:center;gap:6px;padding-right:6px}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--up)}
-  /* ── Market Watch: an Excel-grid table ── */
-  .watch{grid-area:watch;background:var(--panel);border-right:1px solid var(--cellbd);overflow-y:auto}
+  /* ── icon toolbar (New Order · Algo · timeframes) ── */
+  .tools{grid-area:tools;display:flex;align-items:center;gap:5px;padding:0 6px;background:linear-gradient(#22262c,#15181d);border-bottom:1px solid #000}
+  .tbtn{display:flex;align-items:center;gap:5px;height:23px;padding:0 9px;background:linear-gradient(#3a4048,#2a2e34);border:1px solid #474d56;border-radius:3px;color:#e0e4ea;font-size:11px;cursor:pointer;white-space:nowrap}
+  .tbtn:hover{background:linear-gradient(#464c55,#34393f)}.tbtn.algo{color:#8fe08f}
+  .tsep{width:1px;height:18px;background:#3a3f47;margin:0 2px}
+  .tf{display:flex;gap:1px}
+  .tf b{padding:2px 7px;background:#23272d;border:1px solid #383d45;color:#b8bcc4;font-weight:600;font-size:11px;cursor:pointer;border-radius:2px}
+  .tf b.on{background:#3a6ea5;color:#fff;border-color:#3a6ea5}
+  .tbrand{margin-left:auto;font-weight:700;letter-spacing:.3px;color:#8890a0;font-size:11px}.tbrand span{color:#7fb0e0}
+  /* ── left column: Market Watch (top) + Navigator (bottom) ── */
+  .left{grid-area:left;display:flex;flex-direction:column;border-right:1px solid var(--cellbd);min-height:0}
+  .watch{flex:1;background:var(--panel);overflow:auto;min-height:0}
+  .nav{height:186px;background:var(--panel);border-top:1px solid var(--cellbd);overflow:auto;flex:none}
+  .nav .navhd{position:sticky;top:0;padding:3px 8px;background:#0a0d12;color:var(--dim);font-size:11px;font-weight:600;border-bottom:1px solid var(--line)}
+  .nav ul{list-style:none;margin:0;padding:2px 0}
+  .nav li{padding:2px 8px;color:#c4c8d0;cursor:default;white-space:nowrap}
+  .nav li:hover{background:#0d1420}
+  .nav li.root{font-weight:700;color:#dfe3ea}
+  .nav li.child{padding-left:26px;color:#aeb6c2}
+  .nav .ic{display:inline-block;width:15px;text-align:center;margin-right:5px}
+  /* ── one-click order box (top-left of each chart) ── */
+  .obox{position:absolute;top:19px;left:6px;z-index:5;display:flex;align-items:stretch;height:30px;
+    border:1px solid #000;box-shadow:0 1px 3px rgba(0,0,0,.7);font-family:Tahoma,Arial,sans-serif}
+  .obox .side{padding:2px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;min-width:50px;line-height:1.1}
+  .obox .sell{background:linear-gradient(#e8621e,#c64c12);color:#fff}
+  .obox .buy{background:linear-gradient(#2f7fd6,#1d63b4);color:#fff}
+  .obox .side:hover{filter:brightness(1.12)}
+  .obox .lbl{font-size:8px;opacity:.9;text-transform:uppercase;letter-spacing:.3px}
+  .obox .val{font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
+  .obox .vol{background:#0a0d12;color:#e6ebf2;border:none;width:46px;text-align:center;font:700 12px Tahoma;outline:none}
   .mwt{width:100%;border-collapse:collapse}
   .mwt th{position:sticky;top:0;background:#0a0d12;color:var(--dim);font-weight:600;font-size:11px;text-align:right;padding:3px 6px;border:1px solid var(--line)}
   .mwt th:first-child{text-align:left}
@@ -36,17 +65,21 @@
   .up{color:var(--up)}.down{color:var(--down)}
   /* ── Chart grid: 2×2, each cell a bordered window with a top-left symbol label ── */
   .charts{grid-area:charts;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:0;background:var(--cellbd)}
-  .cell{background:#000;position:relative;min-width:0;min-height:0;border:1px solid var(--cellbd)}
-  .canvas{position:absolute;inset:0}
+  .cell{background:#000;display:flex;flex-direction:column;min-width:0;min-height:0;border:1px solid var(--cellbd)}
+  .cell-title{display:flex;align-items:center;gap:6px;height:18px;padding:0 7px;flex:none;
+    background:linear-gradient(#1b1f25,#0c0f13);border-bottom:1px solid #000;font:600 11px Tahoma,sans-serif;color:#c8ccd2}
+  .cell-title .wc{margin-left:auto;display:flex;gap:10px;color:#6a7280}
+  .canvas{position:relative;flex:1;min-height:0}
   .cell-lbl{position:absolute;top:3px;left:6px;z-index:3;pointer-events:none;
     font:400 11px Tahoma,'Segoe UI',Arial,sans-serif;color:#c8ccd2;letter-spacing:.2px;text-shadow:0 0 3px #000,0 0 3px #000}
-  .cell-lbl b{font-weight:600}.cell-lbl .px{color:#98d898;margin-left:8px;font-variant-numeric:tabular-nums}
+  .cell-lbl b{font-weight:600}
   /* ── Bottom: KPI strip + Excel-grid positions table ── */
   .bottom{grid-area:bottom;background:var(--panel);border-top:1px solid var(--cellbd);display:flex;flex-direction:column;overflow:hidden}
-  .kpis{display:flex;gap:0;border-bottom:1px solid var(--cellbd);background:#0a0d12}
-  .kpi{padding:6px 14px;border-right:1px solid var(--line)}
-  .kpi .l{color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:.4px}
-  .kpi .v{font-weight:700;font-size:13px;font-variant-numeric:tabular-nums;margin-top:2px}
+  .tbxtabs{display:flex;background:linear-gradient(#20242a,#14171c);border-bottom:1px solid #000}
+  .tbxtabs .t{padding:3px 11px;font-size:11px;color:#a2aab6;border-right:1px solid #2a2e34;cursor:default}
+  .tbxtabs .t.on{background:#000;color:#fff;border-top:2px solid #3a6ea5;margin-top:-1px}
+  .acctline{display:flex;align-items:center;gap:18px;padding:4px 12px;background:#0a0d12;border-top:1px solid var(--line);font-size:11.5px;color:#c8ccd2;white-space:nowrap;overflow-x:auto}
+  .acctline .k{color:#8890a0}.acctline b{color:#fff;font-variant-numeric:tabular-nums}
   .postbl{flex:1;overflow:auto}
   table.pos{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
   table.pos th{position:sticky;top:0;background:#0a0d12;color:var(--dim);font-weight:600;font-size:11px;text-align:right;padding:3px 10px;border:1px solid var(--line)}
@@ -139,6 +172,31 @@ const priceStore = {
 };
 priceStore.notify = throttle(function(){ priceStore.listeners.forEach(fn=>{ try{fn(priceStore.mids);}catch(e){} }); }, 400);
 
+/* ── positionsStore: ONE source of truth for open FX positions + account.
+   ChartCell draws createPriceLine flags from it; BottomBar tables it. Server-owned
+   (read-only display) — never writes money, matches CLAUDE.md #5 (server is sole owner). ── */
+const positionsStore = {
+  acct:null, pos:[], listeners:new Set(), ch1:null, ch2:null, started:false,
+  async loadAcct(){ try{ if(!(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me)) return;
+    const r=await AlpexaSync.db.from('accounts').select('acct_no,balance').eq('server','fx').limit(1);
+    if(r&&r.data&&r.data[0]){ this.acct=r.data[0]; this.notify(); } }catch(e){} },
+  async loadPos(){ try{ if(!(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me)) return;
+    const r=await AlpexaSync.db.from('positions').select('local_id,symbol,side,stake,size,open_price,status,created_at').eq('server','fx').eq('status','open').limit(200);
+    if(r&&r.data){ this.pos=r.data; this.notify(); } }catch(e){} },
+  start(){ if(this.started) return; this.started=true; this.loadAcct(); this.loadPos();
+    try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me){
+      this.ch1=AlpexaSync.db.channel('wt-acct').on('postgres_changes',{event:'*',schema:'public',table:'accounts'},()=>this.loadAcct()).subscribe();
+      this.ch2=AlpexaSync.db.channel('wt-pos').on('postgres_changes',{event:'*',schema:'public',table:'positions'},()=>this.loadPos()).subscribe();
+    } }catch(e){} },
+  notify(){ this.listeners.forEach(fn=>{ try{fn(this);}catch(e){} }); },
+  subscribe(fn){ this.listeners.add(fn); fn(this); return ()=>this.listeners.delete(fn); },
+  forSymbol(sym){ return this.pos.filter(p=>p.symbol===sym); },
+};
+
+// lots for a position row (MT5 "Volume") + display helpers shared by chart flags & tables
+const lotsOf = (p)=> (+p.size||+p.stake||0.01);
+const sideUp = (s)=> (s==='sell'||s==='SELL')?'SELL':'BUY';
+
 // ── candle history: try the fx-prices Edge, fall back to a synthetic seed (live bars are REAL feed). ──
 async function loadCandles(symbol){
   try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.functions){
@@ -158,10 +216,33 @@ function synthCandles(symbol){   // ~120 M15 bars ending near the current mid
   return out;
 }
 
-/* ── Chart cell: one Lightweight Charts instance, seeded history + throttled live last-bar ── */
-function ChartCell({ symbol }){
+/* ── One-click order box (SELL orange / vol / BUY blue) — live Ask/Bid inside the buttons.
+   Display-only affordance (no client money write); real order goes through fx_open RPC. ── */
+function OrderBox({ symbol }){
+  const [m,setM]=React.useState(priceStore.get(symbol)||{});
+  const [vol,setVol]=React.useState('0.01');
+  React.useEffect(()=> priceStore.subscribe(throttle(mids=>setM({...(mids[symbol]||{})}),400)), [symbol]);
+  return (
+    <div className="obox">
+      <div className="side sell" title="Sell at Bid">
+        <span className="lbl">Sell</span><span className="val">{fmtPx(symbol,m.bid)}</span>
+      </div>
+      <input className="vol" value={vol} onChange={e=>setVol(e.target.value)}
+        onClick={e=>e.stopPropagation()} title="Volume (lots)" />
+      <div className="side buy" title="Buy at Ask">
+        <span className="lbl">Buy</span><span className="val">{fmtPx(symbol,m.ask)}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ── Chart cell: one Lightweight Charts instance, seeded history + throttled live last-bar.
+   Draws a green dotted createPriceLine + "BUY 0.01 at 1.14318" flag for every open position. ── */
+function ChartCell({ symbol, tf }){
   const box=React.useRef(null), chart=React.useRef(null), series=React.useRef(null), bar=React.useRef(null);
+  const lines=React.useRef([]);
   const [px,setPx]=React.useState(null);
+  const [posLbl,setPosLbl]=React.useState([]);   // for the price-line flags
   React.useEffect(()=>{
     if(!window.LightweightCharts || !box.current) return;      // CDN blocked → no chart, no crash
     // MT5 look: pure-black canvas, dense grey DOTTED gridlines, Tahoma scales.
@@ -192,10 +273,37 @@ function ChartCell({ symbol }){
     const unsub=priceStore.subscribe(onTick);
     return ()=>{ unsub(); try{ c.remove(); }catch(e){} };
   }, [symbol]);
+
+  // ── ORDER PRICE LINE (🔴 most important): redraw green dotted lines whenever this
+  //    symbol's open positions change. One createPriceLine per position at its open_price.
+  React.useEffect(()=>{
+    const draw=(store)=>{
+      const s=series.current; if(!s||!s.createPriceLine) return;
+      lines.current.forEach(l=>{ try{ s.removePriceLine(l); }catch(e){} });
+      lines.current=[];
+      const mine=store.forSymbol(symbol);
+      const DOT=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dotted)!=null?LightweightCharts.LineStyle.Dotted:1;
+      mine.forEach(p=>{ const price=+p.open_price; if(!price) return;
+        const title=sideUp(p.side)+' '+lotsOf(p);
+        try{ lines.current.push(s.createPriceLine({ price, color:'#00ff00', lineWidth:1,
+          lineStyle:DOT, axisLabelVisible:true, title })); }catch(e){}
+      });
+      setPosLbl(mine.map(p=>({ side:sideUp(p.side), lots:lotsOf(p), price:+p.open_price })));
+    };
+    return positionsStore.subscribe(draw);
+  }, [symbol]);
+
   return (
     <div className="cell">
-      <div className="cell-lbl"><b>{symbol}</b>, H1<span className="px">{fmtPx(symbol,px)}</span></div>
-      <div className="canvas" ref={box}></div>
+      <div className="cell-title">
+        <span>{symbol}.FX,{tf||'H1'}</span>
+        {posLbl.map((p,i)=><span key={i} style={{color:'#00c800',fontWeight:600}}>{p.side} {p.lots} at {fmtPx(symbol,p.price)}</span>)}
+        <span className="wc"><span>—</span><span>▢</span><span>✕</span></span>
+      </div>
+      <div className="canvas" ref={box}>
+        <OrderBox symbol={symbol} />
+        <div className="cell-lbl"><b>{symbol}</b>, {tf||'H1'} <span className="px">{fmtPx(symbol,px)}</span></div>
+      </div>
     </div>
   );
 }
@@ -224,80 +332,118 @@ function MarketWatch({ onPick }){
   );
 }
 
-/* ── Bottom bar: Balance / Equity / Margin + open positions, from Supabase realtime ── */
+/* ── Bottom Toolbox: MT5 tab strip + positions grid + account line, from positionsStore ── */
+const TBX_TABS=['Trade','Exposure','History','News','Mailbox','Calendar','Company','Journal'];
 function BottomBar(){
-  const [acct,setAcct]=React.useState(null);
-  const [pos,setPos]=React.useState([]);
+  const [acct,setAcct]=React.useState(positionsStore.acct);
+  const [pos,setPos]=React.useState(positionsStore.pos);
   const [mids,setMids]=React.useState({});
-  React.useEffect(()=>{
-    let ch1,ch2;
-    async function loadAcct(){ try{ if(!(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me)) return;
-      const r=await AlpexaSync.db.from('accounts').select('acct_no,balance').eq('server','fx').limit(1);
-      if(r&&r.data&&r.data[0]) setAcct(r.data[0]); }catch(e){} }
-    async function loadPos(){ try{ if(!(window.AlpexaSync&&AlpexaSync.db)) return;
-      const r=await AlpexaSync.db.from('positions').select('local_id,symbol,side,stake,size,open_price,status').eq('server','fx').eq('status','open').limit(200);
-      if(r&&r.data) setPos(r.data); }catch(e){} }
-    loadAcct(); loadPos();
-    try{ if(window.AlpexaSync&&AlpexaSync.db&&acct){
-      ch1=AlpexaSync.db.channel('wt-acct').on('postgres_changes',{event:'*',schema:'public',table:'accounts'},loadAcct).subscribe();
-      ch2=AlpexaSync.db.channel('wt-pos').on('postgres_changes',{event:'*',schema:'public',table:'positions'},loadPos).subscribe();
-    } }catch(e){}
-    const unsub=priceStore.subscribe(throttle(m=>setMids({...m}),400));
-    return ()=>{ unsub(); try{AlpexaSync.db.removeChannel(ch1);AlpexaSync.db.removeChannel(ch2);}catch(e){} };
-  }, [acct&&acct.acct_no]);
+  const [tab,setTab]=React.useState('Trade');
+  React.useEffect(()=> positionsStore.subscribe(s=>{ setAcct(s.acct); setPos([...s.pos]); }), []);
+  React.useEffect(()=> priceStore.subscribe(throttle(m=>setMids({...m}),400)), []);
 
   // floating P&L marked at the live mid (display approx — production should use trading.html's
   // fxClosePx lockstep so floating == what fx_close realizes). No open FX positions → 0.
-  const floating = pos.reduce((s,p)=>{ const m=mids[p.symbol]; if(!m) return s;
-    const dir=(p.side==='sell'||p.side==='SELL')?-1:1; const lot=(+p.size||+p.stake||0.01);
-    const contract=100000; return s + dir*(m.mid-(+p.open_price||m.mid))*lot*contract*(p.symbol.includes('JPY')?0.0067:1); }, 0);
+  const plOf=(p)=>{ const m=mids[p.symbol]; if(!m) return 0;
+    const dir=sideUp(p.side)==='SELL'?-1:1; const contract=100000;
+    return dir*(m.mid-(+p.open_price||m.mid))*lotsOf(p)*contract*(p.symbol.includes('JPY')?0.0067:1); };
+  const floating = pos.reduce((s,p)=> s+plOf(p), 0);
   const balance=acct?+acct.balance||0:0, equity=balance+floating;
-  const marginUsed=pos.reduce((s,p)=> s+(+p.size||+p.stake||0.01)*100000/100, 0);  // 1:100 illustrative
+  const marginUsed=pos.reduce((s,p)=> s+lotsOf(p)*100000/100, 0);  // 1:100 illustrative
   const level=marginUsed>0?(equity/marginUsed*100):0;
-  const usd=(n)=>'$'+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const num=(n)=>(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 
   return (
     <div className="bottom">
-      <div className="kpis">
-        <div className="kpi"><div className="l">Balance</div><div className="v">{usd(balance)}</div></div>
-        <div className="kpi"><div className="l">Equity</div><div className="v">{usd(equity)}</div></div>
-        <div className="kpi"><div className="l">Floating P/L</div><div className={"v "+(floating>=0?'up':'down')}>{usd(floating)}</div></div>
-        <div className="kpi"><div className="l">Margin</div><div className="v">{usd(marginUsed)}</div></div>
-        <div className="kpi"><div className="l">Free Margin</div><div className="v">{usd(equity-marginUsed)}</div></div>
-        <div className="kpi"><div className="l">Margin Level</div><div className="v">{marginUsed>0?level.toFixed(2)+'%':'—'}</div></div>
-      </div>
+      <div className="tbxtabs">{TBX_TABS.map(t=><div key={t} className={"t"+(t===tab?' on':'')} onClick={()=>setTab(t)}>{t}</div>)}</div>
       <div className="postbl">
         <table className="pos">
-          <thead><tr><th>Symbol</th><th>Type</th><th>Volume</th><th>Open</th><th>Price</th><th>P/L</th></tr></thead>
+          <thead><tr><th>Symbol</th><th>Ticket</th><th>Time</th><th>Type</th><th>Volume</th><th>Price</th><th>S / L</th><th>T / P</th><th>Price</th><th>Profit</th></tr></thead>
           <tbody>
-            {!pos.length && <tr><td className="empty" colSpan="6">{window.AlpexaSync&&AlpexaSync.me?'No open FX positions':'로그인하면 실계정 잔고·포지션이 표시됩니다 (지금은 데모 시세)'}</td></tr>}
-            {pos.map(p=>{ const m=mids[p.symbol]||{}; const dir=(p.side==='sell')?-1:1;
-              const pl=m.mid?dir*(m.mid-(+p.open_price||0))*(+p.size||0.01)*100000*(p.symbol.includes('JPY')?0.0067:1):0;
+            {!pos.length && <tr><td className="empty" colSpan="10">{window.AlpexaSync&&AlpexaSync.me?'No open positions':'로그인하면 실계정 잔고·포지션이 표시됩니다 (지금은 데모 시세)'}</td></tr>}
+            {pos.map(p=>{ const m=mids[p.symbol]||{}; const pl=plOf(p);
+              const tkt=String(p.local_id||'').replace(/\D/g,'').slice(-8)||p.local_id;
+              const tm=p.created_at?String(p.created_at).slice(0,16).replace('T',' '):'—';
               return (<tr key={p.local_id}>
-                <td>{p.symbol}</td><td>{(p.side||'buy').toUpperCase()}</td><td>{(+p.size||+p.stake||0.01)}</td>
-                <td>{fmtPx(p.symbol,+p.open_price)}</td><td>{fmtPx(p.symbol,m.mid)}</td>
-                <td className={pl>=0?'up':'down'}>{usd(pl)}</td>
+                <td>{p.symbol}</td><td>{tkt}</td><td>{tm}</td><td className={sideUp(p.side)==='SELL'?'down':'up'}>{sideUp(p.side).toLowerCase()}</td>
+                <td>{lotsOf(p).toFixed(2)}</td><td>{fmtPx(p.symbol,+p.open_price)}</td><td>—</td><td>—</td>
+                <td>{fmtPx(p.symbol,m.mid)}</td><td className={pl>=0?'up':'down'}>{num(pl)}</td>
               </tr>); })}
           </tbody>
         </table>
       </div>
+      <div className="acctline">
+        <span><span className="k">Balance:</span> <b>{num(balance)} USD</b></span>
+        <span><span className="k">Equity:</span> <b>{num(equity)}</b></span>
+        <span><span className="k">Margin:</span> <b>{num(marginUsed)}</b></span>
+        <span><span className="k">Free Margin:</span> <b>{num(equity-marginUsed)}</b></span>
+        <span><span className="k">Margin Level:</span> <b>{marginUsed>0?num(level)+' %':'—'}</b></span>
+        <span><span className="k">Profit:</span> <b className={floating>=0?'up':'down'}>{num(floating)}</b></span>
+      </div>
+    </div>
+  );
+}
+
+/* ── Top menu bar (File … Help) + connection status dot ── */
+const MENUS=['File','View','Insert','Charts','Tools','Window','Help'];
+function MenuBar(){
+  const [live,setLive]=React.useState(priceStore.live);
+  React.useEffect(()=> priceStore.subscribe(()=>setLive(priceStore.live)), []);
+  return (
+    <div className="menu">
+      {MENUS.map(m=><div key={m} className="mi">{m}</div>)}
+      <div className="conn"><span className="dot" style={{background:live?'#00d060':'#e5a13a'}}></span>{live?'Live feed (1s cache)':'Demo feed'}</div>
+    </div>
+  );
+}
+
+/* ── Icon toolbar: New Order · Algo Trading · timeframe buttons ── */
+const TFS=['M1','M5','M15','M30','H1','H4','D1','W1','MN'];
+function Toolbar({ tf, onTf }){
+  return (
+    <div className="tools">
+      <div className="tbtn" title="New Order (F9)">＋ New Order</div>
+      <div className="tbtn algo" title="Algo Trading">▶ Algo Trading</div>
+      <div className="tsep"></div>
+      <div className="tf">{TFS.map(t=><b key={t} className={t===tf?'on':''} onClick={()=>onTf&&onTf(t)}>{t}</b>)}</div>
+      <div className="tbrand">ALPEXA <span>WebTrade</span></div>
+    </div>
+  );
+}
+
+/* ── Navigator panel (folder tree) — MT5 look under Market Watch ── */
+function Navigator(){
+  return (
+    <div className="nav">
+      <div className="navhd">Navigator</div>
+      <ul>
+        <li className="root"><span className="ic">💠</span>Alpexa MetaTrader 5</li>
+        <li className="child"><span className="ic">👤</span>Accounts</li>
+        <li className="child"><span className="ic">📈</span>Indicators</li>
+        <li className="child"><span className="ic">🤖</span>Expert Advisors</li>
+        <li className="child"><span className="ic">📜</span>Scripts</li>
+        <li className="child"><span className="ic">🛠️</span>Services</li>
+        <li className="child"><span className="ic">🛒</span>Market</li>
+        <li className="child"><span className="ic">☁️</span>VPS</li>
+      </ul>
     </div>
   );
 }
 
 function App(){
   const [grid,setGrid]=React.useState(GRID);
-  React.useEffect(()=>{ priceStore.start(); }, []);
+  const [tf,setTf]=React.useState('H1');
+  React.useEffect(()=>{ priceStore.start(); positionsStore.start(); }, []);
   const swap=(sym)=> setGrid(g=> g.indexOf(sym)>=0 ? g : [sym, g[1], g[2], g[3]]);   // click watch → replace top-left
   return (
     <div className="terminal">
-      <div className="top">
-        <div className="brand">ALPEXA <span>WebTrade</span></div>
-        <div className="dim" style={{color:'#8a97ac',fontSize:12}}>FX Terminal · MetaTrader-style</div>
-        <div className="conn"><span className="dot" style={{background:priceStore.live?'#26a65b':'#e5a13a'}}></span>{priceStore.live?'Live feed (1s cache)':'Demo feed'}</div>
+      <MenuBar />
+      <Toolbar tf={tf} onTf={setTf} />
+      <div className="left">
+        <MarketWatch onPick={swap} />
+        <Navigator />
       </div>
-      <MarketWatch onPick={swap} />
-      <div className="charts">{grid.map((s,i)=><ChartCell key={s+i} symbol={s} />)}</div>
+      <div className="charts">{grid.map((s,i)=><ChartCell key={s+i} symbol={s} tf={tf} />)}</div>
       <BottomBar />
     </div>
   );
