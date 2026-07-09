@@ -147,23 +147,28 @@
   .orow{display:flex;align-items:center;gap:10px;margin-bottom:9px}
   .orow>label{width:96px;text-align:right;color:#2c3138;font-size:13px}
   .orow .in{width:150px;position:relative;display:flex;align-items:center}
-  .orow input,.orow select{width:100%;padding:2px 6px;border:1px solid #b6bcc4;background:#fff;font-size:13px;height:25px;color:#20242a}
+  /* bevel-effect inputs (classic Windows inset) */
+  .orow input,.orow select{width:100%;padding:2px 6px;border:1px solid #777;background:#fff;font-size:13px;height:25px;color:#20242a;
+    box-shadow:inset 1px 1px 2px #ccc;border-radius:1px}
+  .orow input:focus,.orow select:focus{outline:none;border-color:#3d8ee0;box-shadow:inset 1px 1px 2px #bcd,0 0 0 2px rgba(61,142,224,.2)}
   .orow .unit{color:#4a4f57;font-size:12px}
-  .oquote{text-align:center;font-weight:600;letter-spacing:.5px;margin:auto 0;color:#2a2f36;
-    font-size:33px;font-variant-numeric:tabular-nums}
+  .oquote{text-align:center;font-weight:700;letter-spacing:.5px;margin:auto 0;color:#2a2f36;
+    font-size:33px;font-family:'Consolas','JetBrains Mono','Courier New',monospace;font-variant-numeric:tabular-nums}
   .oquote sup{font-size:20px;top:-.05em;position:relative;margin-left:1px}
   .oquote .sep{color:#9aa1aa;margin:0 10px;font-weight:400}
   .oquote .up{color:#1e8e3e}.oquote .dn{color:#d33d30}
   @keyframes oflash{0%{opacity:.35}100%{opacity:1}}
   .oquote .flash{animation:oflash .18s ease-out}
-  .obtns{display:flex;margin-top:auto}
-  .obtns button{flex:1;height:42px;border:none;color:#fff;font-size:14px;font-weight:600;cursor:pointer}
-  .obtns .sell{background:linear-gradient(#e2574c,#d23a2d)}
-  .obtns .buy{background:linear-gradient(#3d8ee0,#2f6ec0)}
-  .obtns button:hover{filter:brightness(1.07)}
-  .otick{flex:1;min-width:0;margin:8px 8px 8px 0;border:1px solid #d7dbe0;background:#fff;display:flex;flex-direction:column}
-  .otick .ttool{height:26px;flex:none;border-bottom:1px solid #e6e9ec;display:flex;align-items:center;gap:10px;padding:0 8px;color:#8a9098}
-  .otick .ttool span{color:#8a9098;font-size:13px}
+  .obtns{display:flex;gap:8px;margin-top:auto}
+  .obtns button{flex:1;height:42px;border:1px solid #777;color:#fff;font-size:14px;font-weight:700;cursor:pointer;border-radius:2px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.35),inset 0 -1px 2px rgba(0,0,0,.25),0 1px 2px rgba(0,0,0,.2)}
+  .obtns .sell{background:linear-gradient(#e2574c,#d23a2d);border-color:#a52a20}
+  .obtns .buy{background:linear-gradient(#3d8ee0,#2f6ec0);border-color:#2358a0}
+  .obtns button:hover{filter:brightness(1.08)}
+  .obtns button:active{box-shadow:inset 0 2px 4px rgba(0,0,0,.35)}
+  .otick{flex:1;min-width:0;margin:8px 8px 8px 0;border:1px solid #2a3345;background:#0b1020;display:flex;flex-direction:column}
+  .otick .ttool{height:26px;flex:none;border-bottom:1px solid #202838;display:flex;align-items:center;gap:10px;padding:0 8px;background:#0e1626}
+  .otick .ttool span{color:#7f8aa0;font-size:13px}
   .otick .tcanvas{flex:1;min-height:0;position:relative}
 </style>
 </head>
@@ -837,15 +842,17 @@ function OrderModal({ symbol:sym0, onClose }){
   // right-side live tick chart: Ask(red) + Bid(blue), advancing right on every tick
   React.useEffect(()=>{
     if(!window.LightweightCharts || !tbox.current) return;
+    const DOT=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dotted)!=null?LightweightCharts.LineStyle.Dotted:1;
     const c=LightweightCharts.createChart(tbox.current, {
-      layout:{ background:{color:'#ffffff'}, textColor:'#7a828c', fontSize:10, fontFamily:"Tahoma, Arial, sans-serif" },
-      grid:{ vertLines:{visible:false}, horzLines:{color:'#eef1f4'} },
-      timeScale:{ visible:false, borderColor:'#e0e0e0' }, rightPriceScale:{ borderColor:'#e0e0e0' },
+      layout:{ background:{color:'#0b1020'}, textColor:'#8a93a6', fontSize:10, fontFamily:"Consolas, 'Courier New', monospace" },
+      grid:{ vertLines:{color:'#222b3d', style:DOT}, horzLines:{color:'#222b3d', style:DOT} },   // dotted charcoal grid
+      timeScale:{ visible:false, borderColor:'#2a3345' }, rightPriceScale:{ borderColor:'#2a3345' },
       crosshair:{ mode:0 }, handleScroll:false, handleScale:false });
     c.resize(tbox.current.clientWidth, tbox.current.clientHeight);
-    const mk=(color)=> c.addLineSeries ? c.addLineSeries({color,lineWidth:1,priceLineVisible:false,lastValueVisible:true})
-                                       : c.addSeries(LightweightCharts.LineSeries,{color,lineWidth:1,priceLineVisible:false,lastValueVisible:true});
-    const ask=mk('#d23a2d'), bid=mk('#2f6ec0'); tchart.current=c; askS.current=ask; bidS.current=bid;
+    // 1.5px-feel NEON lines (LWC widths are integer → 2 is the crisp neon look)
+    const mk=(color)=> c.addLineSeries ? c.addLineSeries({color,lineWidth:2,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false})
+                                       : c.addSeries(LightweightCharts.LineSeries,{color,lineWidth:2,priceLineVisible:false,lastValueVisible:true});
+    const ask=mk('#ff414d'), bid=mk('#22b8ff'); tchart.current=c; askS.current=ask; bidS.current=bid;
     buf.current={t:1000,ask:[],bid:[]};
     const onTick=throttle((mids)=>{ const q=mids[symbol]; if(!q) return; const b=buf.current; b.t+=1;
       b.ask.push({time:b.t,value:q.ask}); b.bid.push({time:b.t,value:q.bid});
