@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<!-- Alpexa WebTrade — PC-only MetaTrader-style FX terminal. Mobile apps untouched. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alpexa WebTrade — FX Terminal</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="preconnect" href="https://unpkg.com">
+<style>
+  :root{ --bg:#0b0f17; --panel:#111826; --panel2:#0e1420; --line:#1e2a3d; --text:#e6ebf2; --dim:#8a97ac;
+    --up:#26a65b; --down:#e5484d; --accent:#2b6cff; --r:8px; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:13px;overflow:hidden}
+  #app{height:100vh}
+  /* ── MT5-style CSS Grid: toolbar / [market-watch | 2×2 charts] / bottom bar ── */
+  .terminal{display:grid;height:100vh;
+    grid-template-columns:230px 1fr;
+    grid-template-rows:40px 1fr 210px;
+    grid-template-areas:"top top" "watch charts" "bottom bottom";}
+  .top{grid-area:top;display:flex;align-items:center;gap:14px;padding:0 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+  .brand{font-weight:800;letter-spacing:.3px}.brand span{color:var(--accent)}
+  .top .conn{margin-left:auto;color:var(--dim);font-size:12px;display:flex;align-items:center;gap:6px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--up)}
+  .watch{grid-area:watch;background:var(--panel2);border-right:1px solid var(--line);overflow-y:auto}
+  .watch h4{margin:0;padding:8px 12px;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;position:sticky;top:0;background:var(--panel2)}
+  .wrow{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:6px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+  .wrow:hover{background:#0f1826}.wrow.on{background:#12203a}
+  .wsym{font-weight:700}.wbid{color:var(--dim);font-size:11px}
+  .wask{text-align:right;font-variant-numeric:tabular-nums}
+  .wchg{text-align:right;font-size:11px;font-variant-numeric:tabular-nums}
+  .up{color:var(--up)}.down{color:var(--down)}
+  .charts{grid-area:charts;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:1px;background:var(--line)}
+  .cell{background:var(--panel);display:flex;flex-direction:column;min-width:0;min-height:0}
+  .cell-hd{display:flex;align-items:center;gap:8px;padding:5px 10px;border-bottom:1px solid var(--line);font-size:12px}
+  .cell-hd b{font-weight:700}.cell-hd .px{margin-left:auto;font-variant-numeric:tabular-nums}
+  .canvas{flex:1;min-height:0}
+  .bottom{grid-area:bottom;background:var(--panel2);border-top:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
+  .kpis{display:flex;gap:0;border-bottom:1px solid var(--line)}
+  .kpi{padding:8px 16px;border-right:1px solid var(--line)}
+  .kpi .l{color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:.4px}
+  .kpi .v{font-weight:700;font-size:14px;font-variant-numeric:tabular-nums;margin-top:2px}
+  .postbl{flex:1;overflow:auto}
+  table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  th{position:sticky;top:0;background:var(--panel2);color:var(--dim);font-weight:600;font-size:11px;text-align:right;padding:6px 12px;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left}
+  td{padding:6px 12px;border-bottom:1px solid #16202f;text-align:right}
+  .empty{padding:18px;color:var(--dim);text-align:center}
+  .note{padding:2px 14px;color:var(--dim);font-size:11px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- Same CDN pattern the other apps use. Chart/render code is guarded so a blocked CDN never throws. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="alpexa-sync.js?v=16"></script>
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel" data-presets="react">
+/* ══════════════════════════════════════════════════════════════════════════
+   OVERLOAD-SAFE PIPELINE: the whole page subscribes to prices ONCE (priceStore),
+   through the 1s-cache `feed` Edge. Every chart cell + market-watch + bottom bar
+   reads from that single in-memory store (browser fan-out) — NOT their own poll.
+   Fan-out to the UI is throttled to ~2.5/sec (mirrors _shared/throttle.ts).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+// throttle — trailing edge, keeps the newest value (mirror of supabase/functions/_shared/throttle.ts)
+function throttle(fn, interval){
+  let last=0, pending=null, timer=null;
+  const fire=()=>{ last=Date.now(); const a=pending; pending=null; timer=null; fn.apply(null,a); };
+  return function(){ const now=Date.now(), wait=interval-(now-last);
+    if(wait<=0){ last=now; fn.apply(null,arguments); return; }
+    pending=arguments; if(!timer) timer=setTimeout(fire, wait); };
+}
+
+const WATCH = ['EURUSD','AUDUSD','USDJPY','GBPUSD','USDCAD','NZDUSD','USDCHF','GBPJPY','AUDJPY','EURJPY'];
+const GRID  = ['EURUSD','USDJPY','AUDUSD','GBPUSD'];   // the 2×2 (matches the MT5 screenshot)
+const pip   = (s)=> s.slice(3)==='JPY'||s.slice(0,3)==='JPY' ? 0.01 : 0.0001;
+const digits= (s)=> s.slice(3)==='JPY'||s.includes('JPY') ? 3 : 5;
+const fmtPx = (s,v)=> (v==null?'—':(+v).toFixed(digits(s)));
+
+// ── read prices via the cache proxy (feed-first → direct DB fallback → dev simulator) ──
+async function feedPrices(){
+  try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.functions){
+    const x=await AlpexaSync.db.functions.invoke('feed',{body:{t:'prices'}});
+    if(x&&!x.error&&Array.isArray(x.data)) return x.data;
+  } }catch(e){}
+  try{ if(window.AlpexaSync&&AlpexaSync.db){
+    const r=await AlpexaSync.db.from('prices').select('symbol,mid,spr_pts');
+    if(r&&r.data) return r.data;
+  } }catch(e){}
+  return null;   // → simulator seed keeps the terminal alive in dev / logged-out
+}
+
+const BASE = { EURUSD:1.143, AUDUSD:0.694, USDJPY:162.36, GBPUSD:1.3417, USDCAD:1.417,
+  NZDUSD:0.5758, USDCHF:0.8068, GBPJPY:217.8, AUDJPY:112.7, EURJPY:185.6 };
+
+const priceStore = {
+  mids:{}, listeners:new Set(), timer:null, live:false,
+  _apply(rows){
+    const now=Date.now();
+    rows.forEach(p=>{
+      const sym=p.symbol; if(WATCH.indexOf(sym)<0) return;
+      const mid=+p.mid||0; if(mid<=0) return;
+      const prev=this.mids[sym]; const half=(+p.spr_pts||10)*pip(sym)/2;
+      this.mids[sym]={ mid, bid:mid-half, ask:mid+half,
+        open: prev? prev.open : mid, chg: prev? (mid-prev.open)/prev.open*100 : 0, ts:now };
+    });
+  },
+  _simulate(){ // dev fallback: gentle random walk so charts show life without a live feed
+    const now=Date.now();
+    WATCH.forEach(sym=>{
+      const cur=this.mids[sym]? this.mids[sym].mid : BASE[sym];
+      const mid=cur*(1+(Math.random()-0.5)*0.0006); const half=10*pip(sym)/2;
+      const open=this.mids[sym]? this.mids[sym].open : cur;
+      this.mids[sym]={ mid, bid:mid-half, ask:mid+half, open, chg:(mid-open)/open*100, ts:now };
+    });
+  },
+  async pull(){
+    const rows=await feedPrices();
+    if(rows && rows.length){ this.live=true; this._apply(rows); } else { this.live=false; this._simulate(); }
+    this.notify();
+  },
+  start(){ if(this.timer) return; this.pull(); this.timer=setInterval(()=>this.pull(), 1000); }, // 1 poll/sec — server 1s-cached
+  subscribe(fn){ this.listeners.add(fn); fn(this.mids); return ()=>this.listeners.delete(fn); },
+  get(sym){ return this.mids[sym]; },
+};
+priceStore.notify = throttle(function(){ priceStore.listeners.forEach(fn=>{ try{fn(priceStore.mids);}catch(e){} }); }, 400);
+
+// ── candle history: try the fx-prices Edge, fall back to a synthetic seed (live bars are REAL feed). ──
+async function loadCandles(symbol){
+  try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.functions){
+    const x=await AlpexaSync.db.functions.invoke('fx-prices',{body:{candles:symbol,tf:'M15'}});
+    if(x&&!x.error&&x.data&&Array.isArray(x.data.candles)&&x.data.candles.length)
+      return x.data.candles.map(c=>({ time:Math.floor((c.t||c.time)/1000), open:+c.o||+c.open, high:+c.h||+c.high, low:+c.l||+c.low, close:+c.c||+c.close }));
+  } }catch(e){}
+  return synthCandles(symbol);   // TODO: wire a public candles endpoint for real history
+}
+function synthCandles(symbol){   // ~120 M15 bars ending near the current mid
+  const step=900, n=120; let t=Math.floor(Date.now()/1000/step)*step - n*step;
+  let px=(priceStore.get(symbol)&&priceStore.get(symbol).mid)||BASE[symbol]||1;
+  const out=[];
+  for(let i=0;i<n;i++){ const o=px; px=px*(1+(Math.random()-0.5)*0.0008);
+    const c=px, h=Math.max(o,c)*(1+Math.random()*0.0003), l=Math.min(o,c)*(1-Math.random()*0.0003);
+    out.push({ time:t, open:o, high:h, low:l, close:c }); t+=step; }
+  return out;
+}
+
+/* ── Chart cell: one Lightweight Charts instance, seeded history + throttled live last-bar ── */
+function ChartCell({ symbol }){
+  const box=React.useRef(null), chart=React.useRef(null), series=React.useRef(null), bar=React.useRef(null);
+  const [px,setPx]=React.useState(null);
+  React.useEffect(()=>{
+    if(!window.LightweightCharts || !box.current) return;      // CDN blocked → no chart, no crash
+    const c=LightweightCharts.createChart(box.current, {
+      layout:{ background:{color:'#111826'}, textColor:'#8a97ac' },
+      grid:{ vertLines:{color:'#16202f'}, horzLines:{color:'#16202f'} },
+      timeScale:{ borderColor:'#1e2a3d', timeVisible:true }, rightPriceScale:{ borderColor:'#1e2a3d' },
+      autoSize:true,
+    });
+    const s=(c.addCandlestickSeries||c.addSeries).call(c, (c.addCandlestickSeries?{}:LightweightCharts.CandlestickSeries), {
+      upColor:'#26a65b', downColor:'#e5484d', wickUpColor:'#26a65b', wickDownColor:'#e5484d', borderVisible:false });
+    chart.current=c; series.current=s;
+    loadCandles(symbol).then(data=>{ try{ s.setData(data); bar.current=data[data.length-1]; }catch(e){} });
+    // live: update ONLY the last bar's close from the shared store — throttled to ~2.5/sec
+    const onTick=throttle((mids)=>{
+      const m=mids[symbol]; if(!m) return; setPx(m.mid);
+      if(!bar.current||!series.current) return;
+      const b=bar.current, close=m.mid;
+      const u={ time:b.time, open:b.open, high:Math.max(b.high,close), low:Math.min(b.low,close), close };
+      bar.current=u; try{ series.current.update(u); }catch(e){}
+    }, 400);
+    const unsub=priceStore.subscribe(onTick);
+    return ()=>{ unsub(); try{ c.remove(); }catch(e){} };
+  }, [symbol]);
+  return (
+    <div className="cell">
+      <div className="cell-hd"><b>{symbol}</b><span className="dim">· H1</span><span className="px">{fmtPx(symbol,px)}</span></div>
+      <div className="canvas" ref={box}>{!window.LightweightCharts && <div className="empty">chart library loading…</div>}</div>
+    </div>
+  );
+}
+
+/* ── Market watch: reads the shared store (fan-out), click to swap a grid symbol ── */
+function MarketWatch({ onPick }){
+  const [mids,setMids]=React.useState({});
+  React.useEffect(()=> priceStore.subscribe(throttle(m=>setMids({...m}),400)), []);
+  return (
+    <div className="watch">
+      <h4>Market Watch</h4>
+      {WATCH.map(sym=>{ const m=mids[sym]||{}; const cls=m.chg>=0?'up':'down';
+        return (
+          <div className="wrow" key={sym} onClick={()=>onPick&&onPick(sym)}>
+            <div className="wsym">{sym}</div>
+            <div className={"wask "+cls}>{fmtPx(sym,m.ask)}</div>
+            <div className="wbid">{fmtPx(sym,m.bid)}</div>
+            <div className={"wchg "+cls}>{m.chg!=null?(m.chg>=0?'+':'')+m.chg.toFixed(2)+'%':'—'}</div>
+          </div>
+        ); })}
+    </div>
+  );
+}
+
+/* ── Bottom bar: Balance / Equity / Margin + open positions, from Supabase realtime ── */
+function BottomBar(){
+  const [acct,setAcct]=React.useState(null);
+  const [pos,setPos]=React.useState([]);
+  const [mids,setMids]=React.useState({});
+  React.useEffect(()=>{
+    let ch1,ch2;
+    async function loadAcct(){ try{ if(!(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me)) return;
+      const r=await AlpexaSync.db.from('accounts').select('acct_no,balance').eq('server','fx').limit(1);
+      if(r&&r.data&&r.data[0]) setAcct(r.data[0]); }catch(e){} }
+    async function loadPos(){ try{ if(!(window.AlpexaSync&&AlpexaSync.db)) return;
+      const r=await AlpexaSync.db.from('positions').select('local_id,symbol,side,stake,size,open_price,status').eq('server','fx').eq('status','open').limit(200);
+      if(r&&r.data) setPos(r.data); }catch(e){} }
+    loadAcct(); loadPos();
+    try{ if(window.AlpexaSync&&AlpexaSync.db&&acct){
+      ch1=AlpexaSync.db.channel('wt-acct').on('postgres_changes',{event:'*',schema:'public',table:'accounts'},loadAcct).subscribe();
+      ch2=AlpexaSync.db.channel('wt-pos').on('postgres_changes',{event:'*',schema:'public',table:'positions'},loadPos).subscribe();
+    } }catch(e){}
+    const unsub=priceStore.subscribe(throttle(m=>setMids({...m}),400));
+    return ()=>{ unsub(); try{AlpexaSync.db.removeChannel(ch1);AlpexaSync.db.removeChannel(ch2);}catch(e){} };
+  }, [acct&&acct.acct_no]);
+
+  // floating P&L marked at the live mid (display approx — production should use trading.html's
+  // fxClosePx lockstep so floating == what fx_close realizes). No open FX positions → 0.
+  const floating = pos.reduce((s,p)=>{ const m=mids[p.symbol]; if(!m) return s;
+    const dir=(p.side==='sell'||p.side==='SELL')?-1:1; const lot=(+p.size||+p.stake||0.01);
+    const contract=100000; return s + dir*(m.mid-(+p.open_price||m.mid))*lot*contract*(p.symbol.includes('JPY')?0.0067:1); }, 0);
+  const balance=acct?+acct.balance||0:0, equity=balance+floating;
+  const marginUsed=pos.reduce((s,p)=> s+(+p.size||+p.stake||0.01)*100000/100, 0);  // 1:100 illustrative
+  const level=marginUsed>0?(equity/marginUsed*100):0;
+  const usd=(n)=>'$'+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+  return (
+    <div className="bottom">
+      <div className="kpis">
+        <div className="kpi"><div className="l">Balance</div><div className="v">{usd(balance)}</div></div>
+        <div className="kpi"><div className="l">Equity</div><div className="v">{usd(equity)}</div></div>
+        <div className="kpi"><div className="l">Floating P/L</div><div className={"v "+(floating>=0?'up':'down')}>{usd(floating)}</div></div>
+        <div className="kpi"><div className="l">Margin</div><div className="v">{usd(marginUsed)}</div></div>
+        <div className="kpi"><div className="l">Free Margin</div><div className="v">{usd(equity-marginUsed)}</div></div>
+        <div className="kpi"><div className="l">Margin Level</div><div className="v">{marginUsed>0?level.toFixed(2)+'%':'—'}</div></div>
+      </div>
+      <div className="postbl">
+        <table>
+          <thead><tr><th>Symbol</th><th>Type</th><th>Volume</th><th>Open</th><th>Price</th><th>P/L</th></tr></thead>
+          <tbody>
+            {!pos.length && <tr><td className="empty" colSpan="6">{window.AlpexaSync&&AlpexaSync.me?'No open FX positions':'로그인하면 실계정 잔고·포지션이 표시됩니다 (지금은 데모 시세)'}</td></tr>}
+            {pos.map(p=>{ const m=mids[p.symbol]||{}; const dir=(p.side==='sell')?-1:1;
+              const pl=m.mid?dir*(m.mid-(+p.open_price||0))*(+p.size||0.01)*100000*(p.symbol.includes('JPY')?0.0067:1):0;
+              return (<tr key={p.local_id}>
+                <td>{p.symbol}</td><td>{(p.side||'buy').toUpperCase()}</td><td>{(+p.size||+p.stake||0.01)}</td>
+                <td>{fmtPx(p.symbol,+p.open_price)}</td><td>{fmtPx(p.symbol,m.mid)}</td>
+                <td className={pl>=0?'up':'down'}>{usd(pl)}</td>
+              </tr>); })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function App(){
+  const [grid,setGrid]=React.useState(GRID);
+  React.useEffect(()=>{ priceStore.start(); }, []);
+  const swap=(sym)=> setGrid(g=> g.indexOf(sym)>=0 ? g : [sym, g[1], g[2], g[3]]);   // click watch → replace top-left
+  return (
+    <div className="terminal">
+      <div className="top">
+        <div className="brand">ALPEXA <span>WebTrade</span></div>
+        <div className="dim" style={{color:'#8a97ac',fontSize:12}}>FX Terminal · MetaTrader-style</div>
+        <div className="conn"><span className="dot" style={{background:priceStore.live?'#26a65b':'#e5a13a'}}></span>{priceStore.live?'Live feed (1s cache)':'Demo feed'}</div>
+      </div>
+      <MarketWatch onPick={swap} />
+      <div className="charts">{grid.map((s,i)=><ChartCell key={s+i} symbol={s} />)}</div>
+      <BottomBar />
+    </div>
+  );
+}
+
+// Boot when Babel+React actually loaded (guarded so a blocked CDN doesn't throw a render error).
+try{ if(window.React && window.ReactDOM){ ReactDOM.createRoot(document.getElementById('app')).render(<App/>); } }catch(e){ console.warn('webtrade boot skipped:', e && e.message); }
+</script>
+</body>
+</html>
