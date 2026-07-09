@@ -147,6 +147,27 @@
       if(r&&r.data){ CRYPTO_BY_CUST[custId].holdings=r.data.filter(function(x){return (+x.qty||0)>0;}); if(!busyEditing())render(); } },function(){});
     AlpexaSync.db.from('crypto_stakes').select('asset,usd,period').eq('acct_no',cryptoAcct).then(function(r){
       if(r&&r.data){ CRYPTO_BY_CUST[custId].stakes=r.data.filter(function(x){return (+x.usd||0)>0;}); if(!busyEditing())render(); } },function(){}); }
+  // ALPXS price — Alpexa's own token has no market feed; the customer app prices it
+  // by a deterministic formula (crypto-live.html: $1.00 × 1.02^months from 2024-01),
+  // so the admin uses the SAME formula → the net-worth we show == what the customer sees.
+  function alpxsPriceAdmin(){ var mo=(Date.now()-Date.UTC(2024,0,1))/2629800000; return 1.00*Math.pow(1.02,mo); }
+  // Per-asset USD price: stablecoins = 1; ALPXS = formula; everything else = the SERVER
+  // mid (LIVE_FEED, the exact price real trades/stakes use). Unknown coin → 0 (never guess).
+  function cryptoPriceOf(asset){
+    if(asset==='USDT'||asset==='USDC'||asset==='USD'||asset==='DAI'||asset==='BUSD') return 1;
+    if(asset==='ALPXS') return alpxsPriceAdmin();
+    return (LIVE_FEED[asset]&&+LIVE_FEED[asset].mid)||0;
+  }
+  // Real crypto net worth = Σ(holding qty × price) + Σ(stake USD). Crypto money lives in
+  // crypto_holdings/crypto_stakes (NOT accounts.balance), so this is the true balance.
+  // Returns null until the customer's holdings have been pulled (caller falls back).
+  function cryptoUsdVal(custId){
+    var cb=CRYPTO_BY_CUST[custId]; if(cb===undefined) return null;
+    var v=0;
+    (cb.holdings||[]).forEach(function(x){ v+=(+x.qty||0)*cryptoPriceOf(x.asset); });
+    (cb.stakes||[]).forEach(function(x){ v+=(+x.usd||0); });
+    return v;
+  }
   // Shared renderer for one open position/bet/holding (with Close/Void control).
   function posRowHTML(x){
     var s=x.server, who=custName(x.cust_id)||x.cust_id||'';
@@ -844,7 +865,7 @@
               '<div class="hint">Marks the account CLOSED. Profile, accounts, positions &amp; history are KEPT and fully restorable — nothing is deleted.</div>');
       } else if(open){
         h+='<div class="row"><span>Live (FX)</span><b>'+bv('fx')+'<span class="muted" style="font-weight:500"> · '+an('fx')+'</span></b></div>'+
-          '<div class="row"><span>Crypto</span><b>'+bv('crypto')+'<span class="muted" style="font-weight:500"> · '+an('crypto')+'</span></b></div>'+
+          '<div class="row"><span>Crypto</span><b>'+(cryptoUsdVal(cid)!=null?usd(cryptoUsdVal(cid)):bv('crypto'))+'<span class="muted" style="font-weight:500"> · '+an('crypto')+'</span></b></div>'+
           '<div class="row"><span>Sports</span><b>'+bv('sports')+'<span class="muted" style="font-weight:500"> · '+an('sports')+'</span></b></div>';
         if(open){
           h+='<div class="row"><span>Phone</span><b class="muted">'+(p.phone||'—')+'</b></div>'+
