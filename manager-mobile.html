@@ -350,8 +350,14 @@
     // funds (Sports $100 + FX $100 + Crypto $0). Was a stale $100 constant that ignored the
     // FX welcome, so a fresh account showed a false +$100 integrity gap.
     SRV_ACCOUNTS.forEach(function(a){ if(a.player_id===p.id){ actual+=(+a.balance||0); opening+=(+a.bonus||0); } });
-    var explained=opening+dep-wd+pnl, gap=actual-explained;
-    return {actual:actual,explained:explained,gap:gap,dep:dep,wd:wd,pnl:pnl,opening:opening,flagged:gap>INTEGRITY_FLAG_GAP};
+    // Crypto net worth (holdings×price + stakes) lives in crypto_holdings, NOT accounts.balance,
+    // so it's invisible above. Add it to BOTH sides: it shows in the displayed total, but the
+    // GAP still polices only CASH (FX+Sports) — crypto is RLS-locked (client can't tamper) and
+    // is admin-granted/market-priced, so this cash tamper-monitor must not flag it. (Without this,
+    // an admin ALPXS bonus would show as an unexplained gap and wrongly block the customer's withdrawals.)
+    var crypto=cryptoUsdVal(cid); if(crypto==null) crypto=0;
+    var explained=opening+dep-wd+pnl+crypto, actualT=actual+crypto, gap=actualT-explained;
+    return {actual:actualT,explained:explained,gap:gap,dep:dep,wd:wd,pnl:pnl,opening:opening,crypto:crypto,flagged:gap>INTEGRITY_FLAG_GAP};
   }
   // Withdrawal guard: a WITHDRAW approval is risky if the customer's balance can't
   // be explained by their records (possible ledger tampering / self-credit, 🚩).
@@ -785,7 +791,7 @@
     }
     var byPlayer={};
     SRV_ACCOUNTS.forEach(function(a){ (byPlayer[a.player_id]=byPlayer[a.player_id]||[]).push(a); });
-    var totOf=function(p){ var t=0,has=false; (byPlayer[p.id]||[]).forEach(function(a){ var b=+a.balance||0; t+=b; if(b>0)has=true; }); return has?t:custBalance(p.cust_id); };
+    var totOf=function(p){ var t=0,has=false; (byPlayer[p.id]||[]).forEach(function(a){ var b=+a.balance||0; t+=b; if(b>0)has=true; }); var cv=cryptoUsdVal(p.cust_id); if(cv!=null) t+=cv; return (has||cv)?t:custBalance(p.cust_id); };
     var cmp={ name:function(a,b){ return (a.name||'').localeCompare(b.name||''); },
               bal:function(a,b){ return totOf(a)-totOf(b); },
               joined:function(a,b){ return (a.created_at||'').localeCompare(b.created_at||''); } }[PLAYER_SORT]||function(){return 0;};
@@ -809,6 +815,7 @@
       var accs=byPlayer[p.id]||[]; var m={}; var tot=0; var hasBal=false;
       accs.forEach(function(a){ m[a.server]=a; var b=+a.balance||0; tot+=b; if(b>0)hasBal=true; });
       if(!hasBal) tot=custBalance(p.cust_id); // fallback until the app pushes real-time balances
+      var _cvHdr=cryptoUsdVal(p.cust_id); if(_cvHdr!=null) tot+=_cvHdr; // + crypto net worth (holdings live in crypto_holdings, not accounts.balance)
       var bv=function(s){ return m[s]? usd(+m[s].balance||0) : '—'; };
       var an=function(s){ return m[s]? m[s].acct_no : '—'; };
       var joined=p.created_at?new Date(p.created_at).toLocaleDateString():'';
@@ -829,7 +836,7 @@
           '<div class="row" style="border:none;padding:1px 0"><span class="muted">Actual balance</span><b>'+usd(ig.actual)+'</b></div>'+
           '<div class="row" style="border:none;padding:1px 0"><span class="muted">Explained by records</span><b>'+usd(ig.explained)+'</b></div>'+
           '<div class="row" style="border:none;padding:1px 0"><span class="muted">Gap (actual − explained)</span><b class="'+(ig.gap>INTEGRITY_FLAG_GAP?'neg':'pos')+'">'+(ig.gap>=0?'+':'')+usd(ig.gap)+'</b></div>'+
-          '<div class="req-meta" style="margin-top:4px">opening '+usd(ig.opening)+' + deposits '+usd(ig.dep)+' − withdrawals '+usd(ig.wd)+' + trade P&L '+(ig.pnl>=0?'+':'')+usd(ig.pnl)+'</div>'+
+          '<div class="req-meta" style="margin-top:4px">opening '+usd(ig.opening)+' + deposits '+usd(ig.dep)+' − withdrawals '+usd(ig.wd)+' + trade P&L '+(ig.pnl>=0?'+':'')+usd(ig.pnl)+(ig.crypto?' + crypto holdings '+usd(ig.crypto)+' (market value, not cash-monitored)':'')+'</div>'+
           (ig.flagged?'<div class="hint" style="color:#c0392b">More money than deposits/trades explain. Review before approving any withdrawal.</div>':'')+
         '</div>';
       }
