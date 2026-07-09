@@ -19,8 +19,15 @@
   /* ── MT5-style CSS Grid: toolbar / [market-watch | 2×2 charts] / bottom bar ── */
   .terminal{display:grid;height:100vh;
     grid-template-columns:var(--leftw,240px) 6px 1fr;
-    grid-template-rows:23px 33px 1fr 188px;
+    grid-template-rows:23px 33px 1fr var(--bottomh,188px);
     grid-template-areas:"menu menu menu" "tools tools tools" "left splitter charts" "bottom bottom bottom";}
+  /* horizontal (row-resize) splitters — layout CHROME, always present & draggable
+     regardless of table/data content (the resize engine is data-independent). */
+  .hsplit,.lhsplit{flex:none;height:6px;cursor:row-resize;background:var(--cellbd);position:relative;user-select:none}
+  .hsplit::before,.lhsplit::before{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:26px;height:2px;background:#5a616c;border-radius:1px}
+  .hsplit:hover,.hsplit.drag,.lhsplit:hover,.lhsplit.drag{background:#3a6ea5}
+  .hsplit:hover::before,.hsplit.drag::before,.lhsplit:hover::before,.lhsplit.drag::before{background:#cdd6e2}
   /* draggable vertical splitter between Market Watch/Navigator and the charts */
   .splitter{grid-area:splitter;cursor:col-resize;background:var(--cellbd);position:relative;user-select:none}
   .splitter::before{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
@@ -53,7 +60,7 @@
   /* ── left column: Market Watch (top) + Navigator (bottom) ── */
   .left{grid-area:left;display:flex;flex-direction:column;min-height:0;overflow:hidden}
   .watch{flex:1;background:var(--panel);overflow:auto;min-height:0}
-  .nav{height:186px;background:var(--panel);border-top:1px solid var(--cellbd);overflow:auto;flex:none}
+  .nav{height:var(--navh,186px);background:var(--panel);border-top:1px solid var(--cellbd);overflow:auto;flex:none}
   .nav .navhd{position:sticky;top:0;padding:3px 8px;background:#0a0d12;color:var(--dim);font-size:11px;font-weight:600;border-bottom:1px solid var(--line)}
   .nav ul{list-style:none;margin:0;padding:2px 0}
   .nav li{padding:2px 8px;color:#c4c8d0;cursor:default;white-space:nowrap}
@@ -206,6 +213,14 @@ priceStore.notify = throttle(function(){ priceStore.listeners.forEach(fn=>{ try{
 /* ── positionsStore: ONE source of truth for open FX positions + account.
    ChartCell draws createPriceLine flags from it; BottomBar tables it. Server-owned
    (read-only display) — never writes money, matches CLAUDE.md #5 (server is sole owner). ── */
+// DEMO seed — a mock ledger so the terminal is never empty for layout/UX testing.
+// Pure client-side DISPLAY only: never written to the server or localStorage, never
+// treated as spendable money (orders still route through useTradeEngine). A real
+// logged-in load REPLACES this (real users never see the mock). (#5 stays intact.)
+const DEMO_ACCT = { acct_no:'FX-DEMO', balance:100000 };
+const DEMO_POS  = [{ local_id:'3172308', symbol:'EURUSD', side:'buy', stake:0.01, size:0.01,
+  open_price:1.14318, status:'open', created_at:'2026-07-09T20:17:40', _demo:true, profit:-0.39 }];
+
 const positionsStore = {
   acct:null, pos:[], listeners:new Set(), ch1:null, ch2:null, started:false,
   async loadAcct(){ try{ if(!(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me)) return;
@@ -213,9 +228,11 @@ const positionsStore = {
     if(r&&r.data&&r.data[0]){ this.acct=r.data[0]; this.notify(); } }catch(e){} },
   async loadPos(){ try{ if(!(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me)) return;
     const r=await AlpexaSync.db.from('positions').select('local_id,symbol,side,stake,size,open_price,status,created_at').eq('server','fx').eq('status','open').limit(200);
-    if(r&&r.data){ this.pos=r.data; this.notify(); } }catch(e){} },
-  start(){ if(this.started) return; this.started=true; this.loadAcct(); this.loadPos();
+    if(r&&r.data){ this.pos=r.data; this.notify(); } }catch(e){} },   // real load REPLACES the demo seed
+  start(){ if(this.started) return; this.started=true;
+    this.acct=DEMO_ACCT; this.pos=DEMO_POS.slice(); this.notify();   // seed demo first → ledger never empty
     try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me){
+      this.loadAcct(); this.loadPos();                                // logged in → overwrite demo with reality
       this.ch1=AlpexaSync.db.channel('wt-acct').on('postgres_changes',{event:'*',schema:'public',table:'accounts'},()=>this.loadAcct()).subscribe();
       this.ch2=AlpexaSync.db.channel('wt-pos').on('postgres_changes',{event:'*',schema:'public',table:'positions'},()=>this.loadPos()).subscribe();
     } }catch(e){} },
@@ -548,7 +565,8 @@ function BottomBar(){
 
   // floating P&L marked at the live mid (display approx — production should use trading.html's
   // fxClosePx lockstep so floating == what fx_close realizes). No open FX positions → 0.
-  const plOf=(p)=>{ const m=mids[p.symbol]; if(!m) return 0;
+  const plOf=(p)=>{ if(p._demo && p.profit!=null) return +p.profit;   // demo seed carries a pinned P/L
+    const m=mids[p.symbol]; if(!m) return 0;
     const dir=sideUp(p.side)==='SELL'?-1:1; const contract=100000;
     return dir*(m.mid-(+p.open_price||m.mid))*lotsOf(p)*contract*(p.symbol.includes('JPY')?0.0067:1); };
   const floating = pos.reduce((s,p)=> s+plOf(p), 0);
@@ -559,6 +577,7 @@ function BottomBar(){
 
   return (
     <div className="bottom">
+      <BottomResizer />
       <div className="tbxtabs">{TBX_TABS.map(t=><div key={t} className={"t"+(t===tab?' on':'')} onClick={()=>setTab(t)}>{t}</div>)}</div>
       <div className="postbl">
         <table className="pos">
@@ -567,9 +586,9 @@ function BottomBar(){
             {!pos.length && <tr><td className="empty" colSpan="10">{window.AlpexaSync&&AlpexaSync.me?'No open positions':'로그인하면 실계정 잔고·포지션이 표시됩니다 (지금은 데모 시세)'}</td></tr>}
             {pos.map(p=>{ const m=mids[p.symbol]||{}; const pl=plOf(p);
               const tkt=String(p.local_id||'').replace(/\D/g,'').slice(-8)||p.local_id;
-              const tm=p.created_at?String(p.created_at).slice(0,16).replace('T',' '):'—';
+              const tm=p.created_at?String(p.created_at).slice(0,19).replace('T',' ').replace(/-/g,'.'):'—';  // MT5: 2026.07.09 20:17:40
               return (<tr key={p.local_id}>
-                <td>{p.symbol}</td><td>{tkt}</td><td>{tm}</td><td className={sideUp(p.side)==='SELL'?'down':'up'}>{sideUp(p.side).toLowerCase()}</td>
+                <td>{p.symbol.toLowerCase()}.fx</td><td>{tkt}</td><td>{tm}</td><td className={sideUp(p.side)==='SELL'?'down':'up'}>{sideUp(p.side).toLowerCase()}</td>
                 <td>{lotsOf(p).toFixed(2)}</td><td>{fmtPx(p.symbol,+p.open_price)}</td><td>—</td><td>—</td>
                 <td>{fmtPx(p.symbol,m.mid)}</td><td className={pl>=0?'up':'down'}>{num(pl)}</td>
               </tr>); })}
@@ -691,6 +710,51 @@ function Splitter(){
   return <div className="splitter" ref={self} onMouseDown={onDown} title="드래그해서 시세창 너비 조절"></div>;
 }
 
+/* ── Bottom Toolbox row-resizer: a row-resize bar that is ALWAYS present as panel
+   chrome (independent of the positions table being empty). Drag up/down sets
+   --bottomh on .terminal; the 1fr charts row absorbs the change; chart.resize() in
+   a rAF loop keeps the charts crisp. ── */
+function BottomResizer(){
+  const self=React.useRef(null);
+  React.useEffect(()=>{
+    const el=self.current, term=document.querySelector('.terminal'); if(!el) return; let raf=null, on=false;
+    const onDown=(e)=>{ e.preventDefault(); on=true; el.classList.add('drag');
+      document.body.style.cursor='row-resize'; document.body.style.userSelect='none'; };
+    const onMove=(e)=>{ if(!on||!term) return;
+      const h=Math.max(90, Math.min(window.innerHeight*0.85, window.innerHeight - e.clientY));
+      term.style.setProperty('--bottomh', h+'px');
+      if(!raf) raf=requestAnimationFrame(()=>{ raf=null; chartResizer.resizeAll(); });
+    };
+    const onUp=()=>{ if(!on) return; on=false; el.classList.remove('drag');
+      document.body.style.cursor=''; document.body.style.userSelect=''; chartResizer.resizeAll(); };
+    el.addEventListener('mousedown',onDown);
+    document.addEventListener('mousemove',onMove); document.addEventListener('mouseup',onUp);
+    return ()=>{ el.removeEventListener('mousedown',onDown); document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); if(raf)cancelAnimationFrame(raf); };
+  }, []);
+  return <div className="hsplit" ref={self} title="드래그해서 거래창 높이 조절"></div>;
+}
+
+/* ── Left-panel internal row-resizer between Market Watch and Navigator. Also pure
+   chrome — works regardless of list contents; sets --navh on the .left column. ── */
+function NavResizer(){
+  const self=React.useRef(null);
+  React.useEffect(()=>{
+    const el=self.current; if(!el) return; const left=el.closest('.left'); let on=false;
+    const onDown=(e)=>{ e.preventDefault(); on=true; el.classList.add('drag');
+      document.body.style.cursor='row-resize'; document.body.style.userSelect='none'; };
+    const onMove=(e)=>{ if(!on||!left) return; const r=left.getBoundingClientRect();
+      const navh=Math.max(70, Math.min(r.height-110, r.bottom - e.clientY));
+      left.style.setProperty('--navh', navh+'px');
+    };
+    const onUp=()=>{ if(!on) return; on=false; el.classList.remove('drag');
+      document.body.style.cursor=''; document.body.style.userSelect=''; };
+    el.addEventListener('mousedown',onDown);
+    document.addEventListener('mousemove',onMove); document.addEventListener('mouseup',onUp);
+    return ()=>{ el.removeEventListener('mousedown',onDown); document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); };
+  }, []);
+  return <div className="lhsplit" ref={self} title="드래그해서 네비게이터 높이 조절"></div>;
+}
+
 function App(){
   const [grid,setGrid]=React.useState(GRID);
   const [tf,setTf]=React.useState('H1');
@@ -716,6 +780,7 @@ function App(){
       <Toolbar tf={tf} />
       <div className="left">
         <MarketWatch onPick={swap} />
+        <NavResizer />
         <Navigator />
       </div>
       <Splitter />
