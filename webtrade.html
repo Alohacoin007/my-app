@@ -30,6 +30,15 @@
   /* ── menu bar (File View …) ── */
   .menu{grid-area:menu;display:flex;align-items:center;gap:1px;padding:0 4px;background:linear-gradient(#2c3138,#20242a);border-bottom:1px solid #0a0a0a;font-size:11px}
   .menu .mi{padding:3px 8px;color:#d0d4da;cursor:default;border-radius:2px}.menu .mi:hover{background:#3a6ea5;color:#fff}
+  .menu .mi{position:relative}
+  .menu .mi.on{background:#3a6ea5;color:#fff}
+  .mdrop{position:absolute;top:100%;left:0;min-width:190px;background:#1b1f25;border:1px solid #3a3f47;
+    box-shadow:0 6px 18px rgba(0,0,0,.6);z-index:40;padding:3px 0;font-size:11.5px}
+  .mdrop .row{display:flex;align-items:center;gap:8px;padding:5px 12px;color:#cfd4dc;cursor:pointer;white-space:nowrap}
+  .mdrop .row:hover{background:#3a6ea5;color:#fff}
+  .mdrop .row .ck{width:12px;text-align:center;color:#00d060}
+  .mdrop .sep{height:1px;background:#3a3f47;margin:3px 0}
+  .mdrop .hd{padding:3px 12px;color:#79808c;font-size:10px;text-transform:uppercase;letter-spacing:.4px}
   .menu .conn{margin-left:auto;color:#9aa2b0;display:flex;align-items:center;gap:6px;padding-right:6px}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--up)}
   /* ── icon toolbar (New Order · Algo · timeframes) ── */
@@ -215,9 +224,9 @@ const chartResizer = {
 if(typeof window!=='undefined') window.addEventListener('resize', ()=>chartResizer.resizeAll());
 
 // ── candle history: try the fx-prices Edge, fall back to a synthetic seed (live bars are REAL feed). ──
-async function loadCandles(symbol){
+async function loadCandles(symbol, tf){
   try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.functions){
-    const x=await AlpexaSync.db.functions.invoke('fx-prices',{body:{candles:symbol,tf:'M15'}});
+    const x=await AlpexaSync.db.functions.invoke('fx-prices',{body:{candles:symbol,tf:tf||'M15'}});
     if(x&&!x.error&&x.data&&Array.isArray(x.data.candles)&&x.data.candles.length)
       return x.data.candles.map(c=>({ time:Math.floor((c.t||c.time)/1000), open:+c.o||+c.open, high:+c.h||+c.high, low:+c.l||+c.low, close:+c.c||+c.close }));
   } }catch(e){}
@@ -233,20 +242,93 @@ function synthCandles(symbol){   // ~120 M15 bars ending near the current mid
   return out;
 }
 
-/* ── One-click order box (SELL orange / vol / BUY blue) — live Ask/Bid inside the buttons.
-   Display-only affordance (no client money write); real order goes through fx_open RPC. ── */
+/* ══════════════════════════════════════════════════════════════════════════
+   INDICATOR ENGINE — extensible, chart-engine-agnostic. Each indicator is a pure
+   compute + a render descriptor (main overlay | bottom sub-band). Adding one = a
+   single registry entry; ChartCell needs no change. This is the seam a future
+   'TradingView Advanced Charts' / server-computed overlay drops into.
+   ══════════════════════════════════════════════════════════════════════════ */
+function _sma(c,p){ const o=[]; let s=0; for(let i=0;i<c.length;i++){ s+=c[i].close; if(i>=p) s-=c[i-p].close; if(i>=p-1) o.push({time:c[i].time,value:s/p}); } return o; }
+function _ema(c,p){ const o=[],k=2/(p+1); let e=null; for(let i=0;i<c.length;i++){ const x=c[i].close; e=e==null?x:x*k+e*(1-k); if(i>=p-1) o.push({time:c[i].time,value:e}); } return o; }
+function _rsi(c,p){ const o=[]; let g=0,l=0; for(let i=1;i<c.length;i++){ const d=c[i].close-c[i-1].close,u=Math.max(d,0),w=Math.max(-d,0);
+  if(i<=p){ g+=u; l+=w; if(i===p){ g/=p; l/=p; o.push({time:c[i].time,value:l===0?100:100-100/(1+g/l)}); } }
+  else { g=(g*(p-1)+u)/p; l=(l*(p-1)+w)/p; o.push({time:c[i].time,value:l===0?100:100-100/(1+g/l)}); } } return o; }
+function _macd(c){ const a=_ema(c,12), b=new Map(_ema(c,26).map(x=>[x.time,x.value])); return a.filter(x=>b.has(x.time)).map(x=>({time:x.time,value:x.value-b.get(x.time)})); }
+
+const INDICATORS = {
+  MA20:  { label:'Moving Average (20)', pane:'main', build:(c)=>[{color:'#f0c674', data:_sma(c,20)}] },
+  MA50:  { label:'Moving Average (50)', pane:'main', build:(c)=>[{color:'#e0709a', data:_sma(c,50)}] },
+  EMA20: { label:'EMA (20)',            pane:'main', build:(c)=>[{color:'#5fb0ff', data:_ema(c,20)}] },
+  RSI14: { label:'RSI (14)',            pane:'sub',  build:(c)=>[{color:'#c792ea', data:_rsi(c,14)}] },
+  MACD:  { label:'MACD (12, 26)',       pane:'sub',  build:(c)=>[{color:'#82d982', data:_macd(c)}] },
+};
+
+/* ══ COMMAND BUS — one event map the menu bar + toolbar dispatch into. Components
+   subscribe; App owns the reducer. New menu action = one entry in COMMANDS. ══ */
+const COMMANDS = {
+  'order.new':        'Open the New Order ticket',
+  'algo.toggle':      'Toggle Algo Trading',
+  'chart.tf':         'Set chart timeframe (arg: M1…MN)',
+  'chart.indicator':  'Toggle an indicator (arg: MA20/RSI14/…)',
+};
+const terminalBus = { listeners:new Set(),
+  emit(cmd,arg){ this.listeners.forEach(fn=>{ try{fn(cmd,arg);}catch(e){} }); },
+  subscribe(fn){ this.listeners.add(fn); return ()=>this.listeners.delete(fn); } };
+
+/* ══ useTradeEngine — the single hook the order box + trade panel talk to. It is a
+   thin CLIENT INTERFACE over the server: it READS balance/positions (positionsStore,
+   server-owned, realtime) and exposes placeOrder/closeOrder that route to a
+   configurable execution endpoint. It NEVER writes balances locally (CLAUDE.md #5 —
+   server is the sole owner). Wire window.ALPEXA_TRADE_API (external MT5 Web API) or
+   the fx_open RPC to go live; until then placeOrder reports 'not connected' rather
+   than faking money. ══ */
+const TRADE_API = (typeof window!=='undefined' && window.ALPEXA_TRADE_API) || '/api/trade/order';
+function useTradeEngine(){
+  const [acct,setAcct]=React.useState(positionsStore.acct);
+  const [pos,setPos]=React.useState(positionsStore.pos);
+  React.useEffect(()=> positionsStore.subscribe(s=>{ setAcct(s.acct); setPos([...s.pos]); }), []);
+  const connected = !!(window.ALPEXA_TRADE_API);   // real execution endpoint present?
+  async function placeOrder({ symbol, side, volume }){
+    const px=priceStore.get(symbol)||{};
+    const payload={ symbol, side, volume:+volume||0.01, price: side==='buy'?px.ask:px.bid, ts:Date.now() };
+    // 1) external MT5 Web API (preferred once configured)
+    if(window.ALPEXA_TRADE_API){
+      try{ const r=await fetch(TRADE_API,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+        return { ok:r.ok, status:r.status, payload }; }catch(e){ return { ok:false, error:String(e), payload }; }
+    }
+    // 2) TODO: server RPC seam — AlpexaSync.db.rpc('fx_open', …). Real money mutation;
+    //    must land with RED→GREEN proof + the fx_open/fx_close spread lockstep. Not wired here.
+    // 3) scaffold: no execution endpoint → surface it, do NOT fake a fill or balance.
+    return { ok:false, reason:'not_connected', payload };
+  }
+  async function closeOrder(localId){
+    if(window.ALPEXA_TRADE_API){ try{ const r=await fetch(TRADE_API+'?close='+encodeURIComponent(localId),{method:'POST'}); return {ok:r.ok}; }catch(e){ return {ok:false,error:String(e)}; } }
+    return { ok:false, reason:'not_connected' };
+  }
+  return { acct, pos, connected, placeOrder, closeOrder, TRADE_API };
+}
+
+/* ── One-click order box (SELL orange / vol / BUY blue) — live Ask/Bid inside the
+   buttons; clicks route through useTradeEngine (server-authoritative, no local money). ── */
 function OrderBox({ symbol }){
   const [m,setM]=React.useState(priceStore.get(symbol)||{});
   const [vol,setVol]=React.useState('0.01');
+  const eng=useTradeEngine();
   React.useEffect(()=> priceStore.subscribe(throttle(mids=>setM({...(mids[symbol]||{})}),400)), [symbol]);
+  const send=async(side)=>{
+    const r=await eng.placeOrder({ symbol, side, volume:vol });
+    if(r.ok) return;
+    // scaffold state: execution endpoint not connected yet — tell the user plainly.
+    alert('주문 실행 API가 아직 연결되지 않았습니다.\n('+side.toUpperCase()+' '+symbol+' '+vol+' lots)\n외부 MT5 Web API(window.ALPEXA_TRADE_API) 또는 fx_open RPC 연결 시 즉시 활성화됩니다.');
+  };
   return (
     <div className="obox">
-      <div className="side sell" title="Sell at Bid">
+      <div className="side sell" title="Sell at Bid" onClick={(e)=>{e.stopPropagation();send('sell');}}>
         <span className="lbl">Sell</span><span className="val">{fmtPx(symbol,m.bid)}</span>
       </div>
       <input className="vol" value={vol} onChange={e=>setVol(e.target.value)}
         onClick={e=>e.stopPropagation()} title="Volume (lots)" />
-      <div className="side buy" title="Buy at Ask">
+      <div className="side buy" title="Buy at Ask" onClick={(e)=>{e.stopPropagation();send('buy');}}>
         <span className="lbl">Buy</span><span className="val">{fmtPx(symbol,m.ask)}</span>
       </div>
     </div>
@@ -255,11 +337,32 @@ function OrderBox({ symbol }){
 
 /* ── Chart cell: one Lightweight Charts instance, seeded history + throttled live last-bar.
    Draws a green dotted createPriceLine + "BUY 0.01 at 1.14318" flag for every open position. ── */
-function ChartCell({ symbol, tf }){
+function ChartCell({ symbol, tf, indicators }){
   const box=React.useRef(null), chart=React.useRef(null), series=React.useRef(null), bar=React.useRef(null);
   const lines=React.useRef([]);
+  const candles=React.useRef([]);         // full history — indicators recompute from this
+  const indSeries=React.useRef([]);       // active indicator line series (to clear/redraw)
+  const indRef=React.useRef(indicators||[]); indRef.current=indicators||[];
   const [px,setPx]=React.useState(null);
   const [posLbl,setPosLbl]=React.useState([]);   // for the price-line flags
+
+  // paint the currently-active indicators from the loaded candles (idempotent: clears first)
+  const paintIndicators=React.useCallback(()=>{
+    const c=chart.current; if(!c) return;
+    indSeries.current.forEach(s=>{ try{ c.removeSeries(s); }catch(e){} }); indSeries.current=[];
+    if(!candles.current.length) return;
+    (indRef.current||[]).forEach(id=>{ const def=INDICATORS[id]; if(!def) return;
+      def.build(candles.current).forEach(ln=>{
+        try{ const opts={ color:ln.color, lineWidth:1, lastValueVisible:false, priceLineVisible:false,
+            priceScaleId: def.pane==='sub'?'ind':'' };
+          const ls = c.addLineSeries ? c.addLineSeries(opts) : c.addSeries(LightweightCharts.LineSeries, opts);
+          if(def.pane==='sub'){ try{ c.priceScale('ind').applyOptions({ scaleMargins:{top:0.72, bottom:0} }); }catch(e){} }
+          ls.setData(ln.data); indSeries.current.push(ls);
+        }catch(e){}
+      });
+    });
+  }, []);
+
   React.useEffect(()=>{
     if(!window.LightweightCharts || !box.current) return;      // CDN blocked → no chart, no crash
     // MT5 look: pure-black canvas, dense grey DOTTED gridlines, Tahoma scales.
@@ -280,7 +383,8 @@ function ChartCell({ symbol, tf }){
     const s = c.addCandlestickSeries ? c.addCandlestickSeries(opts)             // lightweight-charts v4
             : c.addSeries(LightweightCharts.CandlestickSeries, opts);           // v5 fallback
     chart.current=c; series.current=s;
-    loadCandles(symbol).then(data=>{ try{ s.setData(data); bar.current=data[data.length-1]; }catch(e){} });
+    // load candles for the current timeframe, then (re)paint indicators over them
+    loadCandles(symbol, tf).then(data=>{ try{ s.setData(data); bar.current=data[data.length-1]; candles.current=data; paintIndicators(); }catch(e){} });
     // live: update ONLY the last bar's close from the shared store — throttled to ~2.5/sec
     const onTick=throttle((mids)=>{
       const m=mids[symbol]; if(!m) return; setPx(m.mid);
@@ -290,8 +394,11 @@ function ChartCell({ symbol, tf }){
       bar.current=u; try{ series.current.update(u); }catch(e){}
     }, 400);
     const unsub=priceStore.subscribe(onTick);
-    return ()=>{ unsub(); unreg(); try{ c.remove(); }catch(e){} };
-  }, [symbol]);
+    return ()=>{ unsub(); unreg(); indSeries.current=[]; try{ c.remove(); }catch(e){} };
+  }, [symbol, tf]);   // recreate + reload on symbol OR timeframe change (toolbar sync)
+
+  // repaint indicators whenever the active set changes (Charts → Indicators menu)
+  React.useEffect(()=>{ paintIndicators(); }, [(indicators||[]).join(','), paintIndicators]);
 
   // ── ORDER PRICE LINE (🔴 most important): redraw green dotted lines whenever this
   //    symbol's open positions change. One createPriceLine per position at its open_price.
@@ -403,28 +510,56 @@ function BottomBar(){
   );
 }
 
-/* ── Top menu bar (File … Help) + connection status dot ── */
+/* ── Top menu bar (File … Help). "Charts" opens a real Indicators submenu that
+   dispatches chart.indicator commands through the terminalBus (event map). ── */
 const MENUS=['File','View','Insert','Charts','Tools','Window','Help'];
-function MenuBar(){
+function MenuBar({ indicators }){
   const [live,setLive]=React.useState(priceStore.live);
+  const [open,setOpen]=React.useState(null);
   React.useEffect(()=> priceStore.subscribe(()=>setLive(priceStore.live)), []);
+  React.useEffect(()=>{ if(!open) return; const h=()=>setOpen(null); document.addEventListener('click',h); return ()=>document.removeEventListener('click',h); }, [open]);
+  const active=new Set(indicators||[]);
+  const click=(m,e)=>{ e.stopPropagation(); setOpen(open===m?null:m); };
   return (
     <div className="menu">
-      {MENUS.map(m=><div key={m} className="mi">{m}</div>)}
+      {MENUS.map(m=>(
+        <div key={m} className={"mi"+(open===m?' on':'')} onClick={(e)=>click(m,e)}>{m}
+          {open===m && m==='Charts' && (
+            <div className="mdrop" onClick={e=>e.stopPropagation()}>
+              <div className="hd">Indicators</div>
+              {Object.keys(INDICATORS).map(id=>(
+                <div key={id} className="row" onClick={()=>terminalBus.emit('chart.indicator',id)}>
+                  <span className="ck">{active.has(id)?'✓':''}</span>{INDICATORS[id].label}
+                </div>
+              ))}
+              <div className="sep"></div>
+              <div className="row" onClick={()=>terminalBus.emit('chart.indicator','__clear__')}>Remove all indicators</div>
+            </div>
+          )}
+          {open===m && m!=='Charts' && (
+            <div className="mdrop" onClick={e=>e.stopPropagation()}>
+              <div className="row" style={{color:'#79808c',cursor:'default'}}>— {m} —</div>
+            </div>
+          )}
+        </div>
+      ))}
       <div className="conn"><span className="dot" style={{background:live?'#00d060':'#e5a13a'}}></span>{live?'Live feed (1s cache)':'Demo feed'}</div>
     </div>
   );
 }
 
-/* ── Icon toolbar: New Order · Algo Trading · timeframe buttons ── */
+/* ── Icon toolbar: New Order · Algo Trading · timeframe buttons — all dispatch through
+   the command bus so the menu/toolbar share one event map. ── */
 const TFS=['M1','M5','M15','M30','H1','H4','D1','W1','MN'];
-function Toolbar({ tf, onTf }){
+function Toolbar({ tf }){
+  const [algo,setAlgo]=React.useState(false);
+  React.useEffect(()=> terminalBus.subscribe((cmd)=>{ if(cmd==='algo.toggle') setAlgo(a=>!a); }), []);
   return (
     <div className="tools">
-      <div className="tbtn" title="New Order (F9)">＋ New Order</div>
-      <div className="tbtn algo" title="Algo Trading">▶ Algo Trading</div>
+      <div className="tbtn" title="New Order (F9)" onClick={()=>terminalBus.emit('order.new')}>＋ New Order</div>
+      <div className="tbtn algo" title="Algo Trading" onClick={()=>terminalBus.emit('algo.toggle')} style={algo?{background:'linear-gradient(#2f7a35,#1e5a26)',color:'#eaffea'}:null}>{algo?'■':'▶'} Algo Trading</div>
       <div className="tsep"></div>
-      <div className="tf">{TFS.map(t=><b key={t} className={t===tf?'on':''} onClick={()=>onTf&&onTf(t)}>{t}</b>)}</div>
+      <div className="tf">{TFS.map(t=><b key={t} className={t===tf?'on':''} onClick={()=>terminalBus.emit('chart.tf',t)}>{t}</b>)}</div>
       <div className="tbrand">ALPEXA <span>WebTrade</span></div>
     </div>
   );
@@ -481,18 +616,32 @@ function Splitter(){
 function App(){
   const [grid,setGrid]=React.useState(GRID);
   const [tf,setTf]=React.useState('H1');
+  const [indicators,setIndicators]=React.useState([]);   // active indicator ids (shared by all charts)
   React.useEffect(()=>{ priceStore.start(); positionsStore.start(); }, []);
+  // ── one reducer for the whole terminal's command bus (menu bar + toolbar) ──
+  React.useEffect(()=> terminalBus.subscribe((cmd,arg)=>{
+    if(cmd==='chart.tf') setTf(arg);
+    else if(cmd==='chart.indicator'){
+      if(arg==='__clear__') setIndicators([]);
+      else setIndicators(list=> list.indexOf(arg)>=0 ? list.filter(x=>x!==arg) : list.concat(arg));
+    }
+    else if(cmd==='order.new'){
+      const px=priceStore.get(grid[0])||{};
+      alert('New Order — '+grid[0]+'\nBid '+fmtPx(grid[0],px.bid)+'  /  Ask '+fmtPx(grid[0],px.ask)+
+        '\n\n주문 티켓 UI는 실행 API 연결 시 활성화됩니다 (useTradeEngine.placeOrder).');
+    }
+  }), [grid]);
   const swap=(sym)=> setGrid(g=> g.indexOf(sym)>=0 ? g : [sym, g[1], g[2], g[3]]);   // click watch → replace top-left
   return (
     <div className="terminal">
-      <MenuBar />
-      <Toolbar tf={tf} onTf={setTf} />
+      <MenuBar indicators={indicators} />
+      <Toolbar tf={tf} />
       <div className="left">
         <MarketWatch onPick={swap} />
         <Navigator />
       </div>
       <Splitter />
-      <div className="charts">{grid.map((s,i)=><ChartCell key={s+i} symbol={s} tf={tf} />)}</div>
+      <div className="charts">{grid.map((s,i)=><ChartCell key={s+i} symbol={s} tf={tf} indicators={indicators} />)}</div>
       <BottomBar />
     </div>
   );
