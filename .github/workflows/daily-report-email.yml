@@ -26,8 +26,7 @@ jobs:
         with:
           node-version: "20"
       - run: npm ci || npm install
-      # Generate today's report data. (Wire loadReport() to the live Supabase DB for real
-      # numbers; until then this produces the reconciliation-verified sample report.)
+      # Fallback sample (used only if the SUPABASE secrets below aren't set).
       - run: node tests/alpexa-daily-report.test.js
       - name: Send the report email
         env:
@@ -35,4 +34,8 @@ jobs:
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           EMAIL_TO:   ${{ secrets.EMAIL_TO }}
+          # Live data: set these two secrets to email REAL yesterday numbers (calls the
+          # daily_report RPC). Without them, the sample above is sent.
+          SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node reports/send-daily-report.js

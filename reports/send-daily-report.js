@@ -20,19 +20,41 @@ function loadEnv(file) {
   } catch (_e) { /* no .env file → rely on real env vars (CI secrets) */ }
 }
 
-// ── obtain today's report. Wire your live-DB reconciliation here; falls back to the newest
-//    generated reports/alpexa-daily-*.json so the pipeline always has something to send. ──
-function loadReport() {
+// ── obtain the report. LIVE: calls the read-only `daily_report` RPC on Supabase (yesterday's
+//    real trades/bets, assembled server-side — see supabase/sql/daily_report.sql). Falls back
+//    to the newest generated reports/alpexa-daily-*.json when DB creds aren't set (dev/--dry-run). ──
+async function loadReport() {
+  const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
+  if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/daily_report`, {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),   // {} → default p_date = yesterday (Las Vegas day)
+      });
+      if (res.ok) {
+        const j = await res.json();
+        if (j && j.generated_at) { console.log('📊 live report loaded from Supabase for', j.generated_at); return j; }
+      }
+      console.warn('⚠️ daily_report RPC returned', res.status, '— falling back to the latest sample report');
+    } catch (e) {
+      console.warn('⚠️ daily_report fetch failed:', e.message, '— falling back to the latest sample report');
+    }
+  }
   const dir = __dirname;
   const files = fs.readdirSync(dir).filter((f) => /^alpexa-daily-.*\.json$/.test(f)).sort();
   if (files.length) return JSON.parse(fs.readFileSync(path.join(dir, files[files.length - 1]), 'utf8'));
-  throw new Error('no report JSON found — generate one first (npm test / the report harness), or wire the live DB source in loadReport()');
+  throw new Error('no live DB creds and no report JSON — set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY, or run the report harness first');
 }
 
 async function main() {
   loadEnv(path.join(__dirname, '..', '.env'));
   const dryRun = process.argv.includes('--dry-run');
-  const report = loadReport();
+  const report = await loadReport();
   const html = renderReportHTML(report);
   const subject = `[Alpexa] 일일 정산 리포트 ${report.generated_at} — ${report.security.pass ? '무결성 PASS' : '🚨 오차 발생'}`;
 
