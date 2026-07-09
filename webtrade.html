@@ -9,45 +9,50 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
 <link rel="preconnect" href="https://unpkg.com">
 <style>
-  :root{ --bg:#0b0f17; --panel:#111826; --panel2:#0e1420; --line:#1e2a3d; --text:#e6ebf2; --dim:#8a97ac;
-    --up:#26a65b; --down:#e5484d; --accent:#2b6cff; --r:8px; }
+  /* MT5 classic terminal — pure black, grey Excel gridlines, Tahoma. */
+  :root{ --bg:#000000; --panel:#050708; --panel2:#04060a; --line:#333333; --cellbd:#444444;
+    --text:#d0d4da; --dim:#8890a0; --up:#00ff00; --down:#ff2020; --accent:#3a6ea5; --r:0; }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
-    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:13px;overflow:hidden}
+    font-family:Tahoma,'Segoe UI','Malgun Gothic',Arial,sans-serif;font-size:12px;overflow:hidden}
   #app{height:100vh}
   /* ── MT5-style CSS Grid: toolbar / [market-watch | 2×2 charts] / bottom bar ── */
   .terminal{display:grid;height:100vh;
     grid-template-columns:230px 1fr;
     grid-template-rows:40px 1fr 210px;
     grid-template-areas:"top top" "watch charts" "bottom bottom";}
-  .top{grid-area:top;display:flex;align-items:center;gap:14px;padding:0 14px;background:var(--panel);border-bottom:1px solid var(--line)}
-  .brand{font-weight:800;letter-spacing:.3px}.brand span{color:var(--accent)}
-  .top .conn{margin-left:auto;color:var(--dim);font-size:12px;display:flex;align-items:center;gap:6px}
+  .top{grid-area:top;display:flex;align-items:center;gap:14px;padding:0 12px;background:linear-gradient(#0a0d12,#05070a);border-bottom:1px solid var(--cellbd)}
+  .brand{font-weight:700;letter-spacing:.3px}.brand span{color:#7fb0e0}
+  .top .conn{margin-left:auto;color:var(--dim);font-size:11px;display:flex;align-items:center;gap:6px}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--up)}
-  .watch{grid-area:watch;background:var(--panel2);border-right:1px solid var(--line);overflow-y:auto}
-  .watch h4{margin:0;padding:8px 12px;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;position:sticky;top:0;background:var(--panel2)}
-  .wrow{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:6px 12px;border-bottom:1px solid var(--line);cursor:pointer}
-  .wrow:hover{background:#0f1826}.wrow.on{background:#12203a}
-  .wsym{font-weight:700}.wbid{color:var(--dim);font-size:11px}
-  .wask{text-align:right;font-variant-numeric:tabular-nums}
-  .wchg{text-align:right;font-size:11px;font-variant-numeric:tabular-nums}
+  /* ── Market Watch: an Excel-grid table ── */
+  .watch{grid-area:watch;background:var(--panel);border-right:1px solid var(--cellbd);overflow-y:auto}
+  .mwt{width:100%;border-collapse:collapse}
+  .mwt th{position:sticky;top:0;background:#0a0d12;color:var(--dim);font-weight:600;font-size:11px;text-align:right;padding:3px 6px;border:1px solid var(--line)}
+  .mwt th:first-child{text-align:left}
+  .mwt td{padding:2px 6px;border:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .mwt td.sym{text-align:left;font-weight:600;color:#c8ccd2}
+  .mwt tr{cursor:pointer}.mwt tr:hover td{background:#0d1420}
   .up{color:var(--up)}.down{color:var(--down)}
-  .charts{grid-area:charts;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:1px;background:var(--line)}
-  .cell{background:var(--panel);display:flex;flex-direction:column;min-width:0;min-height:0}
-  .cell-hd{display:flex;align-items:center;gap:8px;padding:5px 10px;border-bottom:1px solid var(--line);font-size:12px}
-  .cell-hd b{font-weight:700}.cell-hd .px{margin-left:auto;font-variant-numeric:tabular-nums}
-  .canvas{flex:1;min-height:0}
-  .bottom{grid-area:bottom;background:var(--panel2);border-top:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
-  .kpis{display:flex;gap:0;border-bottom:1px solid var(--line)}
-  .kpi{padding:8px 16px;border-right:1px solid var(--line)}
+  /* ── Chart grid: 2×2, each cell a bordered window with a top-left symbol label ── */
+  .charts{grid-area:charts;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:0;background:var(--cellbd)}
+  .cell{background:#000;position:relative;min-width:0;min-height:0;border:1px solid var(--cellbd)}
+  .canvas{position:absolute;inset:0}
+  .cell-lbl{position:absolute;top:3px;left:6px;z-index:3;pointer-events:none;
+    font:400 11px Tahoma,'Segoe UI',Arial,sans-serif;color:#c8ccd2;letter-spacing:.2px;text-shadow:0 0 3px #000,0 0 3px #000}
+  .cell-lbl b{font-weight:600}.cell-lbl .px{color:#98d898;margin-left:8px;font-variant-numeric:tabular-nums}
+  /* ── Bottom: KPI strip + Excel-grid positions table ── */
+  .bottom{grid-area:bottom;background:var(--panel);border-top:1px solid var(--cellbd);display:flex;flex-direction:column;overflow:hidden}
+  .kpis{display:flex;gap:0;border-bottom:1px solid var(--cellbd);background:#0a0d12}
+  .kpi{padding:6px 14px;border-right:1px solid var(--line)}
   .kpi .l{color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:.4px}
-  .kpi .v{font-weight:700;font-size:14px;font-variant-numeric:tabular-nums;margin-top:2px}
+  .kpi .v{font-weight:700;font-size:13px;font-variant-numeric:tabular-nums;margin-top:2px}
   .postbl{flex:1;overflow:auto}
-  table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-  th{position:sticky;top:0;background:var(--panel2);color:var(--dim);font-weight:600;font-size:11px;text-align:right;padding:6px 12px;border-bottom:1px solid var(--line)}
-  th:first-child,td:first-child{text-align:left}
-  td{padding:6px 12px;border-bottom:1px solid #16202f;text-align:right}
-  .empty{padding:18px;color:var(--dim);text-align:center}
+  table.pos{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  table.pos th{position:sticky;top:0;background:#0a0d12;color:var(--dim);font-weight:600;font-size:11px;text-align:right;padding:3px 10px;border:1px solid var(--line)}
+  table.pos th:first-child,table.pos td:first-child{text-align:left}
+  table.pos td{padding:3px 10px;border:1px solid var(--line);text-align:right}
+  .empty{padding:16px;color:var(--dim);text-align:center;border:none!important}
   .note{padding:2px 14px;color:var(--dim);font-size:11px}
 </style>
 </head>
@@ -159,13 +164,19 @@ function ChartCell({ symbol }){
   const [px,setPx]=React.useState(null);
   React.useEffect(()=>{
     if(!window.LightweightCharts || !box.current) return;      // CDN blocked → no chart, no crash
+    // MT5 look: pure-black canvas, dense grey DOTTED gridlines, Tahoma scales.
+    const DOT=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dotted)!=null?LightweightCharts.LineStyle.Dotted:1;
     const c=LightweightCharts.createChart(box.current, {
-      layout:{ background:{color:'#111826'}, textColor:'#8a97ac' },
-      grid:{ vertLines:{color:'#16202f'}, horzLines:{color:'#16202f'} },
-      timeScale:{ borderColor:'#1e2a3d', timeVisible:true }, rightPriceScale:{ borderColor:'#1e2a3d' },
+      layout:{ background:{color:'#000000'}, textColor:'#b0b6c0', fontSize:11, fontFamily:"Tahoma, 'Segoe UI', Arial, sans-serif" },
+      grid:{ vertLines:{color:'#363c46', style:DOT}, horzLines:{color:'#363c46', style:DOT} },
+      timeScale:{ borderColor:'#555', timeVisible:true, secondsVisible:false },
+      rightPriceScale:{ borderColor:'#555' },
+      crosshair:{ vertLine:{color:'#777', style:DOT}, horzLine:{color:'#777', style:DOT} },
       autoSize:true,
     });
-    const opts={ upColor:'#26a65b', downColor:'#e5484d', wickUpColor:'#26a65b', wickDownColor:'#e5484d', borderVisible:false };
+    // MT5 signature candles: bright lime up, sharp thin red down, crisp borders.
+    const opts={ upColor:'#00ff00', downColor:'#ff2020', wickUpColor:'#00ff00', wickDownColor:'#ff2020',
+      borderUpColor:'#00ff00', borderDownColor:'#ff2020', borderVisible:true };
     const s = c.addCandlestickSeries ? c.addCandlestickSeries(opts)             // lightweight-charts v4
             : c.addSeries(LightweightCharts.CandlestickSeries, opts);           // v5 fallback
     chart.current=c; series.current=s;
@@ -183,8 +194,8 @@ function ChartCell({ symbol }){
   }, [symbol]);
   return (
     <div className="cell">
-      <div className="cell-hd"><b>{symbol}</b><span className="dim">· H1</span><span className="px">{fmtPx(symbol,px)}</span></div>
-      <div className="canvas" ref={box}>{!window.LightweightCharts && <div className="empty">chart library loading…</div>}</div>
+      <div className="cell-lbl"><b>{symbol}</b>, H1<span className="px">{fmtPx(symbol,px)}</span></div>
+      <div className="canvas" ref={box}></div>
     </div>
   );
 }
@@ -195,16 +206,20 @@ function MarketWatch({ onPick }){
   React.useEffect(()=> priceStore.subscribe(throttle(m=>setMids({...m}),400)), []);
   return (
     <div className="watch">
-      <h4>Market Watch</h4>
-      {WATCH.map(sym=>{ const m=mids[sym]||{}; const cls=m.chg>=0?'up':'down';
-        return (
-          <div className="wrow" key={sym} onClick={()=>onPick&&onPick(sym)}>
-            <div className="wsym">{sym}</div>
-            <div className={"wask "+cls}>{fmtPx(sym,m.ask)}</div>
-            <div className="wbid">{fmtPx(sym,m.bid)}</div>
-            <div className={"wchg "+cls}>{m.chg!=null?(m.chg>=0?'+':'')+m.chg.toFixed(2)+'%':'—'}</div>
-          </div>
-        ); })}
+      <table className="mwt">
+        <thead><tr><th>Symbol</th><th>Bid</th><th>Ask</th><th>Chg%</th></tr></thead>
+        <tbody>
+          {WATCH.map(sym=>{ const m=mids[sym]||{}; const cls=m.chg>=0?'up':'down';
+            return (
+              <tr key={sym} onClick={()=>onPick&&onPick(sym)}>
+                <td className="sym">{sym}</td>
+                <td className={cls}>{fmtPx(sym,m.bid)}</td>
+                <td className={cls}>{fmtPx(sym,m.ask)}</td>
+                <td className={cls}>{m.chg!=null?(m.chg>=0?'+':'')+m.chg.toFixed(2):'—'}</td>
+              </tr>
+            ); })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -252,7 +267,7 @@ function BottomBar(){
         <div className="kpi"><div className="l">Margin Level</div><div className="v">{marginUsed>0?level.toFixed(2)+'%':'—'}</div></div>
       </div>
       <div className="postbl">
-        <table>
+        <table className="pos">
           <thead><tr><th>Symbol</th><th>Type</th><th>Volume</th><th>Open</th><th>Price</th><th>P/L</th></tr></thead>
           <tbody>
             {!pos.length && <tr><td className="empty" colSpan="6">{window.AlpexaSync&&AlpexaSync.me?'No open FX positions':'로그인하면 실계정 잔고·포지션이 표시됩니다 (지금은 데모 시세)'}</td></tr>}
