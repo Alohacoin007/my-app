@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Alpexa Sports — App Guide</title>
+<style>
+  :root{
+    --bg:#ffffff; --surface:#ffffff; --surface-2:#f5f7fb; --line:#e9ecf3;
+    --text:#0e1726; --dim:#67718a; --accent:#1e40d8; --accent-2:#3a5bf0;
+    --green:#16a34a; --green-s:#eef8f2; --red:#e5484d; --red-s:#fdeeee; --amber:#b45309; --amber-s:#faf3e5;
+    --r:16px; --shadow:0 1px 2px rgba(16,24,40,.04);
+    --disp:"Space Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --sans:system-ui,-apple-system,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{ --bg:#0b0f1a; --surface:#141a28; --surface-2:#1d2536; --line:rgba(255,255,255,.10);
+      --text:#eef2f8; --dim:#9aa6bd; --accent:#4f6ef7; --accent-2:#7f97ff;
+      --green:#3ecf7a; --green-s:#12271d; --red:#ff6b70; --red-s:#2a1719; --amber:#e5a53c; --amber-s:#2a2113;
+      --shadow:0 1px 2px rgba(0,0,0,.4); }
+  }
+  :root[data-theme="light"]{ --bg:#ffffff; --surface:#ffffff; --surface-2:#f5f7fb; --line:#e9ecf3;
+    --text:#0e1726; --dim:#67718a; --accent:#1e40d8; --accent-2:#3a5bf0; --green:#16a34a; --green-s:#eef8f2;
+    --red:#e5484d; --red-s:#fdeeee; --amber:#b45309; --amber-s:#faf3e5; --shadow:0 1px 2px rgba(16,24,40,.04); }
+  :root[data-theme="dark"]{ --bg:#0b0f1a; --surface:#141a28; --surface-2:#1d2536; --line:rgba(255,255,255,.10);
+    --text:#eef2f8; --dim:#9aa6bd; --accent:#4f6ef7; --accent-2:#7f97ff; --green:#3ecf7a; --green-s:#12271d;
+    --red:#ff6b70; --red-s:#2a1719; --amber:#e5a53c; --amber-s:#2a2113; --shadow:0 1px 2px rgba(0,0,0,.4); }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media(prefers-reduced-motion:reduce){ html{scroll-behavior:auto} }
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.62;
+    -webkit-font-smoothing:antialiased;height:100dvh;overflow-y:auto;scroll-snap-type:y mandatory}
+
+  .page{min-height:100dvh;scroll-snap-align:start;scroll-snap-stop:always;
+    padding:clamp(64px,12vh,132px) 22px 64px;display:flex;flex-direction:column}
+  .page.center{justify-content:center}
+  .inner{width:100%;max-width:600px;margin:0 auto}
+
+  .brand{display:inline-flex;align-items:center;gap:9px;font-family:var(--disp);font-weight:800;font-size:15px;letter-spacing:-.2px;margin-bottom:26px}
+  .brand .m{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;display:grid;place-items:center;font-size:15px;font-weight:900}
+  .cover h1{font-family:var(--disp);font-size:clamp(34px,8vw,50px);font-weight:800;letter-spacing:-1.4px;line-height:1.05;margin:12px 0 12px;text-wrap:balance}
+  .idx{margin:56px 0 0;display:flex;flex-direction:column;gap:2px}
+  .idx a{display:flex;align-items:center;gap:14px;padding:10px 2px;text-decoration:none;color:var(--text);border-top:1px solid var(--line)}
+  .idx a:first-child{border-top:0}
+  .idx .n{font-family:var(--mono);font-size:22px;font-weight:800;color:var(--accent);min-width:32px;letter-spacing:-1px}
+  .idx .t{font-size:14.5px;font-weight:600} .idx .g{margin-left:auto;color:var(--dim)}
+  .hint{margin-top:30px;color:var(--dim);font-size:13px;font-family:var(--mono);display:flex;align-items:center;gap:7px}
+  .hint .a{animation:bob 1.6s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+  @media(prefers-reduced-motion:reduce){ .hint .a{animation:none} }
+
+  .phead{display:flex;align-items:baseline;gap:16px;margin-bottom:16px}
+  .phead .no{font-family:var(--disp);font-size:clamp(48px,12vw,74px);font-weight:800;color:var(--accent);letter-spacing:-2px;line-height:.9;flex:none}
+  .phead h2{margin:0}
+  .page h2{font-family:var(--disp);font-size:clamp(21px,4.4vw,27px);font-weight:800;letter-spacing:-.5px;margin:0 0 6px;text-wrap:balance}
+  .intro{color:var(--dim);margin:0 0 18px}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:4px 18px}
+  .row{display:grid;grid-template-columns:150px 1fr;gap:16px;padding:13px 0;border-top:1px solid var(--line)}
+  .row:first-child{border-top:0}
+  @media(max-width:520px){ .row{grid-template-columns:1fr;gap:3px} }
+  .row .k{font-weight:800;color:var(--text);font-size:14.5px}
+  .row .v{color:var(--dim);font-size:14.5px} .row .v b{color:var(--text)}
+  .path{color:var(--accent);font-weight:700}
+
+  h3{font-size:14.5px;font-weight:800;margin:18px 0 6px;color:var(--text)}
+  ol.plain{margin:4px 0 0;padding-left:20px} ol.plain li{margin:5px 0;color:var(--dim)} ol.plain li b{color:var(--text)}
+  p{margin:0 0 10px;color:var(--dim)} p b{color:var(--text)} .lead{color:var(--dim)}
+
+  .odds{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:460px){ .odds{grid-template-columns:1fr} }
+  .ob{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow)}
+  .ob .n{font-family:var(--mono);font-size:30px;font-weight:800;letter-spacing:-1px;line-height:1}
+  .ob.g .n{color:var(--green)} .ob.b .n{color:var(--accent)}
+  .ob .t{font-weight:800;font-size:14px;margin:9px 0 2px} .ob .s{color:var(--dim);font-size:13.5px}
+
+  .note{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:0 12px 12px 0;background:var(--surface);padding:13px 15px;margin:14px 0;font-size:14px;box-shadow:var(--shadow)}
+  .note.warn{border-left-color:var(--amber);background:var(--amber-s)}
+  .note.safe{border-left-color:var(--green);background:var(--green-s)}
+  .note .nl{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:3px}
+  .note b{color:var(--text)}
+  .livedot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--red);margin-right:4px;vertical-align:middle}
+
+  .counter{position:fixed;right:14px;bottom:14px;z-index:40;background:var(--surface);border:1px solid var(--line);
+    border-radius:999px;padding:6px 13px;font:700 12px var(--mono);color:var(--dim);box-shadow:0 4px 14px rgba(16,24,40,.12)}
+  .counter b{color:var(--accent)}
+
+  .qa{border:1px solid var(--line);border-radius:12px;background:var(--surface);margin-bottom:9px;overflow:hidden;box-shadow:var(--shadow)}
+  .qa summary{list-style:none;cursor:pointer;padding:14px 16px;font-weight:700;font-size:15px;display:flex;align-items:flex-start;gap:10px}
+  .qa summary::-webkit-details-marker{display:none}
+  .qa summary .q{font-family:var(--disp);color:var(--accent);font-weight:800;flex:none}
+  .qa summary .plus{margin-left:auto;color:var(--dim);font-size:20px;font-weight:400;line-height:1;flex:none;transition:transform .2s}
+  .qa[open] summary .plus{transform:rotate(45deg)}
+  .qa .a{padding:0 16px 15px 42px;color:var(--dim);font-size:14.5px;line-height:1.6}
+  .qa .a b{color:var(--text)} .qa .a .path{color:var(--accent);font-weight:700}
+  @media(prefers-reduced-motion:reduce){ .qa summary .plus{transition:none} }
+
+  .shot{max-width:280px;margin:18px auto 6px;background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:0 12px 34px rgba(16,24,40,.14);padding:18px 16px}
+  .shot .lg{display:flex;align-items:center;gap:8px;font-weight:800;font-size:13.5px;margin-bottom:14px}
+  .shot .lg .m{width:25px;height:25px;border-radius:7px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;display:grid;place-items:center;font-weight:900;font-size:13px}
+  .shot .wb{font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:1.6px;color:var(--accent)}
+  .shot h4{font-family:var(--disp);font-size:22px;font-weight:800;margin:3px 0 14px;letter-spacing:-.5px}
+  .shot .lbl{font-size:9px;font-weight:700;letter-spacing:.6px;color:var(--dim);text-transform:uppercase;margin:0 0 5px}
+  .shot .tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:13px}
+  .shot .tab{border:1px solid var(--line);border-radius:9px;padding:8px 0;text-align:center;font-size:11px;font-weight:700;color:var(--dim)}
+  .shot .tab.on{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,transparent)}
+  .shot .field{background:var(--surface-2);border-radius:9px;padding:10px 12px;font-size:12px;margin-bottom:12px;color:var(--text);display:flex;align-items:center;justify-content:space-between}
+  .shot .field .ph{color:var(--dim)}
+  .shot .forgot{text-align:right;font-size:11px;color:var(--accent);font-weight:700;margin:-2px 0 15px}
+  .shot .btn{background:var(--accent);color:#fff;text-align:center;border-radius:999px;padding:12px;font-weight:800;font-size:14px}
+  .shot .new{text-align:center;font-size:11px;color:var(--dim);margin-top:11px}
+  .shot .new b{color:var(--accent)}
+  .shotcap{text-align:center;font-size:12px;color:var(--dim);margin:6px 0 0}
+
+  @media print{
+    :root{ --bg:#fff;--surface:#fff;--surface-2:#f5f7fb;--line:#dfe3ec;--text:#0e1726;--dim:#586074;
+      --accent:#1e40d8;--green:#16a34a;--green-s:#eef8f2;--red:#e5484d;--amber:#b45309;--amber-s:#faf3e5;--shadow:none }
+    body{height:auto;overflow:visible;background:#fff;font-size:13pt}
+    .counter,.hint{display:none!important}
+    .page{min-height:auto;padding:8mm 0 0;display:block;break-after:page;page-break-after:always}
+    .page:last-child{break-after:auto;page-break-after:auto}
+    .card,.two .box,.ob,.note,.qa{box-shadow:none}
+    a{color:var(--accent)!important;text-decoration:none}
+    .qa .plus{display:none} .qa .a{display:block!important} .qa{break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<div class="counter"><b id="cur">Cover</b></div>
+
+<!-- COVER -->
+<section class="page center" id="c0"><div class="inner cover">
+  <div class="brand"><span class="m">A</span>ALPEXA SPORTS</div>
+  <h1>Sports App Guide</h1>
+  <nav class="idx">
+    <a href="#c1"><span class="n">01</span><span class="t">Install the app</span><span class="g">→</span></a>
+    <a href="#c2"><span class="n">02</span><span class="t">Deposit — add funds &amp; buy USDT</span><span class="g">→</span></a>
+    <a href="#c3"><span class="n">03</span><span class="t">Withdraw — cash out &amp; send</span><span class="g">→</span></a>
+    <a href="#c4"><span class="n">04</span><span class="t">Your first bet</span><span class="g">→</span></a>
+    <a href="#c5"><span class="n">05</span><span class="t">The four menus</span><span class="g">→</span></a>
+    <a href="#c6"><span class="n">06</span><span class="t">How to read the odds</span><span class="g">→</span></a>
+    <a href="#c7"><span class="n">07</span><span class="t">Key features</span><span class="g">→</span></a>
+    <a href="#c8"><span class="n">08</span><span class="t">FAQ (Q&amp;A)</span><span class="g">→</span></a>
+  </nav>
+  <div class="hint"><span class="a">↓</span> swipe to start</div>
+</div></section>
+
+<!-- 01 -->
+<section class="page" id="c1"><div class="inner">
+  <div class="phead"><span class="no">01</span><h2>Install the app</h2></div>
+  <p class="intro">Just <b>log in on the website</b> and you're ready. On a phone, <b>add the login page to your home screen</b> to use it like a real app.</p>
+  <div class="card">
+    <div class="row"><div class="k">1 · Open</div><div class="v">Open <b>alpexa-sports.com</b> in your browser.</div></div>
+    <div class="row"><div class="k">2 · Tap Login</div><div class="v">Tap <b>Login</b> to go to the <b>login page</b>.</div></div>
+    <div class="row"><div class="k">3 · Add to home</div><div class="v">Install from the login page —<br>🍎 iPhone: <b>Share (￪) → Add to Home Screen</b><br>🤖 Android: <b>Menu (⋮) → Install app</b></div></div>
+    <div class="row"><div class="k">4 · Launch</div><div class="v">Open the new <b>app icon</b>, then <b>log in</b> or <b>create an account</b>.</div></div>
+  </div>
+
+  <div class="shot" role="img" aria-label="Login page example">
+    <div class="lg"><span class="m">A</span>Alpexa Suisse</div>
+    <div class="wb">WELCOME BACK</div>
+    <h4>Log in</h4>
+    <div class="lbl">Server</div>
+    <div class="tabs"><span class="tab">FX</span><span class="tab">Crypto</span><span class="tab on">Sports</span></div>
+    <div class="lbl">Email</div>
+    <div class="field"><span class="ph">you@email.com</span></div>
+    <div class="lbl">Password</div>
+    <div class="field"><span>••••••••••</span><span>👁</span></div>
+    <div class="forgot">Forgot password?</div>
+    <div class="btn">Log in</div>
+    <div class="new">New to Alpexa? <b>Create account</b></div>
+  </div>
+  <p class="shotcap">▲ The login page — add this screen to your home (<b>Sports</b> selected)</p>
+
+  <div class="note"><span class="nl">Sign up</span>Enter your <b>email</b> → type the <b>6-digit code</b> from your inbox (check <b>spam</b>) → done. After that, log in with <span class="path">email + password</span>.</div>
+</div></section>
+
+<!-- 02 -->
+<section class="page" id="c2"><div class="inner">
+  <div class="phead"><span class="no">02</span><h2>Deposit</h2></div>
+  <p class="intro">Two tabs — <b>Card</b> (buy USDT with a card) / <b>Crypto</b> (you already have USDT). You bet in <b>USDT</b>.</p>
+  <div class="card">
+    <div class="row"><div class="k">1 · Amount</div><div class="v">Type the <b>AMOUNT</b>, or tap <b>$50 · $100 · $500 · $1,000</b>.</div></div>
+    <div class="row"><div class="k">2 · Buy USDT</div><div class="v">Tap <b>Buy with card · MoonPay</b> (Visa · Mastercard · Apple Pay, instant). If it's not available in your region, use <b>MetaMask</b>.</div></div>
+    <div class="row"><div class="k">3 · Send to us</div><div class="v">Send the USDT you bought (MoonPay/MetaMask) to the <b>company address</b> — done! The address is <b>in the app</b> (“THEN SEND TO US”); tap <b>Copy</b>.</div></div>
+    <div class="row"><div class="k">4 · Submit</div><div class="v">Tap <b>Submit deposit request</b>.</div></div>
+    <div class="row"><div class="k">5 · Credited</div><div class="v">First time only: <b>ID check</b>. Credited once the back office confirms receipt.</div></div>
+  </div>
+  <div class="note"><span class="nl">Already have USDT</span>Use the <b>Crypto</b> tab — send to the same company address and <b>Submit</b>. Skip the card step.</div>
+  <div class="note warn"><span class="nl">Important</span>Send USDT on the <b>ERC-20 (Ethereum) network</b> — other networks may be lost. After depositing, <span class="path">Transfer</span> it to your <b>Sports account</b> to bet.</div>
+</div></section>
+
+<!-- 03 -->
+<section class="page" id="c3"><div class="inner">
+  <div class="phead"><span class="no">03</span><h2>Withdraw · cash out · send</h2></div>
+  <h3>① Withdraw (to your wallet)</h3>
+  <div class="card">
+    <div class="row"><div class="k">1 · Open</div><div class="v"><span class="path">Wallet → Withdraw</span>.</div></div>
+    <div class="row"><div class="k">2 · Address</div><div class="v">Enter <b>your USDT wallet address</b> — or <b>scan a QR</b>.</div></div>
+    <div class="row"><div class="k">3 · Request</div><div class="v"><b>Request Withdrawal</b> → sent <b>automatically</b> via the Crypto server.</div></div>
+  </div>
+  <h3>② Turn USDT into cash</h3>
+  <p class="lead">Alpexa sends you <b>USDT</b>. For real cash, sell it on an <b>exchange</b> (Coinbase, Binance…) or <b>MoonPay</b> — the money lands in your bank.</p>
+  <h3>③ Send to another person</h3>
+  <p class="lead">Withdraw to their <b>USDT wallet address</b>. <b>Scan their QR</b> to fill it in fast.</p>
+  <div class="note warn"><span class="nl">Double-check</span>A USDT address <b>can't be reversed</b> if one character is wrong. <b>Check it twice</b> before sending.</div>
+</div></section>
+
+<!-- 04 -->
+<section class="page" id="c4"><div class="inner">
+  <div class="phead"><span class="no">04</span><h2>Your first bet</h2></div>
+  <p class="intro">Tap an odds number on a game, then just enter your stake.</p>
+  <div class="card">
+    <div class="row"><div class="k">1 · Pick odds</div><div class="v">Each game shows 3 markets — <b>Spread</b> (handicap) · <b>Total</b> (Over/Under) · <b>Moneyline</b> (who wins). Tap a <b>number to select it (turns blue)</b>.<br><span class="path">e.g. Blue Jays ML −124</span></div></div>
+    <div class="row"><div class="k">2 · Open slip</div><div class="v">Tap the <b>Bet Slip</b> bar at the bottom.</div></div>
+    <div class="row"><div class="k">3 · Mode</div><div class="v"><b>Singles</b> (each separate) · <b>Parlay</b> (all must win, bigger odds) · <b>Same Game</b> (combo from one game).</div></div>
+    <div class="row"><div class="k">4 · Wager</div><div class="v">Enter the <b>Wager</b>. Use <b>+$10 · +$25 · +$100</b> to add fast, <b>Clear</b> to reset.</div></div>
+    <div class="row"><div class="k">5 · Bet!</div><div class="v">Check <b>Est. Payout</b> → tap the blue button <span class="path">$20 → win $16.13</span>. Done!</div></div>
+  </div>
+  <div class="note"><span class="nl">Est. Payout</span><b>$36.13</b> = your $20 stake + $16.13 profit. The button shows <b>“stake → profit if it wins.”</b> You get paid only if it wins.</div>
+</div></section>
+
+<!-- 05 -->
+<section class="page center" id="c5"><div class="inner">
+  <div class="phead"><span class="no">05</span><h2>The four menus</h2></div>
+  <div class="card">
+    <div class="row"><div class="k">Home</div><div class="v">See games &amp; odds and <b>place bets</b>.</div></div>
+    <div class="row"><div class="k"><span class="livedot"></span>Live</div><div class="v">Bet on games <b>happening now</b>.</div></div>
+    <div class="row"><div class="k">My Bets</div><div class="v"><b>Open &amp; settled</b> bets, results, cash out.</div></div>
+    <div class="row"><div class="k">Wallet</div><div class="v"><b>Deposit · withdraw · transfer</b>, balance, cashback.</div></div>
+  </div>
+</div></section>
+
+<!-- 06 -->
+<section class="page center" id="c6"><div class="inner">
+  <div class="phead"><span class="no">06</span><h2>How to read the odds</h2></div>
+  <p class="intro">Odds tell you <b>“how much you win.”</b> (American format)</p>
+  <div class="odds">
+    <div class="ob g"><div class="n">-140</div><div class="t">Minus = favorite (likely to win)</div><div class="s">Wins less. Bet $140 → +$100.</div></div>
+    <div class="ob b"><div class="n">+120</div><div class="t">Plus = underdog</div><div class="s">Wins more. Bet $100 → +$120.</div></div>
+  </div>
+  <div class="note warn"><span class="nl">🔒 Lock</span>A <b>lock</b> means odds aren't out yet for that game. It <b>opens automatically</b> closer to kickoff — we never make up a fake line.</div>
+</div></section>
+
+<!-- 07 -->
+<section class="page" id="c7"><div class="inner">
+  <div class="phead"><span class="no">07</span><h2>Key features</h2></div>
+  <div class="card">
+    <div class="row"><div class="k">Bet types</div><div class="v"><b>Singles</b> · <b>Parlay</b> (all must win) · <b>Same Game</b> (combo from one game).</div></div>
+    <div class="row"><div class="k">Cash out</div><div class="v">Settle a bet <b>early</b>, before the game ends.</div></div>
+    <div class="row"><div class="k">Cashback</div><div class="v">Get <b>5%</b> of net losses back as credit.</div></div>
+    <div class="row"><div class="k">Live betting</div><div class="v">Bet in-play. It <b>locks briefly</b> when the score changes (normal).</div></div>
+    <div class="row"><div class="k">Accounts</div><div class="v"><b>FX · Crypto · Sports</b>. Bet from the Sports account.</div></div>
+    <div class="row"><div class="k">Handy</div><div class="v"><b>★ Pin</b> · More Markets · Watch live · Search.</div></div>
+    <div class="row"><div class="k">Settings</div><div class="v">Odds format · time zone · language.</div></div>
+  </div>
+</div></section>
+
+<!-- 08 -->
+<section class="page" id="c8"><div class="inner">
+  <div class="phead"><span class="no">08</span><h2>FAQ</h2></div>
+  <p class="intro">Tap a question to expand it.</p>
+
+  <details class="qa"><summary><span class="q">Q</span>What is USDT?<span class="plus">+</span></summary>
+    <div class="a">A <b>digital dollar</b> pinned to <b>~$1</b> (a stablecoin). It doesn't swing like Bitcoin, so it's safe to move. All Alpexa <b>deposits, bets, and withdrawals</b> use USDT.</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>What is a crypto wallet?<span class="plus">+</span></summary>
+    <div class="a">An app/account that <b>holds digital money</b> (like a bank account). Each has an <span class="path">0x…</span> <b>address</b> you use to receive and send. Examples: <b>MetaMask</b>, an exchange wallet (Coinbase, Binance). You enter this address to withdraw. (Alpexa uses the <b>ERC-20</b> network.)</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>What is a crypto address?<span class="plus">+</span></summary>
+    <div class="a">The <b>address for receiving and sending</b> crypto — like a bank account number. It starts with <span class="path">0x…</span> (a long string of letters+numbers, or a QR code). To deposit, send to the <b>company address</b>; to withdraw, enter <b>your own wallet address</b>. ⚠️ <b>One wrong character can't be undone</b> — check it twice!</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>What is the ERC-20 network?<span class="plus">+</span></summary>
+    <div class="a">The <b>“road” (network)</b> USDT travels on. USDT runs on several (ERC-20, TRC-20…); Alpexa uses <b>ERC-20 (Ethereum)</b>. ⚠️ <b>Always send on the same network</b> — other networks may be lost. Choose <b>ERC-20</b> on your exchange/wallet before sending.</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>Does Alpexa give me a wallet too?<span class="plus">+</span></summary>
+    <div class="a"><b>Yes!</b> Your Alpexa account is itself a <b>USDT wallet</b>. You have a balance on <b>FX · Crypto · Sports</b>, and <span class="path">Transfer</span> moves USDT between them <b>free &amp; instantly</b>. Keep your USDT in Alpexa and <b>transfer to Sports</b> when you want to bet. To take it out, <b>withdraw</b>.</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>Why switch servers (FX/Crypto/Sports)?<span class="plus">+</span></summary>
+    <div class="a">Alpexa has <b>3 apps (servers)</b> — <b>FX</b> (forex, stocks, indices, metals) · <b>Crypto</b> (coin trading, swap, staking) · <b>Sports</b> (sports betting). Each has a <b>separate balance</b>, so switch to the one you're using. Move money with <span class="path">Transfer</span> (free &amp; instant); <b>bet on the Sports server</b>.</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>Can I earn interest on unused USDT?<span class="plus">+</span></summary>
+    <div class="a"><b>Yes!</b> Transfer idle USDT to the <b>Crypto app</b> and <b>stake</b> it to earn <b>interest (APY)</b>. USDT: <b>Flexible 3%</b> (unstake anytime) · <b>90 days 6%</b> · <b>1 year 9%</b> — longer lock, higher rate. Transfer back to <b>Sports</b> to bet.</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>Can I become an Alpexa agent (partner)?<span class="plus">+</span></summary>
+    <div class="a"><b>Yes!</b> The <b>IB (partner) program</b> lets you refer people and earn <b>commission</b>.<br>① <b>Register a partner account</b> → get your <b>referral link</b> + dashboard<br>② <b>Share your link</b> → anyone who signs up and trades is tracked to you automatically<br>③ <b>Commission accrues &amp; pays out automatically</b> — see clicks, sign-ups, volume &amp; commission live (no invoicing).<br>Multi-asset (FX, stocks, crypto), per-lot commission or revenue share. Start at the <b>IB Portal</b>.</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>I deposited but I don't see the balance.<span class="plus">+</span></summary>
+    <div class="a">Deposits appear after the <b>back office confirms receipt</b> (first time: ID check). Also check you used <span class="path">Transfer</span> to move it to your <b>Sports account</b> — it must be there to bet.</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>I can't place a bet.<span class="plus">+</span></summary>
+    <div class="a">① Your money must be in the <b>Sports account</b> (use Transfer). ② A 🔒 <b>locked game</b> has no odds yet, so you can't bet it.</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>What is a Parlay?<span class="plus">+</span></summary>
+    <div class="a">A bet that <b>combines several games</b>. Odds <b>multiply for a much bigger win</b>, but <b>all must win</b> — one miss and it's gone. (Combining picks from <b>one game</b> is a <b>Same Game (SGP)</b>.)</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>What is Same Game (SGP)?<span class="plus">+</span></summary>
+    <div class="a">A parlay <b>within one game</b> (e.g. winner + total + spread). Same game, so <b>all legs must win</b>. (Different games = a regular <b>Parlay</b>.)</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>What is the Spread?<span class="plus">+</span></summary>
+    <div class="a">A bet with a <b>handicap (points)</b> on the favorite. E.g. <b>−1.5</b> = that team must <b>win by 2+</b>; <b>+1.5</b> = that team can <b>lose by 1 or win</b>. It's about <b>how much</b> they win, not just win/lose. (Plain win/lose = <b>Moneyline</b>; combined score = <b>Total</b>.)</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>What is the Total?<span class="plus">+</span></summary>
+    <div class="a">A bet on whether the <b>two teams' combined score</b> is <b>Over/Under</b> a number. E.g. <b>Over 8.5</b> = <b>9+ total</b>, <b>Under 8.5</b> = <b>8 or fewer</b>. It <b>doesn't matter who wins</b> — only the score.</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>What is the Moneyline?<span class="plus">+</span></summary>
+    <div class="a">The simplest bet — <b>just who wins</b>. No handicap or score margin. The favorite shows like <b>−140</b> (wins less), the underdog <b>+120</b> (wins more).</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>Why is there a 🔒 lock?<span class="plus">+</span></summary>
+    <div class="a">Odds <b>aren't out yet</b> for that game. It <b>opens automatically</b> closer to kickoff. We never invent a fake line.</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>After I bet, when do I get paid if I win?<span class="plus">+</span></summary>
+    <div class="a">The game <b>settles automatically</b> when it ends — winnings <b>land in your balance right away</b> (no “claim” button). Track it in <span class="path">My Bets</span> under <b>Open · Settled</b>. In a hurry? <b>Cash out</b> before it ends.</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>Why can't I withdraw all my money? (bonus)<span class="plus">+</span></summary>
+    <div class="a"><b>Bonus funds</b> <b>can't be withdrawn or transferred</b> (only money you deposited yourself). So <b>withdrawable = total balance − bonus</b>. Tap <b>“Max”</b> on the withdraw screen to auto-fill exactly what you can take out.</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>The 6-digit code didn't arrive.<span class="plus">+</span></summary>
+    <div class="a">Check your <b>spam folder</b>. Still nothing? Tap <b>“Resend code”</b> after 30 seconds.</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>I forgot my password.<span class="plus">+</span></summary>
+    <div class="a">On the login page tap <b>Forgot password?</b> — you'll get a <b>reset link</b> by email to set a new one.</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>A new tab logs me out.<span class="plus">+</span></summary>
+    <div class="a">For security, <b>login is per-tab</b>. A new tab/window needs to log in again. (Refreshing the same tab keeps you signed in.)</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>How do I change the language?<span class="plus">+</span></summary>
+    <div class="a">Top-right <b>Settings (⚙️)</b> → <b>Language</b>. Supports <b>English, Korean, Japanese, Chinese, Spanish</b>. You can also change <b>time zone</b> and <b>odds format (American/Decimal)</b> there.</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>How do I turn USDT into cash?<span class="plus">+</span></summary>
+    <div class="a"><span class="path">Wallet → Withdraw</span> your USDT to an <b>exchange</b> (Coinbase, Binance…) or <b>MoonPay</b>, then <b>sell it</b> — the cash lands in your bank.</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>What is MoonPay?<span class="plus">+</span></summary>
+    <div class="a">A <b>card payment service to buy/sell crypto (USDT)</b> with <b>Visa · Mastercard · Apple Pay</b>. It's the <b>“Buy with card”</b> option on the deposit screen. You can also sell USDT there to <b>cash out</b>.</div></details>
+
+  <details class="qa"><summary><span class="q">Q</span>What is MetaMask?<span class="plus">+</span></summary>
+    <div class="a">A <b>personal crypto wallet app</b> (browser extension / mobile app) that <b>holds and sends</b> coins like USDT. On Alpexa it's an <b>alternative</b> for buying USDT <b>where MoonPay isn't available</b>.</div></details>
+
+  <p style="margin-top:24px;font-family:var(--mono);font-size:12px;color:var(--dim)">ALPEXA SPORTS · alpexa-sports.com</p>
+</div></section>
+
+<script>
+  (function(){
+    var cur=document.getElementById('cur');
+    var pages=[].slice.call(document.querySelectorAll('.page'));
+    var label=function(p){ if(p.id==='c0') return 'Cover'; var n=p.querySelector('.no'); return n?(n.textContent+' / 08'):''; };
+    if('IntersectionObserver' in window){
+      var io=new IntersectionObserver(function(es){
+        es.forEach(function(e){ if(e.isIntersecting){ var t=label(e.target); if(t) cur.innerHTML=(e.target.id==='c0'?'':'<b>')+t+(e.target.id==='c0'?'':'</b>'); } });
+      },{threshold:.6});
+      pages.forEach(function(p){ io.observe(p); });
+    }
+    var qas=[].slice.call(document.querySelectorAll('.qa'));
+    window.addEventListener('beforeprint',function(){ qas.forEach(function(d){ d.open=true; }); });
+    window.addEventListener('afterprint',function(){ qas.forEach(function(d){ d.open=false; }); });
+  })();
+</script>
+</body>
+</html>
