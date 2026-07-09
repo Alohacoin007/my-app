@@ -3205,9 +3205,12 @@
     }
   });
   reconcileWithdrawals();
-  try{ pullServerActivity(); }catch(e){}   // server-authoritative financial feed on load
-  try{ pullServerSettled(); }catch(e){}    // server-authoritative settled-bets on load
-  try{ pullRG(); }catch(e){}               // server-authoritative responsible-gambling settings
+  // ⚡ Lazy-load (#3): the main screen is the games list — renderGames() below paints it
+  // immediately. The financial-activity, settled-bets and responsible-gaming feeds only
+  // populate the Wallet / History / Settings tabs, so defer them until the browser is idle
+  // after first paint. Same calls, just off the critical path — cuts initial entry time.
+  var __lazyFeeds=function(){ try{ pullServerActivity(); }catch(e){} try{ pullServerSettled(); }catch(e){} try{ pullRG(); }catch(e){} };
+  (window.requestIdleCallback||function(f){return setTimeout(f,1);})(__lazyFeeds);
   setTimeout(function(){ try{ pullRG(); }catch(e){} }, 4000);
   setInterval(function(){ try{ if(!document.hidden) pullRG(); }catch(e){} }, 20000);
   renderCurServerIcon();renderGames();calc();renderTickets();updateWallet();
