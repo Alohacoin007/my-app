@@ -125,8 +125,9 @@
   .win.active{border-color:#3a6ea5;box-shadow:0 4px 20px rgba(0,0,0,.8)}
   .cell-title{display:flex;align-items:center;gap:6px;height:18px;padding:0 7px;flex:none;
     cursor:move;user-select:none;
-    background:linear-gradient(#1b1f25,#0c0f13);border-bottom:1px solid #000;font:600 11px Tahoma,sans-serif;color:#c8ccd2}
-  .win.active .cell-title{background:linear-gradient(#2a3550,#12203a);color:#dfe6f2}
+    background:linear-gradient(#3a3f47,#2a2e34);border-bottom:1px solid #000;font:600 11px Tahoma,sans-serif;color:#9aa1ad}  /* inactive = muted grey */
+  .win.active .cell-title{background:linear-gradient(#2f7fe0,#1c5ec0);color:#ffffff}  /* active = vivid program blue */
+  .win.active{border-color:#2f7fe0}
   .cell-title .wc{margin-left:auto;display:flex;gap:10px;color:#6a7280}
   .canvas{position:relative;flex:1;min-height:0}
   /* 8-direction resize handles hugging the window border */
@@ -591,7 +592,7 @@ function makePriceSeries(c, type){
 }
 const asSeriesData=(data,type)=> type==='line' ? data.map(d=>({time:d.time,value:d.close})) : data;
 
-function ChartCell({ symbol, tf, indicators, chartType, tool, initial }){
+function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isActive, onActivate }){
   const box=React.useRef(null), chart=React.useRef(null), series=React.useRef(null), bar=React.useRef(null);
   const lines=React.useRef([]);
   const candles=React.useRef([]);         // full history — indicators recompute from this
@@ -610,13 +611,12 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial }){
   const win=React.useRef(null);
   const geo=React.useRef({ x:20, y:20, w:400, h:300 });
   const drag=React.useRef(null);
-  const wid=React.useRef(null); if(wid.current==null) wid.current= ++WIN_SEQ;
   const [z,setZ]=React.useState(()=> ++WIN_Z);
-  const [active,setActive]=React.useState(false);
+  const activeRef=React.useRef(isActive); activeRef.current=isActive;   // for toolbar-signal gating
   const applyGeo=()=>{ const el=win.current; if(!el) return; const g=geo.current;
     el.style.left=g.x+'px'; el.style.top=g.y+'px'; el.style.width=g.w+'px'; el.style.height=g.h+'px'; };
   const resizeChart=()=>{ try{ if(chart.current&&box.current) chart.current.resize(box.current.clientWidth, box.current.clientHeight); }catch(e){} };
-  const focus=()=>{ setZ(++WIN_Z); winFocus.set(wid.current); };
+  const focus=()=>{ setZ(++WIN_Z); onActivate&&onActivate(idx); };   // click → raise + become the active chart
   // seed initial geometry from the workspace size BEFORE paint (no flash), then size the chart
   React.useLayoutEffect(()=>{
     const el=win.current, par=el&&el.parentElement; if(!par) return;
@@ -625,8 +625,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial }){
       w:Math.max(WIN_MINW,Math.round(f.fw*W)), h:Math.max(WIN_MINH,Math.round(f.fh*H)) };
     applyGeo();
   }, []);
-  // highlight the window that currently has focus (others dim)
-  React.useEffect(()=> winFocus.subscribe(id=> setActive(id===wid.current)), []);
+  // (active header now comes from the isActive prop / activeChartId — no local focus state)
   // one global move/up handler drives both dragging (title) and resizing (8 handles)
   React.useEffect(()=>{
     let raf=null;
@@ -713,7 +712,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial }){
 
   // toolbar zoom (± bar spacing) + tile (reset this window to its 2×2 slot)
   React.useEffect(()=> terminalBus.subscribe((cmd,arg)=>{
-    if(cmd==='chart.zoom' && chart.current){ try{ const ts=chart.current.timeScale();
+    if(cmd==='chart.zoom' && activeRef.current && chart.current){ try{ const ts=chart.current.timeScale();   // ← active chart only
       const bs=(ts.options&&ts.options().barSpacing)||6;
       ts.applyOptions({ barSpacing: Math.max(2, Math.min(60, bs*(arg==='in'?1.25:0.8))) }); }catch(e){} }
     else if(cmd==='window.tile'){ const el=win.current, par=el&&el.parentElement; if(!par) return;
@@ -794,7 +793,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial }){
   }, [symbol]);
 
   return (
-    <div className={"win"+(active?' active':'')} ref={win} style={{zIndex:z}} onMouseDown={focus}>
+    <div className={"win"+(isActive?' active':'')} ref={win} style={{zIndex:z}} onMouseDown={focus}>
       <div className="cell-title" onMouseDown={(e)=>beginDrag(e,'move')}>
         <span>{symbol}.FX,{tf||'H1'}</span>
         {posLbl.map((p,i)=><span key={i} style={{color:'#00c800',fontWeight:600}}>{p.side} {p.lots} at {fmtPx(symbol,p.price)}</span>)}
@@ -1351,17 +1350,19 @@ function OrderModal({ symbol:sym0, onClose }){
 
 function App(){
   const [grid,setGrid]=React.useState(GRID);
-  const [tf,setTf]=React.useState('H1');
+  const [tfs,setTfs]=React.useState(['H1','H1','H1','H1']);        // per-chart timeframe
+  const [types,setTypes]=React.useState(['candle','candle','candle','candle']);  // per-chart type
+  const [activeIdx,setActiveIdx]=React.useState(0);               // the focused chart window (blue header) — default 0
   const [orderSym,setOrderSym]=React.useState(null);     // popup Order dialog target (null = closed)
   const [indicators,setIndicators]=React.useState([]);   // active indicator ids (shared by all charts)
-  const [chartType,setChartType]=React.useState('candle');   // candle | bar | line (toolbar)
   const [tool,setTool]=React.useState(null);             // armed drawing tool (cross/vline/…)
   const [view,setView]=React.useState({ toolbars:true, statusbar:true, marketwatch:true, navigator:true, toolbox:true });
+  const actRef=React.useRef(activeIdx); actRef.current=activeIdx;
   React.useEffect(()=>{ priceStore.start(); positionsStore.start(); }, []);
-  // ── one reducer for the whole terminal's command bus (menu bar + toolbar) ──
+  // ── command reducer: toolbar chart signals hit ONLY the active chart window ──
   React.useEffect(()=> terminalBus.subscribe((cmd,arg)=>{
-    if(cmd==='chart.tf') setTf(arg);
-    else if(cmd==='chart.type') setChartType(arg);
+    if(cmd==='chart.tf') setTfs(a=> a.map((v,i)=> i===actRef.current ? arg : v));       // active chart only
+    else if(cmd==='chart.type') setTypes(a=> a.map((v,i)=> i===actRef.current ? arg : v)); // active chart only
     else if(cmd==='chart.tool') setTool(arg);
     else if(cmd==='view.toggle') setView(v=>({ ...v, [arg]: !v[arg] }));
     else if(cmd==='chart.indicator'){
@@ -1369,7 +1370,7 @@ function App(){
       else setIndicators(list=> list.indexOf(arg)>=0 ? list.filter(x=>x!==arg) : list.concat(arg));
     }
     else if(cmd==='order.new') setOrderSym(arg||grid[0]);   // open the popup Order dialog
-    // chart.zoom / window.tile are handled inside each ChartCell (transient, per-window)
+    // chart.zoom → the active ChartCell (gated on its isActive); window.tile → all windows
   }), [grid]);
   const swap=(sym)=> setGrid(g=> g.indexOf(sym)>=0 ? g : [sym, g[1], g[2], g[3]]);   // click watch → replace top-left
   const leftShown = view.marketwatch || view.navigator;
@@ -1382,16 +1383,17 @@ function App(){
   return (
     <div className="terminal" style={gridStyle}>
       <MenuBar indicators={indicators} view={view} tool={tool} />
-      {view.toolbars && <Toolbar tf={tf} chartType={chartType} tool={tool} />}
+      {view.toolbars && <Toolbar tf={tfs[activeIdx]} chartType={types[activeIdx]} tool={tool} />}
       {leftShown && <div className="left">
         {view.marketwatch && <MarketWatch onPick={swap} />}
         {view.marketwatch && view.navigator && <NavResizer />}
         {view.navigator && <Navigator />}
       </div>}
       {leftShown && <Splitter />}
-      <div className="charts">{grid.map((s,i)=><ChartCell key={s+i} symbol={s} tf={tf} indicators={indicators} chartType={chartType} tool={tool} initial={WINLAYOUT[i]||WINLAYOUT[0]} />)}</div>
+      <div className="charts">{grid.map((s,i)=><ChartCell key={s+i} idx={i} isActive={i===activeIdx} onActivate={setActiveIdx}
+        symbol={s} tf={tfs[i]} indicators={indicators} chartType={types[i]} tool={tool} initial={WINLAYOUT[i]||WINLAYOUT[0]} />)}</div>
       {view.toolbox && <BottomBar />}
-      {view.statusbar && <StatusBar tool={tool} chartType={chartType} tf={tf} />}
+      {view.statusbar && <StatusBar tool={tool} chartType={types[activeIdx]} tf={tfs[activeIdx]} />}
       {orderSym && <OrderModal symbol={orderSym} onClose={()=>setOrderSym(null)} />}
     </div>
   );
