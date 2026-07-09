@@ -84,6 +84,14 @@ body{font-family:'SF Pro Display','Inter',system-ui,-apple-system,BlinkMacSystem
 .field-inner input::placeholder{color:#bdbdbd;}
 .field-inner select{appearance:none;-webkit-appearance:none;cursor:pointer;}
 .field-inner .msi{color:#bdbdbd;font-size:18px;}
+/* Date of Birth — typed 3-box (Samsung/older-user friendly, no calendar spinner) */
+.dob3{display:flex;align-items:center;gap:8px;}
+.dob3 .dobcell{flex:1;min-width:0;border:1.5px solid #e0e0e0;border-radius:11px;background:#fff;color:#212121;
+  font-size:19px;font-weight:600;text-align:center;height:52px;padding:0 4px;font-family:'Inter',system-ui,sans-serif;letter-spacing:1px;}
+.dob3 .dobcell:first-of-type{flex:1.5;}
+.dob3 .dobcell:focus{outline:none;border-color:#2F6BF6;}
+.dob3 .dobcell::placeholder{color:#c7ccd6;font-weight:500;letter-spacing:1.5px;}
+.dob3 .dobsep{color:#c7ccd6;font-weight:700;font-size:16px;}
 .field-row{display:flex;gap:14px;}
 .field-row .field{flex:1;}
 
@@ -449,6 +457,15 @@ function step1(){
     </div>
 
     <div class="field">
+      <label class="field-label">Country</label>
+      <div class="field-inner" onclick="openCountrySheet()" style="cursor:pointer">
+        ${data.country ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:20px;border-radius:4px;background:#f5f5f5;color:#424242;font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace;letter-spacing:.5px;">${(COUNTRIES.find(c=>c.name===data.country)||{}).code||''}</span>` : ''}
+        <input readonly value="${data.country||''}" placeholder="Select your country" style="cursor:pointer;pointer-events:none;">
+        <span class="msi">expand_more</span>
+      </div>
+    </div>
+
+    <div class="field">
       <label class="field-label">Phone Number</label>
       <div class="field-inner">
         <span class="msi">call</span>
@@ -456,18 +473,14 @@ function step1(){
       </div>
     </div>
 
-    <div class="field-row">
-      <div class="field">
-        <label class="field-label">Date of Birth</label>
-        <div class="field-inner"><input type="date" value="${data.dob}" oninput="setField('dob',this.value)"></div>
-      </div>
-      <div class="field">
-        <label class="field-label">Country</label>
-        <div class="field-inner" onclick="openCountrySheet()" style="cursor:pointer">
-          ${data.country ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:20px;border-radius:4px;background:#f5f5f5;color:#424242;font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace;letter-spacing:.5px;">${(COUNTRIES.find(c=>c.name===data.country)||{}).code||''}</span>` : ''}
-          <input readonly value="${data.country||''}" placeholder="Select your country" style="cursor:pointer;pointer-events:none;">
-          <span class="msi">expand_more</span>
-        </div>
+    <div class="field">
+      <label class="field-label">Date of Birth &nbsp;<span style="color:#bdbdbd">(Year / Month / Day)</span></label>
+      <div class="dob3">
+        <input class="dobcell" inputmode="numeric" maxlength="4" placeholder="YYYY" value="${(data.dob||'').split('-')[0]||''}" data-dp="y" oninput="dobInput(this)" aria-label="Year">
+        <span class="dobsep">/</span>
+        <input class="dobcell" inputmode="numeric" maxlength="2" placeholder="MM" value="${(data.dob||'').split('-')[1]||''}" data-dp="m" oninput="dobInput(this)" aria-label="Month">
+        <span class="dobsep">/</span>
+        <input class="dobcell" inputmode="numeric" maxlength="2" placeholder="DD" value="${(data.dob||'').split('-')[2]||''}" data-dp="d" oninput="dobInput(this)" aria-label="Day">
       </div>
     </div>
 
@@ -644,6 +657,22 @@ function updateStrength(){
 
 // ── Setters ──
 function setData(k,v){ data[k]=v; if(k==='server' && (v==='stocks'||v==='demo')){ data.leverage='1:1'; data.currency='USDT'; } renderStep(); }
+// Date of Birth: 3 typed number boxes → assemble YYYY-MM-DD into data.dob (same format
+// as before, so ageOk()/DB save are unchanged). No native calendar → consistent on Samsung.
+function dobInput(el){
+  el.value = el.value.replace(/\D/g,'');
+  var wrap = el.closest('.dob3');
+  var yy = wrap.querySelector('[data-dp=y]').value;
+  var mm = wrap.querySelector('[data-dp=m]').value;
+  var dd = wrap.querySelector('[data-dp=d]').value;
+  var dp = el.getAttribute('data-dp');
+  if (dp==='y' && el.value.length===4) wrap.querySelector('[data-dp=m]').focus();
+  else if (dp==='m' && el.value.length===2) wrap.querySelector('[data-dp=d]').focus();
+  // Only a complete, sane date sets a valid dob; otherwise blank (button stays disabled).
+  var dob = (yy.length===4 && +mm>=1 && +mm<=12 && +dd>=1 && +dd<=31)
+    ? (yy + '-' + mm.padStart(2,'0') + '-' + dd.padStart(2,'0')) : '';
+  setField('dob', dob);
+}
 function setField(k,v){
   data[k]=v;
   const foot = document.getElementById('foot');
