@@ -18,9 +18,15 @@
   #app{height:100vh}
   /* ── MT5-style CSS Grid: toolbar / [market-watch | 2×2 charts] / bottom bar ── */
   .terminal{display:grid;height:100vh;
-    grid-template-columns:198px 1fr;
+    grid-template-columns:var(--leftw,240px) 6px 1fr;
     grid-template-rows:23px 33px 1fr 188px;
-    grid-template-areas:"menu menu" "tools tools" "left charts" "bottom bottom";}
+    grid-template-areas:"menu menu menu" "tools tools tools" "left splitter charts" "bottom bottom bottom";}
+  /* draggable vertical splitter between Market Watch/Navigator and the charts */
+  .splitter{grid-area:splitter;cursor:col-resize;background:var(--cellbd);position:relative;user-select:none}
+  .splitter::before{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:2px;height:26px;background:#5a616c;border-radius:1px}
+  .splitter:hover,.splitter.drag{background:#3a6ea5}
+  .splitter:hover::before,.splitter.drag::before{background:#cdd6e2}
   /* ── menu bar (File View …) ── */
   .menu{grid-area:menu;display:flex;align-items:center;gap:1px;padding:0 4px;background:linear-gradient(#2c3138,#20242a);border-bottom:1px solid #0a0a0a;font-size:11px}
   .menu .mi{padding:3px 8px;color:#d0d4da;cursor:default;border-radius:2px}.menu .mi:hover{background:#3a6ea5;color:#fff}
@@ -36,7 +42,7 @@
   .tf b.on{background:#3a6ea5;color:#fff;border-color:#3a6ea5}
   .tbrand{margin-left:auto;font-weight:700;letter-spacing:.3px;color:#8890a0;font-size:11px}.tbrand span{color:#7fb0e0}
   /* ── left column: Market Watch (top) + Navigator (bottom) ── */
-  .left{grid-area:left;display:flex;flex-direction:column;border-right:1px solid var(--cellbd);min-height:0}
+  .left{grid-area:left;display:flex;flex-direction:column;min-height:0;overflow:hidden}
   .watch{flex:1;background:var(--panel);overflow:auto;min-height:0}
   .nav{height:186px;background:var(--panel);border-top:1px solid var(--cellbd);overflow:auto;flex:none}
   .nav .navhd{position:sticky;top:0;padding:3px 8px;background:#0a0d12;color:var(--dim);font-size:11px;font-weight:600;border-bottom:1px solid var(--line)}
@@ -197,6 +203,17 @@ const positionsStore = {
 const lotsOf = (p)=> (+p.size||+p.stake||0.01);
 const sideUp = (s)=> (s==='sell'||s==='SELL')?'SELL':'BUY';
 
+/* ── chartResizer: every chart registers its instance + container. The splitter drag loop
+   and window-resize call resizeAll() → chart.resize(w,h) so the 4 charts follow the layout
+   instead of squishing. (autoSize is OFF so these explicit calls actually apply.) ── */
+const chartResizer = {
+  items:new Set(),
+  resizeOne(it){ try{ const w=it.el.clientWidth, h=it.el.clientHeight; if(w>0&&h>0) it.chart.resize(w,h); }catch(e){} },
+  resizeAll(){ this.items.forEach(it=>this.resizeOne(it)); },
+  add(chart, el){ const it={chart,el}; this.items.add(it); this.resizeOne(it); return ()=>this.items.delete(it); },
+};
+if(typeof window!=='undefined') window.addEventListener('resize', ()=>chartResizer.resizeAll());
+
 // ── candle history: try the fx-prices Edge, fall back to a synthetic seed (live bars are REAL feed). ──
 async function loadCandles(symbol){
   try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.functions){
@@ -253,8 +270,10 @@ function ChartCell({ symbol, tf }){
       timeScale:{ borderColor:'#555', timeVisible:true, secondsVisible:false },
       rightPriceScale:{ borderColor:'#555' },
       crosshair:{ vertLine:{color:'#777', style:DOT}, horzLine:{color:'#777', style:DOT} },
-      autoSize:true,
     });
+    // manual sizing (autoSize OFF): register so splitter-drag + window-resize call chart.resize()
+    c.resize(box.current.clientWidth, box.current.clientHeight);
+    const unreg=chartResizer.add(c, box.current);
     // MT5 signature candles: bright lime up, sharp thin red down, crisp borders.
     const opts={ upColor:'#00ff00', downColor:'#ff2020', wickUpColor:'#00ff00', wickDownColor:'#ff2020',
       borderUpColor:'#00ff00', borderDownColor:'#ff2020', borderVisible:true };
@@ -271,7 +290,7 @@ function ChartCell({ symbol, tf }){
       bar.current=u; try{ series.current.update(u); }catch(e){}
     }, 400);
     const unsub=priceStore.subscribe(onTick);
-    return ()=>{ unsub(); try{ c.remove(); }catch(e){} };
+    return ()=>{ unsub(); unreg(); try{ c.remove(); }catch(e){} };
   }, [symbol]);
 
   // ── ORDER PRICE LINE (🔴 most important): redraw green dotted lines whenever this
@@ -430,6 +449,35 @@ function Navigator(){
   );
 }
 
+/* ── Resizable splitter: drag the bar left/right to size the Market Watch column
+   (200–450px). During drag it sets --leftw on .terminal and, in a rAF loop, calls
+   chartResizer.resizeAll() so all 4 charts follow live instead of squishing. ── */
+function Splitter(){
+  const drag=React.useRef(false), self=React.useRef(null);
+  React.useEffect(()=>{
+    const term=document.querySelector('.terminal'); let raf=null;
+    const onMove=(e)=>{ if(!drag.current||!term) return;
+      const rect=term.getBoundingClientRect();
+      const w=Math.max(200, Math.min(450, e.clientX-rect.left));
+      term.style.setProperty('--leftw', w+'px');
+      if(!raf) raf=requestAnimationFrame(()=>{ raf=null; chartResizer.resizeAll(); });
+    };
+    const onUp=()=>{ if(!drag.current) return; drag.current=false;
+      if(self.current) self.current.classList.remove('drag');
+      document.body.style.cursor=''; document.body.style.userSelect='';
+      chartResizer.resizeAll();
+    };
+    document.addEventListener('mousemove',onMove);
+    document.addEventListener('mouseup',onUp);
+    return ()=>{ document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); if(raf)cancelAnimationFrame(raf); };
+  }, []);
+  const onDown=(e)=>{ e.preventDefault(); drag.current=true;
+    if(self.current) self.current.classList.add('drag');
+    document.body.style.cursor='col-resize'; document.body.style.userSelect='none';
+  };
+  return <div className="splitter" ref={self} onMouseDown={onDown} title="드래그해서 시세창 너비 조절"></div>;
+}
+
 function App(){
   const [grid,setGrid]=React.useState(GRID);
   const [tf,setTf]=React.useState('H1');
@@ -443,6 +491,7 @@ function App(){
         <MarketWatch onPick={swap} />
         <Navigator />
       </div>
+      <Splitter />
       <div className="charts">{grid.map((s,i)=><ChartCell key={s+i} symbol={s} tf={tf} />)}</div>
       <BottomBar />
     </div>
