@@ -36,7 +36,10 @@ Deno.serve(async (req) => {
   if (!SB_URL || !SB_KEY) return json({ ok: false, error: "Supabase env missing" }, 500);
   const H = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
 
-  const what = new URL(req.url).searchParams.get("t") === "prices" ? "prices" : "games";
+  // `t` from the query string (GET) OR the JSON body (supabase-js functions.invoke → POST).
+  let t = new URL(req.url).searchParams.get("t");
+  if (!t && req.method === "POST") { try { t = (await req.json())?.t; } catch (_e) { /* no body */ } }
+  const what = t === "prices" ? "prices" : "games";
   try {
     const data = await cache.get(what, async () => {
       if (what === "prices") {

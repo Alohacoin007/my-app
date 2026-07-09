@@ -14395,12 +14395,25 @@ function alpexaApplyServerPrices(rows) {
   if (hits) { window.__alpexaPricesReady = true; window.__alpexaServerFeedLive = true; }
   return hits;
 }
+// ⚡ Overload guard: read prices through the 1s-cache `feed` Edge (all users → ~1 DB read/sec).
+// Backward-compatible — feed error/undeployed → null → direct prices query fallback below.
+async function alpexaFeedPrices() {
+  try { if (window.AlpexaSync && AlpexaSync.db && AlpexaSync.db.functions) {
+    const x = await AlpexaSync.db.functions.invoke('feed', { body: { t: 'prices' } });
+    if (x && !x.error && Array.isArray(x.data)) return x.data;
+  } } catch (e) {}
+  return null;
+}
 async function alpexaLoadServerPrices() {
   try {
     if (!(window.AlpexaSync && AlpexaSync.db)) return 0;
-    const r = await AlpexaSync.db.from('prices').select('symbol,mid');
-    if (!r || r.error || !r.data) return 0;
-    return alpexaApplyServerPrices(r.data);
+    let rows = await alpexaFeedPrices();                 // cache proxy (1s)
+    if (rows === null) {                                 // proxy unavailable → direct DB
+      const r = await AlpexaSync.db.from('prices').select('symbol,mid');
+      if (!r || r.error || !r.data) return 0;
+      rows = r.data;
+    }
+    return alpexaApplyServerPrices(rows);
   } catch (e) { return 0; }
 }
 

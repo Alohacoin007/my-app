@@ -3615,13 +3615,26 @@
         time:(g.live ? (g.time||'Live') : (g.iso ? (fmtKick(g.iso)||g.time||'TBD') : (g.time||'TBD'))),
         home:home, away:away, core:{spread:sp,total:to,ml:ml,threeWay:tw}, props:[] };
     }
+    // ⚡ Overload guard: read games through the 1s-cache `feed` Edge (all users collapse to
+    // ~1 DB read/sec). Backward-compatible: if the Edge isn't deployed / errors, returns null
+    // and we fall back to the direct live_games query below — the app works either way.
+    async function feedGames(){
+      try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.functions){
+        var x=await AlpexaSync.db.functions.invoke('feed',{body:{t:'games'}});
+        if(x && !x.error && Array.isArray(x.data)) return x.data;
+      } }catch(e){}
+      return null;
+    }
     async function loadLive(isRefresh){
-      // SERVER-CENTRE: read the shared live_games feed (one fast query — same data as
-      // the desktop dashboard). Fall back to direct ESPN only if it's empty/unreachable.
+      // SERVER-CENTRE: read the shared live_games feed (cache proxy first, direct DB fallback).
+      // Fall back to direct ESPN only if it's empty/unreachable.
       try{
         if(window.AlpexaSync && AlpexaSync.db){
-          var r = await AlpexaSync.db.from('live_games').select('data').eq('id','all').maybeSingle();
-          var raw = (r && r.data && r.data.data) || [];
+          var raw = await feedGames();                              // cache proxy (1s)
+          if(raw===null){                                          // proxy unavailable → direct DB
+            var r = await AlpexaSync.db.from('live_games').select('data').eq('id','all').maybeSingle();
+            raw = (r && r.data && r.data.data) || [];
+          }
           if(Array.isArray(raw) && raw.length){
             var sgames=[]; raw.forEach(function(g){ var x=lgToGame(g); if(x) sgames.push(x); });
             if(sgames.length){

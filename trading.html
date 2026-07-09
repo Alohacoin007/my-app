@@ -4221,10 +4221,12 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
   // pull so all clients + the back office show the same quote. If the feed goes
   // stale (no manager publishing), the app falls back to its own simulation.
   window.__alpexaFXFeed=window.__alpexaFXFeed||{};
-  function pullFeed(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
-    AlpexaSync.db.from('prices').select('symbol,mid,spr_pts').then(function(r){
-      if(r&&r.data){ var now=Date.now(),f={}; r.data.forEach(function(p){ f[p.symbol]={mid:+p.mid||0,spr:+p.spr_pts||0,ts:now}; }); window.__alpexaFXFeed=f; }
-    },function(){}); }
+  function fxApplyFeed(rows){ var now=Date.now(),f={}; rows.forEach(function(p){ f[p.symbol]={mid:+p.mid||0,spr:+p.spr_pts||0,ts:now}; }); window.__alpexaFXFeed=f; }
+  // ⚡ Overload guard: read FX prices through the 1s-cache `feed` Edge (all users → ~1 DB
+  // read/sec). Backward-compatible — feed error/undeployed → direct prices query fallback.
+  async function pullFeed(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    try{ if(AlpexaSync.db.functions){ var x=await AlpexaSync.db.functions.invoke('feed',{body:{t:'prices'}}); if(x&&!x.error&&Array.isArray(x.data)){ fxApplyFeed(x.data); return; } } }catch(e){}
+    AlpexaSync.db.from('prices').select('symbol,mid,spr_pts').then(function(r){ if(r&&r.data) fxApplyFeed(r.data); },function(){}); }
   setTimeout(pullFeed,1000); setInterval(function(){ if(!document.hidden) pullFeed(); },1500);
   // Kill switch: read the back-office trading-halt flag.
   window.__alpexaHalt=false;
