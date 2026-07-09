@@ -148,6 +148,21 @@
   .dov{position:absolute;pointer-events:none;z-index:4}
   .dov.vline{top:0;bottom:0;width:0;border-left:1px solid #e8b23a}
   .dov.text{transform:translate(0,-50%);color:#e6c14a;font:600 11px Tahoma,sans-serif;white-space:nowrap;text-shadow:0 0 3px #000,0 0 3px #000}
+  /* ── Windows-classic right-click context menu (Market Watch) ── */
+  .mwt tr.sel td{background:#3a6ea5 !important;color:#fff}
+  .mwt tr.sel td.sym,.mwt tr.sel td.up,.mwt tr.sel td.down{color:#fff}
+  .ctxmenu{position:fixed;z-index:1200;min-width:216px;background:#f0f0f0;border:1px solid #9a9a9a;
+    box-shadow:2px 2px 5px rgba(0,0,0,.2);padding:2px;font:12px 'Segoe UI',Tahoma,sans-serif;color:#1c1c1c}
+  .ctxmenu .ci{display:flex;align-items:center;gap:8px;height:24px;padding:0 10px 0 8px;cursor:default;border-radius:2px}
+  .ctxmenu .ci:hover{background:#cfe3fb}
+  .ctxmenu .ci.dis{color:#a0a0a0}.ctxmenu .ci.dis:hover{background:transparent}
+  .ctxmenu .ci .ic{width:16px;height:16px;display:flex;align-items:center;justify-content:center;color:#3a3f46}
+  .ctxmenu .ci .ic svg{width:15px;height:15px}
+  .ctxmenu .ci .lbl{flex:1;white-space:nowrap}
+  .ctxmenu .ci .sc{color:#6a6a6a;font-size:11px;padding-left:22px}
+  .ctxmenu .ci .ar{color:#6a6a6a;margin-left:auto}
+  .ctxmenu .ci .ck{width:14px;text-align:center;color:#2e7d32}
+  .ctxsep{height:1px;background:#c8c8c8;margin:3px 6px}
   /* ── Bottom: KPI strip + Excel-grid positions table ── */
   .bottom{grid-area:bottom;background:var(--panel);border-top:1px solid var(--cellbd);display:flex;flex-direction:column;overflow:hidden}
   .tbxtabs{display:flex;background:linear-gradient(#20242a,#14171c);border-bottom:1px solid #000}
@@ -797,9 +812,52 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial }){
 }
 
 /* ── Market watch: reads the shared store (fan-out), click to swap a grid symbol ── */
+// MT5 Market-Watch right-click menu — mirrors the desktop terminal context menu.
+const MW_MENU=[
+  {l:'New Order', ic:'order', act:'order'},
+  {l:'Chart Window', ic:'line', act:'chart'},
+  {l:'Tick Chart', ic:'tick', act:'order'},
+  {l:'Depth of Market', ic:'dom', k:'Alt+B'},
+  {l:'Options Board', dis:1},
+  {l:'Specification', ic:'spec'},
+  {l:'Popup Prices', ic:'pop', k:'F10'},
+  {sep:1},
+  {l:'Hide', k:'Delete', dis:1},{l:'Hide All'},{l:'Show All'},
+  {l:'Symbols', ic:'dollar', k:'Ctrl+U'},{l:'Sets', ar:1},{l:'Sort', ar:1},{l:'Export', ic:'exp'},
+  {sep:1},
+  {l:'Show Milliseconds'},{l:'Auto Remove Expired', ck:1},{l:'Auto Arrange', ck:1},{l:'Grid', ck:1},
+  {sep:1},
+  {l:'Columns', ar:1},
+];
+function ContextMenu({ x, y, sym, onClose, onPick }){
+  React.useEffect(()=>{ const h=()=>onClose(); const k=(e)=>{ if(e.key==='Escape') onClose(); };
+    document.addEventListener('click',h); document.addEventListener('contextmenu',h); document.addEventListener('keydown',k);
+    return ()=>{ document.removeEventListener('click',h); document.removeEventListener('contextmenu',h); document.removeEventListener('keydown',k); }; }, [onClose]);
+  const run=(it)=>{ if(it.dis||it.sep) return;
+    if(it.act==='order') terminalBus.emit('order.new', sym);       // New Order / Tick Chart → popup for THIS symbol
+    else if(it.act==='chart') onPick&&onPick(sym);                 // Chart Window → reload a chart window with this symbol
+    onClose();
+  };
+  const style={ left:Math.min(x, window.innerWidth-230), top:Math.min(y, window.innerHeight-430) };
+  return (
+    <div className="ctxmenu" style={style} onClick={e=>e.stopPropagation()} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
+      {MW_MENU.map((it,i)=> it.sep ? <div key={i} className="ctxsep"></div> : (
+        <div key={i} className={"ci"+(it.dis?' dis':'')} onClick={()=>run(it)}>
+          <span className="ck">{it.ck?'✓':''}</span>
+          <span className="ic">{it.ic?IC[it.ic]:null}</span>
+          <span className="lbl">{it.l}</span>
+          {it.ar ? <span className="ar">▸</span> : it.k ? <span className="sc">{it.k}</span> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
 function MarketWatch({ onPick }){
   const [mids,setMids]=React.useState({});
+  const [sel,setSel]=React.useState(null);      // blue-selected row
+  const [menu,setMenu]=React.useState(null);    // {sym,x,y} right-click context menu
   React.useEffect(()=> priceStore.subscribe(throttle(m=>setMids({...m}),400)), []);
+  const ctx=(e,sym)=>{ e.preventDefault(); setSel(sym); setMenu({ sym, x:e.clientX, y:e.clientY }); };
   return (
     <div className="watch">
       <table className="mwt">
@@ -807,7 +865,8 @@ function MarketWatch({ onPick }){
         <tbody>
           {WATCH.map(sym=>{ const m=mids[sym]||{}; const cls=m.chg>=0?'up':'down';
             return (
-              <tr key={sym} onClick={()=>onPick&&onPick(sym)} onDoubleClick={()=>terminalBus.emit('order.new',sym)} title="더블클릭: 주문창">
+              <tr key={sym} className={sym===sel?'sel':''} onClick={()=>{setSel(sym);onPick&&onPick(sym);}}
+                  onDoubleClick={()=>terminalBus.emit('order.new',sym)} onContextMenu={(e)=>ctx(e,sym)} title="우클릭: 메뉴 · 더블클릭: 주문창">
                 <td className="sym">{sym}</td>
                 <td className={cls}>{fmtPx(sym,m.bid)}</td>
                 <td className={cls}>{fmtPx(sym,m.ask)}</td>
@@ -816,6 +875,7 @@ function MarketWatch({ onPick }){
             ); })}
         </tbody>
       </table>
+      {menu && <ContextMenu x={menu.x} y={menu.y} sym={menu.sym} onPick={onPick} onClose={()=>setMenu(null)} />}
     </div>
   );
 }
@@ -1035,6 +1095,12 @@ const IC = {
   trend:  <Svg><path d="M4 20 20 4"/><circle cx="4" cy="20" r="2"/><circle cx="20" cy="4" r="2"/></Svg>,
   fib:    <Svg><path d="M3 5h18M3 9h18M3 13h18M3 17h18"/><path d="M3 5v12"/></Svg>,
   text:   <Svg><path d="M5 5h14"/><path d="M12 5v14"/><path d="M9 19h6"/></Svg>,
+  tick:   <Svg><path d="M3 12h4l2-6 4 12 2-6h6"/></Svg>,
+  spec:   <Svg><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h6"/></Svg>,
+  dom:    <Svg><path d="M4 6h10M4 12h16M4 18h7"/></Svg>,
+  pop:    <Svg><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18"/></Svg>,
+  exp:    <Svg><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></Svg>,
+  dollar: <svg viewBox="0 0 24 24" fill="none" stroke="#caa22a" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.5a2.5 2 0 0 0-2.5-1.5c-1.5 0-2.5.8-2.5 2s1 1.8 2.5 2 2.5.8 2.5 2-1 2-2.5 2a2.5 2 0 0 1-2.5-1.5M12 6.5v11"/></svg>,
 };
 const CHART_TYPES=[['candle',IC.candle,'Candlesticks'],['bar',IC.bar,'Bars (OHLC)'],['line',IC.line,'Line']];
 // chart drawing/analysis tools — active state now (frontend), draw handlers come later
