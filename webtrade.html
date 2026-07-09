@@ -46,6 +46,22 @@
   .mdrop .row .ck{width:12px;text-align:center;color:#00d060}
   .mdrop .sep{height:1px;background:#3a3f47;margin:3px 0}
   .mdrop .hd{padding:3px 12px;color:#79808c;font-size:10px;text-transform:uppercase;letter-spacing:.4px}
+  .mdrop .row .sc{margin-left:auto;color:#79808c;font-size:10.5px;padding-left:20px}
+  .mdrop .row.dis{color:#6a7078;cursor:default}.mdrop .row.dis:hover{background:transparent;color:#6a7078}
+  .mdrop .row .ar{margin-left:auto;color:#8a9098}
+  /* ── bottom status bar (View → Status Bar) ── */
+  .statusbar{grid-area:status;display:flex;align-items:center;gap:14px;padding:0 8px;font-size:11px;color:#9aa2b0;
+    background:linear-gradient(#20242a,#171a1f);border-top:1px solid #000;white-space:nowrap;overflow:hidden}
+  .statusbar .s{display:flex;align-items:center;gap:5px}.statusbar b{color:#c8ccd2;font-weight:600}
+  .statusbar .grow{margin-left:auto}
+  /* ── toolbox non-Trade tab content (News/Mailbox/…): themed empty panels ── */
+  .tbxbody{flex:1;overflow:auto;padding:0}
+  .tbxempty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#6a7078;gap:6px;font-size:12px}
+  .tbxempty .ic{font-size:22px;opacity:.5}
+  table.jrnl{width:100%;border-collapse:collapse;font:11px Consolas,monospace}
+  table.jrnl td{padding:2px 10px;border-bottom:1px solid #14181e;color:#9aa2b0;white-space:nowrap}
+  table.jrnl td.t{color:#6f778a;width:150px}
+  table.jrnl td.ok{color:#59c26a}
   .menu .conn{margin-left:auto;color:#9aa2b0;display:flex;align-items:center;gap:6px;padding-right:6px}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--up)}
   /* ── icon toolbar (New Order · Algo · chart tools · timeframes) — compact, 2–4px gaps ── */
@@ -395,7 +411,9 @@ const COMMANDS = {
   'chart.indicator':  'Toggle an indicator (arg: MA20/RSI14/…)',
   'chart.type':       'Set chart series type (arg: candle/bar/line)',
   'chart.zoom':       'Zoom the charts (arg: in/out)',
+  'chart.tool':       'Arm a drawing tool (arg: cross/vline/hline/trend/fib/text|null)',
   'window.tile':      'Re-tile the chart windows to a 2×2 grid',
+  'view.toggle':      'Show/hide a panel (arg: marketwatch/navigator/toolbox/toolbars/statusbar)',
 };
 const terminalBus = { listeners:new Set(),
   emit(cmd,arg){ this.listeners.forEach(fn=>{ try{fn(cmd,arg);}catch(e){} }); },
@@ -731,6 +749,60 @@ function MarketWatch({ onPick }){
 
 /* ── Bottom Toolbox: MT5 tab strip + positions grid + account line, from positionsStore ── */
 const TBX_TABS=['Trade','Exposure','History','News','Mailbox','Calendar','Company','Journal'];
+// themed empty panel for tabs with no live data source yet (News/Mailbox/Calendar/Company)
+const TAB_EMPTY={ News:['📰','No news for the selected symbols'], Mailbox:['✉️','Mailbox is empty'],
+  Calendar:['📅','No scheduled economic events'], Company:['🏛️','Alpexa Ltd · account & company info'] };
+function ExposureTab({ pos, mids }){
+  const net={}; pos.forEach(p=>{ const d=sideUp(p.side)==='SELL'?-1:1; net[p.symbol]=(net[p.symbol]||0)+d*lotsOf(p); });
+  const rows=Object.keys(net).filter(s=>Math.abs(net[s])>1e-9);
+  const num=(n)=>(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  return (
+    <div className="postbl"><table className="pos">
+      <thead><tr><th>Symbol</th><th>Net Volume</th><th>Direction</th><th>Notional (USD)</th></tr></thead>
+      <tbody>
+        {!rows.length && <tr><td className="empty" colSpan="4">No net exposure</td></tr>}
+        {rows.map(s=>{ const v=net[s]; const m=mids[s]||{};
+          return (<tr key={s}><td>{s.toLowerCase()}.fx</td><td className={v>=0?'up':'down'}>{v.toFixed(2)}</td>
+            <td className={v>=0?'up':'down'}>{v>=0?'Long':'Short'}</td>
+            <td>{num(Math.abs(v)*100000*(m.mid||0))}</td></tr>); })}
+      </tbody></table></div>
+  );
+}
+function JournalTab(){
+  const t=new Date(), p2=n=>String(n).padStart(2,'0');
+  const stamp=p2(t.getHours())+':'+p2(t.getMinutes())+':'+p2(t.getSeconds());
+  const live=priceStore.live;
+  const rows=[
+    [stamp,'Alpexa WebTrade terminal started',1],
+    [stamp,'Chart engine (Lightweight Charts) initialised',1],
+    [stamp, live?'Price feed connected (1s cache)':'Price feed: demo simulator',live?1:0],
+    [stamp, (window.AlpexaSync&&AlpexaSync.me)?'Account session active — B-Book execution ready':'Not logged in — demo ledger',1],
+  ];
+  return (
+    <div className="tbxbody"><table className="jrnl"><tbody>
+      {rows.map((r,i)=><tr key={i}><td className="t">{r[0]}</td><td className={r[2]?'ok':''}>{r[1]}</td></tr>)}
+    </tbody></table></div>
+  );
+}
+function EmptyTab({ tab }){ const e=TAB_EMPTY[tab]||['—',tab];
+  return <div className="tbxbody"><div className="tbxempty"><div className="ic">{e[0]}</div>{e[1]}</div></div>; }
+
+function StatusBar({ tool, chartType, tf }){
+  const [live,setLive]=React.useState(priceStore.live);
+  React.useEffect(()=> priceStore.subscribe(()=>setLive(priceStore.live)), []);
+  const t=new Date(), p2=n=>String(n).padStart(2,'0');
+  return (
+    <div className="statusbar">
+      <span className="s"><span className="dot" style={{width:7,height:7,background:live?'#00d060':'#e5a13a'}}></span>{live?'Connected':'Demo'}</span>
+      <span className="s">Tool: <b>{tool?tool:'—'}</b></span>
+      <span className="s">Chart: <b>{chartType} · {tf}</b></span>
+      <span className="grow"></span>
+      <span className="s">{(window.AlpexaSync&&AlpexaSync.me)?'Live account':'Guest'}</span>
+      <span className="s">Vegas <b>{p2(t.getHours())+':'+p2(t.getMinutes())}</b></span>
+    </div>
+  );
+}
+
 function BottomBar(){
   const [acct,setAcct]=React.useState(positionsStore.acct);
   const [pos,setPos]=React.useState(positionsStore.pos);
@@ -763,12 +835,17 @@ function BottomBar(){
     <div className="bottom">
       <BottomResizer />
       <div className="tbxtabs">{TBX_TABS.map(t=><div key={t} className={"t"+(t===tab?' on':'')} onClick={()=>setTab(t)}>{t}</div>)}</div>
+      {tab==='Exposure' ? <ExposureTab pos={pos} mids={mids} />
+       : tab==='Journal' ? <JournalTab />
+       : (tab!=='Trade' && tab!=='History') ? <EmptyTab tab={tab} />
+       : (<React.Fragment>
       <div className="postbl">
         <table className="pos">
           <thead><tr><th>Symbol</th><th>Ticket</th><th>Time</th><th>Type</th><th>Volume</th><th>Price</th><th>S / L</th><th>T / P</th><th>Price</th><th>Profit</th><th></th></tr></thead>
           <tbody>
-            {!pos.length && <tr><td className="empty" colSpan="11">{window.AlpexaSync&&AlpexaSync.me?'No open positions':'로그인하면 실계정 잔고·포지션이 표시됩니다 (지금은 데모 시세)'}</td></tr>}
-            {pos.map(p=>{ const m=mids[p.symbol]||{}; const pl=plOf(p);
+            {tab==='History' && <tr><td className="empty" colSpan="11">No history in the selected period</td></tr>}
+            {tab==='Trade' && !pos.length && <tr><td className="empty" colSpan="11">{window.AlpexaSync&&AlpexaSync.me?'No open positions':'로그인하면 실계정 잔고·포지션이 표시됩니다 (지금은 데모 시세)'}</td></tr>}
+            {tab==='Trade' && pos.map(p=>{ const m=mids[p.symbol]||{}; const pl=plOf(p);
               const tkt=String(p.local_id||'').replace(/\D/g,'').slice(-8)||p.local_id;
               const tm=p.created_at?String(p.created_at).slice(0,19).replace('T',' ').replace(/-/g,'.'):'—';  // MT5: 2026.07.09 20:17:40
               return (<tr key={p.local_id}>
@@ -780,7 +857,7 @@ function BottomBar(){
           </tbody>
         </table>
       </div>
-      <div className="acctline">
+      {tab==='Trade' && <div className="acctline">
         <span><span className="k">Balance:</span> <b>{num(balance)} USD</b></span>
         <span><span className="k">Equity:</span> <b>{num(equity)}</b></span>
         <span><span className="k">Margin:</span> <b>{num(marginUsed)}</b></span>
@@ -788,7 +865,8 @@ function BottomBar(){
         <span><span className="k">Margin Level:</span> <b className={marginUsed>0&&level<100?'down':''}>{marginUsed>0?num(level)+' %':'—'}</b>
           {marginUsed>0&&level<50 && <b style={{color:'#ff5252',marginLeft:6}}>⚠ Stop Out &lt;30%</b>}</span>
         <span><span className="k">Profit:</span> <b className={floating>=0?'up':'down'}>{num(floating)}</b></span>
-      </div>
+      </div>}
+       </React.Fragment>)}
     </div>
   );
 }
@@ -796,19 +874,51 @@ function BottomBar(){
 /* ── Top menu bar (File … Help). "Charts" opens a real Indicators submenu that
    dispatches chart.indicator commands through the terminalBus (event map). ── */
 const MENUS=['File','View','Insert','Charts','Tools','Window','Help'];
-function MenuBar({ indicators }){
+// static menu trees (Windows-app dropdowns). cmd → terminalBus; v → View toggle; keep=true
+// leaves the menu open after a click (checkboxes/indicators); dis = disabled placeholder.
+const MENU_DEF = {
+  File:  [ {l:'New Chart Window', cmd:'order.new'}, {l:'Open Deleted', dis:1}, {sep:1},
+           {l:'Save As Picture...', dis:1}, {l:'Print...', k:'Ctrl+P', dis:1}, {sep:1}, {l:'Exit', dis:1} ],
+  View:  [ {l:'Languages', ar:1, dis:1}, {l:'Toolbars', v:'toolbars', keep:1}, {sep:1},
+           {l:'Status Bar', v:'statusbar', keep:1}, {sep:1},
+           {l:'Market Watch', v:'marketwatch', k:'Ctrl+M', keep:1},
+           {l:'Navigator', v:'navigator', k:'Ctrl+N', keep:1},
+           {l:'Toolbox', v:'toolbox', k:'Ctrl+T', keep:1}, {sep:1}, {l:'Full Screen', k:'F11', dis:1} ],
+  Insert:[ {l:'Indicators', dis:1}, {sep:1}, {l:'Lines', ar:1, dis:1}, {l:'Channels', ar:1, dis:1},
+           {l:'Fibonacci', ar:1, dis:1}, {l:'Shapes', ar:1, dis:1}, {sep:1}, {l:'Text', tool:'text'} ],
+  Tools: [ {l:'New Order', cmd:'order.new', k:'F9'}, {l:'History Center', dis:1}, {sep:1},
+           {l:'Options', k:'Ctrl+O', dis:1} ],
+  Window:[ {l:'Tile Windows', cmd:'window.tile'}, {l:'Cascade', dis:1}, {sep:1}, {l:'EURUSD.FX', dis:1} ],
+  Help:  [ {l:'Help Topics', k:'F1', dis:1}, {sep:1}, {l:'About Alpexa WebTrade', dis:1} ],
+};
+function MenuBar({ indicators, view, tool }){
   const [live,setLive]=React.useState(priceStore.live);
   const [open,setOpen]=React.useState(null);
   React.useEffect(()=> priceStore.subscribe(()=>setLive(priceStore.live)), []);
   React.useEffect(()=>{ if(!open) return; const h=()=>setOpen(null); document.addEventListener('click',h); return ()=>document.removeEventListener('click',h); }, [open]);
   const active=new Set(indicators||[]);
   const click=(m,e)=>{ e.stopPropagation(); setOpen(open===m?null:m); };
+  const run=(it)=>{ if(it.dis) return;
+    if(it.v) terminalBus.emit('view.toggle', it.v);
+    else if(it.tool) terminalBus.emit('chart.tool', it.tool);
+    else if(it.cmd) terminalBus.emit(it.cmd, it.arg);
+    if(!it.keep) setOpen(null);
+  };
+  const Row = (it,i)=> it.sep ? <div key={i} className="sep"></div> : (
+    <div key={i} className={"row"+(it.dis?' dis':'')} onClick={()=>run(it)}>
+      <span className="ck">{it.v && view[it.v] ? '✓' : ''}</span>{it.l}
+      {it.ar ? <span className="ar">▸</span> : it.k ? <span className="sc">{it.k}</span> : null}
+    </div>
+  );
   return (
     <div className="menu">
       {MENUS.map(m=>(
         <div key={m} className={"mi"+(open===m?' on':'')} onClick={(e)=>click(m,e)}>{m}
           {open===m && m==='Charts' && (
             <div className="mdrop" onClick={e=>e.stopPropagation()}>
+              <div className="hd">Chart Type</div>
+              {CHART_TYPES.map(([k,ic,t])=><div key={k} className="row" onClick={()=>{terminalBus.emit('chart.type',k);setOpen(null);}}><span className="ck">{k===tool?'':''}</span>{t}</div>)}
+              <div className="sep"></div>
               <div className="hd">Indicators</div>
               {Object.keys(INDICATORS).map(id=>(
                 <div key={id} className="row" onClick={()=>terminalBus.emit('chart.indicator',id)}>
@@ -816,13 +926,11 @@ function MenuBar({ indicators }){
                 </div>
               ))}
               <div className="sep"></div>
-              <div className="row" onClick={()=>terminalBus.emit('chart.indicator','__clear__')}>Remove all indicators</div>
+              <div className="row" onClick={()=>{terminalBus.emit('chart.indicator','__clear__');setOpen(null);}}>Remove all indicators</div>
             </div>
           )}
           {open===m && m!=='Charts' && (
-            <div className="mdrop" onClick={e=>e.stopPropagation()}>
-              <div className="row" style={{color:'#79808c',cursor:'default'}}>— {m} —</div>
-            </div>
+            <div className="mdrop" onClick={e=>e.stopPropagation()}>{MENU_DEF[m].map(Row)}</div>
           )}
         </div>
       ))}
@@ -847,9 +955,18 @@ const IC = {
   tile:   <Svg><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></Svg>,
   order:  <Svg><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 12v6M9 15h6"/></Svg>,
   play:   <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M7 4v16l13-8z"/></svg>,
+  cross:  <Svg><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="2.5"/></Svg>,
+  vline:  <Svg><path d="M12 3v18"/><path d="M8 6l4-3 4 3M8 18l4 3 4-3"/></Svg>,
+  hline:  <Svg><path d="M3 12h18"/><path d="M6 8l-3 4 3 4M18 8l3 4-3 4"/></Svg>,
+  trend:  <Svg><path d="M4 20 20 4"/><circle cx="4" cy="20" r="2"/><circle cx="20" cy="4" r="2"/></Svg>,
+  fib:    <Svg><path d="M3 5h18M3 9h18M3 13h18M3 17h18"/><path d="M3 5v12"/></Svg>,
+  text:   <Svg><path d="M5 5h14"/><path d="M12 5v14"/><path d="M9 19h6"/></Svg>,
 };
 const CHART_TYPES=[['candle',IC.candle,'Candlesticks'],['bar',IC.bar,'Bars (OHLC)'],['line',IC.line,'Line']];
-function Toolbar({ tf, chartType }){
+// chart drawing/analysis tools — active state now (frontend), draw handlers come later
+const DRAW_TOOLS=[['cross',IC.cross,'Crosshair'],['vline',IC.vline,'Vertical Line'],['hline',IC.hline,'Horizontal Line'],
+  ['trend',IC.trend,'Trend Line'],['fib',IC.fib,'Fibonacci Retracement'],['text',IC.text,'Text']];
+function Toolbar({ tf, chartType, tool }){
   const [algo,setAlgo]=React.useState(false);
   React.useEffect(()=> terminalBus.subscribe((cmd)=>{ if(cmd==='algo.toggle') setAlgo(a=>!a); }), []);
   return (
@@ -866,6 +983,10 @@ function Toolbar({ tf, chartType }){
         <div className="tibtn" title="Zoom In" onClick={()=>terminalBus.emit('chart.zoom','in')}>{IC.zin}</div>
         <div className="tibtn" title="Zoom Out" onClick={()=>terminalBus.emit('chart.zoom','out')}>{IC.zout}</div>
       </div>
+      <div className="tsep"></div>
+      {/* drawing / analysis tools — click to arm (active state); draw on chart is future */}
+      <div className="tigrp">{DRAW_TOOLS.map(([k,ic,t])=>
+        <div key={k} className={"tibtn"+(k===tool?' on':'')} title={t} onClick={()=>terminalBus.emit('chart.tool', k===tool?null:k)}>{ic}</div>)}</div>
       <div className="tsep"></div>
       {/* tile windows back to a 2×2 grid */}
       <div className="tibtn" title="Tile Windows (2×2)" onClick={()=>terminalBus.emit('window.tile')}>{IC.tile}</div>
@@ -1094,11 +1215,15 @@ function App(){
   const [orderSym,setOrderSym]=React.useState(null);     // popup Order dialog target (null = closed)
   const [indicators,setIndicators]=React.useState([]);   // active indicator ids (shared by all charts)
   const [chartType,setChartType]=React.useState('candle');   // candle | bar | line (toolbar)
+  const [tool,setTool]=React.useState(null);             // armed drawing tool (cross/vline/…)
+  const [view,setView]=React.useState({ toolbars:true, statusbar:true, marketwatch:true, navigator:true, toolbox:true });
   React.useEffect(()=>{ priceStore.start(); positionsStore.start(); }, []);
   // ── one reducer for the whole terminal's command bus (menu bar + toolbar) ──
   React.useEffect(()=> terminalBus.subscribe((cmd,arg)=>{
     if(cmd==='chart.tf') setTf(arg);
     else if(cmd==='chart.type') setChartType(arg);
+    else if(cmd==='chart.tool') setTool(arg);
+    else if(cmd==='view.toggle') setView(v=>({ ...v, [arg]: !v[arg] }));
     else if(cmd==='chart.indicator'){
       if(arg==='__clear__') setIndicators([]);
       else setIndicators(list=> list.indexOf(arg)>=0 ? list.filter(x=>x!==arg) : list.concat(arg));
@@ -1107,18 +1232,26 @@ function App(){
     // chart.zoom / window.tile are handled inside each ChartCell (transient, per-window)
   }), [grid]);
   const swap=(sym)=> setGrid(g=> g.indexOf(sym)>=0 ? g : [sym, g[1], g[2], g[3]]);   // click watch → replace top-left
+  const leftShown = view.marketwatch || view.navigator;
+  // dynamic grid: View toggles collapse the corresponding rows/cols (real Windows behaviour)
+  const gridStyle = {
+    gridTemplateColumns: leftShown ? 'var(--leftw,240px) 6px 1fr' : '0 0 1fr',
+    gridTemplateRows: `23px ${view.toolbars?'33px':'0'} 1fr ${view.toolbox?'var(--bottomh,188px)':'0'} ${view.statusbar?'22px':'0'}`,
+    gridTemplateAreas: '"menu menu menu" "tools tools tools" "left splitter charts" "bottom bottom bottom" "status status status"',
+  };
   return (
-    <div className="terminal">
-      <MenuBar indicators={indicators} />
-      <Toolbar tf={tf} chartType={chartType} />
-      <div className="left">
-        <MarketWatch onPick={swap} />
-        <NavResizer />
-        <Navigator />
-      </div>
-      <Splitter />
+    <div className="terminal" style={gridStyle}>
+      <MenuBar indicators={indicators} view={view} tool={tool} />
+      {view.toolbars && <Toolbar tf={tf} chartType={chartType} tool={tool} />}
+      {leftShown && <div className="left">
+        {view.marketwatch && <MarketWatch onPick={swap} />}
+        {view.marketwatch && view.navigator && <NavResizer />}
+        {view.navigator && <Navigator />}
+      </div>}
+      {leftShown && <Splitter />}
       <div className="charts">{grid.map((s,i)=><ChartCell key={s+i} symbol={s} tf={tf} indicators={indicators} chartType={chartType} initial={WINLAYOUT[i]||WINLAYOUT[0]} />)}</div>
-      <BottomBar />
+      {view.toolbox && <BottomBar />}
+      {view.statusbar && <StatusBar tool={tool} chartType={chartType} tf={tf} />}
       {orderSym && <OrderModal symbol={orderSym} onClose={()=>setOrderSym(null)} />}
     </div>
   );
