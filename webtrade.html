@@ -125,6 +125,46 @@
   table.pos td{padding:3px 10px;border:1px solid var(--line);text-align:right}
   .empty{padding:16px;color:var(--dim);text-align:center;border:none!important}
   .note{padding:2px 14px;color:var(--dim);font-size:11px}
+  /* ── MT5 popup Order dialog (light theme, matches the desktop terminal dialog) ── */
+  .omodal-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:flex;
+    align-items:center;justify-content:center;font-family:'Segoe UI',Tahoma,Arial,sans-serif}
+  .omodal{width:970px;max-width:96vw;height:452px;max-height:92vh;background:#eef0f2;
+    border:1px solid #5f6b78;box-shadow:0 12px 44px rgba(0,0,0,.55);display:flex;flex-direction:column;color:#20242a}
+  .omodal .obar{display:flex;align-items:center;height:30px;padding:0 4px 0 10px;
+    background:linear-gradient(#fdfdfd,#e7e9ec);border-bottom:1px solid #cdd1d6;font-weight:600;color:#2a2f36;font-size:13px}
+  .omodal .obar .t{flex:1}
+  .omodal .obar .wb{width:36px;height:24px;display:inline-flex;align-items:center;justify-content:center;color:#5a616b;cursor:pointer;font-size:13px}
+  .omodal .obar .wb:hover{background:#dcdfe3}
+  .omodal .obar .wb.x:hover{background:#e81123;color:#fff}
+  .omodal .obody{flex:1;display:flex;min-height:0}
+  .omenu{width:162px;flex:none;background:#fff;border-right:1px solid #dfe2e6;padding:8px 0;display:flex;flex-direction:column}
+  .omenu .mi{display:flex;align-items:center;gap:9px;padding:7px 14px;color:#2c3138;cursor:pointer;font-size:13px}
+  .omenu .mi .i{color:#1667d6;width:16px;text-align:center}
+  .omenu .mi:hover{background:#eef4fe}
+  .omenu .mi.on{color:#1667d6;font-weight:600}
+  .omenu .sp{flex:1}
+  .oform{width:400px;flex:none;padding:14px 16px;display:flex;flex-direction:column;min-width:0;background:#eef0f2}
+  .orow{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+  .orow>label{width:96px;text-align:right;color:#2c3138;font-size:13px}
+  .orow .in{width:150px;position:relative;display:flex;align-items:center}
+  .orow input,.orow select{width:100%;padding:2px 6px;border:1px solid #b6bcc4;background:#fff;font-size:13px;height:25px;color:#20242a}
+  .orow .unit{color:#4a4f57;font-size:12px}
+  .oquote{text-align:center;font-weight:600;letter-spacing:.5px;margin:auto 0;color:#2a2f36;
+    font-size:33px;font-variant-numeric:tabular-nums}
+  .oquote sup{font-size:20px;top:-.05em;position:relative;margin-left:1px}
+  .oquote .sep{color:#9aa1aa;margin:0 10px;font-weight:400}
+  .oquote .up{color:#1e8e3e}.oquote .dn{color:#d33d30}
+  @keyframes oflash{0%{opacity:.35}100%{opacity:1}}
+  .oquote .flash{animation:oflash .18s ease-out}
+  .obtns{display:flex;margin-top:auto}
+  .obtns button{flex:1;height:42px;border:none;color:#fff;font-size:14px;font-weight:600;cursor:pointer}
+  .obtns .sell{background:linear-gradient(#e2574c,#d23a2d)}
+  .obtns .buy{background:linear-gradient(#3d8ee0,#2f6ec0)}
+  .obtns button:hover{filter:brightness(1.07)}
+  .otick{flex:1;min-width:0;margin:8px 8px 8px 0;border:1px solid #d7dbe0;background:#fff;display:flex;flex-direction:column}
+  .otick .ttool{height:26px;flex:none;border-bottom:1px solid #e6e9ec;display:flex;align-items:center;gap:10px;padding:0 8px;color:#8a9098}
+  .otick .ttool span{color:#8a9098;font-size:13px}
+  .otick .tcanvas{flex:1;min-height:0;position:relative}
 </style>
 </head>
 <body>
@@ -239,6 +279,16 @@ const positionsStore = {
   notify(){ this.listeners.forEach(fn=>{ try{fn(this);}catch(e){} }); },
   subscribe(fn){ this.listeners.add(fn); fn(this); return ()=>this.listeners.delete(fn); },
   forSymbol(sym){ return this.pos.filter(p=>p.symbol===sym); },
+  // append a DEMO position from an order-modal fill — client display only (never server/
+  // localStorage; #5 intact). Live P/L (no pinned profit) marks at the feed mid.
+  addDemo({ symbol, side, volume, price }){
+    const tkt=String(3000000+Math.floor(Math.random()*999999));
+    const d=new Date(), p2=n=>String(n).padStart(2,'0');
+    const ts=d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())+'T'+p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds());
+    this.pos=this.pos.concat([{ local_id:tkt, symbol, side:(side==='sell'?'sell':'buy'), stake:+volume||0.01,
+      size:+volume||0.01, open_price:+price||0, status:'open', created_at:ts, _demo:true }]);
+    this.notify();
+  },
 };
 
 // lots for a position row (MT5 "Volume") + display helpers shared by chart flags & tables
@@ -540,7 +590,7 @@ function MarketWatch({ onPick }){
         <tbody>
           {WATCH.map(sym=>{ const m=mids[sym]||{}; const cls=m.chg>=0?'up':'down';
             return (
-              <tr key={sym} onClick={()=>onPick&&onPick(sym)}>
+              <tr key={sym} onClick={()=>onPick&&onPick(sym)} onDoubleClick={()=>terminalBus.emit('order.new',sym)} title="더블클릭: 주문창">
                 <td className="sym">{sym}</td>
                 <td className={cls}>{fmtPx(sym,m.bid)}</td>
                 <td className={cls}>{fmtPx(sym,m.ask)}</td>
@@ -755,9 +805,115 @@ function NavResizer(){
   return <div className="lhsplit" ref={self} title="드래그해서 네비게이터 높이 조절"></div>;
 }
 
+/* ══ MT5 popup Order dialog. Opens on Market-Watch double-click or toolbar New Order.
+   Left mode menu + center form + a LIVE Ask(red)/Bid(blue) tick chart on the right,
+   fed from priceStore. Sell/Buy route through useTradeEngine.placeOrder and land in
+   the demo ledger (positionsStore.addDemo). ══ */
+const SYM_NAME={ EURUSD:'Euro vs US Dollar', AUDUSD:'Australian Dollar vs US Dollar', USDJPY:'US Dollar vs Japanese Yen',
+  GBPUSD:'Great Britain Pound vs US Dollar', USDCAD:'US Dollar vs Canadian Dollar', NZDUSD:'New Zealand Dollar vs US Dollar',
+  USDCHF:'US Dollar vs Swiss Franc', GBPJPY:'Great Britain Pound vs Japanese Yen', AUDJPY:'Australian Dollar vs Japanese Yen', EURJPY:'Euro vs Japanese Yen' };
+const OMODES=[['Market Execution','↗'],['Limit Order','⤢'],['Stop Order','⤡']];
+const OFOOT=[['One Click Trading','⚡'],['Tick Chart','📈'],['Depth of Market','▤']];
+// split a price into main body + last digit (MT5 shows the last digit larger/raised)
+function QuoteNum({ symbol, value, dir }){
+  const s=fmtPx(symbol,value); if(s==='—') return <span>—</span>;
+  const main=s.slice(0,-1), last=s.slice(-1);
+  return <span key={value} className={"flash "+(dir>0?'up':dir<0?'dn':'')}>{main}<sup>{last}</sup></span>;
+}
+function OrderModal({ symbol:sym0, onClose }){
+  const [symbol,setSymbol]=React.useState(sym0);
+  const [vol,setVol]=React.useState('0.01');
+  const [sl,setSl]=React.useState('0.00000');
+  const [tp,setTp]=React.useState('0.00000');
+  const [m,setM]=React.useState(priceStore.get(symbol)||{});
+  const dir=React.useRef({bid:0,ask:0}); const prev=React.useRef({});
+  const eng=useTradeEngine();
+  const tbox=React.useRef(null), tchart=React.useRef(null), askS=React.useRef(null), bidS=React.useRef(null), buf=React.useRef({t:1000,ask:[],bid:[]});
+
+  React.useEffect(()=>{ const un=priceStore.subscribe(throttle(mids=>{ const q=mids[symbol]; if(!q) return;
+    const pb=prev.current; dir.current={ bid:q.bid-(pb.bid||q.bid)>0?1:q.bid<(pb.bid||q.bid)?-1:0, ask:q.ask-(pb.ask||q.ask)>0?1:q.ask<(pb.ask||q.ask)?-1:0 };
+    prev.current={bid:q.bid,ask:q.ask}; setM({...q}); }, 180)); return un; }, [symbol]);
+
+  // right-side live tick chart: Ask(red) + Bid(blue), advancing right on every tick
+  React.useEffect(()=>{
+    if(!window.LightweightCharts || !tbox.current) return;
+    const c=LightweightCharts.createChart(tbox.current, {
+      layout:{ background:{color:'#ffffff'}, textColor:'#7a828c', fontSize:10, fontFamily:"Tahoma, Arial, sans-serif" },
+      grid:{ vertLines:{visible:false}, horzLines:{color:'#eef1f4'} },
+      timeScale:{ visible:false, borderColor:'#e0e0e0' }, rightPriceScale:{ borderColor:'#e0e0e0' },
+      crosshair:{ mode:0 }, handleScroll:false, handleScale:false });
+    c.resize(tbox.current.clientWidth, tbox.current.clientHeight);
+    const mk=(color)=> c.addLineSeries ? c.addLineSeries({color,lineWidth:1,priceLineVisible:false,lastValueVisible:true})
+                                       : c.addSeries(LightweightCharts.LineSeries,{color,lineWidth:1,priceLineVisible:false,lastValueVisible:true});
+    const ask=mk('#d23a2d'), bid=mk('#2f6ec0'); tchart.current=c; askS.current=ask; bidS.current=bid;
+    buf.current={t:1000,ask:[],bid:[]};
+    const onTick=throttle((mids)=>{ const q=mids[symbol]; if(!q) return; const b=buf.current; b.t+=1;
+      b.ask.push({time:b.t,value:q.ask}); b.bid.push({time:b.t,value:q.bid});
+      if(b.ask.length>180){ b.ask.shift(); b.bid.shift(); }
+      try{ ask.setData(b.ask); bid.setData(b.bid); }catch(e){}
+    }, 220);
+    const un=priceStore.subscribe(onTick);
+    const onR=()=>{ try{ c.resize(tbox.current.clientWidth, tbox.current.clientHeight); }catch(e){} };
+    window.addEventListener('resize',onR);
+    return ()=>{ un(); window.removeEventListener('resize',onR); try{c.remove();}catch(e){} };
+  }, [symbol]);
+
+  React.useEffect(()=>{ const k=(e)=>{ if(e.key==='Escape') onClose(); }; document.addEventListener('keydown',k); return ()=>document.removeEventListener('keydown',k); }, [onClose]);
+
+  const submit=async(side)=>{
+    const q=priceStore.get(symbol)||m; const price=side==='buy'?q.ask:q.bid;
+    try{ await eng.placeOrder({ symbol, side, volume:vol }); }catch(e){}   // real execution seam (server-authoritative)
+    positionsStore.addDemo({ symbol, side, volume:+vol||0.01, price });    // reflect in the ledger immediately
+    onClose();
+  };
+  const spin=(set,cur,step,dg)=>({ up:()=>set((+cur+step).toFixed(dg)), dn:()=>set(Math.max(0,+cur-step).toFixed(dg)) });
+
+  return (
+    <div className="omodal-ov" onMouseDown={onClose}>
+      <div className="omodal" onMouseDown={e=>e.stopPropagation()}>
+        <div className="obar">
+          <div className="t">Order: {symbol}.FX — {SYM_NAME[symbol]||symbol}</div>
+          <span className="wb">—</span><span className="wb">▢</span><span className="wb x" onClick={onClose}>✕</span>
+        </div>
+        <div className="obody">
+          <div className="omenu">
+            {OMODES.map(([l,i],k)=><div key={l} className={"mi"+(k===0?' on':'')}><span className="i">{i}</span>{l}</div>)}
+            <div className="sp"></div>
+            {OFOOT.map(([l,i])=><div key={l} className="mi"><span className="i">{i}</span>{l}</div>)}
+            <div className="mi" onClick={onClose}><span className="i">←</span>Minimize</div>
+          </div>
+          <div className="oform">
+            <div className="orow"><label>Symbol:</label><div className="in" style={{width:'auto',flex:1}}>
+              <select value={symbol} onChange={e=>setSymbol(e.target.value)}>{WATCH.map(s=><option key={s} value={s}>{s}.FX, {SYM_NAME[s]||s}</option>)}</select></div></div>
+            <div className="orow"><label>Volume:</label><div className="in"><input value={vol} onChange={e=>setVol(e.target.value)} /></div><span className="unit">{(Math.round((+vol||0)*100000)).toLocaleString()} {symbol.slice(0,3)}</span></div>
+            <div className="orow"><label>Stop Loss:</label><div className="in"><input value={sl} onChange={e=>setSl(e.target.value)} /></div></div>
+            <div className="orow"><label>Take Profit:</label><div className="in"><input value={tp} onChange={e=>setTp(e.target.value)} /></div></div>
+            <div className="orow"><label>Fill policy:</label><span className="olink">Fill or Kill</span></div>
+            <div className="orow"><label>Comment:</label><div className="in" style={{width:'auto',flex:1}}><input placeholder="" /></div></div>
+            <div className="oquote">
+              <QuoteNum symbol={symbol} value={m.bid} dir={dir.current.bid} />
+              <span className="sep">/</span>
+              <QuoteNum symbol={symbol} value={m.ask} dir={dir.current.ask} />
+            </div>
+            <div className="obtns">
+              <button className="sell" onClick={()=>submit('sell')}>Sell by Market</button>
+              <button className="buy" onClick={()=>submit('buy')}>Buy by Market</button>
+            </div>
+          </div>
+          <div className="otick">
+            <div className="ttool"><span>📊</span><span>✎</span><span>📈</span><span>🔍</span></div>
+            <div className="tcanvas" ref={tbox}></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App(){
   const [grid,setGrid]=React.useState(GRID);
   const [tf,setTf]=React.useState('H1');
+  const [orderSym,setOrderSym]=React.useState(null);     // popup Order dialog target (null = closed)
   const [indicators,setIndicators]=React.useState([]);   // active indicator ids (shared by all charts)
   React.useEffect(()=>{ priceStore.start(); positionsStore.start(); }, []);
   // ── one reducer for the whole terminal's command bus (menu bar + toolbar) ──
@@ -767,11 +923,7 @@ function App(){
       if(arg==='__clear__') setIndicators([]);
       else setIndicators(list=> list.indexOf(arg)>=0 ? list.filter(x=>x!==arg) : list.concat(arg));
     }
-    else if(cmd==='order.new'){
-      const px=priceStore.get(grid[0])||{};
-      alert('New Order — '+grid[0]+'\nBid '+fmtPx(grid[0],px.bid)+'  /  Ask '+fmtPx(grid[0],px.ask)+
-        '\n\n주문 티켓 UI는 실행 API 연결 시 활성화됩니다 (useTradeEngine.placeOrder).');
-    }
+    else if(cmd==='order.new') setOrderSym(arg||grid[0]);   // open the popup Order dialog
   }), [grid]);
   const swap=(sym)=> setGrid(g=> g.indexOf(sym)>=0 ? g : [sym, g[1], g[2], g[3]]);   // click watch → replace top-left
   return (
@@ -786,6 +938,7 @@ function App(){
       <Splitter />
       <div className="charts">{grid.map((s,i)=><ChartCell key={s+i} symbol={s} tf={tf} indicators={indicators} initial={WINLAYOUT[i]||WINLAYOUT[0]} />)}</div>
       <BottomBar />
+      {orderSym && <OrderModal symbol={orderSym} onClose={()=>setOrderSym(null)} />}
     </div>
   );
 }
