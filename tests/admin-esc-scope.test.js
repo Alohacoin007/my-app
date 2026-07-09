@@ -22,13 +22,14 @@ function body(name){
 function callsEsc(b){ return /[^A-Za-z0-9_.]esc\(/.test(b); }
 function definesEscLocally(b){ return /(?:var|const|let)\s+esc\s*=|function\s+esc\b/.test(b); }
 
-// Which top-level views call esc()? Each must resolve esc (global OR local), else it crashes on render.
-const VIEWS=['viewHistory','viewApprovals','viewPlayers','viewReport','viewOverview'];
+// Auto-discover EVERY top-level view (not a hardcoded subset — viewLogs was missed once).
+const VIEWS=[...src.matchAll(/\n {2}function (view[A-Za-z]+)\(/g)].map(m=>m[1]);
 const users=VIEWS.filter(v=>callsEsc(body(v)));
 
-console.log('\n=== views that call esc():', users.join(', '), '===');
+console.log('\n=== '+VIEWS.length+' views found; call esc():', users.join(', '), '===');
 ok('viewHistory calls esc() (row rendering)', callsEsc(body('viewHistory')));
 ok('viewApprovals calls esc() (request rendering)', callsEsc(body('viewApprovals')));
+ok('viewLogs calls esc() (audit rendering)', callsEsc(body('viewLogs')));
 
 // The core invariant: every esc()-calling view must have esc in scope (global, or its own local).
 let allResolvable=true, offenders=[];
