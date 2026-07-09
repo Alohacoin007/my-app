@@ -193,6 +193,20 @@
   .xclose:hover{background:linear-gradient(#a03636,#7a2626);color:#fff}
   .empty{padding:16px;color:var(--dim);text-align:center;border:none!important}
   .note{padding:2px 14px;color:var(--dim);font-size:11px}
+  /* ── chart tabs strip (bottom of the charts workspace) ── */
+  .charttabs{position:absolute;left:0;right:0;bottom:0;height:22px;display:flex;z-index:950;
+    background:#0c0f13;border-top:1px solid #000;overflow-x:auto}
+  .charttabs .ctab{display:flex;align-items:center;padding:0 12px;font-size:11px;color:#9aa1ad;cursor:pointer;
+    border-right:1px solid #23272d;background:linear-gradient(#20242a,#15181d);white-space:nowrap}
+  .charttabs .ctab:hover{color:#dfe3ea}
+  .charttabs .ctab.on{background:#000;color:#fff;border-top:2px solid #2f7fe0;margin-top:-1px}
+  /* ── order form spinner steppers (Volume / SL / TP) ── */
+  .orow .in.step input{border-right:none;border-top-right-radius:0;border-bottom-right-radius:0}
+  .spin{display:flex;flex-direction:column;width:16px;height:25px;border:1px solid #777;border-left:none;flex:none}
+  .spin b{flex:1;display:flex;align-items:center;justify-content:center;background:linear-gradient(#fbfbfb,#e6e6e6);
+    cursor:pointer;font-size:7px;color:#333;line-height:1;user-select:none}
+  .spin b:hover{background:#d7e6fb}
+  .spin b:first-child{border-bottom:1px solid #bbb}
   /* ── MT5 popup Order dialog (light theme, matches the desktop terminal dialog) ── */
   .omodal-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:flex;
     align-items:center;justify-content:center;font-family:'Segoe UI',Tahoma,Arial,sans-serif}
@@ -207,7 +221,8 @@
   .omodal .obody{flex:1;display:flex;min-height:0}
   .omenu{width:162px;flex:none;background:#fff;border-right:1px solid #dfe2e6;padding:8px 0;display:flex;flex-direction:column}
   .omenu .mi{display:flex;align-items:center;gap:9px;padding:7px 14px;color:#2c3138;cursor:pointer;font-size:13px}
-  .omenu .mi .i{color:#1667d6;width:16px;text-align:center}
+  .omenu .mi .i{color:#1667d6;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center}
+  .omenu .mi .i svg{width:16px;height:16px}
   .omenu .mi:hover{background:#eef4fe}
   .omenu .mi.on{color:#1667d6;font-weight:600}
   .omenu .sp{flex:1}
@@ -1279,8 +1294,18 @@ function NavResizer(){
 const SYM_NAME={ EURUSD:'Euro vs US Dollar', AUDUSD:'Australian Dollar vs US Dollar', USDJPY:'US Dollar vs Japanese Yen',
   GBPUSD:'Great Britain Pound vs US Dollar', USDCAD:'US Dollar vs Canadian Dollar', NZDUSD:'New Zealand Dollar vs US Dollar',
   USDCHF:'US Dollar vs Swiss Franc', GBPJPY:'Great Britain Pound vs Japanese Yen', AUDJPY:'Australian Dollar vs Japanese Yen', EURJPY:'Euro vs Japanese Yen' };
-const OMODES=[['Market Execution','↗'],['Limit Order','⤢'],['Stop Order','⤡']];
-const OFOOT=[['One Click Trading','⚡'],['Tick Chart','📈'],['Depth of Market','▤']];
+// order-dialog left menu icons (MT5-style thin line-chart + arrow marks)
+const OIC = {
+  mkt:  <svg viewBox="0 0 24 24" fill="none" stroke="#2f6ec0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 17l5-5 3 3 5-7"/><path d="M18 5h3v3"/></svg>,
+  lim:  <svg viewBox="0 0 24 24" fill="none" stroke="#c0392b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 15l5-4 3 2 5-6"/><path d="M3 20h18"/></svg>,
+  stp:  <svg viewBox="0 0 24 24" fill="none" stroke="#c0392b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12l5-3 3 2 5-5"/><path d="M18 6h3v3"/><path d="M3 20h18"/></svg>,
+  oct:  <svg viewBox="0 0 24 24" fill="none" stroke="#e08a2f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 9h5M8 13h8M8 17h4"/></svg>,
+  tick: <svg viewBox="0 0 24 24" fill="none" stroke="#2f6ec0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg>,
+  dom:  <svg viewBox="0 0 24 24" fill="none" stroke="#5a6270" strokeWidth="2" strokeLinecap="round"><path d="M4 6h10M4 12h16M4 18h7"/></svg>,
+  min:  <svg viewBox="0 0 24 24" fill="none" stroke="#5a6270" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5l-7 7 7 7"/><path d="M4 12h16"/></svg>,
+};
+const OMODES=[['Market Execution','mkt'],['Limit Order','lim'],['Stop Order','stp']];
+const OFOOT=[['One Click Trading','oct'],['Tick Chart','tick'],['Depth of Market','dom']];
 // split a price into main body + last digit (MT5 shows the last digit larger/raised)
 function QuoteNum({ symbol, value, dir }){
   const s=fmtPx(symbol,value); if(s==='—') return <span>—</span>;
@@ -1353,19 +1378,27 @@ function OrderModal({ symbol:sym0, onClose }){
         </div>
         <div className="obody">
           <div className="omenu">
-            {OMODES.map(([l,i],k)=><div key={l} className={"mi"+(k===0?' on':'')}><span className="i">{i}</span>{l}</div>)}
+            {OMODES.map(([l,i],k)=><div key={l} className={"mi"+(k===0?' on':'')}><span className="i">{OIC[i]}</span>{l}</div>)}
             <div className="sp"></div>
-            {OFOOT.map(([l,i])=><div key={l} className="mi"><span className="i">{i}</span>{l}</div>)}
-            <div className="mi" onClick={onClose}><span className="i">←</span>Minimize</div>
+            {OFOOT.map(([l,i])=><div key={l} className="mi"><span className="i">{OIC[i]}</span>{l}</div>)}
+            <div className="mi" onClick={onClose}><span className="i">{OIC.min}</span>Minimize</div>
           </div>
           <div className="oform">
             <div className="orow"><label>Symbol:</label><div className="in" style={{width:'auto',flex:1}}>
               <select value={symbol} onChange={e=>setSymbol(e.target.value)}>{WATCH.map(s=><option key={s} value={s}>{s}.FX, {SYM_NAME[s]||s}</option>)}</select></div></div>
-            <div className="orow"><label>Volume:</label><div className="in"><input value={vol} onChange={e=>setVol(e.target.value)} /></div><span className="unit">{(Math.round((+vol||0)*100000)).toLocaleString()} {symbol.slice(0,3)}</span></div>
+            <div className="orow"><label>Volume:</label>
+              <div className="in step"><input value={vol} onChange={e=>setVol(e.target.value)} />
+                <span className="spin"><b onClick={()=>setVol((Math.max(0.01,(+vol||0)+0.01)).toFixed(2))}>▲</b><b onClick={()=>setVol((Math.max(0.01,(+vol||0.01)-0.01)).toFixed(2))}>▼</b></span></div>
+              <span className="unit">{(Math.round((+vol||0)*100000)).toLocaleString()} {symbol.slice(0,3)}</span></div>
             <div className="orow"><label>Leverage:</label><div className="in"><select value={eng.leverage} onChange={e=>eng.setLeverage(e.target.value)}>{LEVERAGES.map(l=><option key={l} value={l}>1:{l}</option>)}</select></div><span className="unit">Max <b>{eng.maxVolume(symbol).toFixed(2)}</b> lots</span></div>
-            <div className="orow"><label>Stop Loss:</label><div className="in"><input value={sl} onChange={e=>setSl(e.target.value)} /></div></div>
-            <div className="orow"><label>Take Profit:</label><div className="in"><input value={tp} onChange={e=>setTp(e.target.value)} /></div></div>
+            <div className="orow"><label>Stop Loss:</label>
+              <div className="in step"><input value={sl} onChange={e=>setSl(e.target.value)} />
+                <span className="spin"><b onClick={()=>setSl(((+sl||0)+pip(symbol)).toFixed(digits(symbol)))}>▲</b><b onClick={()=>setSl((Math.max(0,(+sl||0)-pip(symbol))).toFixed(digits(symbol)))}>▼</b></span></div></div>
+            <div className="orow"><label>Take Profit:</label>
+              <div className="in step"><input value={tp} onChange={e=>setTp(e.target.value)} />
+                <span className="spin"><b onClick={()=>setTp(((+tp||0)+pip(symbol)).toFixed(digits(symbol)))}>▲</b><b onClick={()=>setTp((Math.max(0,(+tp||0)-pip(symbol))).toFixed(digits(symbol)))}>▼</b></span></div></div>
             <div className="orow"><label>Fill policy:</label><span className="olink">Fill or Kill</span></div>
+            <div className="orow"><label>Comment:</label><div className="in" style={{width:'auto',flex:1}}><input placeholder="" /></div></div>
             <div className="orow omargin"><label>Margin:</label>
               <span className="unit" style={{flex:1,color:canAfford?'#2c3138':'#d23a2d'}}>
                 <b>{usd(need)}</b> required &nbsp;·&nbsp; Free Margin <b>{usd(eng.freeMargin)}</b>
@@ -1433,8 +1466,12 @@ function App(){
         {view.navigator && <Navigator />}
       </div>}
       {leftShown && <Splitter />}
-      <div className="charts">{grid.map((s,i)=><ChartCell key={s+i} idx={i} isActive={i===activeIdx} onActivate={setActiveIdx}
-        symbol={s} tf={tfs[i]} indicators={indicators} chartType={types[i]} tool={tool} initial={WINLAYOUT[i]||WINLAYOUT[0]} />)}</div>
+      <div className="charts">
+        {grid.map((s,i)=><ChartCell key={s+i} idx={i} isActive={i===activeIdx} onActivate={setActiveIdx}
+          symbol={s} tf={tfs[i]} indicators={indicators} chartType={types[i]} tool={tool} initial={WINLAYOUT[i]||WINLAYOUT[0]} />)}
+        <div className="charttabs">{grid.map((s,i)=>
+          <div key={i} className={"ctab"+(i===activeIdx?' on':'')} onClick={()=>setActiveIdx(i)}>{s}.FX,{tfs[i]}</div>)}</div>
+      </div>
       {view.toolbox && <BottomBar />}
       {view.statusbar && <StatusBar tool={tool} chartType={types[activeIdx]} tf={tfs[activeIdx]} />}
       {orderSym && <OrderModal symbol={orderSym} onClose={()=>setOrderSym(null)} />}
