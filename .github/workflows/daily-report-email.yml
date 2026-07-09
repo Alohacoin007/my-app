@@ -1,0 +1,38 @@
+# Alpexa — daily reconciliation report EMAIL.
+# Builds the daily report and emails it to EMAIL_TO each morning.
+#
+# SETUP (see reports/EMAIL-SETUP-가이드.md):
+#   1) Add repo secrets: EMAIL_HOST, EMAIL_USER, EMAIL_PASS, EMAIL_TO
+#      (Settings → Secrets and variables → Actions → New repository secret)
+#   2) Enable the daily schedule by uncommenting the `schedule:` block below.
+#
+# Ships as MANUAL-ONLY (workflow_dispatch) so it never sends until you've added the
+# secrets and are ready. `schedule` only fires on the repo's DEFAULT branch.
+name: daily report email
+
+on:
+  workflow_dispatch: {}        # manual "Run workflow" — use this to test
+  # schedule:
+  #   - cron: "0 15 * * *"     # 15:00 UTC = 08:00 PDT — uncomment to auto-send daily
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/wizardly-ritchie-lsRnz
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci || npm install
+      # Generate today's report data. (Wire loadReport() to the live Supabase DB for real
+      # numbers; until then this produces the reconciliation-verified sample report.)
+      - run: node tests/alpexa-daily-report.test.js
+      - name: Send the report email
+        env:
+          EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          EMAIL_TO:   ${{ secrets.EMAIL_TO }}
+        run: node reports/send-daily-report.js
