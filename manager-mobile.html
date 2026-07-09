@@ -108,6 +108,10 @@
   function setJSON(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
   function num(k,d){var v=parseFloat(localStorage.getItem(k));return isNaN(v)?d:v;}
   function usd(n){return '$'+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+  // GLOBAL HTML escape. Several views (viewHistory, viewApprovals, …) call esc() but define
+  // no local copy — without this global they threw "esc is not defined" the moment they rendered
+  // a row, which killed render() so the tab click never switched pages. (Full escape: & < > " '.)
+  function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
   function k0(n){return '$'+Math.round(Number(n)||0).toLocaleString('en-US');}
   function ago(ts){if(!ts)return '';var s=Math.floor((Date.now()-ts)/1000);if(s<60)return s+'s ago';var m=(s/60|0);if(m<60)return m+'m ago';var h=(m/60|0);if(h<24)return h+'h ago';return (h/24|0)+'d ago';}
   // Requests pulled from the shared server (all customers). Filled by pullServer().
