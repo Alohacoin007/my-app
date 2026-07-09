@@ -142,6 +142,12 @@
   .cell-lbl{position:absolute;top:3px;left:6px;z-index:3;pointer-events:none;
     font:400 11px Tahoma,'Segoe UI',Arial,sans-serif;color:#c8ccd2;letter-spacing:.2px;text-shadow:0 0 3px #000,0 0 3px #000}
   .cell-lbl b{font-weight:600}
+  /* drawing layer over each chart — captures the mouse only when a draw tool is armed */
+  .drawlayer{position:absolute;inset:0;z-index:4;pointer-events:none}
+  .drawlayer.arm{pointer-events:auto;cursor:crosshair}
+  .dov{position:absolute;pointer-events:none;z-index:4}
+  .dov.vline{top:0;bottom:0;width:0;border-left:1px solid #e8b23a}
+  .dov.text{transform:translate(0,-50%);color:#e6c14a;font:600 11px Tahoma,sans-serif;white-space:nowrap;text-shadow:0 0 3px #000,0 0 3px #000}
   /* ── Bottom: KPI strip + Excel-grid positions table ── */
   .bottom{grid-area:bottom;background:var(--panel);border-top:1px solid var(--cellbd);display:flex;flex-direction:column;overflow:hidden}
   .tbxtabs{display:flex;background:linear-gradient(#20242a,#14171c);border-bottom:1px solid #000}
@@ -561,13 +567,18 @@ function makePriceSeries(c, type){
 }
 const asSeriesData=(data,type)=> type==='line' ? data.map(d=>({time:d.time,value:d.close})) : data;
 
-function ChartCell({ symbol, tf, indicators, chartType, initial }){
+function ChartCell({ symbol, tf, indicators, chartType, tool, initial }){
   const box=React.useRef(null), chart=React.useRef(null), series=React.useRef(null), bar=React.useRef(null);
   const lines=React.useRef([]);
   const candles=React.useRef([]);         // full history — indicators recompute from this
   const indSeries=React.useRef([]);       // active indicator line series (to clear/redraw)
   const indRef=React.useRef(indicators||[]); indRef.current=indicators||[];
   const typeRef=React.useRef(chartType||'candle'); typeRef.current=chartType||'candle';
+  // ── drawing engine state ──
+  const dlayer=React.useRef(null);        // the pointer-capture overlay div
+  const toolRef=React.useRef(tool); toolRef.current=tool;
+  const dragDraw=React.useRef(null);      // in-progress trend/fib drag
+  const overlays=React.useRef([]);        // time-anchored DOM overlays (vline/text) to reposition
   const [px,setPx]=React.useState(null);
   const [posLbl,setPosLbl]=React.useState([]);   // for the price-line flags
 
@@ -650,6 +661,7 @@ function ChartCell({ symbol, tf, indicators, chartType, initial }){
     // MT5 price series in the currently-selected type (candles / bars / line)
     const s = makePriceSeries(c, typeRef.current);
     chart.current=c; series.current=s;
+    try{ c.timeScale().subscribeVisibleTimeRangeChange(()=>posOverlays()); }catch(e){}   // keep drawings pinned while panning
     // load candles for the current timeframe, then (re)paint indicators over them
     loadCandles(symbol, tf).then(data=>{ try{ s.setData(asSeriesData(data,typeRef.current)); bar.current=data[data.length-1]; candles.current=data; paintIndicators(); }catch(e){} });
     // live: update ONLY the last bar's close from the shared store — throttled to ~2.5/sec
@@ -662,7 +674,9 @@ function ChartCell({ symbol, tf, indicators, chartType, initial }){
       try{ series.current.update(typeRef.current==='line' ? {time:u.time,value:close} : u); }catch(e){}
     }, 400);
     const unsub=priceStore.subscribe(onTick);
-    return ()=>{ unsub(); unreg(); indSeries.current=[]; try{ c.remove(); }catch(e){} };
+    return ()=>{ unsub(); unreg(); indSeries.current=[]; lines.current=[];
+      overlays.current.forEach(o=>{ try{o.el.remove();}catch(e){} }); overlays.current=[];   // chart recreated → clear drawings
+      try{ c.remove(); }catch(e){} };
   }, [symbol, tf]);   // recreate + reload on symbol OR timeframe change (toolbar sync)
 
   // switch chart type WITHOUT recreating the whole chart (swap the price series, re-seed data)
@@ -686,6 +700,55 @@ function ChartCell({ symbol, tf, indicators, chartType, initial }){
 
   // repaint indicators whenever the active set changes (Charts → Indicators menu)
   React.useEffect(()=>{ paintIndicators(); }, [(indicators||[]).join(','), paintIndicators]);
+
+  // ── DRAWING ENGINE — arm a tool → drag/click on the chart draws real objects.
+  //    hline = price line · trend = 2-pt line series · fib = level price lines ·
+  //    vline/text = time-anchored DOM overlays (repositioned as the chart pans). ──
+  const posOverlays=React.useCallback(()=>{ const c=chart.current,s=series.current; if(!c||!dlayer.current) return;
+    overlays.current.forEach(o=>{ let x=null; try{ x=c.timeScale().timeToCoordinate(o.time); }catch(e){}
+      if(x==null){ o.el.style.display='none'; return; } o.el.style.display=''; o.el.style.left=Math.round(x)+'px';
+      if(o.type==='text'){ let y=null; try{ y=s&&s.priceToCoordinate(o.price); }catch(e){} o.el.style.top=Math.round(y==null?10:y)+'px'; }
+    });
+  }, []);
+  // reflect the armed tool onto the overlay's pointer-capture + cursor
+  React.useEffect(()=>{ const el=dlayer.current; if(!el) return;
+    const armed = tool && tool!=='arrow' && tool!=='cross';
+    el.className='drawlayer'+(armed?' arm':'');
+    try{ if(chart.current) chart.current.applyOptions({ crosshair:{ mode: tool==='cross'?0:1 } }); }catch(e){}
+  }, [tool]);
+  // attach the draw handlers once (they read the live refs)
+  React.useEffect(()=>{
+    const el=dlayer.current; if(!el) return;
+    const xy=(e)=>{ const r=el.getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; };
+    const addVLine=(time)=>{ const d=document.createElement('div'); d.className='dov vline'; el.appendChild(d);
+      overlays.current.push({type:'vline',time,el:d}); posOverlays(); };
+    const addText=(time,price,txt)=>{ const d=document.createElement('div'); d.className='dov text'; d.textContent=txt; el.appendChild(d);
+      overlays.current.push({type:'text',time,price,el:d}); posOverlays(); };
+    const onDown=(e)=>{ const t=toolRef.current, c=chart.current, s=series.current;
+      if(!t||t==='arrow'||t==='cross'||!c||!s) return;
+      e.preventDefault(); e.stopPropagation();
+      const [x,y]=xy(e); let time=null,price=null;
+      try{ time=c.timeScale().coordinateToTime(x); price=s.coordinateToPrice(y); }catch(e){}
+      if(t==='hline'){ if(price==null) return; try{ lines.current.push(s.createPriceLine({price,color:'#e8b23a',lineWidth:1,lineStyle:0,axisLabelVisible:true,title:''})); }catch(e){} return; }
+      if(t==='vline'){ if(time==null) return; addVLine(time); return; }
+      if(t==='text'){ if(time==null||price==null) return; const txt=window.prompt('Text label:'); if(txt) addText(time,price,txt); return; }
+      dragDraw.current={ tool:t, time, price };   // trend / fib — finish on mouseup
+    };
+    const onUp=(e)=>{ const d=dragDraw.current; if(!d) return; dragDraw.current=null;
+      const c=chart.current, s=series.current; if(!c||!s) return; const [x,y]=xy(e);
+      let t2=null,p2=null; try{ t2=c.timeScale().coordinateToTime(x); p2=s.coordinateToPrice(y); }catch(e){}
+      if(d.time==null||d.price==null||t2==null||p2==null) return;
+      if(d.tool==='trend'){ const pts=[{time:d.time,value:d.price},{time:t2,value:p2}].sort((a,b)=>a.time-b.time);
+        if(pts[0].time===pts[1].time) return;
+        try{ const ls=c.addLineSeries?c.addLineSeries({color:'#3aa0ff',lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false})
+                                     :c.addSeries(LightweightCharts.LineSeries,{color:'#3aa0ff',lineWidth:2}); ls.setData(pts); indSeries.current.push(ls); }catch(e){} }
+      else if(d.tool==='fib'){ const hi=Math.max(d.price,p2), lo=Math.min(d.price,p2);
+        const lv=[0,0.236,0.382,0.5,0.618,0.786,1], col=['#8a9098','#e0709a','#f0c674','#82d982','#5fb0ff','#c792ea','#8a9098'];
+        lv.forEach((L,i)=>{ try{ lines.current.push(s.createPriceLine({price:lo+(hi-lo)*L,color:col[i],lineWidth:1,lineStyle:2,axisLabelVisible:true,title:(L*100).toFixed(1)+'%'})); }catch(e){} }); }
+    };
+    el.addEventListener('mousedown',onDown); document.addEventListener('mouseup',onUp);
+    return ()=>{ el.removeEventListener('mousedown',onDown); document.removeEventListener('mouseup',onUp); };
+  }, [posOverlays]);
 
   // ── ORDER PRICE LINE (🔴 most important): redraw green dotted lines whenever this
   //    symbol's open positions change. One createPriceLine per position at its open_price.
@@ -714,6 +777,7 @@ function ChartCell({ symbol, tf, indicators, chartType, initial }){
         <span className="wc"><span>—</span><span>▢</span><span>✕</span></span>
       </div>
       <div className="canvas" ref={box}>
+        <div className="drawlayer" ref={dlayer}></div>
         <OrderBox symbol={symbol} />
         <div className="cell-lbl"><b>{symbol}</b>, {tf||'H1'} <span className="px">{fmtPx(symbol,px)}</span></div>
       </div>
@@ -955,6 +1019,7 @@ const IC = {
   tile:   <Svg><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></Svg>,
   order:  <Svg><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 12v6M9 15h6"/></Svg>,
   play:   <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M7 4v16l13-8z"/></svg>,
+  arrow:  <Svg><path d="M4 3l7 17 2.5-7L20 10 4 3z"/></Svg>,
   cross:  <Svg><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="2.5"/></Svg>,
   vline:  <Svg><path d="M12 3v18"/><path d="M8 6l4-3 4 3M8 18l4 3 4-3"/></Svg>,
   hline:  <Svg><path d="M3 12h18"/><path d="M6 8l-3 4 3 4M18 8l3 4-3 4"/></Svg>,
@@ -964,7 +1029,7 @@ const IC = {
 };
 const CHART_TYPES=[['candle',IC.candle,'Candlesticks'],['bar',IC.bar,'Bars (OHLC)'],['line',IC.line,'Line']];
 // chart drawing/analysis tools — active state now (frontend), draw handlers come later
-const DRAW_TOOLS=[['cross',IC.cross,'Crosshair'],['vline',IC.vline,'Vertical Line'],['hline',IC.hline,'Horizontal Line'],
+const DRAW_TOOLS=[['arrow',IC.arrow,'Cursor'],['cross',IC.cross,'Crosshair'],['vline',IC.vline,'Vertical Line'],['hline',IC.hline,'Horizontal Line'],
   ['trend',IC.trend,'Trend Line'],['fib',IC.fib,'Fibonacci Retracement'],['text',IC.text,'Text']];
 function Toolbar({ tf, chartType, tool }){
   const [algo,setAlgo]=React.useState(false);
@@ -1249,7 +1314,7 @@ function App(){
         {view.navigator && <Navigator />}
       </div>}
       {leftShown && <Splitter />}
-      <div className="charts">{grid.map((s,i)=><ChartCell key={s+i} symbol={s} tf={tf} indicators={indicators} chartType={chartType} initial={WINLAYOUT[i]||WINLAYOUT[0]} />)}</div>
+      <div className="charts">{grid.map((s,i)=><ChartCell key={s+i} symbol={s} tf={tf} indicators={indicators} chartType={chartType} tool={tool} initial={WINLAYOUT[i]||WINLAYOUT[0]} />)}</div>
       {view.toolbox && <BottomBar />}
       {view.statusbar && <StatusBar tool={tool} chartType={chartType} tf={tf} />}
       {orderSym && <OrderModal symbol={orderSym} onClose={()=>setOrderSym(null)} />}
