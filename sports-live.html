@@ -16,13 +16,28 @@
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=5">
 <link rel="shortcut icon" href="favicon.ico?v=5">
 <meta name="theme-color" content="#ffffff">
+<!-- ⚡ Perf (#3): preconnect to the font + CDN origins so DNS/TLS runs in parallel with
+     HTML parse, and load web fonts NON-blocking (media=print flips to all on load) instead
+     of a render-blocking @import that serialized the critical path. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Google+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Google+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap"></noscript>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Google+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap');
   :root{
     --bg:#f4f6fb; --surface:#ffffff; --surface-2:#eef1f7; --line:#e7ebf2;
     --text:#0e1726; --dim:#8a94a6; --accent:#1e40d8; --accent-d:#ffffff;
     --pos:#16a34a; --neg:#e5484d; --live:#e5484d; --r:12px;
   }
+  /* ⚡ Perf (#3): skeleton shell shown while live_games loads, so first entry is never a
+     blank screen — perceived speed ↑. Replaced by real cards the moment data arrives. */
+  .skel-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin:8px 0;display:flex;flex-direction:column;gap:10px}
+  .skel-line{height:12px;border-radius:6px;background:linear-gradient(90deg,var(--surface-2) 25%,#e3e8f0 37%,var(--surface-2) 63%);background-size:400% 100%;animation:skel-shimmer 1.3s ease-in-out infinite}
+  .skel-line.w40{width:40%}.skel-line.w60{width:60%}.skel-line.w25{width:25%}
+  .skel-row{display:flex;gap:8px}.skel-row .skel-line{flex:1;height:34px}
+  @keyframes skel-shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+  @media(prefers-reduced-motion:reduce){.skel-line{animation:none}}
   /* Dark theme — toggled from Settings (body.dark). Same tokens, dark values. */
   body.dark{
     --bg:#0b0f1a; --surface:#141a28; --surface-2:#1d2536; --line:rgba(255,255,255,.09);
@@ -690,7 +705,9 @@
   .watch-live{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:9px 12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);color:var(--text);font-size:12.5px;font-weight:700;cursor:pointer}
   .watch-live .wl-go{color:var(--dim);font-size:16px}
 </style>
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<!-- ⚡ Perf (#3): jsQR is only needed for the deposit/withdraw QR scanner, not the main
+     screen — it is now lazy-loaded on demand (see ensureJsQR) instead of a blocking CDN
+     script on initial entry. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /* Restore identity from the URL (#alpexa=...) so a home-screen install can inherit the account created in Safari (iOS isolates their storage) - no re-login. */
@@ -1722,12 +1739,19 @@
       } }
     }catch(e){}
   }
+  // ⚡ Perf (#3): skeleton cards for the pre-data state (before live_games returns).
+  function skeletonHTML(n){ var h=''; for(var i=0;i<(n||5);i++){ h+='<div class="skel-card">'+
+      '<div class="skel-line w40"></div><div class="skel-line w60"></div>'+
+      '<div class="skel-row"><div class="skel-line"></div><div class="skel-line"></div><div class="skel-line"></div></div>'+
+      '</div>'; } return h; }
   function renderGames(){
     // Soccer cards are 1X2 (self-labeled Home/Draw/Away) → hide the Spread/Total/ML header.
     try{ var _soc=curSport==='SOC'; ['colheadUp','colheadLive'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display=_soc?'none':''; }); }catch(e){}
     const emptyMsg=gameQuery?`No games match "${gameQuery}"`:'No upcoming games';
     const base=(gameQuery?GAMES.filter(matchGame):GAMES.filter(g=>g.lg===curSport)).slice().sort(sortByPin);
-    document.getElementById('list').innerHTML=gameRowsHTML(base,false)||`<div class="empty">${emptyMsg}</div>`;
+    // Before the first live_games load resolves, show a skeleton instead of a blank/empty msg.
+    const emptyOrSkel=(!window.__gamesLoaded && GAMES.length===0 && !gameQuery) ? skeletonHTML(5) : `<div class="empty">${emptyMsg}</div>`;
+    document.getElementById('list').innerHTML=gameRowsHTML(base,false)||emptyOrSkel;
     const liveGames=GAMES.filter(g=>g.live&&matchGame(g)).slice().sort(sortByPin);
     document.getElementById('liveList').innerHTML=gameRowsHTML(liveGames,true)||'<div class="empty">No live games right now</div>';
     document.getElementById('liveCount').textContent=liveGames.length;
@@ -2861,10 +2885,28 @@
   let wdNet='ERC-20';
   document.getElementById('wdNet').onclick=e=>{const p=e.target.closest('.wd-net-pill');if(!p)return;
     document.querySelector('.wd-net-pill.on').classList.remove('on');p.classList.add('on');wdNet=p.dataset.net;};
+  // ⚡ Perf (#3): load the jsQR CDN script only when the scanner is first opened, so it
+  // never blocks initial entry. Resolves once jsQR is available (or false if it can't load).
+  function ensureJsQR(){
+    return new Promise(function(resolve){
+      if(typeof jsQR!=='undefined') return resolve(true);
+      if(window.__jsqrLoading){ window.__jsqrLoading.push(resolve); return; }
+      window.__jsqrLoading=[resolve];
+      var s=document.createElement('script');
+      s.src='https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+      s.onload=function(){ var q=window.__jsqrLoading; window.__jsqrLoading=null; q.forEach(function(r){r(true);}); };
+      s.onerror=function(){ var q=window.__jsqrLoading; window.__jsqrLoading=null; q.forEach(function(r){r(false);}); };
+      document.head.appendChild(s);
+    });
+  }
   // QR scan (demo: fills a sample address matching the selected network)
   document.getElementById('wdScan').onclick=async ()=>{
-    if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)||typeof jsQR==='undefined'){
+    if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)){
       showToast('📷','Camera unavailable','Enter the address manually');return;
+    }
+    await ensureJsQR();
+    if(typeof jsQR==='undefined'){
+      showToast('📷','Scanner unavailable','Enter the address manually');return;
     }
     let ov=document.getElementById('qrScanOv');
     if(!ov){
@@ -3587,6 +3629,7 @@
               applySuspensions(sgames);
               GAMES.length=0; sgames.forEach(function(g){GAMES.push(g);});
               try{ autoPickSport(); }catch(e){}
+              window.__gamesLoaded=true;   // ⚡ live_games loaded → skeleton off
               if(typeof renderGames==='function') renderGames();
               try{ settleBets(); }catch(e){}
               if(!isRefresh){ try{ if(badge&&badge.parentNode) badge.remove(); }catch(e){} }
@@ -3605,13 +3648,14 @@
         // REAL games only — replace whatever is showing (may be empty off-season).
         GAMES.length = 0;
         all.forEach(g => GAMES.push(g));
+        window.__gamesLoaded=true;   // ⚡ ESPN fallback done → skeleton off
         if (typeof renderGames === 'function') renderGames();
         try{ settleBets(); }catch(e){}
         if(!isRefresh){ try{ if(badge&&badge.parentNode) badge.remove(); }catch(e){} }
       }catch(e){
         // Hard failure: show no games (this is a real service — never fake demo games).
         if(!isRefresh){
-          try{ GAMES.length=0; if(typeof renderGames==='function') renderGames(); }catch(_){}
+          try{ window.__gamesLoaded=true; GAMES.length=0; if(typeof renderGames==='function') renderGames(); }catch(_){}
           setBadge('⚠️ Live games unavailable right now — pull down to refresh', '#b00020');
           setTimeout(function(){ try{ if(badge&&badge.parentNode) badge.remove(); }catch(_){} }, 4000);
         }

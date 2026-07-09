@@ -42,5 +42,15 @@ ok('pullServerSettled is NOT a blocking boot fetch (deferred only)', !bareSyncCa
 ok('financial-activity feed still loads (deferred)', /pullServerActivity\(\)/.test(init));
 ok('settled-bets feed still loads (deferred)', /pullServerSettled\(\)/.test(init));
 
+// ── #3 critical-path resource contract (A/B/C + skeleton) ──
+const head=src.slice(0, src.indexOf('</head>'));
+ok('A: no render-blocking @import for fonts', !/@import\s+url\(['"]?https:\/\/fonts\.googleapis/.test(src));
+ok('A: fonts loaded non-blocking (media=print → all)', /<link rel="stylesheet"[^>]*fonts\.googleapis[^>]*media="print"[^>]*onload=/.test(head));
+ok('C: preconnect to fonts.gstatic + cdn.jsdelivr', /preconnect"\s+href="https:\/\/fonts\.gstatic\.com"/.test(head) && /preconnect"\s+href="https:\/\/cdn\.jsdelivr\.net"/.test(head));
+ok('B: jsQR is NOT a blocking sync <script src> at load', !/<script[^>]*src="[^"]*jsqr[^"]*"><\/script>/i.test(src));
+ok('B: jsQR is lazy-loaded on demand (ensureJsQR)', /function ensureJsQR\(/.test(src) && /await ensureJsQR\(\)/.test(src));
+ok('skeleton: shell renders before data (skeletonHTML + skel CSS)', /function skeletonHTML\(/.test(src) && /\.skel-card\{/.test(src));
+ok('skeleton: gated on !__gamesLoaded (cleared once live_games loads)', /__gamesLoaded/.test(src) && /!window\.__gamesLoaded[^]*skeletonHTML/.test(src));
+
 console.log(pass?'\n🟢 lazy-load-harness: PASS':'\n🔴 lazy-load-harness: FAIL — a heavy fetch is back on the boot critical path');
 process.exit(pass?0:1);
