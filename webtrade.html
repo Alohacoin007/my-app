@@ -128,7 +128,11 @@
     background:linear-gradient(#3a3f47,#2a2e34);border-bottom:1px solid #000;font:600 11px Tahoma,sans-serif;color:#9aa1ad}  /* inactive = muted grey */
   .win.active .cell-title{background:linear-gradient(#2f7fe0,#1c5ec0);color:#ffffff}  /* active = vivid program blue */
   .win.active{border-color:#2f7fe0}
-  .cell-title .wc{margin-left:auto;display:flex;gap:10px;color:#6a7280}
+  .cell-title .wc{margin-left:auto;display:flex;gap:4px}
+  .cell-title .wc span{cursor:pointer;width:16px;text-align:center;border-radius:2px;color:#c8ccd2}
+  .cell-title .wc span:hover{background:rgba(255,255,255,.22)}
+  .win.active .cell-title .wc span{color:#eaf2ff}
+  .cell-title .wc span:last-child:hover{background:#e81123;color:#fff}
   .canvas{position:relative;flex:1;min-height:0}
   /* 8-direction resize handles hugging the window border */
   .rsz{position:absolute;z-index:7}
@@ -149,9 +153,17 @@
   .dov{position:absolute;pointer-events:none;z-index:4}
   .dov.vline{top:0;bottom:0;width:0;border-left:1px solid #e8b23a}
   .dov.text{transform:translate(0,-50%);color:#e6c14a;font:600 11px Tahoma,sans-serif;white-space:nowrap;text-shadow:0 0 3px #000,0 0 3px #000}
-  /* ── Windows-classic right-click context menu (Market Watch) ── */
+  /* ── Market Watch: per-tick price flash + selected row + bottom tab strip ── */
+  .mwt td.uptick{color:#26c281}.mwt td.dntick{color:#ff4d4d}
+  .mwt td.flash{animation:mwflash .35s ease-out}
+  @keyframes mwflash{0%{background:rgba(120,140,170,.28)}100%{background:transparent}}
   .mwt tr.sel td{background:#3a6ea5 !important;color:#fff}
-  .mwt tr.sel td.sym,.mwt tr.sel td.up,.mwt tr.sel td.down{color:#fff}
+  .mwt tr.sel td.sym,.mwt tr.sel td.up,.mwt tr.sel td.down,.mwt tr.sel td.uptick,.mwt tr.sel td.dntick{color:#fff}
+  .mwtabs{display:flex;flex:none;background:linear-gradient(#20242a,#14171c);border-top:1px solid #000}
+  .mwtabs .mt{padding:3px 10px;font-size:11px;color:#a2aab6;border-right:1px solid #2a2e34;cursor:default}
+  .mwtabs .mt.on{background:#000;color:#fff;border-top:2px solid #3a6ea5;margin-top:-1px}
+  .watch{display:flex;flex-direction:column;overflow:hidden}
+  .watch .mwscroll{flex:1;overflow:auto;min-height:0}
   .ctxmenu{position:fixed;z-index:1200;min-width:216px;background:#f0f0f0;border:1px solid #9a9a9a;
     box-shadow:2px 2px 5px rgba(0,0,0,.2);padding:2px;font:12px 'Segoe UI',Tahoma,sans-serif;color:#1c1c1c}
   .ctxmenu .ci{display:flex;align-items:center;gap:8px;height:24px;padding:0 10px 0 8px;cursor:default;border-radius:2px}
@@ -617,6 +629,20 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     el.style.left=g.x+'px'; el.style.top=g.y+'px'; el.style.width=g.w+'px'; el.style.height=g.h+'px'; };
   const resizeChart=()=>{ try{ if(chart.current&&box.current) chart.current.resize(box.current.clientWidth, box.current.clientHeight); }catch(e){} };
   const focus=()=>{ setZ(++WIN_Z); onActivate&&onActivate(idx); };   // click → raise + become the active chart
+  // ── window controls (real MT5 title-bar buttons) ──
+  const savedGeo=React.useRef(null), winMode=React.useRef('normal');
+  const setGeo=(g)=>{ geo.current=g; applyGeo(); resizeChart(); };
+  const tileGeo=()=>{ const par=win.current&&win.current.parentElement; const f=initial||{fx:.02,fy:.02,fw:.48,fh:.48};
+    const W=(par&&par.clientWidth)||800, H=(par&&par.clientHeight)||500;
+    return { x:Math.round(f.fx*W), y:Math.round(f.fy*H), w:Math.max(WIN_MINW,Math.round(f.fw*W)), h:Math.max(WIN_MINH,Math.round(f.fh*H)) }; };
+  const ctlMin=(e)=>{ e&&e.stopPropagation(); focus();
+    if(winMode.current==='min'){ setGeo(savedGeo.current||tileGeo()); winMode.current='normal'; }
+    else { savedGeo.current={...geo.current}; geo.current={...geo.current, h:19}; applyGeo(); winMode.current='min'; } };
+  const ctlMax=(e)=>{ e&&e.stopPropagation(); focus();
+    if(winMode.current==='max'){ setGeo(savedGeo.current||tileGeo()); winMode.current='normal'; }
+    else { const par=win.current&&win.current.parentElement; savedGeo.current={...geo.current};
+      setGeo({ x:0, y:0, w:(par?par.clientWidth:800), h:(par?par.clientHeight:500) }); winMode.current='max'; } };
+  const ctlReset=(e)=>{ e&&e.stopPropagation(); focus(); setGeo(tileGeo()); winMode.current='normal'; };   // ✕ → back to its tile slot
   // seed initial geometry from the workspace size BEFORE paint (no flash), then size the chart
   React.useLayoutEffect(()=>{
     const el=win.current, par=el&&el.parentElement; if(!par) return;
@@ -797,7 +823,11 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       <div className="cell-title" onMouseDown={(e)=>beginDrag(e,'move')}>
         <span>{symbol}.FX,{tf||'H1'}</span>
         {posLbl.map((p,i)=><span key={i} style={{color:'#00c800',fontWeight:600}}>{p.side} {p.lots} at {fmtPx(symbol,p.price)}</span>)}
-        <span className="wc"><span>—</span><span>▢</span><span>✕</span></span>
+        <span className="wc">
+          <span onMouseDown={e=>e.stopPropagation()} onClick={ctlMin} title="Minimize">—</span>
+          <span onMouseDown={e=>e.stopPropagation()} onClick={ctlMax} title="Maximize / Restore">▢</span>
+          <span onMouseDown={e=>e.stopPropagation()} onClick={ctlReset} title="Restore to tile">✕</span>
+        </span>
       </div>
       <div className="canvas" ref={box}>
         <div className="drawlayer" ref={dlayer}></div>
@@ -851,29 +881,42 @@ function ContextMenu({ x, y, sym, onClose, onPick }){
     </div>
   );
 }
+const MW_TABS=['Symbols','Details','Trading','Ticks'];
 function MarketWatch({ onPick }){
   const [mids,setMids]=React.useState({});
+  const [dirs,setDirs]=React.useState({});      // per-symbol last-tick direction for bid/ask
   const [sel,setSel]=React.useState(null);      // blue-selected row
+  const [tab,setTab]=React.useState('Symbols');
   const [menu,setMenu]=React.useState(null);    // {sym,x,y} right-click context menu
-  React.useEffect(()=> priceStore.subscribe(throttle(m=>setMids({...m}),400)), []);
+  const prev=React.useRef({});
+  React.useEffect(()=> priceStore.subscribe(throttle(m=>{
+    const nd={}; WATCH.forEach(s=>{ const c=m[s]||{}, p=prev.current[s]||{};
+      nd[s]={ bid: c.bid>p.bid?1:c.bid<p.bid?-1:0, ask: c.ask>p.ask?1:c.ask<p.ask?-1:0 };
+      prev.current[s]={ bid:c.bid, ask:c.ask }; });
+    setDirs(nd); setMids({...m});
+  }, 350)), []);
   const ctx=(e,sym)=>{ e.preventDefault(); setSel(sym); setMenu({ sym, x:e.clientX, y:e.clientY }); };
+  const tc=(d)=> d>0?'uptick flash':d<0?'dntick flash':'';   // tick color + brief flash
   return (
     <div className="watch">
-      <table className="mwt">
-        <thead><tr><th>Symbol</th><th>Bid</th><th>Ask</th><th>Chg%</th></tr></thead>
-        <tbody>
-          {WATCH.map(sym=>{ const m=mids[sym]||{}; const cls=m.chg>=0?'up':'down';
-            return (
-              <tr key={sym} className={sym===sel?'sel':''} onClick={()=>{setSel(sym);onPick&&onPick(sym);}}
-                  onDoubleClick={()=>terminalBus.emit('order.new',sym)} onContextMenu={(e)=>ctx(e,sym)} title="우클릭: 메뉴 · 더블클릭: 주문창">
-                <td className="sym">{sym}</td>
-                <td className={cls}>{fmtPx(sym,m.bid)}</td>
-                <td className={cls}>{fmtPx(sym,m.ask)}</td>
-                <td className={cls}>{m.chg!=null?(m.chg>=0?'+':'')+m.chg.toFixed(2):'—'}</td>
-              </tr>
-            ); })}
-        </tbody>
-      </table>
+      <div className="mwscroll">
+        <table className="mwt">
+          <thead><tr><th>Symbol</th><th>Bid</th><th>Ask</th><th>Daily Ch%</th></tr></thead>
+          <tbody>
+            {WATCH.map(sym=>{ const m=mids[sym]||{}, d=dirs[sym]||{}; const chg=m.chg>=0?'up':'down';
+              return (
+                <tr key={sym} className={sym===sel?'sel':''} onClick={()=>{setSel(sym);onPick&&onPick(sym);}}
+                    onDoubleClick={()=>terminalBus.emit('order.new',sym)} onContextMenu={(e)=>ctx(e,sym)} title="우클릭: 메뉴 · 더블클릭: 주문창">
+                  <td className="sym">{sym}</td>
+                  <td className={tc(d.bid)}>{fmtPx(sym,m.bid)}</td>
+                  <td className={tc(d.ask)}>{fmtPx(sym,m.ask)}</td>
+                  <td className={chg}>{m.chg!=null?(m.chg>=0?'+':'')+m.chg.toFixed(2):'—'}</td>
+                </tr>
+              ); })}
+          </tbody>
+        </table>
+      </div>
+      <div className="mwtabs">{MW_TABS.map(t=><div key={t} className={"mt"+(t===tab?' on':'')} onClick={()=>setTab(t)}>{t}</div>)}</div>
       {menu && <ContextMenu x={menu.x} y={menu.y} sym={menu.sym} onPick={onPick} onClose={()=>setMenu(null)} />}
     </div>
   );
