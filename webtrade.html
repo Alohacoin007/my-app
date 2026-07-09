@@ -52,15 +52,16 @@
 </style>
 </head>
 <body>
-<div id="app"></div>
+<div id="app"><div style="display:flex;height:100vh;align-items:center;justify-content:center;color:#8a97ac;font:14px -apple-system,Segoe UI,Roboto,sans-serif">Alpexa WebTrade 로딩 중… <span style="opacity:.6;margin-left:8px">(차트 엔진 컴파일 ~10–20초)</span></div></div>
 
-<!-- Same CDN pattern the other apps use. Chart/render code is guarded so a blocked CDN never throws. -->
+<!-- PINNED versions + crossorigin — MUST match crypto-live.html/trading.html (proven-working
+     React+Babel setup). Unpinned versions were why the app didn't mount. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="alpexa-sync.js?v=16"></script>
-<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
 
 <script type="text/babel" data-presets="react">
 /* ══════════════════════════════════════════════════════════════════════════
@@ -164,8 +165,9 @@ function ChartCell({ symbol }){
       timeScale:{ borderColor:'#1e2a3d', timeVisible:true }, rightPriceScale:{ borderColor:'#1e2a3d' },
       autoSize:true,
     });
-    const s=(c.addCandlestickSeries||c.addSeries).call(c, (c.addCandlestickSeries?{}:LightweightCharts.CandlestickSeries), {
-      upColor:'#26a65b', downColor:'#e5484d', wickUpColor:'#26a65b', wickDownColor:'#e5484d', borderVisible:false });
+    const opts={ upColor:'#26a65b', downColor:'#e5484d', wickUpColor:'#26a65b', wickDownColor:'#e5484d', borderVisible:false };
+    const s = c.addCandlestickSeries ? c.addCandlestickSeries(opts)             // lightweight-charts v4
+            : c.addSeries(LightweightCharts.CandlestickSeries, opts);           // v5 fallback
     chart.current=c; series.current=s;
     loadCandles(symbol).then(data=>{ try{ s.setData(data); bar.current=data[data.length-1]; }catch(e){} });
     // live: update ONLY the last bar's close from the shared store — throttled to ~2.5/sec
