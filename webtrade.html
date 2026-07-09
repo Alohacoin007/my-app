@@ -35,8 +35,8 @@
   .splitter:hover,.splitter.drag{background:#3a6ea5}
   .splitter:hover::before,.splitter.drag::before{background:#cdd6e2}
   /* ── menu bar (File View …) ── */
-  .menu{grid-area:menu;display:flex;align-items:center;gap:1px;padding:0 4px;background:linear-gradient(#2c3138,#20242a);border-bottom:1px solid #0a0a0a;font-size:11px}
-  .menu .mi{padding:3px 8px;color:#d0d4da;cursor:default;border-radius:2px}.menu .mi:hover{background:#3a6ea5;color:#fff}
+  .menu{grid-area:menu;display:flex;align-items:center;gap:1px;padding:0 3px;background:linear-gradient(#2c3138,#20242a);border-bottom:1px solid #0a0a0a;font-size:11px;font-weight:400}
+  .menu .mi{padding:2px 7px;color:#d0d4da;cursor:default;border-radius:2px}.menu .mi:hover{background:#3a6ea5;color:#fff}
   .menu .mi{position:relative}
   .menu .mi.on{background:#3a6ea5;color:#fff}
   .mdrop{position:absolute;top:100%;left:0;min-width:190px;background:#1b1f25;border:1px solid #3a3f47;
@@ -48,13 +48,28 @@
   .mdrop .hd{padding:3px 12px;color:#79808c;font-size:10px;text-transform:uppercase;letter-spacing:.4px}
   .menu .conn{margin-left:auto;color:#9aa2b0;display:flex;align-items:center;gap:6px;padding-right:6px}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--up)}
-  /* ── icon toolbar (New Order · Algo · timeframes) ── */
-  .tools{grid-area:tools;display:flex;align-items:center;gap:5px;padding:0 6px;background:linear-gradient(#22262c,#15181d);border-bottom:1px solid #000}
-  .tbtn{display:flex;align-items:center;gap:5px;height:23px;padding:0 9px;background:linear-gradient(#3a4048,#2a2e34);border:1px solid #474d56;border-radius:3px;color:#e0e4ea;font-size:11px;cursor:pointer;white-space:nowrap}
-  .tbtn:hover{background:linear-gradient(#464c55,#34393f)}.tbtn.algo{color:#8fe08f}
-  .tsep{width:1px;height:18px;background:#3a3f47;margin:0 2px}
+  /* ── icon toolbar (New Order · Algo · chart tools · timeframes) — compact, 2–4px gaps ── */
+  .tools{grid-area:tools;display:flex;align-items:center;gap:3px;padding:0 4px;background:linear-gradient(#22262c,#15181d);border-bottom:1px solid #000}
+  .tbtn{display:flex;align-items:center;gap:4px;height:22px;padding:0 7px;background:linear-gradient(#3a4048,#2a2e34);border:1px solid #4a5059;border-radius:3px;color:#e0e4ea;font-size:11px;cursor:pointer;white-space:nowrap;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+  .tbtn:hover{background:linear-gradient(#464c55,#34393f);border-color:#5a636e}
+  .tbtn:active{box-shadow:inset 0 1px 3px rgba(0,0,0,.4)}
+  .tbtn svg{width:14px;height:14px;flex:none}
+  .tbtn.algo .play{color:#37c837}
+  .tbtn.algo:hover{border-color:#4f8a4f;box-shadow:inset 0 0 8px rgba(60,220,80,.28),inset 0 1px 0 rgba(255,255,255,.08)}
+  .tbtn.algo.on{background:linear-gradient(#2f7a35,#1e5a26);color:#eaffea;border-color:#3c8a44}
+  /* square icon buttons (chart type / zoom / tile) */
+  .tibtn{display:flex;align-items:center;justify-content:center;width:22px;height:22px;color:#c2c8d0;cursor:pointer;
+    background:linear-gradient(#31363d,#252a30);border:1px solid #454b54;border-radius:3px;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+  .tibtn:hover{background:linear-gradient(#3b414a,#2c3138);color:#fff;border-color:#5a636e}
+  .tibtn:active{box-shadow:inset 0 1px 3px rgba(0,0,0,.4)}
+  .tibtn.on{background:#3a6ea5;color:#fff;border-color:#3a6ea5}
+  .tibtn svg{width:14px;height:14px}
+  .tigrp{display:flex;gap:2px}
+  .tsep{width:1px;height:18px;background:#3a3f47;margin:0 3px}
   .tf{display:flex;gap:1px}
-  .tf b{padding:2px 7px;background:#23272d;border:1px solid #383d45;color:#b8bcc4;font-weight:600;font-size:11px;cursor:pointer;border-radius:2px}
+  .tf b{padding:2px 6px;background:#23272d;border:1px solid #383d45;color:#b8bcc4;font-weight:600;font-size:11px;cursor:pointer;border-radius:2px}
+  .tf b:hover{background:#2b3037;color:#dfe3ea}
   .tf b.on{background:#3a6ea5;color:#fff;border-color:#3a6ea5}
   .tbrand{margin-left:auto;font-weight:700;letter-spacing:.3px;color:#8890a0;font-size:11px}.tbrand span{color:#7fb0e0}
   /* ── left column: Market Watch (top) + Navigator (bottom) ── */
@@ -378,6 +393,9 @@ const COMMANDS = {
   'algo.toggle':      'Toggle Algo Trading',
   'chart.tf':         'Set chart timeframe (arg: M1…MN)',
   'chart.indicator':  'Toggle an indicator (arg: MA20/RSI14/…)',
+  'chart.type':       'Set chart series type (arg: candle/bar/line)',
+  'chart.zoom':       'Zoom the charts (arg: in/out)',
+  'window.tile':      'Re-tile the chart windows to a 2×2 grid',
 };
 const terminalBus = { listeners:new Set(),
   emit(cmd,arg){ this.listeners.forEach(fn=>{ try{fn(cmd,arg);}catch(e){} }); },
@@ -509,12 +527,29 @@ function OrderBox({ symbol }){
 
 /* ── Chart cell: one Lightweight Charts instance, seeded history + throttled live last-bar.
    Draws a green dotted createPriceLine + "BUY 0.01 at 1.14318" flag for every open position. ── */
-function ChartCell({ symbol, tf, indicators, initial }){
+// build the main price series for a chart in the requested MT5 chart type
+function makePriceSeries(c, type){
+  if(type==='line'){
+    const o={ color:'#e8b23a', lineWidth:2, priceLineVisible:false, lastValueVisible:true };
+    return c.addLineSeries ? c.addLineSeries(o) : c.addSeries(LightweightCharts.LineSeries, o);
+  }
+  if(type==='bar'){
+    const o={ upColor:'#00ff00', downColor:'#ff2020', thinBars:false };
+    return c.addBarSeries ? c.addBarSeries(o) : c.addSeries(LightweightCharts.BarSeries, o);
+  }
+  const o={ upColor:'#00ff00', downColor:'#ff2020', wickUpColor:'#00ff00', wickDownColor:'#ff2020',
+    borderUpColor:'#00ff00', borderDownColor:'#ff2020', borderVisible:true };
+  return c.addCandlestickSeries ? c.addCandlestickSeries(o) : c.addSeries(LightweightCharts.CandlestickSeries, o);
+}
+const asSeriesData=(data,type)=> type==='line' ? data.map(d=>({time:d.time,value:d.close})) : data;
+
+function ChartCell({ symbol, tf, indicators, chartType, initial }){
   const box=React.useRef(null), chart=React.useRef(null), series=React.useRef(null), bar=React.useRef(null);
   const lines=React.useRef([]);
   const candles=React.useRef([]);         // full history — indicators recompute from this
   const indSeries=React.useRef([]);       // active indicator line series (to clear/redraw)
   const indRef=React.useRef(indicators||[]); indRef.current=indicators||[];
+  const typeRef=React.useRef(chartType||'candle'); typeRef.current=chartType||'candle';
   const [px,setPx]=React.useState(null);
   const [posLbl,setPosLbl]=React.useState([]);   // for the price-line flags
 
@@ -594,25 +629,42 @@ function ChartCell({ symbol, tf, indicators, initial }){
     // manual sizing (autoSize OFF): register so splitter-drag + window-resize call chart.resize()
     c.resize(box.current.clientWidth, box.current.clientHeight);
     const unreg=chartResizer.add(c, box.current);
-    // MT5 signature candles: bright lime up, sharp thin red down, crisp borders.
-    const opts={ upColor:'#00ff00', downColor:'#ff2020', wickUpColor:'#00ff00', wickDownColor:'#ff2020',
-      borderUpColor:'#00ff00', borderDownColor:'#ff2020', borderVisible:true };
-    const s = c.addCandlestickSeries ? c.addCandlestickSeries(opts)             // lightweight-charts v4
-            : c.addSeries(LightweightCharts.CandlestickSeries, opts);           // v5 fallback
+    // MT5 price series in the currently-selected type (candles / bars / line)
+    const s = makePriceSeries(c, typeRef.current);
     chart.current=c; series.current=s;
     // load candles for the current timeframe, then (re)paint indicators over them
-    loadCandles(symbol, tf).then(data=>{ try{ s.setData(data); bar.current=data[data.length-1]; candles.current=data; paintIndicators(); }catch(e){} });
+    loadCandles(symbol, tf).then(data=>{ try{ s.setData(asSeriesData(data,typeRef.current)); bar.current=data[data.length-1]; candles.current=data; paintIndicators(); }catch(e){} });
     // live: update ONLY the last bar's close from the shared store — throttled to ~2.5/sec
     const onTick=throttle((mids)=>{
       const m=mids[symbol]; if(!m) return; setPx(m.mid);
       if(!bar.current||!series.current) return;
       const b=bar.current, close=m.mid;
       const u={ time:b.time, open:b.open, high:Math.max(b.high,close), low:Math.min(b.low,close), close };
-      bar.current=u; try{ series.current.update(u); }catch(e){}
+      bar.current=u;
+      try{ series.current.update(typeRef.current==='line' ? {time:u.time,value:close} : u); }catch(e){}
     }, 400);
     const unsub=priceStore.subscribe(onTick);
     return ()=>{ unsub(); unreg(); indSeries.current=[]; try{ c.remove(); }catch(e){} };
   }, [symbol, tf]);   // recreate + reload on symbol OR timeframe change (toolbar sync)
+
+  // switch chart type WITHOUT recreating the whole chart (swap the price series, re-seed data)
+  React.useEffect(()=>{
+    const c=chart.current; if(!c||!series.current) return;
+    try{ c.removeSeries(series.current); }catch(e){}
+    const s=makePriceSeries(c, chartType||'candle'); series.current=s;
+    try{ s.setData(asSeriesData(candles.current,chartType||'candle')); }catch(e){}
+  }, [chartType]);
+
+  // toolbar zoom (± bar spacing) + tile (reset this window to its 2×2 slot)
+  React.useEffect(()=> terminalBus.subscribe((cmd,arg)=>{
+    if(cmd==='chart.zoom' && chart.current){ try{ const ts=chart.current.timeScale();
+      const bs=(ts.options&&ts.options().barSpacing)||6;
+      ts.applyOptions({ barSpacing: Math.max(2, Math.min(60, bs*(arg==='in'?1.25:0.8))) }); }catch(e){} }
+    else if(cmd==='window.tile'){ const el=win.current, par=el&&el.parentElement; if(!par) return;
+      const W=par.clientWidth||800, H=par.clientHeight||500, f=initial||{fx:0.02,fy:0.02,fw:0.48,fh:0.48};
+      geo.current={ x:Math.round(f.fx*W), y:Math.round(f.fy*H), w:Math.max(WIN_MINW,Math.round(f.fw*W)), h:Math.max(WIN_MINH,Math.round(f.fh*H)) };
+      applyGeo(); resizeChart(); }
+  }), [initial]);
 
   // repaint indicators whenever the active set changes (Charts → Indicators menu)
   React.useEffect(()=>{ paintIndicators(); }, [(indicators||[]).join(','), paintIndicators]);
@@ -782,13 +834,41 @@ function MenuBar({ indicators }){
 /* ── Icon toolbar: New Order · Algo Trading · timeframe buttons — all dispatch through
    the command bus so the menu/toolbar share one event map. ── */
 const TFS=['M1','M5','M15','M30','H1','H4','D1','W1','MN'];
-function Toolbar({ tf }){
+/* ── inline SVG icon set (Lucide-style, MIT). Inlined instead of a CDN icon font so the
+   terminal carries no extra network dependency / FOUT. 14px, currentColor stroke. ── */
+const Svg = ({children})=>(
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{children}</svg>);
+const IC = {
+  candle: <Svg><path d="M8 3v4"/><path d="M8 15v6"/><rect x="6" y="7" width="4" height="8" rx="1"/><path d="M16 2v6"/><path d="M16 16v6"/><rect x="14" y="8" width="4" height="8" rx="1"/></Svg>,
+  bar:    <Svg><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="7" width="3" height="11"/><rect x="17" y="14" width="3" height="4"/></Svg>,
+  line:   <Svg><path d="M3 3v18h18"/><path d="m7 14 3-4 4 3 5-6"/></Svg>,
+  zin:    <Svg><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/><path d="M11 8v6M8 11h6"/></Svg>,
+  zout:   <Svg><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/><path d="M8 11h6"/></Svg>,
+  tile:   <Svg><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></Svg>,
+  order:  <Svg><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 12v6M9 15h6"/></Svg>,
+  play:   <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M7 4v16l13-8z"/></svg>,
+};
+const CHART_TYPES=[['candle',IC.candle,'Candlesticks'],['bar',IC.bar,'Bars (OHLC)'],['line',IC.line,'Line']];
+function Toolbar({ tf, chartType }){
   const [algo,setAlgo]=React.useState(false);
   React.useEffect(()=> terminalBus.subscribe((cmd)=>{ if(cmd==='algo.toggle') setAlgo(a=>!a); }), []);
   return (
     <div className="tools">
-      <div className="tbtn" title="New Order (F9)" onClick={()=>terminalBus.emit('order.new')}>＋ New Order</div>
-      <div className="tbtn algo" title="Algo Trading" onClick={()=>terminalBus.emit('algo.toggle')} style={algo?{background:'linear-gradient(#2f7a35,#1e5a26)',color:'#eaffea'}:null}>{algo?'■':'▶'} Algo Trading</div>
+      <div className="tbtn" title="New Order (F9)" onClick={()=>terminalBus.emit('order.new')}><span className="ord">{IC.order}</span> New Order</div>
+      <div className={"tbtn algo"+(algo?' on':'')} title="Algo Trading" onClick={()=>terminalBus.emit('algo.toggle')}>{algo?<Svg><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></Svg>:<span className="play">{IC.play}</span>} Algo Trading</div>
+      <div className="tsep"></div>
+      {/* chart type */}
+      <div className="tigrp">{CHART_TYPES.map(([k,ic,t])=>
+        <div key={k} className={"tibtn"+(k===chartType?' on':'')} title={t} onClick={()=>terminalBus.emit('chart.type',k)}>{ic}</div>)}</div>
+      <div className="tsep"></div>
+      {/* zoom */}
+      <div className="tigrp">
+        <div className="tibtn" title="Zoom In" onClick={()=>terminalBus.emit('chart.zoom','in')}>{IC.zin}</div>
+        <div className="tibtn" title="Zoom Out" onClick={()=>terminalBus.emit('chart.zoom','out')}>{IC.zout}</div>
+      </div>
+      <div className="tsep"></div>
+      {/* tile windows back to a 2×2 grid */}
+      <div className="tibtn" title="Tile Windows (2×2)" onClick={()=>terminalBus.emit('window.tile')}>{IC.tile}</div>
       <div className="tsep"></div>
       <div className="tf">{TFS.map(t=><b key={t} className={t===tf?'on':''} onClick={()=>terminalBus.emit('chart.tf',t)}>{t}</b>)}</div>
       <div className="tbrand">ALPEXA <span>WebTrade</span></div>
@@ -1013,28 +1093,31 @@ function App(){
   const [tf,setTf]=React.useState('H1');
   const [orderSym,setOrderSym]=React.useState(null);     // popup Order dialog target (null = closed)
   const [indicators,setIndicators]=React.useState([]);   // active indicator ids (shared by all charts)
+  const [chartType,setChartType]=React.useState('candle');   // candle | bar | line (toolbar)
   React.useEffect(()=>{ priceStore.start(); positionsStore.start(); }, []);
   // ── one reducer for the whole terminal's command bus (menu bar + toolbar) ──
   React.useEffect(()=> terminalBus.subscribe((cmd,arg)=>{
     if(cmd==='chart.tf') setTf(arg);
+    else if(cmd==='chart.type') setChartType(arg);
     else if(cmd==='chart.indicator'){
       if(arg==='__clear__') setIndicators([]);
       else setIndicators(list=> list.indexOf(arg)>=0 ? list.filter(x=>x!==arg) : list.concat(arg));
     }
     else if(cmd==='order.new') setOrderSym(arg||grid[0]);   // open the popup Order dialog
+    // chart.zoom / window.tile are handled inside each ChartCell (transient, per-window)
   }), [grid]);
   const swap=(sym)=> setGrid(g=> g.indexOf(sym)>=0 ? g : [sym, g[1], g[2], g[3]]);   // click watch → replace top-left
   return (
     <div className="terminal">
       <MenuBar indicators={indicators} />
-      <Toolbar tf={tf} />
+      <Toolbar tf={tf} chartType={chartType} />
       <div className="left">
         <MarketWatch onPick={swap} />
         <NavResizer />
         <Navigator />
       </div>
       <Splitter />
-      <div className="charts">{grid.map((s,i)=><ChartCell key={s+i} symbol={s} tf={tf} indicators={indicators} initial={WINLAYOUT[i]||WINLAYOUT[0]} />)}</div>
+      <div className="charts">{grid.map((s,i)=><ChartCell key={s+i} symbol={s} tf={tf} indicators={indicators} chartType={chartType} initial={WINLAYOUT[i]||WINLAYOUT[0]} />)}</div>
       <BottomBar />
       {orderSym && <OrderModal symbol={orderSym} onClose={()=>setOrderSym(null)} />}
     </div>
