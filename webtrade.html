@@ -434,7 +434,7 @@ const terminalBus = { listeners:new Set(),
    than faking money. ══ */
 const TRADE_API = (typeof window!=='undefined' && window.ALPEXA_TRADE_API) || '/api/trade/order';
 const CONTRACT = 100000;   // FX standard lot
-const LEVERAGES = [50,100,200,300,500];
+const LEVERAGES = [10,50,100,500];
 
 /* tradeSettings — leverage is a UI/config setting (NOT money), so localStorage is OK
    (CLAUDE.md: UI settings/session OK, money forbidden). Shared across components. */
@@ -485,20 +485,29 @@ function useTradeEngine(){
   // B-BOOK ORDER EXECUTION — the client only CALLS the server; it never sets the fill
   // price, inserts a position, or moves balance. fx_open decides the entry price, enforces
   // the free-margin gate, and inserts the position server-side (idempotent by local_id).
-  async function placeOrder({ symbol, side, volume }){
+  async function placeOrder({ symbol, side, volume, leverage:lev }){
     const size=+volume||0.01;
     const local_id='wt-'+Date.now()+'-'+Math.floor(Math.random()*1e6);
     // 1) external MT5 Web API (only if the operator wired one)
     if(window.ALPEXA_TRADE_API){
       try{ const r=await fetch(TRADE_API,{ method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({ symbol, side, volume:size, local_id, ts:Date.now() }) });
+        body:JSON.stringify({ symbol, side, volume:size, leverage:+lev||undefined, local_id, ts:Date.now() }) });
         return { ok:r.ok, status:r.status, local_id }; }catch(e){ return { ok:false, reason:String(e) }; }
     }
-    // 2) B-Book: our Supabase fx_open RPC (server-authoritative). Requires a logged-in FX account.
+    // 2) B-Book: our Supabase fx_open RPC (server-authoritative — it sets the fill price,
+    //    enforces the free-margin gate, inserts the position). We PASS the chosen leverage;
+    //    the server CLAMPS it to the house cap (LEAST) so a client can only be more
+    //    conservative, never bypass the cap. If the leverage-aware overload isn't deployed
+    //    yet, we transparently retry the base signature (house cap applies).
     if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me){
-      try{ const r=await AlpexaSync.db.rpc('fx_open',{ p_local_id:local_id, p_symbol:symbol, p_side:side, p_size:size });
+      try{
+        const base={ p_local_id:local_id, p_symbol:symbol, p_side:side, p_size:size };
+        let r=await AlpexaSync.db.rpc('fx_open', lev ? { ...base, p_leverage:+lev } : base);
+        if(r&&r.error&&lev && /PGRST202|could not find the function|does not exist|schema cache/i.test(((r.error&&r.error.message)||'')+((r.error&&r.error.code)||''))){
+          r=await AlpexaSync.db.rpc('fx_open', base);   // overload not deployed → base call
+        }
         const d=r&&r.data;
-        if(r&&!r.error&&d&&d.ok){ positionsStore.loadPos(); return { ok:true, server:true, open:d.open, local_id }; }
+        if(r&&!r.error&&d&&d.ok){ positionsStore.loadPos(); return { ok:true, server:true, open:d.open, margin:d.margin, local_id }; }
         return { ok:false, reason:(d&&d.error)||(r&&r.error&&r.error.message)||'rejected' };   // e.g. 'insufficient margin'
       }catch(e){ return { ok:false, reason:String(e&&e.message||e) }; }
     }
@@ -1220,7 +1229,7 @@ function OrderModal({ symbol:sym0, onClose }){
   const submit=async(side)=>{
     if(!canAfford) return;   // client pre-gate; the server margin gate is the real authority
     const q=priceStore.get(symbol)||m; const price=side==='buy'?q.ask:q.bid;
-    const r=await eng.placeOrder({ symbol, side, volume:vol });
+    const r=await eng.placeOrder({ symbol, side, volume:vol, leverage:eng.leverage });   // pass chosen leverage
     if(r.ok){ onClose(); return; }                                   // B-Book fill booked server-side
     if(r.reason==='not_logged_in'){ positionsStore.addDemo({ symbol, side, volume:+vol||0.01, price }); onClose(); return; }  // demo
     alert('주문 거절(Rejected): '+(r.reason||'unknown'));            // e.g. server 'insufficient margin'
