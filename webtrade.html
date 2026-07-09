@@ -176,6 +176,9 @@
   .ctxmenu .ci .ar{color:#6a6a6a;margin-left:auto}
   .ctxmenu .ci .ck{width:14px;text-align:center;color:#2e7d32}
   .ctxsep{height:1px;background:#c8c8c8;margin:3px 6px}
+  .ctxmenu .ci.has{position:relative}
+  .ctxmenu.sub{position:absolute;left:100%;top:-3px;min-width:150px;z-index:1201}
+  .ctxmenu .ci .ic svg{width:15px;height:15px}
   /* ── Bottom: KPI strip + Excel-grid positions table ── */
   .bottom{grid-area:bottom;background:var(--panel);border-top:1px solid var(--cellbd);display:flex;flex-direction:column;overflow:hidden}
   .tbxtabs{display:flex;background:linear-gradient(#20242a,#14171c);border-bottom:1px solid #000}
@@ -621,11 +624,15 @@ const asSeriesData=(data,type)=> type==='line' ? data.map(d=>({time:d.time,value
 
 function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isActive, onActivate }){
   const box=React.useRef(null), chart=React.useRef(null), series=React.useRef(null), bar=React.useRef(null);
-  const lines=React.useRef([]);
+  const lines=React.useRef([]);           // position order-lines (green) — managed by positions effect
+  const drawLines=React.useRef([]);       // USER drawing price-lines (hline/fib) — separate from positions/indicators
+  const drawSeries=React.useRef([]);      // USER drawing line series (trend)
+  const gridOn=React.useRef(true);        // chart grid visibility (context-menu toggle)
   const candles=React.useRef([]);         // full history — indicators recompute from this
   const indSeries=React.useRef([]);       // active indicator line series (to clear/redraw)
   const indRef=React.useRef(indicators||[]); indRef.current=indicators||[];
   const typeRef=React.useRef(chartType||'candle'); typeRef.current=chartType||'candle';
+  const [ohlc,setOhlc]=React.useState(null);   // crosshair OHLC readout
   // ── drawing engine state ──
   const dlayer=React.useRef(null);        // the pointer-capture overlay div
   const toolRef=React.useRef(tool); toolRef.current=tool;
@@ -658,6 +665,11 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     else { const par=win.current&&win.current.parentElement; savedGeo.current={...geo.current};
       setGeo({ x:0, y:0, w:(par?par.clientWidth:800), h:(par?par.clientHeight:500) }); winMode.current='max'; } };
   const ctlReset=(e)=>{ e&&e.stopPropagation(); focus(); setGeo(tileGeo()); winMode.current='normal'; };   // ✕ → back to its tile slot
+  // remove ONLY user-drawn objects (hline/fib/trend/vline/text) — keeps indicators + position lines
+  const clearDrawings=()=>{ const s=series.current, c=chart.current;
+    drawLines.current.forEach(l=>{ try{ s&&s.removePriceLine(l); }catch(e){} }); drawLines.current=[];
+    drawSeries.current.forEach(ls=>{ try{ c&&c.removeSeries(ls); }catch(e){} }); drawSeries.current=[];
+    overlays.current.forEach(o=>{ try{o.el.remove();}catch(e){} }); overlays.current=[]; };
   // seed initial geometry from the workspace size BEFORE paint (no flash), then size the chart
   React.useLayoutEffect(()=>{
     const el=win.current, par=el&&el.parentElement; if(!par) return;
@@ -726,6 +738,13 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     const s = makePriceSeries(c, typeRef.current);
     chart.current=c; series.current=s;
     try{ c.timeScale().subscribeVisibleTimeRangeChange(()=>posOverlays()); }catch(e){}   // keep drawings pinned while panning
+    // crosshair OHLC readout (MT5 data feel) — updates the in-chart label on hover
+    try{ c.subscribeCrosshairMove((param)=>{
+      if(!param||!param.time||!param.seriesData){ setOhlc(null); return; }
+      const d=param.seriesData.get(series.current);
+      if(!d){ setOhlc(null); return; }
+      if(d.open!=null) setOhlc({o:d.open,h:d.high,l:d.low,c:d.close}); else if(d.value!=null) setOhlc({c:d.value}); else setOhlc(null);
+    }); }catch(e){}
     // load candles for the current timeframe, then (re)paint indicators over them
     loadCandles(symbol, tf).then(data=>{ try{ s.setData(asSeriesData(data,typeRef.current)); bar.current=data[data.length-1]; candles.current=data; paintIndicators(); }catch(e){} });
     // live: update ONLY the last bar's close from the shared store — throttled to ~2.5/sec
@@ -738,7 +757,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       try{ series.current.update(typeRef.current==='line' ? {time:u.time,value:close} : u); }catch(e){}
     }, 400);
     const unsub=priceStore.subscribe(onTick);
-    return ()=>{ unsub(); unreg(); indSeries.current=[]; lines.current=[];
+    return ()=>{ unsub(); unreg(); indSeries.current=[]; lines.current=[]; drawLines.current=[]; drawSeries.current=[];
       overlays.current.forEach(o=>{ try{o.el.remove();}catch(e){} }); overlays.current=[];   // chart recreated → clear drawings
       try{ c.remove(); }catch(e){} };
   }, [symbol, tf]);   // recreate + reload on symbol OR timeframe change (toolbar sync)
@@ -760,6 +779,9 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       const W=par.clientWidth||800, H=par.clientHeight||500, f=initial||{fx:0.02,fy:0.02,fw:0.48,fh:0.48};
       geo.current={ x:Math.round(f.fx*W), y:Math.round(f.fy*H), w:Math.max(WIN_MINW,Math.round(f.fw*W)), h:Math.max(WIN_MINH,Math.round(f.fh*H)) };
       applyGeo(); resizeChart(); }
+    else if(cmd==='chart.grid' && arg===idx && chart.current){ gridOn.current=!gridOn.current;   // right-click Grid toggle (this chart)
+      try{ chart.current.applyOptions({ grid:{ vertLines:{visible:gridOn.current}, horzLines:{visible:gridOn.current} } }); }catch(e){} }
+    else if(cmd==='chart.clear' && arg===idx){ clearDrawings(); }   // right-click Delete all objects (this chart)
   }), [initial]);
 
   // repaint indicators whenever the active set changes (Charts → Indicators menu)
@@ -793,7 +815,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       e.preventDefault(); e.stopPropagation();
       const [x,y]=xy(e); let time=null,price=null;
       try{ time=c.timeScale().coordinateToTime(x); price=s.coordinateToPrice(y); }catch(e){}
-      if(t==='hline'){ if(price==null) return; try{ lines.current.push(s.createPriceLine({price,color:'#e8b23a',lineWidth:1,lineStyle:0,axisLabelVisible:true,title:''})); }catch(e){} return; }
+      if(t==='hline'){ if(price==null) return; try{ drawLines.current.push(s.createPriceLine({price,color:'#e8b23a',lineWidth:1,lineStyle:0,axisLabelVisible:true,title:''})); }catch(e){} return; }
       if(t==='vline'){ if(time==null) return; addVLine(time); return; }
       if(t==='text'){ if(time==null||price==null) return; const txt=window.prompt('Text label:'); if(txt) addText(time,price,txt); return; }
       dragDraw.current={ tool:t, time, price };   // trend / fib — finish on mouseup
@@ -805,10 +827,10 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       if(d.tool==='trend'){ const pts=[{time:d.time,value:d.price},{time:t2,value:p2}].sort((a,b)=>a.time-b.time);
         if(pts[0].time===pts[1].time) return;
         try{ const ls=c.addLineSeries?c.addLineSeries({color:'#3aa0ff',lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false})
-                                     :c.addSeries(LightweightCharts.LineSeries,{color:'#3aa0ff',lineWidth:2}); ls.setData(pts); indSeries.current.push(ls); }catch(e){} }
+                                     :c.addSeries(LightweightCharts.LineSeries,{color:'#3aa0ff',lineWidth:2}); ls.setData(pts); drawSeries.current.push(ls); }catch(e){} }
       else if(d.tool==='fib'){ const hi=Math.max(d.price,p2), lo=Math.min(d.price,p2);
         const lv=[0,0.236,0.382,0.5,0.618,0.786,1], col=['#8a9098','#e0709a','#f0c674','#82d982','#5fb0ff','#c792ea','#8a9098'];
-        lv.forEach((L,i)=>{ try{ lines.current.push(s.createPriceLine({price:lo+(hi-lo)*L,color:col[i],lineWidth:1,lineStyle:2,axisLabelVisible:true,title:(L*100).toFixed(1)+'%'})); }catch(e){} }); }
+        lv.forEach((L,i)=>{ try{ drawLines.current.push(s.createPriceLine({price:lo+(hi-lo)*L,color:col[i],lineWidth:1,lineStyle:2,axisLabelVisible:true,title:(L*100).toFixed(1)+'%'})); }catch(e){} }); }
     };
     el.addEventListener('mousedown',onDown); document.addEventListener('mouseup',onUp);
     return ()=>{ el.removeEventListener('mousedown',onDown); document.removeEventListener('mouseup',onUp); };
@@ -833,8 +855,10 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     return positionsStore.subscribe(draw);
   }, [symbol]);
 
+  const [cmenu,setCmenu]=React.useState(null);   // chart right-click menu {x,y}
+  const onCtx=(e)=>{ e.preventDefault(); onActivate&&onActivate(idx); setCmenu({ x:e.clientX, y:e.clientY }); };
   return (
-    <div className={"win"+(isActive?' active':'')} ref={win} style={{zIndex:z}} onMouseDown={focus}>
+    <div className={"win"+(isActive?' active':'')} ref={win} style={{zIndex:z}} onMouseDown={focus} onContextMenu={onCtx}>
       <div className="cell-title" onMouseDown={(e)=>beginDrag(e,'move')}>
         <span>{symbol}.FX,{tf||'H1'}</span>
         {posLbl.map((p,i)=><span key={i} style={{color:'#00c800',fontWeight:600}}>{p.side} {p.lots} at {fmtPx(symbol,p.price)}</span>)}
@@ -847,10 +871,63 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       <div className="canvas" ref={box}>
         <div className="drawlayer" ref={dlayer}></div>
         <OrderBox symbol={symbol} />
-        <div className="cell-lbl"><b>{symbol}</b>, {tf||'H1'} <span className="px">{fmtPx(symbol,px)}</span></div>
+        <div className="cell-lbl"><b>{symbol}</b>, {tf||'H1'} {ohlc
+          ? (ohlc.o!=null ? <span>O {fmtPx(symbol,ohlc.o)} H {fmtPx(symbol,ohlc.h)} L {fmtPx(symbol,ohlc.l)} C {fmtPx(symbol,ohlc.c)}</span>
+                          : <span className="px">{fmtPx(symbol,ohlc.c)}</span>)
+          : <span className="px">{fmtPx(symbol,px)}</span>}</div>
       </div>
       {['n','s','e','w','ne','nw','se','sw'].map(d=>
         <div key={d} className={"rsz "+d} onMouseDown={(e)=>beginDrag(e,d)}></div>)}
+      {cmenu && <ChartMenu x={cmenu.x} y={cmenu.y} idx={idx} symbol={symbol} chartType={chartType} tf={tf} indicators={indicators} onClose={()=>setCmenu(null)} />}
+    </div>
+  );
+}
+
+/* ── Chart right-click context menu (MT5): Type / Timeframes / Indicators submenus,
+   Grid toggle, Delete all objects, New Order. Targets THIS chart (activated on open). ── */
+function ChartMenu({ x, y, idx, symbol, chartType, tf, indicators, onClose }){
+  const [sub,setSub]=React.useState(null);
+  React.useEffect(()=>{ const h=()=>onClose(); const k=(e)=>{ if(e.key==='Escape') onClose(); };
+    document.addEventListener('click',h); document.addEventListener('contextmenu',h); document.addEventListener('keydown',k);
+    return ()=>{ document.removeEventListener('click',h); document.removeEventListener('contextmenu',h); document.removeEventListener('keydown',k); }; }, [onClose]);
+  const act=new Set(indicators||[]);
+  const items=[
+    {l:'New Order', ic:'order', k:'F9', run:()=>terminalBus.emit('order.new',symbol)},
+    {sep:1},
+    {l:'Chart Type', ic:'candle', children:[
+      {l:'Candlesticks', ck:chartType==='candle', run:()=>terminalBus.emit('chart.type','candle')},
+      {l:'Bars', ck:chartType==='bar', run:()=>terminalBus.emit('chart.type','bar')},
+      {l:'Line', ck:chartType==='line', run:()=>terminalBus.emit('chart.type','line')},
+    ]},
+    {l:'Timeframes', ic:'tick', children: TFS.map(t=>({l:t, ck:t===tf, run:()=>terminalBus.emit('chart.tf',t)}))},
+    {l:'Indicators', ic:'line', children: Object.keys(INDICATORS).map(id=>({l:INDICATORS[id].label, ck:act.has(id), keep:1, run:()=>terminalBus.emit('chart.indicator',id)}))},
+    {sep:1},
+    {l:'Grid', ck:true, keep:1, run:()=>terminalBus.emit('chart.grid', idx)},
+    {l:'Delete all objects', ic:'exp', run:()=>terminalBus.emit('chart.clear', idx)},
+    {sep:1},
+    {l:'Properties...', dis:1},
+  ];
+  const style={ left:Math.min(x, window.innerWidth-250), top:Math.min(y, window.innerHeight-330) };
+  const click=(it)=>{ if(it.dis||it.children) return; it.run&&it.run(); if(!it.keep) onClose(); };
+  return (
+    <div className="ctxmenu" style={style} onClick={e=>e.stopPropagation()} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
+      {items.map((it,i)=> it.sep ? <div key={i} className="ctxsep"></div> : (
+        <div key={i} className={"ci"+(it.dis?' dis':'')+(it.children?' has':'')} onMouseEnter={()=>setSub(it.children?i:null)} onClick={()=>click(it)}>
+          <span className="ck">{it.ck?'✓':''}</span>
+          <span className="ic">{it.ic?IC[it.ic]:null}</span>
+          <span className="lbl">{it.l}</span>
+          {it.children ? <span className="ar">▸</span> : it.k ? <span className="sc">{it.k}</span> : null}
+          {it.children && sub===i && (
+            <div className="ctxmenu sub" onClick={e=>e.stopPropagation()}>
+              {it.children.map((ch,j)=>(
+                <div key={j} className="ci" onClick={(e)=>{ e.stopPropagation(); ch.run&&ch.run(); if(!ch.keep) onClose(); }}>
+                  <span className="ck">{ch.ck?'✓':''}</span><span className="lbl">{ch.l}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
