@@ -166,6 +166,7 @@
   .obtns .buy{background:linear-gradient(#3d8ee0,#2f6ec0);border-color:#2358a0}
   .obtns button:hover{filter:brightness(1.08)}
   .obtns button:active{box-shadow:inset 0 2px 4px rgba(0,0,0,.35)}
+  .obtns button:disabled{background:#c2c7cd;color:#eef0f2;border-color:#9aa0a7;cursor:not-allowed;filter:none;box-shadow:inset 1px 1px 2px rgba(0,0,0,.12)}
   .otick{flex:1;min-width:0;margin:8px 8px 8px 0;border:1px solid #2a3345;background:#0b1020;display:flex;flex-direction:column}
   .otick .ttool{height:26px;flex:none;border-bottom:1px solid #202838;display:flex;align-items:center;gap:10px;padding:0 8px;background:#0e1626}
   .otick .ttool span{color:#7f8aa0;font-size:13px}
@@ -386,11 +387,55 @@ const terminalBus = { listeners:new Set(),
    the fx_open RPC to go live; until then placeOrder reports 'not connected' rather
    than faking money. ══ */
 const TRADE_API = (typeof window!=='undefined' && window.ALPEXA_TRADE_API) || '/api/trade/order';
+const CONTRACT = 100000;   // FX standard lot
+const LEVERAGES = [50,100,200,300,500];
+
+/* tradeSettings — leverage is a UI/config setting (NOT money), so localStorage is OK
+   (CLAUDE.md: UI settings/session OK, money forbidden). Shared across components. */
+const tradeSettings = {
+  leverage:100, listeners:new Set(),
+  load(){ try{ const v=localStorage.getItem('alpexa.wt.leverage'); if(v) this.leverage=Math.max(1,+v||100); }catch(e){} return this; },
+  setLeverage(n){ this.leverage=Math.max(1,+n||100); try{ localStorage.setItem('alpexa.wt.leverage', String(this.leverage)); }catch(e){} this.notify(); },
+  notify(){ this.listeners.forEach(fn=>{ try{fn(this.leverage);}catch(e){} }); },
+  subscribe(fn){ this.listeners.add(fn); return ()=>this.listeners.delete(fn); },
+}.load();
+
+// base-currency → USD rate for margin conversion (MT5-standard). USD base = 1; USD quote
+// = the pair price; a cross (EURJPY) uses the base's USD pair if the feed has it.
+function baseUsdRate(symbol){
+  const base=symbol.slice(0,3), quote=symbol.slice(3), px=priceStore.get(symbol);
+  if(base==='USD') return 1;
+  if(quote==='USD') return px? px.mid : 0;
+  const b=priceStore.get(base+'USD'); if(b) return b.mid;
+  const inv=priceStore.get('USD'+base); if(inv&&inv.mid) return 1/inv.mid;
+  return px? px.mid : 0;   // best-effort fallback
+}
+// required margin (in USD account ccy) for a volume at a leverage — the MT5 formula.
+function requiredMargin(symbol, volume, leverage){
+  const lev=Math.max(1,+leverage||100); return (+volume||0)*CONTRACT*baseUsdRate(symbol)/lev;
+}
+
 function useTradeEngine(){
   const [acct,setAcct]=React.useState(positionsStore.acct);
   const [pos,setPos]=React.useState(positionsStore.pos);
+  const [leverage,setLeverageState]=React.useState(tradeSettings.leverage);
+  const [tick,setTick]=React.useState(0);   // re-render on price ticks so margin figures stay live
   React.useEffect(()=> positionsStore.subscribe(s=>{ setAcct(s.acct); setPos([...s.pos]); }), []);
+  React.useEffect(()=> tradeSettings.subscribe(setLeverageState), []);
+  React.useEffect(()=> priceStore.subscribe(throttle(()=>setTick(t=>t+1),400)), []);
   const connected = !!(window.ALPEXA_TRADE_API);   // real execution endpoint present?
+  const setLeverage = (n)=> tradeSettings.setLeverage(n);
+  // ── leverage → real-time order affordability (all display; server stays the money owner) ──
+  const floating = pos.reduce((s,p)=>{ if(p._demo && p.profit!=null) return s+(+p.profit);
+    const m=priceStore.get(p.symbol); if(!m) return s; const dir=sideUp(p.side)==='SELL'?-1:1;
+    return s + dir*(m.mid-(+p.open_price||m.mid))*lotsOf(p)*CONTRACT*(p.symbol.includes('JPY')?0.0067:1); }, 0);
+  const balance = acct?+acct.balance||0:0;
+  const equity  = balance + floating;
+  const usedMargin = pos.reduce((s,p)=> s + requiredMargin(p.symbol, lotsOf(p), leverage), 0);
+  const freeMargin = equity - usedMargin;
+  const marginFor  = (symbol, volume)=> requiredMargin(symbol, volume, leverage);
+  const maxVolume  = (symbol)=>{ const one=requiredMargin(symbol, 1, leverage);
+    return one>0 ? Math.max(0, Math.floor(freeMargin/one*100)/100) : 0; };   // lots affordable with free margin
   async function placeOrder({ symbol, side, volume }){
     const px=priceStore.get(symbol)||{};
     const payload={ symbol, side, volume:+volume||0.01, price: side==='buy'?px.ask:px.bid, ts:Date.now() };
@@ -408,7 +453,8 @@ function useTradeEngine(){
     if(window.ALPEXA_TRADE_API){ try{ const r=await fetch(TRADE_API+'?close='+encodeURIComponent(localId),{method:'POST'}); return {ok:r.ok}; }catch(e){ return {ok:false,error:String(e)}; } }
     return { ok:false, reason:'not_connected' };
   }
-  return { acct, pos, connected, placeOrder, closeOrder, TRADE_API };
+  return { acct, pos, connected, placeOrder, closeOrder, TRADE_API,
+    leverage, setLeverage, balance, equity, floating, usedMargin, freeMargin, marginFor, maxVolume };
 }
 
 /* ── One-click order box (SELL orange / vol / BUY blue) — live Ask/Bid inside the
@@ -615,8 +661,10 @@ function BottomBar(){
   const [pos,setPos]=React.useState(positionsStore.pos);
   const [mids,setMids]=React.useState({});
   const [tab,setTab]=React.useState('Trade');
+  const [leverage,setLev]=React.useState(tradeSettings.leverage);
   React.useEffect(()=> positionsStore.subscribe(s=>{ setAcct(s.acct); setPos([...s.pos]); }), []);
   React.useEffect(()=> priceStore.subscribe(throttle(m=>setMids({...m}),400)), []);
+  React.useEffect(()=> tradeSettings.subscribe(setLev), []);   // margin/level track the chosen leverage
 
   // floating P&L marked at the live mid (display approx — production should use trading.html's
   // fxClosePx lockstep so floating == what fx_close realizes). No open FX positions → 0.
@@ -626,7 +674,7 @@ function BottomBar(){
     return dir*(m.mid-(+p.open_price||m.mid))*lotsOf(p)*contract*(p.symbol.includes('JPY')?0.0067:1); };
   const floating = pos.reduce((s,p)=> s+plOf(p), 0);
   const balance=acct?+acct.balance||0:0, equity=balance+floating;
-  const marginUsed=pos.reduce((s,p)=> s+lotsOf(p)*100000/100, 0);  // 1:100 illustrative
+  const marginUsed=pos.reduce((s,p)=> s+requiredMargin(p.symbol, lotsOf(p), leverage), 0);  // leverage-driven
   const level=marginUsed>0?(equity/marginUsed*100):0;
   const num=(n)=>(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 
@@ -867,7 +915,13 @@ function OrderModal({ symbol:sym0, onClose }){
 
   React.useEffect(()=>{ const k=(e)=>{ if(e.key==='Escape') onClose(); }; document.addEventListener('keydown',k); return ()=>document.removeEventListener('keydown',k); }, [onClose]);
 
+  // ── leverage-driven order affordability, live (updates on price / volume / leverage) ──
+  const need = eng.marginFor(symbol, vol);          // margin this order would lock
+  const canAfford = need <= eng.freeMargin + 1e-9;  // gate against free margin
+  const usd=(n)=>'$'+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+
   const submit=async(side)=>{
+    if(!canAfford) return;   // insufficient free margin → block (display gate; server still authoritative)
     const q=priceStore.get(symbol)||m; const price=side==='buy'?q.ask:q.bid;
     try{ await eng.placeOrder({ symbol, side, volume:vol }); }catch(e){}   // real execution seam (server-authoritative)
     positionsStore.addDemo({ symbol, side, volume:+vol||0.01, price });    // reflect in the ledger immediately
@@ -893,18 +947,23 @@ function OrderModal({ symbol:sym0, onClose }){
             <div className="orow"><label>Symbol:</label><div className="in" style={{width:'auto',flex:1}}>
               <select value={symbol} onChange={e=>setSymbol(e.target.value)}>{WATCH.map(s=><option key={s} value={s}>{s}.FX, {SYM_NAME[s]||s}</option>)}</select></div></div>
             <div className="orow"><label>Volume:</label><div className="in"><input value={vol} onChange={e=>setVol(e.target.value)} /></div><span className="unit">{(Math.round((+vol||0)*100000)).toLocaleString()} {symbol.slice(0,3)}</span></div>
+            <div className="orow"><label>Leverage:</label><div className="in"><select value={eng.leverage} onChange={e=>eng.setLeverage(e.target.value)}>{LEVERAGES.map(l=><option key={l} value={l}>1:{l}</option>)}</select></div><span className="unit">Max <b>{eng.maxVolume(symbol).toFixed(2)}</b> lots</span></div>
             <div className="orow"><label>Stop Loss:</label><div className="in"><input value={sl} onChange={e=>setSl(e.target.value)} /></div></div>
             <div className="orow"><label>Take Profit:</label><div className="in"><input value={tp} onChange={e=>setTp(e.target.value)} /></div></div>
             <div className="orow"><label>Fill policy:</label><span className="olink">Fill or Kill</span></div>
-            <div className="orow"><label>Comment:</label><div className="in" style={{width:'auto',flex:1}}><input placeholder="" /></div></div>
+            <div className="orow omargin"><label>Margin:</label>
+              <span className="unit" style={{flex:1,color:canAfford?'#2c3138':'#d23a2d'}}>
+                <b>{usd(need)}</b> required &nbsp;·&nbsp; Free Margin <b>{usd(eng.freeMargin)}</b>
+                {!canAfford && <b style={{marginLeft:8}}>⚠ Not enough free margin</b>}
+              </span></div>
             <div className="oquote">
               <QuoteNum symbol={symbol} value={m.bid} dir={dir.current.bid} />
               <span className="sep">/</span>
               <QuoteNum symbol={symbol} value={m.ask} dir={dir.current.ask} />
             </div>
             <div className="obtns">
-              <button className="sell" onClick={()=>submit('sell')}>Sell by Market</button>
-              <button className="buy" onClick={()=>submit('buy')}>Buy by Market</button>
+              <button className="sell" disabled={!canAfford} onClick={()=>submit('sell')}>Sell by Market</button>
+              <button className="buy" disabled={!canAfford} onClick={()=>submit('buy')}>Buy by Market</button>
             </div>
           </div>
           <div className="otick">
