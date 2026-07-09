@@ -1,29 +1,35 @@
 // Alpexa — DAILY RECONCILIATION tests (mirrors supabase/sql/daily_reconciliation.sql)
-// Invariant: accounts.balance == bonus(opening) + Σ(ledger). The apply_ledger trigger is
-// the only writer, so a mismatch = a balance written OUTSIDE the ledger (bug/tamper) or a
-// missing ledger row. The daily script must flag any 1-cent drift and never touch balances.
+// Invariant: balance == bonus(opening) + Σ(ledger) + Σ(fx settlement pnl). TWO triggers
+// write balance — apply_ledger (ledger) and apply_settlement_to_balance (settlements.pnl,
+// server='fx' only; fx_close banks FX P&L via settlements, not the ledger). A mismatch =
+// a balance written outside BOTH paths (bug/tamper) or a missing row. Read-only: the daily
+// script flags drift and never touches a balance.
 'use strict';
 let pass=true; const ok=(n,c,x)=>{ if(!c)pass=false; console.log(`  ${c?'✅':'❌'} ${n}${x?'  '+x:''}`); };
 const R=(x)=>Math.round(x*100)/100;
 
-// model one account: opening (bonus) + a ledger of deltas → expected balance
+// model one account: opening(bonus) + Σledger + Σfxpnl → expected balance
+const expectOf=(a)=> R(a.bonus + a.ledger.reduce((s,x)=>s+x,0) + (a.fxpnl||[]).reduce((s,x)=>s+x,0));
 function reconcile(accts, tol=0.01){
   return accts
-    .map(a=>{ const expected=R(a.bonus + a.ledger.reduce((s,x)=>s+x,0)); return {acct:a.acct, bal:R(a.bal), expected, diff:R(a.bal-expected)}; })
+    .map(a=>{ const expected=expectOf(a); return {acct:a.acct, bal:R(a.bal), expected, diff:R(a.bal-expected)}; })
     .filter(r=>Math.abs(r.diff)>tol);
 }
-const totals=(accts)=>({ tb:R(accts.reduce((s,a)=>s+a.bal,0)), te:R(accts.reduce((s,a)=>s+a.bonus+a.ledger.reduce((x,y)=>x+y,0),0)) });
+const totals=(accts)=>({ tb:R(accts.reduce((s,a)=>s+a.bal,0)), te:R(accts.reduce((s,a)=>s+expectOf(a),0)) });
 
 console.log('\n=== GREEN: clean book — every balance == bonus + Σledger → 0 mismatches ===');
 {
   const accts=[
-    { acct:'SP-1', bonus:100, ledger:[-60, 34.29], bal:74.29 },   // bet + payout
-    { acct:'FX-1', bonus:100, ledger:[500, -200, -50], bal:350 }, // deposit − withdraw − loss
+    { acct:'SP-1', bonus:100, ledger:[-60, 34.29], bal:74.29 },   // bet stake + payout (ledger)
     { acct:'SP-2', bonus:100, ledger:[], bal:100 },               // fresh signup
+    // FX account with deposits (ledger) AND trading P&L banked via settlements (server='fx').
+    // This is the FX-288741 shape that a ledger-only recon WRONGLY flagged.
+    { acct:'FX-1', bonus:100, ledger:[3700000], fxpnl:[5000, 2382.87], bal:3707482.87 },
   ];
-  ok('per-account mismatches: 0', reconcile(accts).length===0);
+  ok('per-account mismatches: 0 (FX trading P&L via settlements counted)', reconcile(accts).length===0);
   const {tb,te}=totals(accts);
   ok('global Σbalance == Σexpected ('+tb+')', tb===te);
+  ok('the FX-288741 case reconciles clean (was a false positive)', reconcile([accts[2]]).length===0);
 }
 
 console.log('\n=== RED→GREEN: a balance written OUTSIDE the ledger is caught ===');

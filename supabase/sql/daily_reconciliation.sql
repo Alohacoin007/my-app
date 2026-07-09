@@ -1,10 +1,14 @@
 -- Alpexa — DAILY BALANCE RECONCILIATION (asset integrity, 1-cent tolerance)
 -- ============================================================================
--- The money invariant (CLAUDE.md): balance == opening + Σ(ledger), applied by the
--- apply_ledger trigger — the ONLY writer of accounts.balance. So a mismatch means a
--- balance was written OUTSIDE the ledger (a bug or tamper) or a ledger row vanished.
--- opening = accounts.bonus (the non-withdrawable welcome seed — the same basis the
--- back-office integrity check already reconciles against).
+-- The money invariant: balance == opening + Σ(ledger) + Σ(fx settlement P&L).
+-- TWO triggers write accounts.balance: apply_ledger (ledger → balance) AND
+-- apply_settlement_to_balance (settlements.pnl → balance, but ONLY for server='fx';
+-- fx_close banks FX P&L via settlements, not the ledger, to avoid double-counting —
+-- see fx_close.sql & rls_money_lockdown.sql). Sports payouts go via the ledger (betpay),
+-- so sports settlements are history-only. A mismatch therefore means a balance was
+-- written OUTSIDE both paths (bug/tamper) or a row vanished.
+-- opening = accounts.bonus (non-withdrawable welcome seed — same basis the back-office
+-- integrity check uses).
 --
 -- Scope: sports/fx (ledger-backed). Crypto lives in crypto_holdings (a separate
 -- subsystem, price-valued) — reconciled separately, not here.
@@ -33,12 +37,14 @@ returns table(acct_no text, server text, bal numeric, expected numeric, diff num
 language sql stable security definer set search_path to 'public' as $$
   select a.acct_no, a.server,
          round(coalesce(a.balance,0),2) as bal,
-         round(coalesce(a.bonus,0) + coalesce(l.s,0), 2) as expected,
-         round(coalesce(a.balance,0) - (coalesce(a.bonus,0) + coalesce(l.s,0)), 2) as diff
+         round(coalesce(a.bonus,0) + coalesce(l.s,0) + coalesce(s.p,0), 2) as expected,
+         round(coalesce(a.balance,0) - (coalesce(a.bonus,0) + coalesce(l.s,0) + coalesce(s.p,0)), 2) as diff
     from public.accounts a
     left join lateral (select sum(amount) s from public.ledger where acct_no = a.acct_no) l on true
+    -- FX settlement P&L is banked to balance by apply_settlement_to_balance (server='fx' only)
+    left join lateral (select sum(pnl) p from public.settlements where acct_no = a.acct_no and server = 'fx') s on true
    where a.server in ('sports','fx')
-     and abs(coalesce(a.balance,0) - (coalesce(a.bonus,0) + coalesce(l.s,0))) > p_tol;
+     and abs(coalesce(a.balance,0) - (coalesce(a.bonus,0) + coalesce(l.s,0) + coalesce(s.p,0))) > p_tol;
 $$;
 
 -- ③ daily runner: logs a row, and RAISES a warning if a single cent is off
@@ -48,8 +54,10 @@ declare v_n int; v_rows jsonb; v_tb numeric; v_te numeric;
 begin
   -- global totals (fast system-wide check): Σbalance vs Σbonus + Σledger over sports/fx
   select coalesce(sum(a.balance),0),
-         coalesce(sum(a.bonus),0) + coalesce((select sum(amount) from public.ledger l
-             join public.accounts aa on aa.acct_no=l.acct_no where aa.server in ('sports','fx')),0)
+         coalesce(sum(a.bonus),0)
+           + coalesce((select sum(amount) from public.ledger l
+               join public.accounts aa on aa.acct_no=l.acct_no where aa.server in ('sports','fx')),0)
+           + coalesce((select sum(pnl) from public.settlements where server='fx'),0)
     into v_tb, v_te
     from public.accounts a where a.server in ('sports','fx');
 
