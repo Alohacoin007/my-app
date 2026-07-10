@@ -1302,7 +1302,7 @@ function StatusBar({ tool, chartType, tf }){
   );
 }
 
-function BottomBar(){
+function BottomBar({ onResize }){
   const [acct,setAcct]=React.useState(positionsStore.acct);
   const [pos,setPos]=React.useState(positionsStore.pos);
   const [mids,setMids]=React.useState({});
@@ -1332,7 +1332,7 @@ function BottomBar(){
 
   return (
     <div className="bottom">
-      <BottomResizer />
+      <BottomResizer onDone={onResize} />
       <div className="tbxtabs">{TBX_TABS.map(t=><div key={t} className={"t"+(t===tab?' on':'')} onClick={()=>setTab(t)}>{t}</div>)}</div>
       {tab==='Exposure' ? <ExposureTab pos={pos} mids={mids} />
        : tab==='Journal' ? <JournalTab />
@@ -1555,20 +1555,21 @@ function Navigator({ indicators }){
 /* ── Resizable splitter: drag the bar left/right to size the Market Watch column
    (200–450px). During drag it sets --leftw on .terminal and, in a rAF loop, calls
    chartResizer.resizeAll() so all 4 charts follow live instead of squishing. ── */
-function Splitter(){
+function Splitter({ onDone }){
   const drag=React.useRef(false), self=React.useRef(null);
   React.useEffect(()=>{
-    const term=document.querySelector('.terminal'); let raf=null;
+    const term=document.querySelector('.terminal'); let raf=null, lastW=0;
     const onMove=(e)=>{ if(!drag.current||!term) return;
       const rect=term.getBoundingClientRect();
-      const w=Math.max(200, Math.min(450, e.clientX-rect.left));
-      term.style.setProperty('--leftw', w+'px');
+      lastW=Math.max(200, Math.min(450, e.clientX-rect.left));
+      term.style.setProperty('--leftw', lastW+'px');
       if(!raf) raf=requestAnimationFrame(()=>{ raf=null; chartResizer.resizeAll(); });
     };
     const onUp=()=>{ if(!drag.current) return; drag.current=false;
       if(self.current) self.current.classList.remove('drag');
       document.body.style.cursor=''; document.body.style.userSelect='';
       chartResizer.resizeAll();
+      if(lastW && onDone) onDone(Math.round(lastW));   // persist the new width
     };
     document.addEventListener('mousemove',onMove);
     document.addEventListener('mouseup',onUp);
@@ -1585,19 +1586,20 @@ function Splitter(){
    chrome (independent of the positions table being empty). Drag up/down sets
    --bottomh on .terminal; the 1fr charts row absorbs the change; chart.resize() in
    a rAF loop keeps the charts crisp. ── */
-function BottomResizer(){
+function BottomResizer({ onDone }){
   const self=React.useRef(null);
   React.useEffect(()=>{
-    const el=self.current, term=document.querySelector('.terminal'); if(!el) return; let raf=null, on=false;
+    const el=self.current, term=document.querySelector('.terminal'); if(!el) return; let raf=null, on=false, lastH=0;
     const onDown=(e)=>{ e.preventDefault(); on=true; el.classList.add('drag');
       document.body.style.cursor='row-resize'; document.body.style.userSelect='none'; };
     const onMove=(e)=>{ if(!on||!term) return;
-      const h=Math.max(90, Math.min(window.innerHeight*0.85, window.innerHeight - e.clientY));
-      term.style.setProperty('--bottomh', h+'px');
+      lastH=Math.max(90, Math.min(window.innerHeight*0.85, window.innerHeight - e.clientY));
+      term.style.setProperty('--bottomh', lastH+'px');
       if(!raf) raf=requestAnimationFrame(()=>{ raf=null; chartResizer.resizeAll(); });
     };
     const onUp=()=>{ if(!on) return; on=false; el.classList.remove('drag');
-      document.body.style.cursor=''; document.body.style.userSelect=''; chartResizer.resizeAll(); };
+      document.body.style.cursor=''; document.body.style.userSelect=''; chartResizer.resizeAll();
+      if(lastH && onDone) onDone(Math.round(lastH)); };
     el.addEventListener('mousedown',onDown);
     document.addEventListener('mousemove',onMove); document.addEventListener('mouseup',onUp);
     return ()=>{ el.removeEventListener('mousedown',onDown); document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); if(raf)cancelAnimationFrame(raf); };
@@ -1607,18 +1609,19 @@ function BottomResizer(){
 
 /* ── Left-panel internal row-resizer between Market Watch and Navigator. Also pure
    chrome — works regardless of list contents; sets --navh on the .left column. ── */
-function NavResizer(){
+function NavResizer({ onDone }){
   const self=React.useRef(null);
   React.useEffect(()=>{
-    const el=self.current; if(!el) return; const left=el.closest('.left'); let on=false;
+    const el=self.current; if(!el) return; const left=el.closest('.left'); let on=false, lastH=0;
     const onDown=(e)=>{ e.preventDefault(); on=true; el.classList.add('drag');
       document.body.style.cursor='row-resize'; document.body.style.userSelect='none'; };
     const onMove=(e)=>{ if(!on||!left) return; const r=left.getBoundingClientRect();
-      const navh=Math.max(70, Math.min(r.height-110, r.bottom - e.clientY));
-      left.style.setProperty('--navh', navh+'px');
+      lastH=Math.max(70, Math.min(r.height-110, r.bottom - e.clientY));
+      left.style.setProperty('--navh', lastH+'px');
     };
     const onUp=()=>{ if(!on) return; on=false; el.classList.remove('drag');
-      document.body.style.cursor=''; document.body.style.userSelect=''; };
+      document.body.style.cursor=''; document.body.style.userSelect='';
+      if(lastH && onDone) onDone(Math.round(lastH)); };
     el.addEventListener('mousedown',onDown);
     document.addEventListener('mousemove',onMove); document.addEventListener('mouseup',onUp);
     return ()=>{ el.removeEventListener('mousedown',onDown); document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); };
@@ -1787,9 +1790,13 @@ function App(){
   const [view,setView]=React.useState({ ...DEFAULT_VIEW, ...(cfg.view||{}) });
   const [geos,setGeos]=React.useState(cfg.geos||[null,null,null,null]);   // remembered chart-window boxes
   const setGeo1=React.useCallback((i,g)=> setGeos(a=>{ const b=a.slice(); b[i]=g; return b; }), []);
+  // remembered panel sizes (default wide enough that Market Watch isn't clipped on first load)
+  const [leftw,setLeftw]=React.useState(cfg.leftw||270);
+  const [bottomh,setBottomh]=React.useState(cfg.bottomh||188);
+  const [navh,setNavh]=React.useState(cfg.navh||186);
   const actRef=React.useRef(activeIdx); actRef.current=activeIdx;
   React.useEffect(()=>{ priceStore.start(); positionsStore.start(); }, []);
-  React.useEffect(()=>{ wtConfig.save({ tfs, types, indicators, view, geos }); }, [tfs, types, indicators, view, geos]);   // remember layout
+  React.useEffect(()=>{ wtConfig.save({ tfs, types, indicators, view, geos, leftw, bottomh, navh }); }, [tfs, types, indicators, view, geos, leftw, bottomh, navh]);   // remember layout
   // ── MT5 keyboard shortcuts (View menu + New Order) ──
   React.useEffect(()=>{
     const onKey=(e)=>{
@@ -1822,20 +1829,21 @@ function App(){
   const leftShown = view.marketwatch || view.navigator;
   // dynamic grid: View toggles collapse the corresponding rows/cols (real Windows behaviour)
   const gridStyle = {
-    gridTemplateColumns: leftShown ? 'var(--leftw,240px) 6px 1fr' : '0 0 1fr',
-    gridTemplateRows: `23px ${view.toolbars?'33px':'0'} 1fr ${view.toolbox?'var(--bottomh,188px)':'0'} ${view.statusbar?'22px':'0'}`,
+    '--leftw': leftw+'px', '--bottomh': bottomh+'px',
+    gridTemplateColumns: leftShown ? 'var(--leftw) 6px 1fr' : '0 0 1fr',
+    gridTemplateRows: `23px ${view.toolbars?'33px':'0'} 1fr ${view.toolbox?'var(--bottomh)':'0'} ${view.statusbar?'22px':'0'}`,
     gridTemplateAreas: '"menu menu menu" "tools tools tools" "left splitter charts" "bottom bottom bottom" "status status status"',
   };
   return (
     <div className="terminal" style={gridStyle}>
       <MenuBar indicators={indicators} view={view} tool={tool} />
       {view.toolbars && <Toolbar tf={tfs[activeIdx]} chartType={types[activeIdx]} tool={tool} />}
-      {leftShown && <div className="left">
+      {leftShown && <div className="left" style={{'--navh': navh+'px'}}>
         {view.marketwatch && <MarketWatch onPick={swap} />}
-        {view.marketwatch && view.navigator && <NavResizer />}
+        {view.marketwatch && view.navigator && <NavResizer onDone={setNavh} />}
         {view.navigator && <Navigator indicators={indicators} />}
       </div>}
-      {leftShown && <Splitter />}
+      {leftShown && <Splitter onDone={setLeftw} />}
       <div className="charts">
         {grid.map((s,i)=><ChartCell key={s+i} idx={i} isActive={i===activeIdx} onActivate={setActiveIdx}
           symbol={s} tf={tfs[i]} indicators={indicators} chartType={types[i]} tool={tool}
@@ -1843,7 +1851,7 @@ function App(){
         <div className="charttabs">{grid.map((s,i)=>
           <div key={i} className={"ctab"+(i===activeIdx?' on':'')} onClick={()=>setActiveIdx(i)}>{s}.FX,{tfs[i]}</div>)}</div>
       </div>
-      {view.toolbox && <BottomBar />}
+      {view.toolbox && <BottomBar onResize={setBottomh} />}
       {view.statusbar && <StatusBar tool={tool} chartType={types[activeIdx]} tf={tfs[activeIdx]} />}
       {orderSym && <OrderModal symbol={orderSym} onClose={()=>setOrderSym(null)} />}
     </div>
