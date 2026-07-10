@@ -1905,6 +1905,22 @@ function OrderModal({ symbol:sym0, onClose }){
     holdRef.current=setInterval(()=>{ const el=Date.now()-t0;                          // 0–0.3s ×0.01 · 0.3–1.2s ×0.1 · >1.2s ×1.0
       bump(el>1200 ? 1.0 : el>300 ? 0.1 : 0.01); }, 40);
   };
+  // ── SL/TP price stepper: the STEP is LOCKED at 1 pipette (last 5-digit place, 0.00001; JPY 0.001)
+  //    — never a volume/weight. Long-press only compresses the TIMER interval, not the amount:
+  //    single click = 1 pipette · 0.3–1.0s → 30ms fire · >1.0s → 6ms fire. parseFloat().toFixed(5) always.
+  const pHoldRef=React.useRef(null);
+  const stopPHold=()=>{ if(pHoldRef.current){ clearTimeout(pHoldRef.current); pHoldRef.current=null; } };
+  React.useEffect(()=>stopPHold, []);
+  const startPriceHold=(setter, sign)=>{
+    stopPHold();
+    const d=digits(symbol), step=Math.pow(10,-d);                                        // exactly 1 pipette — fixed
+    const bump=()=> setter(v=> Math.max(0, parseFloat(v||0) + sign*step).toFixed(d));    // parseFloat.toFixed(5) — no float dust
+    bump();                                                                              // single click = one pipette
+    const t0=Date.now();
+    const tick=()=>{ const el=Date.now()-t0; bump();
+      pHoldRef.current=setTimeout(tick, el<1000 ? 30 : 6); };                            // 0.3–1.0s → 30ms · >1.0s → 6ms
+    pHoldRef.current=setTimeout(tick, 300);                                              // first repeat only after 0.3s
+  };
 
   // ── leverage-driven order affordability, live (updates on price / volume / leverage) ──
   const need = eng.marginFor(symbol, vol);          // margin this order would lock
@@ -1954,17 +1970,17 @@ function OrderModal({ symbol:sym0, onClose }){
               <div className="om-price">
                 <input value={sl} onChange={e=>setSl(e.target.value)}
                   onFocus={()=>{ const q=priceStore.get(symbol)||m; if(q.bid!=null) setSl((+q.bid).toFixed(digits(symbol))); }} />{/* focus → inject live BID */}
-                <span className="om-pspin">
-                  <b onClick={()=>setSl(v=>((+v||0)+10*pip(symbol)).toFixed(digits(symbol)))}>▲</b>
-                  <b onClick={()=>setSl(v=>Math.max(0,(+v||0)-10*pip(symbol)).toFixed(digits(symbol)))}>▼</b>{/* ±10 pips */}
+                <span className="om-pspin">{/* ±1 pipette; hold = timer accel only */}
+                  <b onMouseDown={()=>startPriceHold(setSl,1)} onMouseUp={stopPHold} onMouseLeave={stopPHold}>▲</b>
+                  <b onMouseDown={()=>startPriceHold(setSl,-1)} onMouseUp={stopPHold} onMouseLeave={stopPHold}>▼</b>
                 </span></div></div>
             <div className="om-field"><label>Take Profit</label>
               <div className="om-price">
                 <input value={tp} onChange={e=>setTp(e.target.value)}
                   onFocus={()=>{ const q=priceStore.get(symbol)||m; if(q.ask!=null) setTp((+q.ask).toFixed(digits(symbol))); }} />{/* focus → inject live ASK */}
-                <span className="om-pspin">
-                  <b onClick={()=>setTp(v=>((+v||0)+10*pip(symbol)).toFixed(digits(symbol)))}>▲</b>
-                  <b onClick={()=>setTp(v=>Math.max(0,(+v||0)-10*pip(symbol)).toFixed(digits(symbol)))}>▼</b>
+                <span className="om-pspin">{/* ±1 pipette; hold = timer accel only */}
+                  <b onMouseDown={()=>startPriceHold(setTp,1)} onMouseUp={stopPHold} onMouseLeave={stopPHold}>▲</b>
+                  <b onMouseDown={()=>startPriceHold(setTp,-1)} onMouseUp={stopPHold} onMouseLeave={stopPHold}>▼</b>
                 </span></div></div>
           </div>
           {/* Margin */}
