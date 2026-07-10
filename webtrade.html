@@ -161,8 +161,9 @@
      floating window (absolute) that can move, resize and overlap like real MT5. ── */
   /* RIGHT column = vertical stack: charts (1f) → chart-tab bar → terminal toolbox.
      Left Symbols column sits beside this whole stack at full height (grid: left|splitter|right). */
-  .right{grid-area:right;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
-  .charts{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;background:#0a0d12}
+  .right{grid-area:right;display:flex;flex-direction:column;height:100%;min-width:0;min-height:0;overflow:hidden}
+  /* chart layer GROWS/SHRINKS with the terminal (never overlaid): flex-grow+shrink, floor 100px */
+  .charts{flex:1 1 0%;min-height:100px;display:flex;flex-direction:column;overflow:hidden;background:#0a0d12}
   .chartgrid{flex:1;min-height:0;display:grid;gap:1px;background:var(--cellbd)}   /* auto-tiled N charts */
   .win{position:absolute;background:#000;display:flex;flex-direction:column;
     border:1px solid var(--cellbd);box-shadow:0 2px 12px rgba(0,0,0,.55);
@@ -1727,7 +1728,15 @@ function BottomResizer({ onDone }){
     const onDown=(e)=>{ e.preventDefault(); on=true; el.classList.add('drag');
       document.body.style.cursor='row-resize'; document.body.style.userSelect='none'; };
     const onMove=(e)=>{ if(!on||!term) return;
-      lastH=Math.max(90, Math.min(window.innerHeight*0.85, window.innerHeight - e.clientY));
+      // Height = cursor → the terminal's REAL bottom edge (= bottom of .right, which excludes the
+      // full-width termtabs/status rows below). Using window bottom overshot by ~46px and pushed
+      // --bottomh past the available space, clipping the chart. Clamp so the chart floor is 100px:
+      // the chart SHRINKS (never gets covered), Y-axis + candles stay fully on screen.
+      const rightEl=document.querySelector('.right'); if(!rightEl) return;
+      const rr=rightEl.getBoundingClientRect();
+      const ct=rightEl.querySelector('.charttabs'); const ctH=ct?ct.offsetHeight:0;
+      const maxH=Math.max(90, rr.height - ctH - 100);   // leave ≥100px for the chart layer
+      lastH=Math.max(90, Math.min(maxH, rr.bottom - e.clientY));
       term.style.setProperty('--bottomh', lastH+'px');
       if(!raf) raf=requestAnimationFrame(()=>{ raf=null; chartResizer.resizeAll(); });
     };
