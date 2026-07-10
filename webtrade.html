@@ -107,15 +107,20 @@
   .nav li.leaf .ic{margin-right:4px}
   .nav .ic{display:inline-block;width:15px;text-align:center;margin-right:5px}
   /* ── one-click order box (top-left of each chart) ── */
-  .obox{position:absolute;top:19px;left:6px;z-index:5;display:flex;align-items:stretch;height:30px;
-    border:1px solid #000;box-shadow:0 1px 3px rgba(0,0,0,.7);font-family:Tahoma,Arial,sans-serif}
-  .obox .side{padding:2px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;min-width:50px;line-height:1.1}
-  .obox .sell{background:linear-gradient(#e8621e,#c64c12);color:#fff}
-  .obox .buy{background:linear-gradient(#2f7fd6,#1d63b4);color:#fff}
-  .obox .side:hover{filter:brightness(1.12)}
-  .obox .lbl{font-size:8px;opacity:.9;text-transform:uppercase;letter-spacing:.3px}
-  .obox .val{font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
-  .obox .vol{background:#0a0d12;color:#e6ebf2;border:none;width:46px;text-align:center;font:700 12px Tahoma;outline:none}
+  /* MT5 one-click trading panel (top-left of each chart) */
+  .obox{position:absolute;top:22px;left:6px;z-index:5;display:flex;align-items:stretch;height:44px;
+    border:1px solid #0a0a0a;box-shadow:0 2px 5px rgba(0,0,0,.6);font-family:Tahoma,Arial,sans-serif}
+  .obox .side{padding:3px 10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;min-width:84px;color:#fff;line-height:1}
+  .obox .sell{background:linear-gradient(#4a6f9e,#33547d)}   /* MT5 sell (blue-grey) */
+  .obox .buy{background:linear-gradient(#2f7fe0,#1c60c0)}    /* MT5 buy (bright blue) */
+  .obox .side:hover{filter:brightness(1.1)}
+  .obox .side:active{filter:brightness(.9)}
+  .obox .lbl{font-size:9px;letter-spacing:1.5px;opacity:.92;margin-bottom:2px}
+  .obox .bf{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .obox .bf .sm{font-size:11px}.obox .bf .bg{font-size:20px;font-weight:700}.obox .bf sup{font-size:11px;top:-.55em}
+  .obox .vol{width:64px;background:#e9ecf0;color:#20242a;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-left:1px solid #0a0a0a;border-right:1px solid #0a0a0a}
+  .obox .vol .dd{font-size:8px;color:#6a7078}
+  .obox .vol input{width:52px;text-align:center;border:1px solid #b6bcc4;background:#fff;font:700 12px Tahoma;height:19px;outline:none;box-shadow:inset 1px 1px 2px #ccc}
   .mwt{width:100%;border-collapse:collapse}
   .mwt th{position:sticky;top:0;background:#0a0d12;color:var(--dim);font-weight:600;font-size:11px;text-align:right;padding:3px 6px;border:1px solid var(--line)}
   .mwt th:first-child{text-align:left}
@@ -619,26 +624,34 @@ function useTradeEngine(){
 
 /* ── One-click order box (SELL orange / vol / BUY blue) — live Ask/Bid inside the
    buttons; clicks route through useTradeEngine (server-authoritative, no local money). ── */
+// MT5 big-figure price: small head · large pips · superscript last digit (e.g. 1.14 37⁶)
+function BigFig({ symbol, v }){
+  const s=fmtPx(symbol,v); if(s==='—') return <span className="bf">—</span>;
+  return <span className="bf"><span className="sm">{s.slice(0,-3)}</span><span className="bg">{s.slice(-3,-1)}</span><sup>{s.slice(-1)}</sup></span>;
+}
 function OrderBox({ symbol }){
   const [m,setM]=React.useState(priceStore.get(symbol)||{});
   const [vol,setVol]=React.useState('0.01');
   const eng=useTradeEngine();
   React.useEffect(()=> priceStore.subscribe(throttle(mids=>setM({...(mids[symbol]||{})}),400)), [symbol]);
   const send=async(side)=>{
-    const r=await eng.placeOrder({ symbol, side, volume:vol });
+    const q=priceStore.get(symbol)||m; const price=side==='buy'?q.ask:q.bid;
+    const r=await eng.placeOrder({ symbol, side, volume:vol, leverage:eng.leverage });   // one-click B-Book
     if(r.ok) return;
-    // scaffold state: execution endpoint not connected yet — tell the user plainly.
-    alert('주문 실행 API가 아직 연결되지 않았습니다.\n('+side.toUpperCase()+' '+symbol+' '+vol+' lots)\n외부 MT5 Web API(window.ALPEXA_TRADE_API) 또는 fx_open RPC 연결 시 즉시 활성화됩니다.');
+    if(r.reason==='not_logged_in'){ positionsStore.addDemo({ symbol, side, volume:+vol||0.01, price }); return; }   // demo
+    alert('주문 거절(Rejected): '+(r.reason||'unknown'));
   };
   return (
     <div className="obox">
       <div className="side sell" title="Sell at Bid" onClick={(e)=>{e.stopPropagation();send('sell');}}>
-        <span className="lbl">Sell</span><span className="val">{fmtPx(symbol,m.bid)}</span>
+        <span className="lbl">SELL</span><BigFig symbol={symbol} v={m.bid} />
       </div>
-      <input className="vol" value={vol} onChange={e=>setVol(e.target.value)}
-        onClick={e=>e.stopPropagation()} title="Volume (lots)" />
+      <div className="vol" onClick={e=>e.stopPropagation()}>
+        <span className="dd">▼</span>
+        <input value={vol} onChange={e=>setVol(e.target.value)} title="Volume (lots)" />
+      </div>
       <div className="side buy" title="Buy at Ask" onClick={(e)=>{e.stopPropagation();send('buy');}}>
-        <span className="lbl">Buy</span><span className="val">{fmtPx(symbol,m.ask)}</span>
+        <span className="lbl">BUY</span><BigFig symbol={symbol} v={m.ask} />
       </div>
     </div>
   );
