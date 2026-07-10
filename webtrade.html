@@ -1105,7 +1105,8 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       const DOT=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dotted)!=null?LightweightCharts.LineStyle.Dotted:1;
       mine.slice(0,40).forEach(p=>{ const price=+p.open_price; if(!price) return;   // cap lines so 100 positions don't flood the chart
         const title=sideUp(p.side)+' '+lotsOf(p);
-        try{ lines.current.push(s.createPriceLine({ price, color:'#00ff00', lineWidth:1,
+        const col=sideUp(p.side)==='SELL'?'#ff2020':'#00ff00';   // SELL=red, BUY=green (line + axis-label tag)
+        try{ lines.current.push(s.createPriceLine({ price, color:col, lineWidth:1,
           lineStyle:DOT, axisLabelVisible:true, title })); }catch(e){}
       });
       setPosLbl(mine.map(p=>({ side:sideUp(p.side), lots:lotsOf(p), price:+p.open_price })));
@@ -1124,7 +1125,8 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
         </span>
         <span>{symbol}.FX,{tf||'H1'}</span>
         {posLbl.length>0 && (()=>{ const net=posLbl.reduce((s,p)=>s+(p.side==='SELL'?-1:1)*p.lots,0);
-          return <span className="poslbl">{posLbl.length===1
+          const one=posLbl.length===1; const col=one?(posLbl[0].side==='SELL'?'#ff2020':'#00c800'):undefined;  // SELL=red, BUY=green
+          return <span className="poslbl" style={col?{color:col}:null}>{one
             ? posLbl[0].side+' '+posLbl[0].lots.toFixed(2)+' at '+fmtPx(symbol,posLbl[0].price)
             : posLbl.length+' pos · net '+(net>=0?'+':'')+net.toFixed(2)}</span>; })()}
         <span className="wc">
