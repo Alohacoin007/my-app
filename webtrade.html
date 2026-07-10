@@ -139,6 +139,17 @@
   /* per-side GLOSSY radial colour — blue = up/hold, red = down (SELL↔Bid, BUY↔Ask, independent) */
   .oc-blue{background:#1c3f8c !important;border:1px solid #102566 !important}
   .oc-red{background:#bd2c2c !important;border:1px solid #8c1212 !important}
+  /* ── ECN order interaction (overlay only — 190x64 치수/대칭 불변) ──
+     처리중: 클릭한 쪽 호가를 dim+blur, 코너에 미세 스피너. 체결완료: 패널 0.1s 플래시. */
+  .obox.ecn-flash{animation:ecnFlash .1s ease-out}
+  @keyframes ecnFlash{0%{filter:brightness(2.5) saturate(1.25)}55%{filter:brightness(1.6)}100%{filter:brightness(1)}}
+  .oc-busy{cursor:progress !important}
+  .oc-lbl.oc-busy{opacity:.55}
+  .oc-price.oc-busy .bf{opacity:.30;filter:blur(1.3px)}                 /* 호가 매칭 중 — 흐릿하게 */
+  .oc-spin{position:absolute;top:3px;right:4px;width:10px;height:10px;pointer-events:none;
+    border:1.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50% !important;
+    animation:ecnSpin .5s linear infinite}                              /* Processing… 미세 로딩 휠 */
+  @keyframes ecnSpin{to{transform:rotate(360deg)}}
   .mwt{width:100%;border-collapse:collapse}
   .mwt th{position:sticky;top:0;background:#0a0d12;color:var(--dim);font-weight:600;font-size:11px;text-align:right;padding:3px 6px;border:1px solid var(--line)}
   .mwt th:first-child{text-align:left}
@@ -665,6 +676,31 @@ function BigFig({ symbol, v }){
   const s=fmtPx(symbol,v); if(s==='—') return <span className="bf">—</span>;
   return <span className="bf"><span className="sm">{s.slice(0,-3)}</span><span className="bg">{s.slice(-3,-1)}</span><span className="fr">{s.slice(-1)}</span></span>;
 }
+/* ── ECN fill sound — 칼같은 MT5 "틱!" 을 클릭 순간 즉석 합성(외부 파일 불필요).
+   클릭 = 유저 제스처 안에서 울리므로 autoplay-block 안 걸린다.
+   ▶ 본인 사운드 파일을 쓰고 싶으면 HTML5 Audio 객체로 갈아끼우면 된다:
+        const SNAP = new Audio('/sfx/fill.mp3');   // 또는 data: URI
+        SNAP.volume = 0.5;
+        function ecnSnap(){ try{ SNAP.currentTime = 0; SNAP.play(); }catch(e){} }
+     …그리고 아래 WebAudio 본문은 지운다. ── */
+let _ecnActx = null;
+function ecnSnap(){
+  try{
+    _ecnActx = _ecnActx || new (window.AudioContext||window.webkitAudioContext)();
+    if(_ecnActx.state === 'suspended') _ecnActx.resume();
+    const t = _ecnActx.currentTime;
+    const osc = _ecnActx.createOscillator(), g = _ecnActx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(1750, t);
+    osc.frequency.exponentialRampToValueAtTime(950, t + 0.03);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.22, t + 0.004);   // fast attack
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.055); // snappy decay → "틱!"
+    osc.connect(g); g.connect(_ecnActx.destination);
+    osc.start(t); osc.stop(t + 0.06);
+  }catch(e){ /* 오디오 불가 환경 — 무음, 체결은 절대 안 막음 */ }
+}
+
 function OrderBox({ symbol }){
   const [m,setM]=React.useState(priceStore.get(symbol)||{});
   const [vol,setVol]=React.useState('0.01');
@@ -672,6 +708,9 @@ function OrderBox({ symbol }){
   const [askDir,setAskDir]=React.useState('up');
   const prevBid=React.useRef(null), prevAsk=React.useRef(null);
   const eng=useTradeEngine();
+  const [busy,setBusy]=React.useState(null);   // null | 'sell' | 'buy' — ECN 처리중 상태(렌더용)
+  const [flash,setFlash]=React.useState(false); // 체결 성공 순간 패널 플래시
+  const busyRef=React.useRef(null);            // 동기 레이스 가드(state는 비동기라 클릭 중복 못 막음)
   React.useEffect(()=> priceStore.subscribe(throttle(mids=>{ const q=mids[symbol]||{}; setM({...q});
     if(q.bid!=null){ const p=prevBid.current; if(p!=null){ if(q.bid>p) setBidDir('up'); else if(q.bid<p) setBidDir('down'); } prevBid.current=q.bid; }
     if(q.ask!=null){ const p=prevAsk.current; if(p!=null){ if(q.ask>p) setAskDir('up'); else if(q.ask<p) setAskDir('down'); } prevAsk.current=q.ask; }
@@ -679,30 +718,41 @@ function OrderBox({ symbol }){
   const sellCls = bidDir==='down' ? 'oc-red' : 'oc-blue';   // blue on up/hold, red on down
   const buyCls  = askDir==='down' ? 'oc-red' : 'oc-blue';
   const send=async(side)=>{
+    if(busyRef.current) return;                       // debounce — 한 번에 한 주문만(레이스/이중발사 차단)
+    busyRef.current=side; setBusy(side);
     const q=priceStore.get(symbol)||m; const price=side==='buy'?q.ask:q.bid;
-    const r=await eng.placeOrder({ symbol, side, volume:vol, leverage:eng.leverage });   // one-click B-Book
-    if(r.ok) return;   // real fill booked server-side (loadPos shows it)
-    // any non-success (logged out / no fx account / rpc not deployed / rejected) → land it in the
-    // demo ledger so the order always goes in for testing (display only, no real money — #5 safe)
-    positionsStore.addDemo({ symbol, side, volume:+vol||0.01, price });
-    if(r.reason && r.reason!=='not_logged_in') console.warn('one-click order fell back to demo:', r.reason);
+    // ── ECN 오더 샌드박스: LP 왕복 지연(250~550ms)을 RPC 발사 '앞단'에만 시뮬레이션 ──
+    const lat=250+Math.floor(Math.random()*301);      // 250..550 ms
+    await new Promise(res=>setTimeout(res,lat));
+    let r; try{ r=await eng.placeOrder({ symbol, side, volume:vol, leverage:eng.leverage }); }  // one-click B-Book
+    catch(e){ r={ok:false,reason:'error'}; }
+    if(!r||!r.ok){
+      // any non-success (logged out / no fx account / rpc not deployed / rejected) → land it in the
+      // demo ledger so the order always goes in for testing (display only, no real money — #5 safe)
+      positionsStore.addDemo({ symbol, side, volume:+vol||0.01, price });
+      if(r&&r.reason&&r.reason!=='not_logged_in') console.warn('one-click order fell back to demo:', r.reason);
+    }
+    // ── The Snap: 처리 상태 해제 → 패널 0.1s 플래시 → 칼체결 틱 재생 ──
+    busyRef.current=null; setBusy(null);
+    setFlash(true); ecnSnap(); setTimeout(()=>setFlash(false),120);
   };
   const dec=()=>setVol((Math.max(0.01,(+vol||0.01)-0.01)).toFixed(2));
   const inc=()=>setVol((Math.max(0.01,(+vol||0)+0.01)).toFixed(2));
+  const busySell=busy==='sell', busyBuy=busy==='buy';
   return (
-    <div className="obox">
+    <div className={"obox"+(flash?' ecn-flash':'')}>
       <div className="oc-top">
-        <div className={"oc-lbl "+sellCls} title="Sell at Bid" onClick={(e)=>{e.stopPropagation();send('sell');}}>SELL</div>
+        <div className={"oc-lbl "+sellCls+(busySell?' oc-busy':'')} title="Sell at Bid" onClick={(e)=>{e.stopPropagation();send('sell');}}>SELL</div>
         <div className="oc-vol" onClick={e=>e.stopPropagation()}>
           <b className="dn" onClick={dec} title="−0.01">▼</b>
           <input value={vol} onChange={e=>setVol(e.target.value)} title="Volume (lots)" />
           <b className="up" onClick={inc} title="+0.01">▲</b>
         </div>
-        <div className={"oc-lbl "+buyCls} title="Buy at Ask" onClick={(e)=>{e.stopPropagation();send('buy');}}>BUY</div>
+        <div className={"oc-lbl "+buyCls+(busyBuy?' oc-busy':'')} title="Buy at Ask" onClick={(e)=>{e.stopPropagation();send('buy');}}>BUY</div>
       </div>
       <div className="oc-bot">
-        <div className={"oc-price "+sellCls} title="Sell at Bid" onClick={(e)=>{e.stopPropagation();send('sell');}}><BigFig symbol={symbol} v={m.bid} /></div>
-        <div className={"oc-price "+buyCls} title="Buy at Ask" onClick={(e)=>{e.stopPropagation();send('buy');}}><BigFig symbol={symbol} v={m.ask} /></div>
+        <div className={"oc-price "+sellCls+(busySell?' oc-busy':'')} title="Sell at Bid" onClick={(e)=>{e.stopPropagation();send('sell');}}><BigFig symbol={symbol} v={m.bid} />{busySell&&<span className="oc-spin" aria-hidden="true"></span>}</div>
+        <div className={"oc-price "+buyCls+(busyBuy?' oc-busy':'')} title="Buy at Ask" onClick={(e)=>{e.stopPropagation();send('buy');}}><BigFig symbol={symbol} v={m.ask} />{busyBuy&&<span className="oc-spin" aria-hidden="true"></span>}</div>
       </div>
     </div>
   );
