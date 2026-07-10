@@ -436,7 +436,7 @@ if(typeof document!=='undefined'){ document.addEventListener('pointerdown', unlo
   document.addEventListener('keydown', unlockAudio, {once:true}); }
 
 const WATCH = ['EURUSD','AUDUSD','USDJPY','GBPUSD','USDCAD','NZDUSD','USDCHF','GBPJPY','AUDJPY','EURJPY'];
-const GRID  = ['EURUSD','USDJPY','AUDUSD','GBPUSD'];   // the 2×2 (matches the MT5 screenshot)
+const GRID  = ['USDJPY','USDCHF','EURUSD','GBPUSD'];   // the default 2×2 (TL·TR·BL·BR, matches the MT5 screenshot)
 const pip   = (s)=> s.slice(3)==='JPY'||s.slice(0,3)==='JPY' ? 0.01 : 0.0001;
 const digits= (s)=> s.slice(3)==='JPY'||s.includes('JPY') ? 3 : 5;
 const fmtPx = (s,v)=> (v==null?'—':(+v).toFixed(digits(s)));
@@ -1929,7 +1929,9 @@ const DEFAULT_VIEW={ toolbars:true, statusbar:true, marketwatch:true, navigator:
 function tileDims(n){ if(n<=1) return [1,1]; if(n===2) return [2,1]; if(n<=4) return [2,2]; const c=Math.ceil(Math.sqrt(n)); return [c, Math.ceil(n/c)]; }
 function App(){
   const cfg=React.useRef(wtConfig.load()).current;     // saved layout (persists across reloads)
-  const initCharts=React.useRef((cfg.charts&&cfg.charts.length) ? cfg.charts : GRID.map((s,i)=>({ id:i+1, symbol:s, tf:'H1', type:'candle' }))).current;
+  // ALWAYS boot to the fixed default 2×2 @ M1 (chart layout is intentionally NOT persisted, so a
+  // refresh always shows this exact setup regardless of what was open last session).
+  const initCharts=React.useRef(GRID.map((s,i)=>({ id:i+1, symbol:s, tf:'M1', type:'candle' }))).current;
   const [charts,setCharts]=React.useState(initCharts);   // dynamic chart windows [{id,symbol,tf,type}]
   const [activeId,setActiveId]=React.useState(initCharts[0]?initCharts[0].id:null);
   const idRef=React.useRef(initCharts.reduce((mx,c)=>Math.max(mx,c.id),0));
@@ -1947,11 +1949,11 @@ function App(){
   const actRef=React.useRef(null); actRef.current = activeChart ? activeChart.id : null;
   // ── chart window life-cycle ──
   const addChart=React.useCallback((symbol)=>{ const id=++idRef.current;
-    setCharts(cs=>cs.concat([{ id, symbol:symbol||WATCH[0], tf:'H1', type:'candle' }])); setActiveId(id); }, []);
+    setCharts(cs=>cs.concat([{ id, symbol:symbol||WATCH[0], tf:'M1', type:'candle' }])); setActiveId(id); }, []);
   const closeChart=React.useCallback((id)=>{ setCharts(cs=>cs.filter(c=>c.id!==id));   // unmount → ChartCell cleanup unsubscribes + chart.remove (no leak)
     setActiveId(a=> a===id ? null : a); }, []);
   React.useEffect(()=>{ priceStore.start(); positionsStore.start(); }, []);
-  React.useEffect(()=>{ wtConfig.save({ charts, indicators, view, leftw, bottomh, navh }); }, [charts, indicators, view, leftw, bottomh, navh]);
+  React.useEffect(()=>{ wtConfig.save({ indicators, view, leftw, bottomh, navh }); }, [indicators, view, leftw, bottomh, navh]);   // charts NOT persisted → refresh = fixed default
   React.useEffect(()=>{ requestAnimationFrame(()=>chartResizer.resizeAll()); }, [charts.length]);   // reflow charts on add/close
   // ── MT5 keyboard shortcuts (View menu + New Order) ──
   React.useEffect(()=>{
