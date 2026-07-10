@@ -700,6 +700,11 @@ priceStore.notify = throttle(function(){ priceStore.listeners.forEach(fn=>{ try{
 /* ── positionsStore: ONE source of truth for open FX positions + account.
    ChartCell draws createPriceLine flags from it; BottomBar tables it. Server-owned
    (read-only display) — never writes money, matches CLAUDE.md #5 (server is sole owner). ── */
+// WT_DEMO — WebTrader currently runs as a SERVER-INDEPENDENT demo terminal. All orders fill on
+// the CLIENT demo ledger only: they NEVER call fx_open / fx_close, never touch accounts /
+// positions, so NOTHING reaches Supabase or the admin backoffice. Flip to false the day this
+// terminal is wired to real B-Book execution (the server code paths below are kept, just gated).
+const WT_DEMO = true;
 // DEMO seed — a mock ledger so the terminal is never empty for layout/UX testing.
 // Pure client-side DISPLAY only: never written to the server or localStorage, never
 // treated as spendable money (orders still route through useTradeEngine). A real
@@ -710,15 +715,15 @@ const DEMO_POS  = [{ local_id:'3172308', symbol:'EURUSD', side:'buy', stake:0.01
 
 const positionsStore = {
   acct:null, pos:[], listeners:new Set(), ch1:null, ch2:null, ch3:null, started:false,
-  async loadAcct(){ try{ if(!(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me)) return;
+  async loadAcct(){ try{ if(WT_DEMO || !(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me)) return;
     const r=await AlpexaSync.db.from('accounts').select('acct_no,balance').eq('server','fx').limit(1);
     if(r&&r.data&&r.data[0]){ this.acct=r.data[0]; this.notify(); } }catch(e){} },
-  async loadPos(){ try{ if(!(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me)) return;
+  async loadPos(){ try{ if(WT_DEMO || !(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me)) return;
     const r=await AlpexaSync.db.from('positions').select('local_id,symbol,side,stake,size,open_price,status,created_at').eq('server','fx').eq('status','open').limit(200);
     if(r&&r.data){ this.pos=r.data; this.notify(); } }catch(e){} },   // real load REPLACES the demo seed
   start(){ if(this.started) return; this.started=true;
     this.acct=DEMO_ACCT; this.pos=DEMO_POS.slice(); this.notify();   // seed demo first → ledger never empty
-    try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me){
+    try{ if(!WT_DEMO && window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me){   // WT_DEMO: stay server-independent (never load/overwrite demo with real)
       this.loadAcct(); this.loadPos();                                // logged in → overwrite demo with reality
       this.ch1=AlpexaSync.db.channel('wt-acct').on('postgres_changes',{event:'*',schema:'public',table:'accounts'},()=>this.loadAcct()).subscribe();
       this.ch2=AlpexaSync.db.channel('wt-pos').on('postgres_changes',{event:'*',schema:'public',table:'positions'},()=>this.loadPos()).subscribe();
@@ -915,7 +920,7 @@ function useTradeEngine(){
     //    CLAMPS to the house cap) plus the requested price + max slippage so a violent tick between
     //    click and arrival is REJECTED server-side. If the consolidated fn isn't deployed yet we
     //    transparently retry the base signature (slippage/leverage simply not enforced until then).
-    if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me){
+    if(!WT_DEMO && window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me){   // WT_DEMO skips the server → falls through to the demo ledger (nothing hits admin)
       try{
         const base={ p_local_id:local_id, p_symbol:symbol, p_side:side, p_size:size };
         const full={ ...base,
@@ -940,7 +945,7 @@ function useTradeEngine(){
   // (trg_settlement_balance → accounts.balance). The client never touches balance.
   async function closeOrder(localId){
     if(window.ALPEXA_TRADE_API){ try{ const r=await fetch(TRADE_API+'?close='+encodeURIComponent(localId),{method:'POST'}); playSnd(r.ok? sndClose : sndError); return {ok:r.ok}; }catch(e){ playSnd(sndError); return {ok:false,reason:String(e)}; } }
-    if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me){
+    if(!WT_DEMO && window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me){   // WT_DEMO: demo rows close via removeDemo (see BottomBar) — never server
       try{ const r=await AlpexaSync.db.rpc('fx_close',{ p_local_id:localId });
         const d=r&&r.data;
         if(r&&!r.error&&d&&d.ok){ positionsStore.loadPos(); positionsStore.loadAcct(); playSnd(sndClose);   // ← fx_close 완공
@@ -1652,7 +1657,7 @@ function JournalTab(){
     [stamp,'Alpexa WebTrade terminal started',1],
     [stamp,'Chart engine (Lightweight Charts) initialised',1],
     [stamp, live?'Price feed connected (1s cache)':'Price feed: demo simulator',live?1:0],
-    [stamp, (window.AlpexaSync&&AlpexaSync.me)?'Account session active — B-Book execution ready':'Not logged in — demo ledger',1],
+    [stamp, (!WT_DEMO && window.AlpexaSync&&AlpexaSync.me)?'Account session active — B-Book execution ready':'Demo terminal — client ledger only (no server / admin)',1],
   ];
   return (
     <div className="tbxbody"><table className="jrnl"><tbody>
@@ -1673,7 +1678,7 @@ function StatusBar({ tool, chartType, tf }){
       <span className="s">Tool: <b>{tool?tool:'—'}</b></span>
       <span className="s">Chart: <b>{chartType} · {tf}</b></span>
       <span className="grow"></span>
-      <span className="s">{(window.AlpexaSync&&AlpexaSync.me)?'Live account':'Guest'}</span>
+      <span className="s">{(!WT_DEMO && window.AlpexaSync&&AlpexaSync.me)?'Live account':'Demo'}</span>
       <span className="s">Vegas <b>{p2(t.getHours())+':'+p2(t.getMinutes())}</b></span>
     </div>
   );
@@ -1718,7 +1723,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
           <thead><tr><th>{t('Symbol')}</th><th>{t('Ticket')}</th><th>{t('Time')}</th><th>{t('Type')}</th><th>{t('Volume')}</th><th>{t('Price')}</th><th>S / L</th><th>T / P</th><th>{t('Price')}</th><th>{t('Profit')}</th><th></th></tr></thead>
           <tbody>
             {tab==='History' && <tr><td className="empty" colSpan="11">No history in the selected period</td></tr>}
-            {tab==='Trade' && !pos.length && <tr><td className="empty" colSpan="11">{window.AlpexaSync&&AlpexaSync.me?'No open positions':'로그인하면 실계정 잔고·포지션이 표시됩니다 (지금은 데모 시세)'}</td></tr>}
+            {tab==='Trade' && !pos.length && <tr><td className="empty" colSpan="11">{(!WT_DEMO && window.AlpexaSync&&AlpexaSync.me)?'No open positions':'데모 터미널 — 주문하면 여기에 데모 포지션이 표시됩니다 (서버·어드민 기록 없음)'}</td></tr>}
             {tab==='Trade' && pos.map(p=>{ const m=mids[p.symbol]||{}; const pl=plOf(p);
               const tkt=String(p.local_id||'').replace(/\D/g,'').slice(-8)||p.local_id;
               const tm=p.created_at?String(p.created_at).slice(0,19).replace('T',' ').replace(/-/g,'.'):'—';  // MT5: 2026.07.09 20:17:40
@@ -1903,9 +1908,9 @@ function Navigator({ indicators }){
   const [acct,setAcct]=React.useState(positionsStore.acct);
   const [open,setOpen]=React.useState({});   // all Navigator folders COLLAPSED by default (click to expand)
   React.useEffect(()=> positionsStore.subscribe(s=>setAcct(s.acct)), []);
-  const me=window.AlpexaSync&&AlpexaSync.me;
+  const me=!WT_DEMO && window.AlpexaSync&&AlpexaSync.me;
   const bal=acct?(+acct.balance||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):null;
-  const acctLine=acct ? (acct.acct_no+' — Alpexa-Live — '+bal+' USD') : (me?'Loading account…':'Not logged in (demo)');
+  const acctLine=acct ? (acct.acct_no+' — '+(WT_DEMO?'Alpexa-Demo':'Alpexa-Live')+' — '+bal+' USD') : (me?'Loading account…':'Demo terminal');
   const active=new Set(indicators||[]);
   const tog=(k)=>setOpen(o=>({ ...o, [k]:!o[k] }));
   return (
