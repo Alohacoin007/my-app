@@ -258,30 +258,32 @@
   .ctxmenu.sub{position:absolute;left:100%;top:-3px;min-width:150px;z-index:1201}
   .ctxmenu .ci .ic svg{width:15px;height:15px}
   /* ── Bottom: KPI strip + Excel-grid positions table ── */
-  .bottom{grid-area:bottom;background:var(--panel);border-top:1px solid var(--cellbd);display:flex;flex-direction:column;overflow:hidden}
+  .bottom{grid-area:bottom;background:#0d0d0d;border-top:1px solid var(--cellbd);display:flex;flex-direction:column;overflow:hidden;
+    font-family:"Segoe UI",Tahoma,sans-serif;font-size:11px}
   .tbxtabs{display:flex;background:linear-gradient(#20242a,#14171c);border-bottom:1px solid #000}
   .tbxtabs .t{padding:3px 11px;font-size:11px;color:#a2aab6;border-right:1px solid #2a2e34;cursor:default}
   .tbxtabs .t.on{background:#000;color:#fff;border-top:2px solid #3a6ea5;margin-top:-1px}
-  .acctline{display:flex;align-items:center;gap:18px;padding:4px 12px;background:#0a0d12;border-top:1px solid var(--line);font-size:11.5px;color:#c8ccd2;white-space:nowrap;overflow-x:auto}
+  .acctline{display:flex;align-items:center;gap:18px;padding:4px 12px;background:#0d0d0d;border-top:1px solid #222;font-size:11.5px;color:#c8ccd2;white-space:nowrap;overflow-x:auto}
   .acctline .k{color:#8890a0}.acctline b{color:#fff;font-variant-numeric:tabular-nums}
   .postbl{flex:1;overflow:auto}
   table.pos{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-  table.pos th{position:sticky;top:0;background:#0a0d12;color:var(--dim);font-weight:600;font-size:11px;text-align:right;padding:3px 10px;border:1px solid var(--line)}
+  table.pos th{position:sticky;top:0;background:#141414;color:var(--dim);font-weight:600;font-size:11px;text-align:right;padding:3px 10px;border:1px solid #222}
   table.pos th:first-child,table.pos td:first-child{text-align:left}
-  table.pos td{padding:3px 10px;border:1px solid var(--line);text-align:right}
+  table.pos td{padding:3px 10px;border:1px solid #222;text-align:right}
   .xclose{width:18px;height:18px;line-height:1;padding:0;border:1px solid #5a2020;border-radius:2px;
     background:linear-gradient(#7a2b2b,#5a1e1e);color:#ffd7d7;font-size:11px;cursor:pointer}
   .xclose:hover{background:linear-gradient(#a03636,#7a2626);color:#fff}
   .empty{padding:16px;color:var(--dim);text-align:center;border:none!important}
   .note{padding:2px 14px;color:var(--dim);font-size:11px}
-  /* ── chart tabs strip (bottom of the charts workspace) ── */
-  .charttabs{position:absolute;left:0;right:0;bottom:0;height:22px;display:flex;z-index:950;
-    background:#0c0f13;border-top:1px solid #000;overflow-x:auto}
-  .charttabs .ctab{display:flex;align-items:center;padding:0 12px;font-size:11px;color:#9aa1ad;cursor:pointer;
-    border-right:1px solid #23272d;background:linear-gradient(#20242a,#15181d);white-space:nowrap}
-  .charttabs .ctab:hover{color:#dfe3ea}
-  .charttabs .ctab.on{background:#000;color:#fff;border-top:2px solid #2f7fe0;margin-top:-1px}
-  .charttabs .ctab .tclose{margin-left:8px;color:#8890a0;font-size:10px}
+  /* ── TIER 2: chart-window tab bar (bottommost, its own grid row) — MT5 navy/black ── */
+  .charttabs{grid-area:charttabs;height:24px;display:flex;align-items:stretch;overflow-x:auto;overflow-y:hidden;
+    background:#0a0e14;border-top:1px solid #000;font-family:"Segoe UI",Tahoma,sans-serif}
+  .charttabs .ctab{position:relative;display:flex;align-items:center;padding:0 12px 0 15px;font-size:11px;color:#9aa1ad;
+    cursor:pointer;border-right:1px solid #1b1f27;background:#0a0e14;white-space:nowrap;border-radius:0}
+  .charttabs .ctab:hover{color:#dfe3ea;background:#0f141c}
+  .charttabs .ctab.on{background:#000;color:#fff}
+  .charttabs .ctab.on::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:#2f7fe0}  /* 활성탭 왼쪽 파란 인디케이터 */
+  .charttabs .ctab .tclose{margin-left:9px;color:#8890a0;font-size:10px;line-height:1;border-radius:0}
   .charttabs .ctab .tclose:hover{color:#fff;background:#e81123;padding:0 3px}
   .noch{margin:auto;color:#6a7078;font-size:12px;text-align:center;padding:20px}
   /* ── order form spinner steppers (Volume / SL / TP) ── */
@@ -1952,8 +1954,8 @@ function App(){
   const gridStyle = {
     '--leftw': leftw+'px', '--bottomh': bottomh+'px',
     gridTemplateColumns: leftShown ? 'var(--leftw) 6px 1fr' : '0 0 1fr',
-    gridTemplateRows: `23px ${view.toolbars?'33px':'0'} 1fr ${view.toolbox?'var(--bottomh)':'0'} ${view.statusbar?'22px':'0'}`,
-    gridTemplateAreas: '"menu menu menu" "tools tools tools" "left splitter charts" "bottom bottom bottom" "status status status"',
+    gridTemplateRows: `23px ${view.toolbars?'33px':'0'} 1fr ${view.toolbox?'var(--bottomh)':'0'} ${charts.length?'24px':'0'} ${view.statusbar?'22px':'0'}`,
+    gridTemplateAreas: '"menu menu menu" "tools tools tools" "left splitter charts" "bottom bottom bottom" "charttabs charttabs charttabs" "status status status"',
   };
   const [tcols,trows]=tileDims(charts.length);
   const gridTiles={ gridTemplateColumns:`repeat(${tcols},1fr)`, gridTemplateRows:`repeat(${trows},1fr)` };
@@ -1975,11 +1977,12 @@ function App(){
             tiled onClose={()=>closeChart(c.id)} />)}
           {!charts.length && <div className="noch">No charts open — File → New Chart Window, or double-click a Market Watch symbol.</div>}
         </div>
-        <div className="charttabs">{charts.map(c=>
-          <div key={c.id} className={"ctab"+(c.id===(activeChart&&activeChart.id)?' on':'')} onClick={()=>setActiveId(c.id)}>{c.symbol}.FX,{c.tf}
-            <span className="tclose" onClick={(e)=>{e.stopPropagation();closeChart(c.id);}} title="Close">✕</span></div>)}</div>
       </div>
       {view.toolbox && <BottomBar onResize={setBottomh} />}
+      {/* ── TIER 2: chart-window tab bar (bottommost) — click=focus, ✕=close+unsubscribe ── */}
+      {!!charts.length && <div className="charttabs">{charts.map(c=>
+        <div key={c.id} className={"ctab"+(c.id===(activeChart&&activeChart.id)?' on':'')} onClick={()=>setActiveId(c.id)} title={c.symbol+'.FX,'+c.tf}>{c.symbol}.FX,{c.tf}
+          <span className="tclose" onClick={(e)=>{e.stopPropagation();closeChart(c.id);}} title="Close chart">✕</span></div>)}</div>}
       {view.statusbar && <StatusBar tool={tool} chartType={activeChart?activeChart.type:'candle'} tf={activeChart?activeChart.tf:'H1'} />}
       {orderSym && <OrderModal symbol={orderSym} onClose={()=>setOrderSym(null)} />}
     </div>
