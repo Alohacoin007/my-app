@@ -98,9 +98,12 @@
   .nav li:hover{background:#0d1420}
   .nav li.root{font-weight:700;color:#dfe3ea}
   .nav li.child{padding-left:26px;color:#aeb6c2}
-  .nav li.folder{padding-left:8px;cursor:pointer}
+  .nav li.navf{cursor:pointer;color:#c4c8d0}
+  .nav li.ind{cursor:pointer;color:#aeb6c2}.nav li.ind.on{color:#8fd3a0}
+  .nav li.ind .ic{color:#e0b84a}.nav li.ind.on .ic{color:#8fd3a0}
+  .nav li.dim{color:#6a7078}
   .nav .tw{display:inline-block;width:12px;text-align:center;color:#8a9098}
-  .nav li.leaf{padding-left:44px;color:#8fd3a0;font-size:11px}
+  .nav li.leaf{color:#8fd3a0;font-size:11px}
   .nav li.leaf .ic{margin-right:4px}
   .nav .ic{display:inline-block;width:15px;text-align:center;margin-right:5px}
   /* ── one-click order box (top-left of each chart) ── */
@@ -1429,27 +1432,47 @@ function Toolbar({ tf, chartType, tool }){
 }
 
 /* ── Navigator panel (folder tree) — MT5 look under Market Watch ── */
-function Navigator(){
+// MT5 Indicators tree — our real indicators mapped into the standard categories
+const IND_TREE=[
+  ['Trend', [['MA20','Moving Average'],['MA50','Moving Average'],['EMA20','Exponential Moving Average']]],
+  ['Oscillators', [['RSI14','Relative Strength Index'],['MACD','MACD']]],
+  ['Volumes', []],['Bill Williams', []],['Examples', []],['Free Indicators', []],
+];
+const NAV_FOLDERS=[['Accounts','👤'],['Indicators','📈'],['Expert Advisors','🤖'],['Scripts','📜'],['Services','🛠️'],['Market','🛒'],['VPS','☁️']];
+function Navigator({ indicators }){
   const [acct,setAcct]=React.useState(positionsStore.acct);
-  const [open,setOpen]=React.useState({ Accounts:true });
+  const [open,setOpen]=React.useState({ Accounts:true, Indicators:true, 'ind:Trend':true });
   React.useEffect(()=> positionsStore.subscribe(s=>setAcct(s.acct)), []);
   const me=window.AlpexaSync&&AlpexaSync.me;
   const bal=acct?(+acct.balance||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):null;
   const acctLine=acct ? (acct.acct_no+' — Alpexa-Live — '+bal+' USD') : (me?'Loading account…':'Not logged in (demo)');
+  const active=new Set(indicators||[]);
   const tog=(k)=>setOpen(o=>({ ...o, [k]:!o[k] }));
-  const folders=[['Accounts','👤'],['Indicators','📈'],['Expert Advisors','🤖'],['Scripts','📜'],['Services','🛠️'],['Market','🛒'],['VPS','☁️']];
   return (
     <div className="nav">
       <div className="navhd">Navigator</div>
       <ul>
         <li className="root"><span className="ic">💠</span>Alpexa MetaTrader 5</li>
-        {folders.map(([name,ic])=>(
+        {NAV_FOLDERS.map(([name,ic])=>(
           <React.Fragment key={name}>
-            <li className="child folder" onClick={()=>tog(name)}>
+            <li className="navf" style={{paddingLeft:14}} onClick={()=>tog(name)}>
               <span className="tw">{open[name]?'▾':'▸'}</span><span className="ic">{ic}</span>{name}
             </li>
             {name==='Accounts' && open.Accounts &&
-              <li className="child leaf"><span className="ic">🔑</span>{acctLine}</li>}
+              <li className="leaf" style={{paddingLeft:40}}><span className="ic">🔑</span>{acctLine}</li>}
+            {name==='Indicators' && open.Indicators && IND_TREE.map(([sub,items])=>(
+              <React.Fragment key={sub}>
+                <li className="navf" style={{paddingLeft:28}} onClick={()=>tog('ind:'+sub)}>
+                  <span className="tw">{open['ind:'+sub]?'▾':'▸'}</span><span className="ic">📁</span>{sub}
+                </li>
+                {open['ind:'+sub] && (items.length ? items.map(([id,label],j)=>(
+                  <li key={id+j} className={"leaf ind"+(active.has(id)?' on':'')} style={{paddingLeft:48}}
+                      onDoubleClick={()=>terminalBus.emit('chart.indicator',id)} title="더블클릭: 활성 차트에 적용/해제">
+                    <span className="ic">{active.has(id)?'✓':'ƒ'}</span>{label}
+                  </li>
+                )) : <li className="leaf dim" style={{paddingLeft:48}}><span className="ic">·</span>(empty)</li>)}
+              </React.Fragment>
+            ))}
           </React.Fragment>
         ))}
       </ul>
@@ -1738,7 +1761,7 @@ function App(){
       {leftShown && <div className="left">
         {view.marketwatch && <MarketWatch onPick={swap} />}
         {view.marketwatch && view.navigator && <NavResizer />}
-        {view.navigator && <Navigator />}
+        {view.navigator && <Navigator indicators={indicators} />}
       </div>}
       {leftShown && <Splitter />}
       <div className="charts">
