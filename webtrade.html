@@ -16,6 +16,13 @@
   html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
     font-family:Tahoma,'Segoe UI','Malgun Gothic',Arial,sans-serif;font-size:12px;overflow:hidden}
   #app{height:100vh}
+  /* ── thin dark custom scrollbars (kill the ugly white browser bars; keep scrolling) ── */
+  .terminal *{scrollbar-width:thin;scrollbar-color:#333a44 transparent}
+  .terminal ::-webkit-scrollbar{width:8px;height:8px}
+  .terminal ::-webkit-scrollbar-track{background:transparent}
+  .terminal ::-webkit-scrollbar-corner{background:transparent}
+  .terminal ::-webkit-scrollbar-thumb{background:#333a44;border-radius:4px;border:2px solid transparent;background-clip:content-box}
+  .terminal ::-webkit-scrollbar-thumb:hover{background:#48505c;background-clip:content-box}
   /* ── MT5-style CSS Grid: toolbar / [market-watch | 2×2 charts] / bottom bar ── */
   .terminal{display:grid;height:100vh;
     grid-template-columns:var(--leftw,240px) 6px 1fr;
@@ -23,17 +30,14 @@
     grid-template-areas:"menu menu menu" "tools tools tools" "left splitter charts" "bottom bottom bottom";}
   /* horizontal (row-resize) splitters — layout CHROME, always present & draggable
      regardless of table/data content (the resize engine is data-independent). */
-  .hsplit,.lhsplit{flex:none;height:6px;cursor:row-resize;background:var(--cellbd);position:relative;user-select:none}
-  .hsplit::before,.lhsplit::before{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-    width:26px;height:2px;background:#5a616c;border-radius:1px}
-  .hsplit:hover,.hsplit.drag,.lhsplit:hover,.lhsplit.drag{background:#3a6ea5}
-  .hsplit:hover::before,.hsplit.drag::before,.lhsplit:hover::before,.lhsplit.drag::before{background:#cdd6e2}
-  /* draggable vertical splitter between Market Watch/Navigator and the charts */
-  .splitter{grid-area:splitter;cursor:col-resize;background:var(--cellbd);position:relative;user-select:none}
-  .splitter::before{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-    width:2px;height:26px;background:#5a616c;border-radius:1px}
-  .splitter:hover,.splitter.drag{background:#3a6ea5}
-  .splitter:hover::before,.splitter.drag::before{background:#cdd6e2}
+  /* thin 1px line, but a 7px transparent grab zone; cursor snaps to row-resize on hover */
+  .hsplit,.lhsplit{flex:none;height:7px;cursor:row-resize;background:transparent;position:relative;user-select:none}
+  .hsplit::before,.lhsplit::before{content:"";position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:1px;background:#222}
+  .hsplit:hover::before,.hsplit.drag::before,.lhsplit:hover::before,.lhsplit.drag::before{height:2px;background:#3a6ea5}
+  /* vertical splitter: thin 1px line inside a 6px transparent grab zone; col-resize on hover */
+  .splitter{grid-area:splitter;cursor:col-resize;background:transparent;position:relative;user-select:none}
+  .splitter::before{content:"";position:absolute;top:0;bottom:0;left:50%;transform:translateX(-50%);width:1px;background:#222}
+  .splitter:hover::before,.splitter.drag::before{width:2px;background:#3a6ea5}
   /* ── menu bar (File View …) ── */
   .menu{grid-area:menu;display:flex;align-items:center;gap:1px;padding:0 3px;background:linear-gradient(#2c3138,#20242a);border-bottom:1px solid #0a0a0a;font-size:11px;font-weight:400}
   .menu .mi{padding:2px 7px;color:#d0d4da;cursor:default;border-radius:2px}.menu .mi:hover{background:#3a6ea5;color:#fff}
