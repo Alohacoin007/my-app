@@ -259,6 +259,14 @@
   .ctxmenu .ci .ck{width:14px;text-align:center;color:#2e7d32}
   .ctxsep{height:1px;background:#c8c8c8;margin:3px 6px}
   .ctxmenu .ci.has{position:relative}
+  /* ── Market-Watch MT5 classic dark context menu (right-click) ── */
+  .mt5-context-menu{position:fixed;z-index:10000;min-width:178px;background:#1e1e1e;border:1px solid #444;
+    box-shadow:0 4px 14px rgba(0,0,0,.6);padding:2px 0;font:11px "Segoe UI",Tahoma,sans-serif;border-radius:0}
+  .mt5-context-menu .mt5-mi{padding:5px 24px 5px 14px;color:#fff;cursor:pointer;white-space:nowrap;border-radius:0}
+  .mt5-context-menu .mt5-mi:hover{background:#2b579a;color:#fff}
+  .mt5-context-menu .mt5-mi.dis{color:#777;cursor:default}
+  .mt5-context-menu .mt5-mi.dis:hover{background:transparent}
+  .mt5-context-menu .mt5-sep{height:0;border-top:1px solid #444;margin:3px 0}
   .ctxmenu.sub{position:absolute;left:100%;top:-3px;min-width:150px;z-index:1201}
   .ctxmenu .ci .ic svg{width:15px;height:15px}
   /* ── Bottom: KPI strip + Excel-grid positions table ── */
@@ -1260,42 +1268,33 @@ function ChartMenu({ x, y, idx, symbol, chartType, tf, indicators, onClose }){
 }
 
 /* ── Market watch: reads the shared store (fan-out), click to swap a grid symbol ── */
-// MT5 Market-Watch right-click menu — mirrors the desktop terminal context menu.
+// MT5 Market-Watch right-click menu — the classic desktop-terminal sub-menu (exact order).
 const MW_MENU=[
-  {l:'New Order', ic:'order', act:'order'},
-  {l:'Chart Window', ic:'line', act:'chart'},
-  {l:'Tick Chart', ic:'tick', act:'order'},
-  {l:'Depth of Market', ic:'dom', k:'Alt+B'},
-  {l:'Options Board', dis:1},
-  {l:'Specification', ic:'spec'},
-  {l:'Popup Prices', ic:'pop', k:'F10'},
+  {l:'New Chart', act:'chart'},          // → addChart (tile-aware multi-chart)
+  {l:'Depth Of Market', act:'dom'},
+  {l:'New Order', act:'order'},          // → order.new popup for this symbol
   {sep:1},
-  {l:'Hide', k:'Delete', dis:1},{l:'Hide All'},{l:'Show All'},
-  {l:'Symbols', ic:'dollar', k:'Ctrl+U'},{l:'Sets', ar:1},{l:'Sort', ar:1},{l:'Export', ic:'exp'},
-  {sep:1},
-  {l:'Show Milliseconds'},{l:'Auto Remove Expired', ck:1},{l:'Auto Arrange', ck:1},{l:'Grid', ck:1},
-  {sep:1},
-  {l:'Columns', ar:1},
+  {l:'Specification', act:'spec'},
+  {l:'Hide', act:'hide'},                // hide this symbol row (memory-only, no storage)
+  {l:'Show All', act:'showall'},         // restore every hidden symbol
 ];
-function ContextMenu({ x, y, sym, onClose, onPick }){
+function ContextMenu({ x, y, sym, onClose, onPick, onHide, onShowAll }){
   React.useEffect(()=>{ const h=()=>onClose(); const k=(e)=>{ if(e.key==='Escape') onClose(); };
     document.addEventListener('click',h); document.addEventListener('contextmenu',h); document.addEventListener('keydown',k);
     return ()=>{ document.removeEventListener('click',h); document.removeEventListener('contextmenu',h); document.removeEventListener('keydown',k); }; }, [onClose]);
   const run=(it)=>{ if(it.dis||it.sep) return;
-    if(it.act==='order') terminalBus.emit('order.new', sym);       // New Order / Tick Chart → popup for THIS symbol
-    else if(it.act==='chart') onPick&&onPick(sym);                 // Chart Window → reload a chart window with this symbol
+    if(it.act==='chart') onPick&&onPick(sym);                      // New Chart → tile-aware chart of THIS symbol
+    else if(it.act==='order') terminalBus.emit('order.new', sym);  // New Order → popup for THIS symbol
+    else if(it.act==='hide') onHide&&onHide(sym);                  // Hide → drop the row (client display only)
+    else if(it.act==='showall') onShowAll&&onShowAll();            // Show All → restore hidden rows
+    // 'dom'/'spec' are placeholders (no panel yet) — they just close cleanly.
     onClose();
   };
-  const style={ left:Math.min(x, window.innerWidth-230), top:Math.min(y, window.innerHeight-430) };
+  const style={ left:Math.min(x, window.innerWidth-190), top:Math.min(y, window.innerHeight-200) };
   return (
-    <div className="ctxmenu" style={style} onClick={e=>e.stopPropagation()} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
-      {MW_MENU.map((it,i)=> it.sep ? <div key={i} className="ctxsep"></div> : (
-        <div key={i} className={"ci"+(it.dis?' dis':'')} onClick={()=>run(it)}>
-          <span className="ck">{it.ck?'✓':''}</span>
-          <span className="ic">{it.ic?IC[it.ic]:null}</span>
-          <span className="lbl">{it.l}</span>
-          {it.ar ? <span className="ar">▸</span> : it.k ? <span className="sc">{it.k}</span> : null}
-        </div>
+    <div className="mt5-context-menu" style={style} onClick={e=>e.stopPropagation()} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
+      {MW_MENU.map((it,i)=> it.sep ? <div key={i} className="mt5-sep"></div> : (
+        <div key={i} className={"mt5-mi"+(it.dis?' dis':'')} onClick={()=>run(it)}>{it.l}</div>
       ))}
     </div>
   );
@@ -1384,6 +1383,7 @@ function MarketWatch({ onPick }){
   const [sel,setSel]=React.useState(null);      // blue-selected row
   const [tab,setTab]=React.useState('Symbols');
   const [menu,setMenu]=React.useState(null);    // {sym,x,y} right-click context menu
+  const [hidden,setHidden]=React.useState(()=>new Set());   // Hide/Show-All — MEMORY-ONLY (never persisted)
   const [clock,setClock]=React.useState('');
   React.useEffect(()=>{ const u=()=>{ const d=new Date(),p2=n=>String(n).padStart(2,'0'); setClock(p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds())); }; u(); const id=setInterval(u,1000); return ()=>clearInterval(id); }, []);
   const prev=React.useRef({}), dirRef=React.useRef({});
@@ -1409,10 +1409,10 @@ function MarketWatch({ onPick }){
         <table className="mwt">
           <thead><tr><th>Symbol</th><th>Bid</th><th>Ask</th><th>Daily Ch%</th></tr></thead>
           <tbody>
-            {WATCH.map(sym=>{ const m=mids[sym]||{}, d=dirs[sym]||{}; const up=(m.chg||0)>=0;
+            {WATCH.filter(sym=>!hidden.has(sym)).map(sym=>{ const m=mids[sym]||{}, d=dirs[sym]||{}; const up=(m.chg||0)>=0;
               return (
                 <tr key={sym} className={sym===sel?'sel':''} onClick={()=>setSel(sym)}
-                    onDoubleClick={()=>onPick&&onPick(sym)} onContextMenu={(e)=>ctx(e,sym)} title="더블클릭/우클릭 Chart Window: 새 차트 창 · (우클릭 New Order: 주문)">
+                    onDoubleClick={()=>terminalBus.emit('order.new',sym)} onContextMenu={(e)=>ctx(e,sym)} title="더블클릭: New Order 주문창 · 우클릭: 메뉴(New Chart 등)">
                   <td className="sym"><span className={up?'au':'ad'}>{up?'↗':'↘'}</span> {sym}.FX</td>
                   <td className={tc(d.bid)}>{fmtPx(sym,m.bid)}</td>
                   <td className={tc(d.ask)}>{fmtPx(sym,m.ask)}</td>
@@ -1423,7 +1423,9 @@ function MarketWatch({ onPick }){
         </table>}
       </div>}
       <div className="mwtabs">{MW_TABS.map(t=><div key={t} className={"mt"+(t===tab?' on':'')} onClick={()=>setTab(t)}>{t}</div>)}</div>
-      {menu && <ContextMenu x={menu.x} y={menu.y} sym={menu.sym} onPick={onPick} onClose={()=>setMenu(null)} />}
+      {menu && <ContextMenu x={menu.x} y={menu.y} sym={menu.sym} onPick={onPick}
+        onHide={(s)=>setHidden(h=>new Set(h).add(s))} onShowAll={()=>setHidden(new Set())}
+        onClose={()=>setMenu(null)} />}
     </div>
   );
 }
