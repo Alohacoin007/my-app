@@ -1043,7 +1043,14 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       deselect(); if(best){ selDraw.current=best; try{ (best.pl||best.ls).applyOptions({lineWidth:best.w0+2}); }catch(_){} }
     }); }catch(e){}
     // load candles for the current timeframe, then (re)paint indicators over them
-    loadCandles(symbol, tf).then(data=>{ try{ s.setData(asSeriesData(data,typeRef.current)); bar.current=data[data.length-1]; candles.current=data; paintIndicators(); }catch(e){} });
+    loadCandles(symbol, tf).then(data=>{ try{
+      s.setData(asSeriesData(data,typeRef.current)); bar.current=data[data.length-1]; candles.current=data; paintIndicators();
+      // The container can be 0-width at creation (tiled grid / deferred mount) → candles land off-view
+      // and the chart looks EMPTY. Resize to the real box + fitContent so every bar is on screen —
+      // do it now AND on the next frame once layout settled (fixes the blank-chart-on-refresh).
+      const fit=()=>{ try{ if(box.current) c.resize(box.current.clientWidth, box.current.clientHeight); c.timeScale().fitContent(); }catch(e){} };
+      fit(); requestAnimationFrame(fit);
+    }catch(e){} });
     // live: update ONLY the last bar's close from the shared store — throttled to ~2.5/sec
     const onTick=throttle((mids)=>{
       const m=mids[symbol]; if(!m) return; setPx(m.mid);
