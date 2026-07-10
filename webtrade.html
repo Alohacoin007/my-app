@@ -403,9 +403,10 @@ function throttle(fn, interval){
 //    PC unchanged; only phones/in-app-webviews take the lighter path.
 const IS_MOBILE = (typeof navigator!=='undefined') &&
   /Android|iPhone|iPad|iPod|Mobile|IEMobile|Opera Mini/i.test(navigator.userAgent||'');
-// UI re-render throttle: on mobile coalesce fast ticks into ≥400ms batches (save AP/GPU);
-// desktop stays snappy at 300ms. Applied to every live-price → setState subscription.
-const RENDER_MS = IS_MOBILE ? 400 : 300;
+// UI re-render throttle: coalesce fast ticks into 300ms DOM-update batches (mobile spec).
+// Desktop already ran ~300ms, so the value is 300 for both; the aggressive Market-Watch tick
+// updater stays mobile-gated below (desktop 180ms / mobile 300ms). Applied to every live-price → setState.
+const RENDER_MS = 300;
 
 /* ══ MT5 ORDER-LIFECYCLE SOUNDS ══════════════════════════════════════════════
    Preloaded HTML5 Audio, one per lifecycle event. Files live at /assets/sounds/.
@@ -885,6 +886,15 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   const indRef=React.useRef(indicators||[]); indRef.current=indicators||[];
   const typeRef=React.useRef(chartType||'candle'); typeRef.current=chartType||'candle';
   const [ohlc,setOhlc]=React.useState(null);   // crosshair OHLC readout
+  // MOBILE deferred-execution: don't build the heavy Lightweight Charts core on first paint. Start
+  // NOT-hydrated on mobile so the shell (one-click panel + ⊕Balance skeleton) paints in ~0.1s, then
+  // hydrate on the next idle tick (requestIdleCallback → setTimeout fallback). Desktop = immediate.
+  const [hydrated,setHydrated]=React.useState(!IS_MOBILE);
+  React.useEffect(()=>{ if(hydrated) return; let id;
+    if(typeof requestIdleCallback==='function'){ id=requestIdleCallback(()=>setHydrated(true),{timeout:300}); }
+    else { id=setTimeout(()=>setHydrated(true),0); }
+    return ()=>{ try{ (typeof cancelIdleCallback==='function'?cancelIdleCallback:clearTimeout)(id); }catch(e){ clearTimeout(id); } };
+  }, [hydrated]);
   // ── drawing engine state ──
   const dlayer=React.useRef(null);        // the pointer-capture overlay div
   const toolRef=React.useRef(tool); toolRef.current=tool;
@@ -986,7 +996,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   }, []);
 
   React.useEffect(()=>{
-    if(lazyHold) return;                                       // MOBILE lazy init: not revealed yet → don't build the chart
+    if(lazyHold || !hydrated) return;                          // MOBILE: skip until revealed (lazy) AND past first paint (idle-deferred)
     if(!window.LightweightCharts || !box.current) return;      // CDN blocked → no chart, no crash
     // MT5 look: pure-black canvas, dense grey DOTTED gridlines, Tahoma scales.
     const DOT=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dotted)!=null?LightweightCharts.LineStyle.Dotted:1;
@@ -1039,7 +1049,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     return ()=>{ unsub(); unreg(); indSeries.current=[]; lines.current=[]; drawLines.current=[]; drawSeries.current=[]; drawStack.current=[]; selDraw.current=null;
       overlays.current.forEach(o=>{ try{o.el.remove();}catch(e){} }); overlays.current=[];   // chart recreated → clear drawings
       try{ c.remove(); }catch(e){} };
-  }, [symbol, tf, lazyHold]);   // recreate on symbol/tf change; also builds when a lazy-held mobile chart is revealed
+  }, [symbol, tf, lazyHold, hydrated]);   // recreate on symbol/tf change; builds when revealed (lazy) and hydrated (idle-deferred)
 
   // switch chart type WITHOUT recreating the whole chart (swap the price series, re-seed data)
   React.useEffect(()=>{
