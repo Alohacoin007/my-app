@@ -1372,6 +1372,13 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       let t2=null,p2=null; try{ t2=c.timeScale().coordinateToTime(x); p2=s.coordinateToPrice(y); }catch(_){}
       if(t2==null||p2==null||d.time==null||d.price==null) return;
       if(d.tool==='fib'){ const hi=Math.max(d.price,p2), lo=Math.min(d.price,p2);
+        // base diagonal line ATTACHED to the start point, following the cursor (MT5)
+        const bp=[{time:d.time,value:d.price},{time:t2,value:p2}].sort((a,b)=>a.time-b.time);
+        if(bp[0].time!==bp[1].time){
+          if(!previewLine.current){ try{ previewLine.current = c.addLineSeries
+            ? c.addLineSeries({color:NEON,lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false})
+            : c.addSeries(LightweightCharts.LineSeries,{color:NEON,lineWidth:1}); }catch(_){} }
+          try{ previewLine.current.setData(bp); }catch(_){} }
         if(!previewFib.current.length){ FIB_LV.forEach((L,i)=>{ try{ previewFib.current.push(
           s.createPriceLine({price:lo+(hi-lo)*L,color:FIB_COL[i],lineWidth:1,lineStyle:2,axisLabelVisible:true,title:(L*100).toFixed(1)+'%'})); }catch(_){} }); }
         else { previewFib.current.forEach((pl,i)=>{ try{ pl.applyOptions({price:lo+(hi-lo)*FIB_LV[i]}); }catch(_){} }); }
