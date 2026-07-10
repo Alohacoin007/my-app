@@ -1075,12 +1075,13 @@ function TickChart({ symbol }){
     const onTick=throttle((mids)=>{ const q=mids[symbol]; if(!q) return; buf.t+=STEPT;
       buf.ask.push({time:buf.t,value:q.ask}); buf.bid.push({time:buf.t,value:q.bid});
       if(buf.ask.length>N){ buf.ask.shift(); buf.bid.shift(); }
-      try{ ask.setData(buf.ask); bid.setData(buf.bid); }catch(e){}
+      try{ ask.setData(buf.ask); bid.setData(buf.bid); c.timeScale().fitContent(); }catch(e){}   // keep it full-width
     }, 220);
     const un=priceStore.subscribe(onTick);
-    const onR=()=>{ try{ c.resize(box.current.clientWidth, box.current.clientHeight); }catch(e){} };
+    const onR=()=>{ try{ c.resize(box.current.clientWidth, box.current.clientHeight); c.timeScale().fitContent(); }catch(e){} };
     window.addEventListener('resize',onR);
-    return ()=>{ un(); window.removeEventListener('resize',onR); try{c.remove();}catch(e){} };
+    const raf=requestAnimationFrame(onR);   // re-fit once the container has real width
+    return ()=>{ un(); window.removeEventListener('resize',onR); cancelAnimationFrame(raf); try{c.remove();}catch(e){} };
   }, [symbol]);
   return <div className="mwtick" ref={box}></div>;
 }
@@ -1597,12 +1598,13 @@ function OrderModal({ symbol:sym0, onClose }){
     const onTick=throttle((mids)=>{ const q=mids[symbol]; if(!q) return; const b=buf.current; b.t+=b.step;
       b.ask.push({time:b.t,value:q.ask}); b.bid.push({time:b.t,value:q.bid});
       if(b.ask.length>N){ b.ask.shift(); b.bid.shift(); }
-      try{ ask.setData(b.ask); bid.setData(b.bid); }catch(e){}
+      try{ ask.setData(b.ask); bid.setData(b.bid); c.timeScale().fitContent(); }catch(e){}   // keep it full-width
     }, 220);
     const un=priceStore.subscribe(onTick);
-    const onR=()=>{ try{ c.resize(tbox.current.clientWidth, tbox.current.clientHeight); }catch(e){} };
+    const onR=()=>{ try{ c.resize(tbox.current.clientWidth, tbox.current.clientHeight); c.timeScale().fitContent(); }catch(e){} };
     window.addEventListener('resize',onR);
-    return ()=>{ un(); window.removeEventListener('resize',onR); try{c.remove();}catch(e){} };
+    const raf=requestAnimationFrame(onR);   // re-fit once the dialog has laid out (container width > 0)
+    return ()=>{ un(); window.removeEventListener('resize',onR); cancelAnimationFrame(raf); try{c.remove();}catch(e){} };
   }, [symbol]);
 
   React.useEffect(()=>{ const k=(e)=>{ if(e.key==='Escape') onClose(); }; document.addEventListener('keydown',k); return ()=>document.removeEventListener('keydown',k); }, [onClose]);
