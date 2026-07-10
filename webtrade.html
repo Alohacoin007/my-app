@@ -210,6 +210,7 @@
   .dov{position:absolute;pointer-events:none;z-index:4}
   .dov.vline{top:0;bottom:0;width:0;border-left:1px solid #e8b23a}
   .dov.text{transform:translate(0,-50%);color:#e6c14a;font:600 11px Tahoma,sans-serif;white-space:nowrap;text-shadow:0 0 3px #000,0 0 3px #000}
+  .dov.pt{width:7px;height:7px;margin:-4px 0 0 -4px;background:#ffffff;border:1px solid #000;box-shadow:0 0 2px #000}   /* selected trend-line handle */
   /* ── Market Watch: sticky tick colours (hold until next up/down) + daily arrows ── */
   .mwt td.tick-up,.mwt td.text-up{color:#00ff00 !important;font-weight:bold}
   .mwt td.tick-down,.mwt td.text-down{color:#ff3b30 !important;font-weight:bold}
@@ -1128,8 +1129,28 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   const ctlReset=(e)=>{ e&&e.stopPropagation(); focus(); setGeo(tileGeo()); winMode.current='normal'; reportGeo(); };   // ✕ → back to its tile slot
   // remove ONLY user-drawn objects (hline/fib/trend/vline/text) — keeps indicators + position lines
   const drawStack=React.useRef([]);   // chronological removers for undo (Ctrl+Z / menu)
-  const selDraw=React.useRef(null);   // currently-selected horizontal line entry {pl,price}
-  const deselect=()=>{ const e=selDraw.current; if(e){ try{ (e.pl||e.ls).applyOptions({lineWidth:e.w0||1}); }catch(_){} selDraw.current=null; } };
+  const selDraw=React.useRef(null);   // currently-selected drawing entry {kind,pl|ls,...}
+  const selHandles=React.useRef([]);  // 3 white square DOM handles shown while a trend line is selected
+  const previewLine=React.useRef(null); // rubber-band preview series while dragging a trend line
+  const hideHandles=()=>{ selHandles.current.forEach(el=>{ try{el.remove();}catch(_){} }); selHandles.current=[]; };
+  const positionHandles=()=>{ const ent=selDraw.current, c=chart.current, s=series.current;
+    if(!ent||ent.kind!=='t'||!c||!s||selHandles.current.length!==3) return;
+    let x1,y1,x2,y2; try{ const ts=c.timeScale();
+      x1=ts.timeToCoordinate(ent.pts[0].time); y1=s.priceToCoordinate(ent.pts[0].value);
+      x2=ts.timeToCoordinate(ent.pts[1].time); y2=s.priceToCoordinate(ent.pts[1].value); }catch(_){}
+    const p3=[[x1,y1],[(x1+x2)/2,(y1+y2)/2],[x2,y2]];   // start · MIDDLE · end (midpoint in pixels)
+    selHandles.current.forEach((el,i)=>{ const hx=p3[i][0], hy=p3[i][1];
+      if(hx==null||hy==null||isNaN(hx)||isNaN(hy)){ el.style.display='none'; }
+      else { el.style.display=''; el.style.left=Math.round(hx)+'px'; el.style.top=Math.round(hy)+'px'; } }); };
+  const showHandles=()=>{ hideHandles(); const el=dlayer.current; if(!el) return;
+    for(let i=0;i<3;i++){ const d=document.createElement('div'); d.className='dov pt'; el.appendChild(d); selHandles.current.push(d); }
+    positionHandles(); };
+  const deselect=()=>{ const e=selDraw.current; if(e){ try{ (e.pl||e.ls).applyOptions({lineWidth:e.w0||1}); }catch(_){} selDraw.current=null; } hideHandles(); };
+  // remove the currently-selected drawing (keyboard Delete + right-click Delete popup share this)
+  const deleteSelected=()=>{ const ent=selDraw.current; if(!ent) return;
+    if(ent.kind==='t'){ try{ chart.current.removeSeries(ent.ls); }catch(_){} drawSeries.current=drawSeries.current.filter(x=>x!==ent); }
+    else { try{ series.current.removePriceLine(ent.pl); }catch(_){} drawLines.current=drawLines.current.filter(x=>x!==ent); }
+    hideHandles(); selDraw.current=null; };
   const clearDrawings=()=>{ const s=series.current, c=chart.current; deselect();
     drawLines.current.forEach(l=>{ try{ s&&s.removePriceLine(l.pl); }catch(e){} }); drawLines.current=[];
     drawSeries.current.forEach(e=>{ try{ c&&c.removeSeries(e.ls); }catch(_){} }); drawSeries.current=[];
@@ -1240,7 +1261,8 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
               x2=ts.timeToCoordinate(e.pts[1].time), y2=sc.priceToCoordinate(e.pts[1].value);
         if(x1==null||y1==null||x2==null||y2==null) return;
         const dd=distSeg(px,py,x1,y1,x2,y2); if(dd<bd){ bd=dd; best=e; } }catch(_){} });
-      deselect(); if(best){ selDraw.current=best; try{ (best.pl||best.ls).applyOptions({lineWidth:best.w0+2}); }catch(_){} }
+      deselect(); if(best){ selDraw.current=best; try{ (best.pl||best.ls).applyOptions({lineWidth:best.w0+2}); }catch(_){}
+        if(best.kind==='t') showHandles(); }   // trend line selected → show the 3 white handles
     }); }catch(e){}
     // load candles for the current timeframe, then (re)paint indicators over them
     loadCandles(symbol, tf).then(data=>{ try{
@@ -1262,6 +1284,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     }, 400);
     const unsub=priceStore.subscribe(onTick);
     return ()=>{ unsub(); unreg(); unTheme(); indSeries.current=[]; lines.current=[]; drawLines.current=[]; drawSeries.current=[]; drawStack.current=[]; selDraw.current=null;
+      hideHandles(); previewLine.current=null;   // drop selection handles + any in-flight preview
       overlays.current.forEach(o=>{ try{o.el.remove();}catch(e){} }); overlays.current=[];   // chart recreated → clear drawings
       try{ c.remove(); }catch(e){} };
   }, [symbol, tf, lazyHold, hydrated]);   // recreate on symbol/tf change; builds when revealed (lazy) and hydrated (idle-deferred)
@@ -1300,6 +1323,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       if(x==null){ o.el.style.display='none'; return; } o.el.style.display=''; o.el.style.left=Math.round(x)+'px';
       if(o.type==='text'){ let y=null; try{ y=s&&s.priceToCoordinate(o.price); }catch(e){} o.el.style.top=Math.round(y==null?10:y)+'px'; }
     });
+    positionHandles();   // keep the selected trend line's 3 handles pinned while panning/zooming
   }, []);
   // reflect the armed tool onto the overlay's pointer-capture + cursor
   React.useEffect(()=>{ const el=dlayer.current; if(!el) return;
@@ -1328,14 +1352,28 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       if(t==='text'){ if(time==null||price==null) return; const txt=window.prompt('Text label:'); if(txt) addText(time,price,txt); return; }
       dragDraw.current={ tool:t, time, price };   // trend / fib — finish on mouseup
     };
-    const onUp=(e)=>{ const d=dragDraw.current; if(!d) return; dragDraw.current=null;
+    const NEON='#ff1a1a';   // 네온 빨강 추세선
+    const killPreview=()=>{ if(previewLine.current){ try{ chart.current.removeSeries(previewLine.current); }catch(_){} previewLine.current=null; } };
+    // live rubber-band while dragging a trend line (점을 찍고 드래그하는 동안 선이 따라온다)
+    const onMoveDraw=(e)=>{ const d=dragDraw.current; if(!d||d.tool!=='trend') return;
       const c=chart.current, s=series.current; if(!c||!s) return; const [x,y]=xy(e);
+      let t2=null,p2=null; try{ t2=c.timeScale().coordinateToTime(x); p2=s.coordinateToPrice(y); }catch(_){}
+      if(t2==null||p2==null||d.time==null||d.price==null) return;
+      const pts=[{time:d.time,value:d.price},{time:t2,value:p2}].sort((a,b)=>a.time-b.time);
+      if(pts[0].time===pts[1].time) return;
+      if(!previewLine.current){ try{ previewLine.current = c.addLineSeries
+        ? c.addLineSeries({color:NEON,lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false})
+        : c.addSeries(LightweightCharts.LineSeries,{color:NEON,lineWidth:2}); }catch(_){} }
+      try{ previewLine.current.setData(pts); }catch(_){} };
+    const onUp=(e)=>{ const d=dragDraw.current; if(!d) return; dragDraw.current=null;
+      const c=chart.current, s=series.current; if(!c||!s){ killPreview(); return; } const [x,y]=xy(e);
       let t2=null,p2=null; try{ t2=c.timeScale().coordinateToTime(x); p2=s.coordinateToPrice(y); }catch(e){}
+      killPreview();
       if(d.time==null||d.price==null||t2==null||p2==null) return;
       if(d.tool==='trend'){ const pts=[{time:d.time,value:d.price},{time:t2,value:p2}].sort((a,b)=>a.time-b.time);
         if(pts[0].time===pts[1].time) return;
-        try{ const ls=c.addLineSeries?c.addLineSeries({color:'#e02020',lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false})
-                                     :c.addSeries(LightweightCharts.LineSeries,{color:'#e02020',lineWidth:2}); ls.setData(pts);
+        try{ const ls=c.addLineSeries?c.addLineSeries({color:NEON,lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false})
+                                     :c.addSeries(LightweightCharts.LineSeries,{color:NEON,lineWidth:2}); ls.setData(pts);
           const ent={kind:'t',ls,pts,w0:2}; drawSeries.current.push(ent);
           drawStack.current.push(()=>{ try{c.removeSeries(ls);}catch(e){} drawSeries.current=drawSeries.current.filter(x=>x!==ent); }); }catch(e){} }
       else if(d.tool==='fib'){ const hi=Math.max(d.price,p2), lo=Math.min(d.price,p2);
@@ -1348,16 +1386,15 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       if(/INPUT|SELECT|TEXTAREA/.test((e.target&&e.target.tagName)||'')) return;   // don't hijack form typing
       if((e.ctrlKey||e.metaKey) && (e.key==='z'||e.key==='Z')){ e.preventDefault(); undoDraw(); return; }
       const ent=selDraw.current; if(!ent) return;
-      if(e.key==='Delete'||e.key==='Backspace'){ e.preventDefault();
-        if(ent.kind==='t'){ try{ chart.current.removeSeries(ent.ls); }catch(_){} drawSeries.current=drawSeries.current.filter(x=>x!==ent); }
-        else { try{ series.current.removePriceLine(ent.pl); }catch(_){} drawLines.current=drawLines.current.filter(x=>x!==ent); }
-        selDraw.current=null; }
+      if(e.key==='Delete'||e.key==='Backspace'){ e.preventDefault(); deleteSelected(); }
       else if(ent.kind==='h' && (e.key==='ArrowUp'||e.key==='ArrowDown')){ e.preventDefault();
         const np=ent.price+(e.key==='ArrowUp'?pip(symbol):-pip(symbol));
         try{ ent.pl.applyOptions({price:np}); }catch(_){} ent.price=np; }
     };
-    el.addEventListener('mousedown',onDown); document.addEventListener('mouseup',onUp); document.addEventListener('keydown',onKey);
-    return ()=>{ el.removeEventListener('mousedown',onDown); document.removeEventListener('mouseup',onUp); document.removeEventListener('keydown',onKey); };
+    el.addEventListener('mousedown',onDown); el.addEventListener('mousemove',onMoveDraw);
+    document.addEventListener('mouseup',onUp); document.addEventListener('keydown',onKey);
+    return ()=>{ el.removeEventListener('mousedown',onDown); el.removeEventListener('mousemove',onMoveDraw);
+      document.removeEventListener('mouseup',onUp); document.removeEventListener('keydown',onKey); };
   }, [posOverlays]);
 
   // ── ORDER PRICE LINE (🔴 most important): redraw green dotted lines whenever this
@@ -1381,7 +1418,10 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   }, [symbol]);
 
   const [cmenu,setCmenu]=React.useState(null);   // chart right-click menu {x,y}
-  const onCtx=(e)=>{ e.preventDefault(); onActivate&&onActivate(idx); setCmenu({ x:e.clientX, y:e.clientY }); };
+  const [delMenu,setDelMenu]=React.useState(null);   // selected-drawing Delete popup {x,y}
+  const onCtx=(e)=>{ e.preventDefault(); onActivate&&onActivate(idx);
+    if(selDraw.current) setDelMenu({ x:e.clientX, y:e.clientY });   // a line is selected → Delete popup (MT5)
+    else setCmenu({ x:e.clientX, y:e.clientY }); };
   return (
     <div className={"win"+(isActive?' active':'')+(tiled?' tiled':'')} ref={win} style={tiled?null:{zIndex:z}} onMouseDown={focus} onContextMenu={onCtx}>
       <div className="cell-title" onMouseDown={(e)=>beginDrag(e,'move')}>
@@ -1415,6 +1455,21 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       {!tiled && ['n','s','e','w','ne','nw','se','sw'].map(d=>
         <div key={d} className={"rsz "+d} onMouseDown={(e)=>beginDrag(e,d)}></div>)}
       {cmenu && <ChartMenu x={cmenu.x} y={cmenu.y} idx={idx} symbol={symbol} chartType={chartType} tf={tf} indicators={indicators} onClose={()=>setCmenu(null)} />}
+      {delMenu && <DrawMenu x={delMenu.x} y={delMenu.y}
+        onDelete={()=>deleteSelected()} onDeleteAll={()=>clearDrawings()} onClose={()=>setDelMenu(null)} />}
+    </div>
+  );
+}
+/* ── selected-drawing Delete popup (right-click a selected trend line) ── */
+function DrawMenu({ x, y, onDelete, onDeleteAll, onClose }){
+  React.useEffect(()=>{ const h=()=>onClose(); const k=(e)=>{ if(e.key==='Escape') onClose(); };
+    document.addEventListener('click',h); document.addEventListener('contextmenu',h); document.addEventListener('keydown',k);
+    return ()=>{ document.removeEventListener('click',h); document.removeEventListener('contextmenu',h); document.removeEventListener('keydown',k); }; }, [onClose]);
+  const st={ left:Math.min(x, window.innerWidth-180), top:Math.min(y, window.innerHeight-90) };
+  return (
+    <div className="ctxmenu" style={st} onClick={e=>e.stopPropagation()} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
+      <div className="ci" onClick={()=>{ onDelete(); onClose(); }}><span className="ck"></span><span className="lbl">{t('Delete')}</span><span className="sc">Del</span></div>
+      <div className="ci" onClick={()=>{ onDeleteAll(); onClose(); }}><span className="ck"></span><span className="lbl">{t('Delete all objects')}</span></div>
     </div>
   );
 }
