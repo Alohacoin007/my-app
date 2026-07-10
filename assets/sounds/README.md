@@ -12,8 +12,10 @@ names** (served from the site root as `/assets/sounds/…`):
 | `stops.wav`    | 30% stop-out cron force-liquidates a position           | `sndStopout`   |
 
 Notes:
-- Playback is fire-and-forget (`.play().catch(…)`) — a **missing file never breaks a
-  fill**, it just plays nothing.
+- **Each event has a built-in WebAudio fallback tone**, so sound works out of the box
+  even before you add any file. Drop a `.wav` here and it auto-swaps to the real MT5
+  clip on next load (detected via the audio element's `loadeddata`/`canplaythrough`).
+- Playback is fire-and-forget — a **missing/blocked file never breaks a fill**.
 - Browsers block audio until the first user gesture; `webtrade.html` unlocks all four
   clips on the first `pointerdown`/`keydown` (volume-0 play→pause), so sounds that fire
   ~250–550 ms after the click (past the ECN delay) still play.

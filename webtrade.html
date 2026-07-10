@@ -375,22 +375,49 @@ function throttle(fn, interval){
    fire-and-forget with .catch so a missing file / policy block never breaks a fill.
    Playback happens up to ~550ms AFTER the click (past the ECN delay), so we UNLOCK
    the audio on the user's very first gesture (see below) to dodge autoplay blocking. */
-const sndOpen    = new Audio('/assets/sounds/ok.wav');       // fx_open  성공 (주문 진입)
-const sndClose   = new Audio('/assets/sounds/connect.wav');  // fx_close 성공 (포지션 청산)
-const sndError   = new Audio('/assets/sounds/timeout.wav');  // RPC 에러 / 마진 게이트 차단
-const sndStopout = new Audio('/assets/sounds/stops.wav');    // 30% 스탑아웃 강제청산 (서버 크론)
-[sndOpen, sndClose, sndError, sndStopout].forEach(a=>{ try{ a.preload='auto'; a.load(); }catch(e){} });
-const playSnd = (a)=>{ try{ a.currentTime=0; const p=a.play(); if(p&&p.catch) p.catch(e=>console.log('snd',e)); }catch(e){ console.log('snd',e); } };
+// Each event has (a) an optional MT5 .wav in /assets/sounds/ AND (b) a built-in WebAudio
+// fallback tone that ALWAYS plays even when the file is absent — so sound works out of the
+// box right now, and auto-swaps to the real MT5 clip the moment you drop the .wav in.
+let _actx=null;
+function _primeCtx(){ try{ _actx=_actx||new (window.AudioContext||window.webkitAudioContext)(); if(_actx.state==='suspended') _actx.resume(); }catch(e){} return _actx; }
+function _tone(specs){   // specs: [{f0, f1?, type?, t0, dur, gain?}] — layered oscillator blips
+  const ctx=_primeCtx(); if(!ctx) return; const now=ctx.currentTime;
+  specs.forEach(s=>{ try{
+    const osc=ctx.createOscillator(), g=ctx.createGain();
+    osc.type=s.type||'square'; osc.frequency.setValueAtTime(s.f0, now+s.t0);
+    if(s.f1) osc.frequency.exponentialRampToValueAtTime(s.f1, now+s.t0+s.dur);
+    g.gain.setValueAtTime(0.0001, now+s.t0);
+    g.gain.exponentialRampToValueAtTime(s.gain||0.2, now+s.t0+0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, now+s.t0+s.dur);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(now+s.t0); osc.stop(now+s.t0+s.dur+0.03);
+  }catch(e){} });
+}
+const synOpen  = ()=>_tone([{f0:1750,f1:950,type:'square',t0:0,dur:0.055,gain:0.22}]);                                          // 진입: 칼틱!
+const synClose = ()=>_tone([{f0:680,f1:1020,type:'sine',t0:0,dur:0.10,gain:0.20}]);                                             // 청산: 상승 확인음
+const synError = ()=>_tone([{f0:320,f1:170,type:'sawtooth',t0:0,dur:0.20,gain:0.17}]);                                          // 실패: 낮은 부저
+const synStop  = ()=>_tone([{f0:500,type:'square',t0:0,dur:0.10,gain:0.20},{f0:500,type:'square',t0:0.14,dur:0.10,gain:0.20}]); // 스탑아웃: 삐-삐 경보
+// wrap: prefer the real file once it actually loads, else the fallback synth.
+function mkSnd(src, syn){
+  let ok=false; const a=new Audio(src); a.preload='auto';
+  const good=()=>{ ok=true; }; a.addEventListener('canplaythrough',good); a.addEventListener('loadeddata',good);
+  a.addEventListener('error',()=>{ ok=false; });
+  try{ a.load(); }catch(e){}
+  return { el:a,
+    play(){ if(ok){ try{ a.currentTime=0; const p=a.play(); if(p&&p.catch) p.catch(()=>syn()); return; }catch(e){} } syn(); },
+    unlock(){ try{ const v=a.volume; a.volume=0; const p=a.play(); if(p&&p.then) p.then(()=>{ a.pause(); a.currentTime=0; a.volume=v; }).catch(()=>{ a.volume=v; }); }catch(e){} } };
+}
+const sndOpen    = mkSnd('/assets/sounds/ok.wav',      synOpen);   // fx_open  성공 (주문 진입)
+const sndClose   = mkSnd('/assets/sounds/connect.wav', synClose);  // fx_close 성공 (포지션 청산)
+const sndError   = mkSnd('/assets/sounds/timeout.wav', synError);  // RPC 에러 / 마진 게이트 차단
+const sndStopout = mkSnd('/assets/sounds/stops.wav',   synStop);   // 30% 스탑아웃 강제청산 (서버 크론)
+const playSnd = (s)=>{ try{ s.play(); }catch(e){} };
 
-// Autoplay Unlock — the browser mutes audio until the first user gesture. On the very
-// first click/keydown anywhere, volume-0 play→pause every clip once to prime the audio
-// context, then restore volume. {once:true} tears the listeners down after firing.
+// Autoplay Unlock — first user gesture primes the AudioContext + the <audio> elements, so
+// playback that fires ~250–550ms after the click (past the ECN delay) isn't autoplay-blocked.
 let _audioUnlocked=false;
-function unlockAudio(){ if(_audioUnlocked) return; _audioUnlocked=true;
-  [sndOpen, sndClose, sndError, sndStopout].forEach(a=>{ try{ const v=a.volume; a.volume=0;
-    const p=a.play(); if(p&&p.then) p.then(()=>{ a.pause(); a.currentTime=0; a.volume=v; }).catch(()=>{ a.volume=v; });
-    else { a.pause(); a.currentTime=0; a.volume=v; }
-  }catch(e){} }); }
+function unlockAudio(){ if(_audioUnlocked) return; _audioUnlocked=true; _primeCtx();
+  [sndOpen, sndClose, sndError, sndStopout].forEach(s=>s.unlock()); }
 if(typeof document!=='undefined'){ document.addEventListener('pointerdown', unlockAudio, {once:true});
   document.addEventListener('keydown', unlockAudio, {once:true}); }
 
