@@ -373,6 +373,57 @@
   .otick .ttool{height:26px;flex:none;border-bottom:1px solid #e6e9ec;display:flex;align-items:center;gap:10px;padding:0 8px;background:#f3f5f7}
   .otick .ttool span{color:#6a7078;font-size:13px}
   .otick .tcanvas{flex:1;min-height:0;position:relative}
+
+  /* ══════════════ LIGHT THEME (MT5-style) — View → Color Theme. Charts re-theme via themeBus;
+     these override every other surface. Higher specificity (.terminal.light .x) wins over dark. ══ */
+  .terminal.light{ --bg:#e9ebee; --panel:#f5f6f8; --panel2:#eceef1; --line:#c8ccd2; --cellbd:#c2c6cc;
+    --text:#1c2028; --dim:#5c6675; --accent:#2f6ec0; background:#e9ebee; color:#1c2028; }
+  .terminal.light .menu{background:linear-gradient(#fbfbfc,#eceef1);border-bottom:1px solid #c8ccd2;color:#20242a}
+  .terminal.light .menu .mi,.terminal.light .menu>span{color:#20242a}
+  .terminal.light .tools{background:linear-gradient(#f7f8fa,#e7e9ec);border-bottom:1px solid #c8ccd2}
+  .terminal.light .statusbar{background:#eceef1;color:#4a5260;border-top:1px solid #c8ccd2}
+  /* menu dropdowns */
+  .terminal.light .mdrop{background:#ffffff;border:1px solid #b8bcc4;box-shadow:0 6px 20px rgba(0,0,0,.18)}
+  .terminal.light .mdrop .row{color:#20242a}
+  .terminal.light .mdrop .row:hover{background:#2f6ec0;color:#fff}
+  .terminal.light .mdrop .sep{background:#dfe2e6}
+  .terminal.light .mdrop .hd,.terminal.light .mdrop .row .sc,.terminal.light .mdrop .row .ar{color:#8a909a}
+  .terminal.light .mdrop .row.dis{color:#adb2ba}
+  /* toolbar buttons */
+  .terminal.light .tbtn{background:linear-gradient(#fdfdfe,#e9ebee);border:1px solid #c2c6cc;color:#20242a}
+  .terminal.light .tibtn{color:#4a5260}
+  .terminal.light .tibtn:hover{background:linear-gradient(#f2f3f5,#e4e6e9);color:#111;border-color:#c2c6cc}
+  /* left panel: market watch + navigator */
+  .terminal.light .left,.terminal.light .watch,.terminal.light .nav{background:#f5f6f8;color:#1c2028}
+  .terminal.light .mwhead{background:#eceef1;color:#20242a;border-color:#c8ccd2}
+  .terminal.light .mwt th{background:#eceef1;color:#5c6675;border:1px solid #d2d6dc}
+  .terminal.light .mwt td{border:1px solid #e2e5ea;color:#1c2028}
+  .terminal.light .mwt tr.sel{background:#dbe8fb}
+  .terminal.light .mwtabs{background:linear-gradient(#f2f3f5,#e6e8eb);border-top:1px solid #c8ccd2}
+  .terminal.light .mwtabs .mt{color:#5c6675}
+  .terminal.light .mwtabs .mt.on{background:#ffffff;color:#1c2028;border-top-color:#2f6ec0}
+  /* chart workspace */
+  .terminal.light .charts{background:#dfe2e6}
+  .terminal.light .chartgrid{background:#c2c6cc}
+  .terminal.light .win{background:#ffffff}
+  .terminal.light .cell-title{background:linear-gradient(#f2f3f5,#e6e8eb);color:#20242a;border-color:#c8ccd2}
+  .terminal.light .charttabs{background:#e6e8eb;border-top:1px solid #c8ccd2}
+  .terminal.light .charttabs .ctab{background:#e6e8eb;color:#5c6675;border-right:1px solid #d2d6dc}
+  .terminal.light .charttabs .ctab:hover{background:#eff1f3;color:#1c2028}
+  .terminal.light .charttabs .ctab.on{background:#ffffff;color:#1c2028}
+  .terminal.light .noch{color:#8a909a}
+  /* terminal toolbox */
+  .terminal.light .bottom{background:#f5f6f8;border-top:1px solid #c2c6cc;color:#1c2028}
+  .terminal.light table.pos th{background:#eceef1;color:#5c6675;border:1px solid #d2d6dc}
+  .terminal.light table.pos td{border:1px solid #e2e5ea;color:#1c2028}
+  .terminal.light .acctline{background:#eceef1;color:#20242a;border-top:1px solid #c8ccd2}
+  .terminal.light .acctline .k{color:#5c6675}.terminal.light .acctline b{color:#111}
+  .terminal.light .tbxtabs{background:linear-gradient(#f2f3f5,#e4e6e9);border-top:1px solid #c8ccd2}
+  .terminal.light .tbxtabs .t{color:#5c6675}
+  .terminal.light .tbxtabs .t.on{background:#ffffff;color:#1c2028;border-top-color:#2f6ec0}
+  .terminal.light .tbxbody,.terminal.light .empty{color:#5c6675}
+  /* splitter grab-lines a touch darker so they show on light */
+  .terminal.light .hsplit::before,.terminal.light .lhsplit::before,.terminal.light .splitter::before{background:#c2c6cc}
 </style>
 </head>
 <body>
@@ -428,6 +479,16 @@ const IS_MOBILE = (typeof navigator!=='undefined') &&
 // Desktop already ran ~300ms, so the value is 300 for both; the aggressive Market-Watch tick
 // updater stays mobile-gated below (desktop 180ms / mobile 300ms). Applied to every live-price → setState.
 const RENDER_MS = 300;
+
+// ── COLOR THEME (dark default / MT5-style light). UI setting only. themeBus lets the live
+//    Lightweight Charts canvases re-theme without a rebuild; CSS handles every other surface. ──
+const CHART_THEME = {
+  dark:  { bg:'#000000', text:'#b0b6c0', grid:'#363c46', border:'#555555', cross:'#777777' },
+  light: { bg:'#ffffff', text:'#3a4048', grid:'#e3e6ea', border:'#c0c4c8', cross:'#9aa2ab' },
+};
+const themeBus = { theme:'dark', listeners:new Set(),
+  set(t){ this.theme=(t==='light'?'light':'dark'); this.listeners.forEach(fn=>{ try{fn(this.theme);}catch(e){} }); },
+  subscribe(fn){ this.listeners.add(fn); return ()=>this.listeners.delete(fn); } };
 
 /* ══ MT5 ORDER-LIFECYCLE SOUNDS ══════════════════════════════════════════════
    Preloaded HTML5 Audio, one per lifecycle event. Files live at /assets/sounds/.
@@ -1021,13 +1082,20 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     if(!window.LightweightCharts || !box.current) return;      // CDN blocked → no chart, no crash
     // MT5 look: pure-black canvas, dense grey DOTTED gridlines, Tahoma scales.
     const DOT=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dotted)!=null?LightweightCharts.LineStyle.Dotted:1;
+    const th0=CHART_THEME[themeBus.theme]||CHART_THEME.dark;
     const c=LightweightCharts.createChart(box.current, {
-      layout:{ background:{color:'#000000'}, textColor:'#b0b6c0', fontSize:11, fontFamily:"Tahoma, 'Segoe UI', Arial, sans-serif", attributionLogo:false },
-      grid:{ vertLines:{color:'#363c46', style:DOT}, horzLines:{color:'#363c46', style:DOT} },
-      timeScale:{ borderColor:'#555', timeVisible:true, secondsVisible:false },
-      rightPriceScale:{ borderColor:'#555' },
-      crosshair:{ vertLine:{color:'#777', style:DOT}, horzLine:{color:'#777', style:DOT} },
+      layout:{ background:{color:th0.bg}, textColor:th0.text, fontSize:11, fontFamily:"Tahoma, 'Segoe UI', Arial, sans-serif", attributionLogo:false },
+      grid:{ vertLines:{color:th0.grid, style:DOT}, horzLines:{color:th0.grid, style:DOT} },
+      timeScale:{ borderColor:th0.border, timeVisible:true, secondsVisible:false },
+      rightPriceScale:{ borderColor:th0.border },
+      crosshair:{ vertLine:{color:th0.cross, style:DOT}, horzLine:{color:th0.cross, style:DOT} },
     });
+    // live re-theme when the user flips Light/Dark (no rebuild)
+    const unTheme=themeBus.subscribe((t)=>{ const th=CHART_THEME[t]||CHART_THEME.dark;
+      try{ c.applyOptions({ layout:{background:{color:th.bg},textColor:th.text},
+        grid:{vertLines:{color:th.grid},horzLines:{color:th.grid}},
+        timeScale:{borderColor:th.border}, rightPriceScale:{borderColor:th.border},
+        crosshair:{vertLine:{color:th.cross},horzLine:{color:th.cross}} }); }catch(e){} });
     // manual sizing (autoSize OFF): register so splitter-drag + window-resize call chart.resize()
     c.resize(box.current.clientWidth, box.current.clientHeight);
     const unreg=chartResizer.add(c, box.current);
@@ -1074,7 +1142,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       try{ series.current.update(typeRef.current==='line' ? {time:u.time,value:close} : u); }catch(e){}
     }, 400);
     const unsub=priceStore.subscribe(onTick);
-    return ()=>{ unsub(); unreg(); indSeries.current=[]; lines.current=[]; drawLines.current=[]; drawSeries.current=[]; drawStack.current=[]; selDraw.current=null;
+    return ()=>{ unsub(); unreg(); unTheme(); indSeries.current=[]; lines.current=[]; drawLines.current=[]; drawSeries.current=[]; drawStack.current=[]; selDraw.current=null;
       overlays.current.forEach(o=>{ try{o.el.remove();}catch(e){} }); overlays.current=[];   // chart recreated → clear drawings
       try{ c.remove(); }catch(e){} };
   }, [symbol, tf, lazyHold, hydrated]);   // recreate on symbol/tf change; builds when revealed (lazy) and hydrated (idle-deferred)
@@ -1590,7 +1658,9 @@ const MENU_DEF = {
            {l:'Status Bar', v:'statusbar', keep:1}, {sep:1},
            {l:'Market Watch', v:'marketwatch', k:'Ctrl+M', keep:1},
            {l:'Navigator', v:'navigator', k:'Ctrl+N', keep:1},
-           {l:'Toolbox', v:'toolbox', k:'Ctrl+T', keep:1}, {sep:1}, {l:'Full Screen', k:'F11', cmd:'view.fullscreen'} ],
+           {l:'Toolbox', v:'toolbox', k:'Ctrl+T', keep:1}, {sep:1},
+           {l:'Color Theme — Light / Dark', cmd:'theme.toggle', keep:1}, {sep:1},
+           {l:'Full Screen', k:'F11', cmd:'view.fullscreen'} ],
   Insert:[ {l:'Indicators', dis:1}, {sep:1}, {l:'Lines', ar:1, dis:1}, {l:'Channels', ar:1, dis:1},
            {l:'Fibonacci', ar:1, dis:1}, {l:'Shapes', ar:1, dis:1}, {sep:1}, {l:'Text', tool:'text'} ],
   Tools: [ {l:'New Order', cmd:'order.new', k:'F9'}, {l:'History Center', dis:1}, {sep:1},
@@ -2023,6 +2093,8 @@ function App(){
   const [bottomh,setBottomh]=React.useState(cfg.bottomh||188);
   const [navh,setNavh]=React.useState(cfg.navh||186);
   const [termTab,setTermTab]=React.useState('Trade');   // terminal tab bar lives full-width at screen bottom
+  const [theme,setTheme]=React.useState(cfg.theme==='light'?'light':'dark');   // View → Color Theme (UI setting)
+  React.useEffect(()=>{ themeBus.set(theme); }, [theme]);   // broadcast to live chart canvases
   // effective active chart (id may point at a closed one after a close)
   const activeChart = charts.find(c=>c.id===activeId) || charts[0] || null;
   const actRef=React.useRef(null); actRef.current = activeChart ? activeChart.id : null;
@@ -2033,7 +2105,7 @@ function App(){
   const closeChart=React.useCallback((id)=>{ setCharts(cs=>cs.filter(c=>c.id!==id));   // unmount → ChartCell cleanup unsubscribes + chart.remove (no leak)
     setActiveId(a=> a===id ? null : a); }, []);
   React.useEffect(()=>{ priceStore.start(); positionsStore.start(); }, []);
-  React.useEffect(()=>{ wtConfig.save({ indicators, view, leftw, bottomh, navh }); }, [indicators, view, leftw, bottomh, navh]);   // charts NOT persisted → refresh = fixed default
+  React.useEffect(()=>{ wtConfig.save({ indicators, view, leftw, bottomh, navh, theme }); }, [indicators, view, leftw, bottomh, navh, theme]);   // charts NOT persisted → refresh = fixed default
   React.useEffect(()=>{ requestAnimationFrame(()=>chartResizer.resizeAll()); }, [charts.length]);   // reflow charts on add/close
   // ── MT5 keyboard shortcuts (View menu + New Order) ──
   React.useEffect(()=>{
@@ -2056,6 +2128,7 @@ function App(){
     else if(cmd==='chart.new') addChart();
     else if(cmd==='chart.tool') setTool(arg);
     else if(cmd==='view.toggle') setView(v=>({ ...v, [arg]: !v[arg] }));
+    else if(cmd==='theme.toggle') setTheme(t=> t==='light'?'dark':'light');   // View → Color Theme (Light ⇄ Dark)
     else if(cmd==='view.fullscreen'){ try{ if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }catch(e){} }
     else if(cmd==='chart.indicator'){
       if(arg==='__clear__') setIndicators([]);
@@ -2091,7 +2164,7 @@ function App(){
   const gridTiles={ gridTemplateColumns:`repeat(${tcols},1fr)`, gridTemplateRows:`repeat(${trows},1fr)` };
   const activeSym = activeChart ? activeChart.symbol : null;
   return (
-    <div className="terminal" style={gridStyle}>
+    <div className={"terminal"+(theme==='light'?' light':'')} style={gridStyle}>
       <MenuBar indicators={indicators} view={view} tool={tool} />
       {view.toolbars && <Toolbar tf={activeChart?activeChart.tf:'H1'} chartType={activeChart?activeChart.type:'candle'} tool={tool} />}
       {leftShown && <div className="left" style={{'--navh': navh+'px'}}>
