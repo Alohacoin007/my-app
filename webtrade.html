@@ -355,16 +355,32 @@
 </style>
 </head>
 <body>
-<div id="app"><div style="display:flex;height:100vh;align-items:center;justify-content:center;color:#8a97ac;font:14px -apple-system,Segoe UI,Roboto,sans-serif">Alpexa WebTrade 로딩 중… <span style="opacity:.6;margin-left:8px">(차트 엔진 컴파일 ~10–20초)</span></div></div>
+<!-- Static app SHELL — paints in ~0.1s (black screen + ⊕Balance/terminal skeleton) BEFORE the
+     deferred React/Babel/chart libs finish. React's first render replaces #app's children. -->
+<div id="app"><div id="wt-boot" style="position:fixed;inset:0;background:#000;color:#8a97ac;font:13px -apple-system,Segoe UI,Roboto,sans-serif;display:flex;flex-direction:column">
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:10px">
+    <span style="width:14px;height:14px;border:2px solid #2a3340;border-top-color:#3a6ea5;border-radius:50%;display:inline-block;animation:wtspin .8s linear infinite"></span>
+    Alpexa WebTrade 로딩 중…<span style="opacity:.55">차트 엔진 컴파일</span>
+  </div>
+  <div style="height:212px;background:#0d0d0d;border-top:1px solid #333;display:flex;flex-direction:column">
+    <div style="flex:1"></div>
+    <div style="padding:5px 12px;border-top:1px solid #222;color:#8890a0;font-size:11.5px;white-space:nowrap;overflow:hidden">⊕ Balance: <b style="color:#c8ccd2">—</b> &nbsp; Equity: <b style="color:#c8ccd2">—</b> &nbsp; Margin: <b style="color:#c8ccd2">—</b> &nbsp; Free Margin: <b style="color:#c8ccd2">—</b></div>
+    <div style="height:24px;background:linear-gradient(#20242a,#14171c);border-top:1px solid #000"></div>
+  </div>
+</div></div>
+<style>@keyframes wtspin{to{transform:rotate(360deg)}}</style>
 
 <!-- PINNED versions + crossorigin — MUST match crypto-live.html/trading.html (proven-working
      React+Babel setup). Unpinned versions were why the app didn't mount. -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="alpexa-sync.js?v=16"></script>
-<script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+<!-- defer = non-blocking + IN-ORDER: the shell above paints first, libs download in parallel and
+     execute in sequence after parse (supabase → sync → charts → react → react-dom → babel).
+     Babel then transforms the text/babel app on DOMContentLoaded. -->
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script defer src="alpexa-sync.js?v=16"></script>
+<script defer src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js" crossorigin="anonymous"></script>
+<script defer src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script defer src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+<script defer src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
 
 <script type="text/babel" data-presets="react">
 /* ══════════════════════════════════════════════════════════════════════════
@@ -382,6 +398,14 @@ function throttle(fn, interval){
     if(wait<=0){ last=now; fn.apply(null,arguments); return; }
     pending=arguments; if(!timer) timer=setTimeout(fire, wait); };
 }
+
+// ── MOBILE device splitter (iOS/Android) — drives render throttling + lazy chart init below.
+//    PC unchanged; only phones/in-app-webviews take the lighter path.
+const IS_MOBILE = (typeof navigator!=='undefined') &&
+  /Android|iPhone|iPad|iPod|Mobile|IEMobile|Opera Mini/i.test(navigator.userAgent||'');
+// UI re-render throttle: on mobile coalesce fast ticks into ≥400ms batches (save AP/GPU);
+// desktop stays snappy at 300ms. Applied to every live-price → setState subscription.
+const RENDER_MS = IS_MOBILE ? 400 : 300;
 
 /* ══ MT5 ORDER-LIFECYCLE SOUNDS ══════════════════════════════════════════════
    Preloaded HTML5 Audio, one per lifecycle event. Files live at /assets/sounds/.
@@ -686,7 +710,7 @@ function useTradeEngine(){
   const [tick,setTick]=React.useState(0);   // re-render on price ticks so margin figures stay live
   React.useEffect(()=> positionsStore.subscribe(s=>{ setAcct(s.acct); setPos([...s.pos]); }), []);
   React.useEffect(()=> tradeSettings.subscribe(setLeverageState), []);
-  React.useEffect(()=> priceStore.subscribe(throttle(()=>setTick(t=>t+1),300)), []);   // 0.3s live P&L/equity
+  React.useEffect(()=> priceStore.subscribe(throttle(()=>setTick(t=>t+1),RENDER_MS)), []);   // live P&L/equity (mobile-throttled)
   const connected = !!(window.ALPEXA_TRADE_API);   // real execution endpoint present?
   const setLeverage = (n)=> tradeSettings.setLeverage(n);
   // ── leverage → real-time order affordability (all display; server stays the money owner) ──
@@ -850,7 +874,7 @@ function distSeg(px,py,x1,y1,x2,y2){ const dx=x2-x1,dy=y2-y1,L2=dx*dx+dy*dy;
   let t=L2? ((px-x1)*dx+(py-y1)*dy)/L2 : 0; t=Math.max(0,Math.min(1,t));
   return Math.hypot(px-(x1+t*dx), py-(y1+t*dy)); }
 
-function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isActive, onActivate, savedGeo, onGeo, tiled, onClose }){
+function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isActive, onActivate, savedGeo, onGeo, tiled, onClose, lazyHold }){
   const box=React.useRef(null), chart=React.useRef(null), series=React.useRef(null), bar=React.useRef(null);
   const lines=React.useRef([]);           // position order-lines (green) — managed by positions effect
   const drawLines=React.useRef([]);       // USER drawing price-lines (hline/fib) — separate from positions/indicators
@@ -962,6 +986,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   }, []);
 
   React.useEffect(()=>{
+    if(lazyHold) return;                                       // MOBILE lazy init: not revealed yet → don't build the chart
     if(!window.LightweightCharts || !box.current) return;      // CDN blocked → no chart, no crash
     // MT5 look: pure-black canvas, dense grey DOTTED gridlines, Tahoma scales.
     const DOT=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dotted)!=null?LightweightCharts.LineStyle.Dotted:1;
@@ -1014,7 +1039,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     return ()=>{ unsub(); unreg(); indSeries.current=[]; lines.current=[]; drawLines.current=[]; drawSeries.current=[]; drawStack.current=[]; selDraw.current=null;
       overlays.current.forEach(o=>{ try{o.el.remove();}catch(e){} }); overlays.current=[];   // chart recreated → clear drawings
       try{ c.remove(); }catch(e){} };
-  }, [symbol, tf]);   // recreate + reload on symbol OR timeframe change (toolbar sync)
+  }, [symbol, tf, lazyHold]);   // recreate on symbol/tf change; also builds when a lazy-held mobile chart is revealed
 
   // switch chart type WITHOUT recreating the whole chart (swap the price series, re-seed data)
   React.useEffect(()=>{
@@ -1157,6 +1182,9 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       </div>
       <div className="canvas" ref={box}>
         <div className="drawlayer" ref={dlayer}></div>
+        {lazyHold && <div onClick={()=>onActivate&&onActivate(idx)} title="탭하여 차트 로드"
+          style={{position:'absolute',inset:0,zIndex:2,display:'flex',alignItems:'center',justifyContent:'center',
+            background:'#000',color:'#5a6472',font:'12px -apple-system,Segoe UI,sans-serif',cursor:'pointer'}}>차트 탭하여 로드</div>}
         <OrderBox symbol={symbol} />
         <div className="cell-lbl">{ohlc
           ? (ohlc.o!=null ? <span>O {fmtPx(symbol,ohlc.o)} H {fmtPx(symbol,ohlc.h)} L {fmtPx(symbol,ohlc.l)} C {fmtPx(symbol,ohlc.c)}</span>
@@ -1301,7 +1329,7 @@ function TickChart({ symbol }){
 /* Market Watch → Details tab: Bid/Ask + session Hi/Lo + Open/Close for the selected symbol */
 function MWDetails({ sym }){
   const [m,setM]=React.useState(priceStore.get(sym)||{});
-  React.useEffect(()=> priceStore.subscribe(throttle(mids=>setM({...(mids[sym]||{})}),350)), [sym]);
+  React.useEffect(()=> priceStore.subscribe(throttle(mids=>setM({...(mids[sym]||{})}),RENDER_MS)), [sym]);
   const ar=(d)=> d>0? <span className="ar" style={{color:'#26c281'}}>↗</span> : d<0? <span className="ar" style={{color:'#ff4d4d'}}>↘</span> : <span className="ar">·</span>;
   const rows=[['Bid',m.bid,-1,'#ff4d4d'],['Bid High',m.bidHi,1,'#8fb7ff'],['Bid Low',m.bidLo,-1,'#ff4d4d'],
     ['Ask',m.ask,-1,'#ff4d4d'],['Ask High',m.askHi,1,'#8fb7ff'],['Ask Low',m.askLo,-1,'#ff4d4d'],
@@ -1318,7 +1346,7 @@ function MWDetails({ sym }){
 /* Market Watch → Trading tab: stacked one-click SELL/BUY panels per symbol */
 function MWTrading(){
   const [mids,setMids]=React.useState({});
-  React.useEffect(()=> priceStore.subscribe(throttle(m=>setMids({...m}),350)), []);
+  React.useEffect(()=> priceStore.subscribe(throttle(m=>setMids({...m}),RENDER_MS)), []);
   const d=new Date(),p2=n=>String(n).padStart(2,'0'), tm=p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds());
   const big=(sym,v)=>{ const s=fmtPx(sym,v); return s==='—'?s:<span>{s.slice(0,-1)}<sup>{s.slice(-1)}</sup></span>; };
   return (
@@ -1357,7 +1385,7 @@ function MarketWatch({ onPick }){
               ask: c.ask>p.ask?1 : c.ask<p.ask?-1 : last.ask };
       if(c.bid!=null) prev.current[s]={ bid:c.bid, ask:c.ask }; });
     dirRef.current=nd; setDirs(nd); setMids({...m});
-  }, 350)), []);
+  }, RENDER_MS)), []);
   const ctx=(e,sym)=>{ e.preventDefault(); setSel(sym); setMenu({ sym, x:e.clientX, y:e.clientY }); };
   const tc=(d)=> d>0?'tick-up':d<0?'tick-down':'';   // sticky tick colour (held until next up/down)
   const cur=sel||WATCH[0];
@@ -1454,7 +1482,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
   const [leverage,setLev]=React.useState(tradeSettings.leverage);
   const eng=useTradeEngine();
   React.useEffect(()=> positionsStore.subscribe(s=>{ setAcct(s.acct); setPos([...s.pos]); }), []);
-  React.useEffect(()=> priceStore.subscribe(throttle(m=>setMids({...m}),300)), []);   // 0.3s live P&L
+  React.useEffect(()=> priceStore.subscribe(throttle(m=>setMids({...m}),RENDER_MS)), []);   // live P&L (mobile-throttled)
   React.useEffect(()=> tradeSettings.subscribe(setLev), []);   // margin/level track the chosen leverage
   const closePos=async(p)=>{
     if(p._demo){ positionsStore.removeDemo(p.local_id); playSnd(sndClose); return; }   // demo row → drop it (+청산음)
@@ -1819,7 +1847,7 @@ function OrderModal({ symbol:sym0, onClose }){
 
   React.useEffect(()=>{ const un=priceStore.subscribe(throttle(mids=>{ const q=mids[symbol]; if(!q) return;
     const pb=prev.current; dir.current={ bid:q.bid-(pb.bid||q.bid)>0?1:q.bid<(pb.bid||q.bid)?-1:0, ask:q.ask-(pb.ask||q.ask)>0?1:q.ask<(pb.ask||q.ask)?-1:0 };
-    prev.current={bid:q.bid,ask:q.ask}; setM({...q}); }, 180)); return un; }, [symbol]);
+    prev.current={bid:q.bid,ask:q.ask}; setM({...q}); }, IS_MOBILE?RENDER_MS:180)); return un; }, [symbol]);
 
   // right-side live tick chart: Ask(red) + Bid(blue), advancing right on every tick
   React.useEffect(()=>{
@@ -1943,6 +1971,12 @@ function App(){
   const initCharts=React.useRef(GRID.map((s,i)=>({ id:i+1, symbol:s, tf:'M1', type:'candle' }))).current;
   const [charts,setCharts]=React.useState(initCharts);   // dynamic chart windows [{id,symbol,tf,type}]
   const [activeId,setActiveId]=React.useState(initCharts[0]?initCharts[0].id:null);
+  // MOBILE lazy chart init: only mount the chart(s) the user has REVEALED (seeded with the active
+  // one). Hidden tiles create their Lightweight Charts instance the moment they're tapped or on
+  // Window→Tile. Desktop reveals eagerly (lazyHold below is gated on IS_MOBILE → all charts mount).
+  const [revealed,setRevealed]=React.useState(()=> new Set(IS_MOBILE && initCharts[0] ? [initCharts[0].id] : []));
+  const revealChart=React.useCallback((id)=>{ if(IS_MOBILE) setRevealed(s=> s.has(id)?s:new Set(s).add(id)); }, []);
+  const activate=React.useCallback((id)=>{ setActiveId(id); if(IS_MOBILE) setRevealed(s=> s.has(id)?s:new Set(s).add(id)); }, []);
   const idRef=React.useRef(initCharts.reduce((mx,c)=>Math.max(mx,c.id),0));
   const chartsRef=React.useRef(charts); chartsRef.current=charts;
   const [orderSym,setOrderSym]=React.useState(null);     // popup Order dialog target (null = closed)
@@ -1958,7 +1992,8 @@ function App(){
   const actRef=React.useRef(null); actRef.current = activeChart ? activeChart.id : null;
   // ── chart window life-cycle ──
   const addChart=React.useCallback((symbol)=>{ const id=++idRef.current;
-    setCharts(cs=>cs.concat([{ id, symbol:symbol||WATCH[0], tf:'M1', type:'candle' }])); setActiveId(id); }, []);
+    setCharts(cs=>cs.concat([{ id, symbol:symbol||WATCH[0], tf:'M1', type:'candle' }])); setActiveId(id);
+    if(IS_MOBILE) setRevealed(s=> new Set(s).add(id)); }, []);   // a freshly-opened chart is revealed
   const closeChart=React.useCallback((id)=>{ setCharts(cs=>cs.filter(c=>c.id!==id));   // unmount → ChartCell cleanup unsubscribes + chart.remove (no leak)
     setActiveId(a=> a===id ? null : a); }, []);
   React.useEffect(()=>{ priceStore.start(); positionsStore.start(); }, []);
@@ -1992,6 +2027,7 @@ function App(){
     }
     else if(cmd==='order.new'){ const ac=chartsRef.current.find(c=>c.id===actRef.current)||chartsRef.current[0]; setOrderSym(arg||(ac&&ac.symbol)||WATCH[0]); }
     else if(cmd==='window.tile'){
+      if(IS_MOBILE) setRevealed(new Set(chartsRef.current.map(c=>c.id)));   // tile = load EVERY chart (lazy → eager)
       // OVERLAY-AWARE tile: fit the 2×2 grid into the ACTIVE height = the strip visible ABOVE the
       // floating toolbox. Measure the toolbox's real top line (it may be pulled up over the charts)
       // and clamp .charts to (chart-top → toolbox-top − chart-tab-bar), then re-render every candle
@@ -2032,15 +2068,16 @@ function App(){
       <div className="right">
         <div className="charts">
           <div className="chartgrid" style={gridTiles}>
-            {charts.map((c)=><ChartCell key={c.id} idx={c.id} isActive={c.id===(activeChart&&activeChart.id)} onActivate={setActiveId}
+            {charts.map((c)=><ChartCell key={c.id} idx={c.id} isActive={c.id===(activeChart&&activeChart.id)} onActivate={activate}
               symbol={c.symbol} tf={c.tf} indicators={indicators} chartType={c.type} tool={tool}
+              lazyHold={IS_MOBILE && !revealed.has(c.id)}
               tiled onClose={()=>closeChart(c.id)} />)}
             {!charts.length && <div className="noch">No charts open — File → New Chart Window, or double-click a Market Watch symbol.</div>}
           </div>
         </div>
         {/* layer 2: chart-window tab bar — glued directly under the charts. click=focus, ✕=close+unsubscribe */}
         {!!charts.length && <div className="charttabs">{charts.map(c=>
-          <div key={c.id} className={"ctab"+(c.id===(activeChart&&activeChart.id)?' on':'')} onClick={()=>setActiveId(c.id)} title={c.symbol+'.FX,'+c.tf}>{c.symbol}.FX,{c.tf}
+          <div key={c.id} className={"ctab"+(c.id===(activeChart&&activeChart.id)?' on':'')} onClick={()=>activate(c.id)} title={c.symbol+'.FX,'+c.tf}>{c.symbol}.FX,{c.tf}
             <span className="tclose" onClick={(e)=>{e.stopPropagation();closeChart(c.id);}} title="Close chart">✕</span></div>)}</div>}
       </div>
       {/* GLOBAL floating toolbox overlay — pinned to window bottom (absolute, z-9999), covers the
