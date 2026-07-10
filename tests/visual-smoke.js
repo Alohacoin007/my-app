@@ -77,6 +77,53 @@ const INIT = `
 })();
 `;
 
+// agent.html uses a CUSTOM PIN session (not Supabase auth): on boot it reads
+// sessionStorage['alpexa.agent']='CODE|PIN' and hydrates from the `agents` table. This mock
+// injects that session + a rich per-table dataset so the page bypasses the login card and
+// renders the LOGGED-IN commission dashboard (agents/agent_links/players/settlements/agent_payouts).
+// Injected AFTER the generic INIT (overrides window.supabase for this page only).
+const AGENT_INIT = `
+(function(){
+  try{ sessionStorage.setItem('alpexa.agent','AG-TEST|0000'); }catch(e){}
+  var A='AG-TEST';
+  var iso=function(d){ return new Date(Date.now()-d*86400000).toISOString(); };   // always in the 30d window
+  var DATA={
+    agents:[{code:A,name:'Test Partner',email:'partner@test.dev',pin:'0000',status:'active',fx_per_lot:5,sports_net_pct:20,crypto_fee_pct:15}],
+    agent_links:[{agent_code:A,cust_id:'C1',share:100},{agent_code:A,cust_id:'C2',share:50}],
+    players:[{cust_id:'C1',name:'Alice'},{cust_id:'C2',name:'Bob'}],
+    settlements:[
+      {cust_id:'C1',server:'fx',kind:'fx_close',stake:1.5,pnl:120,created_at:iso(1)},
+      {cust_id:'C2',server:'sports',kind:'bet_won',stake:50,pnl:80,created_at:iso(1)},
+      {cust_id:'C1',server:'sports',kind:'bet_lost',stake:30,pnl:-30,created_at:iso(2)},
+      {cust_id:'C2',kind:'crypto_fee',stake:12.5,pnl:0,created_at:iso(2)}
+    ],
+    agent_payouts:[
+      {agent_code:A,amount:100,method:'crypto',status:'approved',created_at:iso(9)},
+      {agent_code:A,amount:40,method:'bank',status:'pending',created_at:iso(5)}
+    ]
+  };
+  function res(rows){ return Promise.resolve({data:rows, error:null}); }
+  function from(table){
+    var rows = DATA[table]||[];
+    var b={};
+    ['select','eq','neq','ilike','like','in','order','limit','gte','lte','gt','lt','is','match','not','or','filter','range'].forEach(function(k){ b[k]=function(){return b;}; });
+    b.insert=function(){ return b; };
+    b.single=function(){ return res(rows[0]||null); };
+    b.maybeSingle=function(){ return res(rows[0]||null); };
+    b.then=function(f,g){ return res(rows).then(f,g); };
+    b.catch=function(){ return b; };
+    return b;
+  }
+  var MOCK = { createClient:function(){ return {
+    from:from, channel:function(){return {on:function(){return this;},subscribe:function(){return this;}};}, removeChannel:function(){} }; } };
+  // Pin the mock: agent.html loads the REAL supabase-js from a CDN in <head> which would clobber
+  // window.supabase. A getter that always returns MOCK (and a no-op setter, so even the strict-mode
+  // UMD assignment doesn't throw) guarantees our mock wins regardless of whether the CDN loads.
+  try{ Object.defineProperty(window,'supabase',{ configurable:false, get:function(){return MOCK;}, set:function(){} }); }
+  catch(e){ window.supabase = MOCK; }
+})();
+`;
+
 const PAGES = ['index.html', 'login.html', 'signup.html', 'statement.html',
                'crypto-live.html', 'trading.html', 'sports-live.html', 'manager-mobile.html', 'webtrade.html',
                'fx.html', 'agent.html'];
@@ -104,8 +151,24 @@ function isNoise(t) {
     pg.on('console', (m) => { if (m.type() === 'error' && !isNoise(m.text())) crashes.push('console: ' + m.text()); });
     try {
       await pg.addInitScript(INIT);
+      if (page === 'agent.html') {
+        await pg.addInitScript(AGENT_INIT);                                     // rich PIN-session mock → logged-in dashboard
+        // agent.html has a blocking Google-Fonts <link> + supabase-js <script> in <head>; offline
+        // they hang and stall the inline app for ~12s (a pending stylesheet blocks script exec).
+        // Fulfill every external request instantly (empty, by type) so the dashboard renders fast.
+        await pg.route(/^https?:\/\//, (r) => { const t = r.request().resourceType();
+          if (t === 'stylesheet' || t === 'font') return r.fulfill({ status: 200, contentType: 'text/css', body: '' });
+          if (t === 'script') return r.fulfill({ status: 200, contentType: 'application/javascript', body: '/*mock*/' });
+          return r.fulfill({ status: 200, body: '' }); });
+      }
       await pg.goto('file://' + fp, { waitUntil: 'commit', timeout: 12000 });
       await pg.waitForTimeout(1800);                                            // let React/Babel mount
+      if (page === 'agent.html') {                                             // expand every collapsible section so the
+        for (const id of ['cust', 'tr', 'pay']) {                             // customers / recent-trades / payouts tables
+          try { await pg.evaluate((i) => { const e = document.querySelector('[data-tg="' + i + '"]'); if (e) e.click(); }, id); } catch (e) {}
+          await pg.waitForTimeout(150);                                        // each click re-renders #wrap; TG state persists
+        }
+      }
     } catch (e) {
       // A navigation timeout/failure here = a blocked CDN script in the sandbox, not our bug.
       console.log('  ⏭️  ' + page + ' — could not load (blocked CDN / env), skipped');
@@ -133,6 +196,36 @@ function isNoise(t) {
           else console.log('  ✅ crypto-live chart path coordinates are finite');
         } else console.log('  ⏭️  crypto-live chart not mounted (React/Babel CDN likely blocked) — skipped chart assert');
       } catch (e) {}
+    }
+
+    // agent.html LOGGED-IN dashboard: must enter (not stuck on login) + the commission KPI grid
+    // must stay a laid-out 2×2 (no collapsed/overflowing cells) — the settlement-layout lock.
+    if (page === 'agent.html') {
+      try {
+        const dash = await pg.evaluate(() => {
+          const signedIn = !!document.getElementById('btnOut');     // dashboard sign-out (present only when logged in)
+          const onLogin = !!document.getElementById('lgGo');        // login button (must be gone)
+          const kpis = Array.prototype.slice.call(document.querySelectorAll('.kpis .kpi')).map((k) => {
+            const r = k.getBoundingClientRect(); return { t: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) }; });
+          const hdr = document.querySelector('.hdr');
+          const name = hdr ? (hdr.textContent || '').replace(/\s+/g, ' ').trim() : '';
+          const wrap = document.getElementById('wrap');
+          const overflow = wrap ? (wrap.scrollWidth - wrap.clientWidth) : 0;
+          const twoCol = kpis.length === 4 && Math.abs(kpis[0].t - kpis[1].t) < 2 && kpis[2].t > kpis[0].t + 2;
+          const collapsed = kpis.some((k) => k.w <= 0 || k.h <= 0);
+          const secs = document.querySelectorAll('.sec').length;    // commission / withdraw / customers / trades / payouts headers
+          return { signedIn, onLogin, n: kpis.length, twoCol, collapsed, overflow, name, secs };
+        });
+        if (!dash.signedIn || dash.onLogin) {
+          failed = true; console.log('  🔴 agent.html stuck on LOGIN — mock session did NOT enter the dashboard');
+        } else if (dash.n < 4 || dash.collapsed || !dash.twoCol) {
+          failed = true; console.log('  🔴 agent.html commission KPI grid broken (n=' + dash.n + ' twoCol=' + dash.twoCol + ' collapsed=' + dash.collapsed + ')');
+        } else if (dash.overflow > 8) {
+          failed = true; console.log('  🔴 agent.html dashboard overflows horizontally by ' + dash.overflow + 'px (layout shifted)');
+        } else {
+          rendered++; console.log('  ✅ agent.html LOGGED-IN dashboard OK — 2×2 KPI grid intact, ' + dash.secs + ' sections, 0 overflow, "' + dash.name.slice(0, 26) + '"');
+        }
+      } catch (e) { console.log('  ⏭️  agent.html dashboard assert skipped: ' + String(e.message).slice(0, 80)); }
     }
     await pg.close();
   }
