@@ -15,8 +15,8 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 
 // Files that actually ship (GitHub Pages) — orphan prototypes are excluded on purpose.
-const DEPLOYED = ['crypto-live.html', 'sports-live.html', 'trading.html', 'webtrade.html', 'index.html',
-                  'login.html', 'signup.html', 'manager-mobile.html', 'compliance.js',
+const DEPLOYED = ['crypto-live.html', 'sports-live.html', 'trading.html', 'webtrade.html', 'fx.html', 'index.html',
+                  'login.html', 'signup.html', 'manager-mobile.html', 'agent.html', 'compliance.js',
                   'alpexa-sync.js'];
 const MONEY_EDGE = ['sports-settle', 'stake-accrue'];   // edge fns that MOVE money (must fail-closed)
 // Price/game FEEDS: not payouts, but they WRITE market data settlements read, and a fail-open
@@ -25,7 +25,7 @@ const FEED_EDGE = ['crypto-prices', 'fx-prices', 'sports-games', 'sports-odds', 
 // Every page a customer could ever load (shipped apps + landing + the parked site/ mirror) —
 // scanned so hardcoded FAKE BALANCES / demo emails can't sneak back (the 2026-06 cleanup class).
 const DEMO_FILES = DEPLOYED.concat([
-  'agent.html', 'manager.html', 'manager-app.html',
+  'manager.html', 'manager-app.html',   // agent.html now in DEPLOYED above
   'site/index.html', 'site/wallet.html', 'site/settings.html', 'site/dashboard.html',
   'site/my-bets.html', 'site/sports.html', 'site/promotions.html',
   'site/introducing-broker.html', 'site/legal.html', 'site/login.html', 'site/signup.html']);
