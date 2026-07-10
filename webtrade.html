@@ -226,7 +226,9 @@
   .mwdet table{width:100%;border-collapse:collapse;font-size:11.5px}
   .mwdet td{padding:3px 8px;border-bottom:1px solid #14181e;white-space:nowrap}
   .mwdet td.k{color:#c4c8d0}.mwdet td.v{text-align:right;font-variant-numeric:tabular-nums}
-  .mwdet td .ar{display:inline-block;width:12px;color:#8a9098}
+  .mwdet td .ar{display:inline-block;width:12px;text-align:center}
+  .mwdet td .ar.up{color:#26c281}.mwdet td .ar.dn{color:#ff4d4d}.mwdet td .ar.nu{color:#8a9098}
+  .mwdet td.v.up{color:#5b9bff}.mwdet td.v.dn{color:#ff4d4d}.mwdet td.v.nu{color:#c4c8d0}
   /* Trading tab — stacked one-click panels */
   .mwtrade{padding:0}
   .mwtp{border-bottom:1px solid #23272d;padding:4px 6px 6px}
@@ -441,6 +443,12 @@
   .terminal.light .mwtabs{background:#e1e1e1;border-top:1px solid #b0b0b0}
   .terminal.light .mwtabs .mt{color:#333}
   .terminal.light .mwtabs .mt.on{background:#ffffff;color:#000;border-top-color:#316ac5}
+  /* Details tab (light) — white bg, blue up / red down values on black labels */
+  .terminal.light .mwdet .sh{color:#1a5fb4;border-bottom-color:#c0c0c0}
+  .terminal.light .mwdet td{border-bottom-color:#e2e2e2}
+  .terminal.light .mwdet td.k{color:#000;font-weight:600}
+  .terminal.light .mwdet td .ar.up{color:#008000}.terminal.light .mwdet td .ar.dn{color:#cc0000}.terminal.light .mwdet td .ar.nu{color:#888}
+  .terminal.light .mwdet td.v.up{color:#0000cc}.terminal.light .mwdet td.v.dn{color:#cc0000}.terminal.light .mwdet td.v.nu{color:#333}
   /* CHART workspace — white windows, gray separators, #b0b0b0 borders */
   .terminal.light .charts,.terminal.light .chartgrid{background:#a0a0a0}
   .terminal.light .win{background:#ffffff;border:1px solid #b0b0b0}
@@ -1513,16 +1521,25 @@ function TickChart({ symbol }){
 /* Market Watch → Details tab: Bid/Ask + session Hi/Lo + Open/Close for the selected symbol */
 function MWDetails({ sym }){
   const [m,setM]=React.useState(priceStore.get(sym)||{});
-  React.useEffect(()=> priceStore.subscribe(throttle(mids=>setM({...(mids[sym]||{})}),RENDER_MS)), [sym]);
-  const ar=(d)=> d>0? <span className="ar" style={{color:'#26c281'}}>↗</span> : d<0? <span className="ar" style={{color:'#ff4d4d'}}>↘</span> : <span className="ar">·</span>;
-  const rows=[['Bid',m.bid,-1,'#ff4d4d'],['Bid High',m.bidHi,1,'#8fb7ff'],['Bid Low',m.bidLo,-1,'#ff4d4d'],
-    ['Ask',m.ask,-1,'#ff4d4d'],['Ask High',m.askHi,1,'#8fb7ff'],['Ask Low',m.askLo,-1,'#ff4d4d'],
-    ['Open Price',m.open,0,'#c4c8d0'],['Close Price',m.open,0,'#c4c8d0']];
+  const st=React.useRef({pb:null,pa:null,db:0,da:0});   // prev bid/ask + last live tick direction
+  React.useEffect(()=>{ st.current={pb:null,pa:null,db:0,da:0};
+    return priceStore.subscribe(throttle(mids=>{ const q=mids[sym]||{}, s=st.current;
+      if(q.bid!=null && s.pb!=null && q.bid!==s.pb) s.db=q.bid>s.pb?1:-1;
+      if(q.ask!=null && s.pa!=null && q.ask!==s.pa) s.da=q.ask>s.pa?1:-1;
+      s.pb=q.bid; s.pa=q.ask; setM({...q});
+    },RENDER_MS)); }, [sym]);
+  // MT5 Details: GREEN ↗ / RED ↘ arrows; value BLUE on up-tick, RED on down-tick, GRAY for Open/Close.
+  const ar=(d)=> d>0? <span className="ar up">↗</span> : d<0? <span className="ar dn">↘</span> : <span className="ar nu">·</span>;
+  const vc=(d)=> d>0? 'v up' : d<0? 'v dn' : 'v nu';
+  const s=st.current;
+  const rows=[['Bid',m.bid,s.db],['Bid High',m.bidHi,1],['Bid Low',m.bidLo,-1],
+    ['Ask',m.ask,s.da],['Ask High',m.askHi,1],['Ask Low',m.askLo,-1],
+    ['Open Price',m.open,0],['Close Price',m.open,0]];
   return (
     <div className="mwdet">
       <div className="sh">{sym}.FX, {SYM_NAME[sym]||sym}</div>
       <table><tbody>
-        {rows.map(([k,v,d,col],i)=><tr key={i}><td className="k">{ar(d)}{k}</td><td className="v" style={{color:col}}>{fmtPx(sym,v)}</td></tr>)}
+        {rows.map(([k,v,d],i)=><tr key={i}><td className="k">{ar(d)}{k}</td><td className={vc(d)}>{fmtPx(sym,v)}</td></tr>)}
       </tbody></table>
     </div>
   );
