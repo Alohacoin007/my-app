@@ -1982,7 +1982,21 @@ function App(){
       else setIndicators(list=> list.indexOf(arg)>=0 ? list.filter(x=>x!==arg) : list.concat(arg));
     }
     else if(cmd==='order.new'){ const ac=chartsRef.current.find(c=>c.id===actRef.current)||chartsRef.current[0]; setOrderSym(arg||(ac&&ac.symbol)||WATCH[0]); }
-    // chart.zoom → the active ChartCell (gated on its isActive); window.tile → all windows
+    else if(cmd==='window.tile'){
+      // OVERLAY-AWARE tile: fit the 2×2 grid into the ACTIVE height = the strip visible ABOVE the
+      // floating toolbox. Measure the toolbox's real top line (it may be pulled up over the charts)
+      // and clamp .charts to (chart-top → toolbox-top − chart-tab-bar), then re-render every candle
+      // chart to the new mini size. Toolbox at rest (212px dock) → full height back (charts expand).
+      const chartsEl=document.querySelector('.charts'); if(!chartsEl) return;
+      const tb=document.querySelector('.toolbox'), ct=document.querySelector('.charttabs');
+      const top=chartsEl.getBoundingClientRect().top;
+      const tbTop=tb?tb.getBoundingClientRect().top:window.innerHeight;   // ceiling the charts must fit under
+      const ctH=ct?ct.offsetHeight:0;
+      const active=Math.max(120, Math.round(tbTop - top - ctH));          // pure visible area above the toolbox
+      chartsEl.style.flex='none'; chartsEl.style.height=active+'px';      // clamp the grid parent (compact)
+      requestAnimationFrame(()=>chartResizer.resizeAll());               // broadcast resize() → crisp mini candles + Y-axis
+    }
+    // chart.zoom → the active ChartCell (gated on its isActive); window.tile → grid clamp (above)
   }), []);
   const leftShown = view.marketwatch || view.navigator;
   const gridStyle = {
