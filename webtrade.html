@@ -111,26 +111,32 @@
   .nav li.leaf .ic{margin-right:4px}
   .nav .ic{display:inline-block;width:15px;text-align:center;margin-right:5px}
   /* ── one-click order box (top-left of each chart) ── */
-  /* MT5 one-click panel — pixel-matched override ([SELL] [volume] [BUY], 42px, angular) */
-  .obox{position:absolute;top:6px;left:6px;z-index:1000;display:flex;align-items:stretch;height:42px;
-    border:1px solid #050505;box-shadow:0 1px 4px rgba(0,0,0,.55);background:#0d0e12;
+  /* MT5 one-click panel — near-square 2-layer block (top: SELL/vol/BUY · bottom: big quotes) */
+  .obox{position:absolute;top:6px;left:6px;z-index:1000;width:192px;height:76px;display:flex;flex-direction:column;
+    border:1px solid #050505;box-shadow:0 1px 5px rgba(0,0,0,.6);background:#0d0e12;
     font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,Arial,sans-serif}
-  .obox *{border-radius:0 !important;box-sizing:border-box;font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,Arial,sans-serif}
-  .obox .side{height:100%;padding:2px 9px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;min-width:70px;color:#fff;line-height:1;text-shadow:1px 1px 1px rgba(0,0,0,.8)}
-  .obox .sell{background:linear-gradient(to bottom,#bd3a30 0%,#8d1c14 100%);border-top:1px solid rgba(255,255,255,.28)}
-  .obox .buy{background:linear-gradient(to bottom,#2b579a 0%,#1e3d70 100%);border-top:1px solid rgba(255,255,255,.28)}
-  .obox .side:hover{filter:brightness(1.1)}
-  .obox .side:active{box-shadow:inset 0 2px 5px rgba(0,0,0,.6);transform:translateY(1px)}
-  .obox .lbl{font-size:9px;letter-spacing:1px;opacity:.95;margin-bottom:1px;font-weight:bold}
-  .obox .bf{display:inline-flex;align-items:baseline;line-height:1;font-variant-numeric:tabular-nums}
-  .obox .bf .sm{font-size:11px;font-weight:400;color:#fff;line-height:1}       /* 앞자리 1.14 — baseline 정렬 */
-  .obox .bf .bg{font-size:22px;font-weight:900;color:#fff;line-height:1}        /* 핵심 핍 — 순백/굵게 */
-  .obox .bf .fr{align-self:flex-start;font-size:9px;font-weight:700;color:#fff;line-height:1;margin-left:1px;transform:translateY(-4px)}  /* 위첨자 — 우상단 꼬리에 밀착 */
-  .obox .vol{position:relative;height:100%;width:68px;background:#e1e1e1;color:#20242a;display:flex;align-items:center;justify-content:center;border-left:1px solid #555;border-right:1px solid #555}
-  .obox .vol b{position:absolute;top:50%;transform:translateY(-50%);cursor:pointer;color:#333;font-size:9px;width:14px;text-align:center;user-select:none;line-height:1}
-  .obox .vol b.dn{left:0}.obox .vol b.up{right:0}
-  .obox .vol b:hover{color:#1e3d70}
-  .obox .vol input{width:34px;height:22px;text-align:center;padding:0;border:1px dashed #888888;background:#fff;color:#111;font-weight:bold;font-size:12px;outline:none}
+  .obox *{border-radius:0 !important;box-sizing:border-box;font-family:inherit}
+  /* top 1/3 — labels + centered volume */
+  .oc-top{height:26px;flex:none;display:flex;align-items:stretch}
+  .oc-lbl{flex:1;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:bold;letter-spacing:1px;
+    cursor:pointer;text-shadow:1px 1px 1px rgba(0,0,0,.7);background:linear-gradient(to bottom,#2b579a,#1e3d70)}
+  .oc-lbl:hover{filter:brightness(1.13)}
+  .oc-vol{width:66px;flex:none;position:relative;background:#e1e1e1;display:flex;align-items:center;justify-content:center;border-left:1px solid #555;border-right:1px solid #555}
+  .oc-vol b{position:absolute;top:50%;transform:translateY(-50%);cursor:pointer;color:#333;font-size:9px;width:14px;text-align:center;user-select:none;line-height:1}
+  .oc-vol b.dn{left:0}.oc-vol b.up{right:0}
+  .oc-vol b:hover{color:#1e3d70}
+  .oc-vol input{width:34px;height:20px;text-align:center;padding:0;border:1px dashed #888888;background:#fff;color:#111;font-weight:bold;font-size:12px;outline:none}
+  /* bottom 2/3 — SELL | BUY big quotes, 50:50 */
+  .oc-bot{flex:1;display:flex;align-items:stretch}
+  .oc-price{flex:1;position:relative;display:flex;align-items:flex-end;justify-content:flex-start;padding:0 9px 6px;
+    color:#fff;cursor:pointer;text-shadow:1px 1px 1px rgba(0,0,0,.7);background:linear-gradient(to bottom,#2442a0,#102470);border-top:1px solid #050505}
+  .oc-price:hover{filter:brightness(1.1)}
+  .oc-price:active{box-shadow:inset 0 2px 6px rgba(0,0,0,.55)}
+  .oc-price+.oc-price{border-left:1px solid #050505}
+  .oc-price .bf{display:inline-flex;align-items:baseline;line-height:1;font-variant-numeric:tabular-nums}
+  .oc-price .bf .sm{font-size:11px;font-weight:400;color:#dfe6f2}             /* 앞자리 1.14 — 좌하단 작게 */
+  .oc-price .bf .bg{font-size:30px;font-weight:900;color:#fff;line-height:.9} /* 핵심 핍 — 거대 */
+  .oc-price .bf .fr{align-self:flex-start;font-size:11px;font-weight:700;color:#fff;margin-left:1px;transform:translateY(-5px)}  /* 위첨자 우상단 밀착 */
   .mwt{width:100%;border-collapse:collapse}
   .mwt th{position:sticky;top:0;background:#0a0d12;color:var(--dim);font-weight:600;font-size:11px;text-align:right;padding:3px 6px;border:1px solid var(--line)}
   .mwt th:first-child{text-align:left}
@@ -658,18 +664,22 @@ function OrderBox({ symbol }){
     if(r.reason==='not_logged_in'){ positionsStore.addDemo({ symbol, side, volume:+vol||0.01, price }); return; }   // demo
     alert('주문 거절(Rejected): '+(r.reason||'unknown'));
   };
+  const dec=()=>setVol((Math.max(0.01,(+vol||0.01)-0.01)).toFixed(2));
+  const inc=()=>setVol((Math.max(0.01,(+vol||0)+0.01)).toFixed(2));
   return (
     <div className="obox">
-      <div className="side sell" title="Sell at Bid" onClick={(e)=>{e.stopPropagation();send('sell');}}>
-        <span className="lbl">SELL</span><BigFig symbol={symbol} v={m.bid} />
+      <div className="oc-top">
+        <div className="oc-lbl" title="Sell at Bid" onClick={(e)=>{e.stopPropagation();send('sell');}}>SELL</div>
+        <div className="oc-vol" onClick={e=>e.stopPropagation()}>
+          <b className="dn" onClick={dec} title="−0.01">▼</b>
+          <input value={vol} onChange={e=>setVol(e.target.value)} title="Volume (lots)" />
+          <b className="up" onClick={inc} title="+0.01">▲</b>
+        </div>
+        <div className="oc-lbl" title="Buy at Ask" onClick={(e)=>{e.stopPropagation();send('buy');}}>BUY</div>
       </div>
-      <div className="vol" onClick={e=>e.stopPropagation()}>
-        <b className="dn" onClick={()=>setVol((Math.max(0.01,(+vol||0.01)-0.01)).toFixed(2))} title="−0.01">▼</b>
-        <input value={vol} onChange={e=>setVol(e.target.value)} title="Volume (lots)" />
-        <b className="up" onClick={()=>setVol((Math.max(0.01,(+vol||0)+0.01)).toFixed(2))} title="+0.01">▲</b>
-      </div>
-      <div className="side buy" title="Buy at Ask" onClick={(e)=>{e.stopPropagation();send('buy');}}>
-        <span className="lbl">BUY</span><BigFig symbol={symbol} v={m.ask} />
+      <div className="oc-bot">
+        <div className="oc-price" title="Sell at Bid" onClick={(e)=>{e.stopPropagation();send('sell');}}><BigFig symbol={symbol} v={m.bid} /></div>
+        <div className="oc-price" title="Buy at Ask" onClick={(e)=>{e.stopPropagation();send('buy');}}><BigFig symbol={symbol} v={m.ask} /></div>
       </div>
     </div>
   );
