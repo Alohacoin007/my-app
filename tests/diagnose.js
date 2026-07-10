@@ -15,7 +15,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 
 // Files that actually ship (GitHub Pages) — orphan prototypes are excluded on purpose.
-const DEPLOYED = ['crypto-live.html', 'sports-live.html', 'trading.html', 'index.html',
+const DEPLOYED = ['crypto-live.html', 'sports-live.html', 'trading.html', 'webtrade.html', 'index.html',
                   'login.html', 'signup.html', 'manager-mobile.html', 'compliance.js',
                   'alpexa-sync.js'];
 const MONEY_EDGE = ['sports-settle', 'stake-accrue'];   // edge fns that MOVE money (must fail-closed)
