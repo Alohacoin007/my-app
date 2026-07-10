@@ -159,7 +159,10 @@
   .up{color:var(--up)}.down{color:var(--down)}
   /* ── MDI workspace: charts area is a positioning context; each chart is a free
      floating window (absolute) that can move, resize and overlap like real MT5. ── */
-  .charts{grid-area:charts;display:flex;flex-direction:column;overflow:hidden;background:#0a0d12}
+  /* RIGHT column = vertical stack: charts (1f) → chart-tab bar → terminal toolbox.
+     Left Symbols column sits beside this whole stack at full height (grid: left|splitter|right). */
+  .right{grid-area:right;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
+  .charts{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;background:#0a0d12}
   .chartgrid{flex:1;min-height:0;display:grid;gap:1px;background:var(--cellbd)}   /* auto-tiled N charts */
   .win{position:absolute;background:#000;display:flex;flex-direction:column;
     border:1px solid var(--cellbd);box-shadow:0 2px 12px rgba(0,0,0,.55);
@@ -258,9 +261,10 @@
   .ctxmenu.sub{position:absolute;left:100%;top:-3px;min-width:150px;z-index:1201}
   .ctxmenu .ci .ic svg{width:15px;height:15px}
   /* ── Bottom: KPI strip + Excel-grid positions table ── */
-  .bottom{grid-area:bottom;background:#0d0d0d;border-top:1px solid var(--cellbd);display:flex;flex-direction:column;overflow:hidden;
+  .bottom{flex:none;height:var(--bottomh,188px);background:#0d0d0d;border-top:1px solid var(--cellbd);display:flex;flex-direction:column;overflow:hidden;
     font-family:"Segoe UI",Tahoma,sans-serif;font-size:11px}
-  .tbxtabs{display:flex;background:linear-gradient(#20242a,#14171c);border-bottom:1px solid #000}
+  /* terminal tab bar docked at the BOTTOM (layer 4) — border on top, active tab flush upward */
+  .tbxtabs{flex:none;display:flex;background:linear-gradient(#20242a,#14171c);border-top:1px solid #000}
   .tbxtabs .t{padding:3px 11px;font-size:11px;color:#a2aab6;border-right:1px solid #2a2e34;cursor:default}
   .tbxtabs .t.on{background:#000;color:#fff;border-top:2px solid #3a6ea5;margin-top:-1px}
   .acctline{display:flex;align-items:center;gap:18px;padding:4px 12px;background:#0d0d0d;border-top:1px solid #222;font-size:11.5px;color:#c8ccd2;white-space:nowrap;overflow-x:auto}
@@ -276,7 +280,7 @@
   .empty{padding:16px;color:var(--dim);text-align:center;border:none!important}
   .note{padding:2px 14px;color:var(--dim);font-size:11px}
   /* ── TIER 2: chart-window tab bar (bottommost, its own grid row) — MT5 navy/black ── */
-  .charttabs{grid-area:charttabs;height:24px;display:flex;align-items:stretch;overflow-x:auto;overflow-y:hidden;
+  .charttabs{flex:none;height:24px;display:flex;align-items:stretch;overflow-x:auto;overflow-y:hidden;
     background:#0a0e14;border-top:1px solid #000;font-family:"Segoe UI",Tahoma,sans-serif}
   .charttabs .ctab{position:relative;display:flex;align-items:center;padding:0 12px 0 15px;font-size:11px;color:#9aa1ad;
     cursor:pointer;border-right:1px solid #1b1f27;background:#0a0e14;white-space:nowrap;border-radius:0}
@@ -1456,7 +1460,6 @@ function BottomBar({ onResize }){
   return (
     <div className="bottom">
       <BottomResizer onDone={onResize} />
-      <div className="tbxtabs">{TBX_TABS.map(t=><div key={t} className={"t"+(t===tab?' on':'')} onClick={()=>setTab(t)}>{t}</div>)}</div>
       {tab==='Exposure' ? <ExposureTab pos={pos} mids={mids} />
        : tab==='Journal' ? <JournalTab />
        : (tab!=='Trade' && tab!=='History') ? <EmptyTab tab={tab} />
@@ -1489,6 +1492,8 @@ function BottomBar({ onResize }){
         <span><span className="k">Profit:</span> <b className={floating>=0?'up':'down'}>{num(floating)}</b></span>
       </div>}
        </React.Fragment>)}
+      {/* layer 4: terminal menu tab bar, docked at the very bottom */}
+      <div className="tbxtabs">{TBX_TABS.map(t=><div key={t} className={"t"+(t===tab?' on':'')} onClick={()=>setTab(t)}>{t}</div>)}</div>
     </div>
   );
 }
@@ -1963,8 +1968,8 @@ function App(){
   const gridStyle = {
     '--leftw': leftw+'px', '--bottomh': bottomh+'px',
     gridTemplateColumns: leftShown ? 'var(--leftw) 6px 1fr' : '0 0 1fr',
-    gridTemplateRows: `23px ${view.toolbars?'33px':'0'} 1fr ${view.toolbox?'var(--bottomh)':'0'} ${charts.length?'24px':'0'} ${view.statusbar?'22px':'0'}`,
-    gridTemplateAreas: '"menu menu menu" "tools tools tools" "left splitter charts" "bottom bottom bottom" "charttabs charttabs charttabs" "status status status"',
+    gridTemplateRows: `23px ${view.toolbars?'33px':'0'} 1fr ${view.statusbar?'22px':'0'}`,
+    gridTemplateAreas: '"menu menu menu" "tools tools tools" "left splitter right" "status status status"',
   };
   const [tcols,trows]=tileDims(charts.length);
   const gridTiles={ gridTemplateColumns:`repeat(${tcols},1fr)`, gridTemplateRows:`repeat(${trows},1fr)` };
@@ -1979,19 +1984,23 @@ function App(){
         {view.navigator && <Navigator indicators={indicators} />}
       </div>}
       {leftShown && <Splitter onDone={setLeftw} />}
-      <div className="charts">
-        <div className="chartgrid" style={gridTiles}>
-          {charts.map((c)=><ChartCell key={c.id} idx={c.id} isActive={c.id===(activeChart&&activeChart.id)} onActivate={setActiveId}
-            symbol={c.symbol} tf={c.tf} indicators={indicators} chartType={c.type} tool={tool}
-            tiled onClose={()=>closeChart(c.id)} />)}
-          {!charts.length && <div className="noch">No charts open — File → New Chart Window, or double-click a Market Watch symbol.</div>}
+      {/* RIGHT vertical stack — layer 1: charts · layer 2: chart-window tab bar · layer 3+4: terminal */}
+      <div className="right">
+        <div className="charts">
+          <div className="chartgrid" style={gridTiles}>
+            {charts.map((c)=><ChartCell key={c.id} idx={c.id} isActive={c.id===(activeChart&&activeChart.id)} onActivate={setActiveId}
+              symbol={c.symbol} tf={c.tf} indicators={indicators} chartType={c.type} tool={tool}
+              tiled onClose={()=>closeChart(c.id)} />)}
+            {!charts.length && <div className="noch">No charts open — File → New Chart Window, or double-click a Market Watch symbol.</div>}
+          </div>
         </div>
+        {/* layer 2: chart-window tab bar — glued directly under the charts. click=focus, ✕=close+unsubscribe */}
+        {!!charts.length && <div className="charttabs">{charts.map(c=>
+          <div key={c.id} className={"ctab"+(c.id===(activeChart&&activeChart.id)?' on':'')} onClick={()=>setActiveId(c.id)} title={c.symbol+'.FX,'+c.tf}>{c.symbol}.FX,{c.tf}
+            <span className="tclose" onClick={(e)=>{e.stopPropagation();closeChart(c.id);}} title="Close chart">✕</span></div>)}</div>}
+        {/* layer 3+4: terminal toolbox (Balance + positions) with its tab bar docked at the bottom */}
+        {view.toolbox && <BottomBar onResize={setBottomh} />}
       </div>
-      {view.toolbox && <BottomBar onResize={setBottomh} />}
-      {/* ── TIER 2: chart-window tab bar (bottommost) — click=focus, ✕=close+unsubscribe ── */}
-      {!!charts.length && <div className="charttabs">{charts.map(c=>
-        <div key={c.id} className={"ctab"+(c.id===(activeChart&&activeChart.id)?' on':'')} onClick={()=>setActiveId(c.id)} title={c.symbol+'.FX,'+c.tf}>{c.symbol}.FX,{c.tf}
-          <span className="tclose" onClick={(e)=>{e.stopPropagation();closeChart(c.id);}} title="Close chart">✕</span></div>)}</div>}
       {view.statusbar && <StatusBar tool={tool} chartType={activeChart?activeChart.type:'candle'} tf={activeChart?activeChart.tf:'H1'} />}
       {orderSym && <OrderModal symbol={orderSym} onClose={()=>setOrderSym(null)} />}
     </div>
