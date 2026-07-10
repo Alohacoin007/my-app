@@ -440,6 +440,9 @@ const GRID  = ['USDJPY','USDCHF','EURUSD','GBPUSD'];   // the default 2×2 (TL·
 const pip   = (s)=> s.slice(3)==='JPY'||s.slice(0,3)==='JPY' ? 0.01 : 0.0001;
 const digits= (s)=> s.slice(3)==='JPY'||s.includes('JPY') ? 3 : 5;
 const fmtPx = (s,v)=> (v==null?'—':(+v).toFixed(digits(s)));
+// Max ADVERSE slippage (in pips) the trader will accept between click and server fill — passed to
+// fx_open's slippage guard. Wide by default (only a violent spike trips it); operator-overridable.
+const SLIP_PIPS = (typeof window!=='undefined' && +window.ALPEXA_MAX_SLIP_PIPS) || 15;
 
 // ── read prices via the cache proxy (feed-first → direct DB fallback → dev simulator) ──
 async function feedPrices(){
@@ -700,7 +703,7 @@ function useTradeEngine(){
   // B-BOOK ORDER EXECUTION — the client only CALLS the server; it never sets the fill
   // price, inserts a position, or moves balance. fx_open decides the entry price, enforces
   // the free-margin gate, and inserts the position server-side (idempotent by local_id).
-  async function placeOrder({ symbol, side, volume, leverage:lev }){
+  async function placeOrder({ symbol, side, volume, leverage:lev, requestedPrice, maxSlippage }){
     const size=+volume||0.01;
     const local_id='wt-'+Date.now()+'-'+Math.floor(Math.random()*1e6);
     // 1) external MT5 Web API (only if the operator wired one)
@@ -710,24 +713,28 @@ function useTradeEngine(){
         playSnd(r.ok? sndOpen : sndError);   // MT5 fill / reject sound
         return { ok:r.ok, status:r.status, local_id }; }catch(e){ playSnd(sndError); return { ok:false, reason:String(e) }; }
     }
-    // 2) B-Book: our Supabase fx_open RPC (server-authoritative — it sets the fill price,
-    //    enforces the free-margin gate, inserts the position). We PASS the chosen leverage;
-    //    the server CLAMPS it to the house cap (LEAST) so a client can only be more
-    //    conservative, never bypass the cap. If the leverage-aware overload isn't deployed
-    //    yet, we transparently retry the base signature (house cap applies).
+    // 2) B-Book: our Supabase fx_open RPC (server-authoritative — it sets the fill price, enforces
+    //    the free-margin gate + SLIPPAGE guard, inserts the position). We pass leverage (server
+    //    CLAMPS to the house cap) plus the requested price + max slippage so a violent tick between
+    //    click and arrival is REJECTED server-side. If the consolidated fn isn't deployed yet we
+    //    transparently retry the base signature (slippage/leverage simply not enforced until then).
     if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me){
       try{
         const base={ p_local_id:local_id, p_symbol:symbol, p_side:side, p_size:size };
-        let r=await AlpexaSync.db.rpc('fx_open', lev ? { ...base, p_leverage:+lev } : base);
-        if(r&&r.error&&lev && /PGRST202|could not find the function|does not exist|schema cache/i.test(((r.error&&r.error.message)||'')+((r.error&&r.error.code)||''))){
-          r=await AlpexaSync.db.rpc('fx_open', base);   // overload not deployed → base call
+        const full={ ...base,
+          p_leverage:(lev?+lev:null),
+          p_requested_price:(requestedPrice!=null?+requestedPrice:null),
+          p_max_slippage:(maxSlippage!=null?+maxSlippage:null) };
+        let r=await AlpexaSync.db.rpc('fx_open', full);
+        if(r&&r.error && /PGRST202|could not find the function|does not exist|schema cache/i.test(((r.error&&r.error.message)||'')+((r.error&&r.error.code)||''))){
+          r=await AlpexaSync.db.rpc('fx_open', lev ? { ...base, p_leverage:+lev } : base);   // pre-slippage deploy → older signature
         }
         const d=r&&r.data;
         if(r&&!r.error&&d&&d.ok){ positionsStore.loadPos(); playSnd(sndOpen);   // ← fx_open 성공 정확한 시점
           return { ok:true, server:true, open:d.open, margin:d.margin, local_id }; }
-        playSnd(sndError);   // 잔고부족(insufficient margin)/RPC 에러 → 실패음
-        return { ok:false, reason:(d&&d.error)||(r&&r.error&&r.error.message)||'rejected' };   // e.g. 'insufficient margin'
-      }catch(e){ playSnd(sndError); return { ok:false, reason:String(e&&e.message||e) }; }
+        playSnd(sndError);   // 슬리피지 초과(SLIPPAGE)/잔고부족(MARGIN)/RPC 에러 → 실패음(timeout.wav)
+        return { ok:false, server:true, reason:(d&&d.error)||(r&&r.error&&r.error.message)||'rejected', code:(d&&d.code)||null };
+      }catch(e){ playSnd(sndError); return { ok:false, server:true, reason:String(e&&e.message||e) }; }
     }
     // 3) logged out → caller may fall back to the demo ledger (no real money)
     return { ok:false, reason:'not_logged_in' };
@@ -777,18 +784,19 @@ function OrderBox({ symbol }){
   const send=async(side)=>{
     if(busyRef.current) return;                       // debounce — 한 번에 한 주문만(레이스/이중발사 차단)
     busyRef.current=side; setBusy(side);
-    const q=priceStore.get(symbol)||m; const price=side==='buy'?q.ask:q.bid;
+    const q=priceStore.get(symbol)||m; const price=side==='buy'?q.ask:q.bid;   // the quote the trader is looking at = requested price
+    const maxSlip=SLIP_PIPS*pip(symbol);   // adverse-deviation tolerance passed to the server slippage guard
     // ── ECN 오더 샌드박스: LP 왕복 지연(250~550ms)을 RPC 발사 '앞단'에만 시뮬레이션 ──
     const lat=250+Math.floor(Math.random()*301);      // 250..550 ms
     await new Promise(res=>setTimeout(res,lat));
-    let r; try{ r=await eng.placeOrder({ symbol, side, volume:vol, leverage:eng.leverage }); }  // one-click B-Book
+    let r; try{ r=await eng.placeOrder({ symbol, side, volume:vol, leverage:eng.leverage, requestedPrice:price, maxSlippage:maxSlip }); }  // one-click B-Book (+slippage)
     catch(e){ r={ok:false,reason:'error'}; }
     if(!r||!r.ok){
-      // any non-success (logged out / no fx account / rpc not deployed / rejected) → land it in the
-      // demo ledger so the order always goes in for testing (display only, no real money — #5 safe)
-      positionsStore.addDemo({ symbol, side, volume:+vol||0.01, price });
-      if(r&&r.reason==='not_logged_in') playSnd(sndOpen);   // logged-out DEMO fill → still snap (real reject already played sndError in placeOrder)
-      else if(r&&r.reason) console.warn('one-click order fell back to demo:', r.reason);
+      // A REAL server rejection (slippage/margin/rpc error, r.server===true) must NOT land — the
+      // trade was refused; sndError already fired in placeOrder (뚜엑/timeout.wav). Only the
+      // logged-out path falls back to the demo ledger so the terminal stays usable for testing.
+      if(r&&r.reason==='not_logged_in'){ positionsStore.addDemo({ symbol, side, volume:+vol||0.01, price }); playSnd(sndOpen); }
+      else console.warn('one-click order rejected:', (r&&(r.code||r.reason))||'unknown');   // slippage/margin → error sound only, no fill
     }
     // ── The Snap: 처리 상태 해제 → 패널 0.1s 플래시 (사운드는 placeOrder에서 sndOpen/sndError로 발동) ──
     busyRef.current=null; setBusy(null);
@@ -1859,12 +1867,13 @@ function OrderModal({ symbol:sym0, onClose }){
 
   const submit=async(side)=>{
     if(!canAfford) return;   // client pre-gate; the server margin gate is the real authority
-    const q=priceStore.get(symbol)||m; const price=side==='buy'?q.ask:q.bid;
-    const r=await eng.placeOrder({ symbol, side, volume:vol, leverage:eng.leverage });   // pass chosen leverage
+    const q=priceStore.get(symbol)||m; const price=side==='buy'?q.ask:q.bid;   // requested price the trader sees
+    const maxSlip=SLIP_PIPS*pip(symbol);
+    const r=await eng.placeOrder({ symbol, side, volume:vol, leverage:eng.leverage, requestedPrice:price, maxSlippage:maxSlip });   // +leverage +slippage
     if(r.ok){ onClose(); return; }                                   // B-Book fill booked server-side (sndOpen in placeOrder)
-    positionsStore.addDemo({ symbol, side, volume:+vol||0.01, price });   // any failure → land in demo ledger (display only)
-    if(r.reason==='not_logged_in') playSnd(sndOpen);                 // logged-out DEMO fill → snap (real reject already played sndError)
-    else if(r.reason) console.warn('order fell back to demo:', r.reason);
+    // real server rejection (slippage/margin) → do NOT land a demo fill; sndError already fired.
+    if(r.reason==='not_logged_in'){ positionsStore.addDemo({ symbol, side, volume:+vol||0.01, price }); playSnd(sndOpen); }
+    else if(r.reason) console.warn('order rejected:', r.code||r.reason);
     onClose();
   };
   const spin=(set,cur,step,dg)=>({ up:()=>set((+cur+step).toFixed(dg)), dn:()=>set(Math.max(0,+cur-step).toFixed(dg)) });

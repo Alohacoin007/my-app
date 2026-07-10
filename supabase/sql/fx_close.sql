@@ -51,15 +51,22 @@ declare
 begin
   if auth.uid() is null then return jsonb_build_object('ok',false,'error','not authenticated'); end if;
 
-  -- find THIS caller's open FX position
+  -- find THIS caller's open FX position — WITH A ROW LOCK (FOR UPDATE OF p).
+  -- Race hardening: the 30% stop-out cron and a user hammering the red ✕ can hit the SAME
+  -- position at the same instant. FOR UPDATE serialises them — the 2nd caller BLOCKS until the
+  -- 1st commits, then Postgres re-checks the WHERE against the new row version: status is now
+  -- 'closed', so it no longer matches status='open' → this SELECT returns nothing → we reject as
+  -- 'already closed'. So P&L is computed and banked EXACTLY once (no double-close, no double-bank).
+  -- (The atomic UPDATE ... WHERE status='open' below stays as a second, independent backstop.)
   select p.* into v_pos
     from public.positions p
     join public.accounts a on a.acct_no = p.acct_no
     join public.players  pl on pl.id = a.player_id
    where p.local_id = p_local_id and p.server = 'fx' and p.status = 'open'
      and pl.auth_id = auth.uid()
-   limit 1;
-  if v_pos.local_id is null then return jsonb_build_object('ok',false,'error','position not found or already closed'); end if;
+   limit 1
+   for update of p;
+  if v_pos.local_id is null then return jsonb_build_object('ok',false,'error','position not found or already closed','code','ALREADY_CLOSED'); end if;
   v_acct := v_pos.acct_no; v_sym := v_pos.symbol; v_side := v_pos.side;
   v_open := coalesce(v_pos.open_price,0); v_size := coalesce(v_pos.size,0);
   v_cust := v_pos.cust_id;   -- positions carries cust_id (accounts does not)
