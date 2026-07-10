@@ -164,7 +164,14 @@
   .right{grid-area:right;display:flex;flex-direction:column;height:100%;min-width:0;min-height:0;overflow:hidden}
   /* chart layer GROWS/SHRINKS with the terminal (never overlaid): flex-grow+shrink, floor 100px */
   .charts{flex:1 1 0%;min-height:100px;display:flex;flex-direction:column;overflow:hidden;background:#0a0d12}
-  .chartgrid{flex:1;min-height:0;display:grid;gap:1px;background:var(--cellbd)}   /* auto-tiled N charts */
+  .chartgrid{flex:1;min-height:0;display:grid;gap:1px;background:var(--cellbd);position:relative}   /* auto-tiled N charts */
+  /* draggable grid splitters — resize a column's width / a row's height to any size you want */
+  .gsplit{position:absolute;z-index:6;background:transparent}
+  .gsplit.v{top:0;bottom:0;width:9px;margin-left:-4px;cursor:col-resize}
+  .gsplit.h{left:0;right:0;height:9px;margin-top:-4px;cursor:row-resize}
+  .gsplit:hover,.gsplit.drag{background:rgba(47,127,224,.45)}
+  .chartgrid.resizing .canvas,.chartgrid.resizing .drawlayer,.chartgrid.resizing iframe{pointer-events:none}
+  .chartgrid.resizing{user-select:none}
   .win{position:absolute;background:#000;display:flex;flex-direction:column;
     border:1px solid var(--cellbd);box-shadow:0 2px 12px rgba(0,0,0,.55);
     min-width:220px;min-height:150px;overflow:hidden}
@@ -2233,6 +2240,14 @@ function wtWinReduce(state, type, id){
   else if(type==='close'){ minIds.delete(id); if(maxId===id) maxId=null; }
   return { maxId, minIds };
 }
+// Pure grid-track resize: move `d0` fr across the gutter between tracks k-1 and k, keeping BOTH
+// ≥ minfr (so the total — hence the grid — never changes size, and no track collapses). Immutable.
+function wtResizeTracks(orig, k, d0, minfr){
+  const d=Math.max(minfr-orig[k-1], Math.min(orig[k]-minfr, d0));
+  const nx=orig.slice(); nx[k-1]=orig[k-1]+d; nx[k]=orig[k]-d; return nx;
+}
+// cumulative % offset of gutter k (for absolute splitter placement over the grid).
+function wtCumPct(arr, k){ const total=arr.reduce((a,b)=>a+b,0); let s=0; for(let i=0;i<k;i++) s+=arr[i]; return (s/total)*100; }
 function App(){
   const cfg=React.useRef(wtConfig.load()).current;     // saved layout (persists across reloads)
   // ALWAYS boot to the fixed default 2×2 @ M1 (chart layout is intentionally NOT persisted, so a
@@ -2243,6 +2258,9 @@ function App(){
   const [win,setWin]=React.useState({ maxId:null, minIds:new Set() });   // MT5 window state (see wtWinReduce)
   const maxId=win.maxId, minIds=win.minIds;
   const winDo=React.useCallback((type,id)=> setWin(w=>wtWinReduce(w,type,id)), []);
+  const [colFr,setColFr]=React.useState(null);   // per-column widths (fr); null → equal 1fr tiles
+  const [rowFr,setRowFr]=React.useState(null);   // per-row heights (fr)
+  const gridRef=React.useRef(null);
   // MOBILE lazy chart init: only mount the chart(s) the user has REVEALED (seeded with the active
   // one). Hidden tiles create their Lightweight Charts instance the moment they're tapped or on
   // Window→Tile. Desktop reveals eagerly (lazyHold below is gated on IS_MOBILE → all charts mount).
@@ -2339,7 +2357,30 @@ function App(){
   const gridCharts = maxId!=null ? charts.filter(c=>c.id===maxId) : charts.filter(c=>!minIds.has(c.id));
   const docked = charts.filter(c=>minIds.has(c.id));
   const [tcols,trows]=tileDims(gridCharts.length||1);
-  const gridTiles={ gridTemplateColumns:`repeat(${tcols},1fr)`, gridTemplateRows:`repeat(${trows},1fr)` };
+  // custom column/row sizes when the user has dragged a splitter; else equal tiles. Auto-resets to
+  // equal whenever the grid dimensions change (chart added/closed/maximized) — no stale arrays.
+  const cols = (colFr && colFr.length===tcols) ? colFr : Array(tcols).fill(1);
+  const rows = (rowFr && rowFr.length===trows) ? rowFr : Array(trows).fill(1);
+  const gridTiles={ gridTemplateColumns:cols.map(f=>f.toFixed(4)+'fr').join(' '),
+                    gridTemplateRows:rows.map(f=>f.toFixed(4)+'fr').join(' ') };
+  // drag a gutter → move size between the two adjacent tracks (both stay ≥ MINFR). Charts re-fit live.
+  const MINFR=0.22;
+  const startSplit=(axis,k)=>(e)=>{ e.preventDefault(); e.stopPropagation();
+    const el=gridRef.current; if(!el) return;
+    const vert = axis==='col';
+    const span = vert ? el.clientWidth : el.clientHeight;
+    const orig = (vert?cols:rows).slice(); const total=orig.reduce((a,b)=>a+b,0);
+    const start = vert ? e.clientX : e.clientY;
+    el.classList.add('resizing'); if(e.currentTarget&&e.currentTarget.classList) e.currentTarget.classList.add('drag');
+    document.body.style.cursor = vert?'col-resize':'row-resize';
+    let raf=0; const refit=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; chartResizer.resizeAll(); }); };
+    const mv=(ev)=>{ const d0=((vert?ev.clientX:ev.clientY)-start)/Math.max(1,span)*total;
+      (vert?setColFr:setRowFr)(wtResizeTracks(orig, k, d0, MINFR)); refit(); };
+    const up=()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up);
+      el.classList.remove('resizing'); document.body.style.cursor='';
+      el.querySelectorAll('.gsplit.drag').forEach(s=>s.classList.remove('drag')); chartResizer.resizeAll(); };
+    document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up); };
+  const cumPct=wtCumPct;
   const activeSym = activeChart ? activeChart.symbol : null;
   return (
     <div className={"terminal"+(theme==='light'?' light':'')} style={gridStyle}>
@@ -2354,11 +2395,16 @@ function App(){
       {/* RIGHT vertical stack — layer 1: charts · layer 2: chart-window tab bar · layer 3+4: terminal */}
       <div className="right">
         <div className="charts">
-          <div className="chartgrid" style={gridTiles}>
+          <div className="chartgrid" style={gridTiles} ref={gridRef}>
             {gridCharts.map((c)=><ChartCell key={c.id} idx={c.id} isActive={c.id===(activeChart&&activeChart.id)} onActivate={activate}
               symbol={c.symbol} tf={c.tf} indicators={indicators} chartType={c.type} tool={tool}
               lazyHold={IS_MOBILE && !revealed.has(c.id)}
               tiled maxed={maxId===c.id} onMin={()=>minChart(c.id)} onMax={()=>maxChart(c.id)} onClose={()=>closeChart(c.id)} />)}
+            {/* draggable gutters — resize any column's width / row's height (maximized = single cell, none) */}
+            {maxId==null && gridCharts.length>1 && tcols>1 && Array.from({length:tcols-1},(_,i)=>i+1).map(k=>
+              <div key={'cs'+k} className="gsplit v" style={{left:cumPct(cols,k)+'%'}} onMouseDown={startSplit('col',k)} title="Drag to resize width"></div>)}
+            {maxId==null && gridCharts.length>1 && trows>1 && Array.from({length:trows-1},(_,i)=>i+1).map(k=>
+              <div key={'rs'+k} className="gsplit h" style={{top:cumPct(rows,k)+'%'}} onMouseDown={startSplit('row',k)} title="Drag to resize height"></div>)}
             {!charts.length && <div className="noch">No charts open — File → New Chart Window, or double-click a Market Watch symbol.</div>}
           </div>
           {docked.length>0 && <div className="mindock">{docked.map(c=>
