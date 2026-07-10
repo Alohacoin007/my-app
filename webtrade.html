@@ -210,7 +210,8 @@
   .dov{position:absolute;pointer-events:none;z-index:4}
   .dov.vline{top:0;bottom:0;width:0;border-left:1px solid #e8b23a}
   .dov.text{transform:translate(0,-50%);color:#e6c14a;font:600 11px Tahoma,sans-serif;white-space:nowrap;text-shadow:0 0 3px #000,0 0 3px #000}
-  .dov.pt{width:7px;height:7px;margin:-4px 0 0 -4px;background:#ffffff;border:1px solid #000;box-shadow:0 0 2px #000}   /* selected trend-line handle */
+  .dov.pt{width:9px;height:9px;margin:-5px 0 0 -5px;background:#ffffff;border:1px solid #000;box-shadow:0 0 2px #000;pointer-events:auto;cursor:move}   /* draggable selected-line handle */
+  .dov.pt:hover{background:#ffe14d}
   /* ── Market Watch: sticky tick colours (hold until next up/down) + daily arrows ── */
   .mwt td.tick-up,.mwt td.text-up{color:#00ff00 !important;font-weight:bold}
   .mwt td.tick-down,.mwt td.text-down{color:#ff3b30 !important;font-weight:bold}
@@ -1069,6 +1070,9 @@ function makePriceSeries(c, type, sym){
   return c.addCandlestickSeries ? c.addCandlestickSeries(o) : c.addSeries(LightweightCharts.CandlestickSeries, o);
 }
 const asSeriesData=(data,type)=> type==='line' ? data.map(d=>({time:d.time,value:d.close})) : data;
+// Fibonacci retracement levels + colours (module scope so both the draw handlers and the
+// handle-drag recompute can reach them).
+const FIB_LV=[0,0.236,0.382,0.5,0.618,0.786,1], FIB_COL=['#8a9098','#e0709a','#f0c674','#82d982','#5fb0ff','#c792ea','#8a9098'];
 // pixel distance from point to a line segment (trend-line hit-test)
 function distSeg(px,py,x1,y1,x2,y2){ const dx=x2-x1,dy=y2-y1,L2=dx*dx+dy*dy;
   let t=L2? ((px-x1)*dx+(py-y1)*dy)/L2 : 0; t=Math.max(0,Math.min(1,t));
@@ -1136,7 +1140,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   const startPt=React.useRef(null);     // white start-anchor point shown during a trend/fib drag
   const hideHandles=()=>{ selHandles.current.forEach(el=>{ try{el.remove();}catch(_){} }); selHandles.current=[]; };
   const positionHandles=()=>{ const ent=selDraw.current, c=chart.current, s=series.current;
-    if(!ent||ent.kind!=='t'||!c||!s||selHandles.current.length!==3) return;
+    if(!ent||(ent.kind!=='t'&&ent.kind!=='f')||!c||!s||selHandles.current.length!==3) return;
     let x1,y1,x2,y2; try{ const ts=c.timeScale();
       x1=ts.timeToCoordinate(ent.pts[0].time); y1=s.priceToCoordinate(ent.pts[0].value);
       x2=ts.timeToCoordinate(ent.pts[1].time); y2=s.priceToCoordinate(ent.pts[1].value); }catch(_){}
@@ -1145,10 +1149,36 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       if(hx==null||hy==null||isNaN(hx)||isNaN(hy)){ el.style.display='none'; }
       else { el.style.display=''; el.style.left=Math.round(hx)+'px'; el.style.top=Math.round(hy)+'px'; } }); };
   const showHandles=()=>{ hideHandles(); const el=dlayer.current; if(!el) return;
-    for(let i=0;i<3;i++){ const d=document.createElement('div'); d.className='dov pt'; el.appendChild(d); selHandles.current.push(d); }
+    for(let i=0;i<3;i++){ const d=document.createElement('div'); d.className='dov pt'; d.dataset.h=i;
+      d.addEventListener('mousedown', onHandleDown); el.appendChild(d); selHandles.current.push(d); }
     positionHandles(); };
+  // ── drag a handle to MOVE the line: 0=start endpoint, 2=end endpoint, 1=middle (translate whole).
+  //    Endpoints snap to a real time via coordinateToTime so the line series stays valid; fib levels
+  //    recompute from the new hi/lo. This lets you re-edit a line after it's drawn (MT5). ──
+  const hDrag=React.useRef(null);
+  const onHandleMove=(e)=>{ const hd=hDrag.current; if(!hd) return; const c=chart.current, s=series.current; if(!c||!s) return;
+    const ts=c.timeScale(), r=box.current.getBoundingClientRect();
+    const ent=hd.ent; let a=hd.pts0[0], b=hd.pts0[1], np;
+    const at=(cx,cy)=>{ let tm=null,pr=null; try{ tm=ts.coordinateToTime(cx); pr=s.coordinateToPrice(cy); }catch(_){} return (tm==null||pr==null)?null:{time:tm,value:pr}; };
+    if(hd.i===0){ const q=at(e.clientX-r.left, e.clientY-r.top); if(!q) return; np=[q,b]; }
+    else if(hd.i===2){ const q=at(e.clientX-r.left, e.clientY-r.top); if(!q) return; np=[a,q]; }
+    else { const dx=e.clientX-hd.sx, dy=e.clientY-hd.sy;   // translate: shift both endpoints by the same pixel delta
+      let x1,y1,x2,y2; try{ x1=ts.timeToCoordinate(a.time); y1=s.priceToCoordinate(a.value); x2=ts.timeToCoordinate(b.time); y2=s.priceToCoordinate(b.value); }catch(_){}
+      if(x1==null||y1==null||x2==null||y2==null) return;
+      const qa=at(x1+dx,y1+dy), qb=at(x2+dx,y2+dy); if(!qa||!qb) return; np=[qa,qb]; }
+    np=np.sort((u,v)=>u.time-v.time); if(np[0].time===np[1].time) return;
+    ent.pts=np; try{ ent.ls.setData(np); }catch(_){}
+    if(ent.kind==='f' && ent.levels){ const hi=Math.max(np[0].value,np[1].value), lo=Math.min(np[0].value,np[1].value);
+      ent.levels.forEach((pl,i)=>{ try{ pl.applyOptions({price:lo+(hi-lo)*FIB_LV[i]}); }catch(_){} }); }
+    positionHandles(); };
+  const onHandleUp=()=>{ hDrag.current=null; document.body.style.userSelect='';
+    document.removeEventListener('mousemove',onHandleMove); document.removeEventListener('mouseup',onHandleUp); };
+  const onHandleDown=(e)=>{ e.preventDefault(); e.stopPropagation(); const ent=selDraw.current; if(!ent||!ent.pts) return;
+    hDrag.current={ i:+e.currentTarget.dataset.h, ent, pts0:ent.pts.map(p=>({...p})), sx:e.clientX, sy:e.clientY };
+    document.body.style.userSelect='none';
+    document.addEventListener('mousemove',onHandleMove); document.addEventListener('mouseup',onHandleUp); };
   const deselect=()=>{ selDraw.current=null; hideHandles(); };   // white handles are the ONLY select marker (no line thickening)
-  const selectDrawing=(ent)=>{ deselect(); if(ent){ selDraw.current=ent; if(ent.kind==='t') showHandles(); } };
+  const selectDrawing=(ent)=>{ deselect(); if(ent){ selDraw.current=ent; if(ent.kind==='t'||ent.kind==='f') showHandles(); } };
   // nearest drawing to a pixel point within 8px (shared by click-select and right-click) — null if none
   const hitDrawing=(px,py)=>{ const c=chart.current, sc=series.current; if(!c||!sc) return null;
     const ts=c.timeScale(); let best=null, bd=8;
@@ -1163,6 +1193,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   // remove the currently-selected drawing (keyboard Delete + right-click Delete popup share this)
   const deleteSelected=()=>{ const ent=selDraw.current; if(!ent) return;
     if(ent.kind==='t'){ try{ chart.current.removeSeries(ent.ls); }catch(_){} drawSeries.current=drawSeries.current.filter(x=>x!==ent); }
+    else if(ent.kind==='f'){ try{ chart.current.removeSeries(ent.ls); }catch(_){} (ent.levels||[]).forEach(pl=>{ try{ series.current.removePriceLine(pl); }catch(_){} }); drawSeries.current=drawSeries.current.filter(x=>x!==ent); }
     else { try{ series.current.removePriceLine(ent.pl); }catch(_){} drawLines.current=drawLines.current.filter(x=>x!==ent); }
     hideHandles(); selDraw.current=null; };
   const clearDrawings=()=>{ const s=series.current, c=chart.current; deselect();
@@ -1269,6 +1300,14 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       const t=toolRef.current; if(t && t!=='arrow' && t!=='cross') return; if(!param||!param.point) { deselect(); return; }
       selectDrawing(hitDrawing(param.point.x, param.point.y));
     }); }catch(e){}
+    // RIGHT-CLICK — Lightweight Charts swallows contextmenu on its canvas (stopPropagation) so a
+    // React onContextMenu on the window never fires. Listen in the CAPTURE phase on the chart box so
+    // we beat LWC: right-click ON a drawing → select it + Delete popup; elsewhere → the chart menu.
+    const onCtxNative=(e)=>{ e.preventDefault(); e.stopPropagation(); onActivate&&onActivate(idx);
+      let hit=null; try{ const r=box.current.getBoundingClientRect(); hit=hitDrawing(e.clientX-r.left, e.clientY-r.top); }catch(_){}
+      if(hit){ selectDrawing(hit); setDelMenu({ x:e.clientX, y:e.clientY }); }
+      else { setDelMenu(null); setCmenu({ x:e.clientX, y:e.clientY }); } };
+    try{ box.current.addEventListener('contextmenu', onCtxNative, true); }catch(e){}
     // load candles for the current timeframe, then (re)paint indicators over them
     loadCandles(symbol, tf).then(data=>{ try{
       s.setData(asSeriesData(data,typeRef.current)); bar.current=data[data.length-1]; candles.current=data; paintIndicators();
@@ -1288,7 +1327,9 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       try{ series.current.update(typeRef.current==='line' ? {time:u.time,value:close} : u); }catch(e){}
     }, 400);
     const unsub=priceStore.subscribe(onTick);
-    return ()=>{ unsub(); unreg(); unTheme(); indSeries.current=[]; lines.current=[]; drawLines.current=[]; drawSeries.current=[]; drawStack.current=[]; selDraw.current=null;
+    const boxEl=box.current;
+    return ()=>{ unsub(); unreg(); unTheme(); try{ boxEl&&boxEl.removeEventListener('contextmenu', onCtxNative, true); }catch(e){}
+      indSeries.current=[]; lines.current=[]; drawLines.current=[]; drawSeries.current=[]; drawStack.current=[]; selDraw.current=null;
       hideHandles(); previewLine.current=null; previewFib.current=[];   // drop selection handles + any in-flight preview
       if(startPt.current){ try{startPt.current.remove();}catch(_){} startPt.current=null; }
       overlays.current.forEach(o=>{ try{o.el.remove();}catch(e){} }); overlays.current=[];   // chart recreated → clear drawings
@@ -1362,7 +1403,6 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
         d.style.left=Math.round(x)+'px'; d.style.top=Math.round(y)+'px'; el2.appendChild(d); if(startPt.current) startPt.current.remove(); startPt.current=d; } }catch(_){}
     };
     const NEON='#ff1a1a';   // 네온 빨강 추세선
-    const FIB_LV=[0,0.236,0.382,0.5,0.618,0.786,1], FIB_COL=['#8a9098','#e0709a','#f0c674','#82d982','#5fb0ff','#c792ea','#8a9098'];
     const killPreview=()=>{ if(previewLine.current){ try{ chart.current.removeSeries(previewLine.current); }catch(_){} previewLine.current=null; }
       if(previewFib.current.length){ previewFib.current.forEach(pl=>{ try{ series.current.removePriceLine(pl); }catch(_){} }); previewFib.current=[]; }
       if(startPt.current){ try{ startPt.current.remove(); }catch(_){} startPt.current=null; } };
@@ -1400,10 +1440,14 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
                                      :c.addSeries(LightweightCharts.LineSeries,{color:NEON,lineWidth:1}); ls.setData(pts);
           const ent={kind:'t',ls,pts,w0:1}; drawSeries.current.push(ent);
           drawStack.current.push(()=>{ try{c.removeSeries(ls);}catch(e){} drawSeries.current=drawSeries.current.filter(x=>x!==ent); }); }catch(e){} }
-      else if(d.tool==='fib'){ const hi=Math.max(d.price,p2), lo=Math.min(d.price,p2);
-        const lv=[0,0.236,0.382,0.5,0.618,0.786,1], col=['#8a9098','#e0709a','#f0c674','#82d982','#5fb0ff','#c792ea','#8a9098']; const grp=[];
-        lv.forEach((L,i)=>{ try{ const price=lo+(hi-lo)*L; const pl=s.createPriceLine({price,color:col[i],lineWidth:1,lineStyle:2,axisLabelVisible:true,title:(L*100).toFixed(1)+'%'}); const ent={kind:'h',pl,price,w0:1}; drawLines.current.push(ent); grp.push(ent); }catch(e){} });
-        drawStack.current.push(()=>{ grp.forEach(e=>{ try{s.removePriceLine(e.pl);}catch(e){} }); drawLines.current=drawLines.current.filter(x=>grp.indexOf(x)<0); }); }
+      else if(d.tool==='fib'){ const pts=[{time:d.time,value:d.price},{time:t2,value:p2}].sort((a,b)=>a.time-b.time);
+        if(pts[0].time===pts[1].time) return;
+        const hi=Math.max(d.price,p2), lo=Math.min(d.price,p2);
+        try{ const ls=c.addLineSeries?c.addLineSeries({color:NEON,lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false})   // base diagonal
+                                     :c.addSeries(LightweightCharts.LineSeries,{color:NEON,lineWidth:1}); ls.setData(pts);
+          const levels=[]; FIB_LV.forEach((L,i)=>{ try{ levels.push(s.createPriceLine({price:lo+(hi-lo)*L,color:FIB_COL[i],lineWidth:1,lineStyle:2,axisLabelVisible:true,title:(L*100).toFixed(1)+'%'})); }catch(_){} });
+          const ent={kind:'f',ls,levels,pts,w0:1}; drawSeries.current.push(ent);   // ONE grouped fib object (base + levels)
+          drawStack.current.push(()=>{ try{c.removeSeries(ls);}catch(_){} levels.forEach(pl=>{try{s.removePriceLine(pl);}catch(_){}}); drawSeries.current=drawSeries.current.filter(x=>x!==ent); }); }catch(e){} }
       terminalBus.emit('chart.tool', null);   // MT5: object placed → auto-revert to cursor so you can click-select it
     };
     const onKey=(e)=>{
@@ -1444,15 +1488,10 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
 
   const [cmenu,setCmenu]=React.useState(null);   // chart right-click menu {x,y}
   const [delMenu,setDelMenu]=React.useState(null);   // selected-drawing Delete popup {x,y}
-  const onCtx=(e)=>{ e.preventDefault(); onActivate&&onActivate(idx);
-    // MT5: right-click ON a drawing → select it + Delete popup; elsewhere → the chart menu. Self-
-    // contained (hit-test at the cursor) so it never depends on a prior click that may have deselected.
-    let hit=null; try{ const r=box.current.getBoundingClientRect(); hit=hitDrawing(e.clientX-r.left, e.clientY-r.top); }catch(_){}
-    if(hit){ selectDrawing(hit); setDelMenu({ x:e.clientX, y:e.clientY }); }
-    else if(selDraw.current) setDelMenu({ x:e.clientX, y:e.clientY });
-    else setCmenu({ x:e.clientX, y:e.clientY }); };
+  // (right-click is handled by a capture-phase native listener on the chart box — see the chart
+  //  effect's onCtxNative — because Lightweight Charts swallows contextmenu before React sees it.)
   return (
-    <div className={"win"+(isActive?' active':'')+(tiled?' tiled':'')} ref={win} style={tiled?null:{zIndex:z}} onMouseDown={focus} onContextMenu={onCtx}>
+    <div className={"win"+(isActive?' active':'')+(tiled?' tiled':'')} ref={win} style={tiled?null:{zIndex:z}} onMouseDown={focus}>
       <div className="cell-title" onMouseDown={(e)=>beginDrag(e,'move')}>
         <span className="ti">
           <svg viewBox="0 0 24 24" fill="none" stroke="#8fd08f" strokeWidth="2"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" fill="#8fd08f" stroke="none"/><rect x="12" y="6" width="3" height="12" fill="#8fd08f" stroke="none"/><rect x="17" y="14" width="3" height="4" fill="#8fd08f" stroke="none"/></svg>

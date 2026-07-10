@@ -32,12 +32,20 @@ if (!(distSeg(4, 40, 0, 0, 8, 0) >= 8)) bad('a click 40px off the line must NOT 
 if (!/const NEON='#ff1a1a'/.test(src)) bad('trend line must be neon red (#ff1a1a)');
 if (!/\.dov\.pt\{[^}]*background:#ffffff/.test(src)) bad('trend handles must be WHITE (.dov.pt background #ffffff)');
 if (!/for\(let i=0;i<3;i\+\+\)/.test(src) || !/showHandles/.test(src)) bad('must create 3 handles (showHandles)');
-if (!/if\(ent\.kind==='t'\) showHandles\(\)/.test(src)) bad('selecting a trend line must show the 3 handles (selectDrawing)');
+if (!/if\(ent\.kind==='t'\|\|ent\.kind==='f'\) showHandles\(\)/.test(src)) bad('selecting a trend/fib line must show the 3 handles (selectDrawing)');
 if (!/previewLine\.current/.test(src) || !/onMoveDraw/.test(src)) bad('must show a live rubber-band preview while dragging');
 if (!/function DrawMenu\(/.test(src)) bad('right-click Delete popup (DrawMenu) missing');
-// right-click must be SELF-CONTAINED: hit-test at the cursor, not reliant on a prior (fragile) click
+// right-click must beat Lightweight Charts (which swallows contextmenu) via a CAPTURE-phase listener
+if (!/addEventListener\('contextmenu', onCtxNative, true\)/.test(src)) bad('right-click must use a capture-phase native listener (LWC swallows contextmenu)');
 if (!/hit=hitDrawing\(e\.clientX-r\.left/.test(src)) bad('right-click must hit-test the drawing at the cursor');
 if (!/if\(hit\)\{ selectDrawing\(hit\); setDelMenu/.test(src)) bad('right-click ON a drawing must select it + open the Delete popup');
+// fib is ONE grouped object (base diagonal + levels) so it selects/deletes as a unit
+if (!/const ent=\{kind:'f',ls,levels,pts,w0:1\}/.test(src)) bad('fib must be a grouped object {kind:f, ls, levels, pts}');
+if (!/else if\(ent\.kind==='f'\)\{ try\{ chart\.current\.removeSeries\(ent\.ls\)/.test(src)) bad('deleting a fib must remove its base line + all levels');
+// handles are DRAGGABLE — grab a point to move an endpoint (0/2) or translate the line (1)
+if (!/const hDrag=React\.useRef/.test(src) || !/onHandleDown/.test(src)) bad('handles must be draggable (onHandleDown/hDrag)');
+if (!/\.dov\.pt\{[^}]*pointer-events:auto/.test(src)) bad('handles must be interactive (pointer-events:auto)');
+if (!/ent\.pts=np; try\{ ent\.ls\.setData\(np\)/.test(src)) bad('dragging a handle must re-write the line endpoints');
 // the line must be THIN and must NOT thicken on select (white handles are the only select marker)
 if (/applyOptions\(\{lineWidth:[^}]*\+2/.test(src)) bad('selecting must NOT thicken the line (no lineWidth+2)');
 if (!/const ent=\{kind:'t',ls,pts,w0:1\}/.test(src)) bad('trend line must be thin (w0:1 / lineWidth 1)');
