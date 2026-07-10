@@ -1177,7 +1177,7 @@ function MarketWatch({ onPick }){
     setDirs(nd); setMids({...m});
   }, 350)), []);
   const ctx=(e,sym)=>{ e.preventDefault(); setSel(sym); setMenu({ sym, x:e.clientX, y:e.clientY }); };
-  const tc=(d)=> d>0?'uptick flash':d<0?'dntick flash':'';   // tick color + brief flash
+  const tc=(d)=> d>0?'uptick':d<0?'dntick':'';   // directional colour only (no flashing — was too jittery)
   const cur=sel||WATCH[0];
   return (
     <div className="watch">
@@ -1193,7 +1193,7 @@ function MarketWatch({ onPick }){
               return (
                 <tr key={sym} className={sym===sel?'sel':''} onClick={()=>{setSel(sym);onPick&&onPick(sym);}}
                     onDoubleClick={()=>terminalBus.emit('order.new',sym)} onContextMenu={(e)=>ctx(e,sym)} title="우클릭: 메뉴 · 더블클릭: 주문창">
-                  <td className="sym">{d.bid>0?<span style={{color:'#26c281'}}>↗ </span>:d.bid<0?<span style={{color:'#ff4d4d'}}>↘ </span>:'  '}{sym}.FX</td>
+                  <td className="sym">{sym}.FX</td>
                   <td className={tc(d.bid)}>{fmtPx(sym,m.bid)}</td>
                   <td className={tc(d.ask)}>{fmtPx(sym,m.ask)}</td>
                   <td className={chg}>{m.chg!=null?(m.chg>=0?'+':'')+m.chg.toFixed(2):'—'}</td>
