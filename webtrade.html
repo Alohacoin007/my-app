@@ -369,6 +369,31 @@ function throttle(fn, interval){
     pending=arguments; if(!timer) timer=setTimeout(fire, wait); };
 }
 
+/* ══ MT5 ORDER-LIFECYCLE SOUNDS ══════════════════════════════════════════════
+   Preloaded HTML5 Audio, one per lifecycle event. Files live at /assets/sounds/.
+   (Drop the MT5 originals there — paths below are the standard.) Every trigger is
+   fire-and-forget with .catch so a missing file / policy block never breaks a fill.
+   Playback happens up to ~550ms AFTER the click (past the ECN delay), so we UNLOCK
+   the audio on the user's very first gesture (see below) to dodge autoplay blocking. */
+const sndOpen    = new Audio('/assets/sounds/ok.wav');       // fx_open  성공 (주문 진입)
+const sndClose   = new Audio('/assets/sounds/connect.wav');  // fx_close 성공 (포지션 청산)
+const sndError   = new Audio('/assets/sounds/timeout.wav');  // RPC 에러 / 마진 게이트 차단
+const sndStopout = new Audio('/assets/sounds/stops.wav');    // 30% 스탑아웃 강제청산 (서버 크론)
+[sndOpen, sndClose, sndError, sndStopout].forEach(a=>{ try{ a.preload='auto'; a.load(); }catch(e){} });
+const playSnd = (a)=>{ try{ a.currentTime=0; const p=a.play(); if(p&&p.catch) p.catch(e=>console.log('snd',e)); }catch(e){ console.log('snd',e); } };
+
+// Autoplay Unlock — the browser mutes audio until the first user gesture. On the very
+// first click/keydown anywhere, volume-0 play→pause every clip once to prime the audio
+// context, then restore volume. {once:true} tears the listeners down after firing.
+let _audioUnlocked=false;
+function unlockAudio(){ if(_audioUnlocked) return; _audioUnlocked=true;
+  [sndOpen, sndClose, sndError, sndStopout].forEach(a=>{ try{ const v=a.volume; a.volume=0;
+    const p=a.play(); if(p&&p.then) p.then(()=>{ a.pause(); a.currentTime=0; a.volume=v; }).catch(()=>{ a.volume=v; });
+    else { a.pause(); a.currentTime=0; a.volume=v; }
+  }catch(e){} }); }
+if(typeof document!=='undefined'){ document.addEventListener('pointerdown', unlockAudio, {once:true});
+  document.addEventListener('keydown', unlockAudio, {once:true}); }
+
 const WATCH = ['EURUSD','AUDUSD','USDJPY','GBPUSD','USDCAD','NZDUSD','USDCHF','GBPJPY','AUDJPY','EURJPY'];
 const GRID  = ['EURUSD','USDJPY','AUDUSD','GBPUSD'];   // the 2×2 (matches the MT5 screenshot)
 const pip   = (s)=> s.slice(3)==='JPY'||s.slice(0,3)==='JPY' ? 0.01 : 0.0001;
@@ -438,7 +463,7 @@ const DEMO_POS  = [{ local_id:'3172308', symbol:'EURUSD', side:'buy', stake:0.01
   open_price:1.14318, status:'open', created_at:'2026-07-09T20:17:40', _demo:true, profit:-0.39 }];
 
 const positionsStore = {
-  acct:null, pos:[], listeners:new Set(), ch1:null, ch2:null, started:false,
+  acct:null, pos:[], listeners:new Set(), ch1:null, ch2:null, ch3:null, started:false,
   async loadAcct(){ try{ if(!(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me)) return;
     const r=await AlpexaSync.db.from('accounts').select('acct_no,balance').eq('server','fx').limit(1);
     if(r&&r.data&&r.data[0]){ this.acct=r.data[0]; this.notify(); } }catch(e){} },
@@ -451,6 +476,12 @@ const positionsStore = {
       this.loadAcct(); this.loadPos();                                // logged in → overwrite demo with reality
       this.ch1=AlpexaSync.db.channel('wt-acct').on('postgres_changes',{event:'*',schema:'public',table:'accounts'},()=>this.loadAcct()).subscribe();
       this.ch2=AlpexaSync.db.channel('wt-pos').on('postgres_changes',{event:'*',schema:'public',table:'positions'},()=>this.loadPos()).subscribe();
+      // 30% 스탑아웃 크론(fx_stopout)이 강제청산하면 settlements에 detail 'STOPOUT …'을 남긴다.
+      // 그 INSERT를 실시간으로 잡아 강제청산 효과음을 울린다(수동 fx_close와는 detail 접두사로 구분).
+      this.ch3=AlpexaSync.db.channel('wt-stopout').on('postgres_changes',{event:'INSERT',schema:'public',table:'settlements'},(payload)=>{
+        const row=payload&&payload.new;
+        if(row&&typeof row.detail==='string'&&row.detail.indexOf('STOPOUT')===0){ playSnd(sndStopout); this.loadPos(); this.loadAcct(); }
+      }).subscribe();
     } }catch(e){} },
   notify(){ this.listeners.forEach(fn=>{ try{fn(this);}catch(e){} }); },
   subscribe(fn){ this.listeners.add(fn); fn(this); return ()=>this.listeners.delete(fn); },
@@ -630,7 +661,8 @@ function useTradeEngine(){
     if(window.ALPEXA_TRADE_API){
       try{ const r=await fetch(TRADE_API,{ method:'POST', headers:{'Content-Type':'application/json'},
         body:JSON.stringify({ symbol, side, volume:size, leverage:+lev||undefined, local_id, ts:Date.now() }) });
-        return { ok:r.ok, status:r.status, local_id }; }catch(e){ return { ok:false, reason:String(e) }; }
+        playSnd(r.ok? sndOpen : sndError);   // MT5 fill / reject sound
+        return { ok:r.ok, status:r.status, local_id }; }catch(e){ playSnd(sndError); return { ok:false, reason:String(e) }; }
     }
     // 2) B-Book: our Supabase fx_open RPC (server-authoritative — it sets the fill price,
     //    enforces the free-margin gate, inserts the position). We PASS the chosen leverage;
@@ -645,9 +677,11 @@ function useTradeEngine(){
           r=await AlpexaSync.db.rpc('fx_open', base);   // overload not deployed → base call
         }
         const d=r&&r.data;
-        if(r&&!r.error&&d&&d.ok){ positionsStore.loadPos(); return { ok:true, server:true, open:d.open, margin:d.margin, local_id }; }
+        if(r&&!r.error&&d&&d.ok){ positionsStore.loadPos(); playSnd(sndOpen);   // ← fx_open 성공 정확한 시점
+          return { ok:true, server:true, open:d.open, margin:d.margin, local_id }; }
+        playSnd(sndError);   // 잔고부족(insufficient margin)/RPC 에러 → 실패음
         return { ok:false, reason:(d&&d.error)||(r&&r.error&&r.error.message)||'rejected' };   // e.g. 'insufficient margin'
-      }catch(e){ return { ok:false, reason:String(e&&e.message||e) }; }
+      }catch(e){ playSnd(sndError); return { ok:false, reason:String(e&&e.message||e) }; }
     }
     // 3) logged out → caller may fall back to the demo ledger (no real money)
     return { ok:false, reason:'not_logged_in' };
@@ -655,13 +689,15 @@ function useTradeEngine(){
   // CLOSE — fx_close computes realized P&L server-side and banks it via settlements
   // (trg_settlement_balance → accounts.balance). The client never touches balance.
   async function closeOrder(localId){
-    if(window.ALPEXA_TRADE_API){ try{ const r=await fetch(TRADE_API+'?close='+encodeURIComponent(localId),{method:'POST'}); return {ok:r.ok}; }catch(e){ return {ok:false,reason:String(e)}; } }
+    if(window.ALPEXA_TRADE_API){ try{ const r=await fetch(TRADE_API+'?close='+encodeURIComponent(localId),{method:'POST'}); playSnd(r.ok? sndClose : sndError); return {ok:r.ok}; }catch(e){ playSnd(sndError); return {ok:false,reason:String(e)}; } }
     if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me){
       try{ const r=await AlpexaSync.db.rpc('fx_close',{ p_local_id:localId });
         const d=r&&r.data;
-        if(r&&!r.error&&d&&d.ok){ positionsStore.loadPos(); positionsStore.loadAcct(); return { ok:true, pnl:d.pnl }; }
+        if(r&&!r.error&&d&&d.ok){ positionsStore.loadPos(); positionsStore.loadAcct(); playSnd(sndClose);   // ← fx_close 완공
+          return { ok:true, pnl:d.pnl }; }
+        playSnd(sndError);
         return { ok:false, reason:(d&&d.error)||'close failed' };
-      }catch(e){ return { ok:false, reason:String(e&&e.message||e) }; }
+      }catch(e){ playSnd(sndError); return { ok:false, reason:String(e&&e.message||e) }; }
     }
     return { ok:false, reason:'not_logged_in' };
   }
@@ -676,31 +712,6 @@ function BigFig({ symbol, v }){
   const s=fmtPx(symbol,v); if(s==='—') return <span className="bf">—</span>;
   return <span className="bf"><span className="sm">{s.slice(0,-3)}</span><span className="bg">{s.slice(-3,-1)}</span><span className="fr">{s.slice(-1)}</span></span>;
 }
-/* ── ECN fill sound — 칼같은 MT5 "틱!" 을 클릭 순간 즉석 합성(외부 파일 불필요).
-   클릭 = 유저 제스처 안에서 울리므로 autoplay-block 안 걸린다.
-   ▶ 본인 사운드 파일을 쓰고 싶으면 HTML5 Audio 객체로 갈아끼우면 된다:
-        const SNAP = new Audio('/sfx/fill.mp3');   // 또는 data: URI
-        SNAP.volume = 0.5;
-        function ecnSnap(){ try{ SNAP.currentTime = 0; SNAP.play(); }catch(e){} }
-     …그리고 아래 WebAudio 본문은 지운다. ── */
-let _ecnActx = null;
-function ecnSnap(){
-  try{
-    _ecnActx = _ecnActx || new (window.AudioContext||window.webkitAudioContext)();
-    if(_ecnActx.state === 'suspended') _ecnActx.resume();
-    const t = _ecnActx.currentTime;
-    const osc = _ecnActx.createOscillator(), g = _ecnActx.createGain();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(1750, t);
-    osc.frequency.exponentialRampToValueAtTime(950, t + 0.03);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.22, t + 0.004);   // fast attack
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.055); // snappy decay → "틱!"
-    osc.connect(g); g.connect(_ecnActx.destination);
-    osc.start(t); osc.stop(t + 0.06);
-  }catch(e){ /* 오디오 불가 환경 — 무음, 체결은 절대 안 막음 */ }
-}
-
 function OrderBox({ symbol }){
   const [m,setM]=React.useState(priceStore.get(symbol)||{});
   const [vol,setVol]=React.useState('0.01');
@@ -730,11 +741,12 @@ function OrderBox({ symbol }){
       // any non-success (logged out / no fx account / rpc not deployed / rejected) → land it in the
       // demo ledger so the order always goes in for testing (display only, no real money — #5 safe)
       positionsStore.addDemo({ symbol, side, volume:+vol||0.01, price });
-      if(r&&r.reason&&r.reason!=='not_logged_in') console.warn('one-click order fell back to demo:', r.reason);
+      if(r&&r.reason==='not_logged_in') playSnd(sndOpen);   // logged-out DEMO fill → still snap (real reject already played sndError in placeOrder)
+      else if(r&&r.reason) console.warn('one-click order fell back to demo:', r.reason);
     }
-    // ── The Snap: 처리 상태 해제 → 패널 0.1s 플래시 → 칼체결 틱 재생 ──
+    // ── The Snap: 처리 상태 해제 → 패널 0.1s 플래시 (사운드는 placeOrder에서 sndOpen/sndError로 발동) ──
     busyRef.current=null; setBusy(null);
-    setFlash(true); ecnSnap(); setTimeout(()=>setFlash(false),120);
+    setFlash(true); setTimeout(()=>setFlash(false),120);
   };
   const dec=()=>setVol((Math.max(0.01,(+vol||0.01)-0.01)).toFixed(2));
   const inc=()=>setVol((Math.max(0.01,(+vol||0)+0.01)).toFixed(2));
@@ -1385,7 +1397,7 @@ function BottomBar({ onResize }){
   React.useEffect(()=> priceStore.subscribe(throttle(m=>setMids({...m}),300)), []);   // 0.3s live P&L
   React.useEffect(()=> tradeSettings.subscribe(setLev), []);   // margin/level track the chosen leverage
   const closePos=async(p)=>{
-    if(p._demo){ positionsStore.removeDemo(p.local_id); return; }        // demo row → just drop it
+    if(p._demo){ positionsStore.removeDemo(p.local_id); playSnd(sndClose); return; }   // demo row → drop it (+청산음)
     const r=await eng.closeOrder(p.local_id);                            // real → fx_close banks P&L server-side
     if(!r.ok) alert('청산 실패(Close failed): '+(r.reason||'unknown'));
   };
@@ -1788,9 +1800,10 @@ function OrderModal({ symbol:sym0, onClose }){
     if(!canAfford) return;   // client pre-gate; the server margin gate is the real authority
     const q=priceStore.get(symbol)||m; const price=side==='buy'?q.ask:q.bid;
     const r=await eng.placeOrder({ symbol, side, volume:vol, leverage:eng.leverage });   // pass chosen leverage
-    if(r.ok){ onClose(); return; }                                   // B-Book fill booked server-side
+    if(r.ok){ onClose(); return; }                                   // B-Book fill booked server-side (sndOpen in placeOrder)
     positionsStore.addDemo({ symbol, side, volume:+vol||0.01, price });   // any failure → land in demo ledger (display only)
-    if(r.reason && r.reason!=='not_logged_in') console.warn('order fell back to demo:', r.reason);
+    if(r.reason==='not_logged_in') playSnd(sndOpen);                 // logged-out DEMO fill → snap (real reject already played sndError)
+    else if(r.reason) console.warn('order fell back to demo:', r.reason);
     onClose();
   };
   const spin=(set,cur,step,dg)=>({ up:()=>set((+cur+step).toFixed(dg)), dn:()=>set(Math.max(0,+cur-step).toFixed(dg)) });
