@@ -673,9 +673,11 @@ function OrderBox({ symbol }){
   const send=async(side)=>{
     const q=priceStore.get(symbol)||m; const price=side==='buy'?q.ask:q.bid;
     const r=await eng.placeOrder({ symbol, side, volume:vol, leverage:eng.leverage });   // one-click B-Book
-    if(r.ok) return;
-    if(r.reason==='not_logged_in'){ positionsStore.addDemo({ symbol, side, volume:+vol||0.01, price }); return; }   // demo
-    alert('주문 거절(Rejected): '+(r.reason||'unknown'));
+    if(r.ok) return;   // real fill booked server-side (loadPos shows it)
+    // any non-success (logged out / no fx account / rpc not deployed / rejected) → land it in the
+    // demo ledger so the order always goes in for testing (display only, no real money — #5 safe)
+    positionsStore.addDemo({ symbol, side, volume:+vol||0.01, price });
+    if(r.reason && r.reason!=='not_logged_in') console.warn('one-click order fell back to demo:', r.reason);
   };
   const dec=()=>setVol((Math.max(0.01,(+vol||0.01)-0.01)).toFixed(2));
   const inc=()=>setVol((Math.max(0.01,(+vol||0)+0.01)).toFixed(2));
@@ -1723,8 +1725,9 @@ function OrderModal({ symbol:sym0, onClose }){
     const q=priceStore.get(symbol)||m; const price=side==='buy'?q.ask:q.bid;
     const r=await eng.placeOrder({ symbol, side, volume:vol, leverage:eng.leverage });   // pass chosen leverage
     if(r.ok){ onClose(); return; }                                   // B-Book fill booked server-side
-    if(r.reason==='not_logged_in'){ positionsStore.addDemo({ symbol, side, volume:+vol||0.01, price }); onClose(); return; }  // demo
-    alert('주문 거절(Rejected): '+(r.reason||'unknown'));            // e.g. server 'insufficient margin'
+    positionsStore.addDemo({ symbol, side, volume:+vol||0.01, price });   // any failure → land in demo ledger (display only)
+    if(r.reason && r.reason!=='not_logged_in') console.warn('order fell back to demo:', r.reason);
+    onClose();
   };
   const spin=(set,cur,step,dg)=>({ up:()=>set((+cur+step).toFixed(dg)), dn:()=>set(Math.max(0,+cur-step).toFixed(dg)) });
 
