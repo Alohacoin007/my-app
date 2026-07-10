@@ -78,7 +78,7 @@ const INIT = `
 `;
 
 const PAGES = ['index.html', 'login.html', 'signup.html', 'statement.html',
-               'crypto-live.html', 'trading.html', 'sports-live.html', 'manager-mobile.html'];
+               'crypto-live.html', 'trading.html', 'sports-live.html', 'manager-mobile.html', 'webtrade.html'];
 
 // console errors that are environment noise (blocked CDN / failed resource), NOT our bug.
 function isNoise(t) {
