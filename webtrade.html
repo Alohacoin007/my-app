@@ -490,6 +490,37 @@ const themeBus = { theme:'dark', listeners:new Set(),
   set(t){ this.theme=(t==='light'?'light':'dark'); this.listeners.forEach(fn=>{ try{fn(this.theme);}catch(e){} }); },
   subscribe(fn){ this.listeners.add(fn); return ()=>this.listeners.delete(fn); } };
 
+// ── i18n (UI language: English / 한국어 / 日本語 / 中文). Keyed by the English string; missing →
+//    falls through to English. LANG.cur is set during App render so children see it immediately. ──
+const LANG = { cur:'en' };
+const I18N = {
+  ko:{ File:'파일',View:'보기',Insert:'삽입',Charts:'차트',Tools:'도구',Window:'창',Help:'도움말',
+    Languages:'언어',Toolbars:'툴바','Status Bar':'상태 표시줄','Market Watch':'시세창',Navigator:'내비게이터',Toolbox:'툴박스','Full Screen':'전체 화면','Color Theme — Light / Dark':'색상 테마 — 라이트/다크',
+    'New Chart Window':'새 차트 창','New Order':'새 주문','Tile Windows':'창 바둑판 정렬','Algo Trading':'알고 트레이딩','About Alpexa WebTrade':'Alpexa WebTrade 정보','Help Topics':'도움말 항목','History Center':'히스토리 센터',Options:'옵션',Indicators:'인디케이터',Text:'텍스트',Cascade:'계단식 정렬','Open Deleted':'삭제 복원',
+    Trade:'거래',Exposure:'익스포저',History:'내역',News:'뉴스',Mailbox:'메일함',Calendar:'캘린더',Company:'회사',Alerts:'알림',Articles:'기사','Code Base':'코드베이스',Experts:'전문가',Journal:'저널',
+    Balance:'잔고',Equity:'순자산',Margin:'마진','Free Margin':'여유 마진','Margin Level':'마진 레벨',Profit:'손익',Free:'여유',
+    Symbol:'심볼','Volume (lots)':'수량 (랏)','Stop Loss':'손절','Take Profit':'익절','Sell by Market':'시장가 매도','Buy by Market':'시장가 매수',SPREAD:'스프레드',
+    Bid:'매도',Ask:'매수','Daily Ch%':'일일 변동%',Symbols:'심볼',Details:'상세',Trading:'거래',Ticks:'틱',
+    'New Chart':'새 차트',Hide:'숨기기','Show All':'모두 표시',Ticket:'티켓',Time:'시간',Type:'유형',Price:'가격',Volume:'수량' },
+  ja:{ File:'ファイル',View:'表示',Insert:'挿入',Charts:'チャート',Tools:'ツール',Window:'ウィンドウ',Help:'ヘルプ',
+    Languages:'言語',Toolbars:'ツールバー','Status Bar':'ステータスバー','Market Watch':'気配値',Navigator:'ナビゲーター',Toolbox:'ツールボックス','Full Screen':'全画面表示','Color Theme — Light / Dark':'カラーテーマ — ライト/ダーク',
+    'New Chart Window':'新規チャート','New Order':'新規注文','Tile Windows':'ウィンドウの整列','Algo Trading':'自動売買','About Alpexa WebTrade':'Alpexa WebTrade について','Help Topics':'ヘルプ項目','History Center':'ヒストリーセンター',Options:'オプション',Indicators:'インジケーター',Text:'テキスト',Cascade:'重ねて表示','Open Deleted':'削除の復元',
+    Trade:'取引',Exposure:'エクスポージャー',History:'履歴',News:'ニュース',Mailbox:'メールボックス',Calendar:'カレンダー',Company:'会社',Alerts:'アラート',Articles:'記事','Code Base':'コードベース',Experts:'エキスパート',Journal:'ジャーナル',
+    Balance:'残高',Equity:'有効証拠金',Margin:'証拠金','Free Margin':'余剰証拠金','Margin Level':'証拠金維持率',Profit:'損益',Free:'余剰',
+    Symbol:'銘柄','Volume (lots)':'数量 (ロット)','Stop Loss':'損切り','Take Profit':'利食い','Sell by Market':'成行売り','Buy by Market':'成行買い',SPREAD:'スプレッド',
+    Bid:'売値',Ask:'買値','Daily Ch%':'日次変動%',Symbols:'銘柄',Details:'詳細',Trading:'取引',Ticks:'ティック',
+    'New Chart':'新規チャート',Hide:'非表示','Show All':'すべて表示',Ticket:'チケット',Time:'時刻',Type:'タイプ',Price:'価格',Volume:'数量' },
+  zh:{ File:'文件',View:'视图',Insert:'插入',Charts:'图表',Tools:'工具',Window:'窗口',Help:'帮助',
+    Languages:'语言',Toolbars:'工具栏','Status Bar':'状态栏','Market Watch':'市场报价',Navigator:'导航器',Toolbox:'工具箱','Full Screen':'全屏','Color Theme — Light / Dark':'配色 — 浅色/深色',
+    'New Chart Window':'新图表','New Order':'新订单','Tile Windows':'平铺窗口','Algo Trading':'自动交易','About Alpexa WebTrade':'关于 Alpexa WebTrade','Help Topics':'帮助主题','History Center':'历史中心',Options:'选项',Indicators:'指标',Text:'文本',Cascade:'层叠窗口','Open Deleted':'恢复已删除',
+    Trade:'交易',Exposure:'敞口',History:'历史',News:'新闻',Mailbox:'邮箱',Calendar:'日历',Company:'公司',Alerts:'提醒',Articles:'文章','Code Base':'代码库',Experts:'智能交易',Journal:'日志',
+    Balance:'余额',Equity:'净值',Margin:'保证金','Free Margin':'可用保证金','Margin Level':'保证金比例',Profit:'盈亏',Free:'可用',
+    Symbol:'品种','Volume (lots)':'手数','Stop Loss':'止损','Take Profit':'止盈','Sell by Market':'市价卖出','Buy by Market':'市价买入',SPREAD:'点差',
+    Bid:'卖价',Ask:'买价','Daily Ch%':'日涨跌%',Symbols:'品种',Details:'详情',Trading:'交易',Ticks:'报价',
+    'New Chart':'新图表',Hide:'隐藏','Show All':'显示全部',Ticket:'订单号',Time:'时间',Type:'类型',Price:'价格',Volume:'手数' },
+};
+const t = (s)=> (I18N[LANG.cur] && I18N[LANG.cur][s]) || s;
+
 /* ══ MT5 ORDER-LIFECYCLE SOUNDS ══════════════════════════════════════════════
    Preloaded HTML5 Audio, one per lifecycle event. Files live at /assets/sounds/.
    (Drop the MT5 originals there — paths below are the standard.) Every trigger is
@@ -1383,7 +1414,7 @@ function ContextMenu({ x, y, sym, onClose, onPick, onHide, onShowAll }){
   return (
     <div className="mt5-context-menu" style={style} onMouseDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
       {MW_MENU.map((it,i)=> it.sep ? <div key={i} className="mt5-sep"></div> : (
-        <div key={i} className={"mt5-mi"+(it.dis?' dis':'')} onClick={()=>run(it)}>{it.l}</div>
+        <div key={i} className={"mt5-mi"+(it.dis?' dis':'')} onClick={()=>run(it)}>{t(it.l)}</div>
       ))}
     </div>
   );
@@ -1490,13 +1521,13 @@ function MarketWatch({ onPick }){
   const cur=sel||WATCH[0];
   return (
     <div className="watch">
-      <div className="mwhead"><span>Market Watch: {clock}</span><span className="x" title="Close (Ctrl+M)" onClick={()=>terminalBus.emit('view.toggle','marketwatch')}>✕</span></div>
+      <div className="mwhead"><span>{t('Market Watch')}: {clock}</span><span className="x" title="Close (Ctrl+M)" onClick={()=>terminalBus.emit('view.toggle','marketwatch')}>✕</span></div>
       {tab==='Ticks' ? <TickChart symbol={cur} /> :
       <div className="mwscroll">
         {tab==='Details' ? <MWDetails sym={cur} /> :
          tab==='Trading' ? <MWTrading /> :
         <table className="mwt">
-          <thead><tr><th>Symbol</th><th>Bid</th><th>Ask</th><th>Daily Ch%</th></tr></thead>
+          <thead><tr><th>{t('Symbol')}</th><th>{t('Bid')}</th><th>{t('Ask')}</th><th>{t('Daily Ch%')}</th></tr></thead>
           <tbody>
             {WATCH.filter(sym=>!hidden.has(sym)).map(sym=>{ const m=mids[sym]||{}, d=dirs[sym]||{}; const up=(m.chg||0)>=0;
               return (
@@ -1511,7 +1542,7 @@ function MarketWatch({ onPick }){
           </tbody>
         </table>}
       </div>}
-      <div className="mwtabs">{MW_TABS.map(t=><div key={t} className={"mt"+(t===tab?' on':'')} onClick={()=>setTab(t)}>{t}</div>)}</div>
+      <div className="mwtabs">{MW_TABS.map(tb=><div key={tb} className={"mt"+(tb===tab?' on':'')} onClick={()=>setTab(tb)}>{t(tb)}</div>)}</div>
       {menu && <ContextMenu x={menu.x} y={menu.y} sym={menu.sym} onPick={onPick}
         onHide={(s)=>setHidden(h=>new Set(h).add(s))} onShowAll={()=>setHidden(new Set())}
         onClose={()=>setMenu(null)} />}
@@ -1612,7 +1643,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
        : (<React.Fragment>
       <div className="postbl">
         <table className="pos">
-          <thead><tr><th>Symbol</th><th>Ticket</th><th>Time</th><th>Type</th><th>Volume</th><th>Price</th><th>S / L</th><th>T / P</th><th>Price</th><th>Profit</th><th></th></tr></thead>
+          <thead><tr><th>{t('Symbol')}</th><th>{t('Ticket')}</th><th>{t('Time')}</th><th>{t('Type')}</th><th>{t('Volume')}</th><th>{t('Price')}</th><th>S / L</th><th>T / P</th><th>{t('Price')}</th><th>{t('Profit')}</th><th></th></tr></thead>
           <tbody>
             {tab==='History' && <tr><td className="empty" colSpan="11">No history in the selected period</td></tr>}
             {tab==='Trade' && !pos.length && <tr><td className="empty" colSpan="11">{window.AlpexaSync&&AlpexaSync.me?'No open positions':'로그인하면 실계정 잔고·포지션이 표시됩니다 (지금은 데모 시세)'}</td></tr>}
@@ -1630,13 +1661,13 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
               row; grows/shrinks WITH the rows (no more floating at the terminal-box bottom). */}
           {tab==='Trade' && <tfoot><tr className="acctrow"><td colSpan="11">
             <div className="acctline">
-              <span><span className="k">Balance:</span> <b>{num(balance)} USD</b></span>
-              <span><span className="k">Equity:</span> <b>{num(equity)}</b></span>
-              <span><span className="k">Margin:</span> <b>{num(marginUsed)}</b></span>
-              <span><span className="k">Free Margin:</span> <b>{num(equity-marginUsed)}</b></span>
-              <span><span className="k">Margin Level:</span> <b className={marginUsed>0&&level<100?'down':''}>{marginUsed>0?num(level)+' %':'—'}</b>
+              <span><span className="k">{t('Balance')}:</span> <b>{num(balance)} USD</b></span>
+              <span><span className="k">{t('Equity')}:</span> <b>{num(equity)}</b></span>
+              <span><span className="k">{t('Margin')}:</span> <b>{num(marginUsed)}</b></span>
+              <span><span className="k">{t('Free Margin')}:</span> <b>{num(equity-marginUsed)}</b></span>
+              <span><span className="k">{t('Margin Level')}:</span> <b className={marginUsed>0&&level<100?'down':''}>{marginUsed>0?num(level)+' %':'—'}</b>
                 {marginUsed>0&&level<50 && <b style={{color:'#ff5252',marginLeft:6}}>⚠ Stop Out &lt;30%</b>}</span>
-              <span><span className="k">Profit:</span> <b className={floating>=0?'up':'down'}>{num(floating)}</b></span>
+              <span><span className="k">{t('Profit')}:</span> <b className={floating>=0?'up':'down'}>{num(floating)}</b></span>
             </div>
           </td></tr></tfoot>}
         </table>
@@ -1654,7 +1685,12 @@ const MENUS=['File','View','Insert','Charts','Tools','Window','Help'];
 const MENU_DEF = {
   File:  [ {l:'New Chart Window', cmd:'chart.new'}, {l:'Open Deleted', dis:1}, {sep:1},
            {l:'Save As Picture...', dis:1}, {l:'Print...', k:'Ctrl+P', dis:1}, {sep:1}, {l:'Exit', dis:1} ],
-  View:  [ {l:'Languages', ar:1, dis:1}, {l:'Toolbars', v:'toolbars', keep:1}, {sep:1},
+  View:  [ {l:'Languages', hd:1},
+           {l:'English', cmd:'lang.set', arg:'en', lang:'en', keep:1},
+           {l:'한국어', cmd:'lang.set', arg:'ko', lang:'ko', keep:1},
+           {l:'日本語', cmd:'lang.set', arg:'ja', lang:'ja', keep:1},
+           {l:'中文', cmd:'lang.set', arg:'zh', lang:'zh', keep:1}, {sep:1},
+           {l:'Toolbars', v:'toolbars', keep:1}, {sep:1},
            {l:'Status Bar', v:'statusbar', keep:1}, {sep:1},
            {l:'Market Watch', v:'marketwatch', k:'Ctrl+M', keep:1},
            {l:'Navigator', v:'navigator', k:'Ctrl+N', keep:1},
@@ -1681,16 +1717,18 @@ function MenuBar({ indicators, view, tool }){
     else if(it.cmd) terminalBus.emit(it.cmd, it.arg);
     if(!it.keep) setOpen(null);
   };
-  const Row = (it,i)=> it.sep ? <div key={i} className="sep"></div> : (
+  const Row = (it,i)=> it.sep ? <div key={i} className="sep"></div>
+    : it.hd ? <div key={i} className="hd">{t(it.l)}</div>
+    : (
     <div key={i} className={"row"+(it.dis?' dis':'')} onClick={()=>run(it)}>
-      <span className="ck">{it.v && view[it.v] ? '✓' : ''}</span>{it.l}
+      <span className="ck">{(it.v && view[it.v]) || (it.lang && it.lang===LANG.cur) ? '✓' : ''}</span>{t(it.l)}
       {it.ar ? <span className="ar">▸</span> : it.k ? <span className="sc">{it.k}</span> : null}
     </div>
   );
   return (
     <div className="menu">
       {MENUS.map(m=>(
-        <div key={m} className={"mi"+(open===m?' on':'')} onClick={(e)=>click(m,e)}>{m}
+        <div key={m} className={"mi"+(open===m?' on':'')} onClick={(e)=>click(m,e)}>{t(m)}
           {open===m && m==='Charts' && (
             <div className="mdrop" onClick={e=>e.stopPropagation()}>
               <div className="hd">Chart Type</div>
@@ -1755,8 +1793,8 @@ function Toolbar({ tf, chartType, tool }){
   React.useEffect(()=> terminalBus.subscribe((cmd)=>{ if(cmd==='algo.toggle') setAlgo(a=>!a); }), []);
   return (
     <div className="tools">
-      <div className="tbtn" title="New Order (F9)" onClick={()=>terminalBus.emit('order.new')}><span className="ord">{IC.order}</span> New Order</div>
-      <div className={"tbtn algo"+(algo?' on':'')} title="Algo Trading" onClick={()=>terminalBus.emit('algo.toggle')}>{algo?<Svg><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></Svg>:<span className="play">{IC.play}</span>} Algo Trading</div>
+      <div className="tbtn" title="New Order (F9)" onClick={()=>terminalBus.emit('order.new')}><span className="ord">{IC.order}</span> {t('New Order')}</div>
+      <div className={"tbtn algo"+(algo?' on':'')} title="Algo Trading" onClick={()=>terminalBus.emit('algo.toggle')}>{algo?<Svg><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></Svg>:<span className="play">{IC.play}</span>} {t('Algo Trading')}</div>
       <div className="tsep"></div>
       {/* chart type */}
       <div className="tigrp">{CHART_TYPES.map(([k,ic,t])=>
@@ -2012,29 +2050,29 @@ function OrderModal({ symbol:sym0, onClose }){
     <div className="omodal-ov" onMouseDown={onClose}>
       <div className="omodal" ref={cardRef} style={pos?{position:'absolute',left:pos.left+'px',top:pos.top+'px',margin:0}:null} onMouseDown={e=>e.stopPropagation()}>
         <div className="obar" onMouseDown={onHeaderDown} style={{cursor:'move'}}>
-          <div className="t">New Order — {symbol}.FX</div>
+          <div className="t">{t('New Order')} — {symbol}.FX</div>
           <span className="wb x" onMouseDown={e=>e.stopPropagation()} onClick={onClose}>✕</span>
         </div>
         <div className="om-body">
           {/* Symbol */}
-          <div className="om-field"><label>Symbol</label>
+          <div className="om-field"><label>{t('Symbol')}</label>
             <select value={symbol} onChange={e=>setSymbol(e.target.value)}>{WATCH.map(s=><option key={s} value={s}>{s}.FX</option>)}</select></div>
           {/* Big Bid / Ask + live SPREAD in the middle — same Arial-Black BigFig look as the panel */}
           <div className="om-quote">
             <div className="om-px"><span className="om-tag">BID · SELL</span><BigFig symbol={symbol} v={m.bid} /></div>
-            <div className="om-spread"><span className="om-sp-l">SPREAD</span>
+            <div className="om-spread"><span className="om-sp-l">{t('SPREAD')}</span>
               <b>{(m.ask!=null&&m.bid!=null) ? ((m.ask-m.bid)/pip(symbol)).toFixed(1) : '—'}</b></div>
             <div className="om-px"><span className="om-tag">ASK · BUY</span><BigFig symbol={symbol} v={m.ask} /></div>
           </div>
           {/* Volume */}
-          <div className="om-field"><label>Volume (lots)</label>
+          <div className="om-field"><label>{t('Volume (lots)')}</label>
             <div className="om-vol">
               <b onMouseDown={()=>startVolHold(-1)} onMouseUp={stopHold} onMouseLeave={stopHold}>−</b>
               <input value={vol} onChange={e=>setVol(e.target.value)} />
               <b onMouseDown={()=>startVolHold(1)} onMouseUp={stopHold} onMouseLeave={stopHold}>+</b></div></div>
           {/* Precision-order settings (always available now the toggle is gone) */}
           <div className="om-adv">
-            <div className="om-field"><label>Stop Loss</label>
+            <div className="om-field"><label>{t('Stop Loss')}</label>
               <div className="om-price">
                 <input value={sl} onChange={e=>setSl(e.target.value)}
                   onFocus={()=>{ const q=priceStore.get(symbol)||m; if(q.bid!=null) setSl((+q.bid).toFixed(digits(symbol))); }} />{/* focus → inject live BID */}
@@ -2042,7 +2080,7 @@ function OrderModal({ symbol:sym0, onClose }){
                   <b onMouseDown={()=>startPriceHold(setSl,1)} onMouseUp={stopPHold} onMouseLeave={stopPHold}>▲</b>
                   <b onMouseDown={()=>startPriceHold(setSl,-1)} onMouseUp={stopPHold} onMouseLeave={stopPHold}>▼</b>
                 </span></div></div>
-            <div className="om-field"><label>Take Profit</label>
+            <div className="om-field"><label>{t('Take Profit')}</label>
               <div className="om-price">
                 <input value={tp} onChange={e=>setTp(e.target.value)}
                   onFocus={()=>{ const q=priceStore.get(symbol)||m; if(q.ask!=null) setTp((+q.ask).toFixed(digits(symbol))); }} />{/* focus → inject live ASK */}
@@ -2053,13 +2091,13 @@ function OrderModal({ symbol:sym0, onClose }){
           </div>
           {/* Margin */}
           <div className="om-margin" style={{color:canAfford?'#8890a0':'#ff5252'}}>
-            Margin <b style={{color:'#fff'}}>{usd(need)}</b> &nbsp;·&nbsp; Free <b style={{color:'#fff'}}>{usd(eng.freeMargin)}</b>
+            {t('Margin')} <b style={{color:'#fff'}}>{usd(need)}</b> &nbsp;·&nbsp; {t('Free')} <b style={{color:'#fff'}}>{usd(eng.freeMargin)}</b>
             {!canAfford && <span> &nbsp;·&nbsp; ⚠ insufficient</span>}
           </div>
           {/* Sell / Buy by Market — matte flat (Binance/TradingView pro) */}
           <div className="om-btns">
-            <button className="om-sell" disabled={!canAfford} onClick={()=>submit('sell')}>Sell by Market</button>
-            <button className="om-buy" disabled={!canAfford} onClick={()=>submit('buy')}>Buy by Market</button>
+            <button className="om-sell" disabled={!canAfford} onClick={()=>submit('sell')}>{t('Sell by Market')}</button>
+            <button className="om-buy" disabled={!canAfford} onClick={()=>submit('buy')}>{t('Buy by Market')}</button>
           </div>
         </div>
       </div>
@@ -2095,6 +2133,8 @@ function App(){
   const [termTab,setTermTab]=React.useState('Trade');   // terminal tab bar lives full-width at screen bottom
   const [theme,setTheme]=React.useState(cfg.theme==='light'?'light':'dark');   // View → Color Theme (UI setting)
   React.useEffect(()=>{ themeBus.set(theme); }, [theme]);   // broadcast to live chart canvases
+  const [lang,setLang]=React.useState(['ko','ja','zh'].indexOf(cfg.lang)>=0?cfg.lang:'en');   // View → Languages (UI setting)
+  LANG.cur=lang;   // set during render so every child's t() reads the current language immediately
   // effective active chart (id may point at a closed one after a close)
   const activeChart = charts.find(c=>c.id===activeId) || charts[0] || null;
   const actRef=React.useRef(null); actRef.current = activeChart ? activeChart.id : null;
@@ -2105,7 +2145,7 @@ function App(){
   const closeChart=React.useCallback((id)=>{ setCharts(cs=>cs.filter(c=>c.id!==id));   // unmount → ChartCell cleanup unsubscribes + chart.remove (no leak)
     setActiveId(a=> a===id ? null : a); }, []);
   React.useEffect(()=>{ priceStore.start(); positionsStore.start(); }, []);
-  React.useEffect(()=>{ wtConfig.save({ indicators, view, leftw, bottomh, navh, theme }); }, [indicators, view, leftw, bottomh, navh, theme]);   // charts NOT persisted → refresh = fixed default
+  React.useEffect(()=>{ wtConfig.save({ indicators, view, leftw, bottomh, navh, theme, lang }); }, [indicators, view, leftw, bottomh, navh, theme, lang]);   // charts NOT persisted → refresh = fixed default
   React.useEffect(()=>{ requestAnimationFrame(()=>chartResizer.resizeAll()); }, [charts.length]);   // reflow charts on add/close
   // ── MT5 keyboard shortcuts (View menu + New Order) ──
   React.useEffect(()=>{
@@ -2129,6 +2169,7 @@ function App(){
     else if(cmd==='chart.tool') setTool(arg);
     else if(cmd==='view.toggle') setView(v=>({ ...v, [arg]: !v[arg] }));
     else if(cmd==='theme.toggle') setTheme(t=> t==='light'?'dark':'light');   // View → Color Theme (Light ⇄ Dark)
+    else if(cmd==='lang.set'){ LANG.cur=arg; setLang(arg); }                  // View → Languages (en/ko/ja/zh)
     else if(cmd==='view.fullscreen'){ try{ if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }catch(e){} }
     else if(cmd==='chart.indicator'){
       if(arg==='__clear__') setIndicators([]);
@@ -2193,7 +2234,7 @@ function App(){
           chart + left navigator when pulled up. Terminal history on top, menu tab bar glued at its bottom. */}
       {view.toolbox && <div className="toolbox">
         <BottomBar onResize={setBottomh} tab={termTab} />
-        <div className="tbxtabs">{TBX_TABS.map(t=><div key={t} className={"t"+(t===termTab?' on':'')} onClick={()=>setTermTab(t)}>{t}</div>)}</div>
+        <div className="tbxtabs">{TBX_TABS.map(tb=><div key={tb} className={"t"+(tb===termTab?' on':'')} onClick={()=>setTermTab(tb)}>{t(tb)}</div>)}</div>
       </div>}
       {orderSym && <OrderModal symbol={orderSym} onClose={()=>setOrderSym(null)} />}
     </div>
