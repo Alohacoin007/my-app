@@ -787,15 +787,32 @@ async function loadCandles(symbol, tf){
     if(x&&!x.error&&x.data&&Array.isArray(x.data.candles)&&x.data.candles.length)
       return x.data.candles.map(c=>({ time:Math.floor((c.t||c.time)/1000), open:+c.o||+c.open, high:+c.h||+c.high, low:+c.l||+c.low, close:+c.c||+c.close }));
   } }catch(e){}
-  return synthCandles(symbol);   // TODO: wire a public candles endpoint for real history
+  return synthCandles(symbol, tf);   // TODO: wire a public candles endpoint for real history
 }
-function synthCandles(symbol){   // ~120 M15 bars ending near the current mid
-  const step=900, n=120; let t=Math.floor(Date.now()/1000/step)*step - n*step;
-  let px=(priceStore.get(symbol)&&priceStore.get(symbol).mid)||BASE[symbol]||1;
+const TF_SEC = { M1:60, M5:300, M15:900, M30:1800, H1:3600, H4:14400, D1:86400 };
+// DETERMINISTIC synthetic history — a pure function of (symbol, absolute bar time). The SAME bar
+// always renders the SAME OHLC, so a refresh keeps the identical chart (no more random walk that
+// redraws on every reload). Only the final bar anchors to the live mid, so the history connects to
+// the live price line. No storage — the determinism is in the seed, not a cache. (#5 intact.)
+function synthCandles(symbol, tf){
+  const step=TF_SEC[tf]||900, n=200;
+  const nowB=Math.floor(Date.now()/1000/step)*step;     // current bar open-time, bucketed → identical across quick refreshes
+  const t0=nowB-(n-1)*step;
+  const end=(priceStore.get(symbol)&&priceStore.get(symbol).mid)||BASE[symbol]||1;
+  // FNV-1a hash → [0,1): stable pseudo-random keyed by symbol + a bar's absolute time.
+  const h=(k)=>{ let s=0x811c9dc5>>>0; const str=symbol+'|'+k; for(let i=0;i<str.length;i++){ s=Math.imul(s^str.charCodeAt(i),0x01000193); } return (s>>>0)/4294967296; };
+  const vol=(symbol.indexOf('JPY')>=0?0.0011:0.0009);   // per-bar log-return scale
+  // integrate a deterministic zero-mean walk, then shift so the LAST close == live mid (shape fixed,
+  // only a tiny vertical offset tracks the drifting mid → the chart looks stable between refreshes).
+  const cum=[0]; for(let i=0;i<n;i++) cum.push(cum[i]+(h(t0+i*step)-0.5)*vol);
+  const shift=cum[n];
   const out=[];
-  for(let i=0;i<n;i++){ const o=px; px=px*(1+(Math.random()-0.5)*0.0008);
-    const c=px, h=Math.max(o,c)*(1+Math.random()*0.0003), l=Math.min(o,c)*(1-Math.random()*0.0003);
-    out.push({ time:t, open:o, high:h, low:l, close:c }); t+=step; }
+  for(let i=0;i<n;i++){
+    const o=end*Math.exp(cum[i]-shift), c=end*Math.exp(cum[i+1]-shift);
+    const wk=(0.00006+h(t0+i*step+7)*vol*0.5);          // deterministic wick beyond the body
+    const hi=Math.max(o,c)*(1+wk), lo=Math.min(o,c)*(1-wk);
+    out.push({ time:t0+i*step, open:o, high:hi, low:lo, close:c });
+  }
   return out;
 }
 
