@@ -114,8 +114,7 @@
   /* MT5 one-click panel — compact sticker in the chart's top-left corner, translucent until hover */
   .obox{position:absolute;top:6px;left:6px;z-index:1000;display:flex;align-items:stretch;height:38px;max-width:170px;
     border:1px solid #050505;box-shadow:0 1px 4px rgba(0,0,0,.55);font-family:Tahoma,Arial,sans-serif;
-    opacity:.6;transition:opacity .12s ease}
-  .obox:hover{opacity:1}
+    background:#0d0e12}   /* solid — nothing behind bleeds through */
   .obox .side{padding:2px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;min-width:56px;color:#fff;line-height:1}
   .obox .sell{background:linear-gradient(to bottom,#cc2929,#991f1f);border-top:1px solid rgba(255,255,255,.4);box-shadow:inset 0 1px 3px rgba(0,0,0,.5)}
   .obox .buy{background:linear-gradient(to bottom,#2f6fd6,#183a86);border-top:1px solid rgba(255,255,255,.4);box-shadow:inset 0 1px 3px rgba(0,0,0,.5)}
@@ -167,8 +166,8 @@
   .rsz.nw{top:-3px;left:-3px;width:12px;height:12px;cursor:nwse-resize}
   .rsz.se{bottom:-3px;right:-3px;width:12px;height:12px;cursor:nwse-resize}
   .rsz.sw{bottom:-3px;left:-3px;width:12px;height:12px;cursor:nesw-resize}
-  .cell-lbl{position:absolute;top:3px;left:6px;z-index:3;pointer-events:none;
-    font:400 11px Tahoma,'Segoe UI',Arial,sans-serif;color:#c8ccd2;letter-spacing:.2px;text-shadow:0 0 3px #000,0 0 3px #000}
+  .cell-lbl{position:absolute;top:48px;left:8px;z-index:3;pointer-events:none;
+    font:400 11px Tahoma,'Segoe UI',Arial,sans-serif;color:#8fa0b4;letter-spacing:.2px;text-shadow:0 0 3px #000,0 0 3px #000}
   .cell-lbl b{font-weight:600}
   /* drawing layer over each chart — captures the mouse only when a draw tool is armed */
   .drawlayer{position:absolute;inset:0;z-index:4;pointer-events:none}
@@ -810,7 +809,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     // MT5 look: pure-black canvas, dense grey DOTTED gridlines, Tahoma scales.
     const DOT=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dotted)!=null?LightweightCharts.LineStyle.Dotted:1;
     const c=LightweightCharts.createChart(box.current, {
-      layout:{ background:{color:'#000000'}, textColor:'#b0b6c0', fontSize:11, fontFamily:"Tahoma, 'Segoe UI', Arial, sans-serif" },
+      layout:{ background:{color:'#000000'}, textColor:'#b0b6c0', fontSize:11, fontFamily:"Tahoma, 'Segoe UI', Arial, sans-serif", attributionLogo:false },
       grid:{ vertLines:{color:'#363c46', style:DOT}, horzLines:{color:'#363c46', style:DOT} },
       timeScale:{ borderColor:'#555', timeVisible:true, secondsVisible:false },
       rightPriceScale:{ borderColor:'#555' },
@@ -993,7 +992,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       <div className="canvas" ref={box}>
         <div className="drawlayer" ref={dlayer}></div>
         <OrderBox symbol={symbol} />
-        <div className="cell-lbl"><b>{symbol}</b>, {tf||'H1'} {ohlc
+        <div className="cell-lbl">{ohlc
           ? (ohlc.o!=null ? <span>O {fmtPx(symbol,ohlc.o)} H {fmtPx(symbol,ohlc.h)} L {fmtPx(symbol,ohlc.l)} C {fmtPx(symbol,ohlc.c)}</span>
                           : <span className="px">{fmtPx(symbol,ohlc.c)}</span>)
           : <span className="px">{fmtPx(symbol,px)}</span>}</div>
