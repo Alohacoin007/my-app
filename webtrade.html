@@ -634,7 +634,7 @@ function makePriceSeries(c, type){
 }
 const asSeriesData=(data,type)=> type==='line' ? data.map(d=>({time:d.time,value:d.close})) : data;
 
-function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isActive, onActivate }){
+function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isActive, onActivate, savedGeo, onGeo }){
   const box=React.useRef(null), chart=React.useRef(null), series=React.useRef(null), bar=React.useRef(null);
   const lines=React.useRef([]);           // position order-lines (green) — managed by positions effect
   const drawLines=React.useRef([]);       // USER drawing price-lines (hline/fib) — separate from positions/indicators
@@ -663,31 +663,40 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     el.style.left=g.x+'px'; el.style.top=g.y+'px'; el.style.width=g.w+'px'; el.style.height=g.h+'px'; };
   const resizeChart=()=>{ try{ if(chart.current&&box.current) chart.current.resize(box.current.clientWidth, box.current.clientHeight); }catch(e){} };
   const focus=()=>{ setZ(++WIN_Z); onActivate&&onActivate(idx); };   // click → raise + become the active chart
+  const reportGeo=()=>{ try{ onGeo&&onGeo(idx, { ...geo.current }); }catch(e){} };   // persist window box
   // ── window controls (real MT5 title-bar buttons) ──
-  const savedGeo=React.useRef(null), winMode=React.useRef('normal');
+  const prevGeo=React.useRef(null), winMode=React.useRef('normal');   // prevGeo = geometry saved before min/max
   const setGeo=(g)=>{ geo.current=g; applyGeo(); resizeChart(); };
   const tileGeo=()=>{ const par=win.current&&win.current.parentElement; const f=initial||{fx:.02,fy:.02,fw:.48,fh:.48};
     const W=(par&&par.clientWidth)||800, H=(par&&par.clientHeight)||500;
     return { x:Math.round(f.fx*W), y:Math.round(f.fy*H), w:Math.max(WIN_MINW,Math.round(f.fw*W)), h:Math.max(WIN_MINH,Math.round(f.fh*H)) }; };
   const ctlMin=(e)=>{ e&&e.stopPropagation(); focus();
-    if(winMode.current==='min'){ setGeo(savedGeo.current||tileGeo()); winMode.current='normal'; }
-    else { savedGeo.current={...geo.current}; geo.current={...geo.current, h:19}; applyGeo(); winMode.current='min'; } };
+    if(winMode.current==='min'){ setGeo(prevGeo.current||tileGeo()); winMode.current='normal'; }
+    else { prevGeo.current={...geo.current}; geo.current={...geo.current, h:19}; applyGeo(); winMode.current='min'; } reportGeo(); };
   const ctlMax=(e)=>{ e&&e.stopPropagation(); focus();
-    if(winMode.current==='max'){ setGeo(savedGeo.current||tileGeo()); winMode.current='normal'; }
-    else { const par=win.current&&win.current.parentElement; savedGeo.current={...geo.current};
-      setGeo({ x:0, y:0, w:(par?par.clientWidth:800), h:(par?par.clientHeight:500) }); winMode.current='max'; } };
-  const ctlReset=(e)=>{ e&&e.stopPropagation(); focus(); setGeo(tileGeo()); winMode.current='normal'; };   // ✕ → back to its tile slot
+    if(winMode.current==='max'){ setGeo(prevGeo.current||tileGeo()); winMode.current='normal'; }
+    else { const par=win.current&&win.current.parentElement; prevGeo.current={...geo.current};
+      setGeo({ x:0, y:0, w:(par?par.clientWidth:800), h:(par?par.clientHeight:500) }); winMode.current='max'; } reportGeo(); };
+  const ctlReset=(e)=>{ e&&e.stopPropagation(); focus(); setGeo(tileGeo()); winMode.current='normal'; reportGeo(); };   // ✕ → back to its tile slot
   // remove ONLY user-drawn objects (hline/fib/trend/vline/text) — keeps indicators + position lines
+  const drawStack=React.useRef([]);   // chronological removers for undo (Ctrl+Z / menu)
   const clearDrawings=()=>{ const s=series.current, c=chart.current;
     drawLines.current.forEach(l=>{ try{ s&&s.removePriceLine(l); }catch(e){} }); drawLines.current=[];
     drawSeries.current.forEach(ls=>{ try{ c&&c.removeSeries(ls); }catch(e){} }); drawSeries.current=[];
-    overlays.current.forEach(o=>{ try{o.el.remove();}catch(e){} }); overlays.current=[]; };
+    overlays.current.forEach(o=>{ try{o.el.remove();}catch(e){} }); overlays.current=[]; drawStack.current=[]; };
+  const undoDraw=()=>{ const rm=drawStack.current.pop(); if(rm) try{ rm(); }catch(e){} };   // remove the most recent object
   // seed initial geometry from the workspace size BEFORE paint (no flash), then size the chart
   React.useLayoutEffect(()=>{
     const el=win.current, par=el&&el.parentElement; if(!par) return;
-    const W=par.clientWidth||800, H=par.clientHeight||500, f=initial||{fx:0.02,fy:0.02,fw:0.48,fh:0.48};
-    geo.current={ x:Math.round(f.fx*W), y:Math.round(f.fy*H),
-      w:Math.max(WIN_MINW,Math.round(f.fw*W)), h:Math.max(WIN_MINH,Math.round(f.fh*H)) };
+    const W=par.clientWidth||800, H=par.clientHeight||500;
+    if(savedGeo && savedGeo.w>0){   // restore the remembered window box (clamped into view)
+      geo.current={ x:Math.max(0,Math.min(savedGeo.x, W-60)), y:Math.max(0,Math.min(savedGeo.y, H-24)),
+        w:Math.max(WIN_MINW,savedGeo.w), h:Math.max(WIN_MINH,savedGeo.h) };
+    } else {
+      const f=initial||{fx:0.02,fy:0.02,fw:0.48,fh:0.48};
+      geo.current={ x:Math.round(f.fx*W), y:Math.round(f.fy*H),
+        w:Math.max(WIN_MINW,Math.round(f.fw*W)), h:Math.max(WIN_MINH,Math.round(f.fh*H)) };
+    }
     applyGeo();
   }, []);
   // (active header now comes from the isActive prop / activeChartId — no local focus state)
@@ -707,7 +716,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       geo.current=g; applyGeo();
       if(!raf) raf=requestAnimationFrame(()=>{ raf=null; resizeChart(); });   // 🔴 chart follows the window 1:1
     };
-    const onUp=()=>{ if(!drag.current) return; drag.current=null; document.body.style.userSelect=''; resizeChart(); };
+    const onUp=()=>{ if(!drag.current) return; drag.current=null; document.body.style.userSelect=''; resizeChart(); reportGeo(); };
     document.addEventListener('mousemove',onMove); document.addEventListener('mouseup',onUp);
     return ()=>{ document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); if(raf)cancelAnimationFrame(raf); };
   }, []);
@@ -769,7 +778,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       try{ series.current.update(typeRef.current==='line' ? {time:u.time,value:close} : u); }catch(e){}
     }, 400);
     const unsub=priceStore.subscribe(onTick);
-    return ()=>{ unsub(); unreg(); indSeries.current=[]; lines.current=[]; drawLines.current=[]; drawSeries.current=[];
+    return ()=>{ unsub(); unreg(); indSeries.current=[]; lines.current=[]; drawLines.current=[]; drawSeries.current=[]; drawStack.current=[];
       overlays.current.forEach(o=>{ try{o.el.remove();}catch(e){} }); overlays.current=[];   // chart recreated → clear drawings
       try{ c.remove(); }catch(e){} };
   }, [symbol, tf]);   // recreate + reload on symbol OR timeframe change (toolbar sync)
@@ -790,10 +799,11 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     else if(cmd==='window.tile'){ const el=win.current, par=el&&el.parentElement; if(!par) return;
       const W=par.clientWidth||800, H=par.clientHeight||500, f=initial||{fx:0.02,fy:0.02,fw:0.48,fh:0.48};
       geo.current={ x:Math.round(f.fx*W), y:Math.round(f.fy*H), w:Math.max(WIN_MINW,Math.round(f.fw*W)), h:Math.max(WIN_MINH,Math.round(f.fh*H)) };
-      applyGeo(); resizeChart(); }
+      applyGeo(); resizeChart(); winMode.current='normal'; reportGeo(); }
     else if(cmd==='chart.grid' && arg===idx && chart.current){ gridOn.current=!gridOn.current;   // right-click Grid toggle (this chart)
       try{ chart.current.applyOptions({ grid:{ vertLines:{visible:gridOn.current}, horzLines:{visible:gridOn.current} } }); }catch(e){} }
-    else if(cmd==='chart.clear' && arg===idx){ clearDrawings(); }   // right-click Delete all objects (this chart)
+    else if(cmd==='chart.clear' && arg===idx){ clearDrawings(); }   // Delete all objects (this chart)
+    else if(cmd==='chart.undo' && arg===idx){ undoDraw(); }         // Delete last object (this chart)
   }), [initial]);
 
   // repaint indicators whenever the active set changes (Charts → Indicators menu)
@@ -819,15 +829,18 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     const el=dlayer.current; if(!el) return;
     const xy=(e)=>{ const r=el.getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; };
     const addVLine=(time)=>{ const d=document.createElement('div'); d.className='dov vline'; el.appendChild(d);
-      overlays.current.push({type:'vline',time,el:d}); posOverlays(); };
+      const o={type:'vline',time,el:d}; overlays.current.push(o);
+      drawStack.current.push(()=>{ try{d.remove();}catch(e){} overlays.current=overlays.current.filter(x=>x!==o); }); posOverlays(); };
     const addText=(time,price,txt)=>{ const d=document.createElement('div'); d.className='dov text'; d.textContent=txt; el.appendChild(d);
-      overlays.current.push({type:'text',time,price,el:d}); posOverlays(); };
+      const o={type:'text',time,price,el:d}; overlays.current.push(o);
+      drawStack.current.push(()=>{ try{d.remove();}catch(e){} overlays.current=overlays.current.filter(x=>x!==o); }); posOverlays(); };
     const onDown=(e)=>{ const t=toolRef.current, c=chart.current, s=series.current;
       if(!t||t==='arrow'||t==='cross'||!c||!s) return;
       e.preventDefault(); e.stopPropagation();
       const [x,y]=xy(e); let time=null,price=null;
       try{ time=c.timeScale().coordinateToTime(x); price=s.coordinateToPrice(y); }catch(e){}
-      if(t==='hline'){ if(price==null) return; try{ drawLines.current.push(s.createPriceLine({price,color:'#e8b23a',lineWidth:1,lineStyle:0,axisLabelVisible:true,title:''})); }catch(e){} return; }
+      if(t==='hline'){ if(price==null) return; try{ const pl=s.createPriceLine({price,color:'#e8b23a',lineWidth:1,lineStyle:0,axisLabelVisible:true,title:''});
+        drawLines.current.push(pl); drawStack.current.push(()=>{ try{s.removePriceLine(pl);}catch(e){} drawLines.current=drawLines.current.filter(x=>x!==pl); }); }catch(e){} return; }
       if(t==='vline'){ if(time==null) return; addVLine(time); return; }
       if(t==='text'){ if(time==null||price==null) return; const txt=window.prompt('Text label:'); if(txt) addText(time,price,txt); return; }
       dragDraw.current={ tool:t, time, price };   // trend / fib — finish on mouseup
@@ -839,13 +852,16 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       if(d.tool==='trend'){ const pts=[{time:d.time,value:d.price},{time:t2,value:p2}].sort((a,b)=>a.time-b.time);
         if(pts[0].time===pts[1].time) return;
         try{ const ls=c.addLineSeries?c.addLineSeries({color:'#3aa0ff',lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false})
-                                     :c.addSeries(LightweightCharts.LineSeries,{color:'#3aa0ff',lineWidth:2}); ls.setData(pts); drawSeries.current.push(ls); }catch(e){} }
+                                     :c.addSeries(LightweightCharts.LineSeries,{color:'#3aa0ff',lineWidth:2}); ls.setData(pts); drawSeries.current.push(ls);
+          drawStack.current.push(()=>{ try{c.removeSeries(ls);}catch(e){} drawSeries.current=drawSeries.current.filter(x=>x!==ls); }); }catch(e){} }
       else if(d.tool==='fib'){ const hi=Math.max(d.price,p2), lo=Math.min(d.price,p2);
-        const lv=[0,0.236,0.382,0.5,0.618,0.786,1], col=['#8a9098','#e0709a','#f0c674','#82d982','#5fb0ff','#c792ea','#8a9098'];
-        lv.forEach((L,i)=>{ try{ drawLines.current.push(s.createPriceLine({price:lo+(hi-lo)*L,color:col[i],lineWidth:1,lineStyle:2,axisLabelVisible:true,title:(L*100).toFixed(1)+'%'})); }catch(e){} }); }
+        const lv=[0,0.236,0.382,0.5,0.618,0.786,1], col=['#8a9098','#e0709a','#f0c674','#82d982','#5fb0ff','#c792ea','#8a9098']; const grp=[];
+        lv.forEach((L,i)=>{ try{ const pl=s.createPriceLine({price:lo+(hi-lo)*L,color:col[i],lineWidth:1,lineStyle:2,axisLabelVisible:true,title:(L*100).toFixed(1)+'%'}); drawLines.current.push(pl); grp.push(pl); }catch(e){} });
+        drawStack.current.push(()=>{ grp.forEach(pl=>{ try{s.removePriceLine(pl);}catch(e){} }); drawLines.current=drawLines.current.filter(x=>grp.indexOf(x)<0); }); }
     };
-    el.addEventListener('mousedown',onDown); document.addEventListener('mouseup',onUp);
-    return ()=>{ el.removeEventListener('mousedown',onDown); document.removeEventListener('mouseup',onUp); };
+    const onKey=(e)=>{ if((e.ctrlKey||e.metaKey) && (e.key==='z'||e.key==='Z') && activeRef.current){ e.preventDefault(); undoDraw(); } };
+    el.addEventListener('mousedown',onDown); document.addEventListener('mouseup',onUp); document.addEventListener('keydown',onKey);
+    return ()=>{ el.removeEventListener('mousedown',onDown); document.removeEventListener('mouseup',onUp); document.removeEventListener('keydown',onKey); };
   }, [posOverlays]);
 
   // ── ORDER PRICE LINE (🔴 most important): redraw green dotted lines whenever this
@@ -915,6 +931,8 @@ function ChartMenu({ x, y, idx, symbol, chartType, tf, indicators, onClose }){
     {l:'Indicators', ic:'line', children: Object.keys(INDICATORS).map(id=>({l:INDICATORS[id].label, ck:act.has(id), keep:1, run:()=>terminalBus.emit('chart.indicator',id)}))},
     {sep:1},
     {l:'Grid', ck:true, keep:1, run:()=>terminalBus.emit('chart.grid', idx)},
+    {sep:1},
+    {l:'Delete last object', k:'Ctrl+Z', run:()=>terminalBus.emit('chart.undo', idx)},
     {l:'Delete all objects', ic:'exp', run:()=>terminalBus.emit('chart.clear', idx)},
     {sep:1},
     {l:'Properties...', dis:1},
@@ -1534,9 +1552,11 @@ function App(){
   const [indicators,setIndicators]=React.useState(cfg.indicators||[]);   // active indicator ids (shared by all charts)
   const [tool,setTool]=React.useState(null);             // armed drawing tool (cross/vline/…)
   const [view,setView]=React.useState({ ...DEFAULT_VIEW, ...(cfg.view||{}) });
+  const [geos,setGeos]=React.useState(cfg.geos||[null,null,null,null]);   // remembered chart-window boxes
+  const setGeo1=React.useCallback((i,g)=> setGeos(a=>{ const b=a.slice(); b[i]=g; return b; }), []);
   const actRef=React.useRef(activeIdx); actRef.current=activeIdx;
   React.useEffect(()=>{ priceStore.start(); positionsStore.start(); }, []);
-  React.useEffect(()=>{ wtConfig.save({ tfs, types, indicators, view }); }, [tfs, types, indicators, view]);   // remember layout
+  React.useEffect(()=>{ wtConfig.save({ tfs, types, indicators, view, geos }); }, [tfs, types, indicators, view, geos]);   // remember layout
   // ── command reducer: toolbar chart signals hit ONLY the active chart window ──
   React.useEffect(()=> terminalBus.subscribe((cmd,arg)=>{
     if(cmd==='chart.tf') setTfs(a=> a.map((v,i)=> i===actRef.current ? arg : v));       // active chart only
@@ -1570,7 +1590,8 @@ function App(){
       {leftShown && <Splitter />}
       <div className="charts">
         {grid.map((s,i)=><ChartCell key={s+i} idx={i} isActive={i===activeIdx} onActivate={setActiveIdx}
-          symbol={s} tf={tfs[i]} indicators={indicators} chartType={types[i]} tool={tool} initial={WINLAYOUT[i]||WINLAYOUT[0]} />)}
+          symbol={s} tf={tfs[i]} indicators={indicators} chartType={types[i]} tool={tool}
+          initial={WINLAYOUT[i]||WINLAYOUT[0]} savedGeo={geos[i]} onGeo={setGeo1} />)}
         <div className="charttabs">{grid.map((s,i)=>
           <div key={i} className={"ctab"+(i===activeIdx?' on':'')} onClick={()=>setActiveIdx(i)}>{s}.FX,{tfs[i]}</div>)}</div>
       </div>
