@@ -336,6 +336,13 @@
   .om-vol b{width:38px;flex:none;display:flex;align-items:center;justify-content:center;background:#0d1420;border:1px solid #222;color:#fff;cursor:pointer;font-size:18px;user-select:none}
   .om-vol b:hover{background:#16202e}
   .om-vol input{text-align:center;border-left:0;border-right:0}
+  /* SL/TP input with an internal ±10-pip mini spinner (respects the volume-arrow style) */
+  .om-price{position:relative;display:flex;align-items:stretch}
+  .om-price input{flex:1;padding-right:24px}
+  .om-pspin{position:absolute;right:0;top:0;bottom:0;width:22px;display:flex;flex-direction:column;border-left:1px solid #222}
+  .om-pspin b{flex:1;display:flex;align-items:center;justify-content:center;background:#0d1420;color:#fff;cursor:pointer;font-size:8px;line-height:1;user-select:none}
+  .om-pspin b:first-child{border-bottom:1px solid #222}
+  .om-pspin b:hover{background:#16202e;color:#1a5cff}
   /* big Bid/Ask quote — SAME Arial-Black BigFig pixel-look as the one-click panel */
   .om-quote{display:flex;align-items:stretch;gap:8px}
   .om-px{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:11px 0;border:1px solid #222;background:#0d1420}
@@ -1883,8 +1890,18 @@ function OrderModal({ symbol:sym0, onClose }){
     prev.current={bid:q.bid,ask:q.ask}; setM({...q}); }, IS_MOBILE?RENDER_MS:180)); return un; }, [symbol]);
 
   React.useEffect(()=>{ const k=(e)=>{ if(e.key==='Escape') onClose(); }; document.addEventListener('keydown',k); return ()=>document.removeEventListener('keydown',k); }, [onClose]);
-  const decV=()=>setVol((Math.max(0.01,(+vol||0.01)-0.01)).toFixed(2));
-  const incV=()=>setVol((Math.max(0.01,(+vol||0)+0.01)).toFixed(2));
+  // ── VOLUME long-press acceleration: hold −/+ to ramp 0.01 → 0.1 → 1.0 lot/tick (~10 lots in ~1.5s) ──
+  const holdRef=React.useRef(null);
+  const stopHold=()=>{ if(holdRef.current){ clearInterval(holdRef.current); holdRef.current=null; } };
+  React.useEffect(()=>stopHold, []);   // clear any running accel on unmount
+  const startVolHold=(sign)=>{
+    stopHold();
+    const bump=(step)=> setVol(v=> Math.max(0.01, (+v||0) + sign*step).toFixed(2));   // .toFixed(2) → no float dust
+    bump(0.01);                                                                        // immediate single 0.01 on press
+    const t0=Date.now();
+    holdRef.current=setInterval(()=>{ const el=Date.now()-t0;                          // 0–0.3s ×0.01 · 0.3–1.2s ×0.1 · >1.2s ×1.0
+      bump(el>1200 ? 1.0 : el>300 ? 0.1 : 0.01); }, 40);
+  };
 
   // ── leverage-driven order affordability, live (updates on price / volume / leverage) ──
   const need = eng.marginFor(symbol, vol);          // margin this order would lock
@@ -1924,13 +1941,28 @@ function OrderModal({ symbol:sym0, onClose }){
           </div>
           {/* Volume */}
           <div className="om-field"><label>Volume (lots)</label>
-            <div className="om-vol"><b onClick={decV}>−</b><input value={vol} onChange={e=>setVol(e.target.value)} /><b onClick={incV}>+</b></div></div>
+            <div className="om-vol">
+              <b onMouseDown={()=>startVolHold(-1)} onMouseUp={stopHold} onMouseLeave={stopHold}>−</b>
+              <input value={vol} onChange={e=>setVol(e.target.value)} />
+              <b onMouseDown={()=>startVolHold(1)} onMouseUp={stopHold} onMouseLeave={stopHold}>+</b></div></div>
           {/* Precision-order settings (always available now the toggle is gone) */}
           <div className="om-adv">
             <div className="om-field"><label>Stop Loss</label>
-              <input value={sl} onChange={e=>setSl(e.target.value)} /></div>
+              <div className="om-price">
+                <input value={sl} onChange={e=>setSl(e.target.value)}
+                  onFocus={()=>{ const q=priceStore.get(symbol)||m; if(q.bid!=null) setSl((+q.bid).toFixed(digits(symbol))); }} />{/* focus → inject live BID */}
+                <span className="om-pspin">
+                  <b onClick={()=>setSl(v=>((+v||0)+10*pip(symbol)).toFixed(digits(symbol)))}>▲</b>
+                  <b onClick={()=>setSl(v=>Math.max(0,(+v||0)-10*pip(symbol)).toFixed(digits(symbol)))}>▼</b>{/* ±10 pips */}
+                </span></div></div>
             <div className="om-field"><label>Take Profit</label>
-              <input value={tp} onChange={e=>setTp(e.target.value)} /></div>
+              <div className="om-price">
+                <input value={tp} onChange={e=>setTp(e.target.value)}
+                  onFocus={()=>{ const q=priceStore.get(symbol)||m; if(q.ask!=null) setTp((+q.ask).toFixed(digits(symbol))); }} />{/* focus → inject live ASK */}
+                <span className="om-pspin">
+                  <b onClick={()=>setTp(v=>((+v||0)+10*pip(symbol)).toFixed(digits(symbol)))}>▲</b>
+                  <b onClick={()=>setTp(v=>Math.max(0,(+v||0)-10*pip(symbol)).toFixed(digits(symbol)))}>▼</b>
+                </span></div></div>
           </div>
           {/* Margin */}
           <div className="om-margin" style={{color:canAfford?'#8890a0':'#ff5252'}}>
