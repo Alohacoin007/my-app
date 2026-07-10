@@ -166,6 +166,29 @@
   .mwtabs{display:flex;flex:none;background:linear-gradient(#20242a,#14171c);border-top:1px solid #000}
   .mwtabs .mt{padding:3px 10px;font-size:11px;color:#a2aab6;border-right:1px solid #2a2e34;cursor:default}
   .mwtabs .mt.on{background:#000;color:#fff;border-top:2px solid #3a6ea5;margin-top:-1px}
+  /* Details tab */
+  .mwdet{padding:0}.mwdet .sh{padding:5px 8px;color:#7fb0e0;font-size:11px;font-weight:600;border-bottom:1px solid var(--line)}
+  .mwdet table{width:100%;border-collapse:collapse;font-size:11.5px}
+  .mwdet td{padding:3px 8px;border-bottom:1px solid #14181e;white-space:nowrap}
+  .mwdet td.k{color:#c4c8d0}.mwdet td.v{text-align:right;font-variant-numeric:tabular-nums}
+  .mwdet td .ar{display:inline-block;width:12px;color:#8a9098}
+  /* Trading tab — stacked one-click panels */
+  .mwtrade{padding:0}
+  .mwtp{border-bottom:1px solid #23272d;padding:4px 6px 6px}
+  .mwtp .hd{display:flex;justify-content:space-between;color:#c8ccd2;font-size:11px;font-weight:600;margin-bottom:3px}
+  .mwtp .hd .tm{color:#8890a0;font-weight:400}
+  .mwtp .row{display:flex;height:38px;gap:2px;align-items:stretch}
+  .mwtp .sd{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;cursor:pointer;line-height:1.05}
+  .mwtp .sd.sell{background:linear-gradient(#2f7fd6,#1d63b4)}.mwtp .sd.buy{background:linear-gradient(#e2574c,#d23a2d)}
+  .mwtp .sd:hover{filter:brightness(1.08)}
+  .mwtp .sd .lbl{font-size:9px;letter-spacing:.5px;opacity:.9}
+  .mwtp .sd .pr{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}.mwtp .sd .pr sup{font-size:10px}
+  .mwtp .mid{width:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a0d12}
+  .mwtp .mid .q{color:#e6ebf2;font:700 12px Tahoma}.mwtp .mid .sp{color:#8890a0;font-size:9px;margin-top:2px}
+  .mwtp .lh{display:flex;justify-content:space-between;font-size:9.5px;color:#8890a0;margin-top:2px}
+  .mwtp .lh b{color:#c4c8d0;font-weight:600}
+  /* Ticks tab chart */
+  .mwtick{flex:1;min-height:0;position:relative;background:#0b1020}
   .watch{display:flex;flex-direction:column;overflow:hidden}
   .watch .mwscroll{flex:1;overflow:auto;min-height:0}
   .ctxmenu{position:fixed;z-index:1200;min-width:216px;background:#f0f0f0;border:1px solid #9a9a9a;
@@ -316,23 +339,25 @@ const BASE = { EURUSD:1.143, AUDUSD:0.694, USDJPY:162.36, GBPUSD:1.3417, USDCAD:
 
 const priceStore = {
   mids:{}, listeners:new Set(), timer:null, live:false,
+  _set(sym,mid,half,spr,now){
+    const prev=this.mids[sym]; const bid=mid-half, ask=mid+half;
+    this.mids[sym]={ mid, bid, ask, spr, open: prev? prev.open : mid, chg: prev? (mid-prev.open)/prev.open*100 : 0, ts:now,
+      bidHi: prev? Math.max(prev.bidHi,bid):bid, bidLo: prev? Math.min(prev.bidLo,bid):bid,
+      askHi: prev? Math.max(prev.askHi,ask):ask, askLo: prev? Math.min(prev.askLo,ask):ask };
+  },
   _apply(rows){
     const now=Date.now();
     rows.forEach(p=>{
       const sym=p.symbol; if(WATCH.indexOf(sym)<0) return;
       const mid=+p.mid||0; if(mid<=0) return;
-      const prev=this.mids[sym]; const half=(+p.spr_pts||10)*pip(sym)/2;
-      this.mids[sym]={ mid, bid:mid-half, ask:mid+half,
-        open: prev? prev.open : mid, chg: prev? (mid-prev.open)/prev.open*100 : 0, ts:now };
+      const spr=(+p.spr_pts||10); this._set(sym, mid, spr*pip(sym)/2, spr, now);
     });
   },
   _simulate(){ // dev fallback: gentle random walk so charts show life without a live feed
     const now=Date.now();
     WATCH.forEach(sym=>{
       const cur=this.mids[sym]? this.mids[sym].mid : BASE[sym];
-      const mid=cur*(1+(Math.random()-0.5)*0.0006); const half=10*pip(sym)/2;
-      const open=this.mids[sym]? this.mids[sym].open : cur;
-      this.mids[sym]={ mid, bid:mid-half, ask:mid+half, open, chg:(mid-open)/open*100, ts:now };
+      const mid=cur*(1+(Math.random()-0.5)*0.0006); this._set(sym, mid, 10*pip(sym)/2, 10, now);
     });
   },
   async pull(){
@@ -1024,6 +1049,82 @@ function ContextMenu({ x, y, sym, onClose, onPick }){
     </div>
   );
 }
+/* reusable seeded tick chart (Market Watch Ticks tab) — full density + time axis */
+function TickChart({ symbol }){
+  const box=React.useRef(null);
+  React.useEffect(()=>{
+    if(!window.LightweightCharts || !box.current) return;
+    const DOT=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dotted)!=null?LightweightCharts.LineStyle.Dotted:1;
+    const c=LightweightCharts.createChart(box.current, {
+      layout:{ background:{color:'#0b1020'}, textColor:'#8a93a6', fontSize:10, fontFamily:"Consolas,'Courier New',monospace" },
+      grid:{ vertLines:{color:'#222b3d', style:DOT}, horzLines:{color:'#222b3d', style:DOT} },
+      timeScale:{ visible:true, timeVisible:true, secondsVisible:false, borderColor:'#2a3345', rightOffset:2, barSpacing:3 },
+      rightPriceScale:{ borderColor:'#2a3345' }, crosshair:{ mode:0 }, handleScroll:false, handleScale:false });
+    c.resize(box.current.clientWidth, box.current.clientHeight);
+    const STEP=(window.LightweightCharts&&LightweightCharts.LineType&&LightweightCharts.LineType.WithSteps)!=null?LightweightCharts.LineType.WithSteps:0;
+    const mk=(color)=> c.addLineSeries ? c.addLineSeries({color,lineWidth:2,lineType:STEP,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false})
+                                       : c.addSeries(LightweightCharts.LineSeries,{color,lineWidth:2,lineType:STEP,priceLineVisible:false,lastValueVisible:true});
+    const ask=mk('#ff414d'), bid=mk('#22b8ff');
+    const N=220, STEPT=2, q0=priceStore.get(symbol)||{}, pv=pip(symbol);
+    let m0=q0.mid||((q0.ask+q0.bid)/2)||BASE[symbol]||1; const half=Math.max(pv/2,((q0.ask-q0.bid)/2)||pv/2);
+    const t0=Math.floor(Date.now()/1000)-N*STEPT, seedA=[],seedB=[]; let m=m0-(Math.random()*pv*10);
+    for(let i=0;i<N;i++){ m+=(Math.random()-0.5)*pv*3; const t=t0+i*STEPT; seedA.push({time:t,value:m+half}); seedB.push({time:t,value:m-half}); }
+    if(q0.ask) seedA[N-1].value=q0.ask; if(q0.bid) seedB[N-1].value=q0.bid;
+    const buf={ t:t0+N*STEPT, ask:seedA, bid:seedB };
+    try{ ask.setData(seedA); bid.setData(seedB); c.timeScale().fitContent(); }catch(e){}
+    const onTick=throttle((mids)=>{ const q=mids[symbol]; if(!q) return; buf.t+=STEPT;
+      buf.ask.push({time:buf.t,value:q.ask}); buf.bid.push({time:buf.t,value:q.bid});
+      if(buf.ask.length>N){ buf.ask.shift(); buf.bid.shift(); }
+      try{ ask.setData(buf.ask); bid.setData(buf.bid); }catch(e){}
+    }, 220);
+    const un=priceStore.subscribe(onTick);
+    const onR=()=>{ try{ c.resize(box.current.clientWidth, box.current.clientHeight); }catch(e){} };
+    window.addEventListener('resize',onR);
+    return ()=>{ un(); window.removeEventListener('resize',onR); try{c.remove();}catch(e){} };
+  }, [symbol]);
+  return <div className="mwtick" ref={box}></div>;
+}
+/* Market Watch → Details tab: Bid/Ask + session Hi/Lo + Open/Close for the selected symbol */
+function MWDetails({ sym }){
+  const [m,setM]=React.useState(priceStore.get(sym)||{});
+  React.useEffect(()=> priceStore.subscribe(throttle(mids=>setM({...(mids[sym]||{})}),350)), [sym]);
+  const ar=(d)=> d>0? <span className="ar" style={{color:'#26c281'}}>↗</span> : d<0? <span className="ar" style={{color:'#ff4d4d'}}>↘</span> : <span className="ar">·</span>;
+  const rows=[['Bid',m.bid,-1,'#ff4d4d'],['Bid High',m.bidHi,1,'#8fb7ff'],['Bid Low',m.bidLo,-1,'#ff4d4d'],
+    ['Ask',m.ask,-1,'#ff4d4d'],['Ask High',m.askHi,1,'#8fb7ff'],['Ask Low',m.askLo,-1,'#ff4d4d'],
+    ['Open Price',m.open,0,'#c4c8d0'],['Close Price',m.open,0,'#c4c8d0']];
+  return (
+    <div className="mwdet">
+      <div className="sh">{sym}.FX, {SYM_NAME[sym]||sym}</div>
+      <table><tbody>
+        {rows.map(([k,v,d,col],i)=><tr key={i}><td className="k">{ar(d)}{k}</td><td className="v" style={{color:col}}>{fmtPx(sym,v)}</td></tr>)}
+      </tbody></table>
+    </div>
+  );
+}
+/* Market Watch → Trading tab: stacked one-click SELL/BUY panels per symbol */
+function MWTrading(){
+  const [mids,setMids]=React.useState({});
+  React.useEffect(()=> priceStore.subscribe(throttle(m=>setMids({...m}),350)), []);
+  const d=new Date(),p2=n=>String(n).padStart(2,'0'), tm=p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds());
+  const big=(sym,v)=>{ const s=fmtPx(sym,v); return s==='—'?s:<span>{s.slice(0,-1)}<sup>{s.slice(-1)}</sup></span>; };
+  return (
+    <div className="mwtrade">
+      {WATCH.map(sym=>{ const m=mids[sym]||{};
+        return (
+          <div className="mwtp" key={sym}>
+            <div className="hd"><span>{sym}.FX</span><span className="tm">{tm}</span></div>
+            <div className="row">
+              <div className="sd sell" onClick={()=>terminalBus.emit('order.new',sym)}><span className="lbl">SELL</span><span className="pr">{big(sym,m.bid)}</span></div>
+              <div className="mid"><div className="q">0.01</div><div className="sp">Spread: {m.spr!=null?m.spr:'—'}</div></div>
+              <div className="sd buy" onClick={()=>terminalBus.emit('order.new',sym)}><span className="lbl">BUY</span><span className="pr">{big(sym,m.ask)}</span></div>
+            </div>
+            <div className="lh"><span>LOW <b>{fmtPx(sym,m.bidLo)}</b></span><span>HIGH <b>{fmtPx(sym,m.askHi)}</b></span></div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 const MW_TABS=['Symbols','Details','Trading','Ticks'];
 function MarketWatch({ onPick }){
   const [mids,setMids]=React.useState({});
@@ -1040,9 +1141,13 @@ function MarketWatch({ onPick }){
   }, 350)), []);
   const ctx=(e,sym)=>{ e.preventDefault(); setSel(sym); setMenu({ sym, x:e.clientX, y:e.clientY }); };
   const tc=(d)=> d>0?'uptick flash':d<0?'dntick flash':'';   // tick color + brief flash
+  const cur=sel||WATCH[0];
   return (
     <div className="watch">
+      {tab==='Ticks' ? <TickChart symbol={cur} /> :
       <div className="mwscroll">
+        {tab==='Details' ? <MWDetails sym={cur} /> :
+         tab==='Trading' ? <MWTrading /> :
         <table className="mwt">
           <thead><tr><th>Symbol</th><th>Bid</th><th>Ask</th><th>Daily Ch%</th></tr></thead>
           <tbody>
@@ -1057,8 +1162,8 @@ function MarketWatch({ onPick }){
                 </tr>
               ); })}
           </tbody>
-        </table>
-      </div>
+        </table>}
+      </div>}
       <div className="mwtabs">{MW_TABS.map(t=><div key={t} className={"mt"+(t===tab?' on':'')} onClick={()=>setTab(t)}>{t}</div>)}</div>
       {menu && <ContextMenu x={menu.x} y={menu.y} sym={menu.sym} onPick={onPick} onClose={()=>setMenu(null)} />}
     </div>
