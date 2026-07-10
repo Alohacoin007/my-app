@@ -447,8 +447,13 @@ const BASE = { EURUSD:1.143, AUDUSD:0.694, USDJPY:162.36, GBPUSD:1.3417, USDCAD:
 
 const priceStore = {
   mids:{}, listeners:new Set(), timer:null, live:false,
-  _set(sym,mid,half,spr,now){
-    const prev=this.mids[sym]; const bid=mid-half, ask=mid+half;
+  _set(sym,mid,half,spr,now,jit){
+    const prev=this.mids[sym];
+    // jit (SIMULATOR ONLY): independent per-side noise so the spread breathes and Bid/Ask can
+    // tick in OPPOSITE directions — the MT5 "left blue / right red diverging" feel. Real feed
+    // (_apply) passes no jit → truthful bid=mid-half, ask=mid+half (never fake real prices, #5).
+    const jb=jit?(Math.random()-0.5)*jit:0, ja=jit?(Math.random()-0.5)*jit:0;
+    const bid=mid-half+jb, ask=mid+half+ja;
     this.mids[sym]={ mid, bid, ask, spr, open: prev? prev.open : mid, chg: prev? (mid-prev.open)/prev.open*100 : 0, ts:now,
       bidHi: prev? Math.max(prev.bidHi,bid):bid, bidLo: prev? Math.min(prev.bidLo,bid):bid,
       askHi: prev? Math.max(prev.askHi,ask):ask, askLo: prev? Math.min(prev.askLo,ask):ask };
@@ -466,7 +471,7 @@ const priceStore = {
     WATCH.forEach(sym=>{
       if(this.drift[sym]==null) this.drift[sym]=(Math.random()-0.5)*0.00009;
       const cur=this.mids[sym]? this.mids[sym].mid : BASE[sym];
-      const mid=cur*(1+(Math.random()-0.5)*0.0006 + this.drift[sym]); this._set(sym, mid, 10*pip(sym)/2, 10, now);
+      const mid=cur*(1+(Math.random()-0.5)*0.0006 + this.drift[sym]); this._set(sym, mid, 10*pip(sym)/2, 10, now, 3*pip(sym));
     });
   },
   async pull(){
@@ -802,17 +807,21 @@ function OrderBox({ symbol }){
 /* ── Chart cell: one Lightweight Charts instance, seeded history + throttled live last-bar.
    Draws a green dotted createPriceLine + "BUY 0.01 at 1.14318" flag for every open position. ── */
 // build the main price series for a chart in the requested MT5 chart type
-function makePriceSeries(c, type){
+function makePriceSeries(c, type, sym){
+  // FX/crypto precision: Y-axis + price-line axis labels show FULL 5 digits (JPY 3), never
+  // the library default precision:2 (that was the "1.41" truncation). minMove = 10^-precision.
+  const d=sym?digits(sym):5;
+  const pf={ type:'price', precision:d, minMove:Math.pow(10,-d) };
   if(type==='line'){
-    const o={ color:'#e8b23a', lineWidth:2, priceLineVisible:false, lastValueVisible:true };
+    const o={ color:'#e8b23a', lineWidth:2, priceLineVisible:false, lastValueVisible:true, priceFormat:pf };
     return c.addLineSeries ? c.addLineSeries(o) : c.addSeries(LightweightCharts.LineSeries, o);
   }
   if(type==='bar'){
-    const o={ upColor:'#00ff00', downColor:'#ff2020', thinBars:false };
+    const o={ upColor:'#00ff00', downColor:'#ff2020', thinBars:false, priceFormat:pf };
     return c.addBarSeries ? c.addBarSeries(o) : c.addSeries(LightweightCharts.BarSeries, o);
   }
   const o={ upColor:'#00ff00', downColor:'#ff2020', wickUpColor:'#00ff00', wickDownColor:'#ff2020',
-    borderUpColor:'#00ff00', borderDownColor:'#ff2020', borderVisible:true };
+    borderUpColor:'#00ff00', borderDownColor:'#ff2020', borderVisible:true, priceFormat:pf };
   return c.addCandlestickSeries ? c.addCandlestickSeries(o) : c.addSeries(LightweightCharts.CandlestickSeries, o);
 }
 const asSeriesData=(data,type)=> type==='line' ? data.map(d=>({time:d.time,value:d.close})) : data;
@@ -947,7 +956,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     c.resize(box.current.clientWidth, box.current.clientHeight);
     const unreg=chartResizer.add(c, box.current);
     // MT5 price series in the currently-selected type (candles / bars / line)
-    const s = makePriceSeries(c, typeRef.current);
+    const s = makePriceSeries(c, typeRef.current, symbol);
     chart.current=c; series.current=s;
     try{ c.timeScale().subscribeVisibleTimeRangeChange(()=>posOverlays()); }catch(e){}   // keep drawings pinned while panning
     // crosshair OHLC readout (MT5 data feel) — updates the in-chart label on hover
@@ -991,7 +1000,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   React.useEffect(()=>{
     const c=chart.current; if(!c||!series.current) return;
     try{ c.removeSeries(series.current); }catch(e){}
-    const s=makePriceSeries(c, chartType||'candle'); series.current=s;
+    const s=makePriceSeries(c, chartType||'candle', symbol); series.current=s;
     try{ s.setData(asSeriesData(candles.current,chartType||'candle')); }catch(e){}
   }, [chartType]);
 
