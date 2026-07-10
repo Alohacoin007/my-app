@@ -186,7 +186,17 @@
   .cell-title .wc span{cursor:pointer;width:16px;text-align:center;border-radius:2px;color:#c8ccd2}
   .cell-title .wc span:hover{background:rgba(255,255,255,.22)}
   .win.active .cell-title .wc span{color:#eaf2ff}
-  .cell-title .wc span:last-child:hover{background:#e81123;color:#fff}
+  .cell-title .wc span.cl:hover,.cell-title .wc span:last-child:hover{background:#e81123;color:#fff}
+  /* minimized-chart dock — MT5 docks minimized windows as small title bars at the workspace bottom */
+  .mindock{flex:none;display:flex;flex-wrap:wrap;gap:3px;padding:3px 3px 4px;background:#0a0d12;border-top:1px solid var(--cellbd)}
+  .minbar{display:flex;align-items:center;gap:6px;height:19px;padding:0 3px 0 8px;min-width:158px;max-width:200px;
+    background:linear-gradient(#2b323d,#1b2029);border:1px solid #3a4250;border-radius:2px;color:#c8ccd2;font-size:11px;cursor:pointer}
+  .minbar.active{border-color:#2f7fe0;background:linear-gradient(#2f7fe0,#1c5ec0);color:#fff}
+  .minbar .mt{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .minbar .mc{display:flex;gap:2px;flex:none}
+  .minbar .mc span{cursor:pointer;width:15px;text-align:center;border-radius:2px;color:inherit}
+  .minbar .mc span:hover{background:rgba(255,255,255,.22)}
+  .minbar .mc span.cl:hover{background:#e81123;color:#fff}
   .canvas{position:relative;flex:1;min-height:0}
   /* 8-direction resize handles hugging the window border */
   .rsz{position:absolute;z-index:7}
@@ -451,6 +461,9 @@
   .terminal.light .mwdet td.v.up{color:#0000cc}.terminal.light .mwdet td.v.dn{color:#cc0000}.terminal.light .mwdet td.v.nu{color:#333}
   /* CHART workspace — white windows, gray separators, #b0b0b0 borders */
   .terminal.light .charts,.terminal.light .chartgrid{background:#a0a0a0}
+  .terminal.light .mindock{background:#c4c4c4;border-top-color:#a0a0a0}
+  .terminal.light .minbar{background:linear-gradient(#f0f0f0,#dcdcdc);border-color:#a0a0a0;color:#000}
+  .terminal.light .minbar.active{background:linear-gradient(#4a90e2,#2f6ec0);border-color:#2f6ec0;color:#fff}
   .terminal.light .win{background:#ffffff;border:1px solid #b0b0b0}
   .terminal.light .cell-title{background:#e1e1e1;color:#000;border-color:#b0b0b0}
   .terminal.light .win.active .cell-title{background:linear-gradient(#4a90e2,#2f6ec0);color:#fff}
@@ -1070,7 +1083,7 @@ function distSeg(px,py,x1,y1,x2,y2){ const dx=x2-x1,dy=y2-y1,L2=dx*dx+dy*dy;
   let t=L2? ((px-x1)*dx+(py-y1)*dy)/L2 : 0; t=Math.max(0,Math.min(1,t));
   return Math.hypot(px-(x1+t*dx), py-(y1+t*dy)); }
 
-function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isActive, onActivate, savedGeo, onGeo, tiled, onClose, lazyHold }){
+function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isActive, onActivate, savedGeo, onGeo, tiled, onClose, onMin, onMax, maxed, lazyHold }){
   const box=React.useRef(null), chart=React.useRef(null), series=React.useRef(null), bar=React.useRef(null);
   const lines=React.useRef([]);           // position order-lines (green) — managed by positions effect
   const drawLines=React.useRef([]);       // USER drawing price-lines (hline/fib) — separate from positions/indicators
@@ -1394,7 +1407,11 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
             : posLbl.length+' pos · net '+(net>=0?'+':'')+net.toFixed(2)}</span>; })()}
         <span className="wc">
           {tiled
-            ? <span onMouseDown={e=>e.stopPropagation()} onClick={(e)=>{e.stopPropagation(); onClose&&onClose();}} title="Close chart">✕</span>
+            ? <React.Fragment>
+                <span onMouseDown={e=>e.stopPropagation()} onClick={(e)=>{e.stopPropagation(); onMin&&onMin();}} title="Minimize">—</span>
+                <span onMouseDown={e=>e.stopPropagation()} onClick={(e)=>{e.stopPropagation(); onMax&&onMax();}} title={maxed?'Restore':'Maximize'}>{maxed?'❐':'▢'}</span>
+                <span className="cl" onMouseDown={e=>e.stopPropagation()} onClick={(e)=>{e.stopPropagation(); onClose&&onClose();}} title="Close chart">✕</span>
+              </React.Fragment>
             : <React.Fragment>
                 <span onMouseDown={e=>e.stopPropagation()} onClick={ctlMin} title="Minimize">—</span>
                 <span onMouseDown={e=>e.stopPropagation()} onClick={ctlMax} title="Maximize / Restore">▢</span>
@@ -2202,6 +2219,20 @@ function OrderModal({ symbol:sym0, onClose }){
 const DEFAULT_VIEW={ toolbars:true, statusbar:true, marketwatch:true, navigator:true, toolbox:true };
 // auto-tile: [cols, rows] for N charts — 1=full, 2=side-by-side, 3-4=2x2, then √-grid
 function tileDims(n){ if(n<=1) return [1,1]; if(n===2) return [2,1]; if(n<=4) return [2,2]; const c=Math.ceil(Math.sqrt(n)); return [c, Math.ceil(n/c)]; }
+// Pure MT5 window-state reducer over {maxId, minIds}. One place decides every min/max/restore/close
+// transition so the rules can't drift (and are unit-tested). Never mutates the input.
+//   min      → dock this chart; if it was maximized, drop back to tiled.
+//   max      → toggle full-workspace for this chart; un-dock it if it was minimized.
+//   activate → un-dock if minimized; in max mode, switch the maximized chart to this one.
+//   close    → forget this chart from both sets.
+function wtWinReduce(state, type, id){
+  const minIds=new Set(state.minIds); let maxId=state.maxId;
+  if(type==='min'){ minIds.add(id); if(maxId===id) maxId=null; }
+  else if(type==='max'){ minIds.delete(id); maxId=(maxId===id?null:id); }
+  else if(type==='activate'){ minIds.delete(id); if(maxId!=null) maxId=id; }
+  else if(type==='close'){ minIds.delete(id); if(maxId===id) maxId=null; }
+  return { maxId, minIds };
+}
 function App(){
   const cfg=React.useRef(wtConfig.load()).current;     // saved layout (persists across reloads)
   // ALWAYS boot to the fixed default 2×2 @ M1 (chart layout is intentionally NOT persisted, so a
@@ -2209,12 +2240,16 @@ function App(){
   const initCharts=React.useRef(GRID.map((s,i)=>({ id:i+1, symbol:s, tf:'M1', type:'candle' }))).current;
   const [charts,setCharts]=React.useState(initCharts);   // dynamic chart windows [{id,symbol,tf,type}]
   const [activeId,setActiveId]=React.useState(initCharts[0]?initCharts[0].id:null);
+  const [win,setWin]=React.useState({ maxId:null, minIds:new Set() });   // MT5 window state (see wtWinReduce)
+  const maxId=win.maxId, minIds=win.minIds;
+  const winDo=React.useCallback((type,id)=> setWin(w=>wtWinReduce(w,type,id)), []);
   // MOBILE lazy chart init: only mount the chart(s) the user has REVEALED (seeded with the active
   // one). Hidden tiles create their Lightweight Charts instance the moment they're tapped or on
   // Window→Tile. Desktop reveals eagerly (lazyHold below is gated on IS_MOBILE → all charts mount).
   const [revealed,setRevealed]=React.useState(()=> new Set(IS_MOBILE && initCharts[0] ? [initCharts[0].id] : []));
   const revealChart=React.useCallback((id)=>{ if(IS_MOBILE) setRevealed(s=> s.has(id)?s:new Set(s).add(id)); }, []);
-  const activate=React.useCallback((id)=>{ setActiveId(id); if(IS_MOBILE) setRevealed(s=> s.has(id)?s:new Set(s).add(id)); }, []);
+  const activate=React.useCallback((id)=>{ setActiveId(id); winDo('activate',id);            // restore-if-minimized + keep-max-view handled by the reducer
+    if(IS_MOBILE) setRevealed(s=> s.has(id)?s:new Set(s).add(id)); }, [winDo]);
   const idRef=React.useRef(initCharts.reduce((mx,c)=>Math.max(mx,c.id),0));
   const chartsRef=React.useRef(charts); chartsRef.current=charts;
   const [orderSym,setOrderSym]=React.useState(null);     // popup Order dialog target (null = closed)
@@ -2237,10 +2272,14 @@ function App(){
     setCharts(cs=>cs.concat([{ id, symbol:symbol||WATCH[0], tf:'M1', type:'candle' }])); setActiveId(id);
     if(IS_MOBILE) setRevealed(s=> new Set(s).add(id)); }, []);   // a freshly-opened chart is revealed
   const closeChart=React.useCallback((id)=>{ setCharts(cs=>cs.filter(c=>c.id!==id));   // unmount → ChartCell cleanup unsubscribes + chart.remove (no leak)
-    setActiveId(a=> a===id ? null : a); }, []);
+    setActiveId(a=> a===id ? null : a); winDo('close',id); }, [winDo]);
+  // ── MT5 window controls (min / max / restore) — grid-aware, no floating geometry ──
+  const minChart=React.useCallback((id)=> winDo('min',id), [winDo]);                 // dock to the bottom strip
+  const maxChart=React.useCallback((id)=>{ winDo('max',id); setActiveId(id);         // toggle full-workspace
+    if(IS_MOBILE) setRevealed(s=> s.has(id)?s:new Set(s).add(id)); }, [winDo]);
   React.useEffect(()=>{ priceStore.start(); positionsStore.start(); }, []);
   React.useEffect(()=>{ wtConfig.save({ indicators, view, leftw, bottomh, navh, theme, lang }); }, [indicators, view, leftw, bottomh, navh, theme, lang]);   // charts NOT persisted → refresh = fixed default
-  React.useEffect(()=>{ requestAnimationFrame(()=>chartResizer.resizeAll()); }, [charts.length]);   // reflow charts on add/close
+  React.useEffect(()=>{ requestAnimationFrame(()=>chartResizer.resizeAll()); }, [charts.length, maxId, minIds]);   // reflow on add/close/min/max
   // ── MT5 keyboard shortcuts (View menu + New Order) ──
   React.useEffect(()=>{
     const onKey=(e)=>{
@@ -2295,7 +2334,11 @@ function App(){
     gridTemplateRows: `23px ${view.toolbars?'33px':'0'} 1fr var(--dockh)`,
     gridTemplateAreas: '"menu menu menu" "tools tools tools" "left splitter right" "dock dock dock"',
   };
-  const [tcols,trows]=tileDims(charts.length);
+  // maximized → only that chart fills the grid; otherwise all non-minimized charts tile. Minimized
+  // charts dock as title-bar strips at the workspace bottom (MT5 MDI behavior).
+  const gridCharts = maxId!=null ? charts.filter(c=>c.id===maxId) : charts.filter(c=>!minIds.has(c.id));
+  const docked = charts.filter(c=>minIds.has(c.id));
+  const [tcols,trows]=tileDims(gridCharts.length||1);
   const gridTiles={ gridTemplateColumns:`repeat(${tcols},1fr)`, gridTemplateRows:`repeat(${trows},1fr)` };
   const activeSym = activeChart ? activeChart.symbol : null;
   return (
@@ -2312,12 +2355,20 @@ function App(){
       <div className="right">
         <div className="charts">
           <div className="chartgrid" style={gridTiles}>
-            {charts.map((c)=><ChartCell key={c.id} idx={c.id} isActive={c.id===(activeChart&&activeChart.id)} onActivate={activate}
+            {gridCharts.map((c)=><ChartCell key={c.id} idx={c.id} isActive={c.id===(activeChart&&activeChart.id)} onActivate={activate}
               symbol={c.symbol} tf={c.tf} indicators={indicators} chartType={c.type} tool={tool}
               lazyHold={IS_MOBILE && !revealed.has(c.id)}
-              tiled onClose={()=>closeChart(c.id)} />)}
+              tiled maxed={maxId===c.id} onMin={()=>minChart(c.id)} onMax={()=>maxChart(c.id)} onClose={()=>closeChart(c.id)} />)}
             {!charts.length && <div className="noch">No charts open — File → New Chart Window, or double-click a Market Watch symbol.</div>}
           </div>
+          {docked.length>0 && <div className="mindock">{docked.map(c=>
+            <div key={c.id} className={"minbar"+(c.id===(activeChart&&activeChart.id)?' active':'')} onClick={()=>activate(c.id)} title={c.symbol+'.FX,'+c.tf}>
+              <span className="mt">{c.symbol}.FX,{c.tf}</span>
+              <span className="mc">
+                <span onClick={(e)=>{e.stopPropagation(); maxChart(c.id);}} title="Restore">❐</span>
+                <span className="cl" onClick={(e)=>{e.stopPropagation(); closeChart(c.id);}} title="Close chart">✕</span>
+              </span>
+            </div>)}</div>}
         </div>
         {/* layer 2: chart-window tab bar — glued directly under the charts. click=focus, ✕=close+unsubscribe */}
         {!!charts.length && <div className="charttabs">{charts.map(c=>
