@@ -1158,11 +1158,12 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     // live re-theme when the user flips Light/Dark (no rebuild)
     const unTheme=themeBus.subscribe((t)=>{ const th=CHART_THEME[t]||CHART_THEME.dark, ct=CANDLE_THEME[t]||CANDLE_THEME.dark;
       try{ c.applyOptions({ layout:{background:{color:th.bg},textColor:th.text},
-        grid:{vertLines:{color:th.grid},horzLines:{color:th.grid}},
+        grid:{vertLines:{color:th.grid, style:DOT},horzLines:{color:th.grid, style:DOT}},   // keep DOTTED across the flip
         timeScale:{borderColor:th.border}, rightPriceScale:{borderColor:th.border},
         crosshair:{vertLine:{color:th.cross},horzLine:{color:th.cross}} }); }catch(e){}
       try{ if(series.current&&series.current.applyOptions&&typeRef.current==='candle') series.current.applyOptions({   // recolor candles on theme flip
-        upColor:ct.up, downColor:ct.down, wickUpColor:ct.wick, wickDownColor:ct.wick, borderUpColor:ct.border, borderDownColor:ct.border }); }catch(e){} });
+        upColor:ct.up, downColor:ct.down, wickUpColor:ct.wick, wickDownColor:ct.wick,
+        borderUpColor:ct.border, borderDownColor:ct.border, borderVisible:true }); }catch(e){} });
     // manual sizing (autoSize OFF): register so splitter-drag + window-resize call chart.resize()
     c.resize(box.current.clientWidth, box.current.clientHeight);
     const unreg=chartResizer.add(c, box.current);
