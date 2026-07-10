@@ -98,6 +98,10 @@
   .nav li:hover{background:#0d1420}
   .nav li.root{font-weight:700;color:#dfe3ea}
   .nav li.child{padding-left:26px;color:#aeb6c2}
+  .nav li.folder{padding-left:8px;cursor:pointer}
+  .nav .tw{display:inline-block;width:12px;text-align:center;color:#8a9098}
+  .nav li.leaf{padding-left:44px;color:#8fd3a0;font-size:11px}
+  .nav li.leaf .ic{margin-right:4px}
   .nav .ic{display:inline-block;width:15px;text-align:center;margin-right:5px}
   /* ── one-click order box (top-left of each chart) ── */
   .obox{position:absolute;top:19px;left:6px;z-index:5;display:flex;align-items:stretch;height:30px;
@@ -491,6 +495,14 @@ const tradeSettings = {
   notify(){ this.listeners.forEach(fn=>{ try{fn(this.leverage);}catch(e){} }); },
   subscribe(fn){ this.listeners.add(fn); return ()=>this.listeners.delete(fn); },
 }.load();
+
+/* wtConfig — persist the terminal LAYOUT (timeframes, chart types, indicators, panel
+   visibility) so the terminal remembers itself across reloads. UI config only, NOT money
+   (localStorage OK per CLAUDE.md — UI settings/session allowed). */
+const wtConfig = {
+  load(){ try{ return JSON.parse(localStorage.getItem('alpexa.wt.config')||'{}')||{}; }catch(e){ return {}; } },
+  save(c){ try{ localStorage.setItem('alpexa.wt.config', JSON.stringify(c)); }catch(e){} },
+};
 
 // base-currency → USD rate for margin conversion (MT5-standard). USD base = 1; USD quote
 // = the pair price; a cross (EURJPY) uses the base's USD pair if the feed has it.
@@ -1273,18 +1285,28 @@ function Toolbar({ tf, chartType, tool }){
 
 /* ── Navigator panel (folder tree) — MT5 look under Market Watch ── */
 function Navigator(){
+  const [acct,setAcct]=React.useState(positionsStore.acct);
+  const [open,setOpen]=React.useState({ Accounts:true });
+  React.useEffect(()=> positionsStore.subscribe(s=>setAcct(s.acct)), []);
+  const me=window.AlpexaSync&&AlpexaSync.me;
+  const bal=acct?(+acct.balance||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):null;
+  const acctLine=acct ? (acct.acct_no+' — Alpexa-Live — '+bal+' USD') : (me?'Loading account…':'Not logged in (demo)');
+  const tog=(k)=>setOpen(o=>({ ...o, [k]:!o[k] }));
+  const folders=[['Accounts','👤'],['Indicators','📈'],['Expert Advisors','🤖'],['Scripts','📜'],['Services','🛠️'],['Market','🛒'],['VPS','☁️']];
   return (
     <div className="nav">
       <div className="navhd">Navigator</div>
       <ul>
         <li className="root"><span className="ic">💠</span>Alpexa MetaTrader 5</li>
-        <li className="child"><span className="ic">👤</span>Accounts</li>
-        <li className="child"><span className="ic">📈</span>Indicators</li>
-        <li className="child"><span className="ic">🤖</span>Expert Advisors</li>
-        <li className="child"><span className="ic">📜</span>Scripts</li>
-        <li className="child"><span className="ic">🛠️</span>Services</li>
-        <li className="child"><span className="ic">🛒</span>Market</li>
-        <li className="child"><span className="ic">☁️</span>VPS</li>
+        {folders.map(([name,ic])=>(
+          <React.Fragment key={name}>
+            <li className="child folder" onClick={()=>tog(name)}>
+              <span className="tw">{open[name]?'▾':'▸'}</span><span className="ic">{ic}</span>{name}
+            </li>
+            {name==='Accounts' && open.Accounts &&
+              <li className="child leaf"><span className="ic">🔑</span>{acctLine}</li>}
+          </React.Fragment>
+        ))}
       </ul>
     </div>
   );
@@ -1501,17 +1523,20 @@ function OrderModal({ symbol:sym0, onClose }){
   );
 }
 
+const DEFAULT_VIEW={ toolbars:true, statusbar:true, marketwatch:true, navigator:true, toolbox:true };
 function App(){
+  const cfg=React.useRef(wtConfig.load()).current;     // saved layout (persists across reloads)
   const [grid,setGrid]=React.useState(GRID);
-  const [tfs,setTfs]=React.useState(['H1','H1','H1','H1']);        // per-chart timeframe
-  const [types,setTypes]=React.useState(['candle','candle','candle','candle']);  // per-chart type
+  const [tfs,setTfs]=React.useState(cfg.tfs||['H1','H1','H1','H1']);        // per-chart timeframe
+  const [types,setTypes]=React.useState(cfg.types||['candle','candle','candle','candle']);  // per-chart type
   const [activeIdx,setActiveIdx]=React.useState(0);               // the focused chart window (blue header) — default 0
   const [orderSym,setOrderSym]=React.useState(null);     // popup Order dialog target (null = closed)
-  const [indicators,setIndicators]=React.useState([]);   // active indicator ids (shared by all charts)
+  const [indicators,setIndicators]=React.useState(cfg.indicators||[]);   // active indicator ids (shared by all charts)
   const [tool,setTool]=React.useState(null);             // armed drawing tool (cross/vline/…)
-  const [view,setView]=React.useState({ toolbars:true, statusbar:true, marketwatch:true, navigator:true, toolbox:true });
+  const [view,setView]=React.useState({ ...DEFAULT_VIEW, ...(cfg.view||{}) });
   const actRef=React.useRef(activeIdx); actRef.current=activeIdx;
   React.useEffect(()=>{ priceStore.start(); positionsStore.start(); }, []);
+  React.useEffect(()=>{ wtConfig.save({ tfs, types, indicators, view }); }, [tfs, types, indicators, view]);   // remember layout
   // ── command reducer: toolbar chart signals hit ONLY the active chart window ──
   React.useEffect(()=> terminalBus.subscribe((cmd,arg)=>{
     if(cmd==='chart.tf') setTfs(a=> a.map((v,i)=> i===actRef.current ? arg : v));       // active chart only
