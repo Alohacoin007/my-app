@@ -111,16 +111,17 @@
   .obox{position:absolute;top:22px;left:6px;z-index:5;display:flex;align-items:stretch;height:44px;
     border:1px solid #0a0a0a;box-shadow:0 2px 5px rgba(0,0,0,.6);font-family:Tahoma,Arial,sans-serif}
   .obox .side{padding:3px 10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;min-width:84px;color:#fff;line-height:1}
-  .obox .sell{background:linear-gradient(#4a6f9e,#33547d)}   /* MT5 sell (blue-grey) */
-  .obox .buy{background:linear-gradient(#2f7fe0,#1c60c0)}    /* MT5 buy (bright blue) */
+  .obox .sell{background:linear-gradient(#e2574c,#c9382b)}   /* MT5 sell (red) */
+  .obox .buy{background:linear-gradient(#2f7fe0,#1c60c0)}    /* MT5 buy (blue) */
   .obox .side:hover{filter:brightness(1.1)}
   .obox .side:active{filter:brightness(.9)}
   .obox .lbl{font-size:9px;letter-spacing:1.5px;opacity:.92;margin-bottom:2px}
   .obox .bf{font-variant-numeric:tabular-nums;white-space:nowrap}
   .obox .bf .sm{font-size:11px}.obox .bf .bg{font-size:20px;font-weight:700}.obox .bf sup{font-size:11px;top:-.55em}
-  .obox .vol{width:64px;background:#e9ecf0;color:#20242a;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-left:1px solid #0a0a0a;border-right:1px solid #0a0a0a}
-  .obox .vol .dd{font-size:8px;color:#6a7078}
-  .obox .vol input{width:52px;text-align:center;border:1px solid #b6bcc4;background:#fff;font:700 12px Tahoma;height:19px;outline:none;box-shadow:inset 1px 1px 2px #ccc}
+  .obox .vol{width:74px;background:#e9ecf0;color:#20242a;display:flex;align-items:center;justify-content:center;gap:2px;padding:0 3px;border-left:1px solid #0a0a0a;border-right:1px solid #0a0a0a}
+  .obox .vol b{cursor:pointer;color:#4a4f57;font-size:8px;width:11px;text-align:center;user-select:none}
+  .obox .vol b:hover{color:#1c60c0}
+  .obox .vol input{width:40px;text-align:center;border:1px solid #b6bcc4;background:#fff;font:700 12px Tahoma;height:19px;outline:none;box-shadow:inset 1px 1px 2px #ccc}
   .mwt{width:100%;border-collapse:collapse}
   .mwt th{position:sticky;top:0;background:#0a0d12;color:var(--dim);font-weight:600;font-size:11px;text-align:right;padding:3px 6px;border:1px solid var(--line)}
   .mwt th:first-child{text-align:left}
@@ -652,8 +653,9 @@ function OrderBox({ symbol }){
         <span className="lbl">SELL</span><BigFig symbol={symbol} v={m.bid} />
       </div>
       <div className="vol" onClick={e=>e.stopPropagation()}>
-        <span className="dd">▼</span>
+        <b onClick={()=>setVol((Math.max(0.01,(+vol||0.01)-0.01)).toFixed(2))} title="−0.01">▼</b>
         <input value={vol} onChange={e=>setVol(e.target.value)} title="Volume (lots)" />
+        <b onClick={()=>setVol((Math.max(0.01,(+vol||0)+0.01)).toFixed(2))} title="+0.01">▲</b>
       </div>
       <div className="side buy" title="Buy at Ask" onClick={(e)=>{e.stopPropagation();send('buy');}}>
         <span className="lbl">BUY</span><BigFig symbol={symbol} v={m.ask} />
