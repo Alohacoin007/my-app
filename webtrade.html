@@ -326,13 +326,6 @@
   .omodal .obar .wb{width:30px;height:26px;display:inline-flex;align-items:center;justify-content:center;color:#8890a0;cursor:pointer;font-size:13px}
   .omodal .obar .wb.x:hover{background:#e81123;color:#fff}
   .om-body{flex:1;display:flex;flex-direction:column;gap:13px;padding:16px 18px;overflow-y:auto;min-height:0}
-  /* One Click Trading toggle */
-  .om-oct{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
-  .om-oct-l{font-size:12.5px;font-weight:600;color:#fff;letter-spacing:.3px}
-  .om-sw{width:42px;height:22px;background:#222;border:1px solid #333;position:relative;flex:none;transition:background .2s}
-  .om-sw.on{background:#1a5cff;border-color:#1a5cff}
-  .om-sw .om-knob{position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;transition:left .2s}
-  .om-sw.on .om-knob{left:22px}
   /* fields */
   .om-field{display:flex;flex-direction:column;gap:5px}
   .om-field>label{font-size:10.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:#8890a0}
@@ -344,25 +337,29 @@
   .om-vol b:hover{background:#16202e}
   .om-vol input{text-align:center;border-left:0;border-right:0}
   /* big Bid/Ask quote — SAME Arial-Black BigFig pixel-look as the one-click panel */
-  .om-quote{display:flex;gap:10px}
+  .om-quote{display:flex;align-items:stretch;gap:8px}
   .om-px{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:11px 0;border:1px solid #222;background:#0d1420}
+  /* live SPREAD box between BID and ASK */
+  .om-spread{flex:none;width:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+    background:#161b22;border:1px solid #30363d}
+  .om-spread .om-sp-l{font-size:8.5px;font-weight:700;letter-spacing:1px;color:#8890a0}
+  .om-spread b{font-size:16px;font-weight:700;color:#00ff66;font-variant-numeric:tabular-nums;line-height:1}
   .om-px .om-tag{font-size:10px;font-weight:700;letter-spacing:1px;color:#8890a0}
   .om-px .bf{display:inline-flex;align-items:baseline;justify-content:center;line-height:1;font-variant-numeric:tabular-nums;color:#fff}
   .om-px .bf .sm{font-size:15px;font-weight:normal;color:#fff}
   .om-px .bf .bg{font-size:30px;font-weight:normal;line-height:1;color:#fff;font-family:"Arial Black","Segoe UI",Arial,sans-serif}
   .om-px .bf .fr{align-self:flex-start;font-size:14px;font-weight:normal;color:#fff;margin-left:1px;transform:translateY(-5px)}
   /* advanced settings — slide down when One-Click is OFF */
-  .om-adv{display:flex;flex-direction:column;gap:13px;max-height:0;overflow:hidden;transition:max-height .3s ease}
-  .om-adv.open{max-height:280px}
+  .om-adv{display:flex;flex-direction:column;gap:13px}   /* precision settings — always visible (toggle removed) */
   .om-margin{font-size:11.5px;color:#8890a0}
-  /* bottom Sell/Buy — original 3D radial-gradient gloss (per spec) */
+  /* bottom Sell/Buy — MATTE FLAT (Binance/TradingView pro), no gradient/gloss */
   .om-btns{display:flex;gap:10px;margin-top:auto}
-  .om-btns button{flex:1;height:52px;border:1px solid #050505;color:#fff;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px;
-    font-family:"Arial Black","Segoe UI",Arial,sans-serif;box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 2px 6px rgba(0,0,0,.5)}
-  .om-btns .om-sell{background:radial-gradient(circle at 50% 20%, #ff4d4d 0%, #a61c1c 60%, #4d0d0d 100%)}
-  .om-btns .om-buy{background:radial-gradient(circle at 50% 20%, #4d79ff 0%, #1a3380 60%, #0a1433 100%)}
-  .om-btns button:hover{filter:brightness(1.1)}
-  .om-btns button:disabled{opacity:.45;cursor:not-allowed}
+  .om-btns button{flex:1;height:52px;border:none;color:#fff;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px;
+    font-family:"Segoe UI",Arial,sans-serif;transition:opacity .15s ease}
+  .om-btns .om-sell{background:#ff3b30 !important}
+  .om-btns .om-buy{background:#007aff !important}
+  .om-btns button:hover{opacity:.88}
+  .om-btns button:disabled{opacity:.4;cursor:not-allowed}
   .obtns button:active{box-shadow:inset 0 2px 4px rgba(0,0,0,.35)}
   .obtns button:disabled{background:#c2c7cd;color:#eef0f2;border-color:#9aa0a7;cursor:not-allowed;filter:none;box-shadow:inset 1px 1px 2px rgba(0,0,0,.12)}
   .otick{flex:1;min-width:0;margin:8px 8px 8px 0;border:1px solid #cfd4da;background:#ffffff;display:flex;flex-direction:column}
@@ -800,15 +797,6 @@ function useTradeEngine(){
     leverage, setLeverage, balance, equity, floating, usedMargin, freeMargin, marginFor, maxVolume };
 }
 
-/* ── GLOBAL one-click-trading flag — binds the New Order popup's toggle to EVERY chart's
-   one-click panel visibility. MEMORY-ONLY (never persisted). OFF → panels hide; ON → show. ── */
-const oneClickStore = {
-  on:true, listeners:new Set(),
-  get(){ return this.on; },
-  set(v){ this.on=!!v; this.listeners.forEach(fn=>{ try{fn(this.on);}catch(e){} }); },
-  subscribe(fn){ this.listeners.add(fn); fn(this.on); return ()=>this.listeners.delete(fn); },
-};
-
 /* ── One-click order box (SELL orange / vol / BUY blue) — live Ask/Bid inside the
    buttons; clicks route through useTradeEngine (server-authoritative, no local money). ── */
 // MT5 big-figure price: small head · large pips · superscript last digit (e.g. 1.14 37⁶)
@@ -821,8 +809,6 @@ function OrderBox({ symbol }){
   const [vol,setVol]=React.useState('0.01');
   const [bidDir,setBidDir]=React.useState('up');   // SELL side follows Bid; BUY side follows Ask (independent, sticky)
   const [askDir,setAskDir]=React.useState('up');
-  const [ocOn,setOcOn]=React.useState(oneClickStore.get());   // global One-Click flag → hide panel when OFF
-  React.useEffect(()=> oneClickStore.subscribe(setOcOn), []);
   const prevBid=React.useRef(null), prevAsk=React.useRef(null);
   const eng=useTradeEngine();
   const [busy,setBusy]=React.useState(null);   // null | 'sell' | 'buy' — ECN 처리중 상태(렌더용)
@@ -858,8 +844,7 @@ function OrderBox({ symbol }){
   const dec=()=>setVol((Math.max(0.01,(+vol||0.01)-0.01)).toFixed(2));
   const inc=()=>setVol((Math.max(0.01,(+vol||0)+0.01)).toFixed(2));
   const busySell=busy==='sell', busyBuy=busy==='buy';
-  if(!ocOn) return null;   // One-Click OFF → the big panel disappears from every chart (global sync)
-  return (
+  return (   // always shown — the 190×64 one-click panel is locked visible on every chart
     <div className={"obox"+(flash?' ecn-flash':'')}>
       <div className="oc-top">
         <div className={"oc-lbl "+sellCls+(busySell?' oc-busy':'')} title="Sell at Bid" onClick={(e)=>{e.stopPropagation();send('sell');}}>SELL</div>
@@ -1867,21 +1852,11 @@ const OIC = {
   dom:  <svg viewBox="0 0 24 24" fill="none" stroke="#5a6270" strokeWidth="2" strokeLinecap="round"><path d="M4 6h10M4 12h16M4 18h7"/></svg>,
   min:  <svg viewBox="0 0 24 24" fill="none" stroke="#5a6270" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5l-7 7 7 7"/><path d="M4 12h16"/></svg>,
 };
-const OMODES=[['Market Execution','mkt'],['Limit Order','lim'],['Stop Order','stp']];
-const OFOOT=[['One Click Trading','oct'],['Tick Chart','tick'],['Depth of Market','dom']];
-// split a price into main body + last digit (MT5 shows the last digit larger/raised)
-function QuoteNum({ symbol, value, dir }){
-  const s=fmtPx(symbol,value); if(s==='—') return <span>—</span>;
-  const main=s.slice(0,-1), last=s.slice(-1);
-  return <span key={value} className={"flash "+(dir>0?'up':dir<0?'dn':'')}>{main}<sup>{last}</sup></span>;
-}
 function OrderModal({ symbol:sym0, onClose }){
   const [symbol,setSymbol]=React.useState(sym0);
   const [vol,setVol]=React.useState('0.01');
   const [sl,setSl]=React.useState('0.00000');
   const [tp,setTp]=React.useState('0.00000');
-  const [oneClick,setOneClick]=React.useState(oneClickStore.get());   // GLOBAL: also drives every chart's one-click panel
-  React.useEffect(()=> oneClickStore.subscribe(setOneClick), []);     // ON = volume + buy/sell only; OFF = advanced slides down
   const [m,setM]=React.useState(priceStore.get(symbol)||{});
   const dir=React.useRef({bid:0,ask:0}); const prev=React.useRef({});
   const eng=useTradeEngine();
@@ -1937,24 +1912,21 @@ function OrderModal({ symbol:sym0, onClose }){
           <span className="wb x" onMouseDown={e=>e.stopPropagation()} onClick={onClose}>✕</span>
         </div>
         <div className="om-body">
-          {/* One Click Trading toggle — GLOBAL: also shows/hides every chart's one-click panel */}
-          <div className="om-oct" onClick={()=>oneClickStore.set(!oneClick)}>
-            <span className="om-oct-l">One Click Trading ⚡</span>
-            <span className={"om-sw"+(oneClick?' on':'')}><span className="om-knob"></span></span>
-          </div>
           {/* Symbol */}
           <div className="om-field"><label>Symbol</label>
             <select value={symbol} onChange={e=>setSymbol(e.target.value)}>{WATCH.map(s=><option key={s} value={s}>{s}.FX</option>)}</select></div>
-          {/* Big Bid / Ask — same Arial-Black BigFig look as the one-click panel */}
+          {/* Big Bid / Ask + live SPREAD in the middle — same Arial-Black BigFig look as the panel */}
           <div className="om-quote">
             <div className="om-px"><span className="om-tag">BID · SELL</span><BigFig symbol={symbol} v={m.bid} /></div>
+            <div className="om-spread"><span className="om-sp-l">SPREAD</span>
+              <b>{(m.ask!=null&&m.bid!=null) ? ((m.ask-m.bid)/pip(symbol)).toFixed(1) : '—'}</b></div>
             <div className="om-px"><span className="om-tag">ASK · BUY</span><BigFig symbol={symbol} v={m.ask} /></div>
           </div>
           {/* Volume */}
           <div className="om-field"><label>Volume (lots)</label>
             <div className="om-vol"><b onClick={decV}>−</b><input value={vol} onChange={e=>setVol(e.target.value)} /><b onClick={incV}>+</b></div></div>
-          {/* Advanced — slides down when One-Click is OFF */}
-          <div className={"om-adv"+(oneClick?'':' open')}>
+          {/* Precision-order settings (always available now the toggle is gone) */}
+          <div className="om-adv">
             <div className="om-field"><label>Leverage</label>
               <select value={eng.leverage} onChange={e=>eng.setLeverage(e.target.value)}>{LEVERAGES.map(l=><option key={l} value={l}>1:{l}</option>)}</select></div>
             <div className="om-field"><label>Stop Loss</label>
@@ -1967,7 +1939,7 @@ function OrderModal({ symbol:sym0, onClose }){
             Margin <b style={{color:'#fff'}}>{usd(need)}</b> &nbsp;·&nbsp; Free <b style={{color:'#fff'}}>{usd(eng.freeMargin)}</b>
             {!canAfford && <span> &nbsp;·&nbsp; ⚠ insufficient</span>}
           </div>
-          {/* Sell / Buy by Market — original radial-gradient gloss */}
+          {/* Sell / Buy by Market — matte flat (Binance/TradingView pro) */}
           <div className="om-btns">
             <button className="om-sell" disabled={!canAfford} onClick={()=>submit('sell')}>Sell by Market</button>
             <button className="om-buy" disabled={!canAfford} onClick={()=>submit('buy')}>Buy by Market</button>
