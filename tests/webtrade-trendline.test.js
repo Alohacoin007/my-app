@@ -32,10 +32,15 @@ if (!(distSeg(4, 40, 0, 0, 8, 0) >= 8)) bad('a click 40px off the line must NOT 
 if (!/const NEON='#ff1a1a'/.test(src)) bad('trend line must be neon red (#ff1a1a)');
 if (!/\.dov\.pt\{[^}]*background:#ffffff/.test(src)) bad('trend handles must be WHITE (.dov.pt background #ffffff)');
 if (!/for\(let i=0;i<3;i\+\+\)/.test(src) || !/showHandles/.test(src)) bad('must create 3 handles (showHandles)');
-if (!/if\(best\.kind==='t'\) showHandles\(\)/.test(src)) bad('selecting a trend line must show the 3 handles');
+if (!/if\(ent\.kind==='t'\) showHandles\(\)/.test(src)) bad('selecting a trend line must show the 3 handles (selectDrawing)');
 if (!/previewLine\.current/.test(src) || !/onMoveDraw/.test(src)) bad('must show a live rubber-band preview while dragging');
 if (!/function DrawMenu\(/.test(src)) bad('right-click Delete popup (DrawMenu) missing');
-if (!/if\(selDraw\.current\) setDelMenu/.test(src)) bad('right-click on a selected line must open the Delete popup');
+// right-click must be SELF-CONTAINED: hit-test at the cursor, not reliant on a prior (fragile) click
+if (!/hit=hitDrawing\(e\.clientX-r\.left/.test(src)) bad('right-click must hit-test the drawing at the cursor');
+if (!/if\(hit\)\{ selectDrawing\(hit\); setDelMenu/.test(src)) bad('right-click ON a drawing must select it + open the Delete popup');
+// the line must be THIN and must NOT thicken on select (white handles are the only select marker)
+if (/applyOptions\(\{lineWidth:[^}]*\+2/.test(src)) bad('selecting must NOT thicken the line (no lineWidth+2)');
+if (!/const ent=\{kind:'t',ls,pts,w0:1\}/.test(src)) bad('trend line must be thin (w0:1 / lineWidth 1)');
 // keyboard Delete and the popup must both go through the ONE deleteSelected path
 if (!/e\.key==='Delete'\|\|e\.key==='Backspace'\)\{ e\.preventDefault\(\); deleteSelected\(\)/.test(src)) bad('keyboard Delete must call deleteSelected()');
 if (!/onDelete=\{\(\)=>deleteSelected\(\)\}/.test(src)) bad('Delete popup must call deleteSelected()');

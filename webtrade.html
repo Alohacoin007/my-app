@@ -1147,7 +1147,19 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   const showHandles=()=>{ hideHandles(); const el=dlayer.current; if(!el) return;
     for(let i=0;i<3;i++){ const d=document.createElement('div'); d.className='dov pt'; el.appendChild(d); selHandles.current.push(d); }
     positionHandles(); };
-  const deselect=()=>{ const e=selDraw.current; if(e){ try{ (e.pl||e.ls).applyOptions({lineWidth:e.w0||1}); }catch(_){} selDraw.current=null; } hideHandles(); };
+  const deselect=()=>{ selDraw.current=null; hideHandles(); };   // white handles are the ONLY select marker (no line thickening)
+  const selectDrawing=(ent)=>{ deselect(); if(ent){ selDraw.current=ent; if(ent.kind==='t') showHandles(); } };
+  // nearest drawing to a pixel point within 8px (shared by click-select and right-click) — null if none
+  const hitDrawing=(px,py)=>{ const c=chart.current, sc=series.current; if(!c||!sc) return null;
+    const ts=c.timeScale(); let best=null, bd=8;
+    drawLines.current.forEach(e=>{ let cy=null; try{ cy=sc.priceToCoordinate(e.price); }catch(_){}
+      if(cy!=null){ const dd=Math.abs(cy-py); if(dd<bd){ bd=dd; best=e; } } });
+    drawSeries.current.forEach(e=>{ try{
+      const x1=ts.timeToCoordinate(e.pts[0].time), y1=sc.priceToCoordinate(e.pts[0].value),
+            x2=ts.timeToCoordinate(e.pts[1].time), y2=sc.priceToCoordinate(e.pts[1].value);
+      if(x1==null||y1==null||x2==null||y2==null) return;
+      const dd=distSeg(px,py,x1,y1,x2,y2); if(dd<bd){ bd=dd; best=e; } }catch(_){} });
+    return best; };
   // remove the currently-selected drawing (keyboard Delete + right-click Delete popup share this)
   const deleteSelected=()=>{ const ent=selDraw.current; if(!ent) return;
     if(ent.kind==='t'){ try{ chart.current.removeSeries(ent.ls); }catch(_){} drawSeries.current=drawSeries.current.filter(x=>x!==ent); }
@@ -1252,19 +1264,10 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       if(!d){ setOhlc(null); return; }
       if(d.open!=null) setOhlc({o:d.open,h:d.high,l:d.low,c:d.close}); else if(d.value!=null) setOhlc({c:d.value}); else setOhlc(null);
     }); }catch(e){}
-    // click to SELECT the nearest horizontal drawing (cursor mode) → then Delete/↑↓ edit it
+    // click to SELECT the nearest drawing (cursor mode) → white handles appear; empty click deselects
     try{ c.subscribeClick((param)=>{
       const t=toolRef.current; if(t && t!=='arrow' && t!=='cross') return; if(!param||!param.point) { deselect(); return; }
-      const px=param.point.x, py=param.point.y; let best=null, bd=8; const ts=c.timeScale(), sc=series.current;
-      drawLines.current.forEach(e=>{ let cy=null; try{ cy=sc.priceToCoordinate(e.price); }catch(_){}
-        if(cy!=null){ const dd=Math.abs(cy-py); if(dd<bd){ bd=dd; best=e; } } });
-      drawSeries.current.forEach(e=>{ try{
-        const x1=ts.timeToCoordinate(e.pts[0].time), y1=sc.priceToCoordinate(e.pts[0].value),
-              x2=ts.timeToCoordinate(e.pts[1].time), y2=sc.priceToCoordinate(e.pts[1].value);
-        if(x1==null||y1==null||x2==null||y2==null) return;
-        const dd=distSeg(px,py,x1,y1,x2,y2); if(dd<bd){ bd=dd; best=e; } }catch(_){} });
-      deselect(); if(best){ selDraw.current=best; try{ (best.pl||best.ls).applyOptions({lineWidth:best.w0+2}); }catch(_){}
-        if(best.kind==='t') showHandles(); }   // trend line selected → show the 3 white handles
+      selectDrawing(hitDrawing(param.point.x, param.point.y));
     }); }catch(e){}
     // load candles for the current timeframe, then (re)paint indicators over them
     loadCandles(symbol, tf).then(data=>{ try{
@@ -1376,8 +1379,8 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       const pts=[{time:d.time,value:d.price},{time:t2,value:p2}].sort((a,b)=>a.time-b.time);
       if(pts[0].time===pts[1].time) return;
       if(!previewLine.current){ try{ previewLine.current = c.addLineSeries
-        ? c.addLineSeries({color:NEON,lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false})
-        : c.addSeries(LightweightCharts.LineSeries,{color:NEON,lineWidth:2}); }catch(_){} }
+        ? c.addLineSeries({color:NEON,lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false})
+        : c.addSeries(LightweightCharts.LineSeries,{color:NEON,lineWidth:1}); }catch(_){} }
       try{ previewLine.current.setData(pts); }catch(_){} };
     const onUp=(e)=>{ const d=dragDraw.current; if(!d) return; dragDraw.current=null;
       const c=chart.current, s=series.current; if(!c||!s){ killPreview(); return; } const [x,y]=xy(e);
@@ -1386,9 +1389,9 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       if(d.time==null||d.price==null||t2==null||p2==null) return;
       if(d.tool==='trend'){ const pts=[{time:d.time,value:d.price},{time:t2,value:p2}].sort((a,b)=>a.time-b.time);
         if(pts[0].time===pts[1].time) return;
-        try{ const ls=c.addLineSeries?c.addLineSeries({color:NEON,lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false})
-                                     :c.addSeries(LightweightCharts.LineSeries,{color:NEON,lineWidth:2}); ls.setData(pts);
-          const ent={kind:'t',ls,pts,w0:2}; drawSeries.current.push(ent);
+        try{ const ls=c.addLineSeries?c.addLineSeries({color:NEON,lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false})
+                                     :c.addSeries(LightweightCharts.LineSeries,{color:NEON,lineWidth:1}); ls.setData(pts);
+          const ent={kind:'t',ls,pts,w0:1}; drawSeries.current.push(ent);
           drawStack.current.push(()=>{ try{c.removeSeries(ls);}catch(e){} drawSeries.current=drawSeries.current.filter(x=>x!==ent); }); }catch(e){} }
       else if(d.tool==='fib'){ const hi=Math.max(d.price,p2), lo=Math.min(d.price,p2);
         const lv=[0,0.236,0.382,0.5,0.618,0.786,1], col=['#8a9098','#e0709a','#f0c674','#82d982','#5fb0ff','#c792ea','#8a9098']; const grp=[];
@@ -1435,7 +1438,11 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   const [cmenu,setCmenu]=React.useState(null);   // chart right-click menu {x,y}
   const [delMenu,setDelMenu]=React.useState(null);   // selected-drawing Delete popup {x,y}
   const onCtx=(e)=>{ e.preventDefault(); onActivate&&onActivate(idx);
-    if(selDraw.current) setDelMenu({ x:e.clientX, y:e.clientY });   // a line is selected → Delete popup (MT5)
+    // MT5: right-click ON a drawing → select it + Delete popup; elsewhere → the chart menu. Self-
+    // contained (hit-test at the cursor) so it never depends on a prior click that may have deselected.
+    let hit=null; try{ const r=box.current.getBoundingClientRect(); hit=hitDrawing(e.clientX-r.left, e.clientY-r.top); }catch(_){}
+    if(hit){ selectDrawing(hit); setDelMenu({ x:e.clientX, y:e.clientY }); }
+    else if(selDraw.current) setDelMenu({ x:e.clientX, y:e.clientY });
     else setCmenu({ x:e.clientX, y:e.clientY }); };
   return (
     <div className={"win"+(isActive?' active':'')+(tiled?' tiled':'')} ref={win} style={tiled?null:{zIndex:z}} onMouseDown={focus} onContextMenu={onCtx}>
