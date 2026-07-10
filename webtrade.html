@@ -148,14 +148,19 @@
   .up{color:var(--up)}.down{color:var(--down)}
   /* ── MDI workspace: charts area is a positioning context; each chart is a free
      floating window (absolute) that can move, resize and overlap like real MT5. ── */
-  .charts{grid-area:charts;position:relative;overflow:hidden;background:#0a0d12}
+  .charts{grid-area:charts;display:flex;flex-direction:column;overflow:hidden;background:#0a0d12}
+  .chartgrid{flex:1;min-height:0;display:grid;gap:1px;background:var(--cellbd)}   /* auto-tiled N charts */
   .win{position:absolute;background:#000;display:flex;flex-direction:column;
     border:1px solid var(--cellbd);box-shadow:0 2px 12px rgba(0,0,0,.55);
     min-width:220px;min-height:150px;overflow:hidden}
   .win.active{border-color:#3a6ea5;box-shadow:0 4px 20px rgba(0,0,0,.8)}
+  /* tiled mode: chart fills its grid cell instead of floating */
+  .win.tiled{position:relative !important;left:auto !important;top:auto !important;width:auto !important;height:auto !important;
+    min-width:0;min-height:0;box-shadow:none}
   .cell-title{display:flex;align-items:center;gap:4px;height:18px;padding:0 5px;flex:none;
     cursor:move;user-select:none;
-    background:linear-gradient(#3a3f47,#2a2e34);border-bottom:1px solid #000;font:600 11px Tahoma,sans-serif;color:#9aa1ad}  /* inactive = muted grey */
+    background:#1e1e1e;border-bottom:1px solid #000;font:600 11px "Segoe UI",Tahoma,sans-serif;color:#eaeaea}  /* MT5 header */
+  .win.tiled .cell-title{cursor:default}
   .cell-title .ti{display:inline-flex;align-items:center;gap:2px;margin-right:1px;flex:none}
   .cell-title .ti svg{width:12px;height:12px;display:block}
   .win.active .cell-title{background:linear-gradient(#2f7fe0,#1c5ec0);color:#ffffff}  /* active = vivid program blue */
@@ -265,6 +270,9 @@
     border-right:1px solid #23272d;background:linear-gradient(#20242a,#15181d);white-space:nowrap}
   .charttabs .ctab:hover{color:#dfe3ea}
   .charttabs .ctab.on{background:#000;color:#fff;border-top:2px solid #2f7fe0;margin-top:-1px}
+  .charttabs .ctab .tclose{margin-left:8px;color:#8890a0;font-size:10px}
+  .charttabs .ctab .tclose:hover{color:#fff;background:#e81123;padding:0 3px}
+  .noch{margin:auto;color:#6a7078;font-size:12px;text-align:center;padding:20px}
   /* ── order form spinner steppers (Volume / SL / TP) ── */
   .orow .in.step input{border-right:none;border-top-right-radius:0;border-bottom-right-radius:0}
   .spin{display:flex;flex-direction:column;width:16px;height:25px;border:1px solid #777;border-left:none;flex:none}
@@ -722,7 +730,7 @@ function distSeg(px,py,x1,y1,x2,y2){ const dx=x2-x1,dy=y2-y1,L2=dx*dx+dy*dy;
   let t=L2? ((px-x1)*dx+(py-y1)*dy)/L2 : 0; t=Math.max(0,Math.min(1,t));
   return Math.hypot(px-(x1+t*dx), py-(y1+t*dy)); }
 
-function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isActive, onActivate, savedGeo, onGeo }){
+function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isActive, onActivate, savedGeo, onGeo, tiled, onClose }){
   const box=React.useRef(null), chart=React.useRef(null), series=React.useRef(null), bar=React.useRef(null);
   const lines=React.useRef([]);           // position order-lines (green) — managed by positions effect
   const drawLines=React.useRef([]);       // USER drawing price-lines (hline/fib) — separate from positions/indicators
@@ -777,6 +785,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   const undoDraw=()=>{ const rm=drawStack.current.pop(); if(rm) try{ rm(); }catch(e){} };   // remove the most recent object
   // seed initial geometry from the workspace size BEFORE paint (no flash), then size the chart
   React.useLayoutEffect(()=>{
+    if(tiled) return;   // tiled mode: the CSS grid sizes the cell — no floating geometry
     const el=win.current, par=el&&el.parentElement; if(!par) return;
     const W=par.clientWidth||800, H=par.clientHeight||500;
     if(savedGeo && savedGeo.w>0){   // restore the remembered window box (clamped into view)
@@ -810,7 +819,8 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     document.addEventListener('mousemove',onMove); document.addEventListener('mouseup',onUp);
     return ()=>{ document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); if(raf)cancelAnimationFrame(raf); };
   }, []);
-  const beginDrag=(e,mode)=>{ e.preventDefault(); e.stopPropagation(); focus();
+  const beginDrag=(e,mode)=>{ if(tiled){ focus(); return; }   // no drag/resize in tiled grid mode
+    e.preventDefault(); e.stopPropagation(); focus();
     drag.current={ mode, sx:e.clientX, sy:e.clientY, og:{ ...geo.current } };
     document.body.style.userSelect='none'; };
 
@@ -1002,7 +1012,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   const [cmenu,setCmenu]=React.useState(null);   // chart right-click menu {x,y}
   const onCtx=(e)=>{ e.preventDefault(); onActivate&&onActivate(idx); setCmenu({ x:e.clientX, y:e.clientY }); };
   return (
-    <div className={"win"+(isActive?' active':'')} ref={win} style={{zIndex:z}} onMouseDown={focus} onContextMenu={onCtx}>
+    <div className={"win"+(isActive?' active':'')+(tiled?' tiled':'')} ref={win} style={tiled?null:{zIndex:z}} onMouseDown={focus} onContextMenu={onCtx}>
       <div className="cell-title" onMouseDown={(e)=>beginDrag(e,'move')}>
         <span className="ti">
           <svg viewBox="0 0 24 24" fill="none" stroke="#8fd08f" strokeWidth="2"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" fill="#8fd08f" stroke="none"/><rect x="12" y="6" width="3" height="12" fill="#8fd08f" stroke="none"/><rect x="17" y="14" width="3" height="4" fill="#8fd08f" stroke="none"/></svg>
@@ -1014,9 +1024,13 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
             ? posLbl[0].side+' '+posLbl[0].lots.toFixed(2)+' at '+fmtPx(symbol,posLbl[0].price)
             : posLbl.length+' pos · net '+(net>=0?'+':'')+net.toFixed(2)}</span>; })()}
         <span className="wc">
-          <span onMouseDown={e=>e.stopPropagation()} onClick={ctlMin} title="Minimize">—</span>
-          <span onMouseDown={e=>e.stopPropagation()} onClick={ctlMax} title="Maximize / Restore">▢</span>
-          <span onMouseDown={e=>e.stopPropagation()} onClick={ctlReset} title="Restore to tile">✕</span>
+          {tiled
+            ? <span onMouseDown={e=>e.stopPropagation()} onClick={(e)=>{e.stopPropagation(); onClose&&onClose();}} title="Close chart">✕</span>
+            : <React.Fragment>
+                <span onMouseDown={e=>e.stopPropagation()} onClick={ctlMin} title="Minimize">—</span>
+                <span onMouseDown={e=>e.stopPropagation()} onClick={ctlMax} title="Maximize / Restore">▢</span>
+                <span onMouseDown={e=>e.stopPropagation()} onClick={ctlReset} title="Restore to tile">✕</span>
+              </React.Fragment>}
         </span>
       </div>
       <div className="canvas" ref={box}>
@@ -1027,7 +1041,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
                           : <span className="px">{fmtPx(symbol,ohlc.c)}</span>)
           : <span className="px">{fmtPx(symbol,px)}</span>}</div>
       </div>
-      {['n','s','e','w','ne','nw','se','sw'].map(d=>
+      {!tiled && ['n','s','e','w','ne','nw','se','sw'].map(d=>
         <div key={d} className={"rsz "+d} onMouseDown={(e)=>beginDrag(e,d)}></div>)}
       {cmenu && <ChartMenu x={cmenu.x} y={cmenu.y} idx={idx} symbol={symbol} chartType={chartType} tf={tf} indicators={indicators} onClose={()=>setCmenu(null)} />}
     </div>
@@ -1237,8 +1251,8 @@ function MarketWatch({ onPick }){
           <tbody>
             {WATCH.map(sym=>{ const m=mids[sym]||{}, d=dirs[sym]||{}; const up=(m.chg||0)>=0;
               return (
-                <tr key={sym} className={sym===sel?'sel':''} onClick={()=>{setSel(sym);onPick&&onPick(sym);}}
-                    onDoubleClick={()=>terminalBus.emit('order.new',sym)} onContextMenu={(e)=>ctx(e,sym)} title="우클릭: 메뉴 · 더블클릭: 주문창">
+                <tr key={sym} className={sym===sel?'sel':''} onClick={()=>setSel(sym)}
+                    onDoubleClick={()=>onPick&&onPick(sym)} onContextMenu={(e)=>ctx(e,sym)} title="더블클릭/우클릭 Chart Window: 새 차트 창 · (우클릭 New Order: 주문)">
                   <td className="sym"><span className={up?'au':'ad'}>{up?'↗':'↘'}</span> {sym}.FX</td>
                   <td className={tc(d.bid)}>{fmtPx(sym,m.bid)}</td>
                   <td className={tc(d.ask)}>{fmtPx(sym,m.ask)}</td>
@@ -1384,7 +1398,7 @@ const MENUS=['File','View','Insert','Charts','Tools','Window','Help'];
 // static menu trees (Windows-app dropdowns). cmd → terminalBus; v → View toggle; keep=true
 // leaves the menu open after a click (checkboxes/indicators); dis = disabled placeholder.
 const MENU_DEF = {
-  File:  [ {l:'New Chart Window', cmd:'order.new'}, {l:'Open Deleted', dis:1}, {sep:1},
+  File:  [ {l:'New Chart Window', cmd:'chart.new'}, {l:'Open Deleted', dis:1}, {sep:1},
            {l:'Save As Picture...', dis:1}, {l:'Print...', k:'Ctrl+P', dis:1}, {sep:1}, {l:'Exit', dis:1} ],
   View:  [ {l:'Languages', ar:1, dis:1}, {l:'Toolbars', v:'toolbars', keep:1}, {sep:1},
            {l:'Status Bar', v:'statusbar', keep:1}, {sep:1},
@@ -1787,25 +1801,33 @@ function OrderModal({ symbol:sym0, onClose }){
 }
 
 const DEFAULT_VIEW={ toolbars:true, statusbar:true, marketwatch:true, navigator:true, toolbox:true };
+// auto-tile: [cols, rows] for N charts — 1=full, 2=side-by-side, 3-4=2x2, then √-grid
+function tileDims(n){ if(n<=1) return [1,1]; if(n===2) return [2,1]; if(n<=4) return [2,2]; const c=Math.ceil(Math.sqrt(n)); return [c, Math.ceil(n/c)]; }
 function App(){
   const cfg=React.useRef(wtConfig.load()).current;     // saved layout (persists across reloads)
-  const [grid,setGrid]=React.useState(GRID);
-  const [tfs,setTfs]=React.useState(cfg.tfs||['H1','H1','H1','H1']);        // per-chart timeframe
-  const [types,setTypes]=React.useState(cfg.types||['candle','candle','candle','candle']);  // per-chart type
-  const [activeIdx,setActiveIdx]=React.useState(0);               // the focused chart window (blue header) — default 0
+  const initCharts=React.useRef((cfg.charts&&cfg.charts.length) ? cfg.charts : GRID.map((s,i)=>({ id:i+1, symbol:s, tf:'H1', type:'candle' }))).current;
+  const [charts,setCharts]=React.useState(initCharts);   // dynamic chart windows [{id,symbol,tf,type}]
+  const [activeId,setActiveId]=React.useState(initCharts[0]?initCharts[0].id:null);
+  const idRef=React.useRef(initCharts.reduce((mx,c)=>Math.max(mx,c.id),0));
+  const chartsRef=React.useRef(charts); chartsRef.current=charts;
   const [orderSym,setOrderSym]=React.useState(null);     // popup Order dialog target (null = closed)
   const [indicators,setIndicators]=React.useState(cfg.indicators||[]);   // active indicator ids (shared by all charts)
   const [tool,setTool]=React.useState(null);             // armed drawing tool (cross/vline/…)
   const [view,setView]=React.useState({ ...DEFAULT_VIEW, ...(cfg.view||{}) });
-  const [geos,setGeos]=React.useState(cfg.geos||[null,null,null,null]);   // remembered chart-window boxes
-  const setGeo1=React.useCallback((i,g)=> setGeos(a=>{ const b=a.slice(); b[i]=g; return b; }), []);
-  // remembered panel sizes (default wide enough that Market Watch isn't clipped on first load)
   const [leftw,setLeftw]=React.useState(cfg.leftw||270);
   const [bottomh,setBottomh]=React.useState(cfg.bottomh||188);
   const [navh,setNavh]=React.useState(cfg.navh||186);
-  const actRef=React.useRef(activeIdx); actRef.current=activeIdx;
+  // effective active chart (id may point at a closed one after a close)
+  const activeChart = charts.find(c=>c.id===activeId) || charts[0] || null;
+  const actRef=React.useRef(null); actRef.current = activeChart ? activeChart.id : null;
+  // ── chart window life-cycle ──
+  const addChart=React.useCallback((symbol)=>{ const id=++idRef.current;
+    setCharts(cs=>cs.concat([{ id, symbol:symbol||WATCH[0], tf:'H1', type:'candle' }])); setActiveId(id); }, []);
+  const closeChart=React.useCallback((id)=>{ setCharts(cs=>cs.filter(c=>c.id!==id));   // unmount → ChartCell cleanup unsubscribes + chart.remove (no leak)
+    setActiveId(a=> a===id ? null : a); }, []);
   React.useEffect(()=>{ priceStore.start(); positionsStore.start(); }, []);
-  React.useEffect(()=>{ wtConfig.save({ tfs, types, indicators, view, geos, leftw, bottomh, navh }); }, [tfs, types, indicators, view, geos, leftw, bottomh, navh]);   // remember layout
+  React.useEffect(()=>{ wtConfig.save({ charts, indicators, view, leftw, bottomh, navh }); }, [charts, indicators, view, leftw, bottomh, navh]);
+  React.useEffect(()=>{ requestAnimationFrame(()=>chartResizer.resizeAll()); }, [charts.length]);   // reflow charts on add/close
   // ── MT5 keyboard shortcuts (View menu + New Order) ──
   React.useEffect(()=>{
     const onKey=(e)=>{
@@ -1814,16 +1836,17 @@ function App(){
       if(e.ctrlKey && k==='m'){ e.preventDefault(); setView(v=>({ ...v, marketwatch:!v.marketwatch })); }
       else if(e.ctrlKey && k==='n'){ e.preventDefault(); setView(v=>({ ...v, navigator:!v.navigator })); }
       else if(e.ctrlKey && k==='t'){ e.preventDefault(); setView(v=>({ ...v, toolbox:!v.toolbox })); }
-      else if(e.key==='F9'){ e.preventDefault(); setOrderSym(s=> s||grid[actRef.current]||grid[0]); }
+      else if(e.key==='F9'){ e.preventDefault(); const ac=chartsRef.current.find(c=>c.id===actRef.current)||chartsRef.current[0]; setOrderSym(s=> s||(ac&&ac.symbol)||WATCH[0]); }
       else if(e.key==='F11'){ e.preventDefault(); try{ if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }catch(_){} }
     };
     document.addEventListener('keydown',onKey);
     return ()=>document.removeEventListener('keydown',onKey);
-  }, [grid]);
+  }, []);
   // ── command reducer: toolbar chart signals hit ONLY the active chart window ──
   React.useEffect(()=> terminalBus.subscribe((cmd,arg)=>{
-    if(cmd==='chart.tf') setTfs(a=> a.map((v,i)=> i===actRef.current ? arg : v));       // active chart only
-    else if(cmd==='chart.type') setTypes(a=> a.map((v,i)=> i===actRef.current ? arg : v)); // active chart only
+    if(cmd==='chart.tf') setCharts(cs=> cs.map(c=> c.id===actRef.current ? {...c, tf:arg} : c));       // active chart only
+    else if(cmd==='chart.type') setCharts(cs=> cs.map(c=> c.id===actRef.current ? {...c, type:arg} : c)); // active chart only
+    else if(cmd==='chart.new') addChart();
     else if(cmd==='chart.tool') setTool(arg);
     else if(cmd==='view.toggle') setView(v=>({ ...v, [arg]: !v[arg] }));
     else if(cmd==='view.fullscreen'){ try{ if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }catch(e){} }
@@ -1831,37 +1854,42 @@ function App(){
       if(arg==='__clear__') setIndicators([]);
       else setIndicators(list=> list.indexOf(arg)>=0 ? list.filter(x=>x!==arg) : list.concat(arg));
     }
-    else if(cmd==='order.new') setOrderSym(arg||grid[0]);   // open the popup Order dialog
+    else if(cmd==='order.new'){ const ac=chartsRef.current.find(c=>c.id===actRef.current)||chartsRef.current[0]; setOrderSym(arg||(ac&&ac.symbol)||WATCH[0]); }
     // chart.zoom → the active ChartCell (gated on its isActive); window.tile → all windows
-  }), [grid]);
-  const swap=(sym)=> setGrid(g=> g.indexOf(sym)>=0 ? g : [sym, g[1], g[2], g[3]]);   // click watch → replace top-left
+  }), []);
   const leftShown = view.marketwatch || view.navigator;
-  // dynamic grid: View toggles collapse the corresponding rows/cols (real Windows behaviour)
   const gridStyle = {
     '--leftw': leftw+'px', '--bottomh': bottomh+'px',
     gridTemplateColumns: leftShown ? 'var(--leftw) 6px 1fr' : '0 0 1fr',
     gridTemplateRows: `23px ${view.toolbars?'33px':'0'} 1fr ${view.toolbox?'var(--bottomh)':'0'} ${view.statusbar?'22px':'0'}`,
     gridTemplateAreas: '"menu menu menu" "tools tools tools" "left splitter charts" "bottom bottom bottom" "status status status"',
   };
+  const [tcols,trows]=tileDims(charts.length);
+  const gridTiles={ gridTemplateColumns:`repeat(${tcols},1fr)`, gridTemplateRows:`repeat(${trows},1fr)` };
+  const activeSym = activeChart ? activeChart.symbol : null;
   return (
     <div className="terminal" style={gridStyle}>
       <MenuBar indicators={indicators} view={view} tool={tool} />
-      {view.toolbars && <Toolbar tf={tfs[activeIdx]} chartType={types[activeIdx]} tool={tool} />}
+      {view.toolbars && <Toolbar tf={activeChart?activeChart.tf:'H1'} chartType={activeChart?activeChart.type:'candle'} tool={tool} />}
       {leftShown && <div className="left" style={{'--navh': navh+'px'}}>
-        {view.marketwatch && <MarketWatch onPick={swap} />}
+        {view.marketwatch && <MarketWatch onPick={addChart} />}
         {view.marketwatch && view.navigator && <NavResizer onDone={setNavh} />}
         {view.navigator && <Navigator indicators={indicators} />}
       </div>}
       {leftShown && <Splitter onDone={setLeftw} />}
       <div className="charts">
-        {grid.map((s,i)=><ChartCell key={s+i} idx={i} isActive={i===activeIdx} onActivate={setActiveIdx}
-          symbol={s} tf={tfs[i]} indicators={indicators} chartType={types[i]} tool={tool}
-          initial={WINLAYOUT[i]||WINLAYOUT[0]} savedGeo={geos[i]} onGeo={setGeo1} />)}
-        <div className="charttabs">{grid.map((s,i)=>
-          <div key={i} className={"ctab"+(i===activeIdx?' on':'')} onClick={()=>setActiveIdx(i)}>{s}.FX,{tfs[i]}</div>)}</div>
+        <div className="chartgrid" style={gridTiles}>
+          {charts.map((c)=><ChartCell key={c.id} idx={c.id} isActive={c.id===(activeChart&&activeChart.id)} onActivate={setActiveId}
+            symbol={c.symbol} tf={c.tf} indicators={indicators} chartType={c.type} tool={tool}
+            tiled onClose={()=>closeChart(c.id)} />)}
+          {!charts.length && <div className="noch">No charts open — File → New Chart Window, or double-click a Market Watch symbol.</div>}
+        </div>
+        <div className="charttabs">{charts.map(c=>
+          <div key={c.id} className={"ctab"+(c.id===(activeChart&&activeChart.id)?' on':'')} onClick={()=>setActiveId(c.id)}>{c.symbol}.FX,{c.tf}
+            <span className="tclose" onClick={(e)=>{e.stopPropagation();closeChart(c.id);}} title="Close">✕</span></div>)}</div>
       </div>
       {view.toolbox && <BottomBar onResize={setBottomh} />}
-      {view.statusbar && <StatusBar tool={tool} chartType={types[activeIdx]} tf={tfs[activeIdx]} />}
+      {view.statusbar && <StatusBar tool={tool} chartType={activeChart?activeChart.type:'candle'} tf={activeChart?activeChart.tf:'H1'} />}
       {orderSym && <OrderModal symbol={orderSym} onClose={()=>setOrderSym(null)} />}
     </div>
   );
