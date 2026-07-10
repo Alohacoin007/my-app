@@ -1132,6 +1132,8 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   const selDraw=React.useRef(null);   // currently-selected drawing entry {kind,pl|ls,...}
   const selHandles=React.useRef([]);  // 3 white square DOM handles shown while a trend line is selected
   const previewLine=React.useRef(null); // rubber-band preview series while dragging a trend line
+  const previewFib=React.useRef([]);    // preview fib level lines that follow the cursor while dragging
+  const startPt=React.useRef(null);     // white start-anchor point shown during a trend/fib drag
   const hideHandles=()=>{ selHandles.current.forEach(el=>{ try{el.remove();}catch(_){} }); selHandles.current=[]; };
   const positionHandles=()=>{ const ent=selDraw.current, c=chart.current, s=series.current;
     if(!ent||ent.kind!=='t'||!c||!s||selHandles.current.length!==3) return;
@@ -1284,7 +1286,8 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     }, 400);
     const unsub=priceStore.subscribe(onTick);
     return ()=>{ unsub(); unreg(); unTheme(); indSeries.current=[]; lines.current=[]; drawLines.current=[]; drawSeries.current=[]; drawStack.current=[]; selDraw.current=null;
-      hideHandles(); previewLine.current=null;   // drop selection handles + any in-flight preview
+      hideHandles(); previewLine.current=null; previewFib.current=[];   // drop selection handles + any in-flight preview
+      if(startPt.current){ try{startPt.current.remove();}catch(_){} startPt.current=null; }
       overlays.current.forEach(o=>{ try{o.el.remove();}catch(e){} }); overlays.current=[];   // chart recreated → clear drawings
       try{ c.remove(); }catch(e){} };
   }, [symbol, tf, lazyHold, hydrated]);   // recreate on symbol/tf change; builds when revealed (lazy) and hydrated (idle-deferred)
@@ -1347,18 +1350,29 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       const [x,y]=xy(e); let time=null,price=null;
       try{ time=c.timeScale().coordinateToTime(x); price=s.coordinateToPrice(y); }catch(e){}
       if(t==='hline'){ if(price==null) return; try{ const pl=s.createPriceLine({price,color:'#e8b23a',lineWidth:1,lineStyle:0,axisLabelVisible:true,title:''});
-        const ent={kind:'h',pl,price,w0:1}; drawLines.current.push(ent); drawStack.current.push(()=>{ try{s.removePriceLine(pl);}catch(e){} drawLines.current=drawLines.current.filter(x=>x!==ent); }); }catch(e){} return; }
-      if(t==='vline'){ if(time==null) return; addVLine(time); return; }
-      if(t==='text'){ if(time==null||price==null) return; const txt=window.prompt('Text label:'); if(txt) addText(time,price,txt); return; }
+        const ent={kind:'h',pl,price,w0:1}; drawLines.current.push(ent); drawStack.current.push(()=>{ try{s.removePriceLine(pl);}catch(e){} drawLines.current=drawLines.current.filter(x=>x!==ent); }); }catch(e){} terminalBus.emit('chart.tool', null); return; }
+      if(t==='vline'){ if(time==null) return; addVLine(time); terminalBus.emit('chart.tool', null); return; }
+      if(t==='text'){ if(time==null||price==null) return; const txt=window.prompt('Text label:'); if(txt) addText(time,price,txt); terminalBus.emit('chart.tool', null); return; }
       dragDraw.current={ tool:t, time, price };   // trend / fib — finish on mouseup
+      // MT5: show a WHITE start-anchor point at the click so you can see where the object began
+      try{ const el2=dlayer.current; if(el2){ const d=document.createElement('div'); d.className='dov pt';
+        d.style.left=Math.round(x)+'px'; d.style.top=Math.round(y)+'px'; el2.appendChild(d); if(startPt.current) startPt.current.remove(); startPt.current=d; } }catch(_){}
     };
     const NEON='#ff1a1a';   // 네온 빨강 추세선
-    const killPreview=()=>{ if(previewLine.current){ try{ chart.current.removeSeries(previewLine.current); }catch(_){} previewLine.current=null; } };
-    // live rubber-band while dragging a trend line (점을 찍고 드래그하는 동안 선이 따라온다)
-    const onMoveDraw=(e)=>{ const d=dragDraw.current; if(!d||d.tool!=='trend') return;
+    const FIB_LV=[0,0.236,0.382,0.5,0.618,0.786,1], FIB_COL=['#8a9098','#e0709a','#f0c674','#82d982','#5fb0ff','#c792ea','#8a9098'];
+    const killPreview=()=>{ if(previewLine.current){ try{ chart.current.removeSeries(previewLine.current); }catch(_){} previewLine.current=null; }
+      if(previewFib.current.length){ previewFib.current.forEach(pl=>{ try{ series.current.removePriceLine(pl); }catch(_){} }); previewFib.current=[]; }
+      if(startPt.current){ try{ startPt.current.remove(); }catch(_){} startPt.current=null; } };
+    // live preview while dragging: trend = rubber-band line; fib = the level lines follow the cursor
+    const onMoveDraw=(e)=>{ const d=dragDraw.current; if(!d||(d.tool!=='trend'&&d.tool!=='fib')) return;
       const c=chart.current, s=series.current; if(!c||!s) return; const [x,y]=xy(e);
       let t2=null,p2=null; try{ t2=c.timeScale().coordinateToTime(x); p2=s.coordinateToPrice(y); }catch(_){}
       if(t2==null||p2==null||d.time==null||d.price==null) return;
+      if(d.tool==='fib'){ const hi=Math.max(d.price,p2), lo=Math.min(d.price,p2);
+        if(!previewFib.current.length){ FIB_LV.forEach((L,i)=>{ try{ previewFib.current.push(
+          s.createPriceLine({price:lo+(hi-lo)*L,color:FIB_COL[i],lineWidth:1,lineStyle:2,axisLabelVisible:true,title:(L*100).toFixed(1)+'%'})); }catch(_){} }); }
+        else { previewFib.current.forEach((pl,i)=>{ try{ pl.applyOptions({price:lo+(hi-lo)*FIB_LV[i]}); }catch(_){} }); }
+        return; }
       const pts=[{time:d.time,value:d.price},{time:t2,value:p2}].sort((a,b)=>a.time-b.time);
       if(pts[0].time===pts[1].time) return;
       if(!previewLine.current){ try{ previewLine.current = c.addLineSeries
@@ -1380,6 +1394,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
         const lv=[0,0.236,0.382,0.5,0.618,0.786,1], col=['#8a9098','#e0709a','#f0c674','#82d982','#5fb0ff','#c792ea','#8a9098']; const grp=[];
         lv.forEach((L,i)=>{ try{ const price=lo+(hi-lo)*L; const pl=s.createPriceLine({price,color:col[i],lineWidth:1,lineStyle:2,axisLabelVisible:true,title:(L*100).toFixed(1)+'%'}); const ent={kind:'h',pl,price,w0:1}; drawLines.current.push(ent); grp.push(ent); }catch(e){} });
         drawStack.current.push(()=>{ grp.forEach(e=>{ try{s.removePriceLine(e.pl);}catch(e){} }); drawLines.current=drawLines.current.filter(x=>grp.indexOf(x)<0); }); }
+      terminalBus.emit('chart.tool', null);   // MT5: object placed → auto-revert to cursor so you can click-select it
     };
     const onKey=(e)=>{
       if(!activeRef.current) return;

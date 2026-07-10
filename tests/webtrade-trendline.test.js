@@ -41,5 +41,15 @@ if (!/e\.key==='Delete'\|\|e\.key==='Backspace'\)\{ e\.preventDefault\(\); delet
 if (!/onDelete=\{\(\)=>deleteSelected\(\)\}/.test(src)) bad('Delete popup must call deleteSelected()');
 if (!/positionHandles\(\);   \/\/ keep the selected trend/.test(src)) bad('handles must stay pinned on pan/zoom (positionHandles in posOverlays)');
 
+// ── the fix: after placing an object the tool must auto-revert to cursor, else click-select (and
+//    thus the handles + right-click Delete) never work — this was the "점이 안보여 / 우클릭 안돼" bug.
+if ((src.match(/terminalBus\.emit\('chart\.tool', null\)/g) || []).length < 2)
+  bad('placing an object must auto-revert to cursor (chart.tool null) on both the click-tools and the drag-tools');
+
+// ── Fibonacci: a white start-anchor point on mousedown + live level lines that follow the cursor ──
+if (!/startPt\.current=d/.test(src)) bad('a WHITE start-anchor point must appear when a trend/fib drag begins');
+if (!/previewFib\.current/.test(src)) bad('fib must show live preview level lines while dragging');
+if (!/d\.tool==='fib'/.test(src) || !/applyOptions\(\{price:lo\+\(hi-lo\)\*FIB_LV\[i\]\}\)/.test(src)) bad('fib preview levels must follow the cursor (applyOptions on drag)');
+
 if (fail) { console.error(`\n🔴 FAIL — ${fail} trend-line problem(s).`); process.exit(1); }
-console.log('🟢 PASS: distSeg hit-test selects within 8px; neon-red line + white 3-point handles on select; live preview; right-click Delete popup shares deleteSelected; handles stay pinned.');
+console.log('🟢 PASS: distSeg selects within 8px; neon line + white handles on select; tool auto-reverts to cursor after draw; fib shows a start point + live-following levels; right-click Delete shares deleteSelected.');
