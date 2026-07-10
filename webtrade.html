@@ -260,7 +260,7 @@
   .ctxsep{height:1px;background:#c8c8c8;margin:3px 6px}
   .ctxmenu .ci.has{position:relative}
   /* ── Market-Watch MT5 classic dark context menu (right-click) ── */
-  .mt5-context-menu{position:fixed;z-index:10000;min-width:178px;background:#1e1e1e;border:1px solid #444;
+  .mt5-context-menu{position:fixed;z-index:200000 !important;min-width:178px;background:#1e1e1e;border:1px solid #444;
     box-shadow:0 4px 14px rgba(0,0,0,.6);padding:2px 0;font:11px "Segoe UI",Tahoma,sans-serif;border-radius:0}
   .mt5-context-menu .mt5-mi{padding:5px 24px 5px 14px;color:#fff;cursor:pointer;white-space:nowrap;border-radius:0}
   .mt5-context-menu .mt5-mi:hover{background:#2b579a;color:#fff}
@@ -1299,9 +1299,12 @@ const MW_MENU=[
   {l:'Show All', act:'showall'},         // restore every hidden symbol
 ];
 function ContextMenu({ x, y, sym, onClose, onPick, onHide, onShowAll }){
-  React.useEffect(()=>{ const h=()=>onClose(); const k=(e)=>{ if(e.key==='Escape') onClose(); };
-    document.addEventListener('click',h); document.addEventListener('contextmenu',h); document.addEventListener('keydown',k);
-    return ()=>{ document.removeEventListener('click',h); document.removeEventListener('contextmenu',h); document.removeEventListener('keydown',k); }; }, [onClose]);
+  React.useEffect(()=>{ const close=()=>onClose(); const k=(e)=>{ if(e.key==='Escape') onClose(); };
+    // Attach outside-close on the NEXT tick — otherwise the SAME right-click that OPENED the menu
+    // (its contextmenu/mousedown still bubbling to document) instantly closes it → menu never shows.
+    const id=setTimeout(()=>{ document.addEventListener('mousedown',close); }, 0);
+    document.addEventListener('keydown',k);
+    return ()=>{ clearTimeout(id); document.removeEventListener('mousedown',close); document.removeEventListener('keydown',k); }; }, [onClose]);
   const run=(it)=>{ if(it.dis||it.sep) return;
     if(it.act==='chart') onPick&&onPick(sym);                      // New Chart → tile-aware chart of THIS symbol
     else if(it.act==='order') terminalBus.emit('order.new', sym);  // New Order → popup for THIS symbol
@@ -1312,7 +1315,7 @@ function ContextMenu({ x, y, sym, onClose, onPick, onHide, onShowAll }){
   };
   const style={ left:Math.min(x, window.innerWidth-190), top:Math.min(y, window.innerHeight-200) };
   return (
-    <div className="mt5-context-menu" style={style} onClick={e=>e.stopPropagation()} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
+    <div className="mt5-context-menu" style={style} onMouseDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
       {MW_MENU.map((it,i)=> it.sep ? <div key={i} className="mt5-sep"></div> : (
         <div key={i} className={"mt5-mi"+(it.dis?' dis':'')} onClick={()=>run(it)}>{it.l}</div>
       ))}
