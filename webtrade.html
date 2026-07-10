@@ -263,8 +263,8 @@
   /* ── Bottom: KPI strip + Excel-grid positions table ── */
   .bottom{flex:none;height:var(--bottomh,188px);background:#0d0d0d;border-top:1px solid var(--cellbd);display:flex;flex-direction:column;overflow:hidden;
     font-family:"Segoe UI",Tahoma,sans-serif;font-size:11px}
-  /* terminal tab bar docked at the BOTTOM (layer 4) — border on top, active tab flush upward */
-  .tbxtabs{flex:none;display:flex;background:linear-gradient(#20242a,#14171c);border-top:1px solid #000}
+  /* SCREEN-BOTTOM full-width terminal tab bar (own grid row, spans all columns) */
+  .tbxtabs{grid-area:termtabs;height:24px;display:flex;align-items:stretch;background:linear-gradient(#20242a,#14171c);border-top:1px solid #000;overflow-x:auto}
   .tbxtabs .t{padding:3px 11px;font-size:11px;color:#a2aab6;border-right:1px solid #2a2e34;cursor:default}
   .tbxtabs .t.on{background:#000;color:#fff;border-top:2px solid #3a6ea5;margin-top:-1px}
   .acctline{display:flex;align-items:center;gap:18px;padding:4px 12px;background:#0d0d0d;border-top:1px solid #222;font-size:11.5px;color:#c8ccd2;white-space:nowrap;overflow-x:auto}
@@ -1431,11 +1431,10 @@ function StatusBar({ tool, chartType, tf }){
   );
 }
 
-function BottomBar({ onResize }){
+function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-width tab bar lives at screen bottom)
   const [acct,setAcct]=React.useState(positionsStore.acct);
   const [pos,setPos]=React.useState(positionsStore.pos);
   const [mids,setMids]=React.useState({});
-  const [tab,setTab]=React.useState('Trade');
   const [leverage,setLev]=React.useState(tradeSettings.leverage);
   const eng=useTradeEngine();
   React.useEffect(()=> positionsStore.subscribe(s=>{ setAcct(s.acct); setPos([...s.pos]); }), []);
@@ -1494,8 +1493,6 @@ function BottomBar({ onResize }){
         <span><span className="k">Profit:</span> <b className={floating>=0?'up':'down'}>{num(floating)}</b></span>
       </div>}
        </React.Fragment>)}
-      {/* layer 4: terminal menu tab bar, docked at the very bottom */}
-      <div className="tbxtabs">{TBX_TABS.map(t=><div key={t} className={"t"+(t===tab?' on':'')} onClick={()=>setTab(t)}>{t}</div>)}</div>
     </div>
   );
 }
@@ -1926,6 +1923,7 @@ function App(){
   const [leftw,setLeftw]=React.useState(cfg.leftw||270);
   const [bottomh,setBottomh]=React.useState(cfg.bottomh||188);
   const [navh,setNavh]=React.useState(cfg.navh||186);
+  const [termTab,setTermTab]=React.useState('Trade');   // terminal tab bar lives full-width at screen bottom
   // effective active chart (id may point at a closed one after a close)
   const activeChart = charts.find(c=>c.id===activeId) || charts[0] || null;
   const actRef=React.useRef(null); actRef.current = activeChart ? activeChart.id : null;
@@ -1970,8 +1968,8 @@ function App(){
   const gridStyle = {
     '--leftw': leftw+'px', '--bottomh': bottomh+'px',
     gridTemplateColumns: leftShown ? 'var(--leftw) 6px 1fr' : '0 0 1fr',
-    gridTemplateRows: `23px ${view.toolbars?'33px':'0'} 1fr ${view.statusbar?'22px':'0'}`,
-    gridTemplateAreas: '"menu menu menu" "tools tools tools" "left splitter right" "status status status"',
+    gridTemplateRows: `23px ${view.toolbars?'33px':'0'} 1fr ${view.toolbox?'24px':'0'} ${view.statusbar?'22px':'0'}`,
+    gridTemplateAreas: '"menu menu menu" "tools tools tools" "left splitter right" "termtabs termtabs termtabs" "status status status"',
   };
   const [tcols,trows]=tileDims(charts.length);
   const gridTiles={ gridTemplateColumns:`repeat(${tcols},1fr)`, gridTemplateRows:`repeat(${trows},1fr)` };
@@ -2000,9 +1998,11 @@ function App(){
         {!!charts.length && <div className="charttabs">{charts.map(c=>
           <div key={c.id} className={"ctab"+(c.id===(activeChart&&activeChart.id)?' on':'')} onClick={()=>setActiveId(c.id)} title={c.symbol+'.FX,'+c.tf}>{c.symbol}.FX,{c.tf}
             <span className="tclose" onClick={(e)=>{e.stopPropagation();closeChart(c.id);}} title="Close chart">✕</span></div>)}</div>}
-        {/* layer 3+4: terminal toolbox (Balance + positions) with its tab bar docked at the bottom */}
-        {view.toolbox && <BottomBar onResize={setBottomh} />}
+        {/* layer 3: terminal history box (table header + rows + Balance bar) — NO tabs inside */}
+        {view.toolbox && <BottomBar onResize={setBottomh} tab={termTab} />}
       </div>
+      {/* SCREEN-BOTTOM full-width terminal tab bar (spans under the left Symbols column too) */}
+      {view.toolbox && <div className="tbxtabs">{TBX_TABS.map(t=><div key={t} className={"t"+(t===termTab?' on':'')} onClick={()=>setTermTab(t)}>{t}</div>)}</div>}
       {view.statusbar && <StatusBar tool={tool} chartType={activeChart?activeChart.type:'candle'} tf={activeChart?activeChart.tf:'H1'} />}
       {orderSym && <OrderModal symbol={orderSym} onClose={()=>setOrderSym(null)} />}
     </div>
