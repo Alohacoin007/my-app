@@ -1306,7 +1306,7 @@ const MENU_DEF = {
            {l:'Status Bar', v:'statusbar', keep:1}, {sep:1},
            {l:'Market Watch', v:'marketwatch', k:'Ctrl+M', keep:1},
            {l:'Navigator', v:'navigator', k:'Ctrl+N', keep:1},
-           {l:'Toolbox', v:'toolbox', k:'Ctrl+T', keep:1}, {sep:1}, {l:'Full Screen', k:'F11', dis:1} ],
+           {l:'Toolbox', v:'toolbox', k:'Ctrl+T', keep:1}, {sep:1}, {l:'Full Screen', k:'F11', cmd:'view.fullscreen'} ],
   Insert:[ {l:'Indicators', dis:1}, {sep:1}, {l:'Lines', ar:1, dis:1}, {l:'Channels', ar:1, dis:1},
            {l:'Fibonacci', ar:1, dis:1}, {l:'Shapes', ar:1, dis:1}, {sep:1}, {l:'Text', tool:'text'} ],
   Tools: [ {l:'New Order', cmd:'order.new', k:'F9'}, {l:'History Center', dis:1}, {sep:1},
@@ -1693,12 +1693,27 @@ function App(){
   const actRef=React.useRef(activeIdx); actRef.current=activeIdx;
   React.useEffect(()=>{ priceStore.start(); positionsStore.start(); }, []);
   React.useEffect(()=>{ wtConfig.save({ tfs, types, indicators, view, geos }); }, [tfs, types, indicators, view, geos]);   // remember layout
+  // ── MT5 keyboard shortcuts (View menu + New Order) ──
+  React.useEffect(()=>{
+    const onKey=(e)=>{
+      if(/INPUT|SELECT|TEXTAREA/.test((e.target&&e.target.tagName)||'')) return;
+      const k=(e.key||'').toLowerCase();
+      if(e.ctrlKey && k==='m'){ e.preventDefault(); setView(v=>({ ...v, marketwatch:!v.marketwatch })); }
+      else if(e.ctrlKey && k==='n'){ e.preventDefault(); setView(v=>({ ...v, navigator:!v.navigator })); }
+      else if(e.ctrlKey && k==='t'){ e.preventDefault(); setView(v=>({ ...v, toolbox:!v.toolbox })); }
+      else if(e.key==='F9'){ e.preventDefault(); setOrderSym(s=> s||grid[actRef.current]||grid[0]); }
+      else if(e.key==='F11'){ e.preventDefault(); try{ if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }catch(_){} }
+    };
+    document.addEventListener('keydown',onKey);
+    return ()=>document.removeEventListener('keydown',onKey);
+  }, [grid]);
   // ── command reducer: toolbar chart signals hit ONLY the active chart window ──
   React.useEffect(()=> terminalBus.subscribe((cmd,arg)=>{
     if(cmd==='chart.tf') setTfs(a=> a.map((v,i)=> i===actRef.current ? arg : v));       // active chart only
     else if(cmd==='chart.type') setTypes(a=> a.map((v,i)=> i===actRef.current ? arg : v)); // active chart only
     else if(cmd==='chart.tool') setTool(arg);
     else if(cmd==='view.toggle') setView(v=>({ ...v, [arg]: !v[arg] }));
+    else if(cmd==='view.fullscreen'){ try{ if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }catch(e){} }
     else if(cmd==='chart.indicator'){
       if(arg==='__clear__') setIndicators([]);
       else setIndicators(list=> list.indexOf(arg)>=0 ? list.filter(x=>x!==arg) : list.concat(arg));
