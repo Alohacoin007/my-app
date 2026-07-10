@@ -137,8 +137,8 @@
   .oc-price .bf .bg{font-size:24px;font-weight:normal;color:#ffffff;line-height:1;font-family:"Arial Black","Segoe UI",Arial,sans-serif}  /* 핵심 핍 — 각진 묵직 폰트 */
   .oc-price .bf .fr{align-self:flex-start;font-size:11px;font-weight:normal;color:#ffffff;margin-left:1px;transform:translateY(-4px)}  /* 위첨자 */
   /* per-side GLOSSY radial colour — blue = up/hold, red = down (SELL↔Bid, BUY↔Ask, independent) */
-  .oc-blue{background:#1c3f8c !important;border:1px solid #102566 !important}
-  .oc-red{background:#bd2c2c !important;border:1px solid #8c1212 !important}
+  .oc-blue{background:#3a63e0 !important;border:1px solid #1f3fb0 !important}   /* royal blue */
+  .oc-red{background:#f5342a !important;border:1px solid #c11f17 !important}   /* bright red */
   /* ── ECN order interaction (overlay only — 190x64 치수/대칭 불변) ──
      처리중: 클릭한 쪽 호가를 dim+blur, 코너에 미세 스피너. 체결완료: 패널 0.1s 플래시. */
   .obox.ecn-flash{animation:ecnFlash .1s ease-out}
@@ -532,9 +532,10 @@ const CHART_THEME = {
 };
 // candle body/border/wick per theme — dark = MT5 hollow-green up / filled-white down; light keeps
 // a light-mode-safe scheme (hollow-white up / filled-black down) so light charts don't vanish.
+// up = GREEN (hollow body + green outline), down = RED (filled red). Per-direction body/line.
 const CANDLE_THEME = {
-  dark:  { up:'rgba(0,0,0,0)', down:'#ffffff', border:'#00ff00', wick:'#00ff00' },
-  light: { up:'#ffffff',       down:'#000000', border:'#000000', wick:'#000000' },
+  dark:  { upBody:'rgba(0,0,0,0)', downBody:'#ff2b2b', upLine:'#00ff00', downLine:'#ff2b2b' },
+  light: { upBody:'rgba(0,0,0,0)', downBody:'#e02020', upLine:'#0a9d0a', downLine:'#e02020' },
 };
 const themeBus = { theme:'dark', listeners:new Set(),
   set(t){ this.theme=(t==='light'?'light':'dark'); this.listeners.forEach(fn=>{ try{fn(this.theme);}catch(e){} }); },
@@ -1028,9 +1029,9 @@ function makePriceSeries(c, type, sym){
     const o={ upColor:'#00ff00', downColor:'#ff2020', thinBars:false, priceFormat:pf };
     return c.addBarSeries ? c.addBarSeries(o) : c.addSeries(LightweightCharts.BarSeries, o);
   }
-  const ct=CANDLE_THEME[themeBus.theme]||CANDLE_THEME.dark;   // MT5: bull hollow (grid shows through), bear filled, green outline
-  const o={ upColor:ct.up, downColor:ct.down, wickUpColor:ct.wick, wickDownColor:ct.wick,
-    borderUpColor:ct.border, borderDownColor:ct.border, borderVisible:true, priceFormat:pf };
+  const ct=CANDLE_THEME[themeBus.theme]||CANDLE_THEME.dark;   // up=green hollow, down=red filled
+  const o={ upColor:ct.upBody, downColor:ct.downBody, wickUpColor:ct.upLine, wickDownColor:ct.downLine,
+    borderUpColor:ct.upLine, borderDownColor:ct.downLine, borderVisible:true, priceFormat:pf };
   return c.addCandlestickSeries ? c.addCandlestickSeries(o) : c.addSeries(LightweightCharts.CandlestickSeries, o);
 }
 const asSeriesData=(data,type)=> type==='line' ? data.map(d=>({time:d.time,value:d.close})) : data;
@@ -1179,8 +1180,8 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
         timeScale:{borderColor:th.border}, rightPriceScale:{borderColor:th.border},
         crosshair:{vertLine:{color:th.cross},horzLine:{color:th.cross}} }); }catch(e){}
       try{ if(series.current&&series.current.applyOptions&&typeRef.current==='candle') series.current.applyOptions({   // recolor candles on theme flip
-        upColor:ct.up, downColor:ct.down, wickUpColor:ct.wick, wickDownColor:ct.wick,
-        borderUpColor:ct.border, borderDownColor:ct.border, borderVisible:true }); }catch(e){} });
+        upColor:ct.upBody, downColor:ct.downBody, wickUpColor:ct.upLine, wickDownColor:ct.downLine,
+        borderUpColor:ct.upLine, borderDownColor:ct.downLine, borderVisible:true }); }catch(e){} });
     // manual sizing (autoSize OFF): register so splitter-drag + window-resize call chart.resize()
     c.resize(box.current.clientWidth, box.current.clientHeight);
     const unreg=chartResizer.add(c, box.current);
