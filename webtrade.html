@@ -680,8 +680,10 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   const ctlReset=(e)=>{ e&&e.stopPropagation(); focus(); setGeo(tileGeo()); winMode.current='normal'; reportGeo(); };   // ✕ → back to its tile slot
   // remove ONLY user-drawn objects (hline/fib/trend/vline/text) — keeps indicators + position lines
   const drawStack=React.useRef([]);   // chronological removers for undo (Ctrl+Z / menu)
-  const clearDrawings=()=>{ const s=series.current, c=chart.current;
-    drawLines.current.forEach(l=>{ try{ s&&s.removePriceLine(l); }catch(e){} }); drawLines.current=[];
+  const selDraw=React.useRef(null);   // currently-selected horizontal line entry {pl,price}
+  const deselect=()=>{ if(selDraw.current){ try{ selDraw.current.pl.applyOptions({lineWidth:1}); }catch(e){} selDraw.current=null; } };
+  const clearDrawings=()=>{ const s=series.current, c=chart.current; deselect();
+    drawLines.current.forEach(l=>{ try{ s&&s.removePriceLine(l.pl); }catch(e){} }); drawLines.current=[];
     drawSeries.current.forEach(ls=>{ try{ c&&c.removeSeries(ls); }catch(e){} }); drawSeries.current=[];
     overlays.current.forEach(o=>{ try{o.el.remove();}catch(e){} }); overlays.current=[]; drawStack.current=[]; };
   const undoDraw=()=>{ const rm=drawStack.current.pop(); if(rm) try{ rm(); }catch(e){} };   // remove the most recent object
@@ -766,6 +768,14 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       if(!d){ setOhlc(null); return; }
       if(d.open!=null) setOhlc({o:d.open,h:d.high,l:d.low,c:d.close}); else if(d.value!=null) setOhlc({c:d.value}); else setOhlc(null);
     }); }catch(e){}
+    // click to SELECT the nearest horizontal drawing (cursor mode) → then Delete/↑↓ edit it
+    try{ c.subscribeClick((param)=>{
+      const t=toolRef.current; if(t && t!=='arrow' && t!=='cross') return; if(!param||!param.point) { deselect(); return; }
+      const y=param.point.y; let best=null, bd=7;
+      drawLines.current.forEach(e=>{ let cy=null; try{ cy=series.current.priceToCoordinate(e.price); }catch(_){}
+        if(cy!=null){ const dd=Math.abs(cy-y); if(dd<bd){ bd=dd; best=e; } } });
+      deselect(); if(best){ selDraw.current=best; try{ best.pl.applyOptions({lineWidth:3}); }catch(_){} }
+    }); }catch(e){}
     // load candles for the current timeframe, then (re)paint indicators over them
     loadCandles(symbol, tf).then(data=>{ try{ s.setData(asSeriesData(data,typeRef.current)); bar.current=data[data.length-1]; candles.current=data; paintIndicators(); }catch(e){} });
     // live: update ONLY the last bar's close from the shared store — throttled to ~2.5/sec
@@ -778,7 +788,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       try{ series.current.update(typeRef.current==='line' ? {time:u.time,value:close} : u); }catch(e){}
     }, 400);
     const unsub=priceStore.subscribe(onTick);
-    return ()=>{ unsub(); unreg(); indSeries.current=[]; lines.current=[]; drawLines.current=[]; drawSeries.current=[]; drawStack.current=[];
+    return ()=>{ unsub(); unreg(); indSeries.current=[]; lines.current=[]; drawLines.current=[]; drawSeries.current=[]; drawStack.current=[]; selDraw.current=null;
       overlays.current.forEach(o=>{ try{o.el.remove();}catch(e){} }); overlays.current=[];   // chart recreated → clear drawings
       try{ c.remove(); }catch(e){} };
   }, [symbol, tf]);   // recreate + reload on symbol OR timeframe change (toolbar sync)
@@ -840,7 +850,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       const [x,y]=xy(e); let time=null,price=null;
       try{ time=c.timeScale().coordinateToTime(x); price=s.coordinateToPrice(y); }catch(e){}
       if(t==='hline'){ if(price==null) return; try{ const pl=s.createPriceLine({price,color:'#e8b23a',lineWidth:1,lineStyle:0,axisLabelVisible:true,title:''});
-        drawLines.current.push(pl); drawStack.current.push(()=>{ try{s.removePriceLine(pl);}catch(e){} drawLines.current=drawLines.current.filter(x=>x!==pl); }); }catch(e){} return; }
+        const ent={pl,price}; drawLines.current.push(ent); drawStack.current.push(()=>{ try{s.removePriceLine(pl);}catch(e){} drawLines.current=drawLines.current.filter(x=>x!==ent); }); }catch(e){} return; }
       if(t==='vline'){ if(time==null) return; addVLine(time); return; }
       if(t==='text'){ if(time==null||price==null) return; const txt=window.prompt('Text label:'); if(txt) addText(time,price,txt); return; }
       dragDraw.current={ tool:t, time, price };   // trend / fib — finish on mouseup
@@ -856,10 +866,21 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
           drawStack.current.push(()=>{ try{c.removeSeries(ls);}catch(e){} drawSeries.current=drawSeries.current.filter(x=>x!==ls); }); }catch(e){} }
       else if(d.tool==='fib'){ const hi=Math.max(d.price,p2), lo=Math.min(d.price,p2);
         const lv=[0,0.236,0.382,0.5,0.618,0.786,1], col=['#8a9098','#e0709a','#f0c674','#82d982','#5fb0ff','#c792ea','#8a9098']; const grp=[];
-        lv.forEach((L,i)=>{ try{ const pl=s.createPriceLine({price:lo+(hi-lo)*L,color:col[i],lineWidth:1,lineStyle:2,axisLabelVisible:true,title:(L*100).toFixed(1)+'%'}); drawLines.current.push(pl); grp.push(pl); }catch(e){} });
-        drawStack.current.push(()=>{ grp.forEach(pl=>{ try{s.removePriceLine(pl);}catch(e){} }); drawLines.current=drawLines.current.filter(x=>grp.indexOf(x)<0); }); }
+        lv.forEach((L,i)=>{ try{ const price=lo+(hi-lo)*L; const pl=s.createPriceLine({price,color:col[i],lineWidth:1,lineStyle:2,axisLabelVisible:true,title:(L*100).toFixed(1)+'%'}); const ent={pl,price}; drawLines.current.push(ent); grp.push(ent); }catch(e){} });
+        drawStack.current.push(()=>{ grp.forEach(e=>{ try{s.removePriceLine(e.pl);}catch(e){} }); drawLines.current=drawLines.current.filter(x=>grp.indexOf(x)<0); }); }
     };
-    const onKey=(e)=>{ if((e.ctrlKey||e.metaKey) && (e.key==='z'||e.key==='Z') && activeRef.current){ e.preventDefault(); undoDraw(); } };
+    const onKey=(e)=>{
+      if(!activeRef.current) return;
+      if(/INPUT|SELECT|TEXTAREA/.test((e.target&&e.target.tagName)||'')) return;   // don't hijack form typing
+      if((e.ctrlKey||e.metaKey) && (e.key==='z'||e.key==='Z')){ e.preventDefault(); undoDraw(); return; }
+      const ent=selDraw.current; if(!ent) return;
+      if(e.key==='Delete'||e.key==='Backspace'){ e.preventDefault();
+        try{ series.current.removePriceLine(ent.pl); }catch(_){}
+        drawLines.current=drawLines.current.filter(x=>x!==ent); selDraw.current=null; }
+      else if(e.key==='ArrowUp'||e.key==='ArrowDown'){ e.preventDefault();
+        const np=ent.price+(e.key==='ArrowUp'?pip(symbol):-pip(symbol));
+        try{ ent.pl.applyOptions({price:np}); }catch(_){} ent.price=np; }
+    };
     el.addEventListener('mousedown',onDown); document.addEventListener('mouseup',onUp); document.addEventListener('keydown',onKey);
     return ()=>{ el.removeEventListener('mousedown',onDown); document.removeEventListener('mouseup',onUp); document.removeEventListener('keydown',onKey); };
   }, [posOverlays]);
