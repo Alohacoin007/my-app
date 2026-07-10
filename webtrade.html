@@ -1471,17 +1471,27 @@ function OrderModal({ symbol:sym0, onClose }){
     const c=LightweightCharts.createChart(tbox.current, {
       layout:{ background:{color:'#0b1020'}, textColor:'#8a93a6', fontSize:10, fontFamily:"Consolas, 'Courier New', monospace" },
       grid:{ vertLines:{color:'#222b3d', style:DOT}, horzLines:{color:'#222b3d', style:DOT} },   // dotted charcoal grid
-      timeScale:{ visible:false, borderColor:'#2a3345' }, rightPriceScale:{ borderColor:'#2a3345' },
-      crosshair:{ mode:0 }, handleScroll:false, handleScale:false });
+      timeScale:{ visible:true, timeVisible:true, secondsVisible:false, borderColor:'#2a3345', rightOffset:2, barSpacing:3 },
+      rightPriceScale:{ borderColor:'#2a3345' }, crosshair:{ mode:0 }, handleScroll:false, handleScale:false });
     c.resize(tbox.current.clientWidth, tbox.current.clientHeight);
-    // 1.5px-feel NEON lines (LWC widths are integer → 2 is the crisp neon look)
-    const mk=(color)=> c.addLineSeries ? c.addLineSeries({color,lineWidth:2,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false})
-                                       : c.addSeries(LightweightCharts.LineSeries,{color,lineWidth:2,priceLineVisible:false,lastValueVisible:true});
+    // NEON stepped tick lines (MT5 look). Ask red, Bid blue.
+    const STEP=(window.LightweightCharts&&LightweightCharts.LineType&&LightweightCharts.LineType.WithSteps)!=null?LightweightCharts.LineType.WithSteps:0;
+    const mk=(color)=> c.addLineSeries ? c.addLineSeries({color,lineWidth:2,lineType:STEP,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false})
+                                       : c.addSeries(LightweightCharts.LineSeries,{color,lineWidth:2,lineType:STEP,priceLineVisible:false,lastValueVisible:true});
     const ask=mk('#ff414d'), bid=mk('#22b8ff'); tchart.current=c; askS.current=ask; bidS.current=bid;
-    buf.current={t:1000,ask:[],bid:[]};
-    const onTick=throttle((mids)=>{ const q=mids[symbol]; if(!q) return; const b=buf.current; b.t+=1;
+    // ── PRE-SEED ~200 ticks so the chart is FULL immediately (was empty until it slowly filled) ──
+    const N=200, STEPT=2;   // 2s spacing → realistic time axis span
+    const q0=priceStore.get(symbol)||{}; const pv=pip(symbol);
+    let mid0=q0.mid||((q0.ask+q0.bid)/2)||BASE[symbol]||1; const half=Math.max(pv/2,((q0.ask-q0.bid)/2)||pv/2);
+    const t0=Math.floor(Date.now()/1000)-N*STEPT; const seedA=[],seedB=[]; let m=mid0-(Math.random()*pv*10);
+    for(let i=0;i<N;i++){ m+=(Math.random()-0.5)*pv*3; const t=t0+i*STEPT; seedA.push({time:t,value:m+half}); seedB.push({time:t,value:m-half}); }
+    // land the last seed point on the real current quote
+    if(q0.ask){ seedA[N-1].value=q0.ask; } if(q0.bid){ seedB[N-1].value=q0.bid; }
+    buf.current={ t:t0+N*STEPT, step:STEPT, ask:seedA, bid:seedB };
+    try{ ask.setData(seedA); bid.setData(seedB); c.timeScale().fitContent(); }catch(e){}
+    const onTick=throttle((mids)=>{ const q=mids[symbol]; if(!q) return; const b=buf.current; b.t+=b.step;
       b.ask.push({time:b.t,value:q.ask}); b.bid.push({time:b.t,value:q.bid});
-      if(b.ask.length>180){ b.ask.shift(); b.bid.shift(); }
+      if(b.ask.length>N){ b.ask.shift(); b.bid.shift(); }
       try{ ask.setData(b.ask); bid.setData(b.bid); }catch(e){}
     }, 220);
     const un=priceStore.subscribe(onTick);
