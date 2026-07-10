@@ -160,7 +160,9 @@
   .cell-title .ti svg{width:12px;height:12px;display:block}
   .win.active .cell-title{background:linear-gradient(#2f7fe0,#1c5ec0);color:#ffffff}  /* active = vivid program blue */
   .win.active{border-color:#2f7fe0}
-  .cell-title .wc{margin-left:auto;display:flex;gap:4px}
+  .cell-title>span:nth-child(2){flex:none;white-space:nowrap}
+  .cell-title .poslbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#00c800;font-weight:600;margin-left:2px}
+  .cell-title .wc{margin-left:auto;flex:none;display:flex;gap:4px}
   .cell-title .wc span{cursor:pointer;width:16px;text-align:center;border-radius:2px;color:#c8ccd2}
   .cell-title .wc span:hover{background:rgba(255,255,255,.22)}
   .win.active .cell-title .wc span{color:#eaf2ff}
@@ -985,7 +987,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       lines.current=[];
       const mine=store.forSymbol(symbol);
       const DOT=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dotted)!=null?LightweightCharts.LineStyle.Dotted:1;
-      mine.forEach(p=>{ const price=+p.open_price; if(!price) return;
+      mine.slice(0,40).forEach(p=>{ const price=+p.open_price; if(!price) return;   // cap lines so 100 positions don't flood the chart
         const title=sideUp(p.side)+' '+lotsOf(p);
         try{ lines.current.push(s.createPriceLine({ price, color:'#00ff00', lineWidth:1,
           lineStyle:DOT, axisLabelVisible:true, title })); }catch(e){}
@@ -1005,7 +1007,10 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
           <svg viewBox="0 0 24 24" fill="none" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M8 21V6M8 6l-3 3M8 6l3 3" stroke="#e23a2d"/><path d="M16 3v15M16 18l-3-3M16 18l3-3" stroke="#2f6fd6"/></svg>
         </span>
         <span>{symbol}.FX,{tf||'H1'}</span>
-        {posLbl.map((p,i)=><span key={i} style={{color:'#00c800',fontWeight:600}}>{p.side} {p.lots} at {fmtPx(symbol,p.price)}</span>)}
+        {posLbl.length>0 && (()=>{ const net=posLbl.reduce((s,p)=>s+(p.side==='SELL'?-1:1)*p.lots,0);
+          return <span className="poslbl">{posLbl.length===1
+            ? posLbl[0].side+' '+posLbl[0].lots.toFixed(2)+' at '+fmtPx(symbol,posLbl[0].price)
+            : posLbl.length+' pos · net '+(net>=0?'+':'')+net.toFixed(2)}</span>; })()}
         <span className="wc">
           <span onMouseDown={e=>e.stopPropagation()} onClick={ctlMin} title="Minimize">—</span>
           <span onMouseDown={e=>e.stopPropagation()} onClick={ctlMax} title="Maximize / Restore">▢</span>
