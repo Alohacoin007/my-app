@@ -510,8 +510,14 @@ const RENDER_MS = 300;
 // ── COLOR THEME (dark default / MT5-style light). UI setting only. themeBus lets the live
 //    Lightweight Charts canvases re-theme without a rebuild; CSS handles every other surface. ──
 const CHART_THEME = {
-  dark:  { bg:'#000000', text:'#b0b6c0', grid:'#363c46', border:'#555555', cross:'#777777' },
+  dark:  { bg:'#000000', text:'#ffffff', grid:'#2a2a2a', border:'#555555', cross:'#888888' },   // MT5 black + white axis
   light: { bg:'#ffffff', text:'#333333', grid:'#d3d3d3', border:'#b0b0b0', cross:'#808080' },
+};
+// candle body/border/wick per theme — dark = MT5 hollow-green up / filled-white down; light keeps
+// a light-mode-safe scheme (hollow-white up / filled-black down) so light charts don't vanish.
+const CANDLE_THEME = {
+  dark:  { up:'rgba(0,0,0,0)', down:'#ffffff', border:'#00ff00', wick:'#00ff00' },
+  light: { up:'#ffffff',       down:'#000000', border:'#000000', wick:'#000000' },
 };
 const themeBus = { theme:'dark', listeners:new Set(),
   set(t){ this.theme=(t==='light'?'light':'dark'); this.listeners.forEach(fn=>{ try{fn(this.theme);}catch(e){} }); },
@@ -1005,8 +1011,9 @@ function makePriceSeries(c, type, sym){
     const o={ upColor:'#00ff00', downColor:'#ff2020', thinBars:false, priceFormat:pf };
     return c.addBarSeries ? c.addBarSeries(o) : c.addSeries(LightweightCharts.BarSeries, o);
   }
-  const o={ upColor:'#00ff00', downColor:'#ff2020', wickUpColor:'#00ff00', wickDownColor:'#ff2020',
-    borderUpColor:'#00ff00', borderDownColor:'#ff2020', borderVisible:true, priceFormat:pf };
+  const ct=CANDLE_THEME[themeBus.theme]||CANDLE_THEME.dark;   // MT5: bull hollow (grid shows through), bear filled, green outline
+  const o={ upColor:ct.up, downColor:ct.down, wickUpColor:ct.wick, wickDownColor:ct.wick,
+    borderUpColor:ct.border, borderDownColor:ct.border, borderVisible:true, priceFormat:pf };
   return c.addCandlestickSeries ? c.addCandlestickSeries(o) : c.addSeries(LightweightCharts.CandlestickSeries, o);
 }
 const asSeriesData=(data,type)=> type==='line' ? data.map(d=>({time:d.time,value:d.close})) : data;
@@ -1149,11 +1156,13 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       crosshair:{ vertLine:{color:th0.cross, style:DOT}, horzLine:{color:th0.cross, style:DOT} },
     });
     // live re-theme when the user flips Light/Dark (no rebuild)
-    const unTheme=themeBus.subscribe((t)=>{ const th=CHART_THEME[t]||CHART_THEME.dark;
+    const unTheme=themeBus.subscribe((t)=>{ const th=CHART_THEME[t]||CHART_THEME.dark, ct=CANDLE_THEME[t]||CANDLE_THEME.dark;
       try{ c.applyOptions({ layout:{background:{color:th.bg},textColor:th.text},
         grid:{vertLines:{color:th.grid},horzLines:{color:th.grid}},
         timeScale:{borderColor:th.border}, rightPriceScale:{borderColor:th.border},
-        crosshair:{vertLine:{color:th.cross},horzLine:{color:th.cross}} }); }catch(e){} });
+        crosshair:{vertLine:{color:th.cross},horzLine:{color:th.cross}} }); }catch(e){}
+      try{ if(series.current&&series.current.applyOptions&&typeRef.current==='candle') series.current.applyOptions({   // recolor candles on theme flip
+        upColor:ct.up, downColor:ct.down, wickUpColor:ct.wick, wickDownColor:ct.wick, borderUpColor:ct.border, borderDownColor:ct.border }); }catch(e){} });
     // manual sizing (autoSize OFF): register so splitter-drag + window-resize call chart.resize()
     c.resize(box.current.clientWidth, box.current.clientHeight);
     const unreg=chartResizer.add(c, box.current);
