@@ -38,10 +38,15 @@ if (/\.terminal\.light[^\n]*background:#ffffff/.test(src)) bad('no WHITE backgro
 
 // (3b) COMPONENT SKIN RECONSTRUCTION (not just recolor):
 // one-click panel → flat matte-black card, no 3D fill, monochrome neon numbers
-if (!/\.terminal\.light \.obox\{background:#000000 !important;border:1px solid #1D212A !important;box-shadow:none/.test(src)) bad('Legend one-click panel must be flat #000000 + 1px #1D212A, no shadow');
-if (!/\.terminal\.light \.oc-blue\{background:#000000 !important;border:1px solid #1D212A !important;color:#00FF55/.test(src)) bad('Legend oc-blue must drop the royal-blue FILL → transparent black + neon-green number');
-if (!/\.terminal\.light \.oc-red\{background:#000000 !important;border:1px solid #1D212A !important;color:#FF453A/.test(src)) bad('Legend oc-red must drop the red FILL → transparent black + orange-red number');
-if (!/\.terminal\.light \.oc-price \.bf \.sm,\.terminal\.light \.oc-price \.bf \.bg,\.terminal\.light \.oc-price \.bf \.fr\{color:inherit/.test(src)) bad('Legend big quote number must inherit the side neon colour (monochrome)');
+if (!/\.terminal\.light \.obox\{background:transparent !important;border:1px solid #1D212A !important;box-shadow:none/.test(src)) bad('Legend one-click panel must be TRANSPARENT + 1px #1D212A hairline (wireframe, candles flow through)');
+if (!/\.terminal\.light \.oc-blue,\.terminal\.light \.oc-red\{background:transparent !important;border:none !important\}/.test(src)) bad('Legend oc-blue/oc-red must have NO fill (transparent, no per-half border)');
+if (!/\.terminal\.light \.oc-blue\{color:#00FF55/.test(src)) bad('Legend oc-blue text = neon green');
+if (!/\.terminal\.light \.oc-red\{color:#FF453A/.test(src)) bad('Legend oc-red text = orange-red');
+if (!/\.terminal\.light \.oc-price \.bf \.bg\{color:inherit !important;font-family:"Segoe UI"[^}]*font-weight:500/.test(src)) bad('Legend big quote must be thin-line (weight 500, non-Arial-Black), inheriting the side colour');
+// window header melts into the pane — no gray 3D frame, only a bottom hairline
+if (!/\.terminal\.light \.cell-title\{background:#000000;color:#ffffff;border:none;border-bottom:1px solid #1D212A\}/.test(src)) bad('Legend chart header must melt into #000000 with only a bottom hairline (no boxy frame)');
+// toolbar hover is neutral white now (green reserved for live ticks / profit)
+if (!/\.terminal\.light \.tbtn:hover[^}]*color:#ffffff !important/.test(src)) bad('toolbar hover must be white, not green (green restraint)');
 // bottom table: vertical grid gone, horizontal only
 if (!/\.terminal\.light table\.pos td\{border:none;border-bottom:1px solid #1D212A/.test(src)) bad('Legend positions table must drop vertical borders (border-bottom only)');
 // toolbar hover = border only (no fill)
