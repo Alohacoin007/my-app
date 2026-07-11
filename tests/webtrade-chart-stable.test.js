@@ -55,6 +55,6 @@ for (const c of a) if (!(c.high >= Math.max(c.open, c.close) && c.low <= Math.mi
 }
 // synth must give a FULL history so fitContent shows a real chart (not 2 giant candles)
 if (a.length < 100) { console.error('🔴 FAIL: synthCandles must return a full history (>=100 bars), got ' + a.length); process.exit(1); }
-// loadCandles must reject a SPARSE feed (e.g. M30 → 2 bars) and fall back to synth
-if (!/candles\.length>=30/.test(src)) { console.error('🔴 FAIL: loadCandles must require >=30 feed bars, else use the 200-bar synth (sparse feed = 2 giant candles)'); process.exit(1); }
-console.log('🟢 PASS: synthCandles is deterministic + full history; loadCandles falls back to synth on a sparse feed (no more 2-giant-candle zoom).');
+// in the WT_DEMO terminal, loadCandles must use synth for EVERY tf (the live feed gave 2-bar M5/M30)
+if (!/if\(!WT_DEMO\)\{ try\{ if\(window\.AlpexaSync/.test(src)) { console.error('🔴 FAIL: loadCandles must skip the feed in WT_DEMO and use the 200-bar synth for every timeframe'); process.exit(1); }
+console.log('🟢 PASS: synthCandles is deterministic + full 200-bar history for every tf; WT_DEMO always uses it (no more 2-giant-candle feed).');

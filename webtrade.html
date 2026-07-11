@@ -817,14 +817,15 @@ const WINLAYOUT=[
 
 // ── candle history: try the fx-prices Edge, fall back to a synthetic seed (live bars are REAL feed). ──
 async function loadCandles(symbol, tf){
-  try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.functions){
+  // WebTrader is a SERVER-INDEPENDENT demo (WT_DEMO): use the deterministic 200-bar synth for EVERY
+  // timeframe. The live fx-prices feed returned a sparse/clustered history for some TFs (M5/M30 came
+  // back as 2 giant candles), so we don't depend on it here. Flip WT_DEMO off to wire a real feed.
+  if(!WT_DEMO){ try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.functions){
     const x=await AlpexaSync.db.functions.invoke('fx-prices',{body:{candles:symbol,tf:tf||'M15'}});
-    // Only use the feed when it returns a REAL history — a sparse reply (e.g. M30 gives 2 bars) makes
-    // fitContent zoom into 2 giant candles. Below the threshold, fall back to the 200-bar synth.
     if(x&&!x.error&&x.data&&Array.isArray(x.data.candles)&&x.data.candles.length>=30)
       return x.data.candles.map(c=>({ time:Math.floor((c.t||c.time)/1000), open:+c.o||+c.open, high:+c.h||+c.high, low:+c.l||+c.low, close:+c.c||+c.close }));
-  } }catch(e){}
-  return synthCandles(symbol, tf);   // full 200-bar deterministic history (TODO: wire a public candles endpoint)
+  } }catch(e){} }
+  return synthCandles(symbol, tf);   // full 200-bar deterministic history for every timeframe
 }
 const TF_SEC = { M1:60, M5:300, M15:900, M30:1800, H1:3600, H4:14400, D1:86400 };
 // DETERMINISTIC synthetic history — a pure function of (symbol, absolute bar time). The SAME bar
