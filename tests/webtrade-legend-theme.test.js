@@ -52,6 +52,10 @@ if (/\.mwtick\{[^}]*background:#ffffff/.test(src)) bad('the tick-chart container
 if (!/\.terminal\.light \.mwtp \.sd\{background:#000000 !important;border:1px solid #1D212A\}/.test(src)) bad('Trading-tab buttons must be flat black cards (no gradient fill)');
 if (!/\.terminal\.light \.mwtp \.sd\.sell \.pr\{color:#FF453A\}/.test(src)) bad('Trading SELL price must be red');
 if (!/\.terminal\.light \.mwtp \.sd\.buy \.pr\{color:#00FF55\}/.test(src)) bad('Trading BUY price must be green');
+// New Order modal in Legend: green BUY button (was blue), muted hairlines, green focus
+if (!/\.terminal\.light \.om-btns \.om-buy\{background:#00c853 !important\}/.test(src)) bad('New Order BUY button must be green in Legend (was blue #007aff)');
+if (!/\.terminal\.light \.om-btns \.om-sell\{background:#FF453A !important\}/.test(src)) bad('New Order SELL button must be Legend red');
+if (!/\.terminal\.light \.omodal\{background:#0E1015;border:1px solid #1D212A\}/.test(src)) bad('New Order modal must use the Legend dark palette');
 
 // (3b) COMPONENT SKIN RECONSTRUCTION (not just recolor):
 // one-click panel → flat matte-black card, no 3D fill, monochrome neon numbers
