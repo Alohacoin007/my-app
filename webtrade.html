@@ -834,6 +834,19 @@ const positionsStore = {
     this.notify();
   },
   removeDemo(localId){ this.pos=this.pos.filter(p=>p.local_id!==localId); this.notify(); },   // demo close (no money)
+  // closed-deal log for the MT5 History tab. In-memory only (session-lived, like the demo
+  // positions) — NEVER localStorage: demo P/L is not real money and must not become a cached
+  // "truth" (#5). Newest first. recordClose is called at the close site where P/L is known.
+  history:[],
+  recordClose(p, closePrice, profit){
+    const d=new Date(), p2=n=>String(n).padStart(2,'0');
+    const ct=d.getFullYear()+'.'+p2(d.getMonth()+1)+'.'+p2(d.getDate())+' '+p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds());
+    this.history=[{ local_id:p.local_id, symbol:p.symbol, side:sideUp(p.side), volume:lotsOf(p),
+      open_price:+p.open_price||0, close_price:+closePrice||0,
+      open_time:(p.created_at?String(p.created_at).slice(0,19).replace('T',' ').replace(/-/g,'.'):'—'),
+      close_time:ct, profit:+profit||0 }].concat(this.history);
+    this.notify();
+  },
 };
 
 // lots for a position row (MT5 "Volume") + display helpers shared by chart flags & tables
@@ -1986,16 +1999,20 @@ function StatusBar({ tool, chartType, tf }){
 function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-width tab bar lives at screen bottom)
   const [acct,setAcct]=React.useState(positionsStore.acct);
   const [pos,setPos]=React.useState(positionsStore.pos);
+  const [hist,setHist]=React.useState(positionsStore.history);
   const [mids,setMids]=React.useState({});
   const [leverage,setLev]=React.useState(tradeSettings.leverage);
   const eng=useTradeEngine();
-  React.useEffect(()=> positionsStore.subscribe(s=>{ setAcct(s.acct); setPos([...s.pos]); }), []);
+  React.useEffect(()=> positionsStore.subscribe(s=>{ setAcct(s.acct); setPos([...s.pos]); setHist([...s.history]); }), []);
   React.useEffect(()=> priceStore.subscribe(throttle(m=>setMids({...m}),RENDER_MS)), []);   // live P&L (mobile-throttled)
   React.useEffect(()=> tradeSettings.subscribe(setLev), []);   // margin/level track the chosen leverage
   const closePos=async(p)=>{
-    if(p._demo){ positionsStore.removeDemo(p.local_id); playSnd(sndClose); return; }   // demo row → drop it (+청산음)
+    if(p._demo){ const m=mids[p.symbol]||{}; positionsStore.recordClose(p, m.mid, plOf(p));   // log the closed deal → History tab
+      positionsStore.removeDemo(p.local_id); playSnd(sndClose); return; }   // demo row → drop it (+청산음)
+    const m=mids[p.symbol]||{}; const pl=plOf(p);
     const r=await eng.closeOrder(p.local_id);                            // real → fx_close banks P&L server-side
-    if(!r.ok) alert('청산 실패(Close failed): '+(r.reason||'unknown'));
+    if(!r.ok){ alert('청산 실패(Close failed): '+(r.reason||'unknown')); return; }
+    positionsStore.recordClose(p, m.mid, pl);                            // realized → History tab
   };
 
   // floating P&L marked at the live mid (display approx — production should use trading.html's
@@ -2021,7 +2038,16 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
         <table className="pos">
           <thead><tr><th>{t('Symbol')}</th><th>{t('Ticket')}</th><th>{t('Time')}</th><th>{t('Type')}</th><th>{t('Volume')}</th><th>{t('Price')}</th><th>S / L</th><th>T / P</th><th>{t('Price')}</th><th>{t('Profit')}</th><th></th></tr></thead>
           <tbody>
-            {tab==='History' && <tr><td className="empty" colSpan="11">No history in the selected period</td></tr>}
+            {tab==='History' && !hist.length && <tr><td className="empty" colSpan="11">No history in the selected period</td></tr>}
+            {tab==='History' && hist.map(h=>(
+              <tr key={h.local_id+'-'+h.close_time}>
+                <td>{h.symbol.toLowerCase()}.fx</td><td>{String(h.local_id||'').replace(/\D/g,'').slice(-8)||h.local_id}</td>
+                <td>{h.close_time}</td><td className={h.side==='SELL'?'down':'up'}>{h.side.toLowerCase()}</td>
+                <td>{(+h.volume||0).toFixed(2)}</td><td>{fmtPx(h.symbol,h.open_price)}</td><td>—</td><td>—</td>
+                <td>{fmtPx(h.symbol,h.close_price)}</td><td className={h.profit>=0?'up':'down'}>{num(h.profit)}</td>
+                <td></td>
+              </tr>
+            ))}
             {tab==='Trade' && !pos.length && <tr><td className="empty" colSpan="11">{(!WT_DEMO && window.AlpexaSync&&AlpexaSync.me)?'No open positions':'데모 터미널 — 주문하면 여기에 데모 포지션이 표시됩니다 (서버·어드민 기록 없음)'}</td></tr>}
             {tab==='Trade' && pos.map(p=>{ const m=mids[p.symbol]||{}; const pl=plOf(p);
               const tkt=String(p.local_id||'').replace(/\D/g,'').slice(-8)||p.local_id;
@@ -2035,6 +2061,11 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
           </tbody>
           {/* Balance bar lives INSIDE the table as <tfoot> → glued right under the last position
               row; grows/shrinks WITH the rows (no more floating at the terminal-box bottom). */}
+          {tab==='History' && hist.length>0 && <tfoot><tr className="acctrow"><td colSpan="11">
+            <div className="acctline">
+              <span><span className="k">{t('Profit')}:</span> <b className={hist.reduce((s,h)=>s+(+h.profit||0),0)>=0?'up':'down'}>{num(hist.reduce((s,h)=>s+(+h.profit||0),0))}</b></span>
+            </div>
+          </td></tr></tfoot>}
           {tab==='Trade' && <tfoot><tr className="acctrow"><td colSpan="11">
             <div className="acctline">
               <span><span className="k">{t('Balance')}:</span> <b>{num(balance)} USD</b></span>
