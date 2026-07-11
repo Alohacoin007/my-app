@@ -80,7 +80,7 @@ if (!/\.terminal\.light \.tf b\.on,\.terminal\.light \.tibtn\.on,\.terminal\.lig
 // user explicitly wants kept as the one deliberate "selected" point.
 const greenBorders = (src.match(/border(?!-top)[a-z-]*:\s*[^;{}]*#00FF55/gi) || []);
 if (greenBorders.length) bad('green border(s) remain (only the active-tab top accent may be green): ' + greenBorders.join(' | '));
-if (!/\.terminal\.light \.tbxtabs \.t\.on\{[^}]*border-top-color:#00FF55\}/.test(src)) bad('the active tab must KEEP its green top accent (user likes it)');
+if (!/\.terminal\.light \.tbxtabs \.t\.on\{[^}]*color:#00FF55[^}]*border-top-color:transparent\}/.test(src)) bad('active toolbox tab: green TEXT, no accent line');
 if (!/\.terminal\.light \.charttabs \.ctab\.on\{background:#000000;color:#00FF55\}/.test(src)) bad('active chart tab TEXT must be green');
 if (!/\.terminal\.light \.win\.active \.cell-title\{background:#000000;color:#00FF55/.test(src)) bad('active window title TEXT must be green');
 // the up-candle LINE (chart) is the one place a green stroke is allowed

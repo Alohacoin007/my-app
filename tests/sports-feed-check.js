@@ -32,7 +32,14 @@ function oddsStatus(g) {
   if (g.lg === 'SOC') {
     const tw = g.threeWay || [];
     if (tw.length < 3) return 'MISSING';
-    if (+tw[1].am === 230) return 'PLACEHOLDER';           // exact mkCore Draw default → overlay didn't match
+    // oddsReal is the server's authoritative bettability flag. sports-games sets it true ONLY
+    // together with a real overlay 3-way line (index.ts:174 — atomic with g.threeWay=core.threeWay,
+    // and oddsToCore only yields threeWay when H/Draw/A are all real). So a flagged-real game IS
+    // real even when its Draw price coincidentally equals +230 — the exact value mkCore uses for an
+    // *unflagged* placeholder Draw (real example: France–Spain Draw +230). Don't call it a fake on
+    // the draw value alone. Only classify the sentinel as a placeholder when NOT flagged real.
+    if (g.oddsReal === true) return 'REAL';
+    if (+tw[1].am === 230) return 'PLACEHOLDER';           // mkCore stub Draw on an un-flagged game
     return 'REAL';
   }
   const ml = g.ml || [];
