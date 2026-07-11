@@ -1334,18 +1334,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       if(startPt.current){ try{startPt.current.remove();}catch(_){} startPt.current=null; }
       overlays.current.forEach(o=>{ try{o.el.remove();}catch(e){} }); overlays.current=[];   // chart recreated → clear drawings
       try{ c.remove(); }catch(e){} };
-  }, [symbol, lazyHold, hydrated]);   // recreate on SYMBOL change only; builds when revealed (lazy) and hydrated (idle-deferred)
-  // TIMEFRAME change → reload candles into the SAME chart/series (no recreate) so drawn objects
-  // (trend/fib/hlines) survive the switch, exactly like MT5. Drawings are anchored by time/price.
-  const tfFirst=React.useRef(true);
-  React.useEffect(()=>{ if(tfFirst.current){ tfFirst.current=false; return; }   // initial load already done by the main effect
-    if(lazyHold || !hydrated) return; const c=chart.current, s=series.current; if(!c||!s) return;
-    loadCandles(symbol, tf).then(data=>{ try{
-      s.setData(asSeriesData(data,typeRef.current)); bar.current=data[data.length-1]; candles.current=data; paintIndicators();
-      const fit=()=>{ try{ if(box.current) c.resize(box.current.clientWidth, box.current.clientHeight); c.timeScale().fitContent(); }catch(e){} };
-      fit(); requestAnimationFrame(fit);
-    }catch(e){} });
-  }, [tf]);
+  }, [symbol, tf, lazyHold, hydrated]);   // recreate on symbol/tf change; builds when revealed (lazy) and hydrated (idle-deferred)
 
   // switch chart type WITHOUT recreating the whole chart (swap the price series, re-seed data)
   React.useEffect(()=>{
