@@ -1369,7 +1369,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     const c=LightweightCharts.createChart(box.current, {
       layout:{ background:{color:th0.bg}, textColor:th0.text, fontSize:11, fontFamily:"Tahoma, 'Segoe UI', Arial, sans-serif", attributionLogo:false },
       grid:{ vertLines:{color:th0.grid, style:DOT}, horzLines:{color:th0.grid, style:DOT} },
-      timeScale:{ borderColor:th0.border, timeVisible:true, secondsVisible:false },
+      timeScale:{ borderColor:th0.border, timeVisible:true, secondsVisible:false, rightOffset:6 },   // small right margin so the newest candles + position tags aren't jammed against the axis
       rightPriceScale:{ borderColor:th0.border },
       crosshair:{ vertLine:{color:th0.cross, style:DOT, visible: themeBus.theme!=='light', labelVisible: themeBus.theme!=='light'}, horzLine:{color:th0.cross, style:DOT, visible: themeBus.theme!=='light', labelVisible: themeBus.theme!=='light'} },   // LEGEND: no crosshair lines OR axis labels on hover (free mouse, MT5-like)
     });
@@ -1607,10 +1607,9 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       const mine=store.forSymbol(symbol);
       const DOT=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dotted)!=null?LightweightCharts.LineStyle.Dotted:1;
       mine.slice(0,40).forEach(p=>{ const price=+p.open_price; if(!price) return;   // cap lines so 100 positions don't flood the chart
-        const title=sideUp(p.side)+' '+lotsOf(p);
-        const col=sideUp(p.side)==='SELL'?'#ff2020':'#00ff00';   // SELL=red, BUY=green (line + axis-label tag)
+        const col=sideUp(p.side)==='SELL'?'#ff2020':'#00ff00';   // SELL=red, BUY=green (colour carries the side)
         try{ lines.current.push(s.createPriceLine({ price, color:col, lineWidth:1,
-          lineStyle:DOT, axisLabelVisible:true, title })); }catch(e){}
+          lineStyle:DOT, axisLabelVisible:true, title:'' })); }catch(e){}   // price-only tag (no "BUY 0.01") so it doesn't cover the candles
       });
       setPosLbl(mine.map(p=>({ side:sideUp(p.side), lots:lotsOf(p), price:+p.open_price })));
     };
