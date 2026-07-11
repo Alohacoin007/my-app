@@ -46,6 +46,13 @@ if (!/else if\(ent\.kind==='f'\)\{ try\{ chart\.current\.removeSeries\(ent\.ls\)
 if (!/const hDrag=React\.useRef/.test(src) || !/onHandleDown/.test(src)) bad('handles must be draggable (onHandleDown/hDrag)');
 if (!/\.dov\.pt\{[^}]*pointer-events:auto/.test(src)) bad('handles must be interactive (pointer-events:auto)');
 if (!/ent\.pts=np; try\{ ent\.ls\.setData\(np\)/.test(src)) bad('dragging a handle must re-write the line endpoints');
+
+// a drawing tool / crosshair must apply ONLY to the ACTIVE window — not all 4 charts at once
+if (!/if\(!t\|\|t==='arrow'\|\|t==='cross'\|\|!c\|\|!s\|\|!activeRef\.current\) return;/.test(src)) bad('drawing must be gated to the active window (activeRef)');
+if (!/const armed = isActive && tool && tool!=='arrow'/.test(src)) bad('the drawlayer must only ARM on the active window (isActive)');
+if (!/const cross = isActive && tool==='cross'/.test(src)) bad('crosshair mode must only apply on the active window');
+if (!/\}, \[tool, isActive\]\);/.test(src)) bad('the tool effect must re-run on isActive change so arming follows the selected window');
+if (!/e\.button!==0 \|\| !activeRef\.current\) return;/.test(src)) bad('crosshair measure must be gated to the active window');
 // the line must be THIN and must NOT thicken on select (white handles are the only select marker)
 if (/applyOptions\(\{lineWidth:[^}]*\+2/.test(src)) bad('selecting must NOT thicken the line (no lineWidth+2)');
 if (!/const ent=\{kind:'t',ls,pts,w0:1\}/.test(src)) bad('trend line must be thin (w0:1 / lineWidth 1)');

@@ -1334,7 +1334,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       showMeasure(md.x0, md.y0, x, y, bars+' bars   '+Math.abs(pips).toFixed(1)+' pips   '+(dp>=0?'+':'')+dp.toFixed(digits(symbol))); };
     const onMeasureUp=()=>{ measDrag.current=null; hideMeasure();
       document.removeEventListener('mousemove',onMeasureMove); document.removeEventListener('mouseup',onMeasureUp); };
-    const onMeasureDown=(e)=>{ if(toolRef.current!=='cross' || e.button!==0) return;
+    const onMeasureDown=(e)=>{ if(toolRef.current!=='cross' || e.button!==0 || !activeRef.current) return;   // measure ONLY on the active window
       const r=box.current.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top, ts=c.timeScale(), sc=series.current;
       let lg0=null,p0=null; try{ lg0=ts.coordinateToLogical(x); p0=sc.coordinateToPrice(y); }catch(_){}
       measDrag.current={ x0:x, y0:y, lg0, p0 };
@@ -1405,17 +1405,18 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     });
     positionHandles();   // keep the selected trend line's 3 handles pinned while panning/zooming
   }, []);
-  // reflect the armed tool onto the overlay's pointer-capture + cursor
+  // reflect the armed tool onto the overlay — ONLY on the ACTIVE window (an inactive chart never arms,
+  // so a drawing tool/crosshair applies to the selected chart, not all 4 at once).
   React.useEffect(()=>{ const el=dlayer.current; if(!el) return;
-    const armed = tool && tool!=='arrow' && tool!=='cross';
+    const armed = isActive && tool && tool!=='arrow' && tool!=='cross';
     el.className='drawlayer'+(armed?' arm':'');
-    const cross = tool==='cross';
+    const cross = isActive && tool==='cross';
     try{ if(chart.current) chart.current.applyOptions({
       crosshair:{ mode: cross?0:1 },   // Crosshair tool = FREE (mode 0); everything else = Magnet (mode 1)
       // Crosshair tool: drag MEASURES (ruler), so disable drag-to-scroll (keep wheel zoom). Cursor tool pans.
       handleScroll: cross ? { mouseWheel:true, pressedMouseMove:false, horzTouchDrag:false, vertTouchDrag:false } : true }); }catch(e){}
     try{ if(box.current) box.current.style.cursor = cross ? 'crosshair' : ''; }catch(e){}
-  }, [tool]);
+  }, [tool, isActive]);
   // attach the draw handlers once (they read the live refs)
   React.useEffect(()=>{
     const el=dlayer.current; if(!el) return;
@@ -1427,7 +1428,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       const o={type:'text',time,price,el:d}; overlays.current.push(o);
       drawStack.current.push(()=>{ try{d.remove();}catch(e){} overlays.current=overlays.current.filter(x=>x!==o); }); posOverlays(); };
     const onDown=(e)=>{ const t=toolRef.current, c=chart.current, s=series.current;
-      if(!t||t==='arrow'||t==='cross'||!c||!s) return;
+      if(!t||t==='arrow'||t==='cross'||!c||!s||!activeRef.current) return;   // draw ONLY on the active window
       e.preventDefault(); e.stopPropagation();
       const [x,y]=xy(e); let time=null,price=null;
       try{ time=c.timeScale().coordinateToTime(x); price=s.coordinateToPrice(y); }catch(e){}
