@@ -34,5 +34,10 @@ if (!/if\(ch\.tool\) terminalBus\.emit\('chart\.tool', ch\.tool\)/.test(src)) ba
 if (!/if\(ch\.ind\)\{ terminalBus\.emit\('chart\.indicator', ch\.ind\); return; \}/.test(src)) bad('a submenu indicator item must toggle via chart.indicator (menu stays open)');
 if (!/indChildren=\(\)=> Object\.keys\(INDICATORS\)/.test(src)) bad('the Indicators submenu must be built from INDICATORS');
 
+// the dropdown must sit ABOVE the floating charts (WIN_Z grows past the old z-index:40 → menu hid
+// behind the chart: "매뉴가 챠트 밑으로 들어가"). Require a very high z-index, well over WIN_Z + toolbox.
+const mz = (src.match(/\.mdrop\{[^}]*z-index:(\d+)/) || [])[1];
+if (!mz || +mz < 10000) bad('menu dropdown (.mdrop) z-index must be very high so it renders above floating charts (was 40)');
+
 if (fail) { console.error(`\n🔴 FAIL — ${fail} Insert-menu problem(s).`); process.exit(1); }
 console.log('🟢 PASS: Insert menu is live — Lines/Fibonacci/Text arm real tools, Indicators is a dynamic submenu; Channels/Shapes are honest disabled placeholders.');
