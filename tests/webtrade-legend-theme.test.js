@@ -66,7 +66,7 @@ if (!/\.terminal\.light table\.pos td\{border:none;border-bottom:1px solid #1D21
 // toolbar hover = border only (no fill)
 if (!/\.terminal\.light \.tbtn:hover[^}]*background:transparent !important;border:1px solid #1D212A/.test(src)) bad('Legend toolbar hover must be border-only (transparent bg)');
 // Balance bar bold pure-white text
-if (!/\.terminal\.light \.acctline\{background:#0E1015;color:#a2aab6;border-top:1px solid #1D212A;border-bottom:1px solid #1D212A;font-size:11px/.test(src)) bad('Legend Balance bar must use the toolbox-tab spec (#a2aab6, 11px)');
+if (!/\.terminal\.light \.acctline\{background:#0E1015;color:#a2aab6;border-top:1px solid #1D212A;border-bottom:1px solid #1D212A;font-weight:normal\}/.test(src)) bad('Legend Balance bar must be #a2aab6 (original size, normal weight)');
 if (!/\.terminal\.light \.acctline \.k\{color:#a2aab6[^}]*\}\.terminal\.light \.acctline b\{color:#a2aab6/.test(src)) bad('Legend Balance bar labels + numbers must be the #a2aab6 tab tone');
 
 // the DEFAULT dark one-click panel keeps its 3D royal-blue / red fills (outside .terminal.light)
