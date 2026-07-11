@@ -1586,6 +1586,7 @@ function ChartMenu({ x, y, idx, symbol, chartType, tf, indicators, onClose }){
     document.addEventListener('click',h); document.addEventListener('contextmenu',h); document.addEventListener('keydown',k);
     return ()=>{ document.removeEventListener('click',h); document.removeEventListener('contextmenu',h); document.removeEventListener('keydown',k); }; }, [onClose]);
   const act=new Set(indicators||[]);
+  const activeInds=[...act];
   const items=[
     {l:'New Order', ic:'order', k:'F9', run:()=>terminalBus.emit('order.new',symbol)},
     {sep:1},
@@ -1596,6 +1597,10 @@ function ChartMenu({ x, y, idx, symbol, chartType, tf, indicators, onClose }){
     ]},
     {l:'Timeframes', ic:'tick', children: TFS.map(t=>({l:t, ck:t===tf, run:()=>terminalBus.emit('chart.tf',t)}))},
     {l:'Indicators', ic:'line', children: Object.keys(INDICATORS).map(id=>({l:INDICATORS[id].label, ck:act.has(id), keep:1, run:()=>terminalBus.emit('chart.indicator',id)}))},
+    // Remove Indicator → lists ONLY the active ones for quick removal (disabled when none are on)
+    {l:'Remove Indicator', ic:'exp', dis: activeInds.length===0,
+      children: activeInds.length ? activeInds.map(id=>({ l:'✕  '+(INDICATORS[id]?INDICATORS[id].label:id), keep:1, run:()=>terminalBus.emit('chart.indicator',id) }))
+        .concat([{ l:t('Remove All Indicators'), run:()=>terminalBus.emit('chart.indicator','__clear__') }]) : null},
     {sep:1},
     {l:'Grid', ck:true, keep:1, run:()=>terminalBus.emit('chart.grid', idx)},
     {sep:1},
