@@ -615,7 +615,12 @@ const CANDLE_THEME = {
   dark:  { upBody:'rgba(0,0,0,0)', downBody:'#ff2b2b', upLine:'#00ff00', downLine:'#ff2b2b' },
   light: { upBody:'rgba(0,0,0,0)', downBody:'#FF453A', upLine:'#00FF55', downLine:'#FF453A' },   // LEGEND: up = HOLLOW green outline, down = filled orange-red
 };
-const themeBus = { theme:'dark', listeners:new Set(),
+// Optional deep-link theme: ?theme=legend|light → open in Legend; ?theme=dark|mt5 → force dark.
+// Lets the marketing site link straight into a specific look (e.g. footer "Log in" → Legend).
+// No param → fall back to the saved UI setting. UI setting only, no money involved.
+const WT_URL_THEME = (()=>{ try{ const p=(new URLSearchParams(location.search).get('theme')||'').toLowerCase();
+  if(p==='legend'||p==='light') return 'light'; if(p==='dark'||p==='mt5') return 'dark'; }catch(e){} return null; })();
+const themeBus = { theme: WT_URL_THEME || 'dark', listeners:new Set(),
   set(t){ this.theme=(t==='light'?'light':'dark'); this.listeners.forEach(fn=>{ try{fn(this.theme);}catch(e){} }); },
   subscribe(fn){ this.listeners.add(fn); return ()=>this.listeners.delete(fn); } };
 
@@ -2537,7 +2542,7 @@ function App(){
   const [bottomh,setBottomh]=React.useState(cfg.bottomh||188);
   const [navh,setNavh]=React.useState(cfg.navh||186);
   const [termTab,setTermTab]=React.useState('Trade');   // terminal tab bar lives full-width at screen bottom
-  const [theme,setTheme]=React.useState(cfg.theme==='light'?'light':'dark');   // View → Color Theme (UI setting)
+  const [theme,setTheme]=React.useState(WT_URL_THEME || (cfg.theme==='light'?'light':'dark'));   // ?theme= deep-link wins, else saved View → Color Theme
   React.useEffect(()=>{ themeBus.set(theme); }, [theme]);   // broadcast to live chart canvases
   const [lang,setLang]=React.useState(['ko','ja','zh'].indexOf(cfg.lang)>=0?cfg.lang:'en');   // View → Languages (UI setting)
   LANG.cur=lang;   // set during render so every child's t() reads the current language immediately
