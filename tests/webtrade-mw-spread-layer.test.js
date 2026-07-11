@@ -21,13 +21,11 @@ if (!/showSpread && <td className="mwspr">\{spr\}<\/td>/.test(src)) bad('Spread 
 // the active toggle shows a checkmark
 if (!/it\.act==='spread' && spread/.test(src)) bad('the Spread menu row must show ✓ when active');
 
-// 2) left panel above the toolbox so its tab bar is never covered when the toolbox is pulled up
-const leftCss = (src.match(/\.left\{[^}]*\}/) || [''])[0];
-const lz = (leftCss.match(/z-index:(\d+)/) || [])[1];
-const tz = ((src.match(/\.toolbox\{[^}]*z-index:(\d+)/) || [])[1]);
-if (!lz || !tz) bad('could not read .left / .toolbox z-index');
-else if (+lz <= +tz) bad(`.left z-index (${lz}) must be ABOVE .toolbox (${tz}) so Market Watch/its tabs stay visible`);
-if (!/\.left\{[^}]*position:relative/.test(src)) bad('.left needs position for its z-index to take effect');
+// 2) DOCKED toolbox (MT5): the dock grid row equals the toolbox height so the content above it
+//    (left panel + charts) SHRINKS to fit — no floating overlay, everything stays visible.
+if (!/'--dockh': \(view\.toolbox \? \(bottomh\+24\) : 0\)\+'px'/.test(src)) bad('dock row must equal the toolbox height (bottomh+24) so content shrinks, docked not overlaid');
+if (!/lastH = Math\.max\(188, Math\.min\(window\.innerHeight - 200, h\)\)/.test(src)) bad('toolbox resize must leave content room (clamp to innerHeight-200)');
+if (/chartsEl\.style\.height=active\+'px'/.test(src)) bad('the old overlay-era .charts height clamp must be gone (grid docks the toolbox now)');
 
-if (fail) { console.error(`\n🔴 FAIL — ${fail} MW spread/layer problem(s).`); process.exit(1); }
-console.log('🟢 PASS: right-click Spread toggles a live (ask-bid)/pip column; the left panel sits above the toolbox so its tab bar is never covered.');
+if (fail) { console.error(`\n🔴 FAIL — ${fail} MW spread / dock problem(s).`); process.exit(1); }
+console.log('🟢 PASS: right-click Spread toggles a live (ask-bid)/pip column; the toolbox is DOCKED (dock row = toolbox height) so panels shrink above it, MT5-style.');

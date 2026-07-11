@@ -95,7 +95,7 @@
   .tf b.on{background:#3a6ea5;color:#fff;border-color:#3a6ea5}
   .tbrand{margin-left:auto;font-weight:700;letter-spacing:.3px;color:#8890a0;font-size:11px}.tbrand span{color:#7fb0e0}
   /* ── left column: Market Watch (top) + Navigator (bottom) ── */
-  .left{grid-area:left;display:flex;flex-direction:column;min-height:0;overflow:hidden;position:relative;z-index:10000}   /* above the toolbox (z-9999) so pulling it up covers only the charts, never Market Watch/its tabs */
+  .left{grid-area:left;display:flex;flex-direction:column;min-height:0;overflow:hidden}
   .watch{flex:1;background:var(--panel);overflow:auto;min-height:0}
   .nav{height:var(--navh,186px);background:var(--panel);border-top:1px solid var(--cellbd);overflow-x:hidden;overflow-y:auto;flex:none}
   .nav .navhd{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;padding:3px 4px 3px 8px;background:#0a0d12;color:var(--dim);font-size:11px;font-weight:600;border-bottom:1px solid var(--line)}
@@ -2235,13 +2235,13 @@ function BottomResizer({ onDone }){
     const onDown=(e)=>{ e.preventDefault(); on=true; el.classList.add('drag');
       document.body.style.cursor='row-resize'; document.body.style.userSelect='none'; };
     const onMove=(e)=>{ if(!on||!term) return;
-      // The toolbox is a floating overlay pinned to the WINDOW bottom; its tab bar (24px) sits at
-      // the very bottom, the terminal content above it. Dragging the top edge to cursorY sets the
-      // terminal height = (window bottom − tab bar) − cursorY. Min 188 (overlay ≥ the 212px resting
-      // dock so it never shrinks past its home); max leaves the menu+toolbar (56px) visible on top.
+      // DOCKED toolbox: its tab bar (24px) sits at the very bottom, content above it. Dragging the top
+      // edge to cursorY sets the terminal (content) height = (window bottom − tab bar) − cursorY. The
+      // grid dock row = this height + tab bar, so the charts/left panel shrink to fit above it. Clamp
+      // so the toolbox never shrinks below its 188 home and always leaves ~140px of content on top.
       const TAB=24;
       const h = window.innerHeight - TAB - e.clientY;
-      lastH = Math.max(188, Math.min(window.innerHeight - 56, h));
+      lastH = Math.max(188, Math.min(window.innerHeight - 200, h));
       term.style.setProperty('--bottomh', lastH+'px');
       if(!raf) raf=requestAnimationFrame(()=>{ raf=null; chartResizer.resizeAll(); });
     };
@@ -2517,18 +2517,10 @@ function App(){
     else if(cmd==='order.new'){ const ac=chartsRef.current.find(c=>c.id===actRef.current)||chartsRef.current[0]; setOrderSym(arg||(ac&&ac.symbol)||WATCH[0]); }
     else if(cmd==='window.tile'){
       if(IS_MOBILE) setRevealed(new Set(chartsRef.current.map(c=>c.id)));   // tile = load EVERY chart (lazy → eager)
-      // OVERLAY-AWARE tile: fit the 2×2 grid into the ACTIVE height = the strip visible ABOVE the
-      // floating toolbox. Measure the toolbox's real top line (it may be pulled up over the charts)
-      // and clamp .charts to (chart-top → toolbox-top − chart-tab-bar), then re-render every candle
-      // chart to the new mini size. Toolbox at rest (212px dock) → full height back (charts expand).
-      const chartsEl=document.querySelector('.charts'); if(!chartsEl) return;
-      const tb=document.querySelector('.toolbox'), ct=document.querySelector('.charttabs');
-      const top=chartsEl.getBoundingClientRect().top;
-      const tbTop=tb?tb.getBoundingClientRect().top:window.innerHeight;   // ceiling the charts must fit under
-      const ctH=ct?ct.offsetHeight:0;
-      const active=Math.max(120, Math.round(tbTop - top - ctH));          // pure visible area above the toolbox
-      chartsEl.style.flex='none'; chartsEl.style.height=active+'px';      // clamp the grid parent (compact)
-      requestAnimationFrame(()=>chartResizer.resizeAll());               // broadcast resize() → crisp mini candles + Y-axis
+      // Toolbox is DOCKED now → the grid already sizes .charts above it. Just clear any leftover
+      // inline clamp (from the old overlay era) and re-fit every chart to its box.
+      const chartsEl=document.querySelector('.charts'); if(chartsEl){ chartsEl.style.flex=''; chartsEl.style.height=''; }
+      requestAnimationFrame(()=>chartResizer.resizeAll());
     }
     // chart.zoom → the active ChartCell (gated on its isActive); window.tile → grid clamp (above)
   }), []);
@@ -2536,7 +2528,9 @@ function App(){
   const gridStyle = {
     '--leftw': leftw+'px', '--bottomh': bottomh+'px',
     gridTemplateColumns: leftShown ? 'var(--leftw) 6px 1fr' : '0 0 1fr',
-    '--dockh': (view.toolbox?212:0)+'px',   // reserved resting height so charts/nav sit ABOVE the floating toolbox at rest
+    // DOCKED toolbox (MT5): the dock row = the toolbox's real height (content + 24px tab bar), so the
+    // 1fr content row (left panel + charts) SHRINKS to sit above it — no overlap, everything visible.
+    '--dockh': (view.toolbox ? (bottomh+24) : 0)+'px',
     gridTemplateRows: `23px ${view.toolbars?'33px':'0'} 1fr var(--dockh)`,
     gridTemplateAreas: '"menu menu menu" "tools tools tools" "left splitter right" "dock dock dock"',
   };
