@@ -1109,7 +1109,8 @@ function makePriceSeries(c, type, sym){
   }
   const ct=CANDLE_THEME[themeBus.theme]||CANDLE_THEME.dark;   // up=green hollow, down=red filled
   const o={ upColor:ct.upBody, downColor:ct.downBody, wickUpColor:ct.upLine, wickDownColor:ct.downLine,
-    borderUpColor:ct.upLine, borderDownColor:ct.downLine, borderVisible:true, priceFormat:pf };
+    borderUpColor:ct.upLine, borderDownColor:ct.downLine, borderVisible:true, priceFormat:pf,
+    priceLineColor: themeBus.theme==='light' ? '#5a6472' : '' };   // LEGEND: mute the current-price line to grey (was loud red)
   return c.addCandlestickSeries ? c.addCandlestickSeries(o) : c.addSeries(LightweightCharts.CandlestickSeries, o);
 }
 const asSeriesData=(data,type)=> type==='line' ? data.map(d=>({time:d.time,value:d.close})) : data;
@@ -1345,7 +1346,9 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
         crosshair:{vertLine:{color:th.cross},horzLine:{color:th.cross}} }); }catch(e){}
       try{ if(series.current&&series.current.applyOptions&&typeRef.current==='candle') series.current.applyOptions({   // recolor candles on theme flip
         upColor:ct.upBody, downColor:ct.downBody, wickUpColor:ct.upLine, wickDownColor:ct.downLine,
-        borderUpColor:ct.upLine, borderDownColor:ct.downLine, borderVisible:true }); }catch(e){} });
+        borderUpColor:ct.upLine, borderDownColor:ct.downLine, borderVisible:true,
+        priceLineColor: t==='light' ? '#5a6472' : '' }); }catch(e){}   // LEGEND: grey current-price line; dark = default
+      try{ if(series.current&&series.current.applyOptions) series.current.applyOptions({ priceLineColor: t==='light' ? '#5a6472' : '' }); }catch(e){} });
     // manual sizing (autoSize OFF): register so splitter-drag + window-resize call chart.resize()
     c.resize(box.current.clientWidth, box.current.clientHeight);
     const unreg=chartResizer.add(c, box.current);

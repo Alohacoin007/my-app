@@ -62,6 +62,9 @@ if (!/\.terminal\.light \.charttabs \.ctab\.on\{background:#000000;color:#00FF55
 if (!/\.terminal\.light \.win\.active \.cell-title\{background:#000000;color:#00FF55/.test(src)) bad('active window title TEXT must be green');
 // the up-candle LINE (chart) is the one place a green stroke is allowed
 if (!/upLine:'#00FF55'/.test(src)) bad('the Legend up-candle line must stay neon green');
+// current-price line muted to grey in Legend (was a loud red), default in dark
+if (!/priceLineColor: themeBus\.theme==='light' \? '#5a6472' : ''/.test(src)) bad('Legend current-price line must be muted grey #5a6472 (dark keeps default)');
+if (!/priceLineColor: t==='light' \? '#5a6472' : ''/.test(src)) bad('theme flip must re-mute the current-price line');
 // bottom table: vertical grid gone, horizontal only
 if (!/\.terminal\.light table\.pos td\{border:none;border-bottom:1px solid #1D212A/.test(src)) bad('Legend positions table must drop vertical borders (border-bottom only)');
 // toolbar hover = border only (no fill)
