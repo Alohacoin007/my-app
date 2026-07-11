@@ -647,10 +647,19 @@ function unlockAudio(){ if(_audioUnlocked) return; _audioUnlocked=true; _primeCt
 if(typeof document!=='undefined'){ document.addEventListener('pointerdown', unlockAudio, {once:true});
   document.addEventListener('keydown', unlockAudio, {once:true}); }
 
-const WATCH = ['EURUSD','AUDUSD','USDJPY','GBPUSD','USDCAD','NZDUSD','USDCHF','GBPJPY','AUDJPY','EURJPY'];
+// Market Watch symbols by CLASS (Forex / Stocks / Crypto). Prices are simulated in this DEMO
+// terminal (WT_DEMO) — stocks/crypto get a BASE seed + random walk like FX, honest for a demo.
+const SYMBOLS = {
+  Forex:  ['EURUSD','AUDUSD','USDJPY','GBPUSD','USDCAD','NZDUSD','USDCHF','GBPJPY','AUDJPY','EURJPY'],
+  Stocks: ['AAPL','MSFT','NVDA','TSLA','AMZN','GOOGL','META'],
+  Crypto: ['BTCUSD','ETHUSD','SOLUSD','XRPUSD','DOGEUSD'],
+};
+const SYM_CAT = {}; Object.keys(SYMBOLS).forEach(cat=> SYMBOLS[cat].forEach(s=> SYM_CAT[s]=cat));
+const WATCH = [...SYMBOLS.Forex, ...SYMBOLS.Stocks, ...SYMBOLS.Crypto];
 const GRID  = ['USDJPY','USDCHF','EURUSD','GBPUSD'];   // the default 2×2 (TL·TR·BL·BR, matches the MT5 screenshot)
-const pip   = (s)=> s.slice(3)==='JPY'||s.slice(0,3)==='JPY' ? 0.01 : 0.0001;
-const digits= (s)=> s.slice(3)==='JPY'||s.includes('JPY') ? 3 : 5;
+const sfx   = (s)=> SYM_CAT[s]==='Forex' ? '.FX' : SYM_CAT[s]==='Crypto' ? '.CR' : '.STK';   // display suffix per class
+const pip   = (s)=> (SYM_CAT[s]==='Stocks'||SYM_CAT[s]==='Crypto') ? 0.01 : (s.slice(3)==='JPY'||s.slice(0,3)==='JPY' ? 0.01 : 0.0001);
+const digits= (s)=> (SYM_CAT[s]==='Stocks'||SYM_CAT[s]==='Crypto') ? 2 : (s.includes('JPY') ? 3 : 5);
 const fmtPx = (s,v)=> (v==null?'—':(+v).toFixed(digits(s)));
 // Max ADVERSE slippage (in pips) the trader will accept between click and server fill — passed to
 // fx_open's slippage guard. Wide by default (only a violent spike trips it); operator-overridable.
@@ -670,7 +679,9 @@ async function feedPrices(){
 }
 
 const BASE = { EURUSD:1.143, AUDUSD:0.694, USDJPY:162.36, GBPUSD:1.3417, USDCAD:1.417,
-  NZDUSD:0.5758, USDCHF:0.8068, GBPJPY:217.8, AUDJPY:112.7, EURJPY:185.6 };
+  NZDUSD:0.5758, USDCHF:0.8068, GBPJPY:217.8, AUDJPY:112.7, EURJPY:185.6,
+  AAPL:229.5, MSFT:465.2, NVDA:128.4, TSLA:248.6, AMZN:198.3, GOOGL:178.9, META:562.1,   // stocks
+  BTCUSD:64250, ETHUSD:3420, SOLUSD:148.5, XRPUSD:0.612, DOGEUSD:0.145 };                 // crypto
 
 const priceStore = {
   mids:{}, listeners:new Set(), timer:null, live:false,
@@ -1656,13 +1667,18 @@ function ChartMenu({ x, y, idx, symbol, chartType, tf, indicators, onClose }){
 /* ── Market watch: reads the shared store (fan-out), click to swap a grid symbol ── */
 // MT5 Market-Watch right-click menu — the classic desktop-terminal sub-menu (exact order).
 const MW_MENU=[
+  {l:'Forex', act:'cat', arg:'Forex'},   // ── class filter (show only this asset class) ──
+  {l:'Stocks', act:'cat', arg:'Stocks'},
+  {l:'Crypto', act:'cat', arg:'Crypto'},
+  {l:'All Symbols', act:'cat', arg:'All'},
+  {sep:1},
   {l:'New Chart', act:'chart'},          // → addChart (tile-aware multi-chart)
   {l:'New Order', act:'order'},          // → order.new popup for this symbol
   {sep:1},
   {l:'Hide', act:'hide'},                // hide this symbol row (memory-only, no storage)
   {l:'Show All', act:'showall'},         // restore every hidden symbol
 ];
-function ContextMenu({ x, y, sym, onClose, onPick, onHide, onShowAll }){
+function ContextMenu({ x, y, sym, cat, onClose, onPick, onHide, onShowAll, onCat }){
   React.useEffect(()=>{ const close=()=>onClose(); const k=(e)=>{ if(e.key==='Escape') onClose(); };
     // Attach outside-close on the NEXT tick — otherwise the SAME right-click that OPENED the menu
     // (its contextmenu/mousedown still bubbling to document) instantly closes it → menu never shows.
@@ -1670,18 +1686,19 @@ function ContextMenu({ x, y, sym, onClose, onPick, onHide, onShowAll }){
     document.addEventListener('keydown',k);
     return ()=>{ clearTimeout(id); document.removeEventListener('mousedown',close); document.removeEventListener('keydown',k); }; }, [onClose]);
   const run=(it)=>{ if(it.dis||it.sep) return;
-    if(it.act==='chart') onPick&&onPick(sym);                      // New Chart → tile-aware chart of THIS symbol
+    if(it.act==='cat') onCat&&onCat(it.arg);                       // class filter (Forex/Stocks/Crypto/All)
+    else if(it.act==='chart') onPick&&onPick(sym);                 // New Chart → tile-aware chart of THIS symbol
     else if(it.act==='order') terminalBus.emit('order.new', sym);  // New Order → popup for THIS symbol
     else if(it.act==='hide') onHide&&onHide(sym);                  // Hide → drop the row (client display only)
     else if(it.act==='showall') onShowAll&&onShowAll();            // Show All → restore hidden rows
-    // 'dom'/'spec' are placeholders (no panel yet) — they just close cleanly.
     onClose();
   };
-  const style={ left:Math.min(x, window.innerWidth-190), top:Math.min(y, window.innerHeight-200) };
+  const style={ left:Math.min(x, window.innerWidth-190), top:Math.min(y, window.innerHeight-260) };
+  const on=(it)=> it.act==='cat' && ((it.arg||'')===(cat||'All'));   // active class → ✓
   return (
     <div className="mt5-context-menu" style={style} onMouseDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
       {MW_MENU.map((it,i)=> it.sep ? <div key={i} className="mt5-sep"></div> : (
-        <div key={i} className={"mt5-mi"+(it.dis?' dis':'')} onClick={()=>run(it)}>{t(it.l)}</div>
+        <div key={i} className={"mt5-mi"+(it.dis?' dis':'')+(on(it)?' ck':'')} onClick={()=>run(it)}>{on(it)?'✓ ':''}{t(it.l)}</div>
       ))}
     </div>
   );
@@ -1780,6 +1797,7 @@ function MarketWatch({ onPick }){
   const [tab,setTab]=React.useState('Symbols');
   const [menu,setMenu]=React.useState(null);    // {sym,x,y} right-click context menu
   const [hidden,setHidden]=React.useState(()=>new Set());   // Hide/Show-All — MEMORY-ONLY (never persisted)
+  const [cat,setCat]=React.useState('All');   // asset-class filter: All / Forex / Stocks / Crypto
   const [clock,setClock]=React.useState('');
   React.useEffect(()=>{ const u=()=>{ const d=new Date(),p2=n=>String(n).padStart(2,'0'); setClock(p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds())); }; u(); const id=setInterval(u,1000); return ()=>clearInterval(id); }, []);
   const prev=React.useRef({}), dirRef=React.useRef({});
@@ -1805,11 +1823,11 @@ function MarketWatch({ onPick }){
         <table className="mwt">
           <thead><tr><th>{t('Symbol')}</th><th>{t('Bid')}</th><th>{t('Ask')}</th><th>{t('Daily Ch%')}</th></tr></thead>
           <tbody>
-            {WATCH.filter(sym=>!hidden.has(sym)).map(sym=>{ const m=mids[sym]||{}, d=dirs[sym]||{}; const up=(m.chg||0)>=0;
+            {WATCH.filter(sym=>!hidden.has(sym) && (cat==='All'||SYM_CAT[sym]===cat)).map(sym=>{ const m=mids[sym]||{}, d=dirs[sym]||{}; const up=(m.chg||0)>=0;
               return (
                 <tr key={sym} className={sym===sel?'sel':''} onClick={()=>setSel(sym)}
-                    onDoubleClick={()=>terminalBus.emit('order.new',sym)} onContextMenu={(e)=>ctx(e,sym)} title="더블클릭: New Order 주문창 · 우클릭: 메뉴(New Chart 등)">
-                  <td className="sym"><span className={up?'au':'ad'}>{up?'↗':'↘'}</span> {sym}.FX</td>
+                    onDoubleClick={()=>terminalBus.emit('order.new',sym)} onContextMenu={(e)=>ctx(e,sym)} title="더블클릭: New Order 주문창 · 우클릭: 메뉴(Forex/Stocks/Crypto 필터, New Chart 등)">
+                  <td className="sym"><span className={up?'au':'ad'}>{up?'↗':'↘'}</span> {sym}{sfx(sym)}</td>
                   <td className={tc(d.bid)}>{fmtPx(sym,m.bid)}</td>
                   <td className={tc(d.ask)}>{fmtPx(sym,m.ask)}</td>
                   <td className={up?'text-up':'text-down'}>{m.chg!=null?(m.chg>=0?'+':'')+m.chg.toFixed(2):'—'}</td>
@@ -1819,7 +1837,7 @@ function MarketWatch({ onPick }){
         </table>}
       </div>}
       <div className="mwtabs">{MW_TABS.map(tb=><div key={tb} className={"mt"+(tb===tab?' on':'')} onClick={()=>setTab(tb)}>{t(tb)}</div>)}</div>
-      {menu && <ContextMenu x={menu.x} y={menu.y} sym={menu.sym} onPick={onPick}
+      {menu && <ContextMenu x={menu.x} y={menu.y} sym={menu.sym} cat={cat} onPick={onPick} onCat={setCat}
         onHide={(s)=>setHidden(h=>new Set(h).add(s))} onShowAll={()=>setHidden(new Set())}
         onClose={()=>setMenu(null)} />}
     </div>
@@ -2258,7 +2276,9 @@ function NavResizer({ onDone }){
    the demo ledger (positionsStore.addDemo). ══ */
 const SYM_NAME={ EURUSD:'Euro vs US Dollar', AUDUSD:'Australian Dollar vs US Dollar', USDJPY:'US Dollar vs Japanese Yen',
   GBPUSD:'Great Britain Pound vs US Dollar', USDCAD:'US Dollar vs Canadian Dollar', NZDUSD:'New Zealand Dollar vs US Dollar',
-  USDCHF:'US Dollar vs Swiss Franc', GBPJPY:'Great Britain Pound vs Japanese Yen', AUDJPY:'Australian Dollar vs Japanese Yen', EURJPY:'Euro vs Japanese Yen' };
+  USDCHF:'US Dollar vs Swiss Franc', GBPJPY:'Great Britain Pound vs Japanese Yen', AUDJPY:'Australian Dollar vs Japanese Yen', EURJPY:'Euro vs Japanese Yen',
+  AAPL:'Apple Inc.', MSFT:'Microsoft Corp.', NVDA:'NVIDIA Corp.', TSLA:'Tesla Inc.', AMZN:'Amazon.com Inc.', GOOGL:'Alphabet Inc.', META:'Meta Platforms Inc.',
+  BTCUSD:'Bitcoin vs US Dollar', ETHUSD:'Ethereum vs US Dollar', SOLUSD:'Solana vs US Dollar', XRPUSD:'XRP vs US Dollar', DOGEUSD:'Dogecoin vs US Dollar' };
 // order-dialog left menu icons (MT5-style thin line-chart + arrow marks)
 const OIC = {
   mkt:  <svg viewBox="0 0 24 24" fill="none" stroke="#2f6ec0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 17l5-5 3 3 5-7"/><path d="M18 5h3v3"/></svg>,
