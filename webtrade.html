@@ -302,6 +302,19 @@
   .tbxtabs .t.on{background:#000;color:#00ff00;border-top:2px solid transparent;margin-top:-1px}   /* active tab = green TEXT, no accent line */
   .acctline{display:flex;align-items:center;gap:18px;padding:4px 12px;background:#0d0d0d;border-top:1px solid #222;font-size:11.5px;color:#c8ccd2;white-space:nowrap;overflow-x:auto}
   .acctline .k{color:#8890a0}.acctline b{color:#fff;font-variant-numeric:tabular-nums}
+  /* History period filter bar (MT5: right-click → period; here a visible toolbar) */
+  .histbar{flex:none;display:flex;align-items:center;gap:6px;padding:4px 10px;background:#141414;border-bottom:1px solid #222;font-size:11px;color:#8890a0;white-space:nowrap;overflow-x:auto}
+  .histbar .hb{background:transparent;border:1px solid #333;color:#c8ccd2;font-size:11px;padding:2px 9px;border-radius:3px;cursor:pointer}
+  .histbar .hb:hover{border-color:#4a4a4a;color:#fff}
+  .histbar .hb.on{border-color:#3a6ea5;color:#fff;background:#182130}
+  .histbar .hbrange{display:flex;align-items:center;gap:5px}
+  .histbar .hbrange input{background:#0d0d0d;border:1px solid #333;color:#c8ccd2;font-size:11px;padding:1px 5px;border-radius:3px}
+  .histbar .hbcount{margin-left:auto;color:#6a7180}
+  .terminal.light .histbar{background:#0E1015;border-bottom:1px solid #1D212A;color:#7a828e}
+  .terminal.light .histbar .hb{border:1px solid #242831;color:#a2aab6}
+  .terminal.light .histbar .hb:hover{border-color:#2f3542;color:#fff}
+  .terminal.light .histbar .hb.on{border-color:#242831;background:#000000;color:#00FF55}   /* active period = green TEXT (Legend accent) */
+  .terminal.light .histbar .hbrange input{background:#000000;border:1px solid #1D212A;color:#c8ccd2}
   .postbl{flex:1;overflow:auto}
   table.pos{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
   table.pos th{position:sticky;top:0;background:#141414;color:var(--dim);font-weight:600;font-size:11px;text-align:right;padding:3px 10px;border:1px solid #222}
@@ -844,7 +857,7 @@ const positionsStore = {
     this.history=[{ local_id:p.local_id, symbol:p.symbol, side:sideUp(p.side), volume:lotsOf(p),
       open_price:+p.open_price||0, close_price:+closePrice||0,
       open_time:(p.created_at?String(p.created_at).slice(0,19).replace('T',' ').replace(/-/g,'.'):'—'),
-      close_time:ct, profit:+profit||0 }].concat(this.history);
+      close_time:ct, close_ms:d.getTime(), profit:+profit||0 }].concat(this.history);
     this.notify();
   },
 };
@@ -2000,6 +2013,9 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
   const [acct,setAcct]=React.useState(positionsStore.acct);
   const [pos,setPos]=React.useState(positionsStore.pos);
   const [hist,setHist]=React.useState(positionsStore.history);
+  const [histPeriod,setHistPeriod]=React.useState('all');   // MT5 History period filter
+  const [histFrom,setHistFrom]=React.useState('');
+  const [histTo,setHistTo]=React.useState('');
   const [mids,setMids]=React.useState({});
   const [leverage,setLev]=React.useState(tradeSettings.leverage);
   const eng=useTradeEngine();
@@ -2027,6 +2043,20 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
   const level=marginUsed>0?(equity/marginUsed*100):0;
   const num=(n)=>(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 
+  // MT5 History customization — filter the closed-deal log by period (All / Today / Last Week /
+  // Last Month / Custom from-to). close_ms is stamped at close time for exact date filtering.
+  const histShown = React.useMemo(()=>{
+    const now=Date.now(), sod=()=>{ const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); };
+    return hist.filter(h=>{ const ms=+h.close_ms||0;
+      if(histPeriod==='today') return ms>=sod();
+      if(histPeriod==='week')  return ms>=now-7*864e5;
+      if(histPeriod==='month') return ms>=now-30*864e5;
+      if(histPeriod==='custom'){ const f=histFrom?Date.parse(histFrom+'T00:00:00'):null, tt=histTo?Date.parse(histTo+'T23:59:59'):null;
+        if(f!=null&&ms<f) return false; if(tt!=null&&ms>tt) return false; return true; }
+      return true; });   // 'all'
+  }, [hist, histPeriod, histFrom, histTo]);
+  const histProfit = histShown.reduce((s,h)=>s+(+h.profit||0),0);
+
   return (
     <div className="bottom">
       <BottomResizer onDone={onResize} />
@@ -2034,12 +2064,27 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
        : tab==='Journal' ? <JournalTab />
        : (tab!=='Trade' && tab!=='History') ? <EmptyTab tab={tab} />
        : (<React.Fragment>
+      {tab==='History' && (
+        <div className="histbar">
+          {[['all','All'],['today','Today'],['week','Last Week'],['month','Last Month'],['custom','Custom']].map(([k,l])=>(
+            <button key={k} className={'hb'+(histPeriod===k?' on':'')} onClick={()=>setHistPeriod(k)}>{l}</button>
+          ))}
+          {histPeriod==='custom' && (
+            <span className="hbrange">
+              <input type="date" value={histFrom} onChange={e=>setHistFrom(e.target.value)} />
+              <span>→</span>
+              <input type="date" value={histTo} onChange={e=>setHistTo(e.target.value)} />
+            </span>
+          )}
+          <span className="hbcount">{histShown.length} deals</span>
+        </div>
+      )}
       <div className="postbl">
         <table className="pos">
           <thead><tr><th>{t('Symbol')}</th><th>{t('Ticket')}</th><th>{t('Time')}</th><th>{t('Type')}</th><th>{t('Volume')}</th><th>{t('Price')}</th><th>S / L</th><th>T / P</th><th>{t('Price')}</th><th>{t('Profit')}</th><th></th></tr></thead>
           <tbody>
-            {tab==='History' && !hist.length && <tr><td className="empty" colSpan="11">No history in the selected period</td></tr>}
-            {tab==='History' && hist.map(h=>(
+            {tab==='History' && !histShown.length && <tr><td className="empty" colSpan="11">No history in the selected period</td></tr>}
+            {tab==='History' && histShown.map(h=>(
               <tr key={h.local_id+'-'+h.close_time}>
                 <td>{h.symbol.toLowerCase()}.fx</td><td>{String(h.local_id||'').replace(/\D/g,'').slice(-8)||h.local_id}</td>
                 <td>{h.close_time}</td><td className={h.side==='SELL'?'down':'up'}>{h.side.toLowerCase()}</td>
@@ -2061,9 +2106,10 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
           </tbody>
           {/* Balance bar lives INSIDE the table as <tfoot> → glued right under the last position
               row; grows/shrinks WITH the rows (no more floating at the terminal-box bottom). */}
-          {tab==='History' && hist.length>0 && <tfoot><tr className="acctrow"><td colSpan="11">
+          {tab==='History' && histShown.length>0 && <tfoot><tr className="acctrow"><td colSpan="11">
             <div className="acctline">
-              <span><span className="k">{t('Profit')}:</span> <b className={hist.reduce((s,h)=>s+(+h.profit||0),0)>=0?'up':'down'}>{num(hist.reduce((s,h)=>s+(+h.profit||0),0))}</b></span>
+              <span><span className="k">Deals:</span> <b>{histShown.length}</b></span>
+              <span><span className="k">{t('Profit')}:</span> <b className={histProfit>=0?'up':'down'}>{num(histProfit)}</b></span>
             </div>
           </td></tr></tfoot>}
           {tab==='Trade' && <tfoot><tr className="acctrow"><td colSpan="11">

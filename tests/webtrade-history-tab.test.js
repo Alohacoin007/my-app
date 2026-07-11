@@ -25,9 +25,18 @@ if (!/positionsStore\.recordClose\(p, m\.mid, pl\);\s*\/\/ realized/.test(src)) 
 
 // 3) BottomBar subscribes to history and renders the rows (no longer a hard-coded placeholder)
 if (!/setHist\(\[\.\.\.s\.history\]\)/.test(src)) bad('BottomBar must subscribe to positionsStore.history');
-if (!/tab==='History' && !hist\.length && <tr><td className="empty"/.test(src)) bad('empty placeholder must only show when there is NO history');
-if (!/tab==='History' && hist\.map\(h=>\(/.test(src)) bad('History tab must map over the recorded deals');
-if (!/tab==='History' && hist\.length>0 && <tfoot>/.test(src)) bad('History tab must show a Profit total footer');
+if (!/tab==='History' && !histShown\.length && <tr><td className="empty"/.test(src)) bad('empty placeholder must only show when the FILTERED history is empty');
+if (!/tab==='History' && histShown\.map\(h=>\(/.test(src)) bad('History tab must map over the FILTERED deals (histShown)');
+if (!/tab==='History' && histShown\.length>0 && <tfoot>/.test(src)) bad('History tab must show a Deals/Profit total footer');
+
+// 4) MT5-style period customization: close_ms stamp + period filter (All/Today/Week/Month/Custom)
+if (!/close_ms:d\.getTime\(\)/.test(src)) bad('recordClose must stamp close_ms for exact date filtering');
+if (!/const histShown = React\.useMemo\(\(\)=>\{/.test(src)) bad('History must derive a filtered list (histShown) via useMemo');
+for (const p of ['today', 'week', 'month', 'custom']) if (!new RegExp(`histPeriod==='${p}'`).test(src)) bad(`period filter missing '${p}'`);
+if (!/histFrom\?Date\.parse\(histFrom\+'T00:00:00'\)/.test(src) || !/histTo\?Date\.parse\(histTo\+'T23:59:59'\)/.test(src)) bad('Custom period must honour from/to date bounds');
+if (!/\[\['all','All'\],\['today','Today'\],\['week','Last Week'\],\['month','Last Month'\],\['custom','Custom'\]\]/.test(src)) bad('History filter bar must offer All/Today/Last Week/Last Month/Custom');
+if (!/type="date" value=\{histFrom\}/.test(src) || !/type="date" value=\{histTo\}/.test(src)) bad('Custom period must expose from/to date inputs');
+if (!/\.histbar \.hb\.on\{/.test(src)) bad('active period button needs a style');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} History-tab problem(s).`); process.exit(1); }
 console.log('🟢 PASS: MT5 History tab logs closed deals (in-memory, newest-first) with a Profit total; empty state only when no history.');
