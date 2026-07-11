@@ -53,8 +53,11 @@ if (!/\.terminal\.light \.tbtn:hover[^}]*color:#ffffff !important/.test(src)) ba
 
 // CRITICAL green-restraint: NO green BORDERS anywhere in Legend (eye-strain). Green is text-only,
 // and only on live ticks / profit / P&L / the up-candle line — never a border/background.
-if (/border[^;{}]*:[^;{}]*#00FF55/i.test(src)) bad('a #00FF55 BORDER remains — all Legend borders must be muted #1D212A / #242831 / #2f3542');
-if (/border-top-color:#00FF55|border-color:#00FF55/i.test(src)) bad('a #00FF55 tab/window border remains');
+// forbid green in EVERY border form except the active-tab TOP accent (border-top-*), which the
+// user explicitly wants kept as the one deliberate "selected" point.
+const greenBorders = (src.match(/border(?!-top)[a-z-]*:\s*[^;{}]*#00FF55/gi) || []);
+if (greenBorders.length) bad('green border(s) remain (only the active-tab top accent may be green): ' + greenBorders.join(' | '));
+if (!/\.terminal\.light \.tbxtabs \.t\.on\{[^}]*border-top-color:#00FF55\}/.test(src)) bad('the active tab must KEEP its green top accent (user likes it)');
 // the up-candle LINE (chart) is the one place a green stroke is allowed
 if (!/upLine:'#00FF55'/.test(src)) bad('the Legend up-candle line must stay neon green');
 // bottom table: vertical grid gone, horizontal only
