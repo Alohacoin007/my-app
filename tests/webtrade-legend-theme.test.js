@@ -38,15 +38,25 @@ if (/\.terminal\.light[^\n]*background:#ffffff/.test(src)) bad('no WHITE backgro
 
 // (3b) COMPONENT SKIN RECONSTRUCTION (not just recolor):
 // one-click panel → flat matte-black card, no 3D fill, monochrome neon numbers
-if (!/\.terminal\.light \.obox\{background:transparent !important;border:1px solid #1D212A !important;box-shadow:none/.test(src)) bad('Legend one-click panel must be TRANSPARENT + 1px #1D212A hairline (wireframe, candles flow through)');
-if (!/\.terminal\.light \.oc-blue,\.terminal\.light \.oc-red\{background:transparent !important;border:none !important\}/.test(src)) bad('Legend oc-blue/oc-red must have NO fill (transparent, no per-half border)');
-if (!/\.terminal\.light \.oc-blue\{color:#00FF55/.test(src)) bad('Legend oc-blue text = neon green');
-if (!/\.terminal\.light \.oc-red\{color:#FF453A/.test(src)) bad('Legend oc-red text = orange-red');
-if (!/\.terminal\.light \.oc-price \.bf \.bg\{color:inherit !important;font-family:"Segoe UI"[^}]*font-weight:500/.test(src)) bad('Legend big quote must be thin-line (weight 500, non-Arial-Black), inheriting the side colour');
-// window header melts into the pane — no gray 3D frame, only a bottom hairline
-if (!/\.terminal\.light \.cell-title\{background:#000000;color:#ffffff;border:none;border-bottom:1px solid #1D212A\}/.test(src)) bad('Legend chart header must melt into #000000 with only a bottom hairline (no boxy frame)');
-// toolbar hover is neutral white now (green reserved for live ticks / profit)
-if (!/\.terminal\.light \.tbtn:hover[^}]*color:#ffffff !important/.test(src)) bad('toolbar hover must be white, not green (green restraint)');
+// one-click panel: calm SOLID matte-black + faint #242831 hairline (transparent-only hurt the eyes)
+if (!/\.terminal\.light \.obox\{background:#000000 !important;border:1px solid #242831 !important;box-shadow:none/.test(src)) bad('Legend one-click panel must be solid #000000 + faint 1px #242831 hairline');
+if (!/\.terminal\.light \.oc-blue,\.terminal\.light \.oc-red\{background:transparent !important;border:none !important\}/.test(src)) bad('oc-blue/oc-red halves must have no fill/border');
+if (!/\.terminal\.light \.oc-lbl\{color:#8A94A6/.test(src)) bad('SELL/BUY labels must be muted silver #8A94A6 (no neon)');
+if (!/\.terminal\.light \.oc-vol b\{color:#8A94A6/.test(src)) bad('qty arrows must be muted silver #8A94A6');
+if (!/\.terminal\.light \.oc-blue \.bf \.sm,\.terminal\.light \.oc-blue \.bf \.bg,\.terminal\.light \.oc-blue \.bf \.fr\{color:#00FF55/.test(src)) bad('only the RISING price number is green');
+if (!/\.terminal\.light \.oc-red \.bf \.sm,\.terminal\.light \.oc-red \.bf \.bg,\.terminal\.light \.oc-red \.bf \.fr\{color:#FF453A/.test(src)) bad('only the FALLING price number is red');
+if (!/\.terminal\.light \.oc-price \.bf \.bg\{font-family:"Segoe UI",Arial,sans-serif !important;font-weight:500/.test(src)) bad('big quote must be thin-line weight 500 (non-Arial-Black)');
+// window header melts, no gray 3D frame; active window = brighter GREY hairline (never green)
+if (!/\.terminal\.light \.cell-title\{background:#000000;color:#ffffff;border:none;border-bottom:1px solid #1D212A\}/.test(src)) bad('chart header must melt into #000000 with a bottom hairline');
+if (!/\.terminal\.light \.win\.active\{border-color:#2f3542/.test(src)) bad('active window must be a brighter GREY hairline, not green/glow');
+if (!/\.terminal\.light \.tbtn:hover[^}]*color:#ffffff !important/.test(src)) bad('toolbar hover must be white');
+
+// CRITICAL green-restraint: NO green BORDERS anywhere in Legend (eye-strain). Green is text-only,
+// and only on live ticks / profit / P&L / the up-candle line — never a border/background.
+if (/border[^;{}]*:[^;{}]*#00FF55/i.test(src)) bad('a #00FF55 BORDER remains — all Legend borders must be muted #1D212A / #242831 / #2f3542');
+if (/border-top-color:#00FF55|border-color:#00FF55/i.test(src)) bad('a #00FF55 tab/window border remains');
+// the up-candle LINE (chart) is the one place a green stroke is allowed
+if (!/upLine:'#00FF55'/.test(src)) bad('the Legend up-candle line must stay neon green');
 // bottom table: vertical grid gone, horizontal only
 if (!/\.terminal\.light table\.pos td\{border:none;border-bottom:1px solid #1D212A/.test(src)) bad('Legend positions table must drop vertical borders (border-bottom only)');
 // toolbar hover = border only (no fill)
