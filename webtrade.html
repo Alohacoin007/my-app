@@ -1825,17 +1825,18 @@ function MWDetails({ sym }){
   );
 }
 /* Market Watch → Trading tab: stacked one-click SELL/BUY panels per symbol */
-function MWTrading(){
+function MWTrading({ cat, onCtx }){
   const [mids,setMids]=React.useState({});
   React.useEffect(()=> priceStore.subscribe(throttle(m=>setMids({...m}),RENDER_MS)), []);
   const d=new Date(),p2=n=>String(n).padStart(2,'0'), tm=p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds());
   const big=(sym,v)=>{ const s=fmtPx(sym,v); return s==='—'?s:<span>{s.slice(0,-1)}<sup>{s.slice(-1)}</sup></span>; };
   return (
     <div className="mwtrade">
-      {WATCH.map(sym=>{ const m=mids[sym]||{};
+      {WATCH.filter(sym=> cat==='All'||!cat||SYM_CAT[sym]===cat).map(sym=>{ const m=mids[sym]||{};
         return (
-          <div className="mwtp" key={sym}>
-            <div className="hd"><span>{sym}.FX</span><span className="tm">{tm}</span></div>
+          <div className="mwtp" key={sym} onContextMenu={(e)=>onCtx&&onCtx(e,sym)}
+               draggable={true} onDragStart={(e)=>{ e.dataTransfer.setData('text/mwsymbol', sym); e.dataTransfer.effectAllowed='copy'; }}>
+            <div className="hd"><span>{sym}{sfx(sym)}</span><span className="tm">{tm}</span></div>
             <div className="row">
               <div className="sd sell" onClick={()=>terminalBus.emit('order.new',sym)}><span className="lbl">SELL</span><span className="pr">{big(sym,m.bid)}</span></div>
               <div className="mid"><div className="q">0.01</div><div className="sp">Spread: {m.spr!=null?m.spr:'—'}</div></div>
@@ -1879,7 +1880,7 @@ function MarketWatch({ onPick }){
       {tab==='Ticks' ? <TickChart symbol={cur} /> :
       <div className="mwscroll">
         {tab==='Details' ? <MWDetails sym={cur} /> :
-         tab==='Trading' ? <MWTrading /> :
+         tab==='Trading' ? <MWTrading cat={cat} onCtx={ctx} /> :
         <table className="mwt">
           <thead><tr><th>{t('Symbol')}</th><th>{t('Bid')}</th><th>{t('Ask')}</th>{showSpread && <th>{t('Spread')}</th>}<th>{t('Daily Ch%')}</th></tr></thead>
           <tbody>
