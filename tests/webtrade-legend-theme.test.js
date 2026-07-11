@@ -41,6 +41,9 @@ if (!/\.terminal\.light \.mwt \.au\{color:#00FF55 !important\}\.terminal\.light 
 if (!/\.terminal\.light \.mwt td\{border:none;border-bottom:1px solid #1D212A;color:#a2aab6;font-weight:normal\}/.test(src)) bad('Market Watch cells must use the #a2aab6 tab tone (normal weight)');
 if (!/\.terminal\.light \.mwt td\.sym\{color:#a2aab6;font-weight:normal\}/.test(src)) bad('Market Watch symbols must use the #a2aab6 tab tone');
 if (/\.terminal\.light[^\n]*background:#ffffff/.test(src)) bad('no WHITE background surfaces may remain in the Legend theme (it is jet-black)');
+// the chart right-click menu (ctxmenu) must be dark in Legend, not the MT5 light-grey #f0f0f0
+if (!/\.terminal\.light \.ctxmenu\{background:#000000;border:1px solid #1D212A/.test(src)) bad('chart right-click menu must be Legend dark (#000000 + #1D212A), not white');
+if (!/\.terminal\.light \.ctxmenu \.ci \.ck\{color:#00FF55\}/.test(src)) bad('right-click menu active checkmark should be green');
 
 // (3b) COMPONENT SKIN RECONSTRUCTION (not just recolor):
 // one-click panel → flat matte-black card, no 3D fill, monochrome neon numbers
