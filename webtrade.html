@@ -175,6 +175,7 @@
     border:1px solid var(--cellbd);box-shadow:0 2px 12px rgba(0,0,0,.55);
     min-width:220px;min-height:150px;overflow:hidden}
   .win.active{border-color:#3a6ea5;box-shadow:0 4px 20px rgba(0,0,0,.8)}
+  .win.dropok{box-shadow:inset 0 0 0 2px #00c800 !important}   /* Market-Watch symbol drag over this chart → drop-here highlight */
   /* tiled mode: chart fills its grid cell instead of floating */
   .win.tiled{position:relative !important;left:auto !important;top:auto !important;width:auto !important;height:auto !important;
     min-width:0;min-height:0;box-shadow:none}
@@ -1141,7 +1142,7 @@ function distSeg(px,py,x1,y1,x2,y2){ const dx=x2-x1,dy=y2-y1,L2=dx*dx+dy*dy;
   let t=L2? ((px-x1)*dx+(py-y1)*dy)/L2 : 0; t=Math.max(0,Math.min(1,t));
   return Math.hypot(px-(x1+t*dx), py-(y1+t*dy)); }
 
-function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isActive, onActivate, savedGeo, onGeo, tiled, onClose, lazyHold }){
+function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isActive, onActivate, savedGeo, onGeo, tiled, onClose, onSymbol, lazyHold }){
   const box=React.useRef(null), chart=React.useRef(null), series=React.useRef(null), bar=React.useRef(null);
   const lines=React.useRef([]);           // position order-lines (green) — managed by positions effect
   const drawLines=React.useRef([]);       // USER drawing price-lines (hline/fib) — separate from positions/indicators
@@ -1607,7 +1608,10 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   // (right-click is handled by a capture-phase native listener on the chart box — see the chart
   //  effect's onCtxNative — because Lightweight Charts swallows contextmenu before React sees it.)
   return (
-    <div className={"win"+(isActive?' active':'')+(tiled?' tiled':'')} ref={win} style={tiled?null:{zIndex:z}} onMouseDown={focus}>
+    <div className={"win"+(isActive?' active':'')+(tiled?' tiled':'')} ref={win} style={tiled?null:{zIndex:z}} onMouseDown={focus}
+      onDragOver={(e)=>{ if((e.dataTransfer.types||[]).indexOf('text/mwsymbol')>=0){ e.preventDefault(); e.dataTransfer.dropEffect='copy'; win.current&&win.current.classList.add('dropok'); } }}
+      onDragLeave={()=>{ win.current&&win.current.classList.remove('dropok'); }}
+      onDrop={(e)=>{ win.current&&win.current.classList.remove('dropok'); const s=e.dataTransfer.getData('text/mwsymbol'); if(s && WATCH.indexOf(s)>=0){ e.preventDefault(); onActivate&&onActivate(idx); onSymbol&&onSymbol(idx, s); } }}>
       <div className="cell-title" onMouseDown={(e)=>beginDrag(e,'move')}>
         <span className="ti">
           <svg viewBox="0 0 24 24" fill="none" stroke="#8fd08f" strokeWidth="2"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" fill="#8fd08f" stroke="none"/><rect x="12" y="6" width="3" height="12" fill="#8fd08f" stroke="none"/><rect x="17" y="14" width="3" height="4" fill="#8fd08f" stroke="none"/></svg>
@@ -1883,7 +1887,8 @@ function MarketWatch({ onPick }){
               const spr=(m.ask!=null&&m.bid!=null)?((m.ask-m.bid)/pip(sym)).toFixed(1):'—';
               return (
                 <tr key={sym} className={sym===sel?'sel':''} onClick={()=>setSel(sym)}
-                    onDoubleClick={()=>terminalBus.emit('order.new',sym)} onContextMenu={(e)=>ctx(e,sym)} title="더블클릭: New Order 주문창 · 우클릭: 메뉴(Forex/Stocks/Crypto 필터, Spread, New Chart 등)">
+                    draggable={true} onDragStart={(e)=>{ e.dataTransfer.setData('text/mwsymbol', sym); e.dataTransfer.effectAllowed='copy'; }}
+                    onDoubleClick={()=>terminalBus.emit('order.new',sym)} onContextMenu={(e)=>ctx(e,sym)} title="드래그: 차트창에 드롭해 심볼 변경 · 더블클릭: New Order · 우클릭: 메뉴(Forex/Stocks/Crypto 필터, Spread, New Chart 등)">
                   <td className="sym"><span className={up?'au':'ad'}>{up?'↗':'↘'}</span> {sym}{sfx(sym)}</td>
                   <td className={tc(d.bid)}>{fmtPx(sym,m.bid)}</td>
                   <td className={tc(d.ask)}>{fmtPx(sym,m.ask)}</td>
@@ -2532,6 +2537,7 @@ function App(){
     if(IS_MOBILE) setRevealed(s=> new Set(s).add(id)); }, []);   // a freshly-opened chart is revealed
   const closeChart=React.useCallback((id)=>{ setCharts(cs=>cs.filter(c=>c.id!==id));   // unmount → ChartCell cleanup unsubscribes + chart.remove (no leak)
     delete geos.current[id]; setActiveId(a=> a===id ? null : a); }, []);
+  const changeSymbol=React.useCallback((id,sym)=>{ setCharts(cs=>cs.map(c=> c.id===id ? {...c, symbol:sym} : c)); }, []);   // MW drag-drop → this window's chart switches symbol
   React.useEffect(()=>{ priceStore.start(); positionsStore.start(); }, []);
   React.useEffect(()=>{ wtConfig.save({ view, leftw, bottomh, navh, theme, lang }); }, [view, leftw, bottomh, navh, theme, lang]);   // charts (+ their per-chart indicators) NOT persisted → refresh = fixed default
   React.useEffect(()=>{ requestAnimationFrame(()=>chartResizer.resizeAll()); }, [charts.length]);   // reflow on add/close
@@ -2604,7 +2610,7 @@ function App(){
               symbol={c.symbol} tf={c.tf} indicators={c.inds||[]} chartType={c.type} tool={tool}
               initial={floatGeo(i)} savedGeo={geos.current[c.id]} onGeo={onGeo}
               lazyHold={IS_MOBILE && !revealed.has(c.id)}
-              onClose={()=>closeChart(c.id)} />)}
+              onClose={()=>closeChart(c.id)} onSymbol={changeSymbol} />)}
             {!charts.length && <div className="noch">No charts open — File → New Chart Window, or double-click a Market Watch symbol.</div>}
           </div>
         </div>
