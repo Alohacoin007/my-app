@@ -53,4 +53,8 @@ if (Math.abs(last.close - 1.14318) > 1e-6) {
 for (const c of a) if (!(c.high >= Math.max(c.open, c.close) && c.low <= Math.min(c.open, c.close) && c.low > 0)) {
   console.error('🔴 FAIL: bad OHLC bar ' + JSON.stringify(c)); process.exit(1);
 }
-console.log('🟢 PASS: synthCandles is deterministic (symbol+time seeded) — identical across refreshes; last bar anchors to live mid; OHLC valid.');
+// synth must give a FULL history so fitContent shows a real chart (not 2 giant candles)
+if (a.length < 100) { console.error('🔴 FAIL: synthCandles must return a full history (>=100 bars), got ' + a.length); process.exit(1); }
+// loadCandles must reject a SPARSE feed (e.g. M30 → 2 bars) and fall back to synth
+if (!/candles\.length>=30/.test(src)) { console.error('🔴 FAIL: loadCandles must require >=30 feed bars, else use the 200-bar synth (sparse feed = 2 giant candles)'); process.exit(1); }
+console.log('🟢 PASS: synthCandles is deterministic + full history; loadCandles falls back to synth on a sparse feed (no more 2-giant-candle zoom).');

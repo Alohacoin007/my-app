@@ -819,10 +819,12 @@ const WINLAYOUT=[
 async function loadCandles(symbol, tf){
   try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.functions){
     const x=await AlpexaSync.db.functions.invoke('fx-prices',{body:{candles:symbol,tf:tf||'M15'}});
-    if(x&&!x.error&&x.data&&Array.isArray(x.data.candles)&&x.data.candles.length)
+    // Only use the feed when it returns a REAL history — a sparse reply (e.g. M30 gives 2 bars) makes
+    // fitContent zoom into 2 giant candles. Below the threshold, fall back to the 200-bar synth.
+    if(x&&!x.error&&x.data&&Array.isArray(x.data.candles)&&x.data.candles.length>=30)
       return x.data.candles.map(c=>({ time:Math.floor((c.t||c.time)/1000), open:+c.o||+c.open, high:+c.h||+c.high, low:+c.l||+c.low, close:+c.c||+c.close }));
   } }catch(e){}
-  return synthCandles(symbol, tf);   // TODO: wire a public candles endpoint for real history
+  return synthCandles(symbol, tf);   // full 200-bar deterministic history (TODO: wire a public candles endpoint)
 }
 const TF_SEC = { M1:60, M5:300, M15:900, M30:1800, H1:3600, H4:14400, D1:86400 };
 // DETERMINISTIC synthetic history — a pure function of (symbol, absolute bar time). The SAME bar
