@@ -212,6 +212,11 @@
   .dov.text{transform:translate(0,-50%);color:#e6c14a;font:600 11px Tahoma,sans-serif;white-space:nowrap;text-shadow:0 0 3px #000,0 0 3px #000}
   .dov.pt{width:9px;height:9px;margin:-5px 0 0 -5px;background:#ffffff;border:1px solid #000;box-shadow:0 0 2px #000;pointer-events:auto;cursor:move}   /* draggable selected-line handle */
   .dov.pt:hover{background:#ffe14d}
+  /* crosshair MEASURE ruler (MT5): drag with the Crosshair tool → bars / pips / price delta */
+  .measure{position:absolute;inset:0;pointer-events:none;z-index:5}
+  .measure svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+  .measure line{stroke:#dfe4ea;stroke-width:1;stroke-dasharray:4 3}
+  .measure .ml{position:absolute;background:#1c2733;color:#e6ebf2;font:11px Tahoma,sans-serif;padding:3px 7px;border:1px solid #3a4756;border-radius:3px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.5)}
   /* ── Market Watch: sticky tick colours (hold until next up/down) + daily arrows ── */
   .mwt td.tick-up,.mwt td.text-up{color:#00ff00 !important;font-weight:bold}
   .mwt td.tick-down,.mwt td.text-down{color:#ff3b30 !important;font-weight:bold}
@@ -1138,6 +1143,15 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   const previewLine=React.useRef(null); // rubber-band preview series while dragging a trend line
   const previewFib=React.useRef([]);    // preview fib level lines that follow the cursor while dragging
   const startPt=React.useRef(null);     // white start-anchor point shown during a trend/fib drag
+  const measure=React.useRef(null);     // crosshair MEASURE ruler DOM {wrap,line,label}
+  const measDrag=React.useRef(null);    // in-progress measure drag {x0,y0,lg0,p0}
+  const hideMeasure=()=>{ const m=measure.current; if(m){ try{m.wrap.remove();}catch(_){} measure.current=null; } };
+  const showMeasure=(x1,y1,x2,y2,txt)=>{ const el=dlayer.current; if(!el) return; let m=measure.current;
+    if(!m){ const wrap=document.createElement('div'); wrap.className='measure';
+      wrap.innerHTML='<svg><line></line></svg><div class="ml"></div>'; el.appendChild(wrap);
+      m=measure.current={ wrap, line:wrap.querySelector('line'), label:wrap.querySelector('.ml') }; }
+    const ln=m.line; ln.setAttribute('x1',x1); ln.setAttribute('y1',y1); ln.setAttribute('x2',x2); ln.setAttribute('y2',y2);
+    m.label.textContent=txt; m.label.style.left=Math.round(x2+12)+'px'; m.label.style.top=Math.round(y2+12)+'px'; };
   const hideHandles=()=>{ selHandles.current.forEach(el=>{ try{el.remove();}catch(_){} }); selHandles.current=[]; };
   const positionHandles=()=>{ const ent=selDraw.current, c=chart.current, s=series.current;
     if(!ent||(ent.kind!=='t'&&ent.kind!=='f')||!c||!s||selHandles.current.length!==3) return;
@@ -1308,6 +1322,22 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       if(hit){ selectDrawing(hit); setDelMenu({ x:e.clientX, y:e.clientY }); }
       else { setDelMenu(null); setCmenu({ x:e.clientX, y:e.clientY }); } };
     try{ box.current.addEventListener('contextmenu', onCtxNative, true); }catch(e){}
+    // CROSSHAIR MEASURE (MT5): with the Crosshair tool, drag = a ruler (bars / pips / price delta).
+    // Panning is disabled in cross mode (see the [tool] effect) so the drag measures instead of scrolls.
+    const onMeasureMove=(e)=>{ const md=measDrag.current; if(!md) return;
+      const r=box.current.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top, ts=c.timeScale(), sc=series.current;
+      let lg1=null,p1=null; try{ lg1=ts.coordinateToLogical(x); p1=sc.coordinateToPrice(y); }catch(_){}
+      const bars=(md.lg0!=null&&lg1!=null)?Math.abs(Math.round(lg1-md.lg0)):0;
+      const dp=(md.p0!=null&&p1!=null)?(p1-md.p0):0, pips=dp/pip(symbol);
+      showMeasure(md.x0, md.y0, x, y, bars+' bars   '+Math.abs(pips).toFixed(1)+' pips   '+(dp>=0?'+':'')+dp.toFixed(digits(symbol))); };
+    const onMeasureUp=()=>{ measDrag.current=null; hideMeasure();
+      document.removeEventListener('mousemove',onMeasureMove); document.removeEventListener('mouseup',onMeasureUp); };
+    const onMeasureDown=(e)=>{ if(toolRef.current!=='cross' || e.button!==0) return;
+      const r=box.current.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top, ts=c.timeScale(), sc=series.current;
+      let lg0=null,p0=null; try{ lg0=ts.coordinateToLogical(x); p0=sc.coordinateToPrice(y); }catch(_){}
+      measDrag.current={ x0:x, y0:y, lg0, p0 };
+      document.addEventListener('mousemove',onMeasureMove); document.addEventListener('mouseup',onMeasureUp); };
+    try{ box.current.addEventListener('mousedown', onMeasureDown); }catch(e){}
     // load candles for the current timeframe, then (re)paint indicators over them
     loadCandles(symbol, tf).then(data=>{ try{
       s.setData(asSeriesData(data,typeRef.current)); bar.current=data[data.length-1]; candles.current=data; paintIndicators();
@@ -1328,9 +1358,10 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     }, 400);
     const unsub=priceStore.subscribe(onTick);
     const boxEl=box.current;
-    return ()=>{ unsub(); unreg(); unTheme(); try{ boxEl&&boxEl.removeEventListener('contextmenu', onCtxNative, true); }catch(e){}
+    return ()=>{ unsub(); unreg(); unTheme();
+      try{ boxEl&&boxEl.removeEventListener('contextmenu', onCtxNative, true); boxEl&&boxEl.removeEventListener('mousedown', onMeasureDown); }catch(e){}
       indSeries.current=[]; lines.current=[]; drawLines.current=[]; drawSeries.current=[]; drawStack.current=[]; selDraw.current=null;
-      hideHandles(); previewLine.current=null; previewFib.current=[];   // drop selection handles + any in-flight preview
+      hideHandles(); hideMeasure(); measDrag.current=null; previewLine.current=null; previewFib.current=[];   // drop selection handles + any in-flight preview
       if(startPt.current){ try{startPt.current.remove();}catch(_){} startPt.current=null; }
       overlays.current.forEach(o=>{ try{o.el.remove();}catch(e){} }); overlays.current=[];   // chart recreated → clear drawings
       try{ c.remove(); }catch(e){} };
@@ -1376,7 +1407,12 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   React.useEffect(()=>{ const el=dlayer.current; if(!el) return;
     const armed = tool && tool!=='arrow' && tool!=='cross';
     el.className='drawlayer'+(armed?' arm':'');
-    try{ if(chart.current) chart.current.applyOptions({ crosshair:{ mode: tool==='cross'?0:1 } }); }catch(e){}
+    const cross = tool==='cross';
+    try{ if(chart.current) chart.current.applyOptions({
+      crosshair:{ mode: cross?0:1 },   // Crosshair tool = FREE (mode 0); everything else = Magnet (mode 1)
+      // Crosshair tool: drag MEASURES (ruler), so disable drag-to-scroll (keep wheel zoom). Cursor tool pans.
+      handleScroll: cross ? { mouseWheel:true, pressedMouseMove:false, horzTouchDrag:false, vertTouchDrag:false } : true }); }catch(e){}
+    try{ if(box.current) box.current.style.cursor = cross ? 'crosshair' : ''; }catch(e){}
   }, [tool]);
   // attach the draw handlers once (they read the live refs)
   React.useEffect(()=>{
