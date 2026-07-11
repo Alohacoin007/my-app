@@ -205,8 +205,8 @@
   .rsz.nw{top:-3px;left:-3px;width:12px;height:12px;cursor:nwse-resize}
   .rsz.se{bottom:-3px;right:-3px;width:12px;height:12px;cursor:nwse-resize}
   .rsz.sw{bottom:-3px;left:-3px;width:12px;height:12px;cursor:nesw-resize}
-  .cell-lbl{position:absolute;top:76px;left:8px;z-index:1001;pointer-events:none;
-    font:400 11px Tahoma,'Segoe UI',Arial,sans-serif;color:#8fa0b4;letter-spacing:.2px;text-shadow:0 0 3px #000,0 0 3px #000}
+  .cell-lbl{position:absolute;top:6px;left:50%;transform:translateX(-50%);z-index:1001;pointer-events:none;white-space:nowrap;
+    font:400 11px Tahoma,'Segoe UI',Arial,sans-serif;color:#8fa0b4;letter-spacing:.2px;text-shadow:0 0 3px #000,0 0 3px #000}   /* hover OHLC — top CENTRE */
   .cell-lbl b{font-weight:600}
   /* drawing layer over each chart — captures the mouse only when a draw tool is armed */
   .drawlayer{position:absolute;inset:0;z-index:4;pointer-events:none}
@@ -1632,7 +1632,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
           <svg viewBox="0 0 24 24" fill="none" stroke="#8fd08f" strokeWidth="2"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" fill="#8fd08f" stroke="none"/><rect x="12" y="6" width="3" height="12" fill="#8fd08f" stroke="none"/><rect x="17" y="14" width="3" height="4" fill="#8fd08f" stroke="none"/></svg>
           <svg viewBox="0 0 24 24" fill="none" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M8 21V6M8 6l-3 3M8 6l3 3" stroke="#e23a2d"/><path d="M16 3v15M16 18l-3-3M16 18l3-3" stroke="#2f6fd6"/></svg>
         </span>
-        <span>{symbol}.FX,{tf||'H1'}</span>
+        <span>{symbol}{sfx(symbol)},{tf||'H1'}</span>
         {posLbl.length>0 && (()=>{ const net=posLbl.reduce((s,p)=>s+(p.side==='SELL'?-1:1)*p.lots,0);
           const one=posLbl.length===1; const col=one?(posLbl[0].side==='SELL'?'#ff2020':'#00c800'):undefined;  // SELL=red, BUY=green
           return <span className="poslbl" style={col?{color:col}:null}>{one
@@ -1650,10 +1650,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
           style={{position:'absolute',inset:0,zIndex:2,display:'flex',alignItems:'center',justifyContent:'center',
             background:'#000',color:'#5a6472',font:'12px -apple-system,Segoe UI,sans-serif',cursor:'pointer'}}>차트 탭하여 로드</div>}
         {showOC && <OrderBox symbol={symbol} />}
-        <div className="cell-lbl">{ohlc
-          ? (ohlc.o!=null ? <span>O {fmtPx(symbol,ohlc.o)} H {fmtPx(symbol,ohlc.h)} L {fmtPx(symbol,ohlc.l)} C {fmtPx(symbol,ohlc.c)}</span>
-                          : <span className="px">{fmtPx(symbol,ohlc.c)}</span>)
-          : <span className="px">{fmtPx(symbol,px)}</span>}</div>
+        {ohlc && ohlc.o!=null && <div className="cell-lbl">O {fmtPx(symbol,ohlc.o)}  H {fmtPx(symbol,ohlc.h)}  L {fmtPx(symbol,ohlc.l)}  C {fmtPx(symbol,ohlc.c)}</div>}
       </div>
       {!tiled && ['n','s','e','w','ne','nw','se','sw'].map(d=>
         <div key={d} className={"rsz "+d} onMouseDown={(e)=>beginDrag(e,d)}></div>)}
