@@ -62,8 +62,8 @@ if (!/\.terminal\.light table\.pos td\{border:none;border-bottom:1px solid #1D21
 // toolbar hover = border only (no fill)
 if (!/\.terminal\.light \.tbtn:hover[^}]*background:transparent !important;border:1px solid #1D212A/.test(src)) bad('Legend toolbar hover must be border-only (transparent bg)');
 // Balance bar bold pure-white text
-if (!/\.terminal\.light \.acctline\{background:#0E1015;color:#c8ccd2;border-top:1px solid #1D212A;border-bottom:1px solid #1D212A/.test(src)) bad('Legend Balance bar must be #0E1015 with thin top/bottom rules');
-if (!/\.terminal\.light \.acctline \.k\{color:#c8ccd2\}\.terminal\.light \.acctline b\{color:#c8ccd2\}/.test(src)) bad('Legend Balance bar labels + numbers must be one uniform colour');
+if (!/\.terminal\.light \.acctline\{background:#0E1015;color:#ffffff;border-top:1px solid #1D212A;border-bottom:1px solid #1D212A/.test(src)) bad('Legend Balance bar must be #0E1015 with thin top/bottom rules');
+if (!/\.terminal\.light \.acctline \.k\{color:#ffffff\}\.terminal\.light \.acctline b\{color:#ffffff\}/.test(src)) bad('Legend Balance bar labels + numbers must be one uniform crisp white');
 
 // the DEFAULT dark one-click panel keeps its 3D royal-blue / red fills (outside .terminal.light)
 if (!/\.oc-blue\{background:#3a63e0 !important/.test(src)) bad('dark one-click panel must keep the royal-blue fill');
