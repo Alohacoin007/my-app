@@ -1336,14 +1336,14 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       grid:{ vertLines:{color:th0.grid, style:DOT}, horzLines:{color:th0.grid, style:DOT} },
       timeScale:{ borderColor:th0.border, timeVisible:true, secondsVisible:false },
       rightPriceScale:{ borderColor:th0.border },
-      crosshair:{ vertLine:{color:th0.cross, style:DOT}, horzLine:{color:th0.cross, style:DOT} },
+      crosshair:{ vertLine:{color:th0.cross, style:DOT, visible: themeBus.theme!=='light'}, horzLine:{color:th0.cross, style:DOT, visible: themeBus.theme!=='light'} },   // LEGEND: no crosshair lines (MT5 has none)
     });
     // live re-theme when the user flips Light/Dark (no rebuild)
     const unTheme=themeBus.subscribe((t)=>{ const th=CHART_THEME[t]||CHART_THEME.dark, ct=CANDLE_THEME[t]||CANDLE_THEME.dark;
       try{ c.applyOptions({ layout:{background:{color:th.bg},textColor:th.text},
         grid:{vertLines:{color:th.grid, style:DOT},horzLines:{color:th.grid, style:DOT}},   // keep DOTTED across the flip
         timeScale:{borderColor:th.border}, rightPriceScale:{borderColor:th.border},
-        crosshair:{vertLine:{color:th.cross},horzLine:{color:th.cross}} }); }catch(e){}
+        crosshair:{vertLine:{color:th.cross, visible: t!=='light'},horzLine:{color:th.cross, visible: t!=='light'}} }); }catch(e){}
       try{ if(series.current&&series.current.applyOptions&&typeRef.current==='candle') series.current.applyOptions({   // recolor candles on theme flip
         upColor:ct.upBody, downColor:ct.downBody, wickUpColor:ct.upLine, wickDownColor:ct.downLine,
         borderUpColor:ct.upLine, borderDownColor:ct.downLine, borderVisible:true,

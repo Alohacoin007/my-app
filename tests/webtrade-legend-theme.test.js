@@ -27,7 +27,9 @@ if (CD.dark.upBody !== 'rgba(0,0,0,0)' || CD.dark.upLine !== '#00ff00' || CD.dar
 
 // (2) LEGEND (Robinhood) — chart pure black, subtle #1D212A grid; candles neon-green / orange-red
 if (CT.light.bg !== '#000000' || CT.light.grid !== '#1D212A') bad('Legend chart must be #000000 bg + #1D212A grid');
-if (CT.light.cross !== '#3a4250') bad('Legend crosshair must be muted (#3a4250) so it does not strain the eyes');
+// Legend hides the crosshair dotted lines entirely (MT5 has none); dark keeps them
+if (!/vertLine:\{color:th0\.cross, style:DOT, visible: themeBus\.theme!=='light'\}/.test(src)) bad('Legend must HIDE the crosshair lines at chart creation (visible only in dark)');
+if (!/crosshair:\{vertLine:\{color:th\.cross, visible: t!=='light'\},horzLine:\{color:th\.cross, visible: t!=='light'\}\}/.test(src)) bad('theme flip must hide/show the crosshair per theme');
 if (CD.light.upBody !== 'rgba(0,0,0,0)' || CD.light.upLine !== '#00FF55') bad('Legend up candle must be HOLLOW (transparent body + neon-green #00FF55 outline)');
 if (CD.light.downBody !== '#FF453A' || CD.light.downLine !== '#FF453A') bad('Legend down candle must be #FF453A');
 
