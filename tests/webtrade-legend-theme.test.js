@@ -53,8 +53,8 @@ if (!/\.terminal\.light \.oc-price \.bf \.bg\{font-family:"Segoe UI",Arial,sans-
 if (!/\.terminal\.light \.cell-title\{background:#000000;color:#ffffff;border:none;border-bottom:1px solid #1D212A\}/.test(src)) bad('chart header must melt into #000000 with a bottom hairline');
 if (!/\.terminal\.light \.win\.active\{border-color:#2f3542/.test(src)) bad('active window must be a brighter GREY hairline, not green/glow');
 if (!/\.terminal\.light \.tbtn:hover[^}]*color:#ffffff !important/.test(src)) bad('toolbar hover must be white');
-// selected timeframe/tool button = FILLED neon green + black label (border transparent, not green)
-if (!/\.terminal\.light \.tf b\.on,\.terminal\.light \.tibtn\.on,\.terminal\.light \.tbtn\.algo\.on\{background:#00FF55 !important;border:1px solid transparent !important;color:#000000/.test(src)) bad('selected timeframe/tool button must be filled green + black label');
+// selected timeframe/tool button = green TEXT only (no fill, no green border)
+if (!/\.terminal\.light \.tf b\.on,\.terminal\.light \.tibtn\.on,\.terminal\.light \.tbtn\.algo\.on\{background:transparent !important;border:1px solid transparent !important;color:#00FF55/.test(src)) bad('selected timeframe/tool button must be green TEXT only (no fill)');
 
 // CRITICAL green-restraint: NO green BORDERS anywhere in Legend (eye-strain). Green is text-only,
 // and only on live ticks / profit / P&L / the up-candle line — never a border/background.
