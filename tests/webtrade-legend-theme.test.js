@@ -34,7 +34,24 @@ if (CD.light.downBody !== '#FF453A' || CD.light.downLine !== '#FF453A') bad('Leg
 if (!/\.terminal\.light\{ --bg:#0E1015; --panel:#000000; --panel2:#000000; --line:#1D212A;[^}]*--up:#00FF55; --down:#FF453A;[^}]*background:#0E1015/.test(src))
   bad('.terminal.light root vars must be the Robinhood palette (#0E1015 master, #000000 boxes, #1D212A line, up #00FF55, down #FF453A)');
 if (!/\.terminal\.light \.mwt \.au\{color:#00FF55 !important\}\.terminal\.light \.mwt \.ad\{color:#FF453A !important\}/.test(src)) bad('Market Watch up/down must be Robinhood green/red in Legend');
-if (/\.terminal\.light[^\n]*#ffffff/.test(src)) bad('no #ffffff surfaces may remain in the Legend theme (it is jet-black, not white)');
+if (/\.terminal\.light[^\n]*background:#ffffff/.test(src)) bad('no WHITE background surfaces may remain in the Legend theme (it is jet-black)');
+
+// (3b) COMPONENT SKIN RECONSTRUCTION (not just recolor):
+// one-click panel → flat matte-black card, no 3D fill, monochrome neon numbers
+if (!/\.terminal\.light \.obox\{background:#000000 !important;border:1px solid #1D212A !important;box-shadow:none/.test(src)) bad('Legend one-click panel must be flat #000000 + 1px #1D212A, no shadow');
+if (!/\.terminal\.light \.oc-blue\{background:#000000 !important;border:1px solid #1D212A !important;color:#00FF55/.test(src)) bad('Legend oc-blue must drop the royal-blue FILL → transparent black + neon-green number');
+if (!/\.terminal\.light \.oc-red\{background:#000000 !important;border:1px solid #1D212A !important;color:#FF453A/.test(src)) bad('Legend oc-red must drop the red FILL → transparent black + orange-red number');
+if (!/\.terminal\.light \.oc-price \.bf \.sm,\.terminal\.light \.oc-price \.bf \.bg,\.terminal\.light \.oc-price \.bf \.fr\{color:inherit/.test(src)) bad('Legend big quote number must inherit the side neon colour (monochrome)');
+// bottom table: vertical grid gone, horizontal only
+if (!/\.terminal\.light table\.pos td\{border:none;border-bottom:1px solid #1D212A/.test(src)) bad('Legend positions table must drop vertical borders (border-bottom only)');
+// toolbar hover = border only (no fill)
+if (!/\.terminal\.light \.tbtn:hover[^}]*background:transparent !important;border:1px solid #1D212A/.test(src)) bad('Legend toolbar hover must be border-only (transparent bg)');
+// Balance bar bold pure-white text
+if (!/\.terminal\.light \.acctline\{background:#0E1015;color:#ffffff;border-top:1px solid #1D212A;border-bottom:1px solid #1D212A/.test(src)) bad('Legend Balance bar must be #0E1015 with thin top/bottom rules + white text');
+
+// the DEFAULT dark one-click panel keeps its 3D royal-blue / red fills (outside .terminal.light)
+if (!/\.oc-blue\{background:#3a63e0 !important/.test(src)) bad('dark one-click panel must keep the royal-blue fill');
+if (!/\.oc-red\{background:#f5342a !important/.test(src)) bad('dark one-click panel must keep the red fill');
 
 // (4) UI label renamed to Legend (no "Light / Dark" left)
 if (/Color Theme — Light \/ Dark/.test(src)) bad('the menu label must be renamed away from "Light / Dark"');
