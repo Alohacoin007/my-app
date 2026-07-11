@@ -1583,6 +1583,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
 
   const [cmenu,setCmenu]=React.useState(null);   // chart right-click menu {x,y}
   const [delMenu,setDelMenu]=React.useState(null);   // selected-drawing Delete popup {x,y}
+  const [showOC,setShowOC]=React.useState(true);   // per-window One-Click panel visibility (right-click toggle)
   // (right-click is handled by a capture-phase native listener on the chart box — see the chart
   //  effect's onCtxNative — because Lightweight Charts swallows contextmenu before React sees it.)
   return (
@@ -1609,7 +1610,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
         {lazyHold && <div onClick={()=>onActivate&&onActivate(idx)} title="탭하여 차트 로드"
           style={{position:'absolute',inset:0,zIndex:2,display:'flex',alignItems:'center',justifyContent:'center',
             background:'#000',color:'#5a6472',font:'12px -apple-system,Segoe UI,sans-serif',cursor:'pointer'}}>차트 탭하여 로드</div>}
-        <OrderBox symbol={symbol} />
+        {showOC && <OrderBox symbol={symbol} />}
         <div className="cell-lbl">{ohlc
           ? (ohlc.o!=null ? <span>O {fmtPx(symbol,ohlc.o)} H {fmtPx(symbol,ohlc.h)} L {fmtPx(symbol,ohlc.l)} C {fmtPx(symbol,ohlc.c)}</span>
                           : <span className="px">{fmtPx(symbol,ohlc.c)}</span>)
@@ -1617,7 +1618,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       </div>
       {!tiled && ['n','s','e','w','ne','nw','se','sw'].map(d=>
         <div key={d} className={"rsz "+d} onMouseDown={(e)=>beginDrag(e,d)}></div>)}
-      {cmenu && <ChartMenu x={cmenu.x} y={cmenu.y} idx={idx} symbol={symbol} chartType={chartType} tf={tf} indicators={indicators} onClose={()=>setCmenu(null)} />}
+      {cmenu && <ChartMenu x={cmenu.x} y={cmenu.y} idx={idx} symbol={symbol} chartType={chartType} tf={tf} indicators={indicators} oneClick={showOC} onOneClick={()=>setShowOC(v=>!v)} onClose={()=>setCmenu(null)} />}
       {delMenu && <DrawMenu x={delMenu.x} y={delMenu.y}
         onDelete={()=>deleteSelected()} onDeleteAll={()=>clearDrawings()} onClose={()=>setDelMenu(null)} />}
     </div>
@@ -1639,7 +1640,7 @@ function DrawMenu({ x, y, onDelete, onDeleteAll, onClose }){
 
 /* ── Chart right-click context menu (MT5): Type / Timeframes / Indicators submenus,
    Grid toggle, Delete all objects, New Order. Targets THIS chart (activated on open). ── */
-function ChartMenu({ x, y, idx, symbol, chartType, tf, indicators, onClose }){
+function ChartMenu({ x, y, idx, symbol, chartType, tf, indicators, oneClick, onOneClick, onClose }){
   const [sub,setSub]=React.useState(null);
   React.useEffect(()=>{ const h=()=>onClose(); const k=(e)=>{ if(e.key==='Escape') onClose(); };
     document.addEventListener('click',h); document.addEventListener('contextmenu',h); document.addEventListener('keydown',k);
@@ -1648,6 +1649,7 @@ function ChartMenu({ x, y, idx, symbol, chartType, tf, indicators, onClose }){
   const activeInds=[...act];
   const items=[
     {l:'New Order', ic:'order', k:'F9', run:()=>terminalBus.emit('order.new',symbol)},
+    {l:'One-Click Trading', ic:'order', ck:oneClick, keep:1, run:()=>onOneClick&&onOneClick()},   // toggle THIS window's one-click panel
     {sep:1},
     {l:'Chart Type', ic:'candle', children:[
       {l:'Candlesticks', ck:chartType==='candle', run:()=>terminalBus.emit('chart.type','candle')},
