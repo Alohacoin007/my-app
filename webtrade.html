@@ -214,6 +214,9 @@
   .dov.text{transform:translate(0,-50%);color:#e6c14a;font:600 11px Tahoma,sans-serif;white-space:nowrap;text-shadow:0 0 3px #000,0 0 3px #000}
   .dov.pt{width:9px;height:9px;margin:-5px 0 0 -5px;background:#ffffff;border:1px solid #000;box-shadow:0 0 2px #000;pointer-events:auto;cursor:move}   /* draggable selected-line handle */
   .dov.pt:hover{background:#ffe14d}
+  /* selected horizontal-line grab strip — full width, drag up/down to move the line (white center knob) */
+  .dov.hgrab{left:0;right:0;height:11px;margin-top:-6px;background:transparent;pointer-events:auto;cursor:ns-resize}
+  .dov.hgrab::after{content:'';position:absolute;left:50%;top:50%;width:9px;height:9px;transform:translate(-50%,-50%);background:#fff;border:1px solid #000;box-shadow:0 0 2px #000}
   /* crosshair MEASURE ruler (MT5): drag with the Crosshair tool → bars / pips / price delta */
   .measure{position:absolute;inset:0;pointer-events:none;z-index:5}
   .measure svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
@@ -1156,7 +1159,12 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     m.label.textContent=txt; m.label.style.left=Math.round(x2+12)+'px'; m.label.style.top=Math.round(y2+12)+'px'; };
   const hideHandles=()=>{ selHandles.current.forEach(el=>{ try{el.remove();}catch(_){} }); selHandles.current=[]; };
   const positionHandles=()=>{ const ent=selDraw.current, c=chart.current, s=series.current;
-    if(!ent||(ent.kind!=='t'&&ent.kind!=='f')||!c||!s||selHandles.current.length!==3) return;
+    if(!ent||!c||!s||!selHandles.current.length) return;
+    if(ent.kind==='h'){ let y=null; try{ y=s.priceToCoordinate(ent.price); }catch(_){}   // horizontal line: one full-width grab strip
+      const el=selHandles.current[0];
+      if(el){ if(y==null||isNaN(y)){ el.style.display='none'; } else { el.style.display=''; el.style.top=Math.round(y)+'px'; } }
+      return; }
+    if((ent.kind!=='t'&&ent.kind!=='f')||selHandles.current.length!==3) return;
     let x1,y1,x2,y2; try{ const ts=c.timeScale();
       x1=ts.timeToCoordinate(ent.pts[0].time); y1=s.priceToCoordinate(ent.pts[0].value);
       x2=ts.timeToCoordinate(ent.pts[1].time); y2=s.priceToCoordinate(ent.pts[1].value); }catch(_){}
@@ -1164,7 +1172,10 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     selHandles.current.forEach((el,i)=>{ const hx=p3[i][0], hy=p3[i][1];
       if(hx==null||hy==null||isNaN(hx)||isNaN(hy)){ el.style.display='none'; }
       else { el.style.display=''; el.style.left=Math.round(hx)+'px'; el.style.top=Math.round(hy)+'px'; } }); };
-  const showHandles=()=>{ hideHandles(); const el=dlayer.current; if(!el) return;
+  const showHandles=()=>{ hideHandles(); const el=dlayer.current; if(!el) return; const ent=selDraw.current; if(!ent) return;
+    if(ent.kind==='h'){   // horizontal line: a full-width grab strip (drag up/down to move it)
+      const strip=document.createElement('div'); strip.className='dov hgrab'; strip.dataset.h='H';
+      strip.addEventListener('mousedown', onHandleDown); el.appendChild(strip); selHandles.current.push(strip); positionHandles(); return; }
     for(let i=0;i<3;i++){ const d=document.createElement('div'); d.className='dov pt'; d.dataset.h=i;
       d.addEventListener('mousedown', onHandleDown); el.appendChild(d); selHandles.current.push(d); }
     positionHandles(); };
@@ -1174,7 +1185,10 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   const hDrag=React.useRef(null);
   const onHandleMove=(e)=>{ const hd=hDrag.current; if(!hd) return; const c=chart.current, s=series.current; if(!c||!s) return;
     const ts=c.timeScale(), r=box.current.getBoundingClientRect();
-    const ent=hd.ent; let a=hd.pts0[0], b=hd.pts0[1], np;
+    const ent=hd.ent;
+    if(ent.kind==='h'){ let p=null; try{ p=s.coordinateToPrice(e.clientY-r.top); }catch(_){}   // move the horizontal line to the cursor price
+      if(p==null) return; ent.price=p; try{ ent.pl.applyOptions({price:p}); }catch(_){} positionHandles(); return; }
+    let a=hd.pts0[0], b=hd.pts0[1], np;
     const at=(cx,cy)=>{ let tm=null,pr=null; try{ tm=ts.coordinateToTime(cx); pr=s.coordinateToPrice(cy); }catch(_){} return (tm==null||pr==null)?null:{time:tm,value:pr}; };
     if(hd.i===0){ const q=at(e.clientX-r.left, e.clientY-r.top); if(!q) return; np=[q,b]; }
     else if(hd.i===2){ const q=at(e.clientX-r.left, e.clientY-r.top); if(!q) return; np=[a,q]; }
@@ -1189,12 +1203,14 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     positionHandles(); };
   const onHandleUp=()=>{ hDrag.current=null; document.body.style.userSelect='';
     document.removeEventListener('mousemove',onHandleMove); document.removeEventListener('mouseup',onHandleUp); };
-  const onHandleDown=(e)=>{ e.preventDefault(); e.stopPropagation(); const ent=selDraw.current; if(!ent||!ent.pts) return;
-    hDrag.current={ i:+e.currentTarget.dataset.h, ent, pts0:ent.pts.map(p=>({...p})), sx:e.clientX, sy:e.clientY };
+  const onHandleDown=(e)=>{ e.preventDefault(); e.stopPropagation(); const ent=selDraw.current; if(!ent) return;
+    if(!ent.pts && ent.kind!=='h') return;   // only lines with anchors (trend/fib pts) or an hline price are draggable
+    const hi=e.currentTarget.dataset.h;
+    hDrag.current={ i: hi==='H'?'H':+hi, ent, pts0: ent.pts?ent.pts.map(p=>({...p})):null, sx:e.clientX, sy:e.clientY };
     document.body.style.userSelect='none';
     document.addEventListener('mousemove',onHandleMove); document.addEventListener('mouseup',onHandleUp); };
   const deselect=()=>{ selDraw.current=null; hideHandles(); };   // white handles are the ONLY select marker (no line thickening)
-  const selectDrawing=(ent)=>{ deselect(); if(ent){ selDraw.current=ent; if(ent.kind==='t'||ent.kind==='f') showHandles(); } };
+  const selectDrawing=(ent)=>{ deselect(); if(ent){ selDraw.current=ent; if(ent.kind==='t'||ent.kind==='f'||ent.kind==='h') showHandles(); } };
   // nearest drawing to a pixel point within 8px (shared by click-select and right-click) — null if none
   const hitDrawing=(px,py)=>{ const c=chart.current, sc=series.current; if(!c||!sc) return null;
     const ts=c.timeScale(); let best=null, bd=8;

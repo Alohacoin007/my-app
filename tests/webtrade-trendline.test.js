@@ -32,7 +32,11 @@ if (!(distSeg(4, 40, 0, 0, 8, 0) >= 8)) bad('a click 40px off the line must NOT 
 if (!/const NEON='#ff1a1a'/.test(src)) bad('trend line must be neon red (#ff1a1a)');
 if (!/\.dov\.pt\{[^}]*background:#ffffff/.test(src)) bad('trend handles must be WHITE (.dov.pt background #ffffff)');
 if (!/for\(let i=0;i<3;i\+\+\)/.test(src) || !/showHandles/.test(src)) bad('must create 3 handles (showHandles)');
-if (!/if\(ent\.kind==='t'\|\|ent\.kind==='f'\) showHandles\(\)/.test(src)) bad('selecting a trend/fib line must show the 3 handles (selectDrawing)');
+if (!/if\(ent\.kind==='t'\|\|ent\.kind==='f'\|\|ent\.kind==='h'\) showHandles\(\)/.test(src)) bad('selecting a trend/fib/hline must show handles (selectDrawing)');
+// horizontal line is draggable: a full-width grab strip + price move on drag
+if (!/\.dov\.hgrab\{[^}]*cursor:ns-resize/.test(src)) bad('selected horizontal line must have a draggable grab strip (ns-resize)');
+if (!/if\(ent\.kind==='h'\)\{ let p=null; try\{ p=s\.coordinateToPrice/.test(src)) bad('dragging an hline handle must move it to the cursor price');
+if (!/ent\.price=p; try\{ ent\.pl\.applyOptions\(\{price:p\}\)/.test(src)) bad('dragging must re-price the horizontal line');
 if (!/previewLine\.current/.test(src) || !/onMoveDraw/.test(src)) bad('must show a live rubber-band preview while dragging');
 if (!/function DrawMenu\(/.test(src)) bad('right-click Delete popup (DrawMenu) missing');
 // right-click must beat Lightweight Charts (which swallows contextmenu) via a CAPTURE-phase listener
