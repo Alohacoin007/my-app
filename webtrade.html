@@ -53,6 +53,8 @@
   .mdrop .row .sc{margin-left:auto;color:#79808c;font-size:10.5px;padding-left:20px}
   .mdrop .row.dis{color:#6a7078;cursor:default}.mdrop .row.dis:hover{background:transparent;color:#6a7078}
   .mdrop .row .ar{margin-left:auto;color:#8a9098}
+  .mdrop .row.has{position:relative}
+  .mdrop.sub{position:absolute;left:100%;top:-4px;min-width:180px}   /* fly-out submenu (Insert → Lines/Fibonacci/…) */
   /* ── bottom status bar (View → Status Bar) ── */
   .statusbar{grid-area:status;display:flex;align-items:center;gap:14px;padding:0 8px;font-size:11px;color:#9aa2b0;
     background:linear-gradient(#20242a,#171a1f);border-top:1px solid #000;white-space:nowrap;overflow:hidden}
@@ -1954,8 +1956,12 @@ const MENU_DEF = {
            {l:'Toolbox', v:'toolbox', k:'Ctrl+T', keep:1}, {sep:1},
            {l:'Color Theme — Light / Dark', cmd:'theme.toggle', keep:1}, {sep:1},
            {l:'Full Screen', k:'F11', cmd:'view.fullscreen'} ],
-  Insert:[ {l:'Indicators', dis:1}, {sep:1}, {l:'Lines', ar:1, dis:1}, {l:'Channels', ar:1, dis:1},
-           {l:'Fibonacci', ar:1, dis:1}, {l:'Shapes', ar:1, dis:1}, {sep:1}, {l:'Text', tool:'text'} ],
+  Insert:[ {l:'Indicators', indicators:1}, {sep:1},
+           {l:'Lines', children:[ {l:'Trend Line', tool:'trend'}, {l:'Horizontal Line', tool:'hline'}, {l:'Vertical Line', tool:'vline'} ]},
+           {l:'Channels', dis:1},   // needs an equidistant-channel tool (not built yet)
+           {l:'Fibonacci', children:[ {l:'Fibonacci Retracement', tool:'fib'} ]},
+           {l:'Shapes', dis:1},     // needs rectangle/triangle/ellipse tools (not built yet)
+           {sep:1}, {l:'Text', tool:'text'} ],
   Tools: [ {l:'New Order', cmd:'order.new', k:'F9'}, {l:'History Center', dis:1}, {sep:1},
            {l:'Options', k:'Ctrl+O', dis:1} ],
   Window:[ {l:'Tile Windows', cmd:'window.tile'}, {l:'Cascade', dis:1}, {sep:1}, {l:'EURUSD.FX', dis:1} ],
@@ -1964,24 +1970,45 @@ const MENU_DEF = {
 function MenuBar({ indicators, view, tool }){
   const [live,setLive]=React.useState(priceStore.live);
   const [open,setOpen]=React.useState(null);
+  const [sub,setSub]=React.useState(null);   // open fly-out submenu index (Insert → Lines/Fibonacci/…)
   React.useEffect(()=> priceStore.subscribe(()=>setLive(priceStore.live)), []);
-  React.useEffect(()=>{ if(!open) return; const h=()=>setOpen(null); document.addEventListener('click',h); return ()=>document.removeEventListener('click',h); }, [open]);
+  React.useEffect(()=>{ if(!open) return; const h=()=>{setOpen(null);setSub(null);}; document.addEventListener('click',h); return ()=>document.removeEventListener('click',h); }, [open]);
   const active=new Set(indicators||[]);
-  const click=(m,e)=>{ e.stopPropagation(); setOpen(open===m?null:m); };
+  const click=(m,e)=>{ e.stopPropagation(); setSub(null); setOpen(open===m?null:m); };
   const run=(it)=>{ if(it.dis) return;
     if(it.v) terminalBus.emit('view.toggle', it.v);
     else if(it.tool) terminalBus.emit('chart.tool', it.tool);
     else if(it.cmd) terminalBus.emit(it.cmd, it.arg);
     if(!it.keep) setOpen(null);
   };
-  const Row = (it,i)=> it.sep ? <div key={i} className="sep"></div>
-    : it.hd ? <div key={i} className="hd">{t(it.l)}</div>
-    : (
-    <div key={i} className={"row"+(it.dis?' dis':'')} onClick={()=>run(it)}>
-      <span className="ck">{(it.v && view[it.v]) || (it.lang && it.lang===LANG.cur) ? '✓' : ''}</span>{t(it.l)}
-      {it.ar ? <span className="ar">▸</span> : it.k ? <span className="sc">{it.k}</span> : null}
-    </div>
-  );
+  // Insert → Indicators submenu is built live (dynamic checkmarks + Remove All)
+  const indChildren=()=> Object.keys(INDICATORS).map(id=>({l:INDICATORS[id].label, ind:id}))
+    .concat([{sep:1},{l:t('Remove All Indicators'), cmd:'chart.indicator', arg:'__clear__'}]);
+  const runChild=(ch)=>{ if(ch.dis) return;
+    if(ch.ind){ terminalBus.emit('chart.indicator', ch.ind); return; }   // keep the menu open to toggle several
+    if(ch.tool) terminalBus.emit('chart.tool', ch.tool);
+    else if(ch.cmd) terminalBus.emit(ch.cmd, ch.arg);
+    setOpen(null); setSub(null); };
+  const Row = (it,i)=>{
+    if(it.sep) return <div key={i} className="sep"></div>;
+    if(it.hd) return <div key={i} className="hd">{t(it.l)}</div>;
+    const kids = it.indicators ? indChildren() : it.children;   // submenu items (dynamic for Indicators)
+    return (
+      <div key={i} className={"row"+(it.dis?' dis':'')+(kids?' has':'')} onMouseEnter={()=>setSub(kids?i:null)}
+           onClick={()=>{ if(!kids) run(it); }}>
+        <span className="ck">{(it.v && view[it.v]) || (it.lang && it.lang===LANG.cur) ? '✓' : ''}</span>{t(it.l)}
+        {kids ? <span className="ar">▸</span> : it.k ? <span className="sc">{it.k}</span> : null}
+        {kids && sub===i && (
+          <div className="mdrop sub" onClick={e=>e.stopPropagation()}>
+            {kids.map((ch,j)=> ch.sep ? <div key={j} className="sep"></div>
+              : <div key={j} className={"row"+(ch.dis?' dis':'')} onClick={()=>runChild(ch)}>
+                  <span className="ck">{ch.ind && active.has(ch.ind) ? '✓' : ''}</span>{t(ch.l)}
+                </div>)}
+          </div>
+        )}
+      </div>
+    );
+  };
   return (
     <div className="menu">
       {MENUS.map(m=>(
