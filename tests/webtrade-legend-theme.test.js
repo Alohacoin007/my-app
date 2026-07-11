@@ -58,6 +58,7 @@ if (!/\.terminal\.light \.tbtn:hover[^}]*color:#ffffff !important/.test(src)) ba
 const greenBorders = (src.match(/border(?!-top)[a-z-]*:\s*[^;{}]*#00FF55/gi) || []);
 if (greenBorders.length) bad('green border(s) remain (only the active-tab top accent may be green): ' + greenBorders.join(' | '));
 if (!/\.terminal\.light \.tbxtabs \.t\.on\{[^}]*border-top-color:#00FF55\}/.test(src)) bad('the active tab must KEEP its green top accent (user likes it)');
+if (!/\.terminal\.light \.charttabs \.ctab\.on::before\{background:#00FF55\}/.test(src)) bad('the active chart tab must have the green accent bar (matches the tab points)');
 // the up-candle LINE (chart) is the one place a green stroke is allowed
 if (!/upLine:'#00FF55'/.test(src)) bad('the Legend up-candle line must stay neon green');
 // bottom table: vertical grid gone, horizontal only
