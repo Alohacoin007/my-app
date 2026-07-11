@@ -2403,7 +2403,7 @@ function App(){
   const cfg=React.useRef(wtConfig.load()).current;     // saved layout (persists across reloads)
   // ALWAYS boot to the fixed default 2×2 @ M1 (chart layout is intentionally NOT persisted, so a
   // refresh always shows this exact setup regardless of what was open last session).
-  const initCharts=React.useRef(GRID.map((s,i)=>({ id:i+1, symbol:s, tf:'M1', type:'candle' }))).current;
+  const initCharts=React.useRef(GRID.map((s,i)=>({ id:i+1, symbol:s, tf:'M1', type:'candle', inds:(cfg.indicators||[]).slice() }))).current;   // indicators are PER-CHART
   const [charts,setCharts]=React.useState(initCharts);   // dynamic chart windows [{id,symbol,tf,type}]
   const [activeId,setActiveId]=React.useState(initCharts[0]?initCharts[0].id:null);
   const geos=React.useRef({});   // id → last {x,y,w,h} so a re-mounted window restores where you left it
@@ -2418,7 +2418,6 @@ function App(){
   const idRef=React.useRef(initCharts.reduce((mx,c)=>Math.max(mx,c.id),0));
   const chartsRef=React.useRef(charts); chartsRef.current=charts;
   const [orderSym,setOrderSym]=React.useState(null);     // popup Order dialog target (null = closed)
-  const [indicators,setIndicators]=React.useState(cfg.indicators||[]);   // active indicator ids (shared by all charts)
   const [tool,setTool]=React.useState(null);             // armed drawing tool (cross/vline/…)
   const [view,setView]=React.useState({ ...DEFAULT_VIEW, ...(cfg.view||{}) });
   const [leftw,setLeftw]=React.useState(cfg.leftw||270);
@@ -2431,6 +2430,7 @@ function App(){
   LANG.cur=lang;   // set during render so every child's t() reads the current language immediately
   // effective active chart (id may point at a closed one after a close)
   const activeChart = charts.find(c=>c.id===activeId) || charts[0] || null;
+  const activeInds = activeChart ? (activeChart.inds||[]) : [];   // indicators of the SELECTED chart (menus reflect this)
   const actRef=React.useRef(null); actRef.current = activeChart ? activeChart.id : null;
   // ── chart window life-cycle ──
   const addChart=React.useCallback((symbol)=>{ const id=++idRef.current;
@@ -2439,7 +2439,7 @@ function App(){
   const closeChart=React.useCallback((id)=>{ setCharts(cs=>cs.filter(c=>c.id!==id));   // unmount → ChartCell cleanup unsubscribes + chart.remove (no leak)
     delete geos.current[id]; setActiveId(a=> a===id ? null : a); }, []);
   React.useEffect(()=>{ priceStore.start(); positionsStore.start(); }, []);
-  React.useEffect(()=>{ wtConfig.save({ indicators, view, leftw, bottomh, navh, theme, lang }); }, [indicators, view, leftw, bottomh, navh, theme, lang]);   // charts NOT persisted → refresh = fixed default
+  React.useEffect(()=>{ wtConfig.save({ view, leftw, bottomh, navh, theme, lang }); }, [view, leftw, bottomh, navh, theme, lang]);   // charts (+ their per-chart indicators) NOT persisted → refresh = fixed default
   React.useEffect(()=>{ requestAnimationFrame(()=>chartResizer.resizeAll()); }, [charts.length]);   // reflow on add/close
   // ── MT5 keyboard shortcuts (View menu + New Order) ──
   React.useEffect(()=>{
@@ -2465,9 +2465,11 @@ function App(){
     else if(cmd==='theme.toggle') setTheme(t=> t==='light'?'dark':'light');   // View → Color Theme (Light ⇄ Dark)
     else if(cmd==='lang.set'){ LANG.cur=arg; setLang(arg); }                  // View → Languages (en/ko/ja/zh)
     else if(cmd==='view.fullscreen'){ try{ if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }catch(e){} }
-    else if(cmd==='chart.indicator'){
-      if(arg==='__clear__') setIndicators([]);
-      else setIndicators(list=> list.indexOf(arg)>=0 ? list.filter(x=>x!==arg) : list.concat(arg));
+    else if(cmd==='chart.indicator'){   // PER-CHART: apply to the ACTIVE chart only (not all 4)
+      setCharts(cs=>cs.map(c=>{ if(c.id!==actRef.current) return c;
+        const list=c.inds||[];
+        return { ...c, inds: arg==='__clear__' ? [] : (list.indexOf(arg)>=0 ? list.filter(x=>x!==arg) : list.concat(arg)) };
+      }));
     }
     else if(cmd==='order.new'){ const ac=chartsRef.current.find(c=>c.id===actRef.current)||chartsRef.current[0]; setOrderSym(arg||(ac&&ac.symbol)||WATCH[0]); }
     else if(cmd==='window.tile'){
@@ -2498,12 +2500,12 @@ function App(){
   const activeSym = activeChart ? activeChart.symbol : null;
   return (
     <div className={"terminal"+(theme==='light'?' light':'')} style={gridStyle}>
-      <MenuBar indicators={indicators} view={view} tool={tool} />
+      <MenuBar indicators={activeInds} view={view} tool={tool} />
       {view.toolbars && <Toolbar tf={activeChart?activeChart.tf:'H1'} chartType={activeChart?activeChart.type:'candle'} tool={tool} />}
       {leftShown && <div className="left" style={{'--navh': navh+'px'}}>
         {view.marketwatch && <MarketWatch onPick={addChart} />}
         {view.marketwatch && view.navigator && <NavResizer onDone={setNavh} />}
-        {view.navigator && <Navigator indicators={indicators} />}
+        {view.navigator && <Navigator indicators={activeInds} />}
       </div>}
       {leftShown && <Splitter onDone={setLeftw} />}
       {/* RIGHT vertical stack — layer 1: charts · layer 2: chart-window tab bar · layer 3+4: terminal */}
@@ -2511,7 +2513,7 @@ function App(){
         <div className="charts">
           <div className="chartstage">
             {charts.map((c,i)=><ChartCell key={c.id} idx={c.id} isActive={c.id===(activeChart&&activeChart.id)} onActivate={activate}
-              symbol={c.symbol} tf={c.tf} indicators={indicators} chartType={c.type} tool={tool}
+              symbol={c.symbol} tf={c.tf} indicators={c.inds||[]} chartType={c.type} tool={tool}
               initial={floatGeo(i)} savedGeo={geos.current[c.id]} onGeo={onGeo}
               lazyHold={IS_MOBILE && !revealed.has(c.id)}
               onClose={()=>closeChart(c.id)} />)}

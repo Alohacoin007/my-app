@@ -20,9 +20,10 @@ if (!/emit\('chart\.indicator','__clear__'\)/.test(src)) bad('"Remove All Indica
 // activeInds is derived from the passed indicators
 if (!/const activeInds=\[\.\.\.act\]/.test(src)) bad('activeInds must be the set of currently-applied indicators');
 
-// the App reducer must actually handle both removal paths
-if (!/if\(arg==='__clear__'\) setIndicators\(\[\]\)/.test(src)) bad('reducer must clear all indicators on __clear__');
+// the App reducer must handle both removal paths — PER-CHART (active chart's inds only)
+if (!/inds: arg==='__clear__' \? \[\]/.test(src)) bad('reducer must clear the active chart indicators on __clear__');
 if (!/list\.indexOf\(arg\)>=0 \? list\.filter\(x=>x!==arg\)/.test(src)) bad('reducer must toggle a single indicator off when already applied');
+if (!/if\(c\.id!==actRef\.current\) return c;/.test(src)) bad('indicator changes must target only the ACTIVE chart (per-chart)');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} remove-indicator problem(s).`); process.exit(1); }
 console.log('🟢 PASS: right-click "Remove Indicator" lists active indicators (+ Remove All), routed through chart.indicator; reducer removes one or clears all.');
