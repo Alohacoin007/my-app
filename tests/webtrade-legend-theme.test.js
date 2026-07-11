@@ -49,8 +49,8 @@ if (!/\.terminal\.light \.obox\{background:#000000 !important;border:1px solid #
 if (!/\.terminal\.light \.oc-blue,\.terminal\.light \.oc-red\{background:transparent !important;border:none !important\}/.test(src)) bad('oc-blue/oc-red halves must have no fill/border');
 if (!/\.terminal\.light \.oc-lbl\{color:#8A94A6/.test(src)) bad('SELL/BUY labels must be muted silver #8A94A6 (no neon)');
 if (!/\.terminal\.light \.oc-vol b\{color:#8A94A6/.test(src)) bad('qty arrows must be muted silver #8A94A6');
-if (!/\.terminal\.light \.oc-blue \.bf \.sm,\.terminal\.light \.oc-blue \.bf \.bg,\.terminal\.light \.oc-blue \.bf \.fr\{color:#00FF55/.test(src)) bad('only the RISING price number is green');
-if (!/\.terminal\.light \.oc-red \.bf \.sm,\.terminal\.light \.oc-red \.bf \.bg,\.terminal\.light \.oc-red \.bf \.fr\{color:#FF453A/.test(src)) bad('only the FALLING price number is red');
+// toned-down one-click: price number is clean monochrome white (no loud green/red)
+if (!/\.terminal\.light \.oc-price \.bf \.sm,\.terminal\.light \.oc-price \.bf \.bg,\.terminal\.light \.oc-price \.bf \.fr\{color:#ffffff/.test(src)) bad('one-click price number must be monochrome white (toned down)');
 if (!/\.terminal\.light \.oc-price \.bf \.bg\{font-family:"Segoe UI",Arial,sans-serif !important;font-weight:500/.test(src)) bad('big quote must be thin-line weight 500 (non-Arial-Black)');
 // window header melts, no gray 3D frame; active window = brighter GREY hairline (never green)
 if (!/\.terminal\.light \.cell-title\{background:#000000;color:#ffffff;border:none;border-bottom:1px solid #1D212A\}/.test(src)) bad('chart header must melt into #000000 with a bottom hairline');
