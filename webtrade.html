@@ -1368,14 +1368,19 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       measDrag.current={ x0:x, y0:y, lg0, p0 };
       document.addEventListener('mousemove',onMeasureMove); document.addEventListener('mouseup',onMeasureUp); };
     try{ box.current.addEventListener('mousedown', onMeasureDown); }catch(e){}
+    // ROBUST initial sizing: a floating window can be 0-wide for a few frames after mount / on
+    // refresh, so the first candles would land off-view → the chart looks EMPTY until you switch tf.
+    // A ResizeObserver fits the chart the moment the box gets a real width; once fitted, later resizes
+    // just re-size (keep the user's zoom). This makes the default M1 chart show immediately on load.
+    let fitted=false;
+    const doFit=()=>{ try{ if(!box.current||!chart.current) return; const w=box.current.clientWidth, h=box.current.clientHeight;
+      if(w<=0||h<=0) return; chart.current.resize(w,h);
+      if(candles.current.length && !fitted){ chart.current.timeScale().fitContent(); fitted=true; } }catch(e){} };
+    let boxRO=null; try{ boxRO=new ResizeObserver(doFit); boxRO.observe(box.current); }catch(e){}
     // load candles for the current timeframe, then (re)paint indicators over them
     loadCandles(symbol, tf).then(data=>{ try{
       s.setData(asSeriesData(data,typeRef.current)); bar.current=data[data.length-1]; candles.current=data; paintIndicators();
-      // The container can be 0-width at creation (tiled grid / deferred mount) → candles land off-view
-      // and the chart looks EMPTY. Resize to the real box + fitContent so every bar is on screen —
-      // do it now AND on the next frame once layout settled (fixes the blank-chart-on-refresh).
-      const fit=()=>{ try{ if(box.current) c.resize(box.current.clientWidth, box.current.clientHeight); c.timeScale().fitContent(); }catch(e){} };
-      fit(); requestAnimationFrame(fit);
+      doFit(); requestAnimationFrame(doFit); setTimeout(doFit,120);   // now + next frame + a late retry (deferred CDN/layout)
     }catch(e){} });
     // live: update ONLY the last bar's close from the shared store — throttled to ~2.5/sec
     const onTick=throttle((mids)=>{
@@ -1388,7 +1393,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     }, 400);
     const unsub=priceStore.subscribe(onTick);
     const boxEl=box.current;
-    return ()=>{ unsub(); unreg(); unTheme();
+    return ()=>{ unsub(); unreg(); unTheme(); try{ boxRO&&boxRO.disconnect(); }catch(e){}
       try{ boxEl&&boxEl.removeEventListener('contextmenu', onCtxNative, true); boxEl&&boxEl.removeEventListener('mousedown', onMeasureDown); }catch(e){}
       indSeries.current=[]; lines.current=[]; drawLines.current=[]; drawSeries.current=[]; drawStack.current=[]; selDraw.current=null;
       hideHandles(); hideMeasure(); measDrag.current=null; previewLine.current=null; previewFib.current=[];   // drop selection handles + any in-flight preview
