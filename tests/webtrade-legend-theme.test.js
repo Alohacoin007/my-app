@@ -44,6 +44,10 @@ if (/\.terminal\.light[^\n]*background:#ffffff/.test(src)) bad('no WHITE backgro
 // the chart right-click menu (ctxmenu) must be dark in Legend, not the MT5 light-grey #f0f0f0
 if (!/\.terminal\.light \.ctxmenu\{background:#000000;border:1px solid #1D212A/.test(src)) bad('chart right-click menu must be Legend dark (#000000 + #1D212A), not white');
 if (!/\.terminal\.light \.ctxmenu \.ci \.ck\{color:#00FF55\}/.test(src)) bad('right-click menu active checkmark should be green');
+// the Market Watch tick chart follows the theme (was hardcoded white)
+if (!/const th=CHART_THEME\[themeBus\.theme\]\|\|CHART_THEME\.dark, legend=themeBus\.theme==='light'/.test(src)) bad('TickChart must follow CHART_THEME (was hardcoded #ffffff)');
+if (!/const ask=mk\(legend\?'#FF453A':'#d13438'\), bid=mk\(legend\?'#00FF55':'#2f6ec0'\)/.test(src)) bad('TickChart ask/bid must be Legend red/green');
+if (/\.mwtick\{[^}]*background:#ffffff/.test(src)) bad('the tick-chart container must not be white');
 
 // (3b) COMPONENT SKIN RECONSTRUCTION (not just recolor):
 // one-click panel → flat matte-black card, no 3D fill, monochrome neon numbers

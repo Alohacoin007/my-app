@@ -261,7 +261,7 @@
   .mwtp .lh{display:flex;justify-content:space-between;font-size:9.5px;color:#8890a0;margin-top:2px}
   .mwtp .lh b{color:#c4c8d0;font-weight:600}
   /* Ticks tab chart */
-  .mwtick{flex:1;min-height:0;position:relative;background:#ffffff}
+  .mwtick{flex:1;min-height:0;position:relative;background:#000000}
   .watch{display:flex;flex-direction:column;overflow:hidden}
   .watch .mwscroll{flex:1;overflow-x:hidden;overflow-y:auto;min-height:0}
   .ctxmenu{position:fixed;z-index:1200;min-width:216px;background:#f0f0f0;border:1px solid #9a9a9a;
@@ -1752,16 +1752,17 @@ function TickChart({ symbol }){
   React.useEffect(()=>{
     if(!window.LightweightCharts || !box.current) return;
     const DOT=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dotted)!=null?LightweightCharts.LineStyle.Dotted:1;
+    const th=CHART_THEME[themeBus.theme]||CHART_THEME.dark, legend=themeBus.theme==='light';   // follow the terminal theme
     const c=LightweightCharts.createChart(box.current, {
-      layout:{ background:{color:'#ffffff'}, textColor:'#4a4f57', fontSize:10, fontFamily:"Consolas,'Courier New',monospace" },
-      grid:{ vertLines:{color:'#e6e9ec', style:DOT}, horzLines:{color:'#e6e9ec', style:DOT} },
-      timeScale:{ visible:true, timeVisible:true, secondsVisible:false, borderColor:'#d0d4d8', rightOffset:2, barSpacing:3 },
-      rightPriceScale:{ borderColor:'#d0d4d8' }, crosshair:{ mode:0 }, handleScroll:false, handleScale:false });
+      layout:{ background:{color:th.bg}, textColor:th.text, fontSize:10, fontFamily:"Consolas,'Courier New',monospace" },
+      grid:{ vertLines:{color:th.grid, style:DOT}, horzLines:{color:th.grid, style:DOT} },
+      timeScale:{ visible:true, timeVisible:true, secondsVisible:false, borderColor:th.border, rightOffset:2, barSpacing:3 },
+      rightPriceScale:{ borderColor:th.border }, crosshair:{ mode:0 }, handleScroll:false, handleScale:false });
     c.resize(box.current.clientWidth, box.current.clientHeight);
     const STEP=(window.LightweightCharts&&LightweightCharts.LineType&&LightweightCharts.LineType.WithSteps)!=null?LightweightCharts.LineType.WithSteps:0;
     const mk=(color)=> c.addLineSeries ? c.addLineSeries({color,lineWidth:1,lineType:STEP,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false})
                                        : c.addSeries(LightweightCharts.LineSeries,{color,lineWidth:1,lineType:STEP,priceLineVisible:false,lastValueVisible:true});
-    const ask=mk('#d13438'), bid=mk('#2f6ec0');
+    const ask=mk(legend?'#FF453A':'#d13438'), bid=mk(legend?'#00FF55':'#2f6ec0');   // Legend: ask red / bid green
     const N=220, STEPT=2, q0=priceStore.get(symbol)||{}, pv=pip(symbol);
     let m0=q0.mid||((q0.ask+q0.bid)/2)||BASE[symbol]||1; const half=Math.max(pv/2,((q0.ask-q0.bid)/2)||pv/2);
     const t0=Math.floor(Date.now()/1000)-N*STEPT, seedA=[],seedB=[]; let m=m0-(Math.random()*pv*10);
