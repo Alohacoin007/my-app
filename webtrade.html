@@ -95,7 +95,7 @@
   .tf b.on{background:#3a6ea5;color:#fff;border-color:#3a6ea5}
   .tbrand{margin-left:auto;font-weight:700;letter-spacing:.3px;color:#8890a0;font-size:11px}.tbrand span{color:#7fb0e0}
   /* ── left column: Market Watch (top) + Navigator (bottom) ── */
-  .left{grid-area:left;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+  .left{grid-area:left;display:flex;flex-direction:column;min-height:0;overflow:hidden;position:relative;z-index:10000}   /* above the toolbox (z-9999) so pulling it up covers only the charts, never Market Watch/its tabs */
   .watch{flex:1;background:var(--panel);overflow:auto;min-height:0}
   .nav{height:var(--navh,186px);background:var(--panel);border-top:1px solid var(--cellbd);overflow-x:hidden;overflow-y:auto;flex:none}
   .nav .navhd{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;padding:3px 4px 3px 8px;background:#0a0d12;color:var(--dim);font-size:11px;font-weight:600;border-bottom:1px solid var(--line)}
@@ -158,6 +158,7 @@
   .mwt th{position:sticky;top:0;background:#0a0d12;color:var(--dim);font-weight:600;font-size:11px;text-align:right;padding:3px 6px;border:1px solid var(--line)}
   .mwt th:first-child{text-align:left}
   .mwt td{padding:2px 6px;border:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .mwt td.mwspr{color:#8a9098}   /* Spread column (right-click → Spread) */
   .mwt td.sym{text-align:left;font-weight:600;color:#c8ccd2}
   .mwt tr{cursor:pointer}.mwt tr:hover td{background:#0d1420}
   .up{color:var(--up)}.down{color:var(--down)}
@@ -1672,13 +1673,15 @@ const MW_MENU=[
   {l:'Crypto', act:'cat', arg:'Crypto'},
   {l:'All Symbols', act:'cat', arg:'All'},
   {sep:1},
+  {l:'Spread', act:'spread'},            // toggle a live Spread column (all symbols)
+  {sep:1},
   {l:'New Chart', act:'chart'},          // → addChart (tile-aware multi-chart)
   {l:'New Order', act:'order'},          // → order.new popup for this symbol
   {sep:1},
   {l:'Hide', act:'hide'},                // hide this symbol row (memory-only, no storage)
   {l:'Show All', act:'showall'},         // restore every hidden symbol
 ];
-function ContextMenu({ x, y, sym, cat, onClose, onPick, onHide, onShowAll, onCat }){
+function ContextMenu({ x, y, sym, cat, spread, onClose, onPick, onHide, onShowAll, onCat, onSpread }){
   React.useEffect(()=>{ const close=()=>onClose(); const k=(e)=>{ if(e.key==='Escape') onClose(); };
     // Attach outside-close on the NEXT tick — otherwise the SAME right-click that OPENED the menu
     // (its contextmenu/mousedown still bubbling to document) instantly closes it → menu never shows.
@@ -1687,6 +1690,7 @@ function ContextMenu({ x, y, sym, cat, onClose, onPick, onHide, onShowAll, onCat
     return ()=>{ clearTimeout(id); document.removeEventListener('mousedown',close); document.removeEventListener('keydown',k); }; }, [onClose]);
   const run=(it)=>{ if(it.dis||it.sep) return;
     if(it.act==='cat') onCat&&onCat(it.arg);                       // class filter (Forex/Stocks/Crypto/All)
+    else if(it.act==='spread') onSpread&&onSpread();               // toggle the Spread column
     else if(it.act==='chart') onPick&&onPick(sym);                 // New Chart → tile-aware chart of THIS symbol
     else if(it.act==='order') terminalBus.emit('order.new', sym);  // New Order → popup for THIS symbol
     else if(it.act==='hide') onHide&&onHide(sym);                  // Hide → drop the row (client display only)
@@ -1694,7 +1698,7 @@ function ContextMenu({ x, y, sym, cat, onClose, onPick, onHide, onShowAll, onCat
     onClose();
   };
   const style={ left:Math.min(x, window.innerWidth-190), top:Math.min(y, window.innerHeight-260) };
-  const on=(it)=> it.act==='cat' && ((it.arg||'')===(cat||'All'));   // active class → ✓
+  const on=(it)=> (it.act==='cat' && (it.arg||'')===(cat||'All')) || (it.act==='spread' && spread);   // active class / spread-on → ✓
   return (
     <div className="mt5-context-menu" style={style} onMouseDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()} onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
       {MW_MENU.map((it,i)=> it.sep ? <div key={i} className="mt5-sep"></div> : (
@@ -1798,6 +1802,7 @@ function MarketWatch({ onPick }){
   const [menu,setMenu]=React.useState(null);    // {sym,x,y} right-click context menu
   const [hidden,setHidden]=React.useState(()=>new Set());   // Hide/Show-All — MEMORY-ONLY (never persisted)
   const [cat,setCat]=React.useState('All');   // asset-class filter: All / Forex / Stocks / Crypto
+  const [showSpread,setShowSpread]=React.useState(false);   // right-click → Spread column toggle
   const [clock,setClock]=React.useState('');
   React.useEffect(()=>{ const u=()=>{ const d=new Date(),p2=n=>String(n).padStart(2,'0'); setClock(p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds())); }; u(); const id=setInterval(u,1000); return ()=>clearInterval(id); }, []);
   const prev=React.useRef({}), dirRef=React.useRef({});
@@ -1821,15 +1826,17 @@ function MarketWatch({ onPick }){
         {tab==='Details' ? <MWDetails sym={cur} /> :
          tab==='Trading' ? <MWTrading /> :
         <table className="mwt">
-          <thead><tr><th>{t('Symbol')}</th><th>{t('Bid')}</th><th>{t('Ask')}</th><th>{t('Daily Ch%')}</th></tr></thead>
+          <thead><tr><th>{t('Symbol')}</th><th>{t('Bid')}</th><th>{t('Ask')}</th>{showSpread && <th>{t('Spread')}</th>}<th>{t('Daily Ch%')}</th></tr></thead>
           <tbody>
             {WATCH.filter(sym=>!hidden.has(sym) && (cat==='All'||SYM_CAT[sym]===cat)).map(sym=>{ const m=mids[sym]||{}, d=dirs[sym]||{}; const up=(m.chg||0)>=0;
+              const spr=(m.ask!=null&&m.bid!=null)?((m.ask-m.bid)/pip(sym)).toFixed(1):'—';
               return (
                 <tr key={sym} className={sym===sel?'sel':''} onClick={()=>setSel(sym)}
-                    onDoubleClick={()=>terminalBus.emit('order.new',sym)} onContextMenu={(e)=>ctx(e,sym)} title="더블클릭: New Order 주문창 · 우클릭: 메뉴(Forex/Stocks/Crypto 필터, New Chart 등)">
+                    onDoubleClick={()=>terminalBus.emit('order.new',sym)} onContextMenu={(e)=>ctx(e,sym)} title="더블클릭: New Order 주문창 · 우클릭: 메뉴(Forex/Stocks/Crypto 필터, Spread, New Chart 등)">
                   <td className="sym"><span className={up?'au':'ad'}>{up?'↗':'↘'}</span> {sym}{sfx(sym)}</td>
                   <td className={tc(d.bid)}>{fmtPx(sym,m.bid)}</td>
                   <td className={tc(d.ask)}>{fmtPx(sym,m.ask)}</td>
+                  {showSpread && <td className="mwspr">{spr}</td>}
                   <td className={up?'text-up':'text-down'}>{m.chg!=null?(m.chg>=0?'+':'')+m.chg.toFixed(2):'—'}</td>
                 </tr>
               ); })}
@@ -1837,7 +1844,7 @@ function MarketWatch({ onPick }){
         </table>}
       </div>}
       <div className="mwtabs">{MW_TABS.map(tb=><div key={tb} className={"mt"+(tb===tab?' on':'')} onClick={()=>setTab(tb)}>{t(tb)}</div>)}</div>
-      {menu && <ContextMenu x={menu.x} y={menu.y} sym={menu.sym} cat={cat} onPick={onPick} onCat={setCat}
+      {menu && <ContextMenu x={menu.x} y={menu.y} sym={menu.sym} cat={cat} spread={showSpread} onPick={onPick} onCat={setCat} onSpread={()=>setShowSpread(v=>!v)}
         onHide={(s)=>setHidden(h=>new Set(h).add(s))} onShowAll={()=>setHidden(new Set())}
         onClose={()=>setMenu(null)} />}
     </div>
