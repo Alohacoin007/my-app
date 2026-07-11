@@ -34,6 +34,9 @@ if (CD.light.downBody !== '#FF453A' || CD.light.downLine !== '#FF453A') bad('Leg
 if (!/\.terminal\.light\{ --bg:#0E1015; --panel:#000000; --panel2:#000000; --line:#1D212A;[^}]*--up:#00FF55; --down:#FF453A;[^}]*background:#0E1015/.test(src))
   bad('.terminal.light root vars must be the Robinhood palette (#0E1015 master, #000000 boxes, #1D212A line, up #00FF55, down #FF453A)');
 if (!/\.terminal\.light \.mwt \.au\{color:#00FF55 !important\}\.terminal\.light \.mwt \.ad\{color:#FF453A !important\}/.test(src)) bad('Market Watch up/down must be Robinhood green/red in Legend');
+// Market Watch body text uses the toolbox-tab tone (#a2aab6, normal weight) — size untouched
+if (!/\.terminal\.light \.mwt td\{border:none;border-bottom:1px solid #1D212A;color:#a2aab6;font-weight:normal\}/.test(src)) bad('Market Watch cells must use the #a2aab6 tab tone (normal weight)');
+if (!/\.terminal\.light \.mwt td\.sym\{color:#a2aab6;font-weight:normal\}/.test(src)) bad('Market Watch symbols must use the #a2aab6 tab tone');
 if (/\.terminal\.light[^\n]*background:#ffffff/.test(src)) bad('no WHITE background surfaces may remain in the Legend theme (it is jet-black)');
 
 // (3b) COMPONENT SKIN RECONSTRUCTION (not just recolor):
