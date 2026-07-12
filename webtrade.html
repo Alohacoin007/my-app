@@ -2095,6 +2095,10 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
   const marginUsed=pos.reduce((s,p)=> s+requiredMargin(p.symbol, lotsOf(p), leverage), 0);  // leverage-driven
   const level=marginUsed>0?(equity/marginUsed*100):0;
   const num=(n)=>(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  // P&L formatter — a small crypto/stock lot (0.01 BTC ≈ $640) makes floating P&L SUB-CENT, so 2
+  // decimals rounds a live position to a flat "0.00". Keep 2 decimals for $1+ amounts (FX/large),
+  // but expand to 4 for sub-dollar values so a working position visibly ticks instead of reading 0.
+  const pnl=(n)=>{ n=Number(n)||0; const d=Math.abs(n)>=1?2:4; return n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); };
 
   // MT5 History customization — filter the closed-deal log by period (All / Today / Last Week /
   // Last Month / Custom from-to). close_ms is stamped at close time for exact date filtering.
@@ -2153,7 +2157,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
               return (<tr key={p.local_id}>
                 <td>{p.symbol.toLowerCase()}{sfx(p.symbol).toLowerCase()}</td><td>{tkt}</td><td>{tm}</td><td className={sideUp(p.side)==='SELL'?'down':'up'}>{sideUp(p.side).toLowerCase()}</td>
                 <td>{lotsOf(p).toFixed(2)}</td><td>{fmtPx(p.symbol,+p.open_price)}</td><td>—</td><td>—</td>
-                <td>{fmtPx(p.symbol,closePx(p,m))}</td><td className={pl>=0?'up':'down'}>{num(pl)}</td>
+                <td>{fmtPx(p.symbol,closePx(p,m))}</td><td className={pl>=0?'up':'down'}>{pnl(pl)}</td>
                 <td><button className="xclose" title="Close position" onClick={()=>closePos(p)}>✕</button></td>
               </tr>); })}
           </tbody>
@@ -2174,7 +2178,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
               <span><span className="k">{t('Margin Level')}:</span> <b className={marginUsed>0&&level<100?'down':''}>{marginUsed>0?num(level)+' %':'—'}</b>
                 {marginUsed>0&&level<100&&level>=30 && <b style={{color:'#e0a020',marginLeft:6}}>⚠ Margin Call</b>}
                 {marginUsed>0&&level<30 && <b style={{color:'#ff5252',marginLeft:6}}>⛔ Stop Out &lt;30%</b>}</span>
-              <span><span className="k">{t('Profit')}:</span> <b className={floating>=0?'up':'down'}>{num(floating)}</b></span>
+              <span><span className="k">{t('Profit')}:</span> <b className={floating>=0?'up':'down'}>{pnl(floating)}</b></span>
             </div>
           </td></tr></tfoot>}
         </table>

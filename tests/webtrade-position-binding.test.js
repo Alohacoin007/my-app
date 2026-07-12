@@ -66,5 +66,18 @@ if (/\(m\.mid-\(\+p\.open_price\|\|m\.mid\)\)/.test(src)) bad('a mid-based P&L f
 // correct per-asset suffix in the table (btcusd.cr, not btcusd.fx)
 if (!/\{p\.symbol\.toLowerCase\(\)\}\{sfx\(p\.symbol\)\.toLowerCase\(\)\}/.test(src)) bad('position row must use the per-asset suffix sfx(), not a hardcoded .fx');
 
+// ── P&L formatter reveals sub-cent crypto P&L instead of a flat 0.00 ──
+const pnlM = src.match(/const pnl=(\(n\)=>\{[\s\S]*?\});/);
+if (!pnlM) bad('pnl formatter missing');
+else {
+  const pnl = new Function('return (' + pnlM[1] + ');')();
+  if (pnl(-1.0) !== '-1.00')       bad(`pnl(-1) should be "-1.00", got "${pnl(-1.0)}"`);
+  if (pnl(1.5) !== '1.50')         bad(`pnl(1.5) should be "1.50", got "${pnl(1.5)}"`);
+  if (!/[1-9]/.test(pnl(-0.001)))  bad(`pnl(-0.001) must reveal a non-zero value (was flat 0.00), got "${pnl(-0.001)}"`);
+  if (pnl(0.05) !== '0.0500')      bad(`pnl(0.05) should expand to "0.0500", got "${pnl(0.05)}"`);
+}
+if (!/<td className=\{pl>=0\?'up':'down'\}>\{pnl\(pl\)\}<\/td>/.test(src)) bad('per-row Profit must use the pnl() formatter');
+if (!/\{pnl\(floating\)\}/.test(src)) bad('account Profit total must use the pnl() formatter');
+
 if (fail) { console.error(`\n🔴 FAIL — ${fail} position-binding problem(s).`); process.exit(1); }
 console.log('🟢 PASS: each position marks against its OWN entry + OWN symbol quote, per side (BUY→BID, SELL→ASK); one shared positionPnL helper; no copied prices/P&L.');
