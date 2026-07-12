@@ -44,7 +44,7 @@ if (!/const freeMargin = equity - usedMargin;/.test(src)) bad('Free Margin = Equ
 if (!/const level=marginUsed>0\?\(equity\/marginUsed\*100\):0;/.test(src)) bad('Margin Level = Equity/Margin × 100');
 // contract size must NOT hardcode 100000 in the P&L paths any more
 if (/const contract=100000;/.test(src)) bad('BottomBar P&L still hardcodes contract=100000 (crypto/stock P&L blows up)');
-if (!/lotsOf\(p\)\*contractSize\(p\.symbol\)/.test(src)) bad('floating P&L must use contractSize(symbol), not a flat 100000');
+if (!/lotsOf\(p\)\*pnlContract\(p\.symbol\)/.test(src)) bad('floating P&L must use pnlContract(symbol) (per-asset), not a flat 100000');
 
 // ── Free-Margin order gate + Margin Call / Stop-Out (30%) ──
 // one-click panel: locked when no free margin; refuses with the error sound

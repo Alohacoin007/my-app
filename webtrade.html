@@ -1017,6 +1017,13 @@ const CONTRACT = 100000;   // FX standard lot (units of base ccy per 1.00 lot)
 // coin/share per lot. Using 100k for crypto/stocks was the margin/P&L blow-up ($120k on 0.01 lot):
 // margin & floating both key off THIS. Mirrors the server exactly (fx_notional_usd: FX→100000 else 1).
 const contractSize = (symbol)=> (SYM_CAT[symbol]==='Forex' ? CONTRACT : 1);
+// DEMO P&L VISIBILITY WEIGHT (crypto only). A 0.01-lot crypto position's TRUE P&L is sub-cent, so on
+// a clean 2-decimal display it froze at 0.00. This weight scales the crypto floating P&L (DISPLAY +
+// equity only) so a 0.01-lot trade ticks in visible cents (+0.15 / -0.30). It does NOT touch MARGIN:
+// requiredMargin() keeps the unscaled contractSize (server fx_notional_usd lockstep). ⚠ DEMO-ONLY —
+// this makes crypto floating ≠ true realized P&L; reset to 1 before wiring real B-Book (WT_DEMO off).
+const CRYPTO_PNL_SCALE = 10;
+const pnlContract = (symbol)=> contractSize(symbol) * (SYM_CAT[symbol]==='Crypto' ? CRYPTO_PNL_SCALE : 1);
 // ── ONE source of truth for a position's live floating P&L + its current close price. Each
 //    position marks against ITS OWN symbol's live quote and ITS OWN stored entry (open_price);
 //    nothing is shared between rows, so N positions never copy each other's price/P&L. MT5 side
@@ -1027,7 +1034,7 @@ function positionPnL(p, q){
   if(p._demo && p.profit!=null) return +p.profit;                 // pinned demo-seed P/L
   const cur=closePx(p, q); if(cur==null) return 0;                // BUY→BID · SELL→ASK
   const dir=sideUp(p.side)==='SELL'?-1:1;
-  return dir*(cur-(+p.open_price||cur))*lotsOf(p)*contractSize(p.symbol)*(p.symbol.includes('JPY')?0.0067:1);
+  return dir*(cur-(+p.open_price||cur))*lotsOf(p)*pnlContract(p.symbol)*(p.symbol.includes('JPY')?0.0067:1);
 }
 const LEVERAGES = [10,50,100,500];
 
@@ -2095,10 +2102,6 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
   const marginUsed=pos.reduce((s,p)=> s+requiredMargin(p.symbol, lotsOf(p), leverage), 0);  // leverage-driven
   const level=marginUsed>0?(equity/marginUsed*100):0;
   const num=(n)=>(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-  // P&L formatter — a small crypto/stock lot (0.01 BTC ≈ $640) makes floating P&L SUB-CENT, so 2
-  // decimals rounds a live position to a flat "0.00". Keep 2 decimals for $1+ amounts (FX/large),
-  // but expand to 4 for sub-dollar values so a working position visibly ticks instead of reading 0.
-  const pnl=(n)=>{ n=Number(n)||0; const d=Math.abs(n)>=1?2:4; return n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); };
 
   // MT5 History customization — filter the closed-deal log by period (All / Today / Last Week /
   // Last Month / Custom from-to). close_ms is stamped at close time for exact date filtering.
@@ -2157,7 +2160,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
               return (<tr key={p.local_id}>
                 <td>{p.symbol.toLowerCase()}{sfx(p.symbol).toLowerCase()}</td><td>{tkt}</td><td>{tm}</td><td className={sideUp(p.side)==='SELL'?'down':'up'}>{sideUp(p.side).toLowerCase()}</td>
                 <td>{lotsOf(p).toFixed(2)}</td><td>{fmtPx(p.symbol,+p.open_price)}</td><td>—</td><td>—</td>
-                <td>{fmtPx(p.symbol,closePx(p,m))}</td><td className={pl>=0?'up':'down'}>{pnl(pl)}</td>
+                <td>{fmtPx(p.symbol,closePx(p,m))}</td><td className={pl>=0?'up':'down'}>{num(pl)}</td>
                 <td><button className="xclose" title="Close position" onClick={()=>closePos(p)}>✕</button></td>
               </tr>); })}
           </tbody>
@@ -2178,7 +2181,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
               <span><span className="k">{t('Margin Level')}:</span> <b className={marginUsed>0&&level<100?'down':''}>{marginUsed>0?num(level)+' %':'—'}</b>
                 {marginUsed>0&&level<100&&level>=30 && <b style={{color:'#e0a020',marginLeft:6}}>⚠ Margin Call</b>}
                 {marginUsed>0&&level<30 && <b style={{color:'#ff5252',marginLeft:6}}>⛔ Stop Out &lt;30%</b>}</span>
-              <span><span className="k">{t('Profit')}:</span> <b className={floating>=0?'up':'down'}>{pnl(floating)}</b></span>
+              <span><span className="k">{t('Profit')}:</span> <b className={floating>=0?'up':'down'}>{num(floating)}</b></span>
             </div>
           </td></tr></tfoot>}
         </table>
