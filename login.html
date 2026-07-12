@@ -255,7 +255,13 @@ async function doLogin(){
     // Splash wordmark per server (Alpexa Sports / Crypto / FX). Parent watermark is static.
     try{ document.getElementById('splashMark').textContent = SERVERS[selServer].name; }catch(e){}
     document.getElementById('successScreen').style.display='flex';
-    const dest=selServer===1?'crypto-live.html':selServer===2?'sports-live.html':'trading.html';
+    // login chime for the terminal (WebTrade plays it on the next interaction) — set on every login
+    try{ sessionStorage.setItem('alpexa.loginChime','1'); }catch(e){}
+    // dest override: only a whitelisted local page (e.g. the WebTrade terminal round-trip). Falls
+    // back to the per-server landing app. No open-redirect (same-origin, fixed allow-list).
+    const _q=(function(){ try{ return new URLSearchParams(location.search).get('dest'); }catch(e){ return null; } })();
+    const _ok=(_q==='webtrade.html');
+    const dest=_ok?_q:(selServer===1?'crypto-live.html':selServer===2?'sports-live.html':'trading.html');
     setTimeout(()=>{window.location.href=dest;},1500);
   }catch(err){ fail((err&&err.message)||'Login failed. Please try again.'); }
 }
@@ -372,7 +378,9 @@ async function quickLogin(){
   try{ var s=await window._db.auth.getSession(); hasSession=!!(s&&s.data&&s.data.session); }catch(e){}
   txt.textContent=old; btn.style.opacity='1';
   if(hasSession){
-    var dest=cred.server===1?'crypto-live.html':cred.server===2?'sports-live.html':'trading.html';
+    try{ sessionStorage.setItem('alpexa.loginChime','1'); }catch(e){}
+    var _bq=(function(){ try{ return new URLSearchParams(location.search).get('dest'); }catch(e){ return null; } })();
+    var dest=(_bq==='webtrade.html')?_bq:(cred.server===1?'crypto-live.html':cred.server===2?'sports-live.html':'trading.html');
     window.location.href=dest;
   } else {
     // Session expired (or revoked) — fall back to a one-time password login. Never a lockout.

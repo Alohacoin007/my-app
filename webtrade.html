@@ -358,6 +358,18 @@
   /* ── New Order popup — MODERN single-column dark card (400×550, matte black) ── */
   .omodal-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100000 !important;display:flex;
     align-items:center;justify-content:center;font-family:"Segoe UI",Tahoma,Arial,sans-serif}   /* above the floating toolbox (z-9999) */
+  /* Login gate — full-terminal overlay when logged out (production) */
+  .logingate{position:absolute;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;
+    background:rgba(6,8,12,.82);backdrop-filter:blur(3px);font-family:"Segoe UI",Tahoma,Arial,sans-serif}
+  .logingate .lg-card{width:320px;max-width:92vw;background:#0d0e12;border:1px solid #242831;padding:30px 28px 22px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.55)}
+  .logingate .lg-logo{font-size:17px;letter-spacing:.5px;color:#c8ccd2;font-weight:400}.logingate .lg-logo b{font-weight:700;color:#fff}
+  .logingate .lg-sub{font-size:12px;color:#8890a0;margin:8px 0 20px}
+  .logingate .lg-btn{width:100%;height:44px;border:none;background:#2f7fe0;color:#fff;font-size:14px;font-weight:700;letter-spacing:.3px;cursor:pointer;transition:opacity .15s}
+  .logingate .lg-btn:hover{opacity:.9}
+  .logingate .lg-dismiss{margin-top:14px;font-size:11.5px;color:#6a7180;cursor:pointer}.logingate .lg-dismiss:hover{color:#9aa1ad}
+  .terminal.light .logingate{background:rgba(14,16,21,.86)}
+  .terminal.light .logingate .lg-card{background:#000000;border:1px solid #1D212A}
+  .terminal.light .logingate .lg-btn{background:#00c853}
   .omodal{width:400px;max-width:96vw;height:550px;max-height:94vh;background:#0a0e14;border:1px solid #222;
     box-shadow:0 16px 50px rgba(0,0,0,.7);display:flex;flex-direction:column;color:#fff}
   .omodal *{border-radius:0 !important;box-sizing:border-box;font-family:inherit}
@@ -708,6 +720,7 @@ const synOpen  = ()=>_tone([{f0:1750,f1:950,type:'square',t0:0,dur:0.055,gain:0.
 const synClose = ()=>_tone([{f0:680,f1:1020,type:'sine',t0:0,dur:0.10,gain:0.20}]);                                             // 청산: 상승 확인음
 const synError = ()=>_tone([{f0:320,f1:170,type:'sawtooth',t0:0,dur:0.20,gain:0.17}]);                                          // 실패: 낮은 부저
 const synStop  = ()=>_tone([{f0:500,type:'square',t0:0,dur:0.10,gain:0.20},{f0:500,type:'square',t0:0.14,dur:0.10,gain:0.20}]); // 스탑아웃: 삐-삐 경보
+const synLogin = ()=>_tone([{f0:660,f1:880,type:'sine',t0:0,dur:0.10,gain:0.16},{f0:990,f1:1320,type:'sine',t0:0.10,dur:0.14,gain:0.18}]); // 로그인: 3음 상승 차임
 // wrap: prefer the real file once it actually loads, else the fallback synth.
 function mkSnd(src, syn){
   let ok=false; const a=new Audio(src); a.preload='auto';
@@ -722,6 +735,7 @@ const sndOpen    = mkSnd('/assets/sounds/ok.wav',      synOpen);   // fx_open  �
 const sndClose   = mkSnd('/assets/sounds/connect.wav', synClose);  // fx_close 성공 (포지션 청산)
 const sndError   = mkSnd('/assets/sounds/timeout.wav', synError);  // RPC 에러 / 마진 게이트 차단
 const sndStopout = mkSnd('/assets/sounds/stops.wav',   synStop);   // 30% 스탑아웃 강제청산 (서버 크론)
+const sndLogin   = mkSnd('/assets/sounds/connect.wav', synLogin);  // 로그인 성공 차임
 const playSnd = (s)=>{ try{ s.play(); }catch(e){} };
 
 // Autoplay Unlock — first user gesture primes the AudioContext + the <audio> elements, so
@@ -2669,6 +2683,23 @@ function floatGeo(i){
   if(i<4) return quad[i];
   const k=i-4; return { fx:Math.min(.45,.10+k*.03), fy:Math.min(.45,.12+k*.05), fw:.5, fh:.5 };
 }
+/* ── Login gate: production (WT_DEMO=false) needs a real account. We REUSE the single proven auth
+   path (login.html — it does sign-in + profile lookup + the #5 cross-account cache wipe), round-
+   tripping back to the terminal so the per-tab sessionStorage session lands in THIS tab. The chime
+   plays on return (login.html sets alpexa.loginChime). No auth logic is duplicated here. ── */
+function LoginGate({ onClose }){
+  const go=()=>{ try{ location.href='login.html?dest=webtrade.html'; }catch(e){} };
+  return (
+    <div className="logingate" onMouseDown={e=>{ if(e.target===e.currentTarget) onClose&&onClose(); }}>
+      <div className="lg-card" onMouseDown={e=>e.stopPropagation()}>
+        <div className="lg-logo">ALPEXA <b>WebTrade</b></div>
+        <div className="lg-sub">Log in to your live account to trade.</div>
+        <button className="lg-btn" onClick={go}>Log in</button>
+        <div className="lg-dismiss" onClick={()=>onClose&&onClose()}>Browse charts (read-only)</div>
+      </div>
+    </div>
+  );
+}
 function App(){
   const cfg=React.useRef(wtConfig.load()).current;     // saved layout (persists across reloads)
   // ALWAYS boot to the fixed default 2×2 @ M1 (chart layout is intentionally NOT persisted, so a
@@ -2712,6 +2743,17 @@ function App(){
     delete geos.current[id]; setActiveId(a=> a===id ? null : a); }, []);
   const changeSymbol=React.useCallback((id,sym)=>{ setCharts(cs=>cs.map(c=> c.id===id ? {...c, symbol:sym} : c)); }, []);   // MW drag-drop → this window's chart switches symbol
   React.useEffect(()=>{ priceStore.start(); positionsStore.start(); }, []);
+  // Login chime — login.html sets this flag on a successful sign-in; play the chime on the first
+  // interaction here (autoplay policy blocks sound until a gesture). Fires once, then clears.
+  React.useEffect(()=>{ let armed=false; try{ armed=!!sessionStorage.getItem('alpexa.loginChime'); }catch(e){}
+    if(!armed) return;
+    const fire=()=>{ try{ sessionStorage.removeItem('alpexa.loginChime'); }catch(e){} playSnd(sndLogin);
+      document.removeEventListener('pointerdown',fire); document.removeEventListener('keydown',fire); };
+    document.addEventListener('pointerdown',fire,{once:true}); document.addEventListener('keydown',fire,{once:true});
+    return ()=>{ document.removeEventListener('pointerdown',fire); document.removeEventListener('keydown',fire); };
+  }, []);
+  const loggedIn = !!(window.AlpexaSync && AlpexaSync.me);
+  const [showLogin,setShowLogin]=React.useState(!loggedIn && !WT_DEMO);   // gate on load when logged out (production)
   React.useEffect(()=>{ wtConfig.save({ view, leftw, bottomh, navh, theme, lang }); }, [view, leftw, bottomh, navh, theme, lang]);   // charts (+ their per-chart indicators) NOT persisted → refresh = fixed default
   React.useEffect(()=>{ requestAnimationFrame(()=>chartResizer.resizeAll()); }, [charts.length]);   // reflow on add/close
   // ── MT5 keyboard shortcuts (View menu + New Order) ──
@@ -2767,6 +2809,7 @@ function App(){
   const activeSym = activeChart ? activeChart.symbol : null;
   return (
     <div className={"terminal"+(theme==='light'?' light':'')} style={gridStyle}>
+      {showLogin && <LoginGate onClose={()=>setShowLogin(false)} />}
       <MenuBar indicators={activeInds} view={view} tool={tool} />
       {view.toolbars && <Toolbar tf={activeChart?activeChart.tf:'H1'} chartType={activeChart?activeChart.type:'candle'} tool={tool} />}
       {leftShown && <div className="left" style={{'--navh': navh+'px'}}>
