@@ -24,11 +24,23 @@ if (!/const catOf = \(s\)=> SYM_CAT\[s\] \|\| CLS_MAP\[SERVER_CLS\[s\]\] \|\|/.t
 // 3) Market Watch renders the LIVE list (syms state), not the hardcoded WATCH
 if (!/const \[syms,setSyms\]=React\.useState\(symbolStore\.list\);/.test(src)) bad('MarketWatch must hold the live symbol list in state');
 if (!/React\.useEffect\(\(\)=> symbolStore\.subscribe\(l=>setSyms\(\[\.\.\.l\]\)\), \[\]\)/.test(src)) bad('MarketWatch must subscribe to symbolStore');
-if (!/syms\.filter\(sym=>!hidden\.has\(sym\) && \(cat==='All'\|\|catOf\(sym\)===cat\)\)/.test(src)) bad('the Symbols table must map the live syms (class-filtered via catOf)');
-if (!/<MWTrading cat=\{cat\} syms=\{syms\} onCtx=\{ctx\} \/>/.test(src)) bad('the Trading tab must also use the live syms');
+if (!/const pool=syms\.filter\(s=>!hidden\.has\(s\)\);/.test(src)) bad('the full live pool must be held from the syms state');
+if (!/pool\.filter\(s=> \(cat==='All'\|\|catOf\(s\)===cat\)/.test(src)) bad('class filter must run over the live pool via catOf');
+if (!/\{visible\.map\(sym=>\{/.test(src)) bad('the Symbols table must render the (Top-20 / filtered) visible list');
+if (!/<MWTrading cat=\{cat\} syms=\{visible\} onCtx=\{ctx\} \/>/.test(src)) bad('the Trading tab must render the visible list');
 if (/WATCH\.filter\(sym=>!hidden\.has/.test(src)) bad('the Market Watch must NOT still render the hardcoded WATCH');
 
-// 4) memory-only (no localStorage for the symbol list)
+// 4) Top 20 default + background pool + search ingestion + throttle scoped to visible rows
+if (!/const TOP20 = \[/.test(src)) bad('TOP20 default set missing');
+if ((src.match(/'BTCUSD','ETHUSD'/g) || []).length < 1 || !/const TOP20 = \[[\s\S]*?'BTCUSD'[\s\S]*?\];/.test(src)) bad('TOP20 must include the popular symbols (BTCUSD, etc.)');
+if (!/const visible = \(q \|\| cat!=='All'\)/.test(src)) bad('visible must be Top 20 by default, or the pool filtered on search/class');
+if (!/pool\.filter\(s=>TOP20\.indexOf\(s\)>=0\)\.sort/.test(src)) bad('default view must be the Top 20 (in order) from the live pool');
+if (!/!q \|\| s\.toLowerCase\(\)\.includes\(q\) \|\| catOf\(s\)\.toLowerCase\(\)\.includes\(q\)/.test(src)) bad('search must match symbol OR class over the full pool');
+if (!/const \[search,setSearch\]=React\.useState\(''\)/.test(src)) bad('Market Watch needs a search box');
+if (!/visRef\.current\.forEach\(s=>\{/.test(src)) bad('the tick throttle must compute ONLY the visible rows (not the whole pool)');
+if (!/visRef\.current=visible;/.test(src)) bad('visRef must track the visible list for the throttle');
+
+// 5) memory-only (no localStorage for the symbol list)
 if (/localStorage\.[gs]etItem\([^)]*symbol/i.test(src)) bad('the symbol list must be memory-only (no localStorage)');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} dynamic-symbol problem(s).`); process.exit(1); }

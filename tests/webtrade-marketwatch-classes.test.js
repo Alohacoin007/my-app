@@ -30,7 +30,7 @@ const baseBlock = (src.match(/const BASE = \{[\s\S]*?\};/) || [''])[0];
 for (const s of ['AAPL', 'BTCUSD', 'ETHUSD', 'TSLA']) if (!new RegExp('\\b' + s + ':').test(baseBlock)) bad(`BASE missing a seed price for ${s}`);
 
 // the Market Watch list filters by the selected class
-if (!/syms\.filter\(sym=>!hidden\.has\(sym\) && \(cat==='All'\|\|catOf\(sym\)===cat\)\)/.test(src)) bad('MW list must render the LIVE symbol set (syms) filtered by class via catOf');
+if (!/pool\.filter\(s=> \(cat==='All'\|\|catOf\(s\)===cat\)/.test(src)) bad('MW list must class-filter the live pool via catOf');
 // the right-click menu offers the class filters + All
 for (const c of ['Forex', 'Stocks', 'Crypto']) if (!new RegExp(`\\{l:'${c}', act:'cat', arg:'${c}'\\}`).test(src)) bad(`right-click menu missing the ${c} filter`);
 if (!/\{l:'All Symbols', act:'cat', arg:'All'\}/.test(src)) bad('right-click menu must have an "All Symbols" entry');
