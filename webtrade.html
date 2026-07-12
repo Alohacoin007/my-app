@@ -670,7 +670,7 @@ const I18N = {
     Symbol:'심볼','Volume (lots)':'수량 (랏)','Stop Loss':'손절','Take Profit':'익절','Sell by Market':'시장가 매도','Buy by Market':'시장가 매수',SPREAD:'스프레드',
     Bid:'매도',Ask:'매수','Daily Ch%':'일일 변동%',Symbols:'심볼',Details:'상세',Trading:'거래',Ticks:'틱',
     'New Chart':'새 차트',Hide:'숨기기','Show All':'모두 표시',Ticket:'티켓',Time:'시간',Type:'유형',Price:'가격',Volume:'수량',
-    'Market closed':'장 마감 — 거래 시간이 아닙니다','Please log in to trade':'거래하려면 로그인이 필요합니다','Margin Call — insufficient free margin':'마진콜 — 증거금 부족' },
+    'Market closed':'장 마감 — 거래 시간이 아닙니다','Please log in to trade':'거래하려면 로그인이 필요합니다','Margin Call — insufficient free margin':'마진콜 — 증거금 부족','Order rejected':'주문 거절됨' },
   ja:{ File:'ファイル',View:'表示',Insert:'挿入',Charts:'チャート',Tools:'ツール',Window:'ウィンドウ',Help:'ヘルプ',
     Languages:'言語',Toolbars:'ツールバー','Status Bar':'ステータスバー','Market Watch':'気配値',Navigator:'ナビゲーター',Toolbox:'ツールボックス','Full Screen':'全画面表示','Color Theme — Legend / Dark':'カラーテーマ — レジェンド/ダーク',
     'New Chart Window':'新規チャート','New Order':'新規注文','Tile Windows':'ウィンドウの整列','Algo Trading':'自動売買','About Alpexa WebTrade':'Alpexa WebTrade について','Help Topics':'ヘルプ項目','History Center':'ヒストリーセンター',Options:'オプション',Indicators:'インジケーター',Text:'テキスト',Cascade:'重ねて表示','Open Deleted':'削除の復元',
@@ -679,7 +679,7 @@ const I18N = {
     Symbol:'銘柄','Volume (lots)':'数量 (ロット)','Stop Loss':'損切り','Take Profit':'利食い','Sell by Market':'成行売り','Buy by Market':'成行買い',SPREAD:'スプレッド',
     Bid:'売値',Ask:'買値','Daily Ch%':'日次変動%',Symbols:'銘柄',Details:'詳細',Trading:'取引',Ticks:'ティック',
     'New Chart':'新規チャート',Hide:'非表示','Show All':'すべて表示',Ticket:'チケット',Time:'時刻',Type:'タイプ',Price:'価格',Volume:'数量',
-    'Market closed':'市場は閉場中です','Please log in to trade':'取引にはログインが必要です','Margin Call — insufficient free margin':'マージンコール — 証拠金不足' },
+    'Market closed':'市場は閉場中です','Please log in to trade':'取引にはログインが必要です','Margin Call — insufficient free margin':'マージンコール — 証拠金不足','Order rejected':'注文が拒否されました' },
   zh:{ File:'文件',View:'视图',Insert:'插入',Charts:'图表',Tools:'工具',Window:'窗口',Help:'帮助',
     Languages:'语言',Toolbars:'工具栏','Status Bar':'状态栏','Market Watch':'市场报价',Navigator:'导航器',Toolbox:'工具箱','Full Screen':'全屏','Color Theme — Legend / Dark':'配色 — 传奇/深色',
     'New Chart Window':'新图表','New Order':'新订单','Tile Windows':'平铺窗口','Algo Trading':'自动交易','About Alpexa WebTrade':'关于 Alpexa WebTrade','Help Topics':'帮助主题','History Center':'历史中心',Options:'选项',Indicators:'指标',Text:'文本',Cascade:'层叠窗口','Open Deleted':'恢复已删除',
@@ -688,7 +688,7 @@ const I18N = {
     Symbol:'品种','Volume (lots)':'手数','Stop Loss':'止损','Take Profit':'止盈','Sell by Market':'市价卖出','Buy by Market':'市价买入',SPREAD:'点差',
     Bid:'卖价',Ask:'买价','Daily Ch%':'日涨跌%',Symbols:'品种',Details:'详情',Trading:'交易',Ticks:'报价',
     'New Chart':'新图表',Hide:'隐藏','Show All':'显示全部',Ticket:'订单号',Time:'时间',Type:'类型',Price:'价格',Volume:'手数',
-    'Market closed':'市场已休市','Please log in to trade':'交易需先登录','Margin Call — insufficient free margin':'追加保证金 — 可用保证金不足' },
+    'Market closed':'市场已休市','Please log in to trade':'交易需先登录','Margin Call — insufficient free margin':'追加保证金 — 可用保证金不足','Order rejected':'订单被拒绝' },
 };
 const t = (s)=> (I18N[LANG.cur] && I18N[LANG.cur][s]) || s;
 
@@ -1223,7 +1223,7 @@ function OrderBox({ symbol }){
       // PRODUCTION: no client demo fill. A server rejection (slippage/margin/rpc) already fired
       // sndError; logged-out just prompts login. The demo ledger path is CLOSED (#5: server owns money).
       if(r&&r.reason==='not_logged_in'){ playSnd(sndError); alert(t('Please log in to trade')); }
-      else console.warn('one-click order rejected:', (r&&(r.code||r.reason))||'unknown');   // slippage/margin → error sound only, no fill
+      else { const rs=(r&&(r.reason||r.code))||'unknown'; console.warn('one-click order rejected:', rs); alert(t('Order rejected')+': '+rs); }   // show WHY (server reason) — sndError already fired
     }
     // ── The Snap: 처리 상태 해제 → 패널 0.1s 플래시 (사운드는 placeOrder에서 sndOpen/sndError로 발동) ──
     busyRef.current=null; setBusy(null);
@@ -2620,7 +2620,7 @@ function OrderModal({ symbol:sym0, onClose }){
     if(r.ok){ onClose(); return; }                                   // B-Book fill booked server-side (sndOpen in placeOrder)
     // PRODUCTION: no client demo fill. Server rejection already fired sndError; logged-out prompts login.
     if(r.reason==='not_logged_in'){ playSnd(sndError); alert(t('Please log in to trade')); return; }
-    else if(r.reason) console.warn('order rejected:', r.code||r.reason);
+    else if(r.reason){ console.warn('order rejected:', r.code||r.reason); alert(t('Order rejected')+': '+(r.reason||r.code)); return; }   // show WHY (server reason)
     onClose();
   };
   const spin=(set,cur,step,dg)=>({ up:()=>set((+cur+step).toFixed(dg)), dn:()=>set(Math.max(0,+cur-step).toFixed(dg)) });
