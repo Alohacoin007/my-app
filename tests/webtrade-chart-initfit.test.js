@@ -17,11 +17,11 @@ if (!/GRID\.map\(\(s,i\)=>\(\{ id:i\+1, symbol:s, tf:'M1'/.test(src)) bad('defau
 if (!/new ResizeObserver\(doFit\)/.test(src)) bad('a ResizeObserver must drive the initial fit');
 if (!/boxRO\.observe\(box\.current\)/.test(src)) bad('the ResizeObserver must observe the chart box');
 if (!/const w=box\.current\.clientWidth, h=box\.current\.clientHeight;\s*\n?\s*if\(w<=0\|\|h<=0\) return;/.test(src)) bad('doFit must no-op while the box has no size (0-wide window)');
-// once, when candles first load: apply the MT5 slim density (barSpacing 5 + rightOffset 15) and scroll
-// to the newest bar — NOT fitContent (which stretches all 400 bars to full width → fat candles).
-if (!/if\(candles\.current\.length && !fitted\)\{ const ts=chart\.current\.timeScale\(\);/.test(src)) bad('doFit must set the fixed MT5 view once when candles load');
-if (!/ts\.applyOptions\(\{ barSpacing:5, rightOffset:15 \}\); ts\.scrollToRealTime\(\);/.test(src)) bad('doFit must apply slim barSpacing + right margin and scroll to the newest bar (not fitContent)');
-if (!/catch\(_\)\{ try\{ ts\.fitContent\(\); \}catch\(e2\)\{\} \}/.test(src)) bad('doFit must fall back to fitContent if scrollToRealTime is unavailable');
+// INVARIANT LOCK: doFit re-pins the MT5 slim density (barSpacing 5 + rightOffset 15) on EVERY resize
+// (not just the first), so a splitter-drag / window-resize can never roll the candle width back to fat.
+if (!/const ts=chart\.current\.timeScale\(\);\s*\n\s*try\{ ts\.applyOptions\(\{ barSpacing:5, rightOffset:15 \}\); \}catch\(_\)\{\}/.test(src)) bad('doFit must re-pin barSpacing 5 + rightOffset 15 on every resize (invariant lock)');
+// only the FIRST fit scrolls to the newest bar (later resizes keep the scroll), fitContent fallback
+if (!/if\(candles\.current\.length && !fitted\)\{ try\{ ts\.scrollToRealTime\(\); \}catch\(_\)\{ try\{ ts\.fitContent\(\); \}catch\(e2\)\{\} \} fitted=true; \}/.test(src)) bad('doFit must scroll-to-realtime only on the first fit, with a fitContent fallback');
 // candle load triggers the fit now + next frame + a late retry
 if (!/doFit\(\); requestAnimationFrame\(doFit\); setTimeout\(doFit,120\)/.test(src)) bad('after loading candles, fit now + rAF + a late retry (deferred layout)');
 // cleaned up on teardown

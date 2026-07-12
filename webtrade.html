@@ -1590,6 +1590,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       grid:{ vertLines:{color:th0.grid, style:DOT}, horzLines:{color:th0.grid, style:DOT} },
       timeScale:{ borderColor:th0.border, timeVisible:true, secondsVisible:false, barSpacing:5, minBarSpacing:0.8, rightOffset:15 },   // MT5-slim lock: barSpacing 5 (sharp, dense candles) + a 15-bar right margin (rightOffset) for future-trend reading space
       rightPriceScale:{ borderColor:th0.border, scaleMargins:{top:0.08, bottom:0.08} },   // trim vertical price padding (0.10→0.08) → taller candle canvas
+      handleScale:{ mouseWheel:false, pinch:false, axisPressedMouseMove:{time:false, price:true} },   // BAR-SPACING LOCK: wheel/pinch/time-axis-drag can NEVER re-zoom the candle width (price-axis drag still ok)
       crosshair:{ vertLine:{color:th0.cross, style:DOT, visible: themeBus.theme!=='light', labelVisible: themeBus.theme!=='light'}, horzLine:{color:th0.cross, style:DOT, visible: themeBus.theme!=='light', labelVisible: themeBus.theme!=='light'} },   // LEGEND: no crosshair lines OR axis labels on hover (free mouse, MT5-like)
     });
     // live re-theme when the user flips Light/Dark (no rebuild)
@@ -1654,10 +1655,12 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     const doFit=()=>{ try{ if(!box.current||!chart.current) return; const w=box.current.clientWidth, h=box.current.clientHeight;
       if(w<=0||h<=0) return; chart.current.resize(w,h);
       // MT5 default view: fixed slim barSpacing + a right margin (NOT fitContent, which stretches all
-      // 400 bars to full width → fat candles). Show the recent bars at MT5 density, newest at the margin.
-      if(candles.current.length && !fitted){ const ts=chart.current.timeScale();
-        try{ ts.applyOptions({ barSpacing:5, rightOffset:15 }); ts.scrollToRealTime(); }catch(_){ try{ ts.fitContent(); }catch(e2){} }
-        fitted=true; } }catch(e){} };
+      // 400 bars to full width → fat candles). INVARIANT LOCK: re-pin the 5px density + 15-bar margin on
+      // EVERY resize so a splitter-drag / window-resize can never roll the candle width back to fat.
+      const ts=chart.current.timeScale();
+      try{ ts.applyOptions({ barSpacing:5, rightOffset:15 }); }catch(_){}
+      if(candles.current.length && !fitted){ try{ ts.scrollToRealTime(); }catch(_){ try{ ts.fitContent(); }catch(e2){} } fitted=true; }
+      }catch(e){} };
     let boxRO=null; try{ boxRO=new ResizeObserver(doFit); boxRO.observe(box.current); }catch(e){}
     // CANDLES — paint the deterministic seed IMMEDIATELY so the grid is NEVER empty (feed-independent,
     // works for CLOSED weekend symbols too — history is never gated by market hours). Then upgrade to
@@ -1678,6 +1681,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       const u={ time:b.time, open:b.open, high:Math.max(b.high,close), low:Math.min(b.low,close), close };
       bar.current=u;
       try{ series.current.update(typeRef.current==='line' ? {time:u.time,value:close} : u); }catch(e){}
+      try{ chart.current.timeScale().applyOptions({ rightOffset:15 }); }catch(e){}   // RIGHT-MARGIN LOCK: every tick re-pins the 15-bar future gap (idempotent — never yanks the scroll)
     }, 400);
     const unsub=priceStore.subscribe(onTick);
     const boxEl=box.current;

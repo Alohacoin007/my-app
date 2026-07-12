@@ -34,5 +34,15 @@ if (/rightOffset:6\b/.test(blk)) bad('old rightOffset:6 must be gone from the ma
 // grid stays the MT5 dotted checkerboard mask on both axes
 if (!/grid:\{ vertLines:\{color:th0\.grid, style:DOT\}, horzLines:\{color:th0\.grid, style:DOT\} \}/.test(blk)) bad('grid must stay the MT5 dotted checkerboard on both axes');
 
+// ── INVARIANT LOCK: no wheel/pinch/time-axis-drag zoom can ever change the 5px candle width ──
+if (!/handleScale:\{ mouseWheel:false, pinch:false, axisPressedMouseMove:\{time:false, price:true\} \}/.test(blk))
+  bad('bar-spacing lock: handleScale must disable wheel + pinch + time-axis-drag zoom (price drag stays)');
+// every resize re-pins the density + right margin (splitter/window-resize can never roll back to fat)
+if (!/try\{ ts\.applyOptions\(\{ barSpacing:5, rightOffset:15 \}\); \}catch\(_\)\{\}/.test(src))
+  bad('every doFit/resize must re-pin barSpacing 5 + rightOffset 15 (no rollback)');
+// every live tick re-pins the 15-bar right margin (idempotent)
+if (!/chart\.current\.timeScale\(\)\.applyOptions\(\{ rightOffset:15 \}\);/.test(src))
+  bad('every tick must re-pin rightOffset 15 (right-margin lock)');
+
 if (fail) { console.error(`\n🔴 FAIL — ${fail} chart-scale problem(s).`); process.exit(1); }
 console.log('🟢 PASS: MT5 chart scale — slim candles (barSpacing 5 / minBarSpacing 0.8), wide right margin (rightOffset 15), 10px axis font + trimmed price margins (bigger canvas), dotted grid intact.');
