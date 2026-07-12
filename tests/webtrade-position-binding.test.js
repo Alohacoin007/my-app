@@ -16,6 +16,8 @@ const near = (a, b, tol) => Math.abs(a - b) <= (tol == null ? 1e-6 : tol);
 const grab = (re, l) => { const m = src.match(re); if (!m) bad(l + ' missing'); return m ? m[0] : ''; };
 const lotsOf_src       = grab(/const lotsOf = \(p\)=>[^\n]*/, 'lotsOf');
 const sideUp_src       = grab(/const sideUp = \(s\)=>[^\n]*/, 'sideUp');
+const ccy_src          = grab(/const CCY = \/[^\n]*/, 'CCY');
+const catOf_src        = grab(/const catOf = \(s\)=>[^\n]*/, 'catOf');
 const contractSize_src = grab(/const contractSize = \(symbol\)=>[^\n]*/, 'contractSize');
 const closePx_src      = grab(/const closePx = \(p, q\)=>[^\n]*/, 'closePx');
 const positionPnL_src  = grab(/function positionPnL\(p, q\)\{[\s\S]*?\n\}/, 'positionPnL');
@@ -23,7 +25,7 @@ const positionPnL_src  = grab(/function positionPnL\(p, q\)\{[\s\S]*?\n\}/, 'pos
 if (!fail) {
   const SYM_CAT = { EURUSD:'Forex', BTCUSD:'Crypto' };
   const scope = new Function('SYM_CAT',
-    'const CONTRACT=100000;\n' + lotsOf_src + '\n' + sideUp_src + '\n' + contractSize_src + '\n' +
+    'const CONTRACT=100000;\n' + ccy_src + '\n' + catOf_src + '\n' + lotsOf_src + '\n' + sideUp_src + '\n' + contractSize_src + '\n' +
     closePx_src + '\n' + positionPnL_src + '\nreturn { positionPnL, closePx };')(SYM_CAT);
   const { positionPnL, closePx } = scope;
 

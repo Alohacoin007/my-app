@@ -38,7 +38,7 @@ if (/CRYPTO_PNL_SCALE/.test(wt)) bad('CRYPTO_PNL_SCALE must be removed in produc
 if (/pnlContract/.test(wt)) bad('pnlContract (scale wrapper) must be removed — positionPnL uses the true contractSize');
 
 // 7) leverage clamped to the house cap (lockstep with fx_open_margin.sql: FX 100, STOCK/CRYPTO 5)
-if (!/const LEV_CAP = \(symbol\)=> SYM_CAT\[symbol\]==='Forex' \? 100 : 5;/.test(wt)) bad('LEV_CAP (per-class leverage cap) missing');
+if (!/const LEV_CAP = \(symbol\)=> catOf\(symbol\)==='Forex' \? 100 : 5;/.test(wt)) bad('LEV_CAP (per-class leverage cap) missing');
 if (!/Math\.min\(\+leverage\|\|100, LEV_CAP\(symbol\)\)/.test(wt)) bad('requiredMargin must clamp leverage to LEV_CAP (server lockstep)');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} production-wiring problem(s).`); process.exit(1); }

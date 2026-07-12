@@ -14,6 +14,8 @@ const near = (a, b, tol) => Math.abs(a - b) <= (tol == null ? 0.01 : tol);
 
 // ── extract the real math and exercise it with a stub feed ──
 const grab = (re, label) => { const m = src.match(re); if (!m) bad(label + ' not found'); return m ? m[0] : ''; };
+const ccy_src            = grab(/const CCY = \/[^\n]*/, 'CCY');
+const catOf_src          = grab(/const catOf = \(s\)=>[^\n]*/, 'catOf');
 const contractSize_src   = grab(/const contractSize = \(symbol\)=>[^\n]*/, 'contractSize');
 const levCap_src         = grab(/const LEV_CAP = \(symbol\)=>[^\n]*/, 'LEV_CAP');
 const baseUsdRate_src    = grab(/function baseUsdRate\(symbol\)\{[\s\S]*?\n\}/, 'baseUsdRate');
@@ -23,7 +25,7 @@ if (!fail) {
   const SYM_CAT = { EURUSD:'Forex', USDJPY:'Forex', BTCUSD:'Crypto', SOLUSD:'Crypto', AAPL:'Stocks' };
   const priceStore = { mids:{ EURUSD:{mid:1.14}, USDJPY:{mid:162}, BTCUSD:{mid:64000}, SOLUSD:{mid:148}, AAPL:{mid:315} }, get(s){ return this.mids[s]; } };
   const rm = new Function('SYM_CAT','priceStore',
-    'const CONTRACT=100000;\n' + contractSize_src + '\n' + levCap_src + '\n' + baseUsdRate_src + '\n' + requiredMargin_src + '\nreturn requiredMargin;'
+    'const CONTRACT=100000;\n' + ccy_src + '\n' + catOf_src + '\n' + contractSize_src + '\n' + levCap_src + '\n' + baseUsdRate_src + '\n' + requiredMargin_src + '\nreturn requiredMargin;'
   )(SYM_CAT, priceStore);
 
   // FX: cap 100 = chosen 100 → unchanged (tens of dollars for 0.01 lot)
