@@ -876,7 +876,7 @@ const positionsStore = {
     if(r&&r.data&&r.data[0]){ this.acct=r.data[0]; this.notify(); } }catch(e){} },
   async loadPos(){ try{ if(WT_DEMO || !(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me)) return;
     const acct=AlpexaSync.acctFor&&AlpexaSync.acctFor('fx'); if(!acct) return;   // only THIS account's positions (not every fx account RLS can see)
-    const r=await AlpexaSync.db.from('positions').select('local_id,symbol,side,size,open_price,pnl,status').eq('server','fx').eq('acct_no',acct).eq('status','open').limit(200);   // EXACT columns match trading.html's proven query (no phantom 'stake') + scoped to the logged-in account
+    const r=await AlpexaSync.db.from('positions').select('local_id,symbol,side,size,open_price,pnl,status,updated_at').eq('server','fx').eq('acct_no',acct).eq('status','open').limit(200);   // real columns only (positions has updated_at, NOT created_at) + scoped to the logged-in account
     if(r&&r.data){ this.pos=r.data; this.notify(); } }catch(e){} },   // real load REPLACES the demo seed
   start(){ if(this.started) return; this.started=true;
     if(WT_DEMO){ this.acct=DEMO_ACCT; this.pos=DEMO_POS.slice(); this.notify(); }   // demo seed ONLY in demo mode; production loads the real account below
@@ -2194,7 +2194,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
             {tab==='Trade' && !pos.length && <tr><td className="empty" colSpan="11">{(!WT_DEMO && window.AlpexaSync&&AlpexaSync.me)?'No open positions':'로그인하면 실계정 포지션이 표시됩니다 (Log in to trade)'}</td></tr>}
             {tab==='Trade' && pos.map(p=>{ const m=mids[p.symbol]||{}; const pl=plOf(p);
               const tkt=String(p.local_id||'').replace(/\D/g,'').slice(-8)||p.local_id;
-              const tm=p.created_at?String(p.created_at).slice(0,19).replace('T',' ').replace(/-/g,'.'):'—';  // MT5: 2026.07.09 20:17:40
+              const _tt=p.updated_at||p.created_at; const tm=_tt?String(_tt).slice(0,19).replace('T',' ').replace(/-/g,'.'):'—';  // real positions carry updated_at (no created_at col); demo seed carries created_at. MT5: 2026.07.09 20:17:40
               return (<tr key={p.local_id}>
                 <td>{p.symbol.toLowerCase()}{sfx(p.symbol).toLowerCase()}</td><td>{tkt}</td><td>{tm}</td><td className={sideUp(p.side)==='SELL'?'down':'up'}>{sideUp(p.side).toLowerCase()}</td>
                 <td>{lotsOf(p).toFixed(2)}</td><td>{fmtPx(p.symbol,+p.open_price)}</td><td>—</td><td>—</td>

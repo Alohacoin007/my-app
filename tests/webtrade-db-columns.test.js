@@ -12,10 +12,11 @@ const src = fs.readFileSync(path.join(__dirname, '..', 'webtrade.html'), 'utf8')
 let fail = 0;
 const bad = (m) => { console.error('🔴 ' + m); fail++; };
 
-// Columns PROVEN to exist (fx_open.sql INSERT + trading.html production selects). 'stake' and
-// 'created_at' are intentionally ABSENT from positions — selecting them errors the query.
+// EXACT positions columns (information_schema, shared fx/sports/crypto table). NOTE: 'stake' EXISTS
+// (sports bets); the column that does NOT exist is 'created_at' — the real table has 'updated_at'.
+// Selecting 'created_at' was the actual empty-positions bug.
 const SCHEMA = {
-  positions: new Set(['cust_id','acct_no','server','kind','local_id','symbol','side','size','open_price','pnl','status','ticket','otype','trigger','sl','tp']),
+  positions: new Set(['id','cust_id','acct_no','server','kind','local_id','symbol','side','size','stake','open_price','pnl','potential','status','updated_at','game','pick','odds','meta']),
   accounts:  new Set(['id','cust_id','acct_no','balance','server','player_id']),
 };
 
@@ -34,8 +35,9 @@ for (const table of Object.keys(SCHEMA)) {
   if (seen === 0 && table === 'positions') bad('expected a positions SELECT in webtrade.html (loadPos)');
 }
 
-// the specific bug that shipped must never come back
-if (/\.from\('positions'\)\.select\('[^']*\bstake\b/.test(src)) bad("positions SELECT must NOT include 'stake' (no such column — this was the empty-positions bug)");
+// the specific bug that shipped must never come back: positions has NO 'created_at' (it has
+// 'updated_at') — selecting created_at errors the whole query → silently-empty positions.
+if (/\.from\('positions'\)\.select\('[^']*\bcreated_at\b/.test(src)) bad("positions has NO 'created_at' column (use 'updated_at') — selecting it errors the query → empty positions");
 
 // money reads must be SCOPED to the logged-in account (acctFor('fx')), NOT a blind limit(1) that
 // grabs a random fx account (that showed a $100 test account instead of the real $1M balance).
