@@ -31,11 +31,11 @@ const wch = grab('.cell-title .wc span:hover');
 if (!wch || !/background:#3a3f4d/.test(wch)) bad('control hover must be a dark-silver box (#3a3f4d)');
 
 // ACTIVE window header top line — dark = royal-blue neon, Legend = green neon; inactive = calm
-if (!/\.win\.active \.cell-title\{border-top:2px solid #1b46e6\}/.test(src)) bad('active header (dark) must be a 2px royal-blue neon top line');
-if (!/\.terminal\.light \.win\.active \.cell-title\{[^}]*border-top:2px solid #00ff55/.test(src)) bad('active header (Legend) must be a 2px neon-green top line');
+if (!/\.win\.active \.cell-title\{border-top:1px solid #1b46e6\}/.test(src)) bad('active header (dark) must be a 1px royal-blue neon top line (thin)');
+if (!/\.terminal\.light \.win\.active \.cell-title\{[^}]*border-top:1px solid #00ff55/.test(src)) bad('active header (Legend) must be a 1px neon-green top line (thin)');
 // Legend stays muted (no metallic gradient on its headers)
 const legendHdr = grab('.terminal.light .cell-title');
 if (!legendHdr || GRAD.test(legendHdr)) bad('Legend header must stay muted black (no metallic gradient)');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} header-skin problem(s).`); process.exit(1); }
-console.log('🟢 PASS: metallic silver-dark window headers (gradient + emboss/shadow hairlines + printed text); active = 2px neon top line (dark blue / Legend green); Legend header stays muted.');
+console.log('🟢 PASS: metallic silver-dark window headers (gradient + emboss/shadow hairlines + printed text); active = 1px neon top line (dark blue / Legend green); Legend header stays muted.');
