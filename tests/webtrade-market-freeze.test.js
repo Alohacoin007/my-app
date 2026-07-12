@@ -22,14 +22,18 @@ if (!/if\(!marketOpen\(sym\)\)\{ if\(!this\.mids\[sym\]\) this\._set\(sym, cur, 
 // ── behavioural: marketOpen is correct (crypto 24/7, FX weekend closed, stock weekend closed) ──
 const mo_src = grab(/function marketOpen\(symbol, at\)\{[\s\S]*?\n\}/, 'marketOpen');
 if (!fail) {
-  const marketOpen = new Function('SYM_CAT','US_MARKET_HOLIDAYS',
-    mo_src + '\nreturn marketOpen;')({BTCUSD:'Crypto',EURUSD:'Forex',AAPL:'Stocks'}, new Set());
+  // marketOpen classifies via catOf now (so dynamic stocks like SPACEX gate as stocks, not Forex)
+  const catOf = (s)=> ({BTCUSD:'Crypto',EURUSD:'Forex',AAPL:'Stocks',SPACEX:'Stocks'}[s]||'Forex');
+  const marketOpen = new Function('catOf','US_MARKET_HOLIDAYS',
+    mo_src + '\nreturn marketOpen;')(catOf, new Set());
   const SAT = Date.UTC(2026,6,11,12,0), WED = Date.UTC(2026,6,8,12,0);   // 2026-07-11 Sat, 2026-07-08 Wed
   if (marketOpen('BTCUSD', SAT) !== true) bad('crypto must be OPEN 24/7 (Saturday)');
   if (marketOpen('BTCUSD', WED) !== true) bad('crypto must be OPEN 24/7 (Wednesday)');
   if (marketOpen('EURUSD', SAT) !== false) bad('Forex must be CLOSED on Saturday');
   if (marketOpen('EURUSD', WED) !== true) bad('Forex must be OPEN Wednesday noon');
   if (marketOpen('AAPL', SAT) !== false) bad('US stock must be CLOSED on Saturday');
+  // the SPACEX bug: a dynamic stock must gate as a STOCK (closed weekend), not slip through as Forex
+  if (marketOpen('SPACEX', SAT) !== false) bad('dynamic stock SPACEX must be CLOSED on Saturday (catOf classification)');
 }
 
 // ── behavioural: _simulate FREEZES a closed symbol but WALKS an open one (crypto) ──

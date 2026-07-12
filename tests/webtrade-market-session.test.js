@@ -17,8 +17,9 @@ const holidaysSrc = (src.match(/const US_MARKET_HOLIDAYS = new Set\(\[[\s\S]*?\]
 const fnSrc = (src.match(/function marketOpen\(symbol, at\)\{[\s\S]*?\n\}/) || [])[0];
 if (!holidaysSrc || !fnSrc) { bad('marketOpen / US_MARKET_HOLIDAYS not found'); }
 else {
-  const SYM_CAT = { BTCUSD:'Crypto', EURUSD:'Forex', AAPL:'Stocks' };
-  const marketOpen = new Function('SYM_CAT', holidaysSrc + '\n' + fnSrc + '\nreturn marketOpen;')(SYM_CAT);
+  // marketOpen classifies via catOf now (dynamic stocks gate correctly, not as Forex)
+  const catOf = (s)=> ({ BTCUSD:'Crypto', EURUSD:'Forex', AAPL:'Stocks' }[s] || 'Forex');
+  const marketOpen = new Function('catOf', holidaysSrc + '\n' + fnSrc + '\nreturn marketOpen;')(catOf);
   const chk = (label, got, want) => { if (got !== want) bad(`${label}: got ${got}, want ${want}`); };
   // Crypto — always open
   chk('Crypto Sat', marketOpen('BTCUSD', '2026-07-11T03:00:00Z'), true);

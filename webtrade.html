@@ -846,6 +846,8 @@ const symbolStore = {
 };
 const sfx   = (s)=> catOf(s)==='Forex' ? '.FX' : catOf(s)==='Crypto' ? '.CR' : '.STK';   // display suffix per class
 const pip   = (s)=> (catOf(s)==='Stocks'||catOf(s)==='Crypto') ? 0.01 : (s.slice(3)==='JPY'||s.slice(0,3)==='JPY' ? 0.01 : 0.0001);
+// MT5 spread POINTS scale (1/point = 10^digits): 5-digit FX ×100000, 3-digit JPY ×1000, 2-digit stocks/crypto ×100.
+const ptScale = (s)=> (catOf(s)==='Stocks'||catOf(s)==='Crypto') ? 100 : ((s.slice(3)==='JPY'||s.slice(0,3)==='JPY') ? 1000 : 100000);
 const digits= (s)=> (catOf(s)==='Stocks'||catOf(s)==='Crypto') ? 2 : (s.includes('JPY') ? 3 : 5);
 const fmtPx = (s,v)=> (v==null?'—':(+v).toFixed(digits(s)));
 // ── Trading-hours session calendar (CLIENT GATE). A regulated broker opens/closes by SESSION, not
@@ -858,7 +860,8 @@ const fmtPx = (s,v)=> (v==null?'—':(+v).toFixed(digits(s)));
 const US_MARKET_HOLIDAYS = new Set(['2026-01-01','2026-01-19','2026-02-16','2026-04-03','2026-05-25',
   '2026-06-19','2026-07-03','2026-09-07','2026-11-26','2026-12-25','2027-01-01']);
 function marketOpen(symbol, at){
-  const cat=SYM_CAT[symbol]||'Forex';
+  const cat=catOf(symbol);   // classify via catOf (server class + inference), NOT SYM_CAT-default-Forex — so a
+  //   dynamic stock like SPACEX (absent from SYM_CAT) is session-gated as a STOCK (weekend '—'), not Forex.
   const d = at!=null ? new Date(at) : new Date();
   if(cat==='Crypto') return true;                                  // 24/7 — never closed
   const day=d.getUTCDay();                                         // 0=Sun … 6=Sat
@@ -2153,7 +2156,7 @@ function MarketWatch({ onPick }){
           <tbody>
             {!visible.length && <tr><td className="empty" colSpan={showSpread?5:4}>No symbols match</td></tr>}
             {visible.map(sym=>{ const m=mids[sym]||{}, d=dirs[sym]||{}; const up=(m.chg||0)>=0;
-              const spr=(m.ask!=null&&m.bid!=null)?((m.ask-m.bid)/pip(sym)).toFixed(1):'—';
+              const spr=(m.ask!=null&&m.bid!=null)?((m.ask-m.bid)*ptScale(sym)).toFixed(1):'—';   // live MT5 points: FX ×100000, JPY ×1000, stock/crypto ×100
               const open=marketOpen(sym);   // session gate — closed → freeze ticks + 'Closed' mask
               return (
                 <tr key={sym} className={(sym===sel?'sel':'')+(open?'':' mw-closed')} onClick={()=>setSel(sym)}
