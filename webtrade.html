@@ -922,6 +922,9 @@ const priceStore = {
     WATCH.forEach(sym=>{
       if(this.drift[sym]==null) this.drift[sym]=(Math.random()-0.5)*0.00009;
       const cur=this.mids[sym]? this.mids[sym].mid : BASE[sym];
+      // SESSION LOCKSTEP (Method A): a CLOSED symbol (weekend/after-hours FX & US stocks) must NOT random-walk
+      // — freeze it at its last/close price so the whole app (chart, quotes, P&L) holds. Crypto is 24/7 → walks.
+      if(!marketOpen(sym)){ if(!this.mids[sym]) this._set(sym, cur, 10*pip(sym)/2, 10, now); return; }
       const mid=cur*(1+(Math.random()-0.5)*0.0006 + this.drift[sym]); this._set(sym, mid, 10*pip(sym)/2, 10, now, 3*pip(sym));
     });
   },
@@ -1667,6 +1670,8 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     fetchRealCandles(symbol, tf).then(real=>{ if(real && series.current===s) applyBars(real); }).catch(()=>{});   // upgrade when the feed gives a clean full history
     // live: update ONLY the last bar's close from the shared store — throttled to ~2.5/sec
     const onTick=throttle((mids)=>{
+      if(!marketOpen(symbol)) return;   // Method A (MT5): session CLOSED → abort the live-bar update so the
+      //   last candle freezes at the actual Friday/close price. Crypto is 24/7 (marketOpen always true) → flows.
       const m=mids[symbol]; if(!m) return; setPx(m.mid);
       if(!bar.current||!series.current) return;
       const b=bar.current, close=m.mid;
