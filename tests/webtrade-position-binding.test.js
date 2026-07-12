@@ -19,15 +19,12 @@ const sideUp_src       = grab(/const sideUp = \(s\)=>[^\n]*/, 'sideUp');
 const contractSize_src = grab(/const contractSize = \(symbol\)=>[^\n]*/, 'contractSize');
 const closePx_src      = grab(/const closePx = \(p, q\)=>[^\n]*/, 'closePx');
 const positionPnL_src  = grab(/function positionPnL\(p, q\)\{[\s\S]*?\n\}/, 'positionPnL');
-const scale_src        = grab(/const CRYPTO_PNL_SCALE = \d+;/, 'CRYPTO_PNL_SCALE');
-const pnlContract_src  = grab(/const pnlContract = \(symbol\)=>[^\n]*/, 'pnlContract');
-const SCALE = Number((scale_src.match(/\d+/) || [10])[0]);
 
 if (!fail) {
   const SYM_CAT = { EURUSD:'Forex', BTCUSD:'Crypto' };
   const scope = new Function('SYM_CAT',
-    'const CONTRACT=100000;\n' + scale_src + '\n' + lotsOf_src + '\n' + sideUp_src + '\n' + contractSize_src + '\n' +
-    pnlContract_src + '\n' + closePx_src + '\n' + positionPnL_src + '\nreturn { positionPnL, closePx };')(SYM_CAT);
+    'const CONTRACT=100000;\n' + lotsOf_src + '\n' + sideUp_src + '\n' + contractSize_src + '\n' +
+    closePx_src + '\n' + positionPnL_src + '\nreturn { positionPnL, closePx };')(SYM_CAT);
   const { positionPnL, closePx } = scope;
 
   // [1] three BUYs, same symbol, DIFFERENT entries → three DIFFERENT P&Ls (no copy)
@@ -50,15 +47,12 @@ if (!fail) {
   // a BUY marked against BID is unaffected by ASK moves (proves it reads the right side)
   if (positionPnL(buy, { bid:1.1430, ask:1.1432 }) !== positionPnL(buy, { bid:1.1430, ask:9.9 })) bad('BUY P&L must ignore ASK (uses BID)');
 
-  // [3] crypto: own entry, per-side, P&L scaled by the DEMO visibility weight (contract size 1 × SCALE)
+  // [3] crypto: own entry, per-side, TRUE contract size 1 (production — no visibility scale)
   const btc1 = { symbol:'BTCUSD', side:'buy', size:0.01, open_price:63806.82 };
   const btc2 = { symbol:'BTCUSD', side:'buy', size:0.01, open_price:63700.00 };
   const bq = { bid:63801.29, ask:63801.40 };
-  if (!near(positionPnL(btc1, bq), (63801.29 - 63806.82) * 0.01 * SCALE, 1e-6)) bad('BTC p1 P&L wrong (contract size 1 × CRYPTO_PNL_SCALE, BID)');
+  if (!near(positionPnL(btc1, bq), (63801.29 - 63806.82) * 0.01, 1e-6)) bad('BTC p1 P&L must be the TRUE per-side value (contract size 1, BID) — no scale');
   if (positionPnL(btc1, bq) === positionPnL(btc2, bq)) bad('two BTC positions with different entries must have different P&L');
-  // the scale must make a small BTC move visible at 2 decimals (was 0.00): a $3 move on 0.01 lot ≠ 0.00
-  const movedPnl = Math.abs((63803.00 - 63806.82) * 0.01 * SCALE);
-  if (movedPnl < 0.01) bad(`CRYPTO_PNL_SCALE too small — a small BTC move still rounds to 0.00 (${movedPnl})`);
 }
 
 // ── ONE source of truth: both P&L call sites route through positionPnL ──
@@ -77,10 +71,10 @@ if (/const pnl=\(n\)=>/.test(src)) bad('the decimal-expanding pnl() formatter mu
 if (!/<td className=\{pl>=0\?'up':'down'\}>\{num\(pl\)\}<\/td>/.test(src)) bad('per-row Profit must use num() (2 decimals)');
 if (!/\{t\('Profit'\)\}:<\/span> <b className=\{floating>=0\?'up':'down'\}>\{num\(floating\)\}/.test(src)) bad('account Profit total must use num() (2 decimals)');
 
-// ── crypto P&L scale is DISPLAY-only: MARGIN must stay on the UNSCALED contractSize ──
-if (!/return \(\+volume\|\|0\)\*contractSize\(symbol\)\*baseUsdRate\(symbol\)\/lev;/.test(src)) bad('requiredMargin must keep the UNSCALED contractSize (crypto scale must not leak into margin)');
-if (/requiredMargin[\s\S]{0,120}pnlContract/.test(src)) bad('the crypto P&L scale (pnlContract) must NOT appear in the margin path');
-if (!/lotsOf\(p\)\*pnlContract\(p\.symbol\)/.test(src)) bad('positionPnL must apply pnlContract (crypto visibility scale)');
+// ── production: NO P&L scale — both margin and P&L use the true contractSize ──
+if (/pnlContract|CRYPTO_PNL_SCALE/.test(src)) bad('the demo P&L visibility scale must be removed in production');
+if (!/return \(\+volume\|\|0\)\*contractSize\(symbol\)\*baseUsdRate\(symbol\)\/lev;/.test(src)) bad('requiredMargin must use the true contractSize');
+if (!/lotsOf\(p\)\*contractSize\(p\.symbol\)/.test(src)) bad('positionPnL must use the true contractSize (no scale)');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} position-binding problem(s).`); process.exit(1); }
 console.log('🟢 PASS: each position marks against its OWN entry + OWN symbol quote, per side (BUY→BID, SELL→ASK); one shared positionPnL helper; no copied prices/P&L.');

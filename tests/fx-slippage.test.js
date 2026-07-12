@@ -59,11 +59,12 @@ if (!/status = 'open'/.test(sqlClose) || !/if not found then/.test(sqlClose)) ba
 const wt = fs.readFileSync(path.join(ROOT, 'webtrade.html'), 'utf8');
 if (!/p_requested_price\s*:/.test(wt) || !/p_max_slippage\s*:/.test(wt)) bad('webtrade.html placeOrder must send p_requested_price + p_max_slippage');
 if (!/requestedPrice\s*:\s*price/.test(wt)) bad('webtrade.html send() must pass the displayed quote as requestedPrice');
-// a REAL server rejection must NOT demo-fallback: addDemo only guarded by not_logged_in now.
-if (/if\(!r\|\|!r\.ok\)\{\s*\n?\s*\/\/[^\n]*\n?\s*positionsStore\.addDemo/.test(wt))
-  bad('webtrade.html still lands a demo fill on ANY non-ok (server rejections must not fill)');
-if (!/r\.reason==='not_logged_in'\)\{\s*positionsStore\.addDemo/.test(wt))
-  bad('webtrade.html demo fallback must be gated to not_logged_in only');
+// PRODUCTION: no client demo fill at all — a server rejection fires sndError, a logged-out user is
+// prompted to log in. addDemo is never called (the client never fabricates a fill / money).
+if (/positionsStore\.addDemo\(/.test(wt))
+  bad('webtrade.html must NOT land a client demo fill in production (addDemo call removed)');
+if (!/reason==='not_logged_in'\)\{ playSnd\(sndError\); alert\('로그인이 필요합니다/.test(wt))
+  bad('webtrade.html logged-out order must prompt login (no demo fill)');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} slippage/lock/binding problem(s).`); process.exit(1); }
 console.log('🟢 PASS: slippage guard rejects only adverse-beyond-tolerance fills; fx_close row-locked; fx_open de-ambiguated; frontend binds requested-price + no phantom demo fill on server reject.');

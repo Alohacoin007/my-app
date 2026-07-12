@@ -834,11 +834,12 @@ priceStore.notify = throttle(function(){ priceStore.listeners.forEach(fn=>{ try{
 /* ── positionsStore: ONE source of truth for open FX positions + account.
    ChartCell draws createPriceLine flags from it; BottomBar tables it. Server-owned
    (read-only display) — never writes money, matches CLAUDE.md #5 (server is sole owner). ── */
-// WT_DEMO — WebTrader currently runs as a SERVER-INDEPENDENT demo terminal. All orders fill on
-// the CLIENT demo ledger only: they NEVER call fx_open / fx_close, never touch accounts /
-// positions, so NOTHING reaches Supabase or the admin backoffice. Flip to false the day this
-// terminal is wired to real B-Book execution (the server code paths below are kept, just gated).
-const WT_DEMO = true;
+// WT_DEMO — PRODUCTION MODE (false). Orders route to the server RPCs fx_open / fx_close (the SAME
+// B-Book path the live FX app uses); balances/positions come from the logged-in Supabase account.
+// The client is DISPLAY-ONLY and never writes money (CLAUDE.md #5). Flip back to true only to run a
+// throwaway offline demo. ⚠ When false, a logged-in trader places REAL orders — the server is the
+// authority (fill price, margin gate, slippage guard, row lock); the client just calls it.
+const WT_DEMO = false;
 // DEMO seed — a mock ledger so the terminal is never empty for layout/UX testing.
 // Pure client-side DISPLAY only: never written to the server or localStorage, never
 // treated as spendable money (orders still route through useTradeEngine). A real
@@ -856,7 +857,7 @@ const positionsStore = {
     const r=await AlpexaSync.db.from('positions').select('local_id,symbol,side,stake,size,open_price,status,created_at').eq('server','fx').eq('status','open').limit(200);
     if(r&&r.data){ this.pos=r.data; this.notify(); } }catch(e){} },   // real load REPLACES the demo seed
   start(){ if(this.started) return; this.started=true;
-    this.acct=DEMO_ACCT; this.pos=DEMO_POS.slice(); this.notify();   // seed demo first → ledger never empty
+    if(WT_DEMO){ this.acct=DEMO_ACCT; this.pos=DEMO_POS.slice(); this.notify(); }   // demo seed ONLY in demo mode; production loads the real account below
     try{ if(!WT_DEMO && window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me){   // WT_DEMO: stay server-independent (never load/overwrite demo with real)
       this.loadAcct(); this.loadPos();                                // logged in → overwrite demo with reality
       this.ch1=AlpexaSync.db.channel('wt-acct').on('postgres_changes',{event:'*',schema:'public',table:'accounts'},()=>this.loadAcct()).subscribe();
@@ -1022,8 +1023,10 @@ const contractSize = (symbol)=> (SYM_CAT[symbol]==='Forex' ? CONTRACT : 1);
 // equity only) so a 0.01-lot trade ticks in visible cents (+0.15 / -0.30). It does NOT touch MARGIN:
 // requiredMargin() keeps the unscaled contractSize (server fx_notional_usd lockstep). ⚠ DEMO-ONLY —
 // this makes crypto floating ≠ true realized P&L; reset to 1 before wiring real B-Book (WT_DEMO off).
-const CRYPTO_PNL_SCALE = 10;
-const pnlContract = (symbol)=> contractSize(symbol) * (SYM_CAT[symbol]==='Crypto' ? CRYPTO_PNL_SCALE : 1);
+// House leverage cap per asset class — LOCKSTEP with the server (fx_open_margin.sql: FX 100, STOCK 5,
+// CRYPTO 5). The client clamps the trader's chosen leverage to this cap so the DISPLAYED required
+// margin == what the server will actually enforce; the server stays the real authority.
+const LEV_CAP = (symbol)=> SYM_CAT[symbol]==='Forex' ? 100 : 5;   // Stocks & Crypto capped at 5×
 // ── ONE source of truth for a position's live floating P&L + its current close price. Each
 //    position marks against ITS OWN symbol's live quote and ITS OWN stored entry (open_price);
 //    nothing is shared between rows, so N positions never copy each other's price/P&L. MT5 side
@@ -1034,7 +1037,7 @@ function positionPnL(p, q){
   if(p._demo && p.profit!=null) return +p.profit;                 // pinned demo-seed P/L
   const cur=closePx(p, q); if(cur==null) return 0;                // BUY→BID · SELL→ASK
   const dir=sideUp(p.side)==='SELL'?-1:1;
-  return dir*(cur-(+p.open_price||cur))*lotsOf(p)*pnlContract(p.symbol)*(p.symbol.includes('JPY')?0.0067:1);
+  return dir*(cur-(+p.open_price||cur))*lotsOf(p)*contractSize(p.symbol)*(p.symbol.includes('JPY')?0.0067:1);
 }
 const LEVERAGES = [10,50,100,500];
 
@@ -1068,7 +1071,7 @@ function baseUsdRate(symbol){
 }
 // required margin (in USD account ccy) for a volume at a leverage — the MT5 formula.
 function requiredMargin(symbol, volume, leverage){
-  const lev=Math.max(1,+leverage||100); return (+volume||0)*contractSize(symbol)*baseUsdRate(symbol)/lev;
+  const lev=Math.max(1, Math.min(+leverage||100, LEV_CAP(symbol))); return (+volume||0)*contractSize(symbol)*baseUsdRate(symbol)/lev;   // leverage clamped to the house cap (server lockstep)
 }
 
 function useTradeEngine(){
@@ -1187,10 +1190,9 @@ function OrderBox({ symbol }){
     let r; try{ r=await eng.placeOrder({ symbol, side, volume:vol, leverage:eng.leverage, requestedPrice:price, maxSlippage:maxSlip }); }  // one-click B-Book (+slippage)
     catch(e){ r={ok:false,reason:'error'}; }
     if(!r||!r.ok){
-      // A REAL server rejection (slippage/margin/rpc error, r.server===true) must NOT land — the
-      // trade was refused; sndError already fired in placeOrder (뚜엑/timeout.wav). Only the
-      // logged-out path falls back to the demo ledger so the terminal stays usable for testing.
-      if(r&&r.reason==='not_logged_in'){ positionsStore.addDemo({ symbol, side, volume:+vol||0.01, price }); playSnd(sndOpen); }
+      // PRODUCTION: no client demo fill. A server rejection (slippage/margin/rpc) already fired
+      // sndError; logged-out just prompts login. The demo ledger path is CLOSED (#5: server owns money).
+      if(r&&r.reason==='not_logged_in'){ playSnd(sndError); alert('로그인이 필요합니다 (Please log in to trade)'); }
       else console.warn('one-click order rejected:', (r&&(r.code||r.reason))||'unknown');   // slippage/margin → error sound only, no fill
     }
     // ── The Snap: 처리 상태 해제 → 패널 0.1s 플래시 (사운드는 placeOrder에서 sndOpen/sndError로 발동) ──
@@ -2045,7 +2047,7 @@ function JournalTab(){
     [stamp,'Alpexa WebTrade terminal started',1],
     [stamp,'Chart engine (Lightweight Charts) initialised',1],
     [stamp, live?'Price feed connected (1s cache)':'Price feed: demo simulator',live?1:0],
-    [stamp, (!WT_DEMO && window.AlpexaSync&&AlpexaSync.me)?'Account session active — B-Book execution ready':'Demo terminal — client ledger only (no server / admin)',1],
+    [stamp, (!WT_DEMO && window.AlpexaSync&&AlpexaSync.me)?'Account session active — B-Book execution ready':'Log in for live account execution',1],
   ];
   return (
     <div className="tbxbody"><table className="jrnl"><tbody>
@@ -2062,11 +2064,11 @@ function StatusBar({ tool, chartType, tf }){
   const t=new Date(), p2=n=>String(n).padStart(2,'0');
   return (
     <div className="statusbar">
-      <span className="s"><span className="dot" style={{width:7,height:7,background:live?'#00d060':'#e5a13a'}}></span>{live?'Connected':'Demo'}</span>
+      <span className="s"><span className="dot" style={{width:7,height:7,background:live?'#00d060':'#e5a13a'}}></span>{live?'Connected':'Offline'}</span>
       <span className="s">Tool: <b>{tool?tool:'—'}</b></span>
       <span className="s">Chart: <b>{chartType} · {tf}</b></span>
       <span className="grow"></span>
-      <span className="s">{(!WT_DEMO && window.AlpexaSync&&AlpexaSync.me)?'Live account':'Demo'}</span>
+      <span className="s">{(!WT_DEMO && window.AlpexaSync&&AlpexaSync.me)?'Live account':'Log in'}</span>
       <span className="s">Vegas <b>{p2(t.getHours())+':'+p2(t.getMinutes())}</b></span>
     </div>
   );
@@ -2153,7 +2155,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
                 <td></td>
               </tr>
             ))}
-            {tab==='Trade' && !pos.length && <tr><td className="empty" colSpan="11">{(!WT_DEMO && window.AlpexaSync&&AlpexaSync.me)?'No open positions':'데모 터미널 — 주문하면 여기에 데모 포지션이 표시됩니다 (서버·어드민 기록 없음)'}</td></tr>}
+            {tab==='Trade' && !pos.length && <tr><td className="empty" colSpan="11">{(!WT_DEMO && window.AlpexaSync&&AlpexaSync.me)?'No open positions':'로그인하면 실계정 포지션이 표시됩니다 (Log in to trade)'}</td></tr>}
             {tab==='Trade' && pos.map(p=>{ const m=mids[p.symbol]||{}; const pl=plOf(p);
               const tkt=String(p.local_id||'').replace(/\D/g,'').slice(-8)||p.local_id;
               const tm=p.created_at?String(p.created_at).slice(0,19).replace('T',' ').replace(/-/g,'.'):'—';  // MT5: 2026.07.09 20:17:40
@@ -2372,7 +2374,7 @@ function Navigator({ indicators }){
   React.useEffect(()=> positionsStore.subscribe(s=>setAcct(s.acct)), []);
   const me=!WT_DEMO && window.AlpexaSync&&AlpexaSync.me;
   const bal=acct?(+acct.balance||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):null;
-  const acctLine=acct ? (acct.acct_no+' — '+(WT_DEMO?'Alpexa-Demo':'Alpexa-Live')+' — '+bal+' USD') : (me?'Loading account…':'Demo terminal');
+  const acctLine=acct ? (acct.acct_no+' — '+(WT_DEMO?'Alpexa-Demo':'Alpexa-Live')+' — '+bal+' USD') : (me?'Loading account…':'Log in to trade');
   const active=new Set(indicators||[]);
   const tog=(k)=>setOpen(o=>({ ...o, [k]:!o[k] }));
   return (
@@ -2582,8 +2584,8 @@ function OrderModal({ symbol:sym0, onClose }){
     const maxSlip=SLIP_PIPS*pip(symbol);
     const r=await eng.placeOrder({ symbol, side, volume:vol, leverage:eng.leverage, requestedPrice:price, maxSlippage:maxSlip });   // +leverage +slippage
     if(r.ok){ onClose(); return; }                                   // B-Book fill booked server-side (sndOpen in placeOrder)
-    // real server rejection (slippage/margin) → do NOT land a demo fill; sndError already fired.
-    if(r.reason==='not_logged_in'){ positionsStore.addDemo({ symbol, side, volume:+vol||0.01, price }); playSnd(sndOpen); }
+    // PRODUCTION: no client demo fill. Server rejection already fired sndError; logged-out prompts login.
+    if(r.reason==='not_logged_in'){ playSnd(sndError); alert('로그인이 필요합니다 (Please log in to trade)'); return; }
     else if(r.reason) console.warn('order rejected:', r.code||r.reason);
     onClose();
   };

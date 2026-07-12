@@ -15,6 +15,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= (tol == null ? 0.01 : tol);
 // ── extract the real math and exercise it with a stub feed ──
 const grab = (re, label) => { const m = src.match(re); if (!m) bad(label + ' not found'); return m ? m[0] : ''; };
 const contractSize_src   = grab(/const contractSize = \(symbol\)=>[^\n]*/, 'contractSize');
+const levCap_src         = grab(/const LEV_CAP = \(symbol\)=>[^\n]*/, 'LEV_CAP');
 const baseUsdRate_src    = grab(/function baseUsdRate\(symbol\)\{[\s\S]*?\n\}/, 'baseUsdRate');
 const requiredMargin_src = grab(/function requiredMargin\(symbol, volume, leverage\)\{[\s\S]*?\n\}/, 'requiredMargin');
 
@@ -22,19 +23,21 @@ if (!fail) {
   const SYM_CAT = { EURUSD:'Forex', USDJPY:'Forex', BTCUSD:'Crypto', SOLUSD:'Crypto', AAPL:'Stocks' };
   const priceStore = { mids:{ EURUSD:{mid:1.14}, USDJPY:{mid:162}, BTCUSD:{mid:64000}, SOLUSD:{mid:148}, AAPL:{mid:315} }, get(s){ return this.mids[s]; } };
   const rm = new Function('SYM_CAT','priceStore',
-    'const CONTRACT=100000;\n' + contractSize_src + '\n' + baseUsdRate_src + '\n' + requiredMargin_src + '\nreturn requiredMargin;'
+    'const CONTRACT=100000;\n' + contractSize_src + '\n' + levCap_src + '\n' + baseUsdRate_src + '\n' + requiredMargin_src + '\nreturn requiredMargin;'
   )(SYM_CAT, priceStore);
 
-  // FX unchanged & correct (tens of dollars for 0.01 lot)
+  // FX: cap 100 = chosen 100 → unchanged (tens of dollars for 0.01 lot)
   if (!near(rm('EURUSD', 0.01, 100), 11.4))  bad(`FX EURUSD 0.01 @100x margin should be ~$11.40, got ${rm('EURUSD',0.01,100)}`);
   if (!near(rm('USDJPY', 0.01, 100), 10.0))  bad(`FX USDJPY 0.01 @100x margin should be ~$10.00 (USD base), got ${rm('USDJPY',0.01,100)}`);
-  // Crypto/stock: contract size 1 → light margin (was the $640,000 blow-up)
-  if (!near(rm('BTCUSD', 0.01, 100), 6.4, 0.05)) bad(`CRYPTO BTCUSD 0.01 @100x margin should be ~$6.40, got ${rm('BTCUSD',0.01,100)}`);
-  if (rm('BTCUSD', 0.01, 100) > 100)          bad(`CRYPTO margin blew up (contract size not per-asset): ${rm('BTCUSD',0.01,100)}`);
-  if (!near(rm('AAPL', 0.01, 100), 0.0315, 0.001)) bad(`STOCK AAPL 0.01 @100x margin should be ~$0.0315, got ${rm('AAPL',0.01,100)}`);
-  // the reported disaster: two 0.01 crypto positions must NOT total anywhere near $120k
+  // Crypto/stock: contract size 1 AND leverage clamped to the house cap 5× (server lockstep)
+  if (!near(rm('BTCUSD', 0.01, 100), 128.0, 0.5)) bad(`CRYPTO BTCUSD 0.01 (chosen 100x → capped 5x) margin should be ~$128, got ${rm('BTCUSD',0.01,100)}`);
+  if (rm('BTCUSD', 0.01, 100) > 5000)        bad(`CRYPTO margin blew up (contract size not per-asset): ${rm('BTCUSD',0.01,100)}`);
+  if (!near(rm('AAPL', 0.01, 100), 0.63, 0.02)) bad(`STOCK AAPL 0.01 (capped 5x) margin should be ~$0.63, got ${rm('AAPL',0.01,100)}`);
+  // leverage cap is a CLAMP, not a floor: choosing 5x explicitly gives the same crypto margin as 100x
+  if (!near(rm('BTCUSD', 0.01, 5), rm('BTCUSD', 0.01, 100), 1e-6)) bad('crypto leverage must clamp to 5× (100x and 5x must match)');
+  // the reported disaster is gone: two 0.01 crypto positions are hundreds, not $120k
   const two = rm('BTCUSD', 0.01, 100) + rm('SOLUSD', 0.01, 100);
-  if (two > 100) bad(`two 0.01-lot crypto positions still lock $${two.toFixed(2)} (should be a few dollars)`);
+  if (two > 5000) bad(`two 0.01-lot crypto positions lock $${two.toFixed(2)} (blow-up regression)`);
 }
 
 // ── the Equity / Free Margin / Margin Level chain must be wired per spec ──
@@ -44,7 +47,7 @@ if (!/const freeMargin = equity - usedMargin;/.test(src)) bad('Free Margin = Equ
 if (!/const level=marginUsed>0\?\(equity\/marginUsed\*100\):0;/.test(src)) bad('Margin Level = Equity/Margin × 100');
 // contract size must NOT hardcode 100000 in the P&L paths any more
 if (/const contract=100000;/.test(src)) bad('BottomBar P&L still hardcodes contract=100000 (crypto/stock P&L blows up)');
-if (!/lotsOf\(p\)\*pnlContract\(p\.symbol\)/.test(src)) bad('floating P&L must use pnlContract(symbol) (per-asset), not a flat 100000');
+if (!/lotsOf\(p\)\*contractSize\(p\.symbol\)/.test(src)) bad('floating P&L must use contractSize(symbol) (per-asset, no scale), not a flat 100000');
 
 // ── Free-Margin order gate + Margin Call / Stop-Out (30%) ──
 // one-click panel: locked when no free margin; refuses with the error sound
