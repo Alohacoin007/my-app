@@ -30,10 +30,11 @@ else {
 }
 
 // toolbox tabs (Trade/Exposure/History…) — same treatment
+// toolbox (terminal) tabs — DARK = window blue + underline, LEGEND = muted neon-green + underline
 const tbxDark = grab('.tbxtabs .t.on');
-if (!tbxDark || !/color:#00ff00/i.test(tbxDark) || !/border-top:\s*2px solid transparent/i.test(tbxDark)) bad('original active toolbox tab must have GREEN text and no accent line');
+if (!tbxDark || !/color:#2f7fe0/i.test(tbxDark) || !/border-bottom:2px solid #2f7fe0/i.test(tbxDark)) bad('dark active toolbox tab must be window-blue text + underline');
 const tbxLegend = grab('.terminal.light .tbxtabs .t.on');
-if (!tbxLegend || !/color:#00FF55/i.test(tbxLegend) || !/border-top-color:transparent/i.test(tbxLegend)) bad('Legend active toolbox tab must have GREEN text and no accent line');
+if (!tbxLegend || !/color:#00FF55/i.test(tbxLegend) || !/border-bottom:2px solid #00FF55/i.test(tbxLegend)) bad('Legend active toolbox tab must be neon-green text + underline');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} MW-tab problem(s).`); process.exit(1); }
 console.log('🟢 PASS: active Market Watch + toolbox tabs show GREEN text (no accent line) in both the original and Legend themes.');

@@ -68,6 +68,18 @@
   table.jrnl td{padding:2px 10px;border-bottom:1px solid #14181e;color:#9aa2b0;white-space:nowrap}
   table.jrnl td.t{color:#6f778a;width:150px}
   table.jrnl td.ok{color:#59c26a}
+  table.jrnl td.err{color:#e5533a}
+  /* Mailbox — account notices from settlements */
+  table.mbx{width:100%;border-collapse:collapse;font-size:11.5px}
+  table.mbx th{position:sticky;top:0;background:#141414;color:var(--dim);font-weight:600;font-size:11px;text-align:right;padding:3px 10px;border-bottom:1px solid #222}
+  table.mbx th:first-child,table.mbx th:nth-child(2){text-align:left}
+  table.mbx td{padding:3px 10px;border-bottom:1px solid #1a1a1a;text-align:right;color:#c8ccd2}
+  table.mbx td:first-child,table.mbx td:nth-child(2){text-align:left}
+  table.mbx tr.mbx-row{cursor:pointer}table.mbx tr.mbx-row:hover td{background:#0d1420}
+  table.mbx tr.mbx-detail td{background:#0a0d12;color:#9aa2b0;font-size:11px;white-space:normal;text-align:left;padding:6px 12px}
+  .terminal.light table.mbx th{background:#0E1015;color:#7a828e;border-bottom:1px solid #1D212A}
+  .terminal.light table.mbx td{border-bottom:1px solid #1D212A;color:#e6e9ee}
+  .terminal.light table.mbx tr.mbx-detail td{background:#000000;color:#a2aab6}
   .menu .conn{margin-left:auto;color:#9aa2b0;display:flex;align-items:center;gap:6px;padding-right:6px}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--up)}
   /* ── icon toolbar (New Order · Algo · chart tools · timeframes) — compact, 2–4px gaps ── */
@@ -307,7 +319,7 @@
   /* terminal menu tab bar — glued to the BOTTOM of the floating toolbox (integral, always bottom) */
   .tbxtabs{flex:none;height:24px;display:flex;align-items:stretch;background:linear-gradient(#20242a,#14171c);border-top:1px solid #000;overflow-x:auto}
   .tbxtabs .t{padding:3px 11px;font-size:11px;color:#a2aab6;border-right:1px solid #2a2e34;cursor:default}
-  .tbxtabs .t.on{background:#000;color:#00ff00;border-top:2px solid transparent;margin-top:-1px}   /* active tab = green TEXT, no accent line */
+  .tbxtabs .t.on{background:#000;color:#2f7fe0;border-top:2px solid transparent;border-bottom:2px solid #2f7fe0;margin-top:-1px}   /* DARK: active tab = window BLUE text + underline */
   .acctline{display:flex;align-items:center;gap:18px;padding:4px 12px;background:#0d0d0d;border-top:1px solid #222;font-size:11.5px;color:#c8ccd2;white-space:nowrap;overflow-x:auto}
   .acctline .k{color:#8890a0}.acctline b{color:#fff;font-variant-numeric:tabular-nums}
   /* History period filter bar (MT5: right-click → period; here a visible toolbar) */
@@ -580,7 +592,7 @@
   /* bottom menu tab bar */
   .terminal.light .tbxtabs{background:#0E1015;border-top:1px solid #1D212A}
   .terminal.light .tbxtabs .t{color:#7a828e}
-  .terminal.light .tbxtabs .t.on{background:#000000;color:#00FF55;border-top-color:transparent}   /* active tab = green TEXT, no accent line */
+  .terminal.light .tbxtabs .t.on{background:#000000;color:#00FF55;border-top-color:transparent;border-bottom:2px solid #00FF55}   /* LEGEND: active tab = muted neon-green text + underline */
   .terminal.light .tbxbody,.terminal.light .empty,.terminal.light .note{color:#7a828e}
   /* splitter grab-lines */
   .terminal.light .hsplit::before,.terminal.light .lhsplit::before,.terminal.light .splitter::before{background:#1D212A}
@@ -757,6 +769,19 @@ const sndError   = mkSnd('/assets/sounds/timeout.wav', synError);  // RPC 에러
 const sndStopout = mkSnd('/assets/sounds/stops.wav',   synStop);   // 30% 스탑아웃 강제청산 (서버 크론)
 const sndLogin   = mkSnd('/assets/sounds/startup.wav', synLogin);  // 로그인 성공 — "띠리링~" 스타트업
 const playSnd = (s)=>{ try{ s.play(); }catch(e){} };
+
+// ── Journal: a REAL system-communication log (HTS-style). Records the actual events that happen —
+//    terminal start, login, order fills/rejections, closes, SL/TP edits, errors — each with a
+//    Vegas-time stamp. Memory-only (session-lived, no localStorage): it's a log, not money. ──
+const journalStore = {
+  entries:[], listeners:new Set(),
+  log(msg, ok=1){ const d=new Date(), p2=n=>String(n).padStart(2,'0');
+    const ts=d.getFullYear()+'.'+p2(d.getMonth()+1)+'.'+p2(d.getDate())+' '+p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds());
+    this.entries=[{ts, msg, ok}, ...this.entries].slice(0,300);   // newest first, capped
+    this.notify(); },
+  notify(){ this.listeners.forEach(fn=>{ try{fn(this.entries);}catch(e){} }); },
+  subscribe(fn){ this.listeners.add(fn); fn(this.entries); return ()=>this.listeners.delete(fn); },
+};
 
 // Autoplay Unlock — first user gesture primes the AudioContext + the <audio> elements, so
 // playback that fires ~250–550ms after the click (past the ECN delay) isn't autoplay-blocked.
@@ -1176,9 +1201,12 @@ function useTradeEngine(){
         }
         const d=r&&r.data;
         if(r&&!r.error&&d&&d.ok){ positionsStore.loadPos(); playSnd(sndOpen);   // ← fx_open 성공 정확한 시점
+          journalStore.log('Order filled — '+side.toUpperCase()+' '+size+' '+symbol+' @ '+d.open, 1);
           return { ok:true, server:true, open:d.open, margin:d.margin, local_id }; }
         playSnd(sndError);   // 슬리피지 초과(SLIPPAGE)/잔고부족(MARGIN)/RPC 에러 → 실패음(timeout.wav)
-        return { ok:false, server:true, reason:(d&&d.error)||(r&&r.error&&r.error.message)||'rejected', code:(d&&d.code)||null };
+        const _rj=(d&&d.error)||(r&&r.error&&r.error.message)||'rejected';
+        journalStore.log('Order rejected — '+side.toUpperCase()+' '+size+' '+symbol+': '+_rj, 0);
+        return { ok:false, server:true, reason:_rj, code:(d&&d.code)||null };
       }catch(e){ playSnd(sndError); return { ok:false, server:true, reason:String(e&&e.message||e) }; }
     }
     // 3) logged out → caller may fall back to the demo ledger (no real money)
@@ -1192,6 +1220,7 @@ function useTradeEngine(){
       try{ const r=await AlpexaSync.db.rpc('fx_close',{ p_local_id:localId });
         const d=r&&r.data;
         if(r&&!r.error&&d&&d.ok){ positionsStore.loadPos(); positionsStore.loadAcct(); playSnd(sndClose);   // ← fx_close 완공
+          journalStore.log('Position closed — '+localId+'  P&L '+(d.pnl!=null?(+d.pnl).toFixed(2):'—'), (d.pnl==null||d.pnl>=0)?1:0);
           return { ok:true, pnl:d.pnl }; }
         playSnd(sndError);
         return { ok:false, reason:(d&&d.error)||'close failed' };
@@ -2076,39 +2105,72 @@ function MarketWatch({ onPick }){
 /* ── Bottom Toolbox: MT5 tab strip + positions grid + account line, from positionsStore ── */
 const TBX_TABS=['Trade','Exposure','History','News','Mailbox','Calendar','Company','Alerts','Articles','Code Base','Experts','Journal'];
 // themed empty panel for tabs with no live data source yet (News/Mailbox/Calendar/Company)
-const TAB_EMPTY={ News:['📰','No news for the selected symbols'], Mailbox:['✉️','Mailbox is empty'],
-  Calendar:['📅','No scheduled economic events'], Company:['🏛️','Alpexa Ltd · account & company info'],
+const TAB_EMPTY={ News:['📰','실시간 뉴스 피드 연결 대기 (news feed not connected)'], Mailbox:['✉️','Mailbox is empty'],
+  Calendar:['📅','경제 캘린더 피드 연결 대기 (economic calendar not connected)'], Company:['🏛️','Alpexa Ltd · account & company info'],
   Alerts:['🔔','No alerts set'], Articles:['📄','No articles'], 'Code Base':['💾','Code Base is empty'], Experts:['🤖','No Expert Advisors attached'] };
-function ExposureTab({ pos, mids }){
+function ExposureTab({ pos, mids, equity }){
   const net={}; pos.forEach(p=>{ const d=sideUp(p.side)==='SELL'?-1:1; net[p.symbol]=(net[p.symbol]||0)+d*lotsOf(p); });
   const rows=Object.keys(net).filter(s=>Math.abs(net[s])>1e-9);
   const num=(n)=>(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  // notional per symbol = |net lots| × per-asset contract size × USD value of 1 base unit (crosses handled)
+  const notl=(s)=> Math.abs(net[s])*contractSize(s)*baseUsdRate(s);
+  const total=rows.reduce((a,s)=>a+notl(s),0), eq=+equity||0;
   return (
     <div className="postbl"><table className="pos">
-      <thead><tr><th>Symbol</th><th>Net Volume</th><th>Direction</th><th>Notional (USD)</th></tr></thead>
+      <thead><tr><th>Symbol</th><th>Net Volume</th><th>Direction</th><th>Notional (USD)</th><th>% of Equity</th></tr></thead>
       <tbody>
-        {!rows.length && <tr><td className="empty" colSpan="4">No net exposure</td></tr>}
-        {rows.map(s=>{ const v=net[s]; const m=mids[s]||{};
-          return (<tr key={s}><td>{s.toLowerCase()}.fx</td><td className={v>=0?'up':'down'}>{v.toFixed(2)}</td>
+        {!rows.length && <tr><td className="empty" colSpan="5">No net exposure</td></tr>}
+        {rows.map(s=>{ const v=net[s], n=notl(s);
+          return (<tr key={s}><td>{s.toLowerCase()}{sfx(s).toLowerCase()}</td><td className={v>=0?'up':'down'}>{v.toFixed(2)}</td>
             <td className={v>=0?'up':'down'}>{v>=0?'Long':'Short'}</td>
-            <td>{num(Math.abs(v)*100000*(m.mid||0))}</td></tr>); })}
-      </tbody></table></div>
+            <td>{num(n)}</td><td>{eq>0?(n/eq*100).toFixed(1)+' %':'—'}</td></tr>); })}
+      </tbody>
+      {rows.length>0 && <tfoot><tr className="acctrow"><td colSpan="5"><div className="acctline">
+        <span><span className="k">Total notional:</span> <b>{num(total)} USD</b></span>
+        <span><span className="k">{t('Equity')}:</span> <b>{num(eq)}</b></span>
+        <span><span className="k">Gross exposure:</span> <b>{eq>0?(total/eq*100).toFixed(1)+' %':'—'}</b></span>
+      </div></td></tr></tfoot>}
+    </table></div>
   );
 }
+// Journal — the REAL system-communication log: every entry journalStore recorded (terminal start,
+// login, order fill/reject, close, SL/TP edit, errors), newest first, live-updating. HTS-style.
 function JournalTab(){
-  const t=new Date(), p2=n=>String(n).padStart(2,'0');
-  const stamp=p2(t.getHours())+':'+p2(t.getMinutes())+':'+p2(t.getSeconds());
-  const live=priceStore.live;
-  const rows=[
-    [stamp,'Alpexa WebTrade terminal started',1],
-    [stamp,'Chart engine (Lightweight Charts) initialised',1],
-    [stamp, live?'Price feed connected (1s cache)':'Price feed: demo simulator',live?1:0],
-    [stamp, (!WT_DEMO && window.AlpexaSync&&AlpexaSync.me)?'Account session active — Live execution ready':'Log in for live account execution',1],
-  ];
+  const [rows,setRows]=React.useState(journalStore.entries);
+  React.useEffect(()=> journalStore.subscribe(e=>setRows([...e])), []);
   return (
     <div className="tbxbody"><table className="jrnl"><tbody>
-      {rows.map((r,i)=><tr key={i}><td className="t">{r[0]}</td><td className={r[2]?'ok':''}>{r[1]}</td></tr>)}
+      {!rows.length && <tr><td className="empty" colSpan="2">No journal entries yet</td></tr>}
+      {rows.map((r,i)=><tr key={r.ts+'-'+i}><td className="t">{r.ts}</td><td className={r.ok?'ok':'err'}>{r.msg}</td></tr>)}
     </tbody></table></div>
+  );
+}
+// Mailbox — REAL account notices from the server: non-trade settlements (deposits, bonuses,
+// adjustments) for the logged-in fx account. Click a row → its full detail expands. Not trades.
+function MailboxTab(){
+  const [msgs,setMsgs]=React.useState(null);   // null = loading
+  const [sel,setSel]=React.useState(null);
+  React.useEffect(()=>{ let live=true;
+    (async()=>{ try{
+      if(WT_DEMO || !(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me)){ if(live) setMsgs([]); return; }
+      const acct=AlpexaSync.acctFor&&AlpexaSync.acctFor('fx'); if(!acct){ if(live) setMsgs([]); return; }
+      const r=await AlpexaSync.db.from('settlements').select('kind,symbol,pnl,detail,created_at').eq('acct_no',acct).eq('server','fx').order('created_at',{ascending:false}).limit(100);
+      if(live) setMsgs((r&&r.data)? r.data.filter(x=> x.kind && x.kind!=='fx_close' && x.kind!=='fx_open') : []);
+    }catch(e){ if(live) setMsgs([]); } })();
+    return ()=>{ live=false; }; }, []);
+  if(msgs===null) return <div className="tbxbody"><div className="tbxempty"><div className="ic">📬</div>Loading…</div></div>;
+  if(!msgs.length) return <div className="tbxbody"><div className="tbxempty"><div className="ic">✉️</div>받은 메시지가 없습니다 (Mailbox empty)</div></div>;
+  const subj=(k)=> k==='deposit'?'💰 입금 승인 (Deposit)':k==='withdraw'?'🏧 출금 (Withdrawal)':k==='bonus'?'🎁 보너스 지급 (Bonus)':k==='adjust'?'⚙ 계좌 조정 (Adjustment)':('📨 '+k);
+  return (
+    <div className="postbl"><table className="mbx">
+      <thead><tr><th>Time</th><th>Subject</th><th>Amount (USD)</th></tr></thead>
+      <tbody>
+        {msgs.map((mm,i)=>{ const isSel=sel===i; const tm=mm.created_at?String(mm.created_at).slice(0,19).replace('T',' '):'—';
+          return (<React.Fragment key={i}>
+            <tr className="mbx-row" onClick={()=>setSel(isSel?null:i)}><td>{tm}</td><td>{subj(mm.kind)}</td><td className={(+mm.pnl>=0)?'up':'down'}>{mm.pnl!=null?(+mm.pnl).toFixed(2):'—'}</td></tr>
+            {isSel && <tr className="mbx-detail"><td colSpan="3">{mm.detail||'(no detail)'}</td></tr>}
+          </React.Fragment>); })}
+      </tbody></table></div>
   );
 }
 function EmptyTab({ tab }){ const e=TAB_EMPTY[tab]||['—',tab];
@@ -2164,6 +2226,7 @@ function ModifyPos({ p, onClose }){
         else { playSnd(sndError); setNote('Failed: '+((r.error&&r.error.message)||'error')); }
         setBusy(false); return; }
       const dd=r&&r.data; if(dd&&dd.ok===false){ playSnd(sndError); setNote('Rejected: '+(dd.error||'')); setBusy(false); return; }
+      journalStore.log('SL/TP modified — '+symbol+(slPx!=null?'  SL '+fmtPx(symbol,slPx):'')+(tpPx!=null?'  TP '+fmtPx(symbol,tpPx):''), 1);
       positionsStore.loadPos(); playSnd(sndOpen); onClose();
     }catch(e){ playSnd(sndError); setNote('Failed'); setBusy(false); }
   };
@@ -2237,8 +2300,9 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
     <div className="bottom">
       {modifyP && <ModifyPos p={modifyP} onClose={()=>setModifyP(null)} />}
       <BottomResizer onDone={onResize} />
-      {tab==='Exposure' ? <ExposureTab pos={pos} mids={mids} />
+      {tab==='Exposure' ? <ExposureTab pos={pos} mids={mids} equity={equity} />
        : tab==='Journal' ? <JournalTab />
+       : tab==='Mailbox' ? <MailboxTab />
        : (tab!=='Trade' && tab!=='History') ? <EmptyTab tab={tab} />
        : (<React.Fragment>
       {tab==='History' && (
@@ -2837,7 +2901,13 @@ function App(){
   const closeChart=React.useCallback((id)=>{ setCharts(cs=>cs.filter(c=>c.id!==id));   // unmount → ChartCell cleanup unsubscribes + chart.remove (no leak)
     delete geos.current[id]; setActiveId(a=> a===id ? null : a); }, []);
   const changeSymbol=React.useCallback((id,sym)=>{ setCharts(cs=>cs.map(c=> c.id===id ? {...c, symbol:sym} : c)); }, []);   // MW drag-drop → this window's chart switches symbol
-  React.useEffect(()=>{ priceStore.start(); positionsStore.start(); }, []);
+  React.useEffect(()=>{ priceStore.start(); positionsStore.start();
+    journalStore.log('Alpexa WebTrade terminal started', 1);
+    journalStore.log('Chart engine (Lightweight Charts) initialised', 1);
+    const un=priceStore.subscribe(()=>{ if(priceStore.live && !journalStore._feed){ journalStore._feed=1; journalStore.log('Price feed connected (1s cache)', 1); } });
+    if(!WT_DEMO && window.AlpexaSync && AlpexaSync.me) journalStore.log('Connect to Alpexa Live Server ready', 1);
+    return un;
+  }, []);
   // Login chime — login.html sets this flag on a successful sign-in; play the chime on the first
   // interaction here (autoplay policy blocks sound until a gesture). Fires once, then clears.
   React.useEffect(()=>{ let armed=false; try{ armed=!!sessionStorage.getItem('alpexa.loginChime'); }catch(e){}

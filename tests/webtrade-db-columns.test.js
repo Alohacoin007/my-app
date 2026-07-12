@@ -16,8 +16,9 @@ const bad = (m) => { console.error('🔴 ' + m); fail++; };
 // (sports bets); the column that does NOT exist is 'created_at' — the real table has 'updated_at'.
 // Selecting 'created_at' was the actual empty-positions bug.
 const SCHEMA = {
-  positions: new Set(['id','cust_id','acct_no','server','kind','local_id','symbol','side','size','stake','open_price','pnl','potential','status','updated_at','game','pick','odds','meta']),
-  accounts:  new Set(['id','cust_id','acct_no','balance','server','player_id']),
+  positions:   new Set(['id','cust_id','acct_no','server','kind','local_id','symbol','side','size','stake','open_price','pnl','potential','status','updated_at','game','pick','odds','meta']),
+  accounts:    new Set(['id','cust_id','acct_no','balance','server','player_id']),
+  settlements: new Set(['id','cust_id','acct_no','server','kind','local_id','ticket','symbol','stake','pnl','detail','created_at']),
 };
 
 for (const table of Object.keys(SCHEMA)) {

@@ -76,11 +76,11 @@ if (!/\.terminal\.light \.tf b\.on,\.terminal\.light \.tibtn\.on,\.terminal\.lig
 
 // CRITICAL green-restraint: NO green BORDERS anywhere in Legend (eye-strain). Green is text-only,
 // and only on live ticks / profit / P&L / the up-candle line — never a border/background.
-// forbid green in EVERY border form except the active-tab TOP accent (border-top-*), which the
-// user explicitly wants kept as the one deliberate "selected" point.
-const greenBorders = (src.match(/border(?!-top)[a-z-]*:\s*[^;{}]*#00FF55/gi) || []);
-if (greenBorders.length) bad('green border(s) remain (only the active-tab top accent may be green): ' + greenBorders.join(' | '));
-if (!/\.terminal\.light \.tbxtabs \.t\.on\{[^}]*color:#00FF55[^}]*border-top-color:transparent\}/.test(src)) bad('active toolbox tab: green TEXT, no accent line');
+// forbid green in EVERY border form except the active-tab ACCENT (border-top-* / border-bottom = the
+// deliberate active-tab underline), which the user explicitly wants as the one green "selected" point.
+const greenBorders = (src.match(/border(?!-top|-bottom)[a-z-]*:\s*[^;{}]*#00FF55/gi) || []);
+if (greenBorders.length) bad('green border(s) remain (only the active-tab top/bottom accent may be green): ' + greenBorders.join(' | '));
+if (!/\.terminal\.light \.tbxtabs \.t\.on\{[^}]*color:#00FF55[^}]*border-bottom:2px solid #00FF55\}/.test(src)) bad('active toolbox tab: neon-green text + underline');
 if (!/\.terminal\.light \.charttabs \.ctab\.on\{background:#000000;color:#00FF55\}/.test(src)) bad('active chart tab TEXT must be green');
 if (!/\.terminal\.light \.win\.active \.cell-title\{background:#000000;color:#00FF55/.test(src)) bad('active window title TEXT must be green');
 // the up-candle LINE (chart) is the one place a green stroke is allowed
