@@ -27,6 +27,17 @@ if (!/\.bottom\{flex:none;height:var\(--bottomh,126px\)/.test(src)) bad('.bottom
 // the 12-tab toolbox switching socket is untouched (functionality preserved)
 if (!/toolbox:true/.test(src)) bad('toolbox must still default on (12 tabs preserved)');
 
+// charts must reflow (resizeAll) when the dock slims / a panel toggles, so they instantly absorb the
+// freed vertical space — not stay flat until the next ResizeObserver tick
+if (!/requestAnimationFrame\(\(\)=>chartResizer\.resizeAll\(\)\); \}, \[charts\.length, bottomh, view\]\)/.test(src))
+  bad('chart reflow effect must depend on bottomh + view (absorb the dock change immediately)');
+// resizeOne fits the FULL live canvas height (no hardcode, no parentElement-48 double-subtract)
+if (!/resizeOne\(it\)\{ try\{ const w=it\.el\.clientWidth, h=it\.el\.clientHeight; if\(w>0&&h>0\)\{ it\.chart\.resize\(w,h\);/.test(src))
+  bad('resizeOne must resize to the full canvas clientHeight (responsive, no fixed px)');
+// [3] the wheel/pinch zoom lock + 5px/15 golden ratio remain welded
+if (!/handleScale:\{ mouseWheel:false, pinch:false/.test(src)) bad('mouseWheel/pinch zoom lock must remain');
+if (!/it\.chart\.timeScale\(\)\.applyOptions\(\{ barSpacing:5, rightOffset:15 \}\);/.test(src)) bad('resizeOne must re-weld barSpacing 5 + rightOffset 15');
+
 // [3] the spread stays the per-row pip formula (Forex ÷pip → 1.0/pip; no ×100000 inflation)
 if (!/catOf\(sym\)==='Crypto'\|\|catOf\(sym\)==='Stocks'\?_diff:_diff\/pip\(sym\)/.test(src)) bad('spread must remain per-row (Forex ÷pip, crypto/stock raw)');
 if (/ptScale/.test(src)) bad('the ×100000 ptScale inflation must remain removed');

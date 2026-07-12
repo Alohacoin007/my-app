@@ -3016,7 +3016,7 @@ function App(){
     } else noSession(); }catch(e){ noSession(); }
     return ()=>{ live=false; }; }, []);
   React.useEffect(()=>{ wtConfig.save({ view, leftw, bottomh, navh, theme, lang }); }, [view, leftw, bottomh, navh, theme, lang]);   // charts (+ their per-chart indicators) NOT persisted → refresh = fixed default
-  React.useEffect(()=>{ requestAnimationFrame(()=>chartResizer.resizeAll()); }, [charts.length]);   // reflow on add/close
+  React.useEffect(()=>{ requestAnimationFrame(()=>chartResizer.resizeAll()); }, [charts.length, bottomh, view]);   // reflow on add/close AND whenever the dock slims / a panel toggles → charts instantly absorb the freed vertical space (no flat rollback)
   // ── MT5 keyboard shortcuts (View menu + New Order) ──
   React.useEffect(()=>{
     const onKey=(e)=>{
