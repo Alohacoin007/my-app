@@ -98,8 +98,8 @@ if (!/\.terminal\.light \.acctline\{background:#0E1015;color:#a2aab6;border-top:
 if (!/\.terminal\.light \.acctline \.k\{color:#a2aab6[^}]*\}\.terminal\.light \.acctline b\{color:#a2aab6/.test(src)) bad('Legend Balance bar labels + numbers must be the #a2aab6 tab tone');
 
 // the DEFAULT dark one-click panel wears the neon skin (outside .terminal.light): SELL red-neon, BUY blue-neon
-if (!/\.oc-sell\{background:linear-gradient\(to bottom,#2a0a0a 0%,#150303 100%\) !important;border:1px solid #ff3b30 !important;color:#ff453a !important\}/.test(src)) bad('dark SELL must be the red-neon skin');
-if (!/\.oc-buy\{background:linear-gradient\(to bottom,#0a1735 0%,#030815 100%\) !important;border:1px solid #007aff !important;color:#3095ff !important\}/.test(src)) bad('dark BUY must be the blue-neon skin');
+if (!/\.oc-sell\{background:linear-gradient\(to bottom,#2c0d0d 0%,#1a0505 100%\) !important;border:1px solid #ff3b30 !important;color:#ff453a !important\}/.test(src)) bad('dark SELL must be the red-neon skin');
+if (!/\.oc-buy\{background:linear-gradient\(to bottom,#0d1b3a 0%,#050d1a 100%\) !important;border:1px solid #007aff !important;color:#3095ff !important\}/.test(src)) bad('dark BUY must be the blue-neon skin');
 
 // (4) UI label renamed to Legend (no "Light / Dark" left)
 if (/Color Theme — Light \/ Dark/.test(src)) bad('the menu label must be renamed away from "Light / Dark"');

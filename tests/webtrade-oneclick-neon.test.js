@@ -13,9 +13,9 @@ let fail = 0;
 const bad = (m) => { console.error('🔴 ' + m); fail++; };
 
 // ── DARK theme: fixed-side neon fills (SELL red / BUY blue) ──
-if (!/\.oc-sell\{background:linear-gradient\(to bottom,#2a0a0a 0%,#150303 100%\) !important;border:1px solid #ff3b30 !important;color:#ff453a !important\}/.test(src))
+if (!/\.oc-sell\{background:linear-gradient\(to bottom,#2c0d0d 0%,#1a0505 100%\) !important;border:1px solid #ff3b30 !important;color:#ff453a !important\}/.test(src))
   bad('SELL must be the red-neon skin (carbon-black gradient + #ff3b30 border + #ff453a text)');
-if (!/\.oc-buy\{background:linear-gradient\(to bottom,#0a1735 0%,#030815 100%\) !important;border:1px solid #007aff !important;color:#3095ff !important\}/.test(src))
+if (!/\.oc-buy\{background:linear-gradient\(to bottom,#0d1b3a 0%,#050d1a 100%\) !important;border:1px solid #007aff !important;color:#3095ff !important\}/.test(src))
   bad('BUY must be the blue-neon skin (carbon-black gradient + #007aff border + #3095ff text)');
 
 // ── glow ignites on hover + the semantic tick class (not a colour swap) ──
