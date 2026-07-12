@@ -26,7 +26,7 @@
   /* ── MT5-style CSS Grid: toolbar / [market-watch | 2×2 charts] / bottom bar ── */
   .terminal{display:grid;height:100vh;position:relative;   /* position:relative → floating toolbox anchors to it */
     grid-template-columns:var(--leftw,240px) 6px 1fr;
-    grid-template-rows:23px 33px 1fr var(--dockh,212px);
+    grid-template-rows:23px 33px 1fr var(--dockh,150px);
     grid-template-areas:"menu menu menu" "tools tools tools" "left splitter right" "dock dock dock";}
   /* horizontal (row-resize) splitters — layout CHROME, always present & draggable
      regardless of table/data content (the resize engine is data-independent). */
@@ -329,7 +329,7 @@
      Pulling it up covers the chart Y-axis AND the left navigator's bottom tabs (opaque overlay). */
   .toolbox{position:absolute;left:0;bottom:0;width:100%;z-index:9999;display:flex;flex-direction:column;
     background:#0d0d0d;box-shadow:0 -2px 10px rgba(0,0,0,.7)}
-  .bottom{flex:none;height:var(--bottomh,188px);background:#0d0d0d;border-top:1px solid var(--cellbd);display:flex;flex-direction:column;overflow:hidden;
+  .bottom{flex:none;height:var(--bottomh,126px);background:#0d0d0d;border-top:1px solid var(--cellbd);display:flex;flex-direction:column;overflow:hidden;
     font-family:"Segoe UI",Tahoma,sans-serif;font-size:11px}
   /* terminal menu tab bar — glued to the BOTTOM of the floating toolbox (integral, always bottom) */
   .tbxtabs{flex:none;height:24px;display:flex;align-items:stretch;background:linear-gradient(#20242a,#14171c);border-top:1px solid #000;overflow-x:auto}
@@ -2715,10 +2715,11 @@ function BottomResizer({ onDone }){
       // DOCKED toolbox: its tab bar (24px) sits at the very bottom, content above it. Dragging the top
       // edge to cursorY sets the terminal (content) height = (window bottom − tab bar) − cursorY. The
       // grid dock row = this height + tab bar, so the charts/left panel shrink to fit above it. Clamp
-      // so the toolbox never shrinks below its 188 home and always leaves ~140px of content on top.
+      // so the toolbox never shrinks below its 126 home (dock 150 = 126 + 24 tab bar → taller charts)
+      // and always leaves room on top.
       const TAB=24;
       const h = window.innerHeight - TAB - e.clientY;
-      lastH = Math.max(188, Math.min(window.innerHeight - 200, h));
+      lastH = Math.max(126, Math.min(window.innerHeight - 200, h));
       term.style.setProperty('--bottomh', lastH+'px');
       if(!raf) raf=requestAnimationFrame(()=>{ raf=null; chartResizer.resizeAll(); });
     };
@@ -2964,7 +2965,7 @@ function App(){
   const [tool,setTool]=React.useState(null);             // armed drawing tool (cross/vline/…)
   const [view,setView]=React.useState({ ...DEFAULT_VIEW, ...(cfg.view||{}) });
   const [leftw,setLeftw]=React.useState(cfg.leftw||270);
-  const [bottomh,setBottomh]=React.useState(cfg.bottomh||188);
+  const [bottomh,setBottomh]=React.useState((cfg.bottomh && cfg.bottomh>188) ? cfg.bottomh : 126);   // dock 150px (126+24) → taller charts; keep only an intentionally-enlarged saved value (>188), else new slim default
   const [navh,setNavh]=React.useState(cfg.navh||186);
   const [termTab,setTermTab]=React.useState('Trade');   // terminal tab bar lives full-width at screen bottom
   const [theme,setTheme]=React.useState(WT_URL_THEME || (cfg.theme==='light'?'light':'dark'));   // ?theme= deep-link wins, else saved View → Color Theme

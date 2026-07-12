@@ -24,7 +24,7 @@ if (!/it\.act==='spread' && spread/.test(src)) bad('the Spread menu row must sho
 // 2) DOCKED toolbox (MT5): the dock grid row equals the toolbox height so the content above it
 //    (left panel + charts) SHRINKS to fit — no floating overlay, everything stays visible.
 if (!/'--dockh': \(view\.toolbox \? \(bottomh\+24\) : 0\)\+'px'/.test(src)) bad('dock row must equal the toolbox height (bottomh+24) so content shrinks, docked not overlaid');
-if (!/lastH = Math\.max\(188, Math\.min\(window\.innerHeight - 200, h\)\)/.test(src)) bad('toolbox resize must leave content room (clamp to innerHeight-200)');
+if (!/lastH = Math\.max\(126, Math\.min\(window\.innerHeight - 200, h\)\)/.test(src)) bad('toolbox resize floor lowered to 126 (dock 150 → taller charts), still clamped to innerHeight-200');
 if (/chartsEl\.style\.height=active\+'px'/.test(src)) bad('the old overlay-era .charts height clamp must be gone (grid docks the toolbox now)');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} MW spread / dock problem(s).`); process.exit(1); }

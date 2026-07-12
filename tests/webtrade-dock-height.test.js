@@ -1,0 +1,35 @@
+#!/usr/bin/env node
+// REGRESSION (webtrade) — the bottom terminal dock was floored at 188px (drag clamp + default), which
+// permanently squeezed the chart area (the 1fr grid row). Slim it to a 150px dock (126px content +
+// 24px tab bar) so the 4-split charts expand vertically. The 12-tab toolbox keeps all its function —
+// only the default/floor height changed; an intentionally-enlarged saved value (>188) is preserved.
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const src = fs.readFileSync(path.join(__dirname, '..', 'webtrade.html'), 'utf8');
+let fail = 0;
+const bad = (m) => { console.error('🔴 ' + m); fail++; };
+
+// default content height 126 (dock = 126 + 24 tab bar = 150), with the old-default (188) migration
+if (!/const \[bottomh,setBottomh\]=React\.useState\(\(cfg\.bottomh && cfg\.bottomh>188\) \? cfg\.bottomh : 126\);/.test(src))
+  bad('bottomh must default to 126 (dock 150), keeping only a saved value >188 (intentional enlargement)');
+// drag floor lowered 188 → 126 so the dock can actually reach the slim height
+if (!/lastH = Math\.max\(126, Math\.min\(window\.innerHeight - 200, h\)\)/.test(src))
+  bad('the resize clamp floor must be 126 (was 188) so the terminal can slim down');
+if (/Math\.max\(188,/.test(src)) bad('the old 188 floor must be gone');
+// dock row still = bottomh + 24 (docked, not overlaid) → charts absorb the freed pixels
+if (!/'--dockh': \(view\.toolbox \? \(bottomh\+24\) : 0\)\+'px'/.test(src))
+  bad('dock row must stay bottomh+24 (charts shrink/grow to fit above it)');
+// CSS fallbacks aligned (pre-React paint)
+if (!/grid-template-rows:23px 33px 1fr var\(--dockh,150px\)/.test(src)) bad('grid --dockh fallback must be 150px');
+if (!/\.bottom\{flex:none;height:var\(--bottomh,126px\)/.test(src)) bad('.bottom --bottomh fallback must be 126px');
+
+// the 12-tab toolbox switching socket is untouched (functionality preserved)
+if (!/toolbox:true/.test(src)) bad('toolbox must still default on (12 tabs preserved)');
+
+// [3] the spread stays the PIP formula (a 1-pip FX gap = 1.0, not 10× inflated)
+if (!/\(\(m\.ask-m\.bid\)\/pip\(sym\)\)\.toFixed\(1\)/.test(src)) bad('spread must remain (ask-bid)/pip (1.0 per pip)');
+if (/ptScale/.test(src)) bad('the ×100000 ptScale inflation must remain removed');
+
+if (fail) { console.error(`\n🔴 FAIL — ${fail} dock-height problem(s).`); process.exit(1); }
+console.log('🟢 PASS: bottom dock slimmed to 150px (126 content + 24 tabs), floor lowered 188→126, charts expand vertically; 12-tab toolbox + pip-spread intact.');
