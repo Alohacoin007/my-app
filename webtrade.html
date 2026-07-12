@@ -933,12 +933,17 @@ const WINLAYOUT=[
 
 // ── candle history: try the fx-prices Edge, fall back to a synthetic seed (live bars are REAL feed). ──
 async function loadCandles(symbol, tf){
-  // WebTrader is a SERVER-INDEPENDENT demo (WT_DEMO): use the deterministic 200-bar synth for EVERY
-  // timeframe. The live fx-prices feed returned a sparse/clustered history for some TFs (M5/M30 came
-  // back as 2 giant candles), so we don't depend on it here. Flip WT_DEMO off to wire a real feed.
+  // FULL HISTORY FOR EVERY SYMBOL — open or CLOSED. The chart history is NOT gated by market hours
+  // (the session gate only blocks orders); a weekend/closed Forex/Stock symbol still fills the whole
+  // window. The live fx-prices feed often returns a SPARSE/clustered history (M5/M30 came back as "2
+  // giant candles"), which drew short/broken charts — so we trust it ONLY when it returns a genuinely
+  // FULL, clean history (≥160 bars); otherwise we fall back to the deterministic 200-bar seed whose
+  // LAST bar anchors to the live mid. Result: a long, full chart every time, real data when the feed
+  // is actually complete. (When the fx-prices candles endpoint is fixed server-side to always return
+  // full history, lower the 160 threshold to prefer real bars.)
   if(!WT_DEMO){ try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.functions){
     const x=await AlpexaSync.db.functions.invoke('fx-prices',{body:{candles:symbol,tf:tf||'M15'}});
-    if(x&&!x.error&&x.data&&Array.isArray(x.data.candles)&&x.data.candles.length>=30)
+    if(x&&!x.error&&x.data&&Array.isArray(x.data.candles)&&x.data.candles.length>=160)
       return x.data.candles.map(c=>({ time:Math.floor((c.t||c.time)/1000), open:+c.o||+c.open, high:+c.h||+c.high, low:+c.l||+c.low, close:+c.c||+c.close }));
   } }catch(e){} }
   return synthCandles(symbol, tf);   // full 200-bar deterministic history for every timeframe
@@ -2676,7 +2681,9 @@ function App(){
   // MOBILE lazy chart init: only mount the chart(s) the user has REVEALED (seeded with the active
   // one). Hidden tiles create their Lightweight Charts instance the moment they're tapped or on
   // Window→Tile. Desktop reveals eagerly (lazyHold below is gated on IS_MOBILE → all charts mount).
-  const [revealed,setRevealed]=React.useState(()=> new Set(IS_MOBILE && initCharts[0] ? [initCharts[0].id] : []));
+  // DESKTOP = EAGER: reveal ALL charts up front so a refresh boots the full 2×2 instantly (no empty
+  // tiles). MOBILE = lazy: only the active chart, others hydrate on tap / Window→Tile.
+  const [revealed,setRevealed]=React.useState(()=> new Set(IS_MOBILE ? (initCharts[0] ? [initCharts[0].id] : []) : initCharts.map(c=>c.id)));
   const revealChart=React.useCallback((id)=>{ if(IS_MOBILE) setRevealed(s=> s.has(id)?s:new Set(s).add(id)); }, []);
   const activate=React.useCallback((id)=>{ setActiveId(id);
     if(IS_MOBILE) setRevealed(s=> s.has(id)?s:new Set(s).add(id)); }, []);
