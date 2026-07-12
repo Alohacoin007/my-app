@@ -19,6 +19,8 @@ const SCHEMA = {
   positions:   new Set(['id','cust_id','acct_no','server','kind','local_id','symbol','side','size','stake','open_price','pnl','potential','status','updated_at','game','pick','odds','meta']),
   accounts:    new Set(['id','cust_id','acct_no','balance','server','player_id']),
   settlements: new Set(['id','cust_id','acct_no','server','kind','local_id','ticket','symbol','stake','pnl','detail','created_at']),
+  prices:      new Set(['symbol','mid','spr_pts','updated_at']),
+  fx_specs:    new Set(['symbol','cls']),
 };
 
 for (const table of Object.keys(SCHEMA)) {

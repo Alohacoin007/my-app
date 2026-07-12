@@ -804,10 +804,37 @@ const SYMBOLS = {
 const SYM_CAT = {}; Object.keys(SYMBOLS).forEach(cat=> SYMBOLS[cat].forEach(s=> SYM_CAT[s]=cat));
 const WATCH = [...SYMBOLS.Forex, ...SYMBOLS.Stocks, ...SYMBOLS.Crypto];
 const GRID  = ['USDJPY','USDCHF','EURUSD','GBPUSD'];   // the default 2×2 (TL·TR·BL·BR, matches the MT5 screenshot)
-// Asset class for ANY symbol — including a position on a symbol NOT in the Market Watch list (e.g.
-// SPACEX). Known → SYM_CAT; else infer: XXXUSD = crypto, 6-char currency pair = FX, else a stock.
+// ── Server-driven symbol master. The Market Watch renders the LIVE symbol set from the server
+//    (prices table = what the feed actually serves), with each symbol's asset class inherited from
+//    fx_specs.cls (the same class the server margins with). No digits/active column exists server-
+//    side, so digits are derived from class. Memory-only. The hardcoded SYMBOLS above are only the
+//    BOOT default (initial paint / chart grid / offline) until symbolStore.load() replaces the list. ──
+const SERVER_CLS = {};   // symbol → fx_specs.cls (FX/CRYPTO/STOCK/INDEX), filled by symbolStore.load()
+const CLS_MAP = { FX:'Forex', FOREX:'Forex', CRYPTO:'Crypto', STOCK:'Stocks', STK:'Stocks', INDEX:'Index' };
+// Asset class for ANY symbol: known Market-Watch default → SYM_CAT; else the server class (fx_specs);
+// else infer (XXXUSD = crypto, 6-char currency pair = FX, else a stock).
 const CCY = /^(EUR|USD|GBP|JPY|AUD|CAD|CHF|NZD|CNY|HKD|SGD)/;
-const catOf = (s)=> SYM_CAT[s] || (/USD$/.test(s) ? 'Crypto' : (CCY.test(s)&&s.length===6 ? 'Forex' : 'Stocks'));
+const catOf = (s)=> SYM_CAT[s] || CLS_MAP[SERVER_CLS[s]] || (/USD$/.test(s) ? 'Crypto' : (CCY.test(s)&&s.length===6 ? 'Forex' : 'Stocks'));
+// LIVE symbol list from the server — memory-only, notifies the Market Watch on load.
+const symbolStore = {
+  list: WATCH.slice(), listeners:new Set(), loaded:false,
+  async load(){ try{ if(window.AlpexaSync&&AlpexaSync.db){
+    const [pr, sp] = await Promise.all([
+      AlpexaSync.db.from('prices').select('symbol'),
+      AlpexaSync.db.from('fx_specs').select('symbol,cls'),
+    ]);
+    if(sp&&sp.data) sp.data.forEach(x=>{ if(x.symbol&&x.cls) SERVER_CLS[x.symbol]=String(x.cls).toUpperCase(); });
+    if(pr&&pr.data&&pr.data.length){
+      const live=pr.data.map(x=>x.symbol).filter(Boolean);
+      // order: Forex → Stocks → Crypto → Index → other, alphabetical within (stable MT5-like grouping)
+      const rank={Forex:0,Stocks:1,Crypto:2,Index:3};
+      live.sort((a,b)=>{ const ra=rank[catOf(a)]??9, rb=rank[catOf(b)]??9; return ra-rb || (a<b?-1:a>b?1:0); });
+      this.list=live; this.loaded=true; this.notify();
+    }
+  } }catch(e){} },
+  notify(){ this.listeners.forEach(fn=>{ try{fn(this.list);}catch(e){} }); },
+  subscribe(fn){ this.listeners.add(fn); fn(this.list); return ()=>this.listeners.delete(fn); },
+};
 const sfx   = (s)=> catOf(s)==='Forex' ? '.FX' : catOf(s)==='Crypto' ? '.CR' : '.STK';   // display suffix per class
 const pip   = (s)=> (catOf(s)==='Stocks'||catOf(s)==='Crypto') ? 0.01 : (s.slice(3)==='JPY'||s.slice(0,3)==='JPY' ? 0.01 : 0.0001);
 const digits= (s)=> (catOf(s)==='Stocks'||catOf(s)==='Crypto') ? 2 : (s.includes('JPY') ? 3 : 5);
@@ -2021,14 +2048,14 @@ function MWDetails({ sym }){
   );
 }
 /* Market Watch → Trading tab: stacked one-click SELL/BUY panels per symbol */
-function MWTrading({ cat, onCtx }){
+function MWTrading({ cat, syms=WATCH, onCtx }){
   const [mids,setMids]=React.useState({});
   React.useEffect(()=> priceStore.subscribe(throttle(m=>setMids({...m}),RENDER_MS)), []);
   const d=new Date(),p2=n=>String(n).padStart(2,'0'), tm=p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds());
   const big=(sym,v)=>{ const s=fmtPx(sym,v); return s==='—'?s:<span>{s.slice(0,-1)}<sup>{s.slice(-1)}</sup></span>; };
   return (
     <div className="mwtrade">
-      {WATCH.filter(sym=> cat==='All'||!cat||SYM_CAT[sym]===cat).map(sym=>{ const m=mids[sym]||{};
+      {syms.filter(sym=> cat==='All'||!cat||catOf(sym)===cat).map(sym=>{ const m=mids[sym]||{};
         return (
           <div className="mwtp" key={sym} onContextMenu={(e)=>onCtx&&onCtx(e,sym)}
                draggable={true} onDragStart={(e)=>{ e.dataTransfer.setData('text/mwsymbol', sym); e.dataTransfer.effectAllowed='copy'; }}>
@@ -2048,6 +2075,8 @@ function MWTrading({ cat, onCtx }){
 const MW_TABS=['Symbols','Details','Trading','Ticks'];
 function MarketWatch({ onPick }){
   const [mids,setMids]=React.useState({});
+  const [syms,setSyms]=React.useState(symbolStore.list);   // LIVE server symbol set (dynamic, not hardcoded)
+  React.useEffect(()=> symbolStore.subscribe(l=>setSyms([...l])), []);
   const [dirs,setDirs]=React.useState({});      // per-symbol last-tick direction for bid/ask
   const [sel,setSel]=React.useState(null);      // blue-selected row
   const [tab,setTab]=React.useState('Symbols');
@@ -2069,18 +2098,18 @@ function MarketWatch({ onPick }){
   }, RENDER_MS)), []);
   const ctx=(e,sym)=>{ e.preventDefault(); setSel(sym); setMenu({ sym, x:e.clientX, y:e.clientY }); };
   const tc=(d)=> d>0?'tick-up':d<0?'tick-down':'';   // sticky tick colour (held until next up/down)
-  const cur=sel||WATCH[0];
+  const cur=sel||syms[0]||WATCH[0];
   return (
     <div className="watch">
       <div className="mwhead"><span>{t('Market Watch')}: {clock}</span><span className="x" title="Close (Ctrl+M)" onClick={()=>terminalBus.emit('view.toggle','marketwatch')}>✕</span></div>
       {tab==='Ticks' ? <TickChart symbol={cur} /> :
       <div className="mwscroll">
         {tab==='Details' ? <MWDetails sym={cur} /> :
-         tab==='Trading' ? <MWTrading cat={cat} onCtx={ctx} /> :
+         tab==='Trading' ? <MWTrading cat={cat} syms={syms} onCtx={ctx} /> :
         <table className="mwt">
           <thead><tr><th>{t('Symbol')}</th><th>{t('Bid')}</th><th>{t('Ask')}</th>{showSpread && <th>{t('Spread')}</th>}<th>{t('Daily Ch%')}</th></tr></thead>
           <tbody>
-            {WATCH.filter(sym=>!hidden.has(sym) && (cat==='All'||SYM_CAT[sym]===cat)).map(sym=>{ const m=mids[sym]||{}, d=dirs[sym]||{}; const up=(m.chg||0)>=0;
+            {syms.filter(sym=>!hidden.has(sym) && (cat==='All'||catOf(sym)===cat)).map(sym=>{ const m=mids[sym]||{}, d=dirs[sym]||{}; const up=(m.chg||0)>=0;
               const spr=(m.ask!=null&&m.bid!=null)?((m.ask-m.bid)/pip(sym)).toFixed(1):'—';
               const open=marketOpen(sym);   // session gate — closed → freeze ticks + 'Closed' mask
               return (
@@ -2908,7 +2937,7 @@ function App(){
   const closeChart=React.useCallback((id)=>{ setCharts(cs=>cs.filter(c=>c.id!==id));   // unmount → ChartCell cleanup unsubscribes + chart.remove (no leak)
     delete geos.current[id]; setActiveId(a=> a===id ? null : a); }, []);
   const changeSymbol=React.useCallback((id,sym)=>{ setCharts(cs=>cs.map(c=> c.id===id ? {...c, symbol:sym} : c)); }, []);   // MW drag-drop → this window's chart switches symbol
-  React.useEffect(()=>{ priceStore.start(); positionsStore.start();
+  React.useEffect(()=>{ priceStore.start(); positionsStore.start(); symbolStore.load();   // pull the LIVE symbol set from the server (prices + fx_specs class)
     journalStore.log('Alpexa WebTrade terminal started', 1);
     journalStore.log('Chart engine (Lightweight Charts) initialised', 1);
     const un=priceStore.subscribe(()=>{ if(priceStore.live && !journalStore._feed){ journalStore._feed=1; journalStore.log('Price feed connected (1s cache)', 1); } });
