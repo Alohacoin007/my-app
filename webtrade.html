@@ -139,11 +139,11 @@
   .oc-lbl{flex:1;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:normal;letter-spacing:.5px;
     cursor:pointer;font-family:"Arial Black","Segoe UI",Arial,sans-serif}
   .oc-lbl:hover{filter:brightness(1.13)}
-  .oc-vol{width:58px;flex:none;position:relative;background:#e1e1e1;display:flex;align-items:center;justify-content:center;border-left:1px solid #555;border-right:1px solid #555}
-  .oc-vol b{position:absolute;top:50%;transform:translateY(-50%);cursor:pointer;color:#333;font-size:9px;width:14px;text-align:center;user-select:none;line-height:1}
+  .oc-vol{width:58px;flex:none;position:relative;background:#121418;display:flex;align-items:center;justify-content:center;border-left:1px solid #3c4049;border-right:1px solid #3c4049}
+  .oc-vol b{position:absolute;top:50%;transform:translateY(-50%);cursor:pointer;color:#8a94a6;font-size:9px;width:14px;text-align:center;user-select:none;line-height:1}
   .oc-vol b.dn{left:0}.oc-vol b.up{right:0}
-  .oc-vol b:hover{color:#1e3d70}
-  .oc-vol input{width:30px;height:16px;text-align:center;padding:0;border:none;background:#fff;color:#111;font-weight:bold;font-size:12px;outline:none}
+  .oc-vol b:hover{color:#ffffff}
+  .oc-vol input{width:30px;height:16px;text-align:center;padding:0;border:none;background:#121418;color:#ffffff;font-weight:bold;font-size:12px;outline:none}
   /* bottom layer (44px) — SELL | BUY big quotes, 50:50 */
   .oc-bot{flex:1;display:flex;align-items:stretch}
   .oc-price{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;margin:0;
@@ -154,9 +154,12 @@
   .oc-price .bf .sm{font-size:11px;font-weight:normal;color:#ffffff}                                  /* 앞자리 1.14 */
   .oc-price .bf .bg{font-size:24px;font-weight:normal;color:#ffffff;line-height:1;font-family:"Arial Black","Segoe UI",Arial,sans-serif}  /* 핵심 핍 — 각진 묵직 폰트 */
   .oc-price .bf .fr{align-self:flex-start;font-size:11px;font-weight:normal;color:#ffffff;margin-left:1px;transform:translateY(-4px)}  /* 위첨자 */
-  /* per-side GLOSSY radial colour — blue = up/hold, red = down (SELL↔Bid, BUY↔Ask, independent) */
-  .oc-blue{background:#3a63e0 !important;border:1px solid #1f3fb0 !important}   /* royal blue */
-  .oc-red{background:#f5342a !important;border:1px solid #c11f17 !important}   /* bright red */
+  /* per-side NEON skin — SELL = red-neon (fixed), BUY = blue-neon (fixed). Semantic side colour,
+     not tick-flip. Glow ignites on hover, and on the live tick (SELL on down-tick, BUY on up-tick). */
+  .oc-sell{background:linear-gradient(to bottom,#2c0d0d 0%,#1a0505 100%) !important;border:1px solid #ff3b30 !important;color:#ff453a !important}
+  .oc-buy{background:linear-gradient(to bottom,#0d1b3a 0%,#050d1a 100%) !important;border:1px solid #007aff !important;color:#3095ff !important}
+  .oc-sell:hover,.oc-sell.oc-glow{box-shadow:0 0 8px rgba(255,59,48,.6)}
+  .oc-buy:hover,.oc-buy.oc-glow{box-shadow:0 0 8px rgba(0,122,255,.6)}
   /* ── ECN order interaction (overlay only — 190x64 치수/대칭 불변) ──
      처리중: 클릭한 쪽 호가를 dim+blur, 코너에 미세 스피너. 체결완료: 패널 0.1s 플래시. */
   .obox.ecn-flash{animation:ecnFlash .1s ease-out}
@@ -617,7 +620,7 @@
   .terminal.light .oc-vol{background:#000000;border-left:1px solid #242831;border-right:1px solid #242831}
   .terminal.light .oc-vol b{color:#8A94A6}.terminal.light .oc-vol b:hover{color:#ffffff}          /* qty arrows → muted silver, no neon */
   .terminal.light .oc-vol input{background:#000000;color:#ffffff}
-  .terminal.light .oc-blue,.terminal.light .oc-red{background:transparent !important;border:none !important}
+  .terminal.light .oc-sell,.terminal.light .oc-buy{background:transparent !important;border:none !important;color:#8A94A6 !important;box-shadow:none !important}
   .terminal.light .oc-lbl{color:#8A94A6 !important;font-weight:600;letter-spacing:.6px}            /* SELL/BUY labels → muted silver */
   /* toned-down: the price number is clean MONOCHROME white (was loud neon green/red) */
   .terminal.light .oc-price .bf .sm,.terminal.light .oc-price .bf .bg,.terminal.light .oc-price .bf .fr{color:#ffffff !important}
@@ -1301,8 +1304,8 @@ function OrderBox({ symbol }){
     if(q.bid!=null){ const p=prevBid.current; if(p!=null){ if(q.bid>p) setBidDir('up'); else if(q.bid<p) setBidDir('down'); } prevBid.current=q.bid; }
     if(q.ask!=null){ const p=prevAsk.current; if(p!=null){ if(q.ask>p) setAskDir('up'); else if(q.ask<p) setAskDir('down'); } prevAsk.current=q.ask; }
   }, 400)), [symbol]);
-  const sellCls = bidDir==='down' ? 'oc-red' : 'oc-blue';   // blue on up/hold, red on down
-  const buyCls  = askDir==='down' ? 'oc-red' : 'oc-blue';
+  const sellCls = 'oc-sell'+(bidDir==='down' ? ' oc-glow' : '');   // SELL fixed red-neon; glow ignites on down-tick
+  const buyCls  = 'oc-buy' +(askDir==='up'   ? ' oc-glow' : '');   // BUY fixed blue-neon; glow ignites on up-tick
   const open=marketOpen(symbol);   // session gate — closed → BUY/SELL locked, order refused
   const tradable = open && eng.freeMargin>0;   // free-margin gate — no free margin → lock BUY/SELL
   const send=async(side)=>{

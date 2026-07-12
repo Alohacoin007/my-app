@@ -61,7 +61,7 @@ if (!/\.terminal\.light \.omodal\{background:#0E1015;border:1px solid #1D212A\}/
 // one-click panel → flat matte-black card, no 3D fill, monochrome neon numbers
 // one-click panel: calm SOLID matte-black + faint #242831 hairline (transparent-only hurt the eyes)
 if (!/\.terminal\.light \.obox\{background:#000000 !important;border:1px solid #242831 !important;box-shadow:none/.test(src)) bad('Legend one-click panel must be solid #000000 + faint 1px #242831 hairline');
-if (!/\.terminal\.light \.oc-blue,\.terminal\.light \.oc-red\{background:transparent !important;border:none !important\}/.test(src)) bad('oc-blue/oc-red halves must have no fill/border');
+if (!/\.terminal\.light \.oc-sell,\.terminal\.light \.oc-buy\{background:transparent !important;border:none !important;color:#8A94A6 !important;box-shadow:none !important\}/.test(src)) bad('oc-sell/oc-buy halves must have no fill/border/glow (muted silver) in Legend');
 if (!/\.terminal\.light \.oc-lbl\{color:#8A94A6/.test(src)) bad('SELL/BUY labels must be muted silver #8A94A6 (no neon)');
 if (!/\.terminal\.light \.oc-vol b\{color:#8A94A6/.test(src)) bad('qty arrows must be muted silver #8A94A6');
 // toned-down one-click: price number is clean monochrome white (no loud green/red)
@@ -97,9 +97,9 @@ if (!/\.terminal\.light \.tbtn:hover[^}]*background:transparent !important;borde
 if (!/\.terminal\.light \.acctline\{background:#0E1015;color:#a2aab6;border-top:1px solid #1D212A;border-bottom:1px solid #1D212A;font-weight:normal\}/.test(src)) bad('Legend Balance bar must be #a2aab6 (original size, normal weight)');
 if (!/\.terminal\.light \.acctline \.k\{color:#a2aab6[^}]*\}\.terminal\.light \.acctline b\{color:#a2aab6/.test(src)) bad('Legend Balance bar labels + numbers must be the #a2aab6 tab tone');
 
-// the DEFAULT dark one-click panel keeps its 3D royal-blue / red fills (outside .terminal.light)
-if (!/\.oc-blue\{background:#3a63e0 !important/.test(src)) bad('dark one-click panel must keep the royal-blue fill');
-if (!/\.oc-red\{background:#f5342a !important/.test(src)) bad('dark one-click panel must keep the red fill');
+// the DEFAULT dark one-click panel wears the neon skin (outside .terminal.light): SELL red-neon, BUY blue-neon
+if (!/\.oc-sell\{background:linear-gradient\(to bottom,#2c0d0d 0%,#1a0505 100%\) !important;border:1px solid #ff3b30 !important;color:#ff453a !important\}/.test(src)) bad('dark SELL must be the red-neon skin');
+if (!/\.oc-buy\{background:linear-gradient\(to bottom,#0d1b3a 0%,#050d1a 100%\) !important;border:1px solid #007aff !important;color:#3095ff !important\}/.test(src)) bad('dark BUY must be the blue-neon skin');
 
 // (4) UI label renamed to Legend (no "Light / Dark" left)
 if (/Color Theme — Light \/ Dark/.test(src)) bad('the menu label must be renamed away from "Light / Dark"');
