@@ -48,11 +48,11 @@ if (!/\.mwt td\.mw-closed-tag\{/.test(src)) bad("'Closed' tag needs a grey style
 // ── one-click panel (OrderBox) lock + refusal ──
 if (!/const open=marketOpen\(symbol\);   \/\/ session gate — closed → BUY\/SELL locked/.test(src)) bad('OrderBox must compute session state');
 if (!/if\(!marketOpen\(symbol\)\)\{ playSnd\(sndError\); alert\('장 마감 시간입니다 \(Market closed\)'\); return; \}[\s\S]*?debounce/.test(src)) bad('OrderBox.send must refuse a closed-market order with the error sound BEFORE any RPC');
-if (!/\(open\?'':' oc-closed'\)/.test(src)) bad('OrderBox must add oc-closed when the market is closed');
+if (!/\(tradable\?'':' oc-closed'\)/.test(src)) bad('OrderBox must dim/disable (oc-closed) when the market is closed or free margin is gone');
 if (!/\.obox\.oc-closed \.oc-lbl,\.obox\.oc-closed \.oc-price\{pointer-events:none;opacity:\.4\}/.test(src)) bad('closed one-click panel must be pointer-events:none; opacity:.4');
 
 // ── New Order popup (OrderModal) lock + refusal ──
-if (!/if\(!marketOpen\(symbol\)\)\{ playSnd\(sndError\); alert\('장 마감 시간입니다 \(Market closed\)'\); return; \}[\s\S]*?client pre-gate/.test(src)) bad('OrderModal.submit must refuse a closed-market order with the error sound');
+if (!/if\(!marketOpen\(symbol\)\)\{ playSnd\(sndError\); alert\('장 마감 시간입니다 \(Market closed\)'\); return; \}[\s\S]*?server gate is the real authority/.test(src)) bad('OrderModal.submit must refuse a closed-market order with the error sound');
 if (!/disabled=\{!canAfford\|\|!open\} onClick=\{\(\)=>submit\('sell'\)\}/.test(src)) bad('New Order Sell button must be disabled when closed');
 if (!/disabled=\{!canAfford\|\|!open\} onClick=\{\(\)=>submit\('buy'\)\}/.test(src)) bad('New Order Buy button must be disabled when closed');
 if (!/\{!open && <div className="om-closed">/.test(src)) bad('New Order popup must show a Market-closed note');

@@ -1012,7 +1012,11 @@ const terminalBus = { listeners:new Set(),
    the fx_open RPC to go live; until then placeOrder reports 'not connected' rather
    than faking money. ══ */
 const TRADE_API = (typeof window!=='undefined' && window.ALPEXA_TRADE_API) || '/api/trade/order';
-const CONTRACT = 100000;   // FX standard lot
+const CONTRACT = 100000;   // FX standard lot (units of base ccy per 1.00 lot)
+// Per-asset CONTRACT SIZE (units per 1.00 lot). FX = 100,000 base units; crypto & stocks = 1
+// coin/share per lot. Using 100k for crypto/stocks was the margin/P&L blow-up ($120k on 0.01 lot):
+// margin & floating both key off THIS. Mirrors the server exactly (fx_notional_usd: FX→100000 else 1).
+const contractSize = (symbol)=> (SYM_CAT[symbol]==='Forex' ? CONTRACT : 1);
 const LEVERAGES = [10,50,100,500];
 
 /* tradeSettings — leverage is a UI/config setting (NOT money), so localStorage is OK
@@ -1045,7 +1049,7 @@ function baseUsdRate(symbol){
 }
 // required margin (in USD account ccy) for a volume at a leverage — the MT5 formula.
 function requiredMargin(symbol, volume, leverage){
-  const lev=Math.max(1,+leverage||100); return (+volume||0)*CONTRACT*baseUsdRate(symbol)/lev;
+  const lev=Math.max(1,+leverage||100); return (+volume||0)*contractSize(symbol)*baseUsdRate(symbol)/lev;
 }
 
 function useTradeEngine(){
@@ -1061,7 +1065,7 @@ function useTradeEngine(){
   // ── leverage → real-time order affordability (all display; server stays the money owner) ──
   const floating = pos.reduce((s,p)=>{ if(p._demo && p.profit!=null) return s+(+p.profit);
     const m=priceStore.get(p.symbol); if(!m) return s; const dir=sideUp(p.side)==='SELL'?-1:1;
-    return s + dir*(m.mid-(+p.open_price||m.mid))*lotsOf(p)*CONTRACT*(p.symbol.includes('JPY')?0.0067:1); }, 0);
+    return s + dir*(m.mid-(+p.open_price||m.mid))*lotsOf(p)*contractSize(p.symbol)*(p.symbol.includes('JPY')?0.0067:1); }, 0);
   const balance = acct?+acct.balance||0:0;
   const equity  = balance + floating;
   const usedMargin = pos.reduce((s,p)=> s + requiredMargin(p.symbol, lotsOf(p), leverage), 0);
@@ -1151,8 +1155,11 @@ function OrderBox({ symbol }){
   const sellCls = bidDir==='down' ? 'oc-red' : 'oc-blue';   // blue on up/hold, red on down
   const buyCls  = askDir==='down' ? 'oc-red' : 'oc-blue';
   const open=marketOpen(symbol);   // session gate — closed → BUY/SELL locked, order refused
+  const tradable = open && eng.freeMargin>0;   // free-margin gate — no free margin → lock BUY/SELL
   const send=async(side)=>{
     if(!marketOpen(symbol)){ playSnd(sndError); alert('장 마감 시간입니다 (Market closed)'); return; }   // reject before any RPC — 뚜엑
+    const need=eng.marginFor(symbol, +vol||0.01);     // margin this order would lock
+    if(eng.freeMargin<=0 || need>eng.freeMargin+1e-9){ playSnd(sndError); alert('Margin Call — 증거금 부족 (Insufficient free margin)'); return; }   // 증거금 부족 → 거절
     if(busyRef.current) return;                       // debounce — 한 번에 한 주문만(레이스/이중발사 차단)
     busyRef.current=side; setBusy(side);
     const q=priceStore.get(symbol)||m; const price=side==='buy'?q.ask:q.bid;   // the quote the trader is looking at = requested price
@@ -1177,7 +1184,7 @@ function OrderBox({ symbol }){
   const inc=()=>setVol((Math.max(0.01,(+vol||0)+0.01)).toFixed(2));
   const busySell=busy==='sell', busyBuy=busy==='buy';
   return (   // always shown — the 190×64 one-click panel is locked visible on every chart
-    <div className={"obox"+(flash?' ecn-flash':'')+(open?'':' oc-closed')}>
+    <div className={"obox"+(flash?' ecn-flash':'')+(tradable?'':' oc-closed')}>
       <div className="oc-top">
         <div className={"oc-lbl "+sellCls+(busySell?' oc-busy':'')} title="Sell at Bid" onClick={(e)=>{e.stopPropagation();send('sell');}}>SELL</div>
         <div className="oc-vol" onClick={e=>e.stopPropagation()}>
@@ -2074,8 +2081,8 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
   // fxClosePx lockstep so floating == what fx_close realizes). No open FX positions → 0.
   const plOf=(p)=>{ if(p._demo && p.profit!=null) return +p.profit;   // demo seed carries a pinned P/L
     const m=mids[p.symbol]; if(!m) return 0;
-    const dir=sideUp(p.side)==='SELL'?-1:1; const contract=100000;
-    return dir*(m.mid-(+p.open_price||m.mid))*lotsOf(p)*contract*(p.symbol.includes('JPY')?0.0067:1); };
+    const dir=sideUp(p.side)==='SELL'?-1:1;
+    return dir*(m.mid-(+p.open_price||m.mid))*lotsOf(p)*contractSize(p.symbol)*(p.symbol.includes('JPY')?0.0067:1); };
   const floating = pos.reduce((s,p)=> s+plOf(p), 0);
   const balance=acct?+acct.balance||0:0, equity=balance+floating;
   const marginUsed=pos.reduce((s,p)=> s+requiredMargin(p.symbol, lotsOf(p), leverage), 0);  // leverage-driven
@@ -2158,7 +2165,8 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
               <span><span className="k">{t('Margin')}:</span> <b>{num(marginUsed)}</b></span>
               <span><span className="k">{t('Free Margin')}:</span> <b>{num(equity-marginUsed)}</b></span>
               <span><span className="k">{t('Margin Level')}:</span> <b className={marginUsed>0&&level<100?'down':''}>{marginUsed>0?num(level)+' %':'—'}</b>
-                {marginUsed>0&&level<50 && <b style={{color:'#ff5252',marginLeft:6}}>⚠ Stop Out &lt;30%</b>}</span>
+                {marginUsed>0&&level<100&&level>=30 && <b style={{color:'#e0a020',marginLeft:6}}>⚠ Margin Call</b>}
+                {marginUsed>0&&level<30 && <b style={{color:'#ff5252',marginLeft:6}}>⛔ Stop Out &lt;30%</b>}</span>
               <span><span className="k">{t('Profit')}:</span> <b className={floating>=0?'up':'down'}>{num(floating)}</b></span>
             </div>
           </td></tr></tfoot>}
@@ -2555,7 +2563,7 @@ function OrderModal({ symbol:sym0, onClose }){
   const open=marketOpen(symbol);   // session gate — closed → Buy/Sell locked, order refused
   const submit=async(side)=>{
     if(!marketOpen(symbol)){ playSnd(sndError); alert('장 마감 시간입니다 (Market closed)'); return; }   // reject before any RPC — 뚜엑
-    if(!canAfford) return;   // client pre-gate; the server margin gate is the real authority
+    if(!canAfford){ playSnd(sndError); alert('Margin Call — 증거금 부족 (Insufficient free margin)'); return; }   // 증거금 부족 → 거절 (server gate is the real authority)
     const q=priceStore.get(symbol)||m; const price=side==='buy'?q.ask:q.bid;   // requested price the trader sees
     const maxSlip=SLIP_PIPS*pip(symbol);
     const r=await eng.placeOrder({ symbol, side, volume:vol, leverage:eng.leverage, requestedPrice:price, maxSlippage:maxSlip });   // +leverage +slippage
@@ -2616,6 +2624,7 @@ function OrderModal({ symbol:sym0, onClose }){
             {!canAfford && <span> &nbsp;·&nbsp; ⚠ insufficient</span>}
           </div>
           {!open && <div className="om-closed">🔒 Market closed — 장 마감 시간입니다</div>}
+          {open && !canAfford && <div className="om-closed">⚠ Margin Call — 증거금 부족</div>}
           {/* Sell / Buy by Market — matte flat (Binance/TradingView pro) */}
           <div className="om-btns">
             <button className="om-sell" disabled={!canAfford||!open} onClick={()=>submit('sell')}>{t('Sell by Market')}</button>
