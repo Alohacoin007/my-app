@@ -14,8 +14,14 @@ const bad = (m) => { console.error('🔴 ' + m); fail++; };
 // 1) the tool effect must toggle panning: cross disables pressedMouseMove, cursor keeps scroll on
 if (!/handleScroll: cross \? \{ mouseWheel:true, pressedMouseMove:false[^}]*\} : true/.test(src))
   bad('Crosshair must disable drag-pan (pressedMouseMove:false) while Cursor keeps handleScroll:true');
-if (!/crosshair:\{ mode: cross\?0:1 \}/.test(src)) bad('Crosshair=free(0), everything else=magnet(1)');
+if (!/crosshair:\{ mode: cross\?0:1,/.test(src)) bad('Crosshair=free(0), everything else=magnet(1)');
 if (!/box\.current\.style\.cursor = cross \? 'crosshair' : ''/.test(src)) bad('Crosshair tool should show a crosshair cursor');
+
+// 1b) the Crosshair tool must FORCE the dotted vert/horz lines on (up+down), even in Legend where the
+// hover crosshair is otherwise off; Cursor reverts to the per-theme default (dark=on, Legend=off).
+if (!/const showX = cross \|\| themeBus\.theme!=='light';/.test(src)) bad('Crosshair tool must force the dotted lines on regardless of theme');
+if (!/vertLine:\{color:thc, style:DOT, visible:showX, labelVisible:showX\}/.test(src)) bad('vertical dotted crosshair line must follow showX');
+if (!/horzLine:\{color:thc, style:DOT, visible:showX, labelVisible:showX\}/.test(src)) bad('horizontal dotted crosshair line must follow showX');
 
 // 2) the measure ruler: only in cross mode, computes bars (logical delta) + pips (pip()) + price delta
 if (!/toolRef\.current!=='cross' \|\| e\.button!==0/.test(src)) bad('measure drag must only start with the Crosshair tool + left button');

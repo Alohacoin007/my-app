@@ -1734,8 +1734,15 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     const armed = isActive && tool && tool!=='arrow' && tool!=='cross';
     el.className='drawlayer'+(armed?' arm':'');
     const cross = isActive && tool==='cross';
+    // Crosshair tool → show the MT5 dotted vert/horz lines (up+down) even in Legend, where the hover
+    // crosshair is otherwise off (18ed8f4). Cursor tool reverts to the per-theme default (dark=on, Legend=off).
+    const DOT=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dotted)!=null?LightweightCharts.LineStyle.Dotted:1;
+    const thc=(CHART_THEME[themeBus.theme]||CHART_THEME.dark).cross;
+    const showX = cross || themeBus.theme!=='light';   // crosshair tool forces lines on; else theme default
     try{ if(chart.current) chart.current.applyOptions({
-      crosshair:{ mode: cross?0:1 },   // Crosshair tool = FREE (mode 0); everything else = Magnet (mode 1)
+      crosshair:{ mode: cross?0:1,   // Crosshair tool = FREE (mode 0); everything else = Magnet (mode 1)
+        vertLine:{color:thc, style:DOT, visible:showX, labelVisible:showX},
+        horzLine:{color:thc, style:DOT, visible:showX, labelVisible:showX} },
       // Crosshair tool: drag MEASURES (ruler), so disable drag-to-scroll (keep wheel zoom). Cursor tool pans.
       handleScroll: cross ? { mouseWheel:true, pressedMouseMove:false, horzTouchDrag:false, vertTouchDrag:false } : true }); }catch(e){}
     try{ if(box.current) box.current.style.cursor = cross ? 'crosshair' : ''; }catch(e){}
