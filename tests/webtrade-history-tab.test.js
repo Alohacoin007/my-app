@@ -20,8 +20,8 @@ if (!/close_price:\+closePrice\|\|0/.test(src) || !/profit:\+profit\|\|0/.test(s
 if (/localStorage\.[gs]etItem\([^)]*hist/i.test(src)) bad('history must NOT touch localStorage (demo P/L is not a cached truth)');
 
 // 2) closing a position records the deal — both demo and real paths
-if (!/positionsStore\.recordClose\(p, m\.mid, plOf\(p\)\);\s*\/\/ log the closed deal/.test(src)) bad('demo close must recordClose before removeDemo');
-if (!/positionsStore\.recordClose\(p, m\.mid, pl\);\s*\/\/ realized/.test(src)) bad('real close must recordClose after a successful fx_close');
+if (!/positionsStore\.recordClose\(p, closePx\(p,m\)\|\|m\.mid, plOf\(p\)\);\s*\/\/ log the closed deal/.test(src)) bad('demo close must recordClose (per-side close px) before removeDemo');
+if (!/positionsStore\.recordClose\(p, closePx\(p,m\)\|\|m\.mid, pl\);\s*\/\/ realized/.test(src)) bad('real close must recordClose (per-side close px) after a successful fx_close');
 
 // 3) BottomBar subscribes to history and renders the rows (no longer a hard-coded placeholder)
 if (!/setHist\(\[\.\.\.s\.history\]\)/.test(src)) bad('BottomBar must subscribe to positionsStore.history');

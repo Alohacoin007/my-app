@@ -1017,6 +1017,18 @@ const CONTRACT = 100000;   // FX standard lot (units of base ccy per 1.00 lot)
 // coin/share per lot. Using 100k for crypto/stocks was the margin/P&L blow-up ($120k on 0.01 lot):
 // margin & floating both key off THIS. Mirrors the server exactly (fx_notional_usd: FX→100000 else 1).
 const contractSize = (symbol)=> (SYM_CAT[symbol]==='Forex' ? CONTRACT : 1);
+// ── ONE source of truth for a position's live floating P&L + its current close price. Each
+//    position marks against ITS OWN symbol's live quote and ITS OWN stored entry (open_price);
+//    nothing is shared between rows, so N positions never copy each other's price/P&L. MT5 side
+//    convention: a BUY closes at the BID, a SELL closes at the ASK (so a fresh trade shows the
+//    spread as a small loss). q = the live {bid,ask} for p.symbol.
+const closePx = (p, q)=> !q ? null : (sideUp(p.side)==='SELL' ? (q.ask==null?null:q.ask) : (q.bid==null?null:q.bid));
+function positionPnL(p, q){
+  if(p._demo && p.profit!=null) return +p.profit;                 // pinned demo-seed P/L
+  const cur=closePx(p, q); if(cur==null) return 0;                // BUY→BID · SELL→ASK
+  const dir=sideUp(p.side)==='SELL'?-1:1;
+  return dir*(cur-(+p.open_price||cur))*lotsOf(p)*contractSize(p.symbol)*(p.symbol.includes('JPY')?0.0067:1);
+}
 const LEVERAGES = [10,50,100,500];
 
 /* tradeSettings — leverage is a UI/config setting (NOT money), so localStorage is OK
@@ -1063,9 +1075,7 @@ function useTradeEngine(){
   const connected = !!(window.ALPEXA_TRADE_API);   // real execution endpoint present?
   const setLeverage = (n)=> tradeSettings.setLeverage(n);
   // ── leverage → real-time order affordability (all display; server stays the money owner) ──
-  const floating = pos.reduce((s,p)=>{ if(p._demo && p.profit!=null) return s+(+p.profit);
-    const m=priceStore.get(p.symbol); if(!m) return s; const dir=sideUp(p.side)==='SELL'?-1:1;
-    return s + dir*(m.mid-(+p.open_price||m.mid))*lotsOf(p)*contractSize(p.symbol)*(p.symbol.includes('JPY')?0.0067:1); }, 0);
+  const floating = pos.reduce((s,p)=> s + positionPnL(p, priceStore.get(p.symbol)), 0);   // per-position, per-side (BID/ASK)
   const balance = acct?+acct.balance||0:0;
   const equity  = balance + floating;
   const usedMargin = pos.reduce((s,p)=> s + requiredMargin(p.symbol, lotsOf(p), leverage), 0);
@@ -2069,20 +2079,17 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
   React.useEffect(()=> priceStore.subscribe(throttle(m=>setMids({...m}),RENDER_MS)), []);   // live P&L (mobile-throttled)
   React.useEffect(()=> tradeSettings.subscribe(setLev), []);   // margin/level track the chosen leverage
   const closePos=async(p)=>{
-    if(p._demo){ const m=mids[p.symbol]||{}; positionsStore.recordClose(p, m.mid, plOf(p));   // log the closed deal → History tab
+    if(p._demo){ const m=mids[p.symbol]||{}; positionsStore.recordClose(p, closePx(p,m)||m.mid, plOf(p));   // log the closed deal (per-side close px) → History tab
       positionsStore.removeDemo(p.local_id); playSnd(sndClose); return; }   // demo row → drop it (+청산음)
     const m=mids[p.symbol]||{}; const pl=plOf(p);
     const r=await eng.closeOrder(p.local_id);                            // real → fx_close banks P&L server-side
     if(!r.ok){ alert('청산 실패(Close failed): '+(r.reason||'unknown')); return; }
-    positionsStore.recordClose(p, m.mid, pl);                            // realized → History tab
+    positionsStore.recordClose(p, closePx(p,m)||m.mid, pl);              // realized (per-side close px) → History tab
   };
 
-  // floating P&L marked at the live mid (display approx — production should use trading.html's
-  // fxClosePx lockstep so floating == what fx_close realizes). No open FX positions → 0.
-  const plOf=(p)=>{ if(p._demo && p.profit!=null) return +p.profit;   // demo seed carries a pinned P/L
-    const m=mids[p.symbol]; if(!m) return 0;
-    const dir=sideUp(p.side)==='SELL'?-1:1;
-    return dir*(m.mid-(+p.open_price||m.mid))*lotsOf(p)*contractSize(p.symbol)*(p.symbol.includes('JPY')?0.0067:1); };
+  // floating P&L — the SAME per-position, per-side helper the engine uses (BUY→BID, SELL→ASK).
+  // Each row marks against its own symbol quote + its own entry; no shared/copied state.
+  const plOf=(p)=> positionPnL(p, mids[p.symbol]);
   const floating = pos.reduce((s,p)=> s+plOf(p), 0);
   const balance=acct?+acct.balance||0:0, equity=balance+floating;
   const marginUsed=pos.reduce((s,p)=> s+requiredMargin(p.symbol, lotsOf(p), leverage), 0);  // leverage-driven
@@ -2144,9 +2151,9 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
               const tkt=String(p.local_id||'').replace(/\D/g,'').slice(-8)||p.local_id;
               const tm=p.created_at?String(p.created_at).slice(0,19).replace('T',' ').replace(/-/g,'.'):'—';  // MT5: 2026.07.09 20:17:40
               return (<tr key={p.local_id}>
-                <td>{p.symbol.toLowerCase()}.fx</td><td>{tkt}</td><td>{tm}</td><td className={sideUp(p.side)==='SELL'?'down':'up'}>{sideUp(p.side).toLowerCase()}</td>
+                <td>{p.symbol.toLowerCase()}{sfx(p.symbol).toLowerCase()}</td><td>{tkt}</td><td>{tm}</td><td className={sideUp(p.side)==='SELL'?'down':'up'}>{sideUp(p.side).toLowerCase()}</td>
                 <td>{lotsOf(p).toFixed(2)}</td><td>{fmtPx(p.symbol,+p.open_price)}</td><td>—</td><td>—</td>
-                <td>{fmtPx(p.symbol,m.mid)}</td><td className={pl>=0?'up':'down'}>{num(pl)}</td>
+                <td>{fmtPx(p.symbol,closePx(p,m))}</td><td className={pl>=0?'up':'down'}>{num(pl)}</td>
                 <td><button className="xclose" title="Close position" onClick={()=>closePos(p)}>✕</button></td>
               </tr>); })}
           </tbody>
