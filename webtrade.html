@@ -1020,7 +1020,8 @@ const sideUp = (s)=> (s==='sell'||s==='SELL')?'SELL':'BUY';
    instead of squishing. (autoSize is OFF so these explicit calls actually apply.) ── */
 const chartResizer = {
   items:new Set(),
-  resizeOne(it){ try{ const w=it.el.clientWidth, h=it.el.clientHeight; if(w>0&&h>0) it.chart.resize(w,h); }catch(e){} },
+  resizeOne(it){ try{ const w=it.el.clientWidth, h=it.el.clientHeight; if(w>0&&h>0){ it.chart.resize(w,h);   // fit the FULL live parent height (responsive; no fixed px)
+    try{ it.chart.timeScale().applyOptions({ barSpacing:5, rightOffset:15 }); }catch(_){} } }catch(e){} },   // weld the 5px/15 golden ratio into the splitter/window-resize path too (no rollback)
   resizeAll(){ this.items.forEach(it=>this.resizeOne(it)); },
   add(chart, el){ const it={chart,el}; this.items.add(it); this.resizeOne(it); return ()=>this.items.delete(it); },
 };

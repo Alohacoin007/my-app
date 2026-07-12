@@ -45,6 +45,11 @@ if (!/try\{ ts\.applyOptions\(\{ barSpacing:5, rightOffset:15 \}\); \}catch\(_\)
 // every live tick re-pins the 15-bar right margin (idempotent)
 if (!/chart\.current\.timeScale\(\)\.applyOptions\(\{ rightOffset:15 \}\);/.test(src))
   bad('every tick must re-pin rightOffset 15 (right-margin lock)');
+// the shared resizer (splitter / window-resize) refits the FULL live parent height AND re-welds the lock
+if (!/resizeOne\(it\)\{ try\{ const w=it\.el\.clientWidth, h=it\.el\.clientHeight; if\(w>0&&h>0\)\{ it\.chart\.resize\(w,h\);/.test(src))
+  bad('chartResizer must resize to the live parent clientWidth/clientHeight (responsive, no fixed px)');
+if (!/it\.chart\.timeScale\(\)\.applyOptions\(\{ barSpacing:5, rightOffset:15 \}\);[^\n]*\}[^\n]*\},/.test(src))
+  bad('chartResizer must re-weld barSpacing 5 + rightOffset 15 after every resize (no rollback on splitter/window resize)');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} chart-scale problem(s).`); process.exit(1); }
 console.log('🟢 PASS: MT5 chart scale — slim candles (barSpacing 5 / minBarSpacing 0.8), wide right margin (rightOffset 15), 10px axis font + trimmed price margins (bigger canvas), dotted grid intact.');
