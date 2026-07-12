@@ -657,7 +657,8 @@ const I18N = {
     Balance:'잔고',Equity:'순자산',Margin:'마진','Free Margin':'여유 마진','Margin Level':'마진 레벨',Profit:'손익',Free:'여유',
     Symbol:'심볼','Volume (lots)':'수량 (랏)','Stop Loss':'손절','Take Profit':'익절','Sell by Market':'시장가 매도','Buy by Market':'시장가 매수',SPREAD:'스프레드',
     Bid:'매도',Ask:'매수','Daily Ch%':'일일 변동%',Symbols:'심볼',Details:'상세',Trading:'거래',Ticks:'틱',
-    'New Chart':'새 차트',Hide:'숨기기','Show All':'모두 표시',Ticket:'티켓',Time:'시간',Type:'유형',Price:'가격',Volume:'수량' },
+    'New Chart':'새 차트',Hide:'숨기기','Show All':'모두 표시',Ticket:'티켓',Time:'시간',Type:'유형',Price:'가격',Volume:'수량',
+    'Market closed':'장 마감 — 거래 시간이 아닙니다','Please log in to trade':'거래하려면 로그인이 필요합니다','Margin Call — insufficient free margin':'마진콜 — 증거금 부족' },
   ja:{ File:'ファイル',View:'表示',Insert:'挿入',Charts:'チャート',Tools:'ツール',Window:'ウィンドウ',Help:'ヘルプ',
     Languages:'言語',Toolbars:'ツールバー','Status Bar':'ステータスバー','Market Watch':'気配値',Navigator:'ナビゲーター',Toolbox:'ツールボックス','Full Screen':'全画面表示','Color Theme — Legend / Dark':'カラーテーマ — レジェンド/ダーク',
     'New Chart Window':'新規チャート','New Order':'新規注文','Tile Windows':'ウィンドウの整列','Algo Trading':'自動売買','About Alpexa WebTrade':'Alpexa WebTrade について','Help Topics':'ヘルプ項目','History Center':'ヒストリーセンター',Options:'オプション',Indicators:'インジケーター',Text:'テキスト',Cascade:'重ねて表示','Open Deleted':'削除の復元',
@@ -665,7 +666,8 @@ const I18N = {
     Balance:'残高',Equity:'有効証拠金',Margin:'証拠金','Free Margin':'余剰証拠金','Margin Level':'証拠金維持率',Profit:'損益',Free:'余剰',
     Symbol:'銘柄','Volume (lots)':'数量 (ロット)','Stop Loss':'損切り','Take Profit':'利食い','Sell by Market':'成行売り','Buy by Market':'成行買い',SPREAD:'スプレッド',
     Bid:'売値',Ask:'買値','Daily Ch%':'日次変動%',Symbols:'銘柄',Details:'詳細',Trading:'取引',Ticks:'ティック',
-    'New Chart':'新規チャート',Hide:'非表示','Show All':'すべて表示',Ticket:'チケット',Time:'時刻',Type:'タイプ',Price:'価格',Volume:'数量' },
+    'New Chart':'新規チャート',Hide:'非表示','Show All':'すべて表示',Ticket:'チケット',Time:'時刻',Type:'タイプ',Price:'価格',Volume:'数量',
+    'Market closed':'市場は閉場中です','Please log in to trade':'取引にはログインが必要です','Margin Call — insufficient free margin':'マージンコール — 証拠金不足' },
   zh:{ File:'文件',View:'视图',Insert:'插入',Charts:'图表',Tools:'工具',Window:'窗口',Help:'帮助',
     Languages:'语言',Toolbars:'工具栏','Status Bar':'状态栏','Market Watch':'市场报价',Navigator:'导航器',Toolbox:'工具箱','Full Screen':'全屏','Color Theme — Legend / Dark':'配色 — 传奇/深色',
     'New Chart Window':'新图表','New Order':'新订单','Tile Windows':'平铺窗口','Algo Trading':'自动交易','About Alpexa WebTrade':'关于 Alpexa WebTrade','Help Topics':'帮助主题','History Center':'历史中心',Options:'选项',Indicators:'指标',Text:'文本',Cascade:'层叠窗口','Open Deleted':'恢复已删除',
@@ -673,7 +675,8 @@ const I18N = {
     Balance:'余额',Equity:'净值',Margin:'保证金','Free Margin':'可用保证金','Margin Level':'保证金比例',Profit:'盈亏',Free:'可用',
     Symbol:'品种','Volume (lots)':'手数','Stop Loss':'止损','Take Profit':'止盈','Sell by Market':'市价卖出','Buy by Market':'市价买入',SPREAD:'点差',
     Bid:'卖价',Ask:'买价','Daily Ch%':'日涨跌%',Symbols:'品种',Details:'详情',Trading:'交易',Ticks:'报价',
-    'New Chart':'新图表',Hide:'隐藏','Show All':'显示全部',Ticket:'订单号',Time:'时间',Type:'类型',Price:'价格',Volume:'手数' },
+    'New Chart':'新图表',Hide:'隐藏','Show All':'显示全部',Ticket:'订单号',Time:'时间',Type:'类型',Price:'价格',Volume:'手数',
+    'Market closed':'市场已休市','Please log in to trade':'交易需先登录','Margin Call — insufficient free margin':'追加保证金 — 可用保证金不足' },
 };
 const t = (s)=> (I18N[LANG.cur] && I18N[LANG.cur][s]) || s;
 
@@ -1177,9 +1180,9 @@ function OrderBox({ symbol }){
   const open=marketOpen(symbol);   // session gate — closed → BUY/SELL locked, order refused
   const tradable = open && eng.freeMargin>0;   // free-margin gate — no free margin → lock BUY/SELL
   const send=async(side)=>{
-    if(!marketOpen(symbol)){ playSnd(sndError); alert('장 마감 시간입니다 (Market closed)'); return; }   // reject before any RPC — 뚜엑
+    if(!marketOpen(symbol)){ playSnd(sndError); alert(t('Market closed')); return; }   // reject before any RPC — 뚜엑
     const need=eng.marginFor(symbol, +vol||0.01);     // margin this order would lock
-    if(eng.freeMargin<=0 || need>eng.freeMargin+1e-9){ playSnd(sndError); alert('Margin Call — 증거금 부족 (Insufficient free margin)'); return; }   // 증거금 부족 → 거절
+    if(eng.freeMargin<=0 || need>eng.freeMargin+1e-9){ playSnd(sndError); alert(t('Margin Call — insufficient free margin')); return; }   // 증거금 부족 → 거절
     if(busyRef.current) return;                       // debounce — 한 번에 한 주문만(레이스/이중발사 차단)
     busyRef.current=side; setBusy(side);
     const q=priceStore.get(symbol)||m; const price=side==='buy'?q.ask:q.bid;   // the quote the trader is looking at = requested price
@@ -1192,7 +1195,7 @@ function OrderBox({ symbol }){
     if(!r||!r.ok){
       // PRODUCTION: no client demo fill. A server rejection (slippage/margin/rpc) already fired
       // sndError; logged-out just prompts login. The demo ledger path is CLOSED (#5: server owns money).
-      if(r&&r.reason==='not_logged_in'){ playSnd(sndError); alert('로그인이 필요합니다 (Please log in to trade)'); }
+      if(r&&r.reason==='not_logged_in'){ playSnd(sndError); alert(t('Please log in to trade')); }
       else console.warn('one-click order rejected:', (r&&(r.code||r.reason))||'unknown');   // slippage/margin → error sound only, no fill
     }
     // ── The Snap: 처리 상태 해제 → 패널 0.1s 플래시 (사운드는 placeOrder에서 sndOpen/sndError로 발동) ──
@@ -2578,14 +2581,14 @@ function OrderModal({ symbol:sym0, onClose }){
 
   const open=marketOpen(symbol);   // session gate — closed → Buy/Sell locked, order refused
   const submit=async(side)=>{
-    if(!marketOpen(symbol)){ playSnd(sndError); alert('장 마감 시간입니다 (Market closed)'); return; }   // reject before any RPC — 뚜엑
-    if(!canAfford){ playSnd(sndError); alert('Margin Call — 증거금 부족 (Insufficient free margin)'); return; }   // 증거금 부족 → 거절 (server gate is the real authority)
+    if(!marketOpen(symbol)){ playSnd(sndError); alert(t('Market closed')); return; }   // reject before any RPC — 뚜엑
+    if(!canAfford){ playSnd(sndError); alert(t('Margin Call — insufficient free margin')); return; }   // 증거금 부족 → 거절 (server gate is the real authority)
     const q=priceStore.get(symbol)||m; const price=side==='buy'?q.ask:q.bid;   // requested price the trader sees
     const maxSlip=SLIP_PIPS*pip(symbol);
     const r=await eng.placeOrder({ symbol, side, volume:vol, leverage:eng.leverage, requestedPrice:price, maxSlippage:maxSlip });   // +leverage +slippage
     if(r.ok){ onClose(); return; }                                   // B-Book fill booked server-side (sndOpen in placeOrder)
     // PRODUCTION: no client demo fill. Server rejection already fired sndError; logged-out prompts login.
-    if(r.reason==='not_logged_in'){ playSnd(sndError); alert('로그인이 필요합니다 (Please log in to trade)'); return; }
+    if(r.reason==='not_logged_in'){ playSnd(sndError); alert(t('Please log in to trade')); return; }
     else if(r.reason) console.warn('order rejected:', r.code||r.reason);
     onClose();
   };
@@ -2639,8 +2642,8 @@ function OrderModal({ symbol:sym0, onClose }){
             {t('Margin')} <b style={{color:'#fff'}}>{usd(need)}</b> &nbsp;·&nbsp; {t('Free')} <b style={{color:'#fff'}}>{usd(eng.freeMargin)}</b>
             {!canAfford && <span> &nbsp;·&nbsp; ⚠ insufficient</span>}
           </div>
-          {!open && <div className="om-closed">🔒 Market closed — 장 마감 시간입니다</div>}
-          {open && !canAfford && <div className="om-closed">⚠ Margin Call — 증거금 부족</div>}
+          {!open && <div className="om-closed">🔒 {t('Market closed')}</div>}
+          {open && !canAfford && <div className="om-closed">⚠ {t('Margin Call — insufficient free margin')}</div>}
           {/* Sell / Buy by Market — matte flat (Binance/TradingView pro) */}
           <div className="om-btns">
             <button className="om-sell" disabled={!canAfford||!open} onClick={()=>submit('sell')}>{t('Sell by Market')}</button>

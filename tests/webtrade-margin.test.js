@@ -52,11 +52,11 @@ if (!/lotsOf\(p\)\*contractSize\(p\.symbol\)/.test(src)) bad('floating P&L must 
 // ── Free-Margin order gate + Margin Call / Stop-Out (30%) ──
 // one-click panel: locked when no free margin; refuses with the error sound
 if (!/const tradable = open && eng\.freeMargin>0;/.test(src)) bad('one-click panel must lock BUY/SELL when free margin ≤ 0');
-if (!/if\(eng\.freeMargin<=0 \|\| need>eng\.freeMargin\+1e-9\)\{ playSnd\(sndError\); alert\('Margin Call/.test(src)) bad('one-click send must refuse over-margin orders with a Margin Call popup + error sound');
+if (!/if\(eng\.freeMargin<=0 \|\| need>eng\.freeMargin\+1e-9\)\{ playSnd\(sndError\); alert\(t\('Margin Call — insufficient free margin'\)/.test(src)) bad('one-click send must refuse over-margin orders with a Margin Call popup + error sound');
 if (!/\(tradable\?'':' oc-closed'\)/.test(src)) bad('one-click panel must dim/disable when not tradable');
 // New Order popup: Margin Call popup on submit + banner
-if (!/if\(!canAfford\)\{ playSnd\(sndError\); alert\('Margin Call/.test(src)) bad('New Order submit must refuse with a Margin Call popup + error sound (was a silent return)');
-if (!/\{open && !canAfford && <div className="om-closed">⚠ Margin Call/.test(src)) bad('New Order popup must show a Margin Call banner when free margin is insufficient');
+if (!/if\(!canAfford\)\{ playSnd\(sndError\); alert\(t\('Margin Call — insufficient free margin'\)/.test(src)) bad('New Order submit must refuse with a Margin Call popup + error sound (was a silent return)');
+if (!/\{open && !canAfford && <div className="om-closed">⚠ \{t\(.Margin Call/.test(src)) bad('New Order popup must show a Margin Call banner when free margin is insufficient');
 // bottom bar: margin-call band at <100%, stop-out at the server 30% threshold
 if (!/marginUsed>0&&level<100&&level>=30 &&/.test(src)) bad('bottom bar must warn Margin Call between 30% and 100%');
 if (!/marginUsed>0&&level<30 && <b style=\{\{color:'#ff5252',marginLeft:6\}\}>⛔ Stop Out &lt;30%/.test(src)) bad('bottom bar Stop-Out warning must fire at <30% (server fx_stopout threshold), not <50%');

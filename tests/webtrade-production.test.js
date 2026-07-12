@@ -23,7 +23,7 @@ if (unguarded > 0) bad(`${unguarded} UN-guarded server gate(s) — every fx_open
 
 // 3) the CLIENT DEMO FILL IS CLOSED — no addDemo on the order paths; logged-out prompts login
 if (/not_logged_in'\)\{\s*positionsStore\.addDemo/.test(wt)) bad('production must NOT fill on the client demo ledger — addDemo fallback must be removed');
-const loginPrompts = (wt.match(/reason==='not_logged_in'\)\{ playSnd\(sndError\); alert\('로그인이 필요합니다/g) || []).length;
+const loginPrompts = (wt.match(/reason==='not_logged_in'\)\{ playSnd\(sndError\); alert\(t\('Please log in to trade'\)/g) || []).length;
 if (loginPrompts < 2) bad(`both order paths (one-click + New Order) must prompt login when logged out, found ${loginPrompts}`);
 
 // 4) demo seed only in demo mode (production shows the real account, not a mock)

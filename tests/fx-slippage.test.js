@@ -63,7 +63,7 @@ if (!/requestedPrice\s*:\s*price/.test(wt)) bad('webtrade.html send() must pass 
 // prompted to log in. addDemo is never called (the client never fabricates a fill / money).
 if (/positionsStore\.addDemo\(/.test(wt))
   bad('webtrade.html must NOT land a client demo fill in production (addDemo call removed)');
-if (!/reason==='not_logged_in'\)\{ playSnd\(sndError\); alert\('로그인이 필요합니다/.test(wt))
+if (!/reason==='not_logged_in'\)\{ playSnd\(sndError\); alert\(t\('Please log in to trade'\)/.test(wt))
   bad('webtrade.html logged-out order must prompt login (no demo fill)');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} slippage/lock/binding problem(s).`); process.exit(1); }
