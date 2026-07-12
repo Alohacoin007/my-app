@@ -120,6 +120,8 @@
     border:1px solid #050505;box-shadow:0 1px 4px rgba(0,0,0,.6);background:#0d0e12;
     font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,Arial,sans-serif}
   .obox *{border-radius:0 !important;box-sizing:border-box;font-family:inherit}
+  /* Session CLOSED: BUY/SELL click-blocked + dimmed (order gate). Volume stepper stays usable. */
+  .obox.oc-closed .oc-lbl,.obox.oc-closed .oc-price{pointer-events:none;opacity:.4}
   /* top layer (20px) — labels + centered volume */
   .oc-top{height:20px;flex:none;display:flex;align-items:stretch}
   .oc-lbl{flex:1;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:normal;letter-spacing:.5px;
@@ -230,6 +232,12 @@
   .mwt td.tick-down,.mwt td.text-down{color:#ff3b30 !important;font-weight:bold}
   .mwt .au{color:#00ff00;font-weight:bold}.mwt .ad{color:#ff3b30;font-weight:bold}
   .mwt tr.sel td{background:#3a6ea5 !important;color:#fff}
+  /* Session CLOSED: frozen greyed price, no tick colour, a grey 'Closed' tag at the right */
+  .mwt tr.mw-closed td.sym{color:#6a7180}.mwt tr.mw-closed .au,.mwt tr.mw-closed .ad{color:#6a7180 !important}
+  .mwt td.mw-closed-cell{color:#6a7180 !important;font-weight:normal}
+  .mwt td.mw-closed-tag{color:#8a9098;font-weight:600;letter-spacing:.3px}
+  .terminal.light .mwt tr.mw-closed td.sym{color:#5c6472}.terminal.light .mwt td.mw-closed-cell{color:#5c6472 !important}
+  .terminal.light .mwt td.mw-closed-tag{color:#7a828e}
   .mwt tr.sel td.sym,.mwt tr.sel td.up,.mwt tr.sel td.down,.mwt tr.sel td.uptick,.mwt tr.sel td.dntick{color:#fff}
   .mwtabs{display:flex;flex:none;background:linear-gradient(#20242a,#14171c);border-top:1px solid #000}
   .mwtabs .mt{padding:3px 10px;font-size:11px;color:#a2aab6;border-right:1px solid #2a2e34;cursor:default}
@@ -400,6 +408,7 @@
   .om-btns .om-buy{background:#007aff !important}
   .om-btns button:hover{opacity:.88}
   .om-btns button:disabled{opacity:.4;cursor:not-allowed}
+  .om-closed{font-size:11.5px;font-weight:600;color:#c2872b;background:rgba(194,135,43,.10);border:1px solid rgba(194,135,43,.35);padding:5px 9px;margin-top:6px;text-align:center;letter-spacing:.2px}
   .obtns button:active{box-shadow:inset 0 2px 4px rgba(0,0,0,.35)}
   .obtns button:disabled{background:#c2c7cd;color:#eef0f2;border-color:#9aa0a7;cursor:not-allowed;filter:none;box-shadow:inset 1px 1px 2px rgba(0,0,0,.12)}
   .otick{flex:1;min-width:0;margin:8px 8px 8px 0;border:1px solid #cfd4da;background:#ffffff;display:flex;flex-direction:column}
@@ -734,6 +743,32 @@ const sfx   = (s)=> SYM_CAT[s]==='Forex' ? '.FX' : SYM_CAT[s]==='Crypto' ? '.CR'
 const pip   = (s)=> (SYM_CAT[s]==='Stocks'||SYM_CAT[s]==='Crypto') ? 0.01 : (s.slice(3)==='JPY'||s.slice(0,3)==='JPY' ? 0.01 : 0.0001);
 const digits= (s)=> (SYM_CAT[s]==='Stocks'||SYM_CAT[s]==='Crypto') ? 2 : (s.includes('JPY') ? 3 : 5);
 const fmtPx = (s,v)=> (v==null?'—':(+v).toFixed(digits(s)));
+// ── Trading-hours session calendar (CLIENT GATE). A regulated broker opens/closes by SESSION, not
+//    by feed freshness: prices.updated_at re-stamps even on weekends (harness finding) so it is
+//    useless as an "open" signal. Crypto 24/7; Forex Sun 22:00 → Fri 22:00 UTC; US stocks Mon–Fri
+//    13:30–20:00 UTC (ET 09:30–16:00) minus US market holidays. This gates DISPLAY + the DEMO order
+//    path; when WT_DEMO flips to real B-Book the fx_open RPC must ALSO enforce sessions (server = the
+//    real gate, client = show only). NOTE: the stock window is fixed to EDT (13:30–20:00 UTC); EST
+//    winter shifts it +1h — add a DST rule when needed.
+const US_MARKET_HOLIDAYS = new Set(['2026-01-01','2026-01-19','2026-02-16','2026-04-03','2026-05-25',
+  '2026-06-19','2026-07-03','2026-09-07','2026-11-26','2026-12-25','2027-01-01']);
+function marketOpen(symbol, at){
+  const cat=SYM_CAT[symbol]||'Forex';
+  const d = at!=null ? new Date(at) : new Date();
+  if(cat==='Crypto') return true;                                  // 24/7 — never closed
+  const day=d.getUTCDay();                                         // 0=Sun … 6=Sat
+  const min=d.getUTCHours()*60+d.getUTCMinutes();                  // minutes past 00:00 UTC
+  if(cat==='Forex'){
+    if(day===6) return false;                                      // Sat: closed
+    if(day===0) return min>=22*60;                                 // Sun: opens 22:00 UTC
+    if(day===5) return min< 22*60;                                 // Fri: closes 22:00 UTC
+    return true;                                                   // Mon–Thu: open
+  }
+  // US Stocks
+  if(day===0||day===6) return false;                               // weekend
+  if(US_MARKET_HOLIDAYS.has(d.toISOString().slice(0,10))) return false;  // US market holiday
+  return min>=13*60+30 && min<20*60;                               // 13:30–20:00 UTC regular session
+}
 // Max ADVERSE slippage (in pips) the trader will accept between click and server fill — passed to
 // fx_open's slippage guard. Wide by default (only a violent spike trips it); operator-overridable.
 const SLIP_PIPS = (typeof window!=='undefined' && +window.ALPEXA_MAX_SLIP_PIPS) || 15;
@@ -1115,7 +1150,9 @@ function OrderBox({ symbol }){
   }, 400)), [symbol]);
   const sellCls = bidDir==='down' ? 'oc-red' : 'oc-blue';   // blue on up/hold, red on down
   const buyCls  = askDir==='down' ? 'oc-red' : 'oc-blue';
+  const open=marketOpen(symbol);   // session gate — closed → BUY/SELL locked, order refused
   const send=async(side)=>{
+    if(!marketOpen(symbol)){ playSnd(sndError); alert('장 마감 시간입니다 (Market closed)'); return; }   // reject before any RPC — 뚜엑
     if(busyRef.current) return;                       // debounce — 한 번에 한 주문만(레이스/이중발사 차단)
     busyRef.current=side; setBusy(side);
     const q=priceStore.get(symbol)||m; const price=side==='buy'?q.ask:q.bid;   // the quote the trader is looking at = requested price
@@ -1140,7 +1177,7 @@ function OrderBox({ symbol }){
   const inc=()=>setVol((Math.max(0.01,(+vol||0)+0.01)).toFixed(2));
   const busySell=busy==='sell', busyBuy=busy==='buy';
   return (   // always shown — the 190×64 one-click panel is locked visible on every chart
-    <div className={"obox"+(flash?' ecn-flash':'')}>
+    <div className={"obox"+(flash?' ecn-flash':'')+(open?'':' oc-closed')}>
       <div className="oc-top">
         <div className={"oc-lbl "+sellCls+(busySell?' oc-busy':'')} title="Sell at Bid" onClick={(e)=>{e.stopPropagation();send('sell');}}>SELL</div>
         <div className="oc-vol" onClick={e=>e.stopPropagation()}>
@@ -1930,15 +1967,17 @@ function MarketWatch({ onPick }){
           <tbody>
             {WATCH.filter(sym=>!hidden.has(sym) && (cat==='All'||SYM_CAT[sym]===cat)).map(sym=>{ const m=mids[sym]||{}, d=dirs[sym]||{}; const up=(m.chg||0)>=0;
               const spr=(m.ask!=null&&m.bid!=null)?((m.ask-m.bid)/pip(sym)).toFixed(1):'—';
+              const open=marketOpen(sym);   // session gate — closed → freeze ticks + 'Closed' mask
               return (
-                <tr key={sym} className={sym===sel?'sel':''} onClick={()=>setSel(sym)}
+                <tr key={sym} className={(sym===sel?'sel':'')+(open?'':' mw-closed')} onClick={()=>setSel(sym)}
                     draggable={true} onDragStart={(e)=>{ e.dataTransfer.setData('text/mwsymbol', sym); e.dataTransfer.effectAllowed='copy'; }}
                     onDoubleClick={()=>terminalBus.emit('order.new',sym)} onContextMenu={(e)=>ctx(e,sym)} title="드래그: 차트창에 드롭해 심볼 변경 · 더블클릭: New Order · 우클릭: 메뉴(Forex/Stocks/Crypto 필터, Spread, New Chart 등)">
                   <td className="sym"><span className={up?'au':'ad'}>{up?'↗':'↘'}</span> {sym}{sfx(sym)}</td>
-                  <td className={tc(d.bid)}>{fmtPx(sym,m.bid)}</td>
-                  <td className={tc(d.ask)}>{fmtPx(sym,m.ask)}</td>
-                  {showSpread && <td className="mwspr">{spr}</td>}
-                  <td className={up?'text-up':'text-down'}>{m.chg!=null?(m.chg>=0?'+':'')+m.chg.toFixed(2):'—'}</td>
+                  <td className={open?tc(d.bid):'mw-closed-cell'}>{fmtPx(sym,m.bid)}</td>
+                  <td className={open?tc(d.ask):'mw-closed-cell'}>{fmtPx(sym,m.ask)}</td>
+                  {showSpread && <td className="mwspr">{open?spr:'—'}</td>}
+                  {open ? <td className={up?'text-up':'text-down'}>{m.chg!=null?(m.chg>=0?'+':'')+m.chg.toFixed(2):'—'}</td>
+                        : <td className="mw-closed-tag">Closed</td>}
                 </tr>
               ); })}
           </tbody>
@@ -2513,7 +2552,9 @@ function OrderModal({ symbol:sym0, onClose }){
   const canAfford = need <= eng.freeMargin + 1e-9;  // gate against free margin
   const usd=(n)=>'$'+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 
+  const open=marketOpen(symbol);   // session gate — closed → Buy/Sell locked, order refused
   const submit=async(side)=>{
+    if(!marketOpen(symbol)){ playSnd(sndError); alert('장 마감 시간입니다 (Market closed)'); return; }   // reject before any RPC — 뚜엑
     if(!canAfford) return;   // client pre-gate; the server margin gate is the real authority
     const q=priceStore.get(symbol)||m; const price=side==='buy'?q.ask:q.bid;   // requested price the trader sees
     const maxSlip=SLIP_PIPS*pip(symbol);
@@ -2574,10 +2615,11 @@ function OrderModal({ symbol:sym0, onClose }){
             {t('Margin')} <b style={{color:'#fff'}}>{usd(need)}</b> &nbsp;·&nbsp; {t('Free')} <b style={{color:'#fff'}}>{usd(eng.freeMargin)}</b>
             {!canAfford && <span> &nbsp;·&nbsp; ⚠ insufficient</span>}
           </div>
+          {!open && <div className="om-closed">🔒 Market closed — 장 마감 시간입니다</div>}
           {/* Sell / Buy by Market — matte flat (Binance/TradingView pro) */}
           <div className="om-btns">
-            <button className="om-sell" disabled={!canAfford} onClick={()=>submit('sell')}>{t('Sell by Market')}</button>
-            <button className="om-buy" disabled={!canAfford} onClick={()=>submit('buy')}>{t('Buy by Market')}</button>
+            <button className="om-sell" disabled={!canAfford||!open} onClick={()=>submit('sell')}>{t('Sell by Market')}</button>
+            <button className="om-buy" disabled={!canAfford||!open} onClick={()=>submit('buy')}>{t('Buy by Market')}</button>
           </div>
         </div>
       </div>

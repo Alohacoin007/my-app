@@ -17,7 +17,7 @@ if (!/const \[showSpread,setShowSpread\]=React\.useState\(false\)/.test(src)) ba
 if (!/onSpread=\{\(\)=>setShowSpread\(v=>!v\)\}/.test(src)) bad('the menu must toggle showSpread');
 if (!/showSpread && <th>\{t\('Spread'\)\}<\/th>/.test(src)) bad('Spread header must render only when toggled on');
 if (!/const spr=\(m\.ask!=null&&m\.bid!=null\)\?\(\(m\.ask-m\.bid\)\/pip\(sym\)\)\.toFixed\(1\)/.test(src)) bad('spread must be (ask-bid)/pip per symbol');
-if (!/showSpread && <td className="mwspr">\{spr\}<\/td>/.test(src)) bad('Spread cell must render only when toggled on');
+if (!/showSpread && <td className="mwspr">\{open\?spr:'—'\}<\/td>/.test(src)) bad('Spread cell must render only when toggled on (— when the session is closed)');
 // the active toggle shows a checkmark
 if (!/it\.act==='spread' && spread/.test(src)) bad('the Spread menu row must show ✓ when active');
 
