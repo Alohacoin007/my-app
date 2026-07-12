@@ -23,9 +23,11 @@ if (!/minBarSpacing:0\.8/.test(blk)) bad('main chart must set minBarSpacing 0.8 
 // [2] wide right margin for future-trend space
 if (!/rightOffset:15/.test(blk)) bad('main chart must set rightOffset 15 (wide right margin)');
 
-// [3] slim axis font + trimmed vertical padding → bigger canvas
+// [3] slim axis font + trimmed vertical padding + no tick nubs → bigger canvas, thinner time axis
 if (!/fontSize:10\b/.test(blk)) bad('axis label font must be slimmed to 10px (was 11)');
-if (!/rightPriceScale:\{ borderColor:th0\.border, scaleMargins:\{top:0\.08, bottom:0\.08\}/.test(blk)) bad('right price scale must trim its vertical margins to 0.08 (more candle canvas)');
+if (!/rightPriceScale:\{ borderColor:th0\.border, ticksVisible:false, scaleMargins:\{top:0\.05, bottom:0\.05\}/.test(blk)) bad('right price scale must expand the canvas (scaleMargins 0.05) with no tick nubs');
+// the bottom TIME axis is slimmed: font-driven ~20px (LWC 4.2 has no pixel height) + no tick marks
+if (!/timeScale:\{ borderColor:th0\.border, timeVisible:true, secondsVisible:false, ticksVisible:false,/.test(blk)) bad('time axis must drop its tick nubs (ticksVisible:false) to slim the bottom bar');
 
 // old fat defaults must be gone from the main block
 if (/fontSize:11\b/.test(blk)) bad('old fontSize:11 must be gone from the main chart');
