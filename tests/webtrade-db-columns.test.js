@@ -37,5 +37,12 @@ for (const table of Object.keys(SCHEMA)) {
 // the specific bug that shipped must never come back
 if (/\.from\('positions'\)\.select\('[^']*\bstake\b/.test(src)) bad("positions SELECT must NOT include 'stake' (no such column — this was the empty-positions bug)");
 
+// money reads must be SCOPED to the logged-in account (acctFor('fx')), NOT a blind limit(1) that
+// grabs a random fx account (that showed a $100 test account instead of the real $1M balance).
+if (!/AlpexaSync\.acctFor\('fx'\)/.test(src)) bad("loadAcct/loadPos must resolve the logged-in account via AlpexaSync.acctFor('fx')");
+if (!/\.from\('accounts'\)\.select\('acct_no,balance'\)\.eq\('server','fx'\)\.eq\('acct_no',acct\)/.test(src)) bad('loadAcct must filter accounts by the logged-in acct_no (not limit(1) → wrong balance)');
+if (!/\.from\('positions'\)\.select\('[^']*'\)\.eq\('server','fx'\)\.eq\('acct_no',acct\)/.test(src)) bad('loadPos must filter positions by the logged-in acct_no');
+if (/\.from\('accounts'\)\.select\('acct_no,balance'\)\.eq\('server','fx'\)\.limit\(1\)/.test(src)) bad('accounts must NOT be loaded with a blind server-only limit(1) (grabs a random account)');
+
 if (fail) { console.error(`\n🔴 FAIL — ${fail} DB-column problem(s).`); process.exit(1); }
 console.log('🟢 PASS: every positions/accounts SELECT column matches the proven real schema (no phantom columns → no silently-empty queries).');
