@@ -16,7 +16,7 @@ if (!/else if\(it\.act==='spread'\) onSpread&&onSpread\(\)/.test(src)) bad('Spre
 if (!/const \[showSpread,setShowSpread\]=React\.useState\(false\)/.test(src)) bad('Market Watch needs a showSpread state');
 if (!/onSpread=\{\(\)=>setShowSpread\(v=>!v\)\}/.test(src)) bad('the menu must toggle showSpread');
 if (!/showSpread && <th>\{t\('Spread'\)\}<\/th>/.test(src)) bad('Spread header must render only when toggled on');
-if (!/const spr=\(m\.ask!=null&&m\.bid!=null\)\?\(\(m\.ask-m\.bid\)\*ptScale\(sym\)\)\.toFixed\(1\)/.test(src)) bad('spread must be live (ask-bid)×ptScale (MT5 points) per symbol');
+if (!/const spr=\(m\.ask!=null&&m\.bid!=null\)\?\(\(m\.ask-m\.bid\)\/pip\(sym\)\)\.toFixed\(1\)/.test(src)) bad('spread must be live (ask-bid)/pip per symbol (pips — a 1-pip FX gap reads 1.0)');
 if (!/showSpread && <td className="mwspr">\{open\?spr:'—'\}<\/td>/.test(src)) bad('Spread cell must render only when toggled on (— when the session is closed)');
 // the active toggle shows a checkmark
 if (!/it\.act==='spread' && spread/.test(src)) bad('the Spread menu row must show ✓ when active');

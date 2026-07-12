@@ -846,8 +846,6 @@ const symbolStore = {
 };
 const sfx   = (s)=> catOf(s)==='Forex' ? '.FX' : catOf(s)==='Crypto' ? '.CR' : '.STK';   // display suffix per class
 const pip   = (s)=> (catOf(s)==='Stocks'||catOf(s)==='Crypto') ? 0.01 : (s.slice(3)==='JPY'||s.slice(0,3)==='JPY' ? 0.01 : 0.0001);
-// MT5 spread POINTS scale (1/point = 10^digits): 5-digit FX ×100000, 3-digit JPY ×1000, 2-digit stocks/crypto ×100.
-const ptScale = (s)=> (catOf(s)==='Stocks'||catOf(s)==='Crypto') ? 100 : ((s.slice(3)==='JPY'||s.slice(0,3)==='JPY') ? 1000 : 100000);
 const digits= (s)=> (catOf(s)==='Stocks'||catOf(s)==='Crypto') ? 2 : (s.includes('JPY') ? 3 : 5);
 const fmtPx = (s,v)=> (v==null?'—':(+v).toFixed(digits(s)));
 // ── Trading-hours session calendar (CLIENT GATE). A regulated broker opens/closes by SESSION, not
@@ -2157,7 +2155,7 @@ function MarketWatch({ onPick }){
           <tbody>
             {!visible.length && <tr><td className="empty" colSpan={showSpread?5:4}>No symbols match</td></tr>}
             {visible.map(sym=>{ const m=mids[sym]||{}, d=dirs[sym]||{}; const up=(m.chg||0)>=0;
-              const spr=(m.ask!=null&&m.bid!=null)?((m.ask-m.bid)*ptScale(sym)).toFixed(1):'—';   // live MT5 points: FX ×100000, JPY ×1000, stock/crypto ×100
+              const spr=(m.ask!=null&&m.bid!=null)?((m.ask-m.bid)/pip(sym)).toFixed(1):'—';   // live spread in PIPS: FX ÷0.0001 → 1.0 for a 1-pip gap, JPY ÷0.01 → 1.0, crypto ÷0.01 → ~0.1 (never 10× inflated)
               const open=marketOpen(sym);   // session gate — closed → freeze ticks + 'Closed' mask
               return (
                 <tr key={sym} className={(sym===sel?'sel':'')+(open?'':' mw-closed')} onClick={()=>setSel(sym)}
