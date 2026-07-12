@@ -732,19 +732,22 @@ function mkSnd(src, syn){
     unlock(){ try{ const v=a.volume; a.volume=0; const p=a.play(); if(p&&p.then) p.then(()=>{ a.pause(); a.currentTime=0; a.volume=v; }).catch(()=>{ a.volume=v; }); }catch(e){} } };
 }
 const sndOpen    = mkSnd('/assets/sounds/ok.wav',      synOpen);   // fx_open  성공 (주문 진입)
-const sndClose   = mkSnd('/assets/sounds/connect.wav', synClose);  // fx_close 성공 (포지션 청산)
+const sndClose   = mkSnd('/assets/sounds/close.wav',   synClose);  // fx_close 성공 (포지션 청산) — "딩~"
 const sndError   = mkSnd('/assets/sounds/timeout.wav', synError);  // RPC 에러 / 마진 게이트 차단
 const sndStopout = mkSnd('/assets/sounds/stops.wav',   synStop);   // 30% 스탑아웃 강제청산 (서버 크론)
-const sndLogin   = mkSnd('/assets/sounds/connect.wav', synLogin);  // 로그인 성공 차임
+const sndLogin   = mkSnd('/assets/sounds/startup.wav', synLogin);  // 로그인 성공 — "띠리링~" 스타트업
 const playSnd = (s)=>{ try{ s.play(); }catch(e){} };
 
 // Autoplay Unlock — first user gesture primes the AudioContext + the <audio> elements, so
 // playback that fires ~250–550ms after the click (past the ECN delay) isn't autoplay-blocked.
 let _audioUnlocked=false;
+// MOBILE (iOS Safari / Android Chrome WebView) autoplay unlock: on the FIRST user gesture — touch,
+// pointer, click OR key — resume the AudioContext and prime every preloaded clip so the login /
+// order / close sounds fire in ~0.1s at the RPC callback (no first-play delay).
 function unlockAudio(){ if(_audioUnlocked) return; _audioUnlocked=true; _primeCtx();
-  [sndOpen, sndClose, sndError, sndStopout].forEach(s=>s.unlock()); }
-if(typeof document!=='undefined'){ document.addEventListener('pointerdown', unlockAudio, {once:true});
-  document.addEventListener('keydown', unlockAudio, {once:true}); }
+  [sndOpen, sndClose, sndError, sndStopout, sndLogin].forEach(s=>s.unlock()); }
+if(typeof document!=='undefined'){ ['touchstart','pointerdown','click','keydown'].forEach(ev=>
+  document.addEventListener(ev, unlockAudio, {once:true, passive:true})); }
 
 // Market Watch symbols by CLASS (Forex / Stocks / Crypto). Prices are simulated in this DEMO
 // terminal (WT_DEMO) — stocks/crypto get a BASE seed + random walk like FX, honest for a demo.
@@ -2761,8 +2764,16 @@ function App(){
     document.addEventListener('pointerdown',fire,{once:true}); document.addEventListener('keydown',fire,{once:true});
     return ()=>{ document.removeEventListener('pointerdown',fire); document.removeEventListener('keydown',fire); };
   }, []);
-  const loggedIn = !!(window.AlpexaSync && AlpexaSync.me);
-  const [showLogin,setShowLogin]=React.useState(!loggedIn && !WT_DEMO);   // gate on load when logged out (production)
+  // Login gate visibility — decided by the REAL auth session, NOT AlpexaSync.me (which is a function /
+  // always-truthy guest placeholder, so it can't signal "logged in"). Show the gate only once we've
+  // confirmed there is NO Supabase session (per-tab sessionStorage). Demo never gates.
+  const [showLogin,setShowLogin]=React.useState(false);
+  React.useEffect(()=>{ if(WT_DEMO) return; let live=true;
+    const noSession=()=>{ if(live) setShowLogin(true); };
+    try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.auth){
+      AlpexaSync.db.auth.getSession().then(r=>{ if(live && !(r&&r.data&&r.data.session)) setShowLogin(true); }).catch(noSession);
+    } else noSession(); }catch(e){ noSession(); }
+    return ()=>{ live=false; }; }, []);
   React.useEffect(()=>{ wtConfig.save({ view, leftw, bottomh, navh, theme, lang }); }, [view, leftw, bottomh, navh, theme, lang]);   // charts (+ their per-chart indicators) NOT persisted → refresh = fixed default
   React.useEffect(()=>{ requestAnimationFrame(()=>chartResizer.resizeAll()); }, [charts.length]);   // reflow on add/close
   // ── MT5 keyboard shortcuts (View menu + New Order) ──
