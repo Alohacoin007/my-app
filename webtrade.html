@@ -874,7 +874,7 @@ const positionsStore = {
     const r=await AlpexaSync.db.from('accounts').select('acct_no,balance').eq('server','fx').limit(1);
     if(r&&r.data&&r.data[0]){ this.acct=r.data[0]; this.notify(); } }catch(e){} },
   async loadPos(){ try{ if(WT_DEMO || !(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me)) return;
-    const r=await AlpexaSync.db.from('positions').select('local_id,symbol,side,stake,size,open_price,status,created_at').eq('server','fx').eq('status','open').limit(200);
+    const r=await AlpexaSync.db.from('positions').select('local_id,symbol,side,size,open_price,pnl,status').eq('server','fx').eq('status','open').limit(200);   // EXACT match to trading.html's proven query — a column not in the real schema (e.g. the old 'stake') errors the whole SELECT → positions never load
     if(r&&r.data){ this.pos=r.data; this.notify(); } }catch(e){} },   // real load REPLACES the demo seed
   start(){ if(this.started) return; this.started=true;
     if(WT_DEMO){ this.acct=DEMO_ACCT; this.pos=DEMO_POS.slice(); this.notify(); }   // demo seed ONLY in demo mode; production loads the real account below
