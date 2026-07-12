@@ -21,10 +21,11 @@ if (!/journalStore\.log\('Alpexa WebTrade terminal started/.test(src)) bad('term
 if (!/React\.useEffect\(\(\)=> journalStore\.subscribe\(e=>setRows\(\[\.\.\.e\]\)\), \[\]\)/.test(src)) bad('JournalTab must render the live journal (not hardcoded rows)');
 
 // 2) Exposure — real notional (per-asset contract size) + % of equity + totals
-if (!/function ExposureTab\(\{ pos, mids, equity \}\)/.test(src)) bad('ExposureTab must receive equity for the % column');
+if (!/function ExposureTab\(\{ pos, mids, equity, leverage \}\)/.test(src)) bad('ExposureTab must receive equity + leverage');
 if (!/const notl=\(s\)=> Math\.abs\(net\[s\]\)\*contractSize\(s\)\*baseUsdRate\(s\);/.test(src)) bad('Exposure notional must use per-asset contract size × USD rate (not a flat 100000)');
-if (!/\(n\/eq\*100\)\.toFixed\(1\)\+' %'/.test(src)) bad('Exposure must show each position as a % of equity');
-if (!/<ExposureTab pos=\{pos\} mids=\{mids\} equity=\{equity\} \/>/.test(src)) bad('ExposureTab must be passed equity');
+if (!/const marg=\(s\)=> requiredMargin\(s, Math\.abs\(net\[s\]\), leverage\);/.test(src)) bad('Exposure must compute MARGIN per net position (we trade on margin)');
+if (!/\(mg\/eq\*100\)\.toFixed\(2\)\+' %'/.test(src)) bad('% of Equity must be MARGIN/equity (capital utilization), not notional/equity');
+if (!/<ExposureTab pos=\{pos\} mids=\{mids\} equity=\{equity\} leverage=\{leverage\} \/>/.test(src)) bad('ExposureTab must be passed equity + leverage');
 
 // 3) Mailbox — real: account non-trade settlements, scoped, click-to-expand
 if (!/function MailboxTab\(\)\{/.test(src)) bad('MailboxTab missing');

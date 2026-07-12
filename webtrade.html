@@ -2108,27 +2108,30 @@ const TBX_TABS=['Trade','Exposure','History','News','Mailbox','Calendar','Compan
 const TAB_EMPTY={ News:['📰','실시간 뉴스 피드 연결 대기 (news feed not connected)'], Mailbox:['✉️','Mailbox is empty'],
   Calendar:['📅','경제 캘린더 피드 연결 대기 (economic calendar not connected)'], Company:['🏛️','Alpexa Ltd · account & company info'],
   Alerts:['🔔','No alerts set'], Articles:['📄','No articles'], 'Code Base':['💾','Code Base is empty'], Experts:['🤖','No Expert Advisors attached'] };
-function ExposureTab({ pos, mids, equity }){
+function ExposureTab({ pos, mids, equity, leverage }){
   const net={}; pos.forEach(p=>{ const d=sideUp(p.side)==='SELL'?-1:1; net[p.symbol]=(net[p.symbol]||0)+d*lotsOf(p); });
   const rows=Object.keys(net).filter(s=>Math.abs(net[s])>1e-9);
   const num=(n)=>(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-  // notional per symbol = |net lots| × per-asset contract size × USD value of 1 base unit (crosses handled)
+  // notional = full market value; MARGIN = the capital actually locked (notional / capped leverage).
+  // We trade on margin, so "% of Equity" is MARGIN/equity (capital utilization), not notional/equity.
   const notl=(s)=> Math.abs(net[s])*contractSize(s)*baseUsdRate(s);
-  const total=rows.reduce((a,s)=>a+notl(s),0), eq=+equity||0;
+  const marg=(s)=> requiredMargin(s, Math.abs(net[s]), leverage);
+  const totN=rows.reduce((a,s)=>a+notl(s),0), totM=rows.reduce((a,s)=>a+marg(s),0), eq=+equity||0;
   return (
     <div className="postbl"><table className="pos">
-      <thead><tr><th>Symbol</th><th>Net Volume</th><th>Direction</th><th>Notional (USD)</th><th>% of Equity</th></tr></thead>
+      <thead><tr><th>Symbol</th><th>Net Volume</th><th>Direction</th><th>Notional (USD)</th><th>Margin (USD)</th><th>% of Equity</th></tr></thead>
       <tbody>
-        {!rows.length && <tr><td className="empty" colSpan="5">No net exposure</td></tr>}
-        {rows.map(s=>{ const v=net[s], n=notl(s);
+        {!rows.length && <tr><td className="empty" colSpan="6">No net exposure</td></tr>}
+        {rows.map(s=>{ const v=net[s], mg=marg(s);
           return (<tr key={s}><td>{s.toLowerCase()}{sfx(s).toLowerCase()}</td><td className={v>=0?'up':'down'}>{v.toFixed(2)}</td>
             <td className={v>=0?'up':'down'}>{v>=0?'Long':'Short'}</td>
-            <td>{num(n)}</td><td>{eq>0?(n/eq*100).toFixed(1)+' %':'—'}</td></tr>); })}
+            <td>{num(notl(s))}</td><td>{num(mg)}</td><td>{eq>0?(mg/eq*100).toFixed(2)+' %':'—'}</td></tr>); })}
       </tbody>
-      {rows.length>0 && <tfoot><tr className="acctrow"><td colSpan="5"><div className="acctline">
-        <span><span className="k">Total notional:</span> <b>{num(total)} USD</b></span>
+      {rows.length>0 && <tfoot><tr className="acctrow"><td colSpan="6"><div className="acctline">
+        <span><span className="k">Notional:</span> <b>{num(totN)} USD</b></span>
+        <span><span className="k">{t('Margin')}:</span> <b>{num(totM)}</b></span>
         <span><span className="k">{t('Equity')}:</span> <b>{num(eq)}</b></span>
-        <span><span className="k">Gross exposure:</span> <b>{eq>0?(total/eq*100).toFixed(1)+' %':'—'}</b></span>
+        <span><span className="k">Margin used:</span> <b>{eq>0?(totM/eq*100).toFixed(2)+' %':'—'}</b></span>
       </div></td></tr></tfoot>}
     </table></div>
   );
@@ -2300,7 +2303,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
     <div className="bottom">
       {modifyP && <ModifyPos p={modifyP} onClose={()=>setModifyP(null)} />}
       <BottomResizer onDone={onResize} />
-      {tab==='Exposure' ? <ExposureTab pos={pos} mids={mids} equity={equity} />
+      {tab==='Exposure' ? <ExposureTab pos={pos} mids={mids} equity={equity} leverage={leverage} />
        : tab==='Journal' ? <JournalTab />
        : tab==='Mailbox' ? <MailboxTab />
        : (tab!=='Trade' && tab!=='History') ? <EmptyTab tab={tab} />
