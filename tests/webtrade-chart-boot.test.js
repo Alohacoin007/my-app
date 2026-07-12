@@ -18,17 +18,21 @@ if (!/new Set\(IS_MOBILE \? \(initCharts\[0\] \? \[initCharts\[0\]\.id\] : \[\]\
 if (!/const \[hydrated,setHydrated\]=React\.useState\(!IS_MOBILE\)/.test(src)) bad('desktop must hydrate immediately (hydrated = !IS_MOBILE)');
 if (!/lazyHold=\{IS_MOBILE && !revealed\.has\(c\.id\)\}/.test(src)) bad('lazyHold must be mobile-only (desktop never lazy-holds)');
 
-// 2) loadCandles: full history, feed trusted only when complete, seed fallback
-const lc = (src.match(/async function loadCandles\(symbol, tf\)\{[\s\S]*?\n\}/) || [''])[0];
-if (!lc) bad('loadCandles not found');
-if (/length>=30\b/.test(lc)) bad('loadCandles must NOT accept a sparse 30-bar feed (that drew short charts)');
-if (!/candles\.length>=160/.test(lc)) bad('loadCandles must trust the feed only when it returns a FULL history (≥160 bars)');
-if (!/return synthCandles\(symbol, tf\);/.test(lc)) bad('loadCandles must fall back to the full 200-bar seed');
-// history must NOT be gated by the session/market-hours gate (closed symbols still load full history)
-if (/\bmarketOpen\s*\(/.test(lc)) bad('loadCandles must NOT call marketOpen — closed symbols must still load full history');
+// 2) the chart is seeded with the deterministic history FIRST (never empty), then upgraded async
+if (!/applyBars\(synthCandles\(symbol, tf\)\);/.test(src)) bad('chart must paint the synth seed IMMEDIATELY so it is never empty');
+if (!/fetchRealCandles\(symbol, tf\)\.then\(real=>\{ if\(real && series\.current===s\) applyBars\(real\)/.test(src)) bad('chart must upgrade to REAL bars only when a validated history returns');
 
-// 3) the seed really is a full 200-bar history
-if (!/const step=TF_SEC\[tf\]\|\|900, n=200;/.test(src)) bad('synthCandles must build a full 200-bar history');
+// 3) fetchRealCandles: real-or-NULL, validated (full + sorted), timed out, NOT gated by market hours
+const fr = (src.match(/async function fetchRealCandles\(symbol, tf\)\{[\s\S]*?\n\}/) || [''])[0];
+if (!fr) bad('fetchRealCandles not found');
+if (!/if\(WT_DEMO\) return null;/.test(fr)) bad('fetchRealCandles must no-op in demo');
+if (!/bars\.length<160\) return null;/.test(fr)) bad('fetchRealCandles must require a FULL history (≥160) or return null (seed stays)');
+if (!/bars\[i\]\.time<=bars\[i-1\]\.time\) return null;/.test(fr)) bad('fetchRealCandles must reject unsorted/duplicate bars (LWC would blank the chart)');
+if (!/setTimeout\(\(\)=>res\(null\),4000\)/.test(fr)) bad('fetchRealCandles must time out (a slow feed must never stall the chart)');
+if (/\bmarketOpen\s*\(/.test(fr)) bad('fetchRealCandles must NOT call marketOpen — closed symbols must still fetch history');
+
+// 4) the seed is a LONG history for backward scroll
+if (!/const step=TF_SEC\[tf\]\|\|900, n=400;/.test(src)) bad('synthCandles must build a long (400-bar) history for backward scroll');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} chart-boot problem(s).`); process.exit(1); }
 console.log('🟢 PASS: desktop boots all 4 charts eagerly; loadCandles fills a full history for every symbol (open or closed), feed trusted only when complete else the 200-bar seed.');

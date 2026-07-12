@@ -55,6 +55,8 @@ for (const c of a) if (!(c.high >= Math.max(c.open, c.close) && c.low <= Math.mi
 }
 // synth must give a FULL history so fitContent shows a real chart (not 2 giant candles)
 if (a.length < 100) { console.error('🔴 FAIL: synthCandles must return a full history (>=100 bars), got ' + a.length); process.exit(1); }
-// in the WT_DEMO terminal, loadCandles must use synth for EVERY tf (the live feed gave 2-bar M5/M30)
-if (!/if\(!WT_DEMO\)\{ try\{ if\(window\.AlpexaSync/.test(src)) { console.error('🔴 FAIL: loadCandles must skip the feed in WT_DEMO and use the 200-bar synth for every timeframe'); process.exit(1); }
-console.log('🟢 PASS: synthCandles is deterministic + full 200-bar history for every tf; WT_DEMO always uses it (no more 2-giant-candle feed).');
+// the chart must SEED the synth history immediately (never depend on the feed to be non-empty), and
+// the real-history upgrade must no-op in WT_DEMO (the live feed gave 2-bar M5/M30).
+if (!/applyBars\(synthCandles\(symbol, tf\)\);/.test(src)) { console.error('🔴 FAIL: chart must seed synthCandles immediately so it is never empty'); process.exit(1); }
+if (!/if\(WT_DEMO\) return null;/.test(src)) { console.error('🔴 FAIL: fetchRealCandles must skip the feed in WT_DEMO'); process.exit(1); }
+console.log('🟢 PASS: synthCandles is deterministic + full history for every tf; the chart seeds it immediately (never empty), upgrading to real bars only when the feed returns a validated full history.');

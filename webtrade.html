@@ -946,21 +946,26 @@ const WINLAYOUT=[
 ];
 
 // ── candle history: try the fx-prices Edge, fall back to a synthetic seed (live bars are REAL feed). ──
-async function loadCandles(symbol, tf){
-  // FULL HISTORY FOR EVERY SYMBOL — open or CLOSED. The chart history is NOT gated by market hours
-  // (the session gate only blocks orders); a weekend/closed Forex/Stock symbol still fills the whole
-  // window. The live fx-prices feed often returns a SPARSE/clustered history (M5/M30 came back as "2
-  // giant candles"), which drew short/broken charts — so we trust it ONLY when it returns a genuinely
-  // FULL, clean history (≥160 bars); otherwise we fall back to the deterministic 200-bar seed whose
-  // LAST bar anchors to the live mid. Result: a long, full chart every time, real data when the feed
-  // is actually complete. (When the fx-prices candles endpoint is fixed server-side to always return
-  // full history, lower the 160 threshold to prefer real bars.)
-  if(!WT_DEMO){ try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.functions){
-    const x=await AlpexaSync.db.functions.invoke('fx-prices',{body:{candles:symbol,tf:tf||'M15'}});
-    if(x&&!x.error&&x.data&&Array.isArray(x.data.candles)&&x.data.candles.length>=160)
-      return x.data.candles.map(c=>({ time:Math.floor((c.t||c.time)/1000), open:+c.o||+c.open, high:+c.h||+c.high, low:+c.l||+c.low, close:+c.c||+c.close }));
-  } }catch(e){} }
-  return synthCandles(symbol, tf);   // full 200-bar deterministic history for every timeframe
+// REAL history upgrade — returns validated real bars, or NULL (never throws, never blocks the chart).
+// The caller ALWAYS seeds synthCandles first, so a null here just leaves the full deterministic chart.
+// This request is NOT gated by market hours — a closed weekend Forex/Stock symbol still fetches its
+// historical bars. We accept the feed ONLY when it's a genuinely FULL, finite, strictly-ascending,
+// de-duplicated history (≥160 bars) — otherwise the sparse/"2 giant candles"/unsorted response is
+// dropped so it can never blank or corrupt the chart. Capped at 4s so a slow feed never stalls a tile.
+async function fetchRealCandles(symbol, tf){
+  if(WT_DEMO) return null;
+  try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.functions){
+    const req=AlpexaSync.db.functions.invoke('fx-prices',{body:{candles:symbol,tf:tf||'M15'}});
+    const cap=new Promise(res=>setTimeout(()=>res(null),4000));
+    const x=await Promise.race([req,cap]);
+    if(!x||x.error||!x.data||!Array.isArray(x.data.candles)) return null;
+    const bars=x.data.candles.map(c=>({ time:Math.floor((c.t||c.time)/1000), open:+c.o||+c.open, high:+c.h||+c.high, low:+c.l||+c.low, close:+c.c||+c.close }))
+      .filter(b=> Number.isFinite(b.time)&&Number.isFinite(b.open)&&Number.isFinite(b.high)&&Number.isFinite(b.low)&&Number.isFinite(b.close));
+    if(bars.length<160) return null;                                   // must be a FULL history
+    for(let i=1;i<bars.length;i++){ if(bars[i].time<=bars[i-1].time) return null; }   // sorted+distinct or LWC rejects → empty
+    return bars;
+  } }catch(e){}
+  return null;
 }
 const TF_SEC = { M1:60, M5:300, M15:900, M30:1800, H1:3600, H4:14400, D1:86400 };
 // DETERMINISTIC synthetic history — a pure function of (symbol, absolute bar time). The SAME bar
@@ -968,7 +973,7 @@ const TF_SEC = { M1:60, M5:300, M15:900, M30:1800, H1:3600, H4:14400, D1:86400 }
 // redraws on every reload). Only the final bar anchors to the live mid, so the history connects to
 // the live price line. No storage — the determinism is in the seed, not a cache. (#5 intact.)
 function synthCandles(symbol, tf){
-  const step=TF_SEC[tf]||900, n=200;
+  const step=TF_SEC[tf]||900, n=400;   // long history for backward scroll (was 200)
   const nowB=Math.floor(Date.now()/1000/step)*step;     // current bar open-time, bucketed → identical across quick refreshes
   const t0=nowB-(n-1)*step;
   const end=(priceStore.get(symbol)&&priceStore.get(symbol).mid)||BASE[symbol]||1;
@@ -1553,11 +1558,15 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       if(w<=0||h<=0) return; chart.current.resize(w,h);
       if(candles.current.length && !fitted){ chart.current.timeScale().fitContent(); fitted=true; } }catch(e){} };
     let boxRO=null; try{ boxRO=new ResizeObserver(doFit); boxRO.observe(box.current); }catch(e){}
-    // load candles for the current timeframe, then (re)paint indicators over them
-    loadCandles(symbol, tf).then(data=>{ try{
+    // CANDLES — paint the deterministic seed IMMEDIATELY so the grid is NEVER empty (feed-independent,
+    // works for CLOSED weekend symbols too — history is never gated by market hours). Then upgrade to
+    // REAL bars only if the backend returns a validated FULL history (async, non-blocking, timed out).
+    const applyBars=(data)=>{ try{
       s.setData(asSeriesData(data,typeRef.current)); bar.current=data[data.length-1]; candles.current=data; paintIndicators();
       doFit(); requestAnimationFrame(doFit); setTimeout(doFit,120);   // now + next frame + a late retry (deferred CDN/layout)
-    }catch(e){} });
+    }catch(e){} };
+    applyBars(synthCandles(symbol, tf));                                                   // instant, full, never empty
+    fetchRealCandles(symbol, tf).then(real=>{ if(real && series.current===s) applyBars(real); }).catch(()=>{});   // upgrade when the feed gives a clean full history
     // live: update ONLY the last bar's close from the shared store — throttled to ~2.5/sec
     const onTick=throttle((mids)=>{
       const m=mids[symbol]; if(!m) return; setPx(m.mid);
