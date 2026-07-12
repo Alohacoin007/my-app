@@ -1583,10 +1583,10 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     const DOT=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dotted)!=null?LightweightCharts.LineStyle.Dotted:1;
     const th0=CHART_THEME[themeBus.theme]||CHART_THEME.dark;
     const c=LightweightCharts.createChart(box.current, {
-      layout:{ background:{color:th0.bg}, textColor:th0.text, fontSize:11, fontFamily:"Tahoma, 'Segoe UI', Arial, sans-serif", attributionLogo:false },
+      layout:{ background:{color:th0.bg}, textColor:th0.text, fontSize:10, fontFamily:"Tahoma, 'Segoe UI', Arial, sans-serif", attributionLogo:false },   // slim 10px axis labels → more canvas
       grid:{ vertLines:{color:th0.grid, style:DOT}, horzLines:{color:th0.grid, style:DOT} },
-      timeScale:{ borderColor:th0.border, timeVisible:true, secondsVisible:false, rightOffset:6 },   // small right margin so the newest candles + position tags aren't jammed against the axis
-      rightPriceScale:{ borderColor:th0.border },
+      timeScale:{ borderColor:th0.border, timeVisible:true, secondsVisible:false, barSpacing:4, minBarSpacing:0.8, rightOffset:14 },   // MT5-slim: 1.5× denser candles (default 6→4) + a wide right margin (rightOffset 6→14) for future-trend reading space
+      rightPriceScale:{ borderColor:th0.border, scaleMargins:{top:0.08, bottom:0.08} },   // trim vertical price padding (0.10→0.08) → taller candle canvas
       crosshair:{ vertLine:{color:th0.cross, style:DOT, visible: themeBus.theme!=='light', labelVisible: themeBus.theme!=='light'}, horzLine:{color:th0.cross, style:DOT, visible: themeBus.theme!=='light', labelVisible: themeBus.theme!=='light'} },   // LEGEND: no crosshair lines OR axis labels on hover (free mouse, MT5-like)
     });
     // live re-theme when the user flips Light/Dark (no rebuild)
@@ -1650,7 +1650,11 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     let fitted=false;
     const doFit=()=>{ try{ if(!box.current||!chart.current) return; const w=box.current.clientWidth, h=box.current.clientHeight;
       if(w<=0||h<=0) return; chart.current.resize(w,h);
-      if(candles.current.length && !fitted){ chart.current.timeScale().fitContent(); fitted=true; } }catch(e){} };
+      // MT5 default view: fixed slim barSpacing + a right margin (NOT fitContent, which stretches all
+      // 400 bars to full width → fat candles). Show the recent bars at MT5 density, newest at the margin.
+      if(candles.current.length && !fitted){ const ts=chart.current.timeScale();
+        try{ ts.applyOptions({ barSpacing:4, rightOffset:14 }); ts.scrollToRealTime(); }catch(_){ try{ ts.fitContent(); }catch(e2){} }
+        fitted=true; } }catch(e){} };
     let boxRO=null; try{ boxRO=new ResizeObserver(doFit); boxRO.observe(box.current); }catch(e){}
     // CANDLES — paint the deterministic seed IMMEDIATELY so the grid is NEVER empty (feed-independent,
     // works for CLOSED weekend symbols too — history is never gated by market hours). Then upgrade to
@@ -1692,7 +1696,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   // toolbar zoom (± bar spacing) + tile (reset this window to its 2×2 slot)
   React.useEffect(()=> terminalBus.subscribe((cmd,arg)=>{
     if(cmd==='chart.zoom' && activeRef.current && chart.current){ try{ const ts=chart.current.timeScale();   // ← active chart only
-      const bs=(ts.options&&ts.options().barSpacing)||6;
+      const bs=(ts.options&&ts.options().barSpacing)||4;
       ts.applyOptions({ barSpacing: Math.max(2, Math.min(60, bs*(arg==='in'?1.25:0.8))) }); }catch(e){} }
     else if(cmd==='window.tile'){ const el=win.current, par=el&&el.parentElement; if(!par) return;
       const W=par.clientWidth||800, H=par.clientHeight||500, f=initial||{fx:0.02,fy:0.02,fw:0.48,fh:0.48};
