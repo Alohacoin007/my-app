@@ -2155,15 +2155,21 @@ function MarketWatch({ onPick }){
           <tbody>
             {!visible.length && <tr><td className="empty" colSpan={showSpread?5:4}>No symbols match</td></tr>}
             {visible.map(sym=>{ const m=mids[sym]||{}, d=dirs[sym]||{}; const up=(m.chg||0)>=0;
-              const spr=(m.ask!=null&&m.bid!=null)?((m.ask-m.bid)/pip(sym)).toFixed(1):'—';   // live spread in PIPS: FX ÷0.0001 → 1.0 for a 1-pip gap, JPY ÷0.01 → 1.0, crypto ÷0.01 → ~0.1 (never 10× inflated)
               const open=marketOpen(sym);   // session gate — closed → freeze ticks + 'Closed' mask
+              // Bid/Ask EXACTLY as shown (rounded to this symbol's digits) so the Spread matches the screen.
+              const bidT=fmtPx(sym,m.bid), askT=fmtPx(sym,m.ask);
+              // PER-ROW INDEPENDENT spread — NO shared variable. Computed from THIS row's own displayed
+              // bid/ask: Forex → pips (÷pip) so EURUSD 0.00010→1.0, USDJPY 161.983−161.964=0.019→1.9;
+              // Crypto/Stocks → raw price gap so BTC 0.10→0.1. Live, memory-only, recomputed every tick.
+              const _diff=(m.ask!=null&&m.bid!=null)?Math.abs(parseFloat(askT)-parseFloat(bidT)):null;
+              const spr=_diff==null?'—':(catOf(sym)==='Crypto'||catOf(sym)==='Stocks'?_diff:_diff/pip(sym)).toFixed(1);
               return (
                 <tr key={sym} className={(sym===sel?'sel':'')+(open?'':' mw-closed')} onClick={()=>setSel(sym)}
                     draggable={true} onDragStart={(e)=>{ e.dataTransfer.setData('text/mwsymbol', sym); e.dataTransfer.effectAllowed='copy'; }}
                     onDoubleClick={()=>terminalBus.emit('order.new',sym)} onContextMenu={(e)=>ctx(e,sym)} title="드래그: 차트창에 드롭해 심볼 변경 · 더블클릭: New Order · 우클릭: 메뉴(Forex/Stocks/Crypto 필터, Spread, New Chart 등)">
                   <td className="sym"><span className={up?'au':'ad'}>{up?'↗':'↘'}</span> {sym}{sfx(sym)}</td>
-                  <td className={open?tc(d.bid):'mw-closed-cell'}>{fmtPx(sym,m.bid)}</td>
-                  <td className={open?tc(d.ask):'mw-closed-cell'}>{fmtPx(sym,m.ask)}</td>
+                  <td className={open?tc(d.bid):'mw-closed-cell'}>{bidT}</td>
+                  <td className={open?tc(d.ask):'mw-closed-cell'}>{askT}</td>
                   {showSpread && <td className="mwspr">{open?spr:'—'}</td>}
                   {open ? <td className={up?'text-up':'text-down'}>{m.chg!=null?(m.chg>=0?'+':'')+m.chg.toFixed(2):'—'}</td>
                         : <td className="mw-closed-tag">Closed</td>}

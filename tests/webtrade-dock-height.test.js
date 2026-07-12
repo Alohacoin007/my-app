@@ -27,8 +27,8 @@ if (!/\.bottom\{flex:none;height:var\(--bottomh,126px\)/.test(src)) bad('.bottom
 // the 12-tab toolbox switching socket is untouched (functionality preserved)
 if (!/toolbox:true/.test(src)) bad('toolbox must still default on (12 tabs preserved)');
 
-// [3] the spread stays the PIP formula (a 1-pip FX gap = 1.0, not 10× inflated)
-if (!/\(\(m\.ask-m\.bid\)\/pip\(sym\)\)\.toFixed\(1\)/.test(src)) bad('spread must remain (ask-bid)/pip (1.0 per pip)');
+// [3] the spread stays the per-row pip formula (Forex ÷pip → 1.0/pip; no ×100000 inflation)
+if (!/catOf\(sym\)==='Crypto'\|\|catOf\(sym\)==='Stocks'\?_diff:_diff\/pip\(sym\)/.test(src)) bad('spread must remain per-row (Forex ÷pip, crypto/stock raw)');
 if (/ptScale/.test(src)) bad('the ×100000 ptScale inflation must remain removed');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} dock-height problem(s).`); process.exit(1); }
