@@ -1927,7 +1927,7 @@ function MWDetails({ sym }){
     ['Open Price',m.open,0],['Close Price',m.open,0]];
   return (
     <div className="mwdet">
-      <div className="sh">{sym}.FX, {SYM_NAME[sym]||sym}</div>
+      <div className="sh">{sym}{sfx(sym)}, {SYM_NAME[sym]||sym}</div>
       <table><tbody>
         {rows.map(([k,v,d],i)=><tr key={i}><td className="k">{ar(d)}{k}</td><td className={vc(d)}>{fmtPx(sym,v)}</td></tr>)}
       </tbody></table>
@@ -2598,13 +2598,13 @@ function OrderModal({ symbol:sym0, onClose }){
     <div className="omodal-ov" onMouseDown={onClose}>
       <div className="omodal" ref={cardRef} style={pos?{position:'absolute',left:pos.left+'px',top:pos.top+'px',margin:0}:null} onMouseDown={e=>e.stopPropagation()}>
         <div className="obar" onMouseDown={onHeaderDown} style={{cursor:'move'}}>
-          <div className="t">{t('New Order')} — {symbol}.FX</div>
+          <div className="t">{t('New Order')} — {symbol}{sfx(symbol)}</div>
           <span className="wb x" onMouseDown={e=>e.stopPropagation()} onClick={onClose}>✕</span>
         </div>
         <div className="om-body">
           {/* Symbol */}
           <div className="om-field"><label>{t('Symbol')}</label>
-            <select value={symbol} onChange={e=>setSymbol(e.target.value)}>{WATCH.map(s=><option key={s} value={s}>{s}.FX</option>)}</select></div>
+            <select value={symbol} onChange={e=>setSymbol(e.target.value)}>{WATCH.map(s=><option key={s} value={s}>{s}{sfx(s)}</option>)}</select></div>
           {/* Big Bid / Ask + live SPREAD in the middle — same Arial-Black BigFig look as the panel */}
           <div className="om-quote">
             <div className="om-px"><span className="om-tag">BID · SELL</span><BigFig symbol={symbol} v={m.bid} /></div>
@@ -2782,7 +2782,7 @@ function App(){
         </div>
         {/* layer 2: chart-window tab bar — glued directly under the charts. click=focus, ✕=close+unsubscribe */}
         {!!charts.length && <div className="charttabs">{charts.map(c=>
-          <div key={c.id} className={"ctab"+(c.id===(activeChart&&activeChart.id)?' on':'')} onClick={()=>activate(c.id)} title={c.symbol+'.FX,'+c.tf}>{c.symbol}.FX,{c.tf}
+          <div key={c.id} className={"ctab"+(c.id===(activeChart&&activeChart.id)?' on':'')} onClick={()=>activate(c.id)} title={c.symbol+sfx(c.symbol)+','+c.tf}>{c.symbol}{sfx(c.symbol)},{c.tf}
             <span className="tclose" onClick={(e)=>{e.stopPropagation();closeChart(c.id);}} title="Close chart">✕</span></div>)}</div>}
       </div>
       {/* GLOBAL floating toolbox overlay — pinned to window bottom (absolute, z-9999), covers the
