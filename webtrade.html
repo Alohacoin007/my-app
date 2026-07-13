@@ -1336,17 +1336,23 @@ function OrderBox({ symbol }){
     busyRef.current=null; setBusy(null);
     setFlash(true); setTimeout(()=>setFlash(false),120);
   };
-  const dec=()=>setVol((Math.max(0.01,(+vol||0.01)-0.01)).toFixed(2));
-  const inc=()=>setVol((Math.max(0.01,(+vol||0)+0.01)).toFixed(2));
+  // lot stepper: click = ±0.01; PRESS-AND-HOLD = auto-repeat that accelerates (interval 320ms → 25ms).
+  const holdRef=React.useRef(null);
+  const bump=(sign)=> setVol(v=> Math.max(0.01,(+v||0.01)+sign*0.01).toFixed(2));   // functional → no stale closure during repeat
+  const hold=(sign)=>{ bump(sign); let d=320;   // one step immediately (also serves the plain click)
+    const run=()=>{ bump(sign); d=Math.max(25, d*0.75); holdRef.current=setTimeout(run, d); };   // accelerate
+    holdRef.current=setTimeout(run, d); };
+  const release=()=>{ if(holdRef.current){ clearTimeout(holdRef.current); holdRef.current=null; } };
+  React.useEffect(()=> release, []);   // stop the repeat on unmount
   const busySell=busy==='sell', busyBuy=busy==='buy';
   return (   // always shown — the 190×64 one-click panel is locked visible on every chart
     <div className={"obox"+(flash?' ecn-flash':'')+(tradable?'':' oc-closed')}>
       <div className="oc-top">
         <div className={"oc-lbl "+sellCls+(busySell?' oc-busy':'')} title="Sell at Bid" onClick={(e)=>{e.stopPropagation();send('sell');}}>SELL</div>
         <div className="oc-vol" onClick={e=>e.stopPropagation()}>
-          <b className="dn" onClick={dec} title="−0.01">▼</b>
+          <b className="dn" onMouseDown={(e)=>{e.stopPropagation();hold(-1);}} onMouseUp={release} onMouseLeave={release} onTouchStart={(e)=>{e.preventDefault();hold(-1);}} onTouchEnd={release} title="−0.01 (hold to speed up)">▼</b>
           <input value={vol} onChange={e=>setVol(e.target.value)} title="Volume (lots)" />
-          <b className="up" onClick={inc} title="+0.01">▲</b>
+          <b className="up" onMouseDown={(e)=>{e.stopPropagation();hold(1);}} onMouseUp={release} onMouseLeave={release} onTouchStart={(e)=>{e.preventDefault();hold(1);}} onTouchEnd={release} title="+0.01 (hold to speed up)">▲</b>
         </div>
         <div className={"oc-lbl "+buyCls+(busyBuy?' oc-busy':'')} title="Buy at Ask" onClick={(e)=>{e.stopPropagation();send('buy');}}>BUY</div>
       </div>
