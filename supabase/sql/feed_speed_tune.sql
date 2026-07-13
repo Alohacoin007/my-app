@@ -38,5 +38,15 @@ $$);
 -- 확인(장중): select symbol, updated_at from prices where symbol in ('AAPL','NVDA') — 초 단위로 갱신돼야 정상.
 -- 롤백: select cron.unschedule('stock-stream-1m');  (stock-prices-1m이 그대로 1분 피드 제공)
 
+-- ── 6) [3단계] FX 실시간: fx-stream Edge (Polygon 웹소켓 펌프 — 유료 Currencies 플랜에 포함, 추가비용 0) ──
+-- 사용자 선행 작업: Edge Functions에서 `fx-stream` 배포(stock-stream과 동일 절차, JWT verify OFF).
+-- 기존 POLYGON_KEY/CRON_SECRET env 재사용, 클라 노출 없음. spr_pts는 fx-prices와 같은 정수 핍(락스텝).
+select cron.schedule('fx-stream-1m', '* * * * *', $$
+  select net.http_get(url := 'https://grxnbgtfnaayeluenvqh.supabase.co/functions/v1/fx-stream?token=<CRON_SECRET>');
+$$);
+-- 확인(주중): select symbol, updated_at from prices where symbol = 'EURUSD' — 1~2초 간격이면 성공.
+-- 롤백: select cron.unschedule('fx-stream-1m');  (fx-prices 3초 크론이 그대로 폴백 제공)
+-- 플랜에 WS가 없으면: 함수가 502 "auth_failed"를 반환하고 아무것도 안 쓴다 — FX는 3초 유지(무해).
+
 -- 되돌리기: select cron.unschedule('crypto-prices-3s');  후 crypto_prices_cron.sql 재실행.
 -- 검증: 1)의 진단 쿼리 재실행 + prices.updated_at 간격 확인.
