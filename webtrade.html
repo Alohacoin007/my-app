@@ -1538,6 +1538,25 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     }
     applyGeo();
   }, []);
+  // FILL THE STAGE: the geometry above is computed ONCE at mount. When the workspace (stage) then
+  // resizes — the dock slims to 150px, or the browser resizes — a floating window kept its old pixel
+  // height, so the stage's black background showed BELOW it (the "black hole" above/under the axis).
+  // Observe the stage and SCALE this window's geometry proportionally so it always fills, gap-free.
+  React.useEffect(()=>{
+    if(tiled) return;
+    const el=win.current, par=el&&el.parentElement; if(!par) return;
+    let last={ w:par.clientWidth, h:par.clientHeight };
+    const onStage=()=>{ const nw=par.clientWidth, nh=par.clientHeight; if(nw<=0||nh<=0) return;
+      if(last.w>0 && last.h>0 && (nw!==last.w || nh!==last.h)){
+        const sx=nw/last.w, sy=nh/last.h, g=geo.current;
+        geo.current={ x:g.x*sx, y:g.y*sy, w:Math.max(WIN_MINW,g.w*sx), h:Math.max(WIN_MINH,g.h*sy) };
+        applyGeo(); resizeChart();   // grow the window, then re-fit the chart to it (boxRO re-pins barSpacing/rightOffset)
+      }
+      last={ w:nw, h:nh };
+    };
+    let ro=null; try{ ro=new ResizeObserver(onStage); ro.observe(par); }catch(e){}
+    return ()=>{ try{ ro&&ro.disconnect(); }catch(e){} };
+  }, []);
   // (active header now comes from the isActive prop / activeChartId — no local focus state)
   // one global move/up handler drives both dragging (title) and resizing (8 handles)
   React.useEffect(()=>{
