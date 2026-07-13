@@ -346,6 +346,7 @@
   .acctline{display:flex;align-items:center;gap:18px;padding:4px 12px;background:#0d0d0d;border-top:1px solid #222;font-size:11.5px;color:#c8ccd2;white-space:nowrap;overflow-x:auto}
   .acctline .k{color:#8890a0}.acctline b{color:#fff;font-variant-numeric:tabular-nums}
   .acctline .up{color:var(--up)}.acctline .down{color:var(--down)}   /* Profit / Margin-Level keep their up=green / down=red (beats the white .acctline b) */
+  .acctline .pl-right{margin-left:auto}   /* MT5: P/L pinned to the far-right end, under the Profit column */
   /* History period filter bar (MT5: right-click → period; here a visible toolbar) */
   .histbar{flex:none;display:flex;align-items:center;gap:6px;padding:4px 10px;background:#141414;border-bottom:1px solid #222;font-size:11px;color:#8890a0;white-space:nowrap;overflow-x:auto}
   .histbar .hb{background:transparent;border:1px solid #333;color:#c8ccd2;font-size:11px;padding:2px 9px;border-radius:3px;cursor:pointer}
@@ -2571,13 +2572,13 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
             <tr className="acctrow"><td colSpan="11">
             <div className="acctline">
               <span><span className="k">{t('Balance')}:</span> <b>{num(balance)} USD</b></span>
-              <span><span className="k">P/L:</span> <b className={floating>=0?'up':'down'}>{num(floating)}</b></span>
               <span><span className="k">{t('Equity')}:</span> <b>{num(equity)}</b></span>
               <span><span className="k">{t('Margin')}:</span> <b>{num(marginUsed)}</b></span>
               <span><span className="k">{t('Free Margin')}:</span> <b>{num(equity-marginUsed)}</b></span>
               <span><span className="k">{t('Margin Level')}:</span> <b className={marginUsed>0&&level<100?'down':''}>{marginUsed>0?num(level)+' %':'—'}</b>{/* MT5-style: safe = neutral (default), red ONLY at ≤100% (margin call) / ≤30% (stop out) — no green */}
                 {marginUsed>0&&level<100&&level>=30 && <b style={{color:'#e0a020',marginLeft:6}}>⚠ Margin Call</b>}
                 {marginUsed>0&&level<30 && <b style={{color:'#ff5252',marginLeft:6}}>⛔ Stop Out &lt;30%</b>}</span>
+              <span className="pl-right"><span className="k">P/L:</span> <b className={floating>=0?'up':'down'}>{num(floating)}</b></span>
             </div>
           </td></tr></tfoot>}
         </table>
