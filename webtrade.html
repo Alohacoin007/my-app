@@ -624,7 +624,7 @@
 <div id="app"><div id="wt-boot" style="position:fixed;inset:0;background:#000;color:#8a97ac;font:13px -apple-system,Segoe UI,Roboto,sans-serif;display:flex;flex-direction:column">
   <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:10px">
     <span style="width:14px;height:14px;border:2px solid #2a3340;border-top-color:#3a6ea5;border-radius:50%;display:inline-block;animation:wtspin .8s linear infinite"></span>
-    Alpexa WebTrade 로딩 중…<span style="opacity:.55">차트 엔진 컴파일</span>
+    Alpexa WebTrade loading…<span style="opacity:.55">compiling chart engine</span>
   </div>
   <div style="height:212px;background:#0d0d0d;border-top:1px solid #333;display:flex;flex-direction:column">
     <div style="flex:1"></div>
@@ -1953,9 +1953,9 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       </div>
       <div className="canvas" ref={box}>
         <div className="drawlayer" ref={dlayer}></div>
-        {lazyHold && <div onClick={()=>onActivate&&onActivate(idx)} title="탭하여 차트 로드"
+        {lazyHold && <div onClick={()=>onActivate&&onActivate(idx)} title="Tap to load chart"
           style={{position:'absolute',inset:0,zIndex:2,display:'flex',alignItems:'center',justifyContent:'center',
-            background:'#000',color:'#5a6472',font:'12px -apple-system,Segoe UI,sans-serif',cursor:'pointer'}}>차트 탭하여 로드</div>}
+            background:'#000',color:'#5a6472',font:'12px -apple-system,Segoe UI,sans-serif',cursor:'pointer'}}>Tap to load chart</div>}
         {showOC && <OrderBox symbol={symbol} />}
       </div>
       {!tiled && ['n','s','e','w','ne','nw','se','sw'].map(d=>
@@ -2208,7 +2208,7 @@ function MarketWatch({ onPick }){
       <div className="mwhead"><span>{t('Market Watch')}: {clock}</span><span className="x" title="Close (Ctrl+M)" onClick={()=>terminalBus.emit('view.toggle','marketwatch')}>✕</span></div>
       {(tab==='Symbols'||tab==='Trading') && <div className="mwsearch">
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder={'🔍 Search '+pool.length+' symbols (symbol / class)'} />
-        {(q||cat!=='All') ? <span className="mwsc">{visible.length}</span> : <span className="mwsc" title="Top 20 대세 종목">Top 20</span>}
+        {(q||cat!=='All') ? <span className="mwsc">{visible.length}</span> : <span className="mwsc" title="Top 20 popular symbols">Top 20</span>}
       </div>}
       {tab==='Ticks' ? <TickChart symbol={cur} /> :
       <div className="mwscroll">
@@ -2253,8 +2253,8 @@ function MarketWatch({ onPick }){
 /* ── Bottom Toolbox: MT5 tab strip + positions grid + account line, from positionsStore ── */
 const TBX_TABS=['Trade','Exposure','History','News','Mailbox','Calendar','Company','Alerts','Articles','Code Base','Experts','Journal'];
 // themed empty panel for tabs with no live data source yet (News/Mailbox/Calendar/Company)
-const TAB_EMPTY={ News:['📰','실시간 뉴스 피드 연결 대기 (news feed not connected)'], Mailbox:['✉️','Mailbox is empty'],
-  Calendar:['📅','경제 캘린더 피드 연결 대기 (economic calendar not connected)'], Company:['🏛️','Alpexa Ltd · account & company info'],
+const TAB_EMPTY={ News:['📰','News feed not connected'], Mailbox:['✉️','Mailbox is empty'],
+  Calendar:['📅','Economic calendar not connected'], Company:['🏛️','Alpexa Ltd · account & company info'],
   Alerts:['🔔','No alerts set'], Articles:['📄','No articles'], 'Code Base':['💾','Code Base is empty'], Experts:['🤖','No Expert Advisors attached'] };
 function ExposureTab({ pos, mids, equity, leverage }){
   const net={}; pos.forEach(p=>{ const d=sideUp(p.side)==='SELL'?-1:1; net[p.symbol]=(net[p.symbol]||0)+d*lotsOf(p); });
@@ -2313,8 +2313,8 @@ function MailboxTab(){
     }catch(e){ if(live) setMsgs([]); } })();
     return ()=>{ live=false; }; }, []);
   if(msgs===null) return <div className="tbxbody"><div className="tbxempty"><div className="ic">📬</div>Loading…</div></div>;
-  if(!msgs.length) return <div className="tbxbody"><div className="tbxempty"><div className="ic">✉️</div>받은 메시지가 없습니다 (Mailbox empty)</div></div>;
-  const subj=(k)=> k==='deposit'?'💰 입금 승인 (Deposit)':k==='withdraw'?'🏧 출금 (Withdrawal)':k==='bonus'?'🎁 보너스 지급 (Bonus)':k==='adjust'?'⚙ 계좌 조정 (Adjustment)':('📨 '+k);
+  if(!msgs.length) return <div className="tbxbody"><div className="tbxempty"><div className="ic">✉️</div>No messages (Mailbox empty)</div></div>;
+  const subj=(k)=> k==='deposit'?'💰 Deposit approved':k==='withdraw'?'🏧 Withdrawal':k==='bonus'?'🎁 Bonus credited':k==='adjust'?'⚙ Account adjustment':('📨 '+k);
   return (
     <div className="postbl"><table className="mbx">
       <thead><tr><th>Time</th><th>Subject</th><th>Amount (USD)</th></tr></thead>
@@ -2396,7 +2396,7 @@ function ModifyPos({ p, onClose }){
           <div className="om-field"><label>{t('Take Profit')}</label>
             <input value={tp} onChange={e=>setTp(e.target.value)} placeholder="price / pips" className={tpBad?'bad':''} />
             <span className="mpos-tp">{tpPx!=null?('→ '+fmtPx(symbol,tpPx)):''}</span></div>
-          {bad && <div className="mpos-err">⚠ {isBuy ? 'SL은 현재가보다 낮게, TP는 높게' : 'SL은 현재가보다 높게, TP는 낮게'} 설정하세요</div>}
+          {bad && <div className="mpos-err">⚠ {isBuy ? 'SL must be below and TP above the current price' : 'SL must be above and TP below the current price'}</div>}
           {note && <div className="mpos-note">{note}</div>}
           <div className="om-btns"><button className="om-buy" disabled={busy||bad} onClick={save}>{busy?'…':t('Modify')}</button></div>
         </div>
@@ -2436,7 +2436,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
       positionsStore.removeDemo(p.local_id); playSnd(sndClose); return; }   // demo row → drop it (+청산음)
     const m=mids[p.symbol]||{}; const pl=plOf(p);
     const r=await eng.closeOrder(p.local_id);                            // real → fx_close banks P&L server-side
-    if(!r.ok){ alert('청산 실패(Close failed): '+(r.reason||'unknown')); return; }
+    if(!r.ok){ alert('Close failed: '+(r.reason||'unknown')); return; }
     positionsStore.recordClose(p, closePx(p,m)||m.mid, pl);              // realized (per-side close px) → History tab
   };
 
@@ -2504,7 +2504,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
               </tr>
             ))}
             {tab==='History' && histV.botH>0 && <tr aria-hidden="true" style={{height:histV.botH}}><td colSpan="11"></td></tr>}
-            {tab==='Trade' && !pos.length && <tr><td className="empty" colSpan="11">{(!WT_DEMO && window.AlpexaSync&&AlpexaSync.me)?'No open positions':'로그인하면 실계정 포지션이 표시됩니다 (Log in to trade)'}</td></tr>}
+            {tab==='Trade' && !pos.length && <tr><td className="empty" colSpan="11">{(!WT_DEMO && window.AlpexaSync&&AlpexaSync.me)?'No open positions':'Log in to see your live positions (Log in to trade)'}</td></tr>}
             {tab==='Trade' && pos.map(p=>{ const m=mids[p.symbol]||{}; const pl=plOf(p);
               const tkt=String(p.local_id||'').replace(/\D/g,'').slice(-8)||p.local_id;
               const _tt=p.updated_at||p.created_at; const tm=_tt?String(_tt).slice(0,19).replace('T',' ').replace(/-/g,'.'):'—';  // real positions carry updated_at (no created_at col); demo seed carries created_at. MT5: 2026.07.09 20:17:40
