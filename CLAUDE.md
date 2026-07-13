@@ -85,6 +85,9 @@
 6. **배포 초록 확인 후에만 "라이브".** Pages 간헐 실패 있음 → GitHub Actions 초록 확인. 서비스워커=네트워크우선(고객 자동최신).
 - ⚙️ 도구: `tests/sports-feed-check.js`(라이브 피드 헬스, 네트워크 필요·수동/크론) · `tests/sports-render.test.js`(렌더 격리, verify 게이트) · 감사 프롬프트 `스포츠-마스터-감사.md`.
 
+## 📌 보류 백로그 (조건 충족 시 사용자에게 먼저 리마인드할 것)
+- **[고객 생기면] 시세 3단계 업그레이드** (2026-07-13 보류, 사용자 지시): 주식 1분 천장 돌파 = Finnhub WS(무료 실시간 체결 스트림) + 크립토 ms급 = Binance WS 클라 직결. **표시-체결 드리프트 안전 설계표 승인 후** 진행 (mid=실시간 WS · half=`halfPx` 서버 공식 · 체결=서버 권위 불변). 현행: 크론 3초 + Supabase Realtime 푸시(2026-07-13 배포, `webtrade-realtime-feed.test.js`). 검증된 Realtime 패턴의 trading.html·crypto-live.html 확산도 이때 같이.
+
 ## 🚚 배포 / 운영
 - GitHub Pages는 브랜치 `claude/wizardly-ritchie-lsRnz`에서 서빙 (CNAME alpexa-sports.com). **푸시는 이 브랜치에만.**
 - 캐시: `Ctrl+Shift+R` 또는 `?v=N`. 빠른 연속 푸시는 Pages 빌드를 취소시킴.
