@@ -40,10 +40,10 @@ if (!fail) {
 const set_src = grab(/_set\(sym,mid,half,spr,now,jit\)\{[\s\S]*?\n  \},/, '_set');
 const sim_src = grab(/_simulate\(\)\{[\s\S]*?\n  \},/, '_simulate');
 if (!fail) {
-  const store = new Function('marketOpen','WATCH','BASE','pip','tickSize',
+  const store = new Function('marketOpen','WATCH','BASE','pip','tickSize','seedSpread',
     'const store={ mids:{}, drift:null,\n' + set_src + '\n' + sim_src + '\n};\nreturn store;'
   )((sym)=> sym==='BTCUSD',              // BTCUSD open (crypto), EURUSD closed (weekend FX)
-    ['EURUSD','BTCUSD'], {EURUSD:1.1, BTCUSD:64000}, ()=>0.0001, ()=>0.00001);   // tickSize stub (freeze/walk test ignores the spread value)
+    ['EURUSD','BTCUSD'], {EURUSD:1.1, BTCUSD:64000}, ()=>0.0001, ()=>0.00001, ()=>1);   // tickSize/seedSpread stubs (freeze/walk test ignores the spread value)
   store._simulate();
   const eur1 = store.mids.EURUSD.mid, btc1 = store.mids.BTCUSD.mid;
   store._simulate();

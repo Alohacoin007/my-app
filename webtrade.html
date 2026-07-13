@@ -880,6 +880,15 @@ const fmtPx = (s,v)=> (v==null?'—':(+v).toFixed(digits(s)));
 // MT5 SYMBOL_TRADE_TICK_SIZE / point = 10^-digits (5-digit FX 0.00001, 3-digit JPY 0.001, crypto/stock 0.01).
 // SYMBOL_SPREAD is in INTEGER POINTS → price gap = spr_points × tickSize (NOT × pip; pip = 10 points on FX).
 const tickSize = (s)=> Math.pow(10, -digits(s));
+// Cold-start ONLY dealing-spread master table (MT5 INTEGER POINTS). The live feed's spr_pts always
+// wins, then the symbol's own last-known value; this seeds the very first tick when neither exists
+// yet. Unknown symbols take their asset-class row from this SAME table — the pipeline carries no
+// bare numeric fallback (flat-10 bomb family; diagnose SPREAD-flat-fallback). Class rows mirror the
+// house convention (Crypto 10 · Stocks 8, cf. ALPEXA_SPREAD_BPS in trading.html).
+const DEFAULT_SPREAD = { EURUSD:1.0, GBPUSD:1.2, USDJPY:1.9, AUDUSD:1.2, USDCAD:1.5, USDCHF:1.6, NZDUSD:1.8,
+  EURGBP:1.4, EURJPY:1.8, GBPJPY:2.2, AUDJPY:1.9, EURAUD:2.0, GBPAUD:2.4,
+  Forex:1.5, Crypto:10, Stocks:8 };
+const seedSpread = (s)=> DEFAULT_SPREAD[s]!=null ? DEFAULT_SPREAD[s] : DEFAULT_SPREAD[catOf(s)];
 // MT5-style X-axis tick: "12 Jul 23:22" (UTC-aligned, matches the bucketed candle times).
 const MON3 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const fmtMt5Tick = (t)=>{ const d=new Date((typeof t==='number'?t:0)*1000), p=n=>(n<10?'0':'')+n;
@@ -953,9 +962,9 @@ const priceStore = {
       const mid=+p.mid||0; if(mid<=0) return; //   off-watch symbols (e.g. SPACEX) still get a live price + P&L
       // MT5 SYMBOL_SPREAD = INTEGER POINTS. Price half-gap = points × tickSize / 2 (NOT × pip — that was
       // the 10× bomb: 10 points read as 10 pips). On a transient feed dropout keep this symbol's OWN
-      // last-known spread (never a flat table); only a cold start with no history falls back to 10 points.
+      // last-known spread; only a cold start with no history reads the DEFAULT_SPREAD master table.
       const prev=this.mids[sym];
-      const spr=(p.spr_pts!=null && p.spr_pts!=='') ? +p.spr_pts : (prev && prev.spr!=null ? prev.spr : 10);
+      const spr=(p.spr_pts!=null && p.spr_pts!=='') ? +p.spr_pts : (prev && prev.spr!=null ? prev.spr : seedSpread(sym));
       this._set(sym, mid, spr*tickSize(sym)/2, spr, now);
     });
   },
@@ -966,7 +975,7 @@ const priceStore = {
       const cur=this.mids[sym]? this.mids[sym].mid : BASE[sym];
       // SESSION LOCKSTEP (Method A): a CLOSED symbol (weekend/after-hours FX & US stocks) must NOT random-walk
       // — freeze it at its last/close price so the whole app (chart, quotes, P&L) holds. Crypto is 24/7 → walks.
-      const sp=(this.mids[sym] && this.mids[sym].spr!=null) ? this.mids[sym].spr : 10;   // last-known spread (MT5 points); 10-pt cold seed only
+      const sp=(this.mids[sym] && this.mids[sym].spr!=null) ? this.mids[sym].spr : seedSpread(sym);   // last-known spread (MT5 points); cold seed = DEFAULT_SPREAD table
       const ts=tickSize(sym);
       if(!marketOpen(sym)){ if(!this.mids[sym]) this._set(sym, cur, sp*ts/2, sp, now); return; }
       const mid=cur*(1+(Math.random()-0.5)*0.0006 + this.drift[sym]); this._set(sym, mid, sp*ts/2, sp, now, 3*pip(sym));
