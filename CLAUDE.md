@@ -91,6 +91,7 @@
 - **Binance = 공개 데이터 미러** (크립토. `data-api/data-stream.binance.vision`, 키 불필요·무료. binance.com 본체는 geo-fence라 미러만 사용).
 - **파이프라인 (전부 라이브 검증됨):** 크립토=클라 Binance WS 직결(ms) + 크론 3초 폴백 · FX=`fx-stream` WS 펌프(~1초, job `fx-stream-1m`) + `fx-prices` 3초 폴백 · 주식=`stock-stream` WS 펌프(2~8초, job `stock-stream-1m`) + `stock-prices` 1분 폴백(+ALPXS) · 클라 수신=Supabase Realtime 푸시(`prices` publication) + 1초 폴링 폴백. 크론 진단/튜닝/롤백 = `supabase/sql/feed_speed_tune.sql`.
 - **WS 펌프 Edge 공통 규칙:** 대시보드에서 JWT verify **OFF**(함수 내 `CRON_SECRET` 검사가 관문) · spr_pts 단위는 기존 작성자와 동일하게(FX 정수핍·크립토 bps·주식 0) — 단위 새로 발명 금지(결함-로그 2026-07-13).
+- **아침 감시 2층 (2026-07-13):** ① Claude 루틴 `trig_01VUfQyWNpydMtCKnghmXNE5` — 매일 15:00 UTC(베가스 8시) 이 세션에서 feed-check+오늘 경기·오즈 점검 후 **능동 보고**. ② GitHub Action `daily-sports-check.yml`(main) — 매일 ~16-17 UTC **침묵 게이트**(빨강 시만 이메일, 7/7부터 전회 초록). 서로 백업 — 하나 지운다고 감시가 사라지지 않게 둘 다 유지.
 
 ## 📌 보류 백로그 (조건 충족 시 사용자에게 먼저 리마인드할 것)
 - **[완료 2026-07-13] 시세 3단계 전체**: 크립토 = webtrade Binance WS 직결(실브라우저 초당 2회 확인) · 주식 = `stock-stream`(AAPL 1분→2~8초 실측) · FX = `fx-stream`(EURUSD 3초→평균 1.5초 실측, 120초에 91회). 상세는 위 📡 섹션. 잔여(고객 생기면): Realtime/WS 패턴 trading.html·crypto-live.html 확산.
