@@ -86,7 +86,7 @@
 - ⚙️ 도구: `tests/sports-feed-check.js`(라이브 피드 헬스, 네트워크 필요·수동/크론) · `tests/sports-render.test.js`(렌더 격리, verify 게이트) · 감사 프롬프트 `스포츠-마스터-감사.md`.
 
 ## 📌 보류 백로그 (조건 충족 시 사용자에게 먼저 리마인드할 것)
-- **[일부 완료 2026-07-13] 시세 3단계**: webtrade 크립토 Binance-vision WS 직결(ms급) 배포됨(`webtrade-crypto-ws.test.js` — 단일 `_apply`/`halfPx` 파이프라인·우선순위 게이트·10초 폴백 복귀). 주식 실시간 = `stock-stream` Edge(Finnhub WS 펌프) 작성됨 — **사용자 배포 대기**(`supabase functions deploy stock-stream` + `feed_speed_tune.sql` §5 크론). 잔여: ① 실브라우저에서 크립토 WS 체감 확인(샌드박스 프록시로 미검증, 실패해도 크론 폴백 안전) ② 검증된 Realtime/WS 패턴의 trading.html·crypto-live.html 확산(고객 생기면).
+- **[완료 2026-07-13] 시세 3단계**: 크립토 = webtrade Binance-vision WS 직결(단일 `_apply`/`halfPx` 파이프라인·우선순위 게이트·10초 폴백, `webtrade-crypto-ws.test.js`). 주식 = `stock-stream` Edge(Finnhub WS 펌프, 매분 크론 `stock-stream-1m` job 37) **배포·라이브 검증 완료**(AAPL 120초에 15회 갱신, 기존 1분→2~8초; JWT verify OFF + 함수 내 CRON_SECRET 검사). prices 테이블이 빨라진 것이라 **모든 앱이 자동 수혜**. 잔여(고객 생기면): ① 실브라우저 크립토 WS 체감 확인(샌드박스 미검증, 실패해도 크론 폴백 안전) ② Realtime/WS 패턴 trading.html·crypto-live.html 확산.
 
 ## 🚚 배포 / 운영
 - GitHub Pages는 브랜치 `claude/wizardly-ritchie-lsRnz`에서 서빙 (CNAME alpexa-sports.com). **푸시는 이 브랜치에만.**
