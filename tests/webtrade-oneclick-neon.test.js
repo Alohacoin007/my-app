@@ -25,12 +25,15 @@ if (!/\.oc-buy:hover,\.oc-buy\.oc-glow\{box-shadow:0 0 10px rgba\(0,122,255,\.7\
   bad('BUY glow (blue 10px/.7) must fire on hover and on oc-glow (up-tick)');
 
 // ── JSX: side colour is FIXED; tick only drives the glow (SELL↓ / BUY↑) ──
-if (!/const sellCls = 'oc-sell'\+\(bidDir==='down' \? ' oc-glow' : ''\);/.test(src))
-  bad('SELL must be a fixed oc-sell; down-tick only adds oc-glow');
-if (!/const buyCls  = 'oc-buy' \+\(askDir==='up'   \? ' oc-glow' : ''\);/.test(src))
-  bad('BUY must be a fixed oc-buy; up-tick only adds oc-glow');
-// the tick-flip colour classes must be gone
+// (2026-07-13, user request) the tick now drives the 160ms MT5 digit FLASH — see
+// webtrade-tick-flash.test.js — NOT a sticky glow; the box glow is hover-only.
+if (!/const sellCls = 'oc-sell';/.test(src))
+  bad('SELL must be a fixed oc-sell (no sticky tick glow — the tick drives the 160ms flash)');
+if (!/const buyCls  = 'oc-buy';/.test(src))
+  bad('BUY must be a fixed oc-buy (no sticky tick glow — the tick drives the 160ms flash)');
+// the tick-flip colour classes and the old sticky direction state must be gone
 if (/oc-red|oc-blue/.test(src)) bad('the old tick-flip oc-red/oc-blue classes must be fully removed');
+if (/setBidDir|setAskDir/.test(src)) bad('the old sticky bidDir/askDir glow state must be fully removed');
 
 // ── centre lot box: dark card + silver #3c4049 rails, white bold input — !important locked, NO white ──
 if (!/\.oc-vol\{[^}]*background:#121418 !important;[^}]*border-left:1px solid #3c4049 !important;border-right:1px solid #3c4049 !important\}/.test(src))
