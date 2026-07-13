@@ -878,17 +878,30 @@ const pip   = (s)=> (catOf(s)==='Stocks'||catOf(s)==='Crypto') ? 0.01 : (s.slice
 const digits= (s)=> (catOf(s)==='Stocks'||catOf(s)==='Crypto') ? 2 : (s.includes('JPY') ? 3 : 5);
 const fmtPx = (s,v)=> (v==null?'—':(+v).toFixed(digits(s)));
 // MT5 SYMBOL_TRADE_TICK_SIZE / point = 10^-digits (5-digit FX 0.00001, 3-digit JPY 0.001, crypto/stock 0.01).
-// SYMBOL_SPREAD is in INTEGER POINTS → price gap = spr_points × tickSize (NOT × pip; pip = 10 points on FX).
+// ⚠ NOT the spread unit: prices.spr_pts arrives in per-class units (FX pips · crypto bps · stock 0)
+// and converts via halfPx (fx_close.sql lockstep) — spr×tickSize was the 2026-07-13 unit-mixup bug.
 const tickSize = (s)=> Math.pow(10, -digits(s));
-// Cold-start ONLY dealing-spread master table (MT5 INTEGER POINTS). The live feed's spr_pts always
-// wins, then the symbol's own last-known value; this seeds the very first tick when neither exists
-// yet. Unknown symbols take their asset-class row from this SAME table — the pipeline carries no
-// bare numeric fallback (flat-10 bomb family; diagnose SPREAD-flat-fallback). Class rows mirror the
-// house convention (Crypto 10 · Stocks 8, cf. ALPEXA_SPREAD_BPS in trading.html).
+// Cold-start ONLY dealing-spread master table, in the SAME per-class units the feed writers use
+// (FX rows/Forex row = PIPS, Crypto/Stocks rows = BPS — see halfPx below). The live feed's spr_pts
+// always wins, then the symbol's own last-known value; this seeds the very first tick when neither
+// exists yet. Unknown symbols take their asset-class row from this SAME table — the pipeline
+// carries no bare numeric fallback (flat-10 bomb family; diagnose SPREAD-flat-fallback).
 const DEFAULT_SPREAD = { EURUSD:1.0, GBPUSD:1.2, USDJPY:1.9, AUDUSD:1.2, USDCAD:1.5, USDCHF:1.6, NZDUSD:1.8,
   EURGBP:1.4, EURJPY:1.8, GBPJPY:2.2, AUDJPY:1.9, EURAUD:2.0, GBPAUD:2.4,
   Forex:1.5, Crypto:10, Stocks:8 };
 const seedSpread = (s)=> DEFAULT_SPREAD[s]!=null ? DEFAULT_SPREAD[s] : DEFAULT_SPREAD[catOf(s)];
+// Half-spread in PRICE units — EXACT mirror of fx_close.sql v_half / trading.html fxHalfSpread
+// (floating == server realized). prices.spr_pts is ONE column with THREE unit regimes, set by the
+// writer Edge per class (verified against the live DB + Edge sources 2026-07-13):
+//   fx-prices    → FX in PIPS ((ask−bid)/pip; its "reported in points" comment is WRONG)
+//   crypto-prices→ real exchange spread in BPS (Binance bookTicker)
+//   stock-prices → always 0 (the house floor below IS the stock spread)
+// FX: greatest(0.1, spr+markup)*pip/2 · non-FX: mid*greatest(FLOOR_BPS, spr)/10000/2. Reading ONE
+// unit for all classes (spr×tickSize) was the 2026-07-13 flat/absurd-spread bug — 결함-로그.md.
+const SPREAD_FLOOR_BPS = { Crypto:10, Stocks:8 };   // lockstep: ALPEXA_SPREAD_BPS (trading.html) ↔ fx_close.sql
+const halfPx = (sym, mid, spr, mk)=> catOf(sym)==='Forex'
+  ? Math.max(0.1, (+spr||0) + (+mk||0)) * pip(sym) / 2
+  : mid * Math.max(SPREAD_FLOOR_BPS[catOf(sym)]||0, +spr||0) / 10000 / 2;
 // MT5-style X-axis tick: "12 Jul 23:22" (UTC-aligned, matches the bucketed candle times).
 const MON3 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const fmtMt5Tick = (t)=>{ const d=new Date((typeof t==='number'?t:0)*1000), p=n=>(n<10?'0':'')+n;
@@ -960,12 +973,12 @@ const priceStore = {
     rows.forEach(p=>{
       const sym=p.symbol; if(!sym) return;   // keep EVERY priced symbol (not just WATCH) so positions on
       const mid=+p.mid||0; if(mid<=0) return; //   off-watch symbols (e.g. SPACEX) still get a live price + P&L
-      // MT5 SYMBOL_SPREAD = INTEGER POINTS. Price half-gap = points × tickSize / 2 (NOT × pip — that was
-      // the 10× bomb: 10 points read as 10 pips). On a transient feed dropout keep this symbol's OWN
-      // last-known spread; only a cold start with no history reads the DEFAULT_SPREAD master table.
+      // spr stays in the writer's per-class units (FX pips · crypto bps · stock 0); halfPx does the
+      // class-correct conversion (fx_close.sql lockstep). On a transient feed dropout keep this
+      // symbol's OWN last-known spread; only a cold start with no history reads DEFAULT_SPREAD.
       const prev=this.mids[sym];
       const spr=(p.spr_pts!=null && p.spr_pts!=='') ? +p.spr_pts : (prev && prev.spr!=null ? prev.spr : seedSpread(sym));
-      this._set(sym, mid, spr*tickSize(sym)/2, spr, now);
+      this._set(sym, mid, halfPx(sym, mid, spr, (this.marks&&this.marks[sym])||0), spr, now);
     });
   },
   _simulate(){ // dev fallback: random walk + a small PERSISTENT per-symbol drift so the daily
@@ -975,10 +988,10 @@ const priceStore = {
       const cur=this.mids[sym]? this.mids[sym].mid : BASE[sym];
       // SESSION LOCKSTEP (Method A): a CLOSED symbol (weekend/after-hours FX & US stocks) must NOT random-walk
       // — freeze it at its last/close price so the whole app (chart, quotes, P&L) holds. Crypto is 24/7 → walks.
-      const sp=(this.mids[sym] && this.mids[sym].spr!=null) ? this.mids[sym].spr : seedSpread(sym);   // last-known spread (MT5 points); cold seed = DEFAULT_SPREAD table
-      const ts=tickSize(sym);
-      if(!marketOpen(sym)){ if(!this.mids[sym]) this._set(sym, cur, sp*ts/2, sp, now); return; }
-      const mid=cur*(1+(Math.random()-0.5)*0.0006 + this.drift[sym]); this._set(sym, mid, sp*ts/2, sp, now, 3*pip(sym));
+      const sp=(this.mids[sym] && this.mids[sym].spr!=null) ? this.mids[sym].spr : seedSpread(sym);   // last-known spread (feed units); cold seed = DEFAULT_SPREAD table
+      const mk=(this.marks&&this.marks[sym])||0;
+      if(!marketOpen(sym)){ if(!this.mids[sym]) this._set(sym, cur, halfPx(sym, cur, sp, mk), sp, now); return; }
+      const mid=cur*(1+(Math.random()-0.5)*0.0006 + this.drift[sym]); this._set(sym, mid, halfPx(sym, mid, sp, mk), sp, now, 3*pip(sym));
     });
   },
   async pull(){
@@ -986,7 +999,12 @@ const priceStore = {
     if(rows && rows.length){ this.live=true; this._apply(rows); } else { this.live=false; this._simulate(); }
     this.notify();
   },
-  start(){ if(this.timer) return; this.pull(); this.timer=setInterval(()=>this.pull(), 1000); }, // 1 poll/sec — server 1s-cached
+  // FX markup_pts (pips) from pricing_marks — same source + [0,50] clamp as trading.html, so the
+  // FX half-gap includes the house markup exactly like fx_close.sql (spr+markup). Best-effort:
+  // a fetch failure just means markup 0 until the next start (server still charges it at close).
+  async loadMarks(){ try{ const r=await AlpexaSync.db.from('pricing_marks').select('symbol,markup_pts');
+    if(r&&r.data){ const m={}; r.data.forEach(p=>{ m[p.symbol]=Math.max(0,Math.min(50,+p.markup_pts||0)); }); this.marks=m; } }catch(e){} },
+  start(){ if(this.timer) return; this.loadMarks(); this.pull(); this.timer=setInterval(()=>this.pull(), 1000); }, // 1 poll/sec — server 1s-cached
   subscribe(fn){ this.listeners.add(fn); fn(this.mids); return ()=>this.listeners.delete(fn); },
   get(sym){ return this.mids[sym]; },
 };
@@ -2203,7 +2221,8 @@ function MWTrading({ cat, syms=WATCH, onCtx }){
             <div className="hd"><span>{sym}{sfx(sym)}</span><span className="tm">{tm}</span></div>
             <div className="row">
               <div className="sd sell" onClick={()=>terminalBus.emit('order.new',sym)}><span className="lbl">SELL</span><span className="pr">{big(sym,m.bid)}</span></div>
-              <div className="mid"><div className="q">0.01</div><div className="sp">Spread: {m.spr!=null?m.spr:'—'}</div></div>
+              <div className="mid"><div className="q">0.01</div><div className="sp">Spread: {(()=>{ if(m.bid==null||m.ask==null) return '—';   // same per-row reading as the MW table: |askShown−bidShown|, FX in pips
+                const d=Math.abs(parseFloat(fmtPx(sym,m.ask))-parseFloat(fmtPx(sym,m.bid))); return (catOf(sym)==='Crypto'||catOf(sym)==='Stocks'?d:d/pip(sym)).toFixed(1); })()}</div></div>
               <div className="sd buy" onClick={()=>terminalBus.emit('order.new',sym)}><span className="lbl">BUY</span><span className="pr">{big(sym,m.ask)}</span></div>
             </div>
             <div className="lh"><span>LOW <b>{fmtPx(sym,m.bidLo)}</b></span><span>HIGH <b>{fmtPx(sym,m.askHi)}</b></span></div>
