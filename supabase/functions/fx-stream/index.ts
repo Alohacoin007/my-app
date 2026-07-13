@@ -100,7 +100,10 @@ Deno.serve(async (req) => {
             if (lastWrite[sym] && now - lastWrite[sym] < PER_SYMBOL_MS) continue;
             lastWrite[sym] = now;
             const mid = Math.round(((a + b) / 2) * 1e6) / 1e6;
-            const spr = Math.max(0, Math.round((a - b) / pip(sym)));   // INTEGER PIPS — fx-prices lockstep
+            // PIPS at 0.1 precision (unit unchanged — fx_close reads pips). Interbank quotes are
+            // often sub-pip (0.1–0.4); integer rounding collapsed those to 0 (AUDUSD live, 2026-07-13)
+            // leaving only the 0.1-pip floor on screen AND at close. Never round a real spread to 0.
+            const spr = Math.max(0, Math.round((a - b) / pip(sym) * 10) / 10);
             upsert([{ symbol: sym, mid, spr_pts: spr }]);
           }
         } catch (_e) { /* junk frame */ }
