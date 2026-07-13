@@ -34,8 +34,8 @@ if (!/x\.kind!=='fx_close' && x\.kind!=='fx_open'/.test(src)) bad('Mailbox must 
 if (!/tab==='Mailbox' \? <MailboxTab \/>/.test(src)) bad('Mailbox tab must render MailboxTab');
 
 // 4) News / Calendar — honest "feed not connected" (NO fake data)
-if (!/News:\['📰','실시간 뉴스 피드 연결 대기/.test(src)) bad('News must show an honest feed-not-connected state (no mock)');
-if (!/Calendar:\['📅','경제 캘린더 피드 연결 대기/.test(src)) bad('Calendar must show an honest feed-not-connected state (no mock)');
+if (!/News:\['📰','News feed not connected'\]/.test(src)) bad('News must show an honest feed-not-connected state (no mock)');
+if (!/Calendar:\['📅','Economic calendar not connected'\]/.test(src)) bad('Calendar must show an honest feed-not-connected state (no mock)');
 
 // 5) Trade + History cores untouched (still routed to the real table)
 if (!/tab==='Trade' && pos\.map\(p=>\{/.test(src)) bad('Trade table core must remain');
