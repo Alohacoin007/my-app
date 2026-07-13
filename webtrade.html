@@ -360,10 +360,16 @@
   .terminal.light .histbar .hb.on{border-color:#242831;background:#000000;color:#00FF55}   /* active period = green TEXT (Legend accent) */
   .terminal.light .histbar .hbrange input{background:#000000;border:1px solid #1D212A;color:#c8ccd2}
   .postbl{flex:1;overflow:auto}
-  table.pos{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  /* table-layout:fixed → column widths come from the header %s, NOT the cell values, so a ticking
+     price/Profit can't reflow the columns (kills the left/right jitter on every update). */
+  table.pos{width:100%;table-layout:fixed;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  table.pos th:nth-child(1){width:9%}table.pos th:nth-child(2){width:9%}table.pos th:nth-child(3){width:14%}
+  table.pos th:nth-child(4){width:7%}table.pos th:nth-child(5){width:8%}table.pos th:nth-child(6){width:10%}
+  table.pos th:nth-child(7){width:9%}table.pos th:nth-child(8){width:9%}table.pos th:nth-child(9){width:10%}
+  table.pos th:nth-child(10){width:11%}table.pos th:nth-child(11){width:4%}
   table.pos th{position:sticky;top:0;background:#141414;color:var(--dim);font-weight:600;font-size:11px;text-align:right;padding:3px 10px;border:1px solid #222}
   table.pos th:first-child,table.pos td:first-child{text-align:left}
-  table.pos td{padding:3px 10px;border:1px solid #222;text-align:right}
+  table.pos td{padding:3px 10px;border:1px solid #222;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* Balance bar row (tfoot): borderless full-width cell so the bar hugs the rows above */
   table.pos tfoot td{padding:0;border:0;text-align:left}
   /* balance bar + P/L are ONE row: P/L is a right-aligned cell sitting under the Profit column, on the bar itself */
