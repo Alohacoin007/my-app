@@ -364,9 +364,7 @@
   table.pos th{position:sticky;top:0;background:#141414;color:var(--dim);font-weight:600;font-size:11px;text-align:right;padding:3px 10px;border:1px solid #222}
   table.pos th:first-child,table.pos td:first-child{text-align:left}
   table.pos td{padding:3px 10px;border:1px solid #222;text-align:right}
-  table.pos tr.pos-sum td{font-weight:800;font-size:13px;padding:6px 10px;border:none;border-top:2px solid #333}
-  table.pos tr.pos-sum td.pl-lbl{color:var(--dim);font-weight:700;font-size:11px;letter-spacing:.5px}
-  .terminal.light table.pos tr.pos-sum td{border-top:2px solid #2f3542}
+  table.pos tr.acctrow td.pl-total{font-weight:800;font-size:13px;font-variant-numeric:tabular-nums}
   /* Balance bar row (tfoot): borderless full-width cell so the bar hugs the rows above */
   table.pos tfoot td{padding:0;border:0;text-align:left}
   table.pos tfoot .acctline{border-top:1px solid #222}
@@ -2571,8 +2569,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
             </div>
           </td></tr></tfoot>}
           {tab==='Trade' && <tfoot>
-            {pos.length>0 && <tr className="pos-sum"><td colSpan="9" className="pl-lbl">P/L</td><td className={floating>=0?'up':'down'}>{num(floating)}</td><td></td></tr>}
-            <tr className="acctrow"><td colSpan="11">
+            <tr className="acctrow"><td colSpan="9">
             <div className="acctline">
               <span><span className="k">{t('Balance')}:</span> <b>{num(balance)} USD</b></span>
               <span><span className="k">{t('Equity')}:</span> <b>{num(equity)}</b></span>
@@ -2581,9 +2578,8 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
               <span><span className="k">{t('Margin Level')}:</span> <b className={marginUsed>0&&level<100?'down':''}>{marginUsed>0?num(level)+' %':'—'}</b>{/* MT5-style: safe = neutral (default), red ONLY at ≤100% (margin call) / ≤30% (stop out) — no green */}
                 {marginUsed>0&&level<100&&level>=30 && <b style={{color:'#e0a020',marginLeft:6}}>⚠ Margin Call</b>}
                 {marginUsed>0&&level<30 && <b style={{color:'#ff5252',marginLeft:6}}>⛔ Stop Out &lt;30%</b>}</span>
-              <span><span className="k">P/L:</span> <b className={floating>=0?'up':'down'}>{num(floating)}</b></span>
             </div>
-          </td></tr></tfoot>}
+          </td><td className={"pl-total "+(floating>=0?'up':'down')}>{num(floating)}</td><td></td></tr></tfoot>}
         </table>
       </div>
        </React.Fragment>)}
