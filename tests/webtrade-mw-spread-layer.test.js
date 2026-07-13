@@ -13,7 +13,7 @@ const bad = (m) => { console.error('🔴 ' + m); fail++; };
 // 1) Spread column toggle wired through the right-click menu
 if (!/\{l:'Spread', act:'spread'\}/.test(src)) bad('right-click menu missing a "Spread" toggle');
 if (!/else if\(it\.act==='spread'\) onSpread&&onSpread\(\)/.test(src)) bad('Spread menu item must call onSpread');
-if (!/const \[showSpread,setShowSpread\]=React\.useState\(false\)/.test(src)) bad('Market Watch needs a showSpread state');
+if (!/const \[showSpread,setShowSpread\]=React\.useState\(true\)/.test(src)) bad('Market Watch Spread column must default ON (useState(true))');
 if (!/onSpread=\{\(\)=>setShowSpread\(v=>!v\)\}/.test(src)) bad('the menu must toggle showSpread');
 if (!/showSpread && <th>\{t\('Spread'\)\}<\/th>/.test(src)) bad('Spread header must render only when toggled on');
 if (!/const _diff=\(m\.ask!=null&&m\.bid!=null\)\?Math\.abs\(parseFloat\(askT\)-parseFloat\(bidT\)\):null;/.test(src)) bad('spread must be a per-row diff of the displayed ask/bid (no shared var)');
