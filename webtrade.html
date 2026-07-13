@@ -1416,6 +1416,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   // ── floating-window geometry (imperative for 60fps; React only owns z + active) ──
   const win=React.useRef(null);
   const geo=React.useRef({ x:20, y:20, w:400, h:300 });
+  const frac=React.useRef(null);   // this window's {fx,fy,fw,fh} of the stage — the SINGLE source for gap-free refit (no ratio weighting)
   const drag=React.useRef(null);
   const [z,setZ]=React.useState(()=> ++WIN_Z);
   const activeRef=React.useRef(isActive); activeRef.current=isActive;   // for toolbar-signal gating
@@ -1538,28 +1539,26 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     if(savedGeo && savedGeo.w>0){   // restore the remembered window box (clamped into view)
       geo.current={ x:Math.max(0,Math.min(savedGeo.x, W-60)), y:Math.max(0,Math.min(savedGeo.y, H-24)),
         w:Math.max(WIN_MINW,savedGeo.w), h:Math.max(WIN_MINH,savedGeo.h) };
+      const g=geo.current; frac.current={ fx:g.x/W, fy:g.y/H, fw:g.w/W, fh:g.h/H };
     } else {
       const f=initial||{fx:0.02,fy:0.02,fw:0.48,fh:0.48};
+      frac.current={ fx:f.fx, fy:f.fy, fw:f.fw, fh:f.fh };
       geo.current={ x:Math.round(f.fx*W), y:Math.round(f.fy*H),
         w:Math.max(WIN_MINW,Math.round(f.fw*W)), h:Math.max(WIN_MINH,Math.round(f.fh*H)) };
     }
     applyGeo();
   }, []);
-  // FILL THE STAGE: the geometry above is computed ONCE at mount. When the workspace (stage) then
-  // resizes — the dock slims to 150px, or the browser resizes — a floating window kept its old pixel
-  // height, so the stage's black background showed BELOW it (the "black hole" above/under the axis).
-  // Observe the stage and SCALE this window's geometry proportionally so it always fills, gap-free.
+  // FILL THE STAGE TO THE BOTTOM RAIL: geometry is seeded once at mount, but the stage grows when the
+  // dock slims to 150px or the browser resizes. NO ratio-weighting — instead re-derive this window's
+  // pixel box DIRECTLY from its fraction of the CURRENT stage every time the stage changes, so the
+  // frame always docks to bottom:0 with zero black gap, and the chart re-fits the full parent height.
   React.useEffect(()=>{
     if(tiled) return;
     const el=win.current, par=el&&el.parentElement; if(!par) return;
-    let last={ w:par.clientWidth, h:par.clientHeight };
-    const onStage=()=>{ const nw=par.clientWidth, nh=par.clientHeight; if(nw<=0||nh<=0) return;
-      if(last.w>0 && last.h>0 && (nw!==last.w || nh!==last.h)){
-        const sx=nw/last.w, sy=nh/last.h, g=geo.current;
-        geo.current={ x:g.x*sx, y:g.y*sy, w:Math.max(WIN_MINW,g.w*sx), h:Math.max(WIN_MINH,g.h*sy) };
-        applyGeo(); resizeChart();   // grow the window, then re-fit the chart to it (boxRO re-pins barSpacing/rightOffset)
-      }
-      last={ w:nw, h:nh };
+    const onStage=()=>{ const W=par.clientWidth, H=par.clientHeight, fr=frac.current; if(W<=0||H<=0||!fr) return;
+      geo.current={ x:Math.round(fr.fx*W), y:Math.round(fr.fy*H),
+        w:Math.max(WIN_MINW,Math.round(fr.fw*W)), h:Math.max(WIN_MINH,Math.round(fr.fh*H)) };
+      applyGeo(); resizeChart();   // dock the frame to the current stage, then re-fit the chart to it.clientHeight (boxRO re-pins barSpacing/rightOffset)
     };
     let ro=null; try{ ro=new ResizeObserver(onStage); ro.observe(par); }catch(e){}
     return ()=>{ try{ ro&&ro.disconnect(); }catch(e){} };
@@ -1581,7 +1580,9 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       geo.current=g; applyGeo();
       if(!raf) raf=requestAnimationFrame(()=>{ raf=null; resizeChart(); });   // 🔴 chart follows the window 1:1
     };
-    const onUp=()=>{ if(!drag.current) return; drag.current=null; document.body.style.userSelect=''; resizeChart(); reportGeo(); };
+    const onUp=()=>{ if(!drag.current) return; drag.current=null; document.body.style.userSelect='';
+      const par=win.current&&win.current.parentElement; if(par){ const W=par.clientWidth||1, H=par.clientHeight||1, g=geo.current; frac.current={ fx:g.x/W, fy:g.y/H, fw:g.w/W, fh:g.h/H }; }   // remember the new box as a fraction → resize keeps it
+      resizeChart(); reportGeo(); };
     document.addEventListener('mousemove',onMove); document.addEventListener('mouseup',onUp);
     return ()=>{ document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); if(raf)cancelAnimationFrame(raf); };
   }, []);
@@ -2951,8 +2952,10 @@ const DEFAULT_VIEW={ toolbars:true, statusbar:true, marketwatch:true, navigator:
 // initial floating geometry (fractions of the stage) — first four lay out as a clean 2×2 of
 // INDEPENDENT windows; extras cascade down-right so a new chart never lands exactly on another.
 function floatGeo(i){
-  const quad=[{fx:.006,fy:.008,fw:.492,fh:.492},{fx:.502,fy:.008,fw:.492,fh:.492},
-              {fx:.006,fy:.5,fw:.492,fh:.492},{fx:.502,fy:.5,fw:.492,fh:.492}];
+  // edge-to-edge 2×2: bottom row fy:.5+fh:.5 reaches y=1.0, right col fx:.5+fw:.5 reaches x=1.0 → the
+  // four charts fill the WHOLE stage with ZERO bottom/side gap (no black hole under the time axis).
+  const quad=[{fx:0,fy:0,fw:.5,fh:.5},{fx:.5,fy:0,fw:.5,fh:.5},
+              {fx:0,fy:.5,fw:.5,fh:.5},{fx:.5,fy:.5,fw:.5,fh:.5}];
   if(i<4) return quad[i];
   const k=i-4; return { fx:Math.min(.45,.10+k*.03), fy:Math.min(.45,.12+k*.05), fw:.5, fh:.5 };
 }
