@@ -64,7 +64,7 @@ if (/\.terminal\.light \.obox\{background:#000000/.test(src)) bad('Legend must N
 if (/\.terminal\.light \.oc-lbl\{color:#8A94A6/.test(src)) bad('Legend must NOT mute the SELL/BUY labels to silver (neon forced)');
 // window header melts, no gray 3D frame; active window = brighter GREY hairline (never green)
 if (!/\.terminal\.light \.cell-title\{background:#000000;color:#ffffff;border:none;border-top:1px solid #1D212A;border-bottom:1px solid #1D212A;text-shadow:none\}/.test(src)) bad('Legend chart header must stay muted black (no metallic) with calm hairlines');
-if (!/\.terminal\.light \.win\.active \.cell-title\{[^}]*border-top:1px solid #00ff55/.test(src)) bad('Legend active window header must get the neon-green top line (thin 1px)');
+if (!/\.terminal\.light \.win\.active \.cell-title\{[^}]*border-top:1px solid #00a2ff/.test(src)) bad('Legend active window header must get the neon-blue top line (thin 1px)');
 if (!/\.terminal\.light \.win\.active\{border-color:#2f3542/.test(src)) bad('active window must be a brighter GREY hairline, not green/glow');
 if (!/\.terminal\.light \.tbtn:hover[^}]*color:#ffffff !important/.test(src)) bad('toolbar hover must be white');
 // selected timeframe/tool button = green TEXT only (no fill, no green border)
