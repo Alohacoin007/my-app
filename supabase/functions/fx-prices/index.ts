@@ -129,7 +129,9 @@ Deno.serve(async (req) => {
     let mid = 0, spr = 0;
     if (bid > 0 && ask > 0) {
       mid = (bid + ask) / 2;
-      spr = Math.max(0, Math.round((ask - bid) / pip(sym)));
+      // PIPS at 0.1 precision — same fix as fx-stream (2026-07-13): integer rounding collapsed
+      // sub-pip interbank spreads to 0 and the fallback kept overwriting the stream's real value.
+      spr = Math.max(0, Math.round((ask - bid) / pip(sym) * 10) / 10);
     } else {
       const last = +(t.lastTrade?.p) || +(t.day?.c) || +(t.prevDay?.c) || 0;
       if (last > 0) { mid = last; spr = 0; }
