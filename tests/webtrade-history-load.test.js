@@ -13,7 +13,12 @@ const bad = (m) => { console.error('🔴 ' + m); fail++; };
 
 // ── static: loadHistory queries settlements (scoped) and is wired on load + on settlement inserts ──
 if (!/async loadHistory\(\)\{ try\{ if\(WT_DEMO \|\| !\(window\.AlpexaSync&&AlpexaSync\.db&&AlpexaSync\.me\)\) return;/.test(src)) bad('loadHistory must exist and no-op in demo/logged-out');
-if (!/from\('settlements'\)\.select\('local_id,symbol,stake,pnl,detail,created_at'\)\.eq\('server','fx'\)\.eq\('acct_no',acct\)\.eq\('kind','fx_close'\)/.test(src)) bad('loadHistory must fetch this account\'s fx_close settlements');
+if (!/_histQ\(a,b\)\{ return AlpexaSync\.db\.from\('settlements'\)\.select\('local_id,symbol,stake,pnl,detail,created_at'\)/.test(src)) bad('_histQ must select the settlement columns');
+if (!/\.eq\('acct_no',AlpexaSync\.acctFor\('fx'\)\)\.eq\('kind','fx_close'\)\.order\('created_at',\{ascending:false\}\)\.range\(a,b\)/.test(src)) bad('_histQ must be account-scoped, fx_close, newest-first, paged by range(a,b)');
+// chunk paging: first 50, then +20 appended on scroll-to-bottom
+if (!/const r=await this\._histQ\(0,49\);/.test(src)) bad('loadHistory must fetch the first chunk (0..49)');
+if (!/const r=await this\._histQ\(this\.histOffset, this\.histOffset\+19\);/.test(src)) bad('loadMoreHistory must fetch the next 20 by range');
+if (!/async loadMoreHistory\(\)\{ try\{ if\(WT_DEMO \|\| !\(window\.AlpexaSync&&AlpexaSync\.db&&AlpexaSync\.me\) \|\| this\._histBusy\|\|this\.histDone\) return;/.test(src)) bad('loadMoreHistory must be WT_DEMO-guarded + busy/done guarded');
 if (!/this\.loadAcct\(\); this\.loadPos\(\); this\.loadHistory\(\);/.test(src)) bad('loadHistory must run on login/start (refresh persistence)');
 if (!/this\.loadHistory\(\);   \/\/ any settlement insert/.test(src)) bad('loadHistory must re-run on any settlement insert (live)');
 

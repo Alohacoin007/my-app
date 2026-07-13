@@ -26,7 +26,7 @@ if (!/positionsStore\.recordClose\(p, closePx\(p,m\)\|\|m\.mid, pl\);\s*\/\/ rea
 // 3) BottomBar subscribes to history and renders the rows (no longer a hard-coded placeholder)
 if (!/setHist\(\[\.\.\.s\.history\]\)/.test(src)) bad('BottomBar must subscribe to positionsStore.history');
 if (!/tab==='History' && !histShown\.length && <tr><td className="empty"/.test(src)) bad('empty placeholder must only show when the FILTERED history is empty');
-if (!/tab==='History' && histShown\.map\(h=>\(/.test(src)) bad('History tab must map over the FILTERED deals (histShown)');
+if (!/tab==='History' && histShown\.slice\(histV\.start,histV\.end\)\.map\(h=>\(/.test(src)) bad('History tab must map over the FILTERED deals (histShown)');
 if (!/tab==='History' && histShown\.length>0 && <tfoot>/.test(src)) bad('History tab must show a Deals/Profit total footer');
 
 // 4) MT5-style period customization: close_ms stamp + period filter (All/Today/Week/Month/Custom)

@@ -39,7 +39,7 @@ if (!/Calendar:\['📅','경제 캘린더 피드 연결 대기/.test(src)) bad('
 
 // 5) Trade + History cores untouched (still routed to the real table)
 if (!/tab==='Trade' && pos\.map\(p=>\{/.test(src)) bad('Trade table core must remain');
-if (!/tab==='History' && histShown\.map\(h=>\(/.test(src)) bad('History table core must remain');
+if (!/tab==='History' && histShown\.slice\(histV\.start,histV\.end\)\.map\(h=>\(/.test(src)) bad('History table core must remain');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} terminal-tab problem(s).`); process.exit(1); }
 console.log('🟢 PASS: Journal (live log) + Exposure (notional/%) + Mailbox (real settlements) activated; News/Calendar honest feed-pending; Trade/History cores intact.');

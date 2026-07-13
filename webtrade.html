@@ -979,19 +979,31 @@ const positionsStore = {
     const r=await AlpexaSync.db.from('positions').select('local_id,symbol,side,size,open_price,pnl,status,updated_at,meta').eq('server','fx').eq('acct_no',acct).eq('status','open').limit(200);   // real columns only (updated_at not created_at) + meta jsonb (holds sl/tp) + scoped to the logged-in account
     if(r&&r.data){ this.pos=r.data; this.notify(); } }catch(e){} },   // real load REPLACES the demo seed
   // CLOSED-TRADE HISTORY from the server (settlements kind='fx_close') so the History tab survives a
-  // refresh. Display-only (server is the source of truth, #5). detail = "SIDE size @ open -> close"
-  // (or "STOPOUT SIDE size @ open (...)" for forced closes) → parse side/open/close out of it.
+  // refresh. CHUNK-PAGED (50 first, +20 per scroll-to-bottom) so tens of thousands of rows never hit
+  // the wire at once. Memory-only (#5 — server is the source of truth). detail = "SIDE size @ open ->
+  // close" (or "STOPOUT SIDE size @ open (...)" for forced closes) → parse side/open/close out of it.
+  histOffset:0, histDone:false, _histBusy:false,
+  _mapSettle(x){ const dt=String(x.detail||'');
+    const sm=dt.match(/(BUY|SELL)/i), pm=dt.match(/@\s*([\d.]+)(?:\s*->\s*([\d.]+))?/);
+    const ct=String(x.created_at||'').slice(0,19).replace('T',' ').replace(/-/g,'.');
+    return { local_id:x.local_id, symbol:x.symbol, side:sm?sm[1].toUpperCase():'—', volume:+x.stake||0,
+      open_price:pm?+pm[1]:0, close_price:(pm&&pm[2]!=null)?+pm[2]:0, open_time:'—',
+      close_time:ct, close_ms:Date.parse(x.created_at)||0, profit:+x.pnl||0 }; },
+  _histQ(a,b){ return AlpexaSync.db.from('settlements').select('local_id,symbol,stake,pnl,detail,created_at')
+    .eq('server','fx').eq('acct_no',AlpexaSync.acctFor('fx')).eq('kind','fx_close').order('created_at',{ascending:false}).range(a,b); },
   async loadHistory(){ try{ if(WT_DEMO || !(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me)) return;
-    const acct=AlpexaSync.acctFor&&AlpexaSync.acctFor('fx'); if(!acct) return;
-    const r=await AlpexaSync.db.from('settlements').select('local_id,symbol,stake,pnl,detail,created_at').eq('server','fx').eq('acct_no',acct).eq('kind','fx_close').order('created_at',{ascending:false}).limit(200);
+    if(!(AlpexaSync.acctFor&&AlpexaSync.acctFor('fx'))) return;
+    const r=await this._histQ(0,49);   // first CHUNK — newest 50
     if(!r||!r.data) return;
-    this.history = r.data.map(x=>{ const dt=String(x.detail||'');
-      const sm=dt.match(/(BUY|SELL)/i), pm=dt.match(/@\s*([\d.]+)(?:\s*->\s*([\d.]+))?/);
-      const ct=String(x.created_at||'').slice(0,19).replace('T',' ').replace(/-/g,'.');
-      return { local_id:x.local_id, symbol:x.symbol, side:sm?sm[1].toUpperCase():'—', volume:+x.stake||0,
-        open_price:pm?+pm[1]:0, close_price:(pm&&pm[2]!=null)?+pm[2]:0, open_time:'—',
-        close_time:ct, close_ms:Date.parse(x.created_at)||0, profit:+x.pnl||0 }; });
-    this.notify(); }catch(e){} },
+    this.history=r.data.map(x=>this._mapSettle(x)); this.histOffset=this.history.length; this.histDone=r.data.length<50; this.notify(); }catch(e){} },
+  async loadMoreHistory(){ try{ if(WT_DEMO || !(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me) || this._histBusy||this.histDone) return;
+    if(!(AlpexaSync.acctFor&&AlpexaSync.acctFor('fx'))) return;
+    this._histBusy=true;
+    const r=await this._histQ(this.histOffset, this.histOffset+19);   // next CHUNK — +20, appended
+    this._histBusy=false;
+    if(!r||!r.data) return;
+    if(r.data.length){ this.history=this.history.concat(r.data.map(x=>this._mapSettle(x))); this.histOffset+=r.data.length; }
+    this.histDone=r.data.length<20; this.notify(); }catch(e){ this._histBusy=false; } },
   start(){ if(this.started) return; this.started=true;
     if(WT_DEMO){ this.acct=DEMO_ACCT; this.pos=DEMO_POS.slice(); this.notify(); }   // demo seed ONLY in demo mode; production loads the real account below
     try{ if(!WT_DEMO && window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me){   // WT_DEMO: stay server-independent (never load/overwrite demo with real)
@@ -2277,10 +2289,13 @@ function ExposureTab({ pos, mids, equity, leverage }){
 function JournalTab(){
   const [rows,setRows]=React.useState(journalStore.entries);
   React.useEffect(()=> journalStore.subscribe(e=>setRows([...e])), []);
+  const V=useVirtual(rows.length, 18, null);   // memory-capped (300) → window only, no paging
   return (
-    <div className="tbxbody"><table className="jrnl"><tbody>
+    <div className="tbxbody" onScroll={V.onScroll}><table className="jrnl"><tbody>
       {!rows.length && <tr><td className="empty" colSpan="2">No journal entries yet</td></tr>}
-      {rows.map((r,i)=><tr key={r.ts+'-'+i}><td className="t">{r.ts}</td><td className={r.ok?'ok':'err'}>{r.msg}</td></tr>)}
+      {V.topH>0 && <tr aria-hidden="true" style={{height:V.topH}}><td colSpan="2"></td></tr>}
+      {rows.slice(V.start,V.end).map((r,i)=><tr key={r.ts+'-'+(V.start+i)}><td className="t">{r.ts}</td><td className={r.ok?'ok':'err'}>{r.msg}</td></tr>)}
+      {V.botH>0 && <tr aria-hidden="true" style={{height:V.botH}}><td colSpan="2"></td></tr>}
     </tbody></table></div>
   );
 }
@@ -2389,6 +2404,19 @@ function ModifyPos({ p, onClose }){
     </div>
   );
 }
+// VIRTUAL WINDOWING — render only the visible slice of a long list (History/Journal) so the DOM holds
+// ~a screenful of rows no matter how many are loaded. onScroll tracks scrollTop → [start,end); spacer
+// rows above/below preserve the true scroll height. onEnd fires near the bottom (→ chunk-page more).
+function useVirtual(total, rowH, onEnd){
+  const [range,setRange]=React.useState({start:0,end:40});
+  const onScroll=(e)=>{ const el=e.currentTarget, st=el.scrollTop;
+    const start=Math.max(0, Math.floor(st/rowH)-8);
+    setRange({start, end:start+40});
+    if(onEnd && el.scrollHeight-st-el.clientHeight < 240) onEnd();   // within ~240px of the bottom → page
+  };
+  const start=Math.min(range.start, Math.max(0,total)), end=Math.min(range.end, total);
+  return { start, end, topH:start*rowH, botH:Math.max(0,(total-end)*rowH), onScroll };
+}
 function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-width tab bar lives at screen bottom)
   const [acct,setAcct]=React.useState(positionsStore.acct);
   const [pos,setPos]=React.useState(positionsStore.pos);
@@ -2433,7 +2461,8 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
         if(f!=null&&ms<f) return false; if(tt!=null&&ms>tt) return false; return true; }
       return true; });   // 'all'
   }, [hist, histPeriod, histFrom, histTo]);
-  const histProfit = histShown.reduce((s,h)=>s+(+h.profit||0),0);
+  const histProfit = histShown.reduce((s,h)=>s+(+h.profit||0),0);   // partial sum over the LOADED chunks only (memory), 2-dp below
+  const histV = useVirtual(histShown.length, 22, ()=>positionsStore.loadMoreHistory());   // window the rows + page more on scroll-to-bottom
 
   return (
     <div className="bottom">
@@ -2459,12 +2488,13 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
           <span className="hbcount">{histShown.length} deals</span>
         </div>
       )}
-      <div className="postbl">
+      <div className="postbl" onScroll={tab==='History'?histV.onScroll:undefined}>
         <table className="pos">
           <thead><tr><th>{t('Symbol')}</th><th>{t('Ticket')}</th><th>{t('Time')}</th><th>{t('Type')}</th><th>{t('Volume')}</th><th>{t('Price')}</th><th>S / L</th><th>T / P</th><th>{t('Price')}</th><th>{t('Profit')}</th><th></th></tr></thead>
           <tbody>
             {tab==='History' && !histShown.length && <tr><td className="empty" colSpan="11">No history in the selected period</td></tr>}
-            {tab==='History' && histShown.map(h=>(
+            {tab==='History' && histV.topH>0 && <tr aria-hidden="true" style={{height:histV.topH}}><td colSpan="11"></td></tr>}
+            {tab==='History' && histShown.slice(histV.start,histV.end).map(h=>(
               <tr key={h.local_id+'-'+h.close_time}>
                 <td>{h.symbol.toLowerCase()}.fx</td><td>{String(h.local_id||'').replace(/\D/g,'').slice(-8)||h.local_id}</td>
                 <td>{h.close_time}</td><td className={h.side==='SELL'?'down':'up'}>{h.side.toLowerCase()}</td>
@@ -2473,6 +2503,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
                 <td></td>
               </tr>
             ))}
+            {tab==='History' && histV.botH>0 && <tr aria-hidden="true" style={{height:histV.botH}}><td colSpan="11"></td></tr>}
             {tab==='Trade' && !pos.length && <tr><td className="empty" colSpan="11">{(!WT_DEMO && window.AlpexaSync&&AlpexaSync.me)?'No open positions':'로그인하면 실계정 포지션이 표시됩니다 (Log in to trade)'}</td></tr>}
             {tab==='Trade' && pos.map(p=>{ const m=mids[p.symbol]||{}; const pl=plOf(p);
               const tkt=String(p.local_id||'').replace(/\D/g,'').slice(-8)||p.local_id;
