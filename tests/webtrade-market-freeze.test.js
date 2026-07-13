@@ -16,7 +16,7 @@ const grab = (re, label) => { const m = src.match(re); if (!m) bad(label + ' not
 // ── static: both gates are present ──
 if (!/const onTick=throttle\(\(mids\)=>\{\s*\n\s*if\(!marketOpen\(symbol\)\) return;/.test(src))
   bad('[1] onTick must abort at the top when the symbol session is closed');
-if (!/if\(!marketOpen\(sym\)\)\{ if\(!this\.mids\[sym\]\) this\._set\(sym, cur, sp\*pip\(sym\)\/2, sp, now\); return; \}/.test(src))
+if (!/if\(!marketOpen\(sym\)\)\{ if\(!this\.mids\[sym\]\) this\._set\(sym, cur, sp\*ts\/2, sp, now\); return; \}/.test(src))
   bad('[3] _simulate must freeze (not random-walk) a closed symbol');
 
 // ── behavioural: marketOpen is correct (crypto 24/7, FX weekend closed, stock weekend closed) ──
@@ -40,10 +40,10 @@ if (!fail) {
 const set_src = grab(/_set\(sym,mid,half,spr,now,jit\)\{[\s\S]*?\n  \},/, '_set');
 const sim_src = grab(/_simulate\(\)\{[\s\S]*?\n  \},/, '_simulate');
 if (!fail) {
-  const store = new Function('marketOpen','WATCH','BASE','pip','defaultSpr',
+  const store = new Function('marketOpen','WATCH','BASE','pip','tickSize',
     'const store={ mids:{}, drift:null,\n' + set_src + '\n' + sim_src + '\n};\nreturn store;'
   )((sym)=> sym==='BTCUSD',              // BTCUSD open (crypto), EURUSD closed (weekend FX)
-    ['EURUSD','BTCUSD'], {EURUSD:1.1, BTCUSD:64000}, ()=>0.0001, ()=>1.5);   // defaultSpr stub (freeze/walk test ignores the spread value)
+    ['EURUSD','BTCUSD'], {EURUSD:1.1, BTCUSD:64000}, ()=>0.0001, ()=>0.00001);   // tickSize stub (freeze/walk test ignores the spread value)
   store._simulate();
   const eur1 = store.mids.EURUSD.mid, btc1 = store.mids.BTCUSD.mid;
   store._simulate();
