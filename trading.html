@@ -793,7 +793,9 @@ const ScreenIcons={
 };
 
 // ── Chart component ──
-const TF_CONFIG={M1:{n:60,scale:0.0008,label:'min',step:1},M5:{n:60,scale:0.0015,label:'min',step:5},M15:{n:60,scale:0.0025,label:'min',step:15},H1:{n:80,scale:0.0050,label:'h',step:1},H4:{n:80,scale:0.0095,label:'h',step:4},D1:{n:90,scale:0.0180,label:'d',step:1},W1:{n:52,scale:0.0400,label:'w',step:1}};
+// Caps = the readability limit of this FIXED-WINDOW canvas chart (no pan — deep multi-year
+// scroll lives in webtrade). Raised 2026-07-13: M/H 120 · D1 180 (~9mo) · W1 104 (~2y).
+const TF_CONFIG={M1:{n:120,scale:0.0008,label:'min',step:1},M5:{n:120,scale:0.0015,label:'min',step:5},M15:{n:120,scale:0.0025,label:'min',step:15},H1:{n:120,scale:0.0050,label:'h',step:1},H4:{n:120,scale:0.0095,label:'h',step:4},D1:{n:180,scale:0.0180,label:'d',step:1},W1:{n:104,scale:0.0400,label:'w',step:1}};
 function seededRandom(seed){let x=seed;return()=>{x=(x*9301+49297)%233280;return x/233280;};}
 function genTfSeries(sym,tf,currentPrice){
   const cfg=TF_CONFIG[tf]||TF_CONFIG.M15;
@@ -880,7 +882,7 @@ function fetchRealCandles(sym,tf){
       try{ localStorage.setItem('alpexa.fxc.'+sym+'.'+tf, JSON.stringify({c:arr,real:1})); }catch(e){}
     };
     if(o.cls==='FX'){ // FX/metals: real candles from our server (Polygon).
-      fetch(FX_FN_URL+'?candles='+encodeURIComponent(sym)+'&tf='+encodeURIComponent(tf))
+      fetch(FX_FN_URL+'?candles='+encodeURIComponent(sym)+'&tf='+encodeURIComponent(tf)+'&n='+Math.max(200,cap))
         .then(r=>r.json()).then(j=>{ if(!j||!j.ok||!Array.isArray(j.candles)||!j.candles.length){ window.__alpexaFXCReq[ckey]=0; return; } seed(j.candles); })
         .catch(()=>{ window.__alpexaFXCReq[ckey]=0; });
     } else if(o.cls==='STOCK'||o.cls==='INDEX'){ // stocks/indices: Twelve Data time_series (free).
@@ -919,7 +921,11 @@ function Chart({series,sym,tf,digits=5,showMA=true,showVol=true,showBB=false,sho
     fetchRealCandles(sym,tf);
   },[sym,tf,fillContainer]);
   const liveSeries=useMemo(()=>{
-    const livePx=series&&series.length?series[series.length-1].c:null;
+    // LIVE CANDLE = the REAL feed mid (2026-07-13, display lockstep — the chart limb): the sim
+    // engine price jitters beyond the real market and made the current candle "dance" while
+    // quotes/P&L already read the real feed. Sim last stays as the no-feed fallback (stocks/indices).
+    const f=(typeof window!=='undefined'&&window.__alpexaFXFeed||{})[sym];
+    const livePx=(f&&+f.mid>0)?+f.mid:(series&&series.length?series[series.length-1].c:null);
     // Main chart: time-based persistent candles (broker-style). Past candles
     // frozen, current one tracks the live price, survives reloads.
     if(fillContainer&&sym&&tf&&livePx!=null&&isFinite(livePx)){
