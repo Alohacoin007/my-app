@@ -89,6 +89,8 @@
   .terminal.light table.mbx td{border-bottom:1px solid #1D212A;color:#e6e9ee}
   .terminal.light table.mbx tr.mbx-detail td{background:#000000;color:#a2aab6}
   .menu .conn{margin-left:auto;color:#9aa2b0;display:flex;align-items:center;gap:6px;padding-right:6px}
+  .menu .conn-out{cursor:pointer;color:#8a93a3;font-size:12px;font-weight:700;line-height:1;padding:1px 6px;border-radius:3px;transition:color .12s,background .12s}   /* X = log out → website */
+  .menu .conn-out:hover{color:#fff;background:#c0392b}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--up)}
   /* ── icon toolbar (New Order · Algo · chart tools · timeframes) — compact, 2–4px gaps ── */
   .tools{grid-area:tools;display:flex;align-items:center;gap:3px;padding:0 4px;background:linear-gradient(#22262c,#15181d);border-bottom:1px solid #000}
@@ -2697,7 +2699,9 @@ function MenuBar({ indicators, view, tool }){
           )}
         </div>
       ))}
-      <div className="conn"><span className="dot" style={{background:live?'#00d060':'#e5a13a'}}></span>{live?'Live feed (1s cache)':'Demo feed'}</div>
+      <div className="conn"><span className="dot" style={{background:live?'#00d060':'#e5a13a'}}></span>{live?'Live feed (1s cache)':'Demo feed'}
+        <span className="conn-out" title={t('Log out')} onClick={wtLogout}>✕</span>
+      </div>
     </div>
   );
 }
@@ -3077,6 +3081,16 @@ function floatGeo(i){
    path (login.html — it does sign-in + profile lookup + the #5 cross-account cache wipe), round-
    tripping back to the terminal so the per-tab sessionStorage session lands in THIS tab. The chime
    plays on return (login.html sets alpexa.loginChime). No auth logic is duplicated here. ── */
+/* Sign out + leave to the marketing site. Mirrors the idle-logout in alpexa-sync.js (same keys):
+   kill the Supabase session, drop the persistent identity tag (else the load gate shows a phantom
+   session), then land on the FX website. Money stays server-only — this only touches the session. */
+function wtLogout(){
+  try{ if(!window.confirm('Log out of WebTrade?')) return; }catch(e){}
+  try{ var db=window.AlpexaSync&&AlpexaSync.db; if(db&&db.auth) db.auth.signOut(); }catch(e){}
+  try{ ['alpexa.me','alpexa.userName','alpexa.userEmail'].forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
+  try{ if(document.fullscreenElement) document.exitFullscreen(); }catch(e){}
+  try{ location.replace('fx.html'); }catch(e){ try{ location.href='fx.html'; }catch(_){} }
+}
 function LoginGate({ onClose }){
   const go=()=>{ try{ location.href='login.html?dest=webtrade.html'; }catch(e){} };
   return (
