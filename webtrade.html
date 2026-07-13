@@ -137,33 +137,33 @@
   .nav li.leaf .ic{margin-right:4px}
   .nav .ic{display:inline-block;width:15px;text-align:center;margin-right:5px}
   /* ── one-click order box (top-left of each chart) ── */
-  /* MT5 one-click panel — SLIM 155x40, whole-panel colour follows the tick */
-  .obox{position:absolute;top:6px;left:6px;z-index:1000;width:155px;height:40px;display:flex;flex-direction:column;
+  /* MT5 one-click panel — MID 190x64, whole-panel colour follows the tick */
+  .obox{position:absolute;top:6px;left:6px;z-index:1000;width:190px;height:64px;display:flex;flex-direction:column;
     border:1px solid #050505;box-shadow:0 1px 4px rgba(0,0,0,.6);background:#0d0e12;
     font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,Arial,sans-serif}
   .obox *{border-radius:0 !important;box-sizing:border-box;font-family:inherit}
   /* Session CLOSED: BUY/SELL click-blocked + dimmed (order gate). Volume stepper stays usable. */
   .obox.oc-closed .oc-lbl,.obox.oc-closed .oc-price{pointer-events:none;opacity:.4}
-  /* top layer (13px) — labels + centered volume (slim 40px panel) */
-  .oc-top{height:13px;flex:none;display:flex;align-items:stretch}
-  .oc-lbl{flex:1;display:flex;align-items:center;justify-content:center;color:#fff;font-size:8px;font-weight:normal;letter-spacing:.4px;
+  /* top layer (20px) — labels + centered volume */
+  .oc-top{height:20px;flex:none;display:flex;align-items:stretch}
+  .oc-lbl{flex:1;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:normal;letter-spacing:.5px;
     cursor:pointer;font-family:"Arial Black","Segoe UI",Arial,sans-serif}
   .oc-lbl:hover{filter:brightness(1.13)}
-  .oc-vol{width:48px;flex:none;position:relative;background:#121418 !important;display:flex;align-items:center;justify-content:center;border-left:1px solid #3c4049 !important;border-right:1px solid #3c4049 !important}
-  .oc-vol b{position:absolute;top:50%;transform:translateY(-50%);cursor:pointer;color:#8a94a6 !important;font-size:8px;width:12px;text-align:center;user-select:none;line-height:1}
+  .oc-vol{width:58px;flex:none;position:relative;background:#121418 !important;display:flex;align-items:center;justify-content:center;border-left:1px solid #3c4049 !important;border-right:1px solid #3c4049 !important}
+  .oc-vol b{position:absolute;top:50%;transform:translateY(-50%);cursor:pointer;color:#8a94a6 !important;font-size:9px;width:14px;text-align:center;user-select:none;line-height:1}
   .oc-vol b.dn{left:0}.oc-vol b.up{right:0}
   .oc-vol b:hover{color:#ffffff !important}
-  .oc-vol input{width:26px;height:11px;text-align:center;padding:0;border:none;background:#121418 !important;color:#ffffff !important;font-weight:bold;font-size:9px;outline:none}
-  /* bottom layer (27px) — SELL | BUY big quotes, 50:50 */
+  .oc-vol input{width:30px;height:16px;text-align:center;padding:0;border:none;background:#121418 !important;color:#ffffff !important;font-weight:bold;font-size:12px;outline:none}
+  /* bottom layer (44px) — SELL | BUY big quotes, 50:50 */
   .oc-bot{flex:1;display:flex;align-items:stretch}
   .oc-price{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;margin:0;
     color:#fff;cursor:pointer;white-space:nowrap;overflow:hidden}
   .oc-price:hover{filter:brightness(1.1)}
   .oc-price:active{box-shadow:inset 0 2px 5px rgba(0,0,0,.55)}
   .oc-price .bf{display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline;justify-content:center;line-height:1;margin:0;padding:0;font-variant-numeric:tabular-nums}   /* one line, never wrap (MT5) */
-  .oc-price .bf .sm{font-size:8px;font-weight:normal;color:#ffffff}                                  /* 앞자리 1.14 */
-  .oc-price .bf .bg{font-size:15px;font-weight:normal;color:#ffffff;line-height:1;font-family:"Arial Black","Segoe UI",Arial,sans-serif}  /* 핵심 핍 — slim 40px panel (20→15) */
-  .oc-price .bf .fr{align-self:flex-start;font-size:9px;font-weight:normal;color:#ffffff;margin-left:1px;transform:translateY(-3px)}  /* 위첨자 */
+  .oc-price .bf .sm{font-size:10px;font-weight:normal;color:#ffffff}                                  /* 앞자리 1.14 */
+  .oc-price .bf .bg{font-size:20px;font-weight:normal;color:#ffffff;line-height:1;font-family:"Arial Black","Segoe UI",Arial,sans-serif}  /* 핵심 핍 — 한 줄에 맞게 (24→20) */
+  .oc-price .bf .fr{align-self:flex-start;font-size:11px;font-weight:normal;color:#ffffff;margin-left:1px;transform:translateY(-4px)}  /* 위첨자 */
   /* per-side NEON skin — SELL = red-neon (fixed), BUY = blue-neon (fixed). Semantic side colour,
      not tick-flip. Glow ignites on hover, and on the live tick (SELL on down-tick, BUY on up-tick). */
   .oc-sell{background:linear-gradient(to bottom,#2a0a0a 0%,#150303 100%) !important;border:1px solid #ff3b30 !important;color:#ff453a !important}
@@ -877,6 +877,14 @@ const sfx   = (s)=> catOf(s)==='Forex' ? '.FX' : catOf(s)==='Crypto' ? '.CR' : '
 const pip   = (s)=> (catOf(s)==='Stocks'||catOf(s)==='Crypto') ? 0.01 : (s.slice(3)==='JPY'||s.slice(0,3)==='JPY' ? 0.01 : 0.0001);
 const digits= (s)=> (catOf(s)==='Stocks'||catOf(s)==='Crypto') ? 2 : (s.includes('JPY') ? 3 : 5);
 const fmtPx = (s,v)=> (v==null?'—':(+v).toFixed(digits(s)));
+// MT5 FIXED price-grid step (createPriceLine 23-line grid). FX = 15 points (0.00015 / JPY 0.015);
+// crypto = a per-symbol weight so a $64k BTC doesn't spawn thousands of lines (BTC 10, others scaled);
+// stocks = 0.15. A hard line-cap in drawGrid is the final backstop against overload.
+const CRYPTO_STEP = { BTCUSD:10, ETHUSD:1, SOLUSD:0.1, BNBUSD:0.5, XRPUSD:0.001, ADAUSD:0.001, DOGEUSD:0.0005, LTCUSD:0.1, LINKUSD:0.05, AVAXUSD:0.05, DOTUSD:0.02, MATICUSD:0.002, TRXUSD:0.0005 };
+const gridStep = (s)=>{ const cat=catOf(s);
+  if(cat==='Crypto') return CRYPTO_STEP[s] || 1;
+  if(cat==='Stocks') return 0.15;
+  return s.includes('JPY') ? 0.015 : 0.00015; };   // FX = 15 points
 // MT5-style X-axis tick: "12 Jul 23:22" (UTC-aligned, matches the bucketed candle times).
 const MON3 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const fmtMt5Tick = (t)=>{ const d=new Date((typeof t==='number'?t:0)*1000), p=n=>(n<10?'0':'')+n;
@@ -1450,6 +1458,9 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   const drawLines=React.useRef([]);       // USER drawing price-lines (hline/fib) — separate from positions/indicators
   const drawSeries=React.useRef([]);      // USER drawing line series (trend)
   const gridOn=React.useRef(true);        // chart grid visibility (context-menu toggle)
+  const gridLines=React.useRef([]);       // MT5 fixed 15-point horizontal grid (createPriceLine) — replaces native horzLines
+  const gridSig=React.useRef('');         // signature of the current grid (lo|count|step) → skip redraw churn
+  const drawGridRef=React.useRef(null);   // latest drawGrid() (set inside the chart effect) → callable from the grid toggle
   const candles=React.useRef([]);         // full history — indicators recompute from this
   const indSeries=React.useRef([]);       // active indicator line series (to clear/redraw)
   const indRef=React.useRef(indicators||[]); indRef.current=indicators||[];
@@ -1675,7 +1686,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     const th0=CHART_THEME[themeBus.theme]||CHART_THEME.dark;
     const c=LightweightCharts.createChart(box.current, {
       layout:{ background:{color:th0.bg}, textColor:th0.text, fontSize:8, fontFamily:"Tahoma, 'Segoe UI', Arial, sans-serif", attributionLogo:false },   // 8px axis labels → LWC packs MORE Y-price + X-time ticks (denser 23-ish grid; no tick-count API in LWC)
-      grid:{ vertLines:{color:th0.grid, style:DOT}, horzLines:{color:th0.grid, style:DOT} },
+      grid:{ vertLines:{color:th0.grid, style:DOT}, horzLines:{visible:false} },   // horizontal grid = our fixed 15-point createPriceLine grid (drawGrid); native horz off
       timeScale:{ borderColor:th0.border, timeVisible:true, secondsVisible:false, ticksVisible:false, barSpacing:5, minBarSpacing:0.8, rightOffset:15, tickMarkFormatter:fmtMt5Tick },   // X ticks = "12 Jul 23:22" (date+time); slim font packs more intervals
       rightPriceScale:{ borderColor:th0.border, ticksVisible:false, scaleMargins:{top:0.05, bottom:0.05} },   // EXPAND candle canvas vertically (0.08→0.05) → the wave amplitude fills the frame like MT5, no tick nubs
       handleScale:{ mouseWheel:false, pinch:false, axisPressedMouseMove:{time:false, price:true} },   // BAR-SPACING LOCK: wheel/pinch/time-axis-drag can NEVER re-zoom the candle width (price-axis drag still ok)
@@ -1684,7 +1695,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     // live re-theme when the user flips Light/Dark (no rebuild)
     const unTheme=themeBus.subscribe((t)=>{ const th=CHART_THEME[t]||CHART_THEME.dark, ct=CANDLE_THEME[t]||CANDLE_THEME.dark;
       try{ c.applyOptions({ layout:{background:{color:th.bg},textColor:th.text},
-        grid:{vertLines:{color:th.grid, style:DOT},horzLines:{color:th.grid, style:DOT}},   // keep DOTTED across the flip
+        grid:{vertLines:{color:th.grid, style:DOT},horzLines:{visible:false}},   // keep native horz OFF across the flip (our 15-point grid handles horizontals)
         timeScale:{borderColor:th.border}, rightPriceScale:{borderColor:th.border},
         crosshair:{vertLine:{color:th.cross, visible: t!=='light', labelVisible: t!=='light'},horzLine:{color:th.cross, visible: t!=='light', labelVisible: t!=='light'}} }); }catch(e){}
       try{ if(series.current&&series.current.applyOptions&&typeRef.current==='candle') series.current.applyOptions({   // recolor candles on theme flip
@@ -1737,6 +1748,29 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     try{ box.current.addEventListener('mousedown', onMeasureDown); }catch(e){}
     // ROBUST initial sizing: a floating window can be 0-wide for a few frames after mount / on
     // refresh, so the first candles would land off-view → the chart looks EMPTY until you switch tf.
+    // ── MT5 fixed 15-point price grid (createPriceLine): thin dotted horizontal pins at every gridStep
+    //    level across the VISIBLE price range, capped so a $64k crypto can't flood. This REPLACES the
+    //    native horizontal grid (off). Redrawn on fit + tick; the signature guard skips churn when the
+    //    scale hasn't moved a full step. Fully try/caught — a failure just leaves no horiz grid (never blanks).
+    const GRID_CAP=48;
+    const clearGrid=()=>{ const cs=series.current; gridLines.current.forEach(pl=>{ try{ cs&&cs.removePriceLine(pl); }catch(e){} }); gridLines.current=[]; };
+    const drawGrid=()=>{ try{
+      const cs=series.current; if(!cs||!cs.createPriceLine||!box.current) return;   // read the CURRENT series (survives a chart-type swap)
+      if(!gridOn.current){ if(gridLines.current.length){ clearGrid(); gridSig.current=''; } return; }
+      const h=box.current.clientHeight; if(h<=0) return;
+      let top,bot; try{ top=cs.coordinateToPrice(0); bot=cs.coordinateToPrice(h); }catch(e){ return; }
+      if(top==null||bot==null||!isFinite(top)||!isFinite(bot)) return;
+      const step=gridStep(symbol); if(!(step>0)) return;
+      const lo=Math.floor(Math.min(top,bot)/step)*step, hi=Math.ceil(Math.max(top,bot)/step)*step;
+      const n=Math.round((hi-lo)/step)+1;
+      if(n<2||n>GRID_CAP){ if(gridLines.current.length){ clearGrid(); gridSig.current=''; } return; }   // guard: never flood the chart
+      const sig=lo.toFixed(6)+'|'+n+'|'+step; if(sig===gridSig.current) return;                          // scale unmoved → no churn
+      clearGrid(); gridSig.current=sig;
+      const GDOT=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dotted)!=null?LightweightCharts.LineStyle.Dotted:1;
+      for(let i=0;i<n;i++){ const price=+(lo+i*step).toFixed(6);
+        try{ gridLines.current.push(cs.createPriceLine({ price, color:'#2a2a2a', lineWidth:1, lineStyle:GDOT, axisLabelVisible:true, title:'' })); }catch(e){} }
+    }catch(e){} };
+    drawGridRef.current=drawGrid;
     // A ResizeObserver fits the chart the moment the box gets a real width; once fitted, later resizes
     // just re-size (keep the user's zoom). This makes the default M1 chart show immediately on load.
     let fitted=false;
@@ -1748,6 +1782,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       const ts=chart.current.timeScale();
       try{ ts.applyOptions({ barSpacing:5, rightOffset:15 }); }catch(_){}
       if(candles.current.length && !fitted){ try{ ts.scrollToRealTime(); }catch(_){ try{ ts.fitContent(); }catch(e2){} } fitted=true; }
+      try{ drawGrid(); }catch(_){}   // re-lay the 15-point grid to the new pixel height
       }catch(e){} };
     let boxRO=null; try{ boxRO=new ResizeObserver(doFit); boxRO.observe(box.current); }catch(e){}
     // CANDLES — paint the deterministic seed IMMEDIATELY so the grid is NEVER empty (feed-independent,
@@ -1775,12 +1810,13 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       bar.current=u;
       try{ series.current.update(typeRef.current==='line' ? {time:u.time,value:close} : u); }catch(e){}
       try{ chart.current.timeScale().applyOptions({ rightOffset:15 }); }catch(e){}   // RIGHT-MARGIN LOCK: every tick re-pins the 15-bar future gap (idempotent — never yanks the scroll)
+      try{ drawGrid(); }catch(e){}   // keep the 15-point grid pinned as the price scale auto-scales (signature-guarded, cheap)
     }, 400);
     const unsub=priceStore.subscribe(onTick);
     const boxEl=box.current;
     return ()=>{ unsub(); unreg(); unTheme(); try{ boxRO&&boxRO.disconnect(); }catch(e){}
       try{ boxEl&&boxEl.removeEventListener('contextmenu', onCtxNative, true); boxEl&&boxEl.removeEventListener('mousedown', onMeasureDown); }catch(e){}
-      indSeries.current=[]; lines.current=[]; drawLines.current=[]; drawSeries.current=[]; drawStack.current=[]; selDraw.current=null;
+      indSeries.current=[]; lines.current=[]; gridLines.current=[]; gridSig.current=''; drawGridRef.current=null; drawLines.current=[]; drawSeries.current=[]; drawStack.current=[]; selDraw.current=null;
       hideHandles(); hideMeasure(); measDrag.current=null; previewLine.current=null; previewFib.current=[];   // drop selection handles + any in-flight preview
       if(startPt.current){ try{startPt.current.remove();}catch(_){} startPt.current=null; }
       overlays.current.forEach(o=>{ try{o.el.remove();}catch(e){} }); overlays.current=[];   // chart recreated → clear drawings
@@ -1793,6 +1829,8 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     try{ c.removeSeries(series.current); }catch(e){}
     const s=makePriceSeries(c, chartType||'candle', symbol); series.current=s;
     try{ s.setData(asSeriesData(candles.current,chartType||'candle')); }catch(e){}
+    gridLines.current=[]; gridSig.current='';   // old price-lines died with the old series → force the 15-point grid to rebuild
+    try{ drawGridRef.current&&drawGridRef.current(); }catch(e){}
   }, [chartType]);
 
   // toolbar zoom (± bar spacing) + tile (reset this window to its 2×2 slot)
@@ -1805,7 +1843,8 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       geo.current={ x:Math.round(f.fx*W), y:Math.round(f.fy*H), w:Math.max(WIN_MINW,Math.round(f.fw*W)), h:Math.max(WIN_MINH,Math.round(f.fh*H)) };
       applyGeo(); resizeChart(); winMode.current='normal'; reportGeo(); }
     else if(cmd==='chart.grid' && (arg===idx || (arg==null && activeRef.current)) && chart.current){ gridOn.current=!gridOn.current;   // Grid toggle: right-click (this chart) OR toolbar/Ctrl+G (arg-less → the ACTIVE chart)
-      try{ chart.current.applyOptions({ grid:{ vertLines:{visible:gridOn.current}, horzLines:{visible:gridOn.current} } }); }catch(e){} }
+      try{ chart.current.applyOptions({ grid:{ vertLines:{visible:gridOn.current}, horzLines:{visible:false} } }); }catch(e){}   // vertical (time) grid follows the toggle; horizontals are our 15-point grid
+      try{ drawGridRef.current&&drawGridRef.current(); }catch(e){} }   // show/hide the fixed 15-point price grid in lockstep
     else if(cmd==='chart.clear' && arg===idx){ clearDrawings(); }   // Delete all objects (this chart)
     else if(cmd==='chart.undo' && arg===idx){ undoDraw(); }         // Delete last object (this chart)
   }), [initial]);

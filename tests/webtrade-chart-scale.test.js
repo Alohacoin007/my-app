@@ -33,8 +33,8 @@ if (!/timeScale:\{ borderColor:th0\.border, timeVisible:true, secondsVisible:fal
 if (/fontSize:11\b/.test(blk)) bad('old fontSize:11 must be gone from the main chart');
 if (/rightOffset:6\b/.test(blk)) bad('old rightOffset:6 must be gone from the main chart');
 
-// grid stays the MT5 dotted checkerboard mask on both axes
-if (!/grid:\{ vertLines:\{color:th0\.grid, style:DOT\}, horzLines:\{color:th0\.grid, style:DOT\} \}/.test(blk)) bad('grid must stay the MT5 dotted checkerboard on both axes');
+// MT5 dotted checkerboard: vertical grid native-dotted; horizontal grid = the fixed 15-point createPriceLine grid (native horz off)
+if (!/grid:\{ vertLines:\{color:th0\.grid, style:DOT\}, horzLines:\{visible:false\} \}/.test(blk)) bad('vertical grid dotted; native horizontals off (15-point createPriceLine grid replaces them)');
 
 // ── INVARIANT LOCK: no wheel/pinch/time-axis-drag zoom can ever change the 5px candle width ──
 if (!/handleScale:\{ mouseWheel:false, pinch:false, axisPressedMouseMove:\{time:false, price:true\} \}/.test(blk))
