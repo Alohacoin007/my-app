@@ -85,8 +85,15 @@
 6. **배포 초록 확인 후에만 "라이브".** Pages 간헐 실패 있음 → GitHub Actions 초록 확인. 서비스워커=네트워크우선(고객 자동최신).
 - ⚙️ 도구: `tests/sports-feed-check.js`(라이브 피드 헬스, 네트워크 필요·수동/크론) · `tests/sports-render.test.js`(렌더 격리, verify 게이트) · 감사 프롬프트 `스포츠-마스터-감사.md`.
 
+## 📡 시세 피드 현황 + 데이터 플랜 (2026-07-13 확정 — 매번 재확인하지 말 것)
+- **Polygon.io = 유료 Currencies 플랜** (FX·메탈. 실시간 스냅샷 + **실시간 웹소켓 포함**. 키=Edge env `POLYGON_KEY`, 클라 노출 절대 금지). 근거: `fx-prices/DEPLOY.md` + fx-stream WS auth 성공 실측.
+- **Finnhub = 무료 티어** (주식. REST 60콜/분 한도 + **실시간 US 체결 웹소켓은 무료 포함**. 키=`FINNHUB_KEY`).
+- **Binance = 공개 데이터 미러** (크립토. `data-api/data-stream.binance.vision`, 키 불필요·무료. binance.com 본체는 geo-fence라 미러만 사용).
+- **파이프라인 (전부 라이브 검증됨):** 크립토=클라 Binance WS 직결(ms) + 크론 3초 폴백 · FX=`fx-stream` WS 펌프(~1초, job `fx-stream-1m`) + `fx-prices` 3초 폴백 · 주식=`stock-stream` WS 펌프(2~8초, job `stock-stream-1m`) + `stock-prices` 1분 폴백(+ALPXS) · 클라 수신=Supabase Realtime 푸시(`prices` publication) + 1초 폴링 폴백. 크론 진단/튜닝/롤백 = `supabase/sql/feed_speed_tune.sql`.
+- **WS 펌프 Edge 공통 규칙:** 대시보드에서 JWT verify **OFF**(함수 내 `CRON_SECRET` 검사가 관문) · spr_pts 단위는 기존 작성자와 동일하게(FX 정수핍·크립토 bps·주식 0) — 단위 새로 발명 금지(결함-로그 2026-07-13).
+
 ## 📌 보류 백로그 (조건 충족 시 사용자에게 먼저 리마인드할 것)
-- **[완료 2026-07-13] 시세 3단계**: 크립토 = webtrade Binance-vision WS 직결(단일 `_apply`/`halfPx` 파이프라인·우선순위 게이트·10초 폴백, `webtrade-crypto-ws.test.js`). 주식 = `stock-stream` Edge(Finnhub WS 펌프, 매분 크론 `stock-stream-1m` job 37) **배포·라이브 검증 완료**(AAPL 120초에 15회 갱신, 기존 1분→2~8초; JWT verify OFF + 함수 내 CRON_SECRET 검사). prices 테이블이 빨라진 것이라 **모든 앱이 자동 수혜**. 잔여(고객 생기면): ① 실브라우저 크립토 WS 체감 확인(샌드박스 미검증, 실패해도 크론 폴백 안전) ② Realtime/WS 패턴 trading.html·crypto-live.html 확산.
+- **[완료 2026-07-13] 시세 3단계 전체**: 크립토 = webtrade Binance WS 직결(실브라우저 초당 2회 확인) · 주식 = `stock-stream`(AAPL 1분→2~8초 실측) · FX = `fx-stream`(EURUSD 3초→평균 1.5초 실측, 120초에 91회). 상세는 위 📡 섹션. 잔여(고객 생기면): Realtime/WS 패턴 trading.html·crypto-live.html 확산.
 
 ## 🚚 배포 / 운영
 - GitHub Pages는 브랜치 `claude/wizardly-ritchie-lsRnz`에서 서빙 (CNAME alpexa-sports.com). **푸시는 이 브랜치에만.**
