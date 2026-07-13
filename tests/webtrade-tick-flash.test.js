@@ -18,10 +18,10 @@ const bad = (m) => { console.error('🔴 ' + m); fail++; };
 const grab = (re, label) => { const m = src.match(re); if (!m) bad(label + ' not found'); return m ? m[0] : ''; };
 
 // ── static: whole-panel CSS + sticky paint helper + single mechanism ──
-if (!/\.obox\.tick-up \.oc-sell,\.obox\.tick-up \.oc-buy\{[^}]*!important[^}]*\}/.test(src))
-  bad('tick-up must repaint BOTH boxes (SELL and BUY) blue at the .obox level');
-if (!/\.obox\.tick-down \.oc-sell,\.obox\.tick-down \.oc-buy\{[^}]*!important[^}]*\}/.test(src))
-  bad('tick-down must repaint BOTH boxes (SELL and BUY) red at the .obox level');
+if (!/\.obox\.tick-up\{[^}]*!important[^}]*\}/.test(src))
+  bad('tick-up must repaint the .obox SHELL blue (one-shell design — children are transparent)');
+if (!/\.obox\.tick-down\{[^}]*!important[^}]*\}/.test(src))
+  bad('tick-down must repaint the .obox SHELL red (one-shell design — children are transparent)');
 if (/\.oc-price\.tick-up \.bf|\.oc-price\.tick-down \.bf/.test(src))
   bad('the v1 digit-colour flash CSS must be gone (whole-panel skin replaced it)');
 const paint_src = grab(/const paint=\(el,dir\)=>\{[\s\S]*?\};/, 'paint helper');

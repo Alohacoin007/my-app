@@ -137,44 +137,46 @@
   .nav li.leaf .ic{margin-right:4px}
   .nav .ic{display:inline-block;width:15px;text-align:center;margin-right:5px}
   /* ── one-click order box (top-left of each chart) ── */
-  /* MT5 one-click panel — MID 190x64, whole-panel colour follows the tick */
+  /* MT5 one-click panel — MID 190x64. ONE-SHELL design (2026-07-13 B안, user-approved mockup):
+     the .obox is the single bordered card; labels/volume/prices carry NO own borders or skins —
+     seams are translucent 1px dividers, so the whole widget reads as one connected MT5 unit. */
   .obox{position:absolute;top:6px;left:6px;z-index:1000;width:190px;height:64px;display:flex;flex-direction:column;
-    border:1px solid #050505;box-shadow:0 1px 4px rgba(0,0,0,.6);background:#0d0e12;
+    border:1px solid #3c4049;border-radius:7px;box-shadow:0 1px 4px rgba(0,0,0,.6);
+    background:linear-gradient(to bottom,#15171c 0%,#0b0d11 100%);
     font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,Arial,sans-serif}
   .obox *{border-radius:0 !important;box-sizing:border-box;font-family:inherit}
   /* Session CLOSED: BUY/SELL click-blocked + dimmed (order gate). Volume stepper stays usable. */
   .obox.oc-closed .oc-lbl,.obox.oc-closed .oc-price{pointer-events:none;opacity:.4}
-  /* top layer (20px) — labels + centered volume */
-  .oc-top{height:20px;flex:none;display:flex;align-items:stretch}
+  /* top layer (20px) — labels + centered volume, split from the price row by a translucent seam */
+  .oc-top{height:20px;flex:none;display:flex;align-items:stretch;border-bottom:1px solid rgba(255,255,255,.18)}
   .oc-lbl{flex:1;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:normal;letter-spacing:.5px;
     cursor:pointer;font-family:"Arial Black","Segoe UI",Arial,sans-serif}
   .oc-lbl:hover{filter:brightness(1.13)}
-  .oc-vol{width:58px;flex:none;position:relative;background:#121418 !important;display:flex;align-items:center;justify-content:center;border-left:1px solid #3c4049 !important;border-right:1px solid #3c4049 !important}
+  .oc-vol{width:58px;flex:none;position:relative;background:rgba(0,0,0,.35) !important;display:flex;align-items:center;justify-content:center;border-left:1px solid rgba(255,255,255,.18) !important;border-right:1px solid rgba(255,255,255,.18) !important}
   .oc-vol b{position:absolute;top:50%;transform:translateY(-50%);cursor:pointer;color:#8a94a6 !important;font-size:9px;width:14px;text-align:center;user-select:none;line-height:1}
   .oc-vol b.dn{left:0}.oc-vol b.up{right:0}
   .oc-vol b:hover{color:#ffffff !important}
-  .oc-vol input{width:30px;height:16px;text-align:center;padding:0;border:none;background:#121418 !important;color:#ffffff !important;font-weight:bold;font-size:12px;outline:none}
+  .oc-vol input{width:30px;height:16px;text-align:center;padding:0;border:none;background:transparent !important;color:#ffffff !important;font-weight:bold;font-size:12px;outline:none}
   /* bottom layer (44px) — SELL | BUY big quotes, 50:50 */
   .oc-bot{flex:1;display:flex;align-items:stretch}
   .oc-price{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;margin:0;
     color:#fff;cursor:pointer;white-space:nowrap;overflow:hidden}
+  .oc-price:first-child{border-right:1px solid rgba(255,255,255,.18)}
   .oc-price:hover{filter:brightness(1.1)}
   .oc-price:active{box-shadow:inset 0 2px 5px rgba(0,0,0,.55)}
   .oc-price .bf{display:inline-flex;flex-wrap:nowrap;white-space:nowrap;align-items:baseline;justify-content:center;line-height:1;margin:0;padding:0;font-variant-numeric:tabular-nums}   /* one line, never wrap (MT5) */
   .oc-price .bf .sm{font-size:10px;font-weight:normal;color:#ffffff}                                  /* 앞자리 1.14 */
   .oc-price .bf .bg{font-size:20px;font-weight:normal;color:#ffffff;line-height:1;font-family:"Arial Black","Segoe UI",Arial,sans-serif}  /* 핵심 핍 — 한 줄에 맞게 (24→20) */
   .oc-price .bf .fr{align-self:flex-start;font-size:11px;font-weight:normal;color:#ffffff;margin-left:1px;transform:translateY(-4px)}  /* 위첨자 */
-  /* per-side NEON skin — SELL = red-neon (fixed), BUY = blue-neon (fixed). Semantic side colour,
-     not tick-flip. Glow ignites on hover, and on the live tick (SELL on down-tick, BUY on up-tick). */
-  .oc-sell{background:linear-gradient(to bottom,#2a0a0a 0%,#150303 100%) !important;border:1px solid #ff3b30 !important;color:#ff453a !important}
-  .oc-buy{background:linear-gradient(to bottom,#0a1735 0%,#030815 100%) !important;border:1px solid #007aff !important;color:#3095ff !important}
-  .oc-sell:hover,.oc-sell.oc-glow{box-shadow:0 0 10px rgba(255,59,48,.7) !important}
-  .oc-buy:hover,.oc-buy.oc-glow{box-shadow:0 0 10px rgba(0,122,255,.7) !important}
-  /* MT5 one-click DIRECTION SKIN — the WHOLE panel follows the last tick, exactly like MT5:
-     up-tick → both boxes blue, down-tick → both boxes red, sticky until the direction flips.
-     Applied by direct classList on .obox from the tick handler (no re-render). Digits stay white. */
-  .obox.tick-up .oc-sell,.obox.tick-up .oc-buy{background:linear-gradient(to bottom,#0d47c8 0%,#082d85 100%) !important;border-color:#3095ff !important;color:#eaf2ff !important}
-  .obox.tick-down .oc-sell,.obox.tick-down .oc-buy{background:linear-gradient(to bottom,#c62828 0%,#7f1616 100%) !important;border-color:#ff6b60 !important;color:#ffecec !important}
+  /* MT5 one-click DIRECTION SKIN — the WHOLE shell follows the last tick, exactly like MT5:
+     up-tick → blue, down-tick → red, sticky until the direction flips. Applied by direct
+     classList on .obox from the tick handler (no re-render). Children stay transparent. */
+  .obox.tick-up{background:linear-gradient(to bottom,#0d47c8 0%,#082d85 100%) !important;border-color:#3095ff !important}
+  .obox.tick-down{background:linear-gradient(to bottom,#c62828 0%,#7f1616 100%) !important;border-color:#ff6b60 !important}
+  /* live spread pill — hangs bottom-centre off the shell (MT5 placement); needs its own radius
+     exception because `.obox *` zeroes radii. Read-only (pointer-events none). */
+  .obox .oc-spr{position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);z-index:2;pointer-events:none;
+    background:#121418;border:1px solid #3c4049;border-radius:9px !important;font-size:9px;color:#c8ccd2;padding:1px 8px;line-height:1.4}
   /* ── ECN order interaction (overlay only — 190x64 치수/대칭 불변) ──
      처리중: 클릭한 쪽 호가를 dim+blur, 코너에 미세 스피너. 체결완료: 패널 0.1s 플래시. */
   .obox.ecn-flash{animation:ecnFlash .1s ease-out}
@@ -1496,6 +1498,9 @@ function OrderBox({ symbol }){
         <div className={"oc-price "+sellCls+(busySell?' oc-busy':'')} title="Sell at Bid" onClick={(e)=>{e.stopPropagation();send('sell');}}><BigFig symbol={symbol} v={m.bid} />{busySell&&<span className="oc-spin" aria-hidden="true"></span>}</div>
         <div className={"oc-price "+buyCls+(busyBuy?' oc-busy':'')} title="Buy at Ask" onClick={(e)=>{e.stopPropagation();send('buy');}}><BigFig symbol={symbol} v={m.ask} />{busyBuy&&<span className="oc-spin" aria-hidden="true"></span>}</div>
       </div>
+      {m.bid!=null&&m.ask!=null&&(()=>{   // live spread pill — same per-row DISPLAYED-price reading as the MW table
+        const d=Math.abs(parseFloat(fmtPx(symbol,m.ask))-parseFloat(fmtPx(symbol,m.bid)));
+        return <div className="oc-spr">{(catOf(symbol)==='Crypto'||catOf(symbol)==='Stocks'?d:d/pip(symbol)).toFixed(1)}</div>; })()}
     </div>
   );
 }

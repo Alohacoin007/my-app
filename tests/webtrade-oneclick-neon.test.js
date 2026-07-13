@@ -1,10 +1,14 @@
 #!/usr/bin/env node
-// REGRESSION (webtrade) — the chart's one-click SELL/BUY panel wears a fixed-side NEON skin, now FORCED
-// in BOTH themes (the Legend matte-black muting was removed on request). SELL is a fixed red-neon
-// (dark-carbon gradient + #ff3b30 border + #ff453a text) and BUY a fixed blue-neon (dark-carbon
-// gradient + #007aff border + #3095ff text). The glow ignites on hover, and on the LIVE tick — SELL on
-// a down-tick, BUY on an up-tick — via a semantic `oc-glow` class, NOT by swapping the side colour. The
-// centre lot box is dark (#121418 !important + #3c4049 silver rails, white bold input) — never white.
+// REGRESSION (webtrade) — one-click ONE-SHELL design (2026-07-13 B안+스프레드, user-approved mockup).
+// The panel must read as ONE connected MT5 unit, not five floating boxes:
+//   · ONE outer border on .obox (rounded 7px, neutral carbon before the first tick)
+//   · children (labels / volume / prices) carry NO own borders or background skins —
+//     seams are translucent white 1px dividers only
+//   · the volume cell is a slightly sunken translucent layer (rgba black), input transparent
+//   · a live SPREAD pill hangs bottom-centre (same per-row displayed-price formula as the MW)
+//   · the DIRECTION skin paints the .obox SHELL itself (blue up / red down — see
+//     webtrade-tick-flash.test.js for the sticky paint mechanics)
+// The old fixed per-side neon skins (red SELL / blue BUY cards) were replaced by this design.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -12,38 +16,43 @@ const src = fs.readFileSync(path.join(__dirname, '..', 'webtrade.html'), 'utf8')
 let fail = 0;
 const bad = (m) => { console.error('🔴 ' + m); fail++; };
 
-// ── DARK theme: fixed-side neon fills (SELL red / BUY blue), deep carbon-black gradient ──
-if (!/\.oc-sell\{background:linear-gradient\(to bottom,#2a0a0a 0%,#150303 100%\) !important;border:1px solid #ff3b30 !important;color:#ff453a !important\}/.test(src))
-  bad('SELL must be the red-neon skin (carbon-black #2a0a0a→#150303 + #ff3b30 border + #ff453a text)');
-if (!/\.oc-buy\{background:linear-gradient\(to bottom,#0a1735 0%,#030815 100%\) !important;border:1px solid #007aff !important;color:#3095ff !important\}/.test(src))
-  bad('BUY must be the blue-neon skin (carbon-black #0a1735→#030815 + #007aff border + #3095ff text)');
+// ── ONE shell: rounded single border + neutral default fill on .obox ──
+if (!/\.obox\{[^}]*border:1px solid #3c4049;border-radius:7px;[^}]*\}/.test(src))
+  bad('.obox must be the ONE shell — single #3c4049 border, 7px radius');
+if (!/\.obox\{[^}]*background:linear-gradient\(to bottom,#15171c 0%,#0b0d11 100%\)[^}]*\}/.test(src))
+  bad('.obox must carry the neutral carbon fill (children stay transparent)');
 
-// ── glow ignites on hover + the semantic tick class (10px / 0.7, !important) ──
-if (!/\.oc-sell:hover,\.oc-sell\.oc-glow\{box-shadow:0 0 10px rgba\(255,59,48,\.7\) !important\}/.test(src))
-  bad('SELL glow (red 10px/.7) must fire on hover and on oc-glow (down-tick)');
-if (!/\.oc-buy:hover,\.oc-buy\.oc-glow\{box-shadow:0 0 10px rgba\(0,122,255,\.7\) !important\}/.test(src))
-  bad('BUY glow (blue 10px/.7) must fire on hover and on oc-glow (up-tick)');
+// ── the five-box look is GONE: no per-side skins, no per-child borders ──
+if (/\.oc-sell\{background:linear-gradient|\.oc-buy\{background:linear-gradient/.test(src))
+  bad('per-side neon card skins must be gone (the shell owns the background now)');
+if (/\.oc-sell\.oc-glow|\.oc-buy\.oc-glow/.test(src))
+  bad('the old per-side glow rules must be gone');
 
-// ── JSX: side colour is FIXED; tick only drives the glow (SELL↓ / BUY↑) ──
-// (2026-07-13, user request) the tick now drives the 160ms MT5 digit FLASH — see
-// webtrade-tick-flash.test.js — NOT a sticky glow; the box glow is hover-only.
-if (!/const sellCls = 'oc-sell';/.test(src))
-  bad('SELL must be a fixed oc-sell (no sticky tick glow — the tick drives the 160ms flash)');
-if (!/const buyCls  = 'oc-buy';/.test(src))
-  bad('BUY must be a fixed oc-buy (no sticky tick glow — the tick drives the 160ms flash)');
-// the tick-flip colour classes and the old sticky direction state must be gone
-if (/oc-red|oc-blue/.test(src)) bad('the old tick-flip oc-red/oc-blue classes must be fully removed');
-if (/setBidDir|setAskDir/.test(src)) bad('the old sticky bidDir/askDir glow state must be fully removed');
+// ── seams = translucent dividers only ──
+if (!/\.oc-top\{[^}]*border-bottom:1px solid rgba\(255,255,255,\.18\)[^}]*\}/.test(src))
+  bad('top/bottom rows must meet at a translucent divider');
+if (!/\.oc-price:first-child\{border-right:1px solid rgba\(255,255,255,\.18\)\}/.test(src))
+  bad('SELL/BUY prices must be split by a translucent centre divider');
 
-// ── centre lot box: dark card + silver #3c4049 rails, white bold input — !important locked, NO white ──
-if (!/\.oc-vol\{[^}]*background:#121418 !important;[^}]*border-left:1px solid #3c4049 !important;border-right:1px solid #3c4049 !important\}/.test(src))
-  bad('lot box must be dark #121418 !important with silver #3c4049 !important side rails');
-if (!/\.oc-vol input\{[^}]*background:#121418 !important;color:#ffffff !important;font-weight:bold/.test(src))
-  bad('lot box input must be dark (#121418 !important) with white bold text — never white bg');
+// ── volume cell: sunken translucent layer, transparent input, translucent rails ──
+if (!/\.oc-vol\{[^}]*background:rgba\(0,0,0,\.35\) !important[^}]*border-left:1px solid rgba\(255,255,255,\.18\) !important;border-right:1px solid rgba\(255,255,255,\.18\) !important\}/.test(src))
+  bad('volume cell must be the sunken translucent layer with translucent rails');
+if (!/\.oc-vol input\{[^}]*background:transparent !important;color:#ffffff !important;font-weight:bold/.test(src))
+  bad('volume input must be transparent with white bold text');
 
-// ── neon is FORCED in both themes: the Legend matte-black muting override must be GONE ──
-if (/\.terminal\.light \.oc-sell|\.terminal\.light \.oc-buy|\.terminal\.light \.obox\{background:#000000/.test(src))
-  bad('Legend must NOT mute the panel any more — the neon skin is forced in both themes');
+// ── spread pill: element + rounded exception + the MW display formula ──
+if (!/\.obox \.oc-spr\{[^}]*border-radius:9px !important[^}]*\}/.test(src))
+  bad('spread pill needs its rounded exception (.obox * zeroes radii)');
+if (!/className="oc-spr"/.test(src)) bad('the spread pill element must render inside .obox');
+const spr = src.match(/const _ocd=[^\n]*\n[^\n]*oc-spr[^\n]*/) || src.match(/oc-spr[^\n]*/);
+if (!/parseFloat\(fmtPx\(symbol,m\.ask\)\)-parseFloat\(fmtPx\(symbol,m\.bid\)\)/.test(src))
+  bad('spread pill must derive from the DISPLAYED bid/ask exactly like the MW row');
 
-if (fail) { console.error(`\n🔴 FAIL — ${fail} one-click neon-skin problem(s).`); process.exit(1); }
-console.log('🟢 PASS: one-click panel — fixed red-neon SELL / blue-neon BUY (carbon fills, 10px/.7 glow) in BOTH themes, dark #121418 silver-railed lot box (no white); Legend muting removed.');
+// ── direction skin paints the SHELL (not the children) ──
+if (!/\.obox\.tick-up\{background:linear-gradient\(to bottom,#0d47c8 0%,#082d85 100%\) !important;border-color:#3095ff !important\}/.test(src))
+  bad('tick-up must repaint the .obox shell blue');
+if (!/\.obox\.tick-down\{background:linear-gradient\(to bottom,#c62828 0%,#7f1616 100%\) !important;border-color:#ff6b60 !important\}/.test(src))
+  bad('tick-down must repaint the .obox shell red');
+
+if (fail) { console.error(`\n🔴 FAIL — ${fail} one-shell design problem(s).`); process.exit(1); }
+console.log('🟢 PASS: one-click ONE-SHELL — single rounded border, translucent seams, sunken volume, live spread pill, direction skin on the shell; five-box look fully retired.');

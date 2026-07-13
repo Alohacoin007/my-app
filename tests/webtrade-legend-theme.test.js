@@ -92,9 +92,11 @@ if (!/\.terminal\.light \.tbtn:hover[^}]*background:transparent !important;borde
 if (!/\.terminal\.light \.acctline\{background:#0E1015;color:#a2aab6;border-top:1px solid #1D212A;border-bottom:1px solid #1D212A;font-weight:normal\}/.test(src)) bad('Legend Balance bar must be #a2aab6 (original size, normal weight)');
 if (!/\.terminal\.light \.acctline \.k\{color:#a2aab6[^}]*\}\.terminal\.light \.acctline b\{color:#a2aab6/.test(src)) bad('Legend Balance bar labels + numbers must be the #a2aab6 tab tone');
 
-// the one-click panel wears the neon skin (forced in both themes): SELL red-neon, BUY blue-neon
-if (!/\.oc-sell\{background:linear-gradient\(to bottom,#2a0a0a 0%,#150303 100%\) !important;border:1px solid #ff3b30 !important;color:#ff453a !important\}/.test(src)) bad('SELL must be the red-neon skin');
-if (!/\.oc-buy\{background:linear-gradient\(to bottom,#0a1735 0%,#030815 100%\) !important;border:1px solid #007aff !important;color:#3095ff !important\}/.test(src)) bad('BUY must be the blue-neon skin');
+// the one-click panel is the ONE-SHELL card in both themes (2026-07-13 B안 — see
+// webtrade-oneclick-neon.test.js): a single bordered .obox, direction skin on the shell,
+// and NO per-side neon card skins (they were retired with the five-box look).
+if (/\.oc-sell\{background:linear-gradient|\.oc-buy\{background:linear-gradient/.test(src)) bad('per-side neon card skins must stay retired (one-shell design)');
+if (!/\.obox\{[^}]*border:1px solid #3c4049;border-radius:7px;/.test(src)) bad('the .obox one-shell card must exist (forced in both themes)');
 
 // (4) UI label renamed to Legend (no "Light / Dark" left)
 if (/Color Theme — Light \/ Dark/.test(src)) bad('the menu label must be renamed away from "Light / Dark"');
