@@ -128,7 +128,7 @@
   .nav .ic{display:inline-block;width:15px;text-align:center;margin-right:5px}
   /* ── one-click order box (top-left of each chart) ── */
   /* MT5 one-click panel — MID 190x64, whole-panel colour follows the tick */
-  .obox{position:absolute;top:6px;left:6px;z-index:1000;width:155px;height:50px;display:flex;flex-direction:column;   /* 20% slim diet (was 190×64) */
+  .obox{position:absolute;top:6px;left:6px;z-index:1000;width:155px;height:40px;display:flex;flex-direction:column;   /* slim diet (was 190×64 → 155×40) */
     border:1px solid #050505;box-shadow:0 1px 4px rgba(0,0,0,.6);background:#0d0e12;
     font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,Arial,sans-serif}
   .obox *{border-radius:0 !important;box-sizing:border-box;font-family:inherit}
@@ -1026,7 +1026,7 @@ const sideUp = (s)=> (s==='sell'||s==='SELL')?'SELL':'BUY';
 const chartResizer = {
   items:new Set(),
   resizeOne(it){ try{ const w=it.el.clientWidth, h=it.el.clientHeight; if(w>0&&h>0){ it.chart.resize(w,h);   // fit the FULL live parent height (responsive; no fixed px)
-    try{ it.chart.timeScale().applyOptions({ barSpacing:5, rightOffset:15 }); }catch(_){} } }catch(e){} },   // weld the 5px/15 golden ratio into the splitter/window-resize path too (no rollback)
+    try{ it.chart.timeScale().applyOptions({ barSpacing:4, rightOffset:15 }); }catch(_){} } }catch(e){} },   // weld the 4px/15 golden ratio into the splitter/window-resize path too (no rollback)
   resizeAll(){ this.items.forEach(it=>this.resizeOne(it)); },
   add(chart, el){ const it={chart,el}; this.items.add(it); this.resizeOne(it); return ()=>this.items.delete(it); },
 };
@@ -1617,7 +1617,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     const c=LightweightCharts.createChart(box.current, {
       layout:{ background:{color:th0.bg}, textColor:th0.text, fontSize:10, fontFamily:"Tahoma, 'Segoe UI', Arial, sans-serif", attributionLogo:false },   // slim 10px axis labels → more canvas
       grid:{ vertLines:{color:th0.grid, style:DOT}, horzLines:{color:th0.grid, style:DOT} },
-      timeScale:{ borderColor:th0.border, timeVisible:true, secondsVisible:false, ticksVisible:false, barSpacing:5, minBarSpacing:0.8, rightOffset:15 },   // SLIM time axis (font 10 → ~20px, no tick nubs — LWC has no pixel height, it is font-driven) + barSpacing/rightOffset lock
+      timeScale:{ borderColor:th0.border, timeVisible:true, secondsVisible:false, ticksVisible:false, barSpacing:4, minBarSpacing:0.8, rightOffset:15 },   // SLIM time axis (font 10 → ~20px, no tick nubs — LWC has no pixel height, it is font-driven) + barSpacing/rightOffset lock
       rightPriceScale:{ borderColor:th0.border, ticksVisible:false, scaleMargins:{top:0.05, bottom:0.05} },   // EXPAND candle canvas vertically (0.08→0.05) → the wave amplitude fills the frame like MT5, no tick nubs
       handleScale:{ mouseWheel:false, pinch:false, axisPressedMouseMove:{time:false, price:true} },   // BAR-SPACING LOCK: wheel/pinch/time-axis-drag can NEVER re-zoom the candle width (price-axis drag still ok)
       crosshair:{ vertLine:{color:th0.cross, style:DOT, visible: themeBus.theme!=='light', labelVisible: themeBus.theme!=='light'}, horzLine:{color:th0.cross, style:DOT, visible: themeBus.theme!=='light', labelVisible: themeBus.theme!=='light'} },   // LEGEND: no crosshair lines OR axis labels on hover (free mouse, MT5-like)
@@ -1687,7 +1687,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       // 400 bars to full width → fat candles). INVARIANT LOCK: re-pin the 5px density + 15-bar margin on
       // EVERY resize so a splitter-drag / window-resize can never roll the candle width back to fat.
       const ts=chart.current.timeScale();
-      try{ ts.applyOptions({ barSpacing:5, rightOffset:15 }); }catch(_){}
+      try{ ts.applyOptions({ barSpacing:4, rightOffset:15 }); }catch(_){}
       if(candles.current.length && !fitted){ try{ ts.scrollToRealTime(); }catch(_){ try{ ts.fitContent(); }catch(e2){} } fitted=true; }
       }catch(e){} };
     let boxRO=null; try{ boxRO=new ResizeObserver(doFit); boxRO.observe(box.current); }catch(e){}
@@ -1734,7 +1734,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
   // toolbar zoom (± bar spacing) + tile (reset this window to its 2×2 slot)
   React.useEffect(()=> terminalBus.subscribe((cmd,arg)=>{
     if(cmd==='chart.zoom' && activeRef.current && chart.current){ try{ const ts=chart.current.timeScale();   // ← active chart only
-      const bs=(ts.options&&ts.options().barSpacing)||5;
+      const bs=(ts.options&&ts.options().barSpacing)||4;
       ts.applyOptions({ barSpacing: Math.max(2, Math.min(60, bs*(arg==='in'?1.25:0.8))) }); }catch(e){} }
     else if(cmd==='window.tile'){ const el=win.current, par=el&&el.parentElement; if(!par) return;
       const W=par.clientWidth||800, H=par.clientHeight||500, f=initial||{fx:0.02,fy:0.02,fw:0.48,fh:0.48};

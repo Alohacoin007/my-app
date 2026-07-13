@@ -36,7 +36,7 @@ if (!/resizeOne\(it\)\{ try\{ const w=it\.el\.clientWidth, h=it\.el\.clientHeigh
   bad('resizeOne must resize to the full canvas clientHeight (responsive, no fixed px)');
 // [3] the wheel/pinch zoom lock + 5px/15 golden ratio remain welded
 if (!/handleScale:\{ mouseWheel:false, pinch:false/.test(src)) bad('mouseWheel/pinch zoom lock must remain');
-if (!/it\.chart\.timeScale\(\)\.applyOptions\(\{ barSpacing:5, rightOffset:15 \}\);/.test(src)) bad('resizeOne must re-weld barSpacing 5 + rightOffset 15');
+if (!/it\.chart\.timeScale\(\)\.applyOptions\(\{ barSpacing:4, rightOffset:15 \}\);/.test(src)) bad('resizeOne must re-weld barSpacing 4 + rightOffset 15');
 
 // [3] the spread stays the per-row pip formula (Forex ÷pip → 1.0/pip; no ×100000 inflation)
 if (!/catOf\(sym\)==='Crypto'\|\|catOf\(sym\)==='Stocks'\?_diff:_diff\/pip\(sym\)/.test(src)) bad('spread must remain per-row (Forex ÷pip, crypto/stock raw)');

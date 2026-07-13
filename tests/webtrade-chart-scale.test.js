@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // REGRESSION (webtrade) — the main chart engine is tuned to MT5-original proportions:
-//   [1] slim candles: default barSpacing 5 (slim, sharp candles) + minBarSpacing 0.8.
+//   [1] slim candles: default barSpacing 4 (slim, sharp candles) + minBarSpacing 0.8.
 //   [2] right margin: rightOffset 15 so the newest live candle breathes off the price axis.
 //   [3] slim axes: layout fontSize 10 (was 11) + trimmed price scaleMargins (0.08) → more candle canvas.
-// The boot view sets the same slim density (barSpacing 5 + rightOffset 15 + scrollToRealTime), NOT
+// The boot view sets the same slim density (barSpacing 4 + rightOffset 15 + scrollToRealTime), NOT
 // fitContent (which stretched all 400 seed bars to full width and fattened the candles).
 'use strict';
 const fs = require('fs');
@@ -17,7 +17,7 @@ const blk = (src.match(/const c=LightweightCharts\.createChart\(box\.current, \{
 if (!blk) bad('main createChart options block not found');
 
 // [1] slim, denser candles
-if (!/barSpacing:5/.test(blk)) bad('main chart must default to barSpacing 5 (slim, sharp, dense candles)');
+if (!/barSpacing:4/.test(blk)) bad('main chart must default to barSpacing 4 (slim, sharp, dense candles)');
 if (!/minBarSpacing:0\.8/.test(blk)) bad('main chart must set minBarSpacing 0.8 (allow dense zoom-out)');
 
 // [2] wide right margin for future-trend space
@@ -40,16 +40,16 @@ if (!/grid:\{ vertLines:\{color:th0\.grid, style:DOT\}, horzLines:\{color:th0\.g
 if (!/handleScale:\{ mouseWheel:false, pinch:false, axisPressedMouseMove:\{time:false, price:true\} \}/.test(blk))
   bad('bar-spacing lock: handleScale must disable wheel + pinch + time-axis-drag zoom (price drag stays)');
 // every resize re-pins the density + right margin (splitter/window-resize can never roll back to fat)
-if (!/try\{ ts\.applyOptions\(\{ barSpacing:5, rightOffset:15 \}\); \}catch\(_\)\{\}/.test(src))
-  bad('every doFit/resize must re-pin barSpacing 5 + rightOffset 15 (no rollback)');
+if (!/try\{ ts\.applyOptions\(\{ barSpacing:4, rightOffset:15 \}\); \}catch\(_\)\{\}/.test(src))
+  bad('every doFit/resize must re-pin barSpacing 4 + rightOffset 15 (no rollback)');
 // every live tick re-pins the 15-bar right margin (idempotent)
 if (!/chart\.current\.timeScale\(\)\.applyOptions\(\{ rightOffset:15 \}\);/.test(src))
   bad('every tick must re-pin rightOffset 15 (right-margin lock)');
 // the shared resizer (splitter / window-resize) refits the FULL live parent height AND re-welds the lock
 if (!/resizeOne\(it\)\{ try\{ const w=it\.el\.clientWidth, h=it\.el\.clientHeight; if\(w>0&&h>0\)\{ it\.chart\.resize\(w,h\);/.test(src))
   bad('chartResizer must resize to the live parent clientWidth/clientHeight (responsive, no fixed px)');
-if (!/it\.chart\.timeScale\(\)\.applyOptions\(\{ barSpacing:5, rightOffset:15 \}\);[^\n]*\}[^\n]*\},/.test(src))
-  bad('chartResizer must re-weld barSpacing 5 + rightOffset 15 after every resize (no rollback on splitter/window resize)');
+if (!/it\.chart\.timeScale\(\)\.applyOptions\(\{ barSpacing:4, rightOffset:15 \}\);[^\n]*\}[^\n]*\},/.test(src))
+  bad('chartResizer must re-weld barSpacing 4 + rightOffset 15 after every resize (no rollback on splitter/window resize)');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} chart-scale problem(s).`); process.exit(1); }
-console.log('🟢 PASS: MT5 chart scale — slim candles (barSpacing 5 / minBarSpacing 0.8), wide right margin (rightOffset 15), 10px axis font + trimmed price margins (bigger canvas), dotted grid intact.');
+console.log('🟢 PASS: MT5 chart scale — slim candles (barSpacing 4 / minBarSpacing 0.8), wide right margin (rightOffset 15), 10px axis font + trimmed price margins (bigger canvas), dotted grid intact.');
