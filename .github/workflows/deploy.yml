@@ -1,0 +1,25 @@
+# Alpexa — gated Pages deploy. Push to the serving branch only goes live if the
+# verify gate (parse + tests + defect scan + render smoke) is GREEN.
+# ⚠️ Requires Repo Settings → Pages → Source = "GitHub Actions" (until then the
+# old branch-based Pages keeps serving and this workflow's publish job will fail).
+name: deploy
+on: { push: { branches: [ claude/wizardly-ritchie-lsRnz ] } }
+permissions: { contents: read, pages: write, id-token: write }
+concurrency: { group: pages, cancel-in-progress: true }
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Install parser (for verify's JSX parse arm)
+        run: npm i @babel/parser --no-save || true
+      - run: node tests/verify.js          # 🔴면 배포 중단
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: '.' }
+  publish:
+    needs: gate
+    runs-on: ubuntu-latest
+    environment: { name: github-pages }
+    steps: [ { uses: actions/deploy-pages@v4 } ]
