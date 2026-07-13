@@ -71,7 +71,7 @@ if (!/\{p\.symbol\.toLowerCase\(\)\}\{sfx\(p\.symbol\)\.toLowerCase\(\)\}/.test(
 // ── Profit is a CLEAN 2 decimals everywhere (no messy decimal expansion) ──
 if (/const pnl=\(n\)=>/.test(src)) bad('the decimal-expanding pnl() formatter must be removed (Profit = 2 decimals uniformly)');
 if (!/<td className=\{pl>=0\?'up':'down'\}>\{num\(pl\)\}<\/td>/.test(src)) bad('per-row Profit must use num() (2 decimals)');
-if (!/P\/L:<\/span> <b className=\{floating>=0\?'up':'down'\}>\{num\(floating\)\}<\/b>/.test(src)) bad('account P/L total (in the Balance bar) must use num() (2 decimals)');
+if (!/<td className=\{"pl-total "\+\(floating>=0\?'up':'down'\)\}>\{num\(floating\)\}<\/td>/.test(src)) bad('account P/L total (aligned under the Profit column) must use num() (2 decimals)');
 
 // ── production: NO P&L scale — both margin and P&L use the true contractSize ──
 if (/pnlContract|CRYPTO_PNL_SCALE/.test(src)) bad('the demo P&L visibility scale must be removed in production');
