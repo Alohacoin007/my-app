@@ -1760,10 +1760,19 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       const h=box.current.clientHeight; if(h<=0) return;
       let top,bot; try{ top=cs.coordinateToPrice(0); bot=cs.coordinateToPrice(h); }catch(e){ return; }
       if(top==null||bot==null||!isFinite(top)||!isFinite(bot)) return;
-      const step=gridStep(symbol); if(!(step>0)) return;
+      // ADAPTIVE density (MT5 does this): keep the 15-point BASE on tight charts (M1/M5), but step up
+      // in clean multiples (30·60·150…) on wide-range charts (H4 / volatile pairs) so the grid stays
+      // dense AND consistent everywhere — instead of a fixed 15-point over-flooding and getting capped
+      // to nothing (that was the 2×2 inconsistency: M5 had a grid, H4/GBP were blank).
+      const base=gridStep(symbol); if(!(base>0)) return;
+      const range=Math.max(top,bot)-Math.min(top,bot); if(!(range>0)) return;
+      const MAXLINES=40, rawM=range/(base*MAXLINES);
+      const LADDER=[1,2,3,4,6,10,15,20,30,40,60,100,150,200,300,500,1000,2000,5000,10000];
+      let m=LADDER[LADDER.length-1]; for(let li=0;li<LADDER.length;li++){ if(LADDER[li]>=rawM){ m=LADDER[li]; break; } }
+      const step=base*m;   // tight charts → m=1 (exactly 15 points); wide charts → next clean multiple
       const lo=Math.floor(Math.min(top,bot)/step)*step, hi=Math.ceil(Math.max(top,bot)/step)*step;
       const n=Math.round((hi-lo)/step)+1;
-      if(n<2||n>GRID_CAP){ if(gridLines.current.length){ clearGrid(); gridSig.current=''; } return; }   // guard: never flood the chart
+      if(n<2||n>GRID_CAP){ if(gridLines.current.length){ clearGrid(); gridSig.current=''; } return; }   // final backstop (rarely trips now that the step adapts)
       const sig=lo.toFixed(6)+'|'+n+'|'+step; if(sig===gridSig.current) return;                          // scale unmoved → no churn
       clearGrid(); gridSig.current=sig;
       const GDOT=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dotted)!=null?LightweightCharts.LineStyle.Dotted:1;
