@@ -2257,22 +2257,26 @@ const TAB_EMPTY={ News:['📰','News feed not connected'], Mailbox:['✉️','Ma
   Calendar:['📅','Economic calendar not connected'], Company:['🏛️','Alpexa Ltd · account & company info'],
   Alerts:['🔔','No alerts set'], Articles:['📄','No articles'], 'Code Base':['💾','Code Base is empty'], Experts:['🤖','No Expert Advisors attached'] };
 function ExposureTab({ pos, mids, equity, leverage }){
-  const net={}; pos.forEach(p=>{ const d=sideUp(p.side)==='SELL'?-1:1; net[p.symbol]=(net[p.symbol]||0)+d*lotsOf(p); });
-  const rows=Object.keys(net).filter(s=>Math.abs(net[s])>1e-9);
+  // aggregate per symbol into long/short lots so a HEDGED book (buy 0.01 + sell 0.01) still shows:
+  // Net = long−short (can be 0 = Flat), but Notional/Margin are GROSS (both legs) — the capital really
+  // at work, matching the bottom bar's margin. Any symbol with an open position renders (net 0 or not).
+  const agg={}; pos.forEach(p=>{ const s=p.symbol, lots=lotsOf(p); const a=agg[s]||(agg[s]={long:0,short:0});
+    if(sideUp(p.side)==='SELL') a.short+=lots; else a.long+=lots; });
+  const rows=Object.keys(agg).filter(s=>(agg[s].long+agg[s].short)>1e-9);
   const num=(n)=>(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-  // notional = full market value; MARGIN = the capital actually locked (notional / capped leverage).
-  // We trade on margin, so "% of Equity" is MARGIN/equity (capital utilization), not notional/equity.
-  const notl=(s)=> Math.abs(net[s])*contractSize(s)*baseUsdRate(s);
-  const marg=(s)=> requiredMargin(s, Math.abs(net[s]), leverage);
+  const net=(s)=> agg[s].long-agg[s].short;                  // signed net volume (0 → fully hedged)
+  const gross=(s)=> agg[s].long+agg[s].short;                // GROSS lots = real exposure / capital at work
+  const notl=(s)=> gross(s)*contractSize(s)*baseUsdRate(s);  // full market value of BOTH legs
+  const marg=(s)=> requiredMargin(s, gross(s), leverage);    // margin locked by BOTH legs (matches the bottom bar)
   const totN=rows.reduce((a,s)=>a+notl(s),0), totM=rows.reduce((a,s)=>a+marg(s),0), eq=+equity||0;
   return (
     <div className="postbl"><table className="pos">
       <thead><tr><th>Symbol</th><th>Net Volume</th><th>Direction</th><th>Notional (USD)</th><th>Margin (USD)</th><th>% of Equity</th></tr></thead>
       <tbody>
-        {!rows.length && <tr><td className="empty" colSpan="6">No net exposure</td></tr>}
-        {rows.map(s=>{ const v=net[s], mg=marg(s);
-          return (<tr key={s}><td>{s.toLowerCase()}{sfx(s).toLowerCase()}</td><td className={v>=0?'up':'down'}>{v.toFixed(2)}</td>
-            <td className={v>=0?'up':'down'}>{v>=0?'Long':'Short'}</td>
+        {!rows.length && <tr><td className="empty" colSpan="6">No open exposure</td></tr>}
+        {rows.map(s=>{ const v=net(s), mg=marg(s), flat=Math.abs(v)<1e-9, cls=flat?'':(v>0?'up':'down');
+          return (<tr key={s}><td>{s.toLowerCase()}{sfx(s).toLowerCase()}</td><td className={cls}>{v.toFixed(2)}</td>
+            <td className={cls}>{flat?'Flat (hedged)':(v>0?'Long':'Short')}</td>
             <td>{num(notl(s))}</td><td>{num(mg)}</td><td>{eq>0?(mg/eq*100).toFixed(2)+' %':'—'}</td></tr>); })}
       </tbody>
       {rows.length>0 && <tfoot><tr className="acctrow"><td colSpan="6"><div className="acctline">
