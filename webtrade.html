@@ -1332,7 +1332,7 @@ function BigFig({ symbol, v }){
 }
 function OrderBox({ symbol }){
   const [m,setM]=React.useState(priceStore.get(symbol)||{});
-  const [vol,setVol]=React.useState('0.01');
+  const [vol,setVol]=React.useState('0.10');   // one-click starts at 0.1 lot (min 0.1)
   const [bidDir,setBidDir]=React.useState('up');   // SELL side follows Bid; BUY side follows Ask (independent, sticky)
   const [askDir,setAskDir]=React.useState('up');
   const prevBid=React.useRef(null), prevAsk=React.useRef(null);
@@ -1350,7 +1350,7 @@ function OrderBox({ symbol }){
   const tradable = open && eng.freeMargin>0;   // free-margin gate — no free margin → lock BUY/SELL
   const send=async(side)=>{
     if(!marketOpen(symbol)){ playSnd(sndError); alert(t('Market closed')); return; }   // reject before any RPC — 뚜엑
-    const need=eng.marginFor(symbol, +vol||0.01);     // margin this order would lock
+    const need=eng.marginFor(symbol, +vol||0.1);     // margin this order would lock
     if(eng.freeMargin<=0 || need>eng.freeMargin+1e-9){ playSnd(sndError); alert(t('Margin Call — insufficient free margin')); return; }   // 증거금 부족 → 거절
     if(busyRef.current) return;                       // debounce — 한 번에 한 주문만(레이스/이중발사 차단)
     busyRef.current=side; setBusy(side);
@@ -1373,7 +1373,7 @@ function OrderBox({ symbol }){
   };
   // lot stepper: click = ±0.01; PRESS-AND-HOLD = auto-repeat that accelerates (interval 320ms → 25ms).
   const holdRef=React.useRef(null);
-  const bump=(sign)=> setVol(v=> Math.max(0.01,(+v||0.01)+sign*0.01).toFixed(2));   // functional → no stale closure during repeat
+  const bump=(sign)=> setVol(v=> Math.max(0.1,(+v||0.1)+sign*0.01).toFixed(2));   // min 0.1 lot; functional → no stale closure during repeat
   const hold=(sign)=>{ bump(sign); let d=320;   // one step immediately (also serves the plain click)
     const run=()=>{ bump(sign); d=Math.max(25, d*0.75); holdRef.current=setTimeout(run, d); };   // accelerate
     holdRef.current=setTimeout(run, d); };

@@ -10,7 +10,7 @@ let fail = 0;
 const bad = (m) => { console.error('🔴 ' + m); fail++; };
 
 // ── static: hold wiring on both arrows (mouse + touch), functional bump, accelerating interval ──
-if (!/const bump=\(sign\)=> setVol\(v=> Math\.max\(0\.01,\(\+v\|\|0\.01\)\+sign\*0\.01\)\.toFixed\(2\)\);/.test(src)) bad('bump must functionally step ±0.01 (no stale closure)');
+if (!/const bump=\(sign\)=> setVol\(v=> Math\.max\(0\.1,\(\+v\|\|0\.1\)\+sign\*0\.01\)\.toFixed\(2\)\);/.test(src)) bad('bump must functionally step ±0.01, floored at 0.1 (one-click min lot)');
 if (!/const hold=\(sign\)=>\{ bump\(sign\); let d=320;/.test(src)) bad('hold must fire once then start the repeat at 320ms');
 if (!/d=Math\.max\(25, d\*0\.75\); holdRef\.current=setTimeout\(run, d\);/.test(src)) bad('repeat interval must accelerate toward 25ms');
 if (!/const release=\(\)=>\{ if\(holdRef\.current\)\{ clearTimeout\(holdRef\.current\); holdRef\.current=null; \} \};/.test(src)) bad('release must clear the repeat timer');
@@ -20,10 +20,10 @@ if (!/onMouseDown=\{\(e\)=>\{e\.stopPropagation\(\);hold\(1\);\}\}[^>]*onTouchSt
 if (/onClick=\{dec\}|onClick=\{inc\}/.test(src)) bad('the old click-only dec/inc handlers must be gone');
 
 // ── behavioural: step math + acceleration ──
-const bump = (v, sign)=> Math.max(0.01,(+v||0.01)+sign*0.01).toFixed(2);
-if (bump('0.01', 1) !== '0.02') bad('▲ from 0.01 → 0.02');
-if (bump('0.01', -1) !== '0.01') bad('▼ floors at 0.01 (no negative/zero lots)');
-if (bump('0.10', 1) !== '0.11') bad('▲ from 0.10 → 0.11 (no float dust)');
+const bump = (v, sign)=> Math.max(0.1,(+v||0.1)+sign*0.01).toFixed(2);
+if (bump('0.10', 1) !== '0.11') bad('▲ from 0.10 → 0.11');
+if (bump('0.10', -1) !== '0.10') bad('▼ floors at 0.10 (one-click min lot, no lower)');
+if (bump('0.20', 1) !== '0.21') bad('▲ from 0.20 → 0.21 (no float dust)');
 // interval accelerates and floors at 25ms
 let d = 320, n = 0; while (d > 25) { d = Math.max(25, d*0.75); n++; }
 if (d !== 25) bad('interval must reach the 25ms floor');
