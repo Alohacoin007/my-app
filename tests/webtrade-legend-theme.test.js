@@ -96,7 +96,7 @@ if (!/\.terminal\.light \.acctline \.k\{color:#a2aab6[^}]*\}\.terminal\.light \.
 // webtrade-oneclick-neon.test.js): a single bordered .obox, direction skin on the shell,
 // and NO per-side neon card skins (they were retired with the five-box look).
 if (/\.oc-sell\{background:linear-gradient|\.oc-buy\{background:linear-gradient/.test(src)) bad('per-side neon card skins must stay retired (one-shell design)');
-if (!/\.obox\{[^}]*border:1px solid #3c4049;border-radius:7px;/.test(src)) bad('the .obox one-shell card must exist (forced in both themes)');
+if (!/\.obox\{[^}]*border:1px solid #3c4049;box-shadow/.test(src)) bad('the .obox one-shell card must exist (forced in both themes)');
 
 // (4) UI label renamed to Legend (no "Light / Dark" left)
 if (/Color Theme — Light \/ Dark/.test(src)) bad('the menu label must be renamed away from "Light / Dark"');

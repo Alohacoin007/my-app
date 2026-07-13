@@ -17,8 +17,10 @@ let fail = 0;
 const bad = (m) => { console.error('🔴 ' + m); fail++; };
 
 // ── ONE shell: rounded single border + neutral default fill on .obox ──
-if (!/\.obox\{[^}]*border:1px solid #3c4049;border-radius:7px;[^}]*\}/.test(src))
-  bad('.obox must be the ONE shell — single #3c4049 border, 7px radius');
+if (!/\.obox\{[^}]*border:1px solid #3c4049;box-shadow[^}]*\}/.test(src))
+  bad('.obox must be the ONE shell — single #3c4049 border');
+if (/\.obox\{[^}]*border-radius/.test(src))
+  bad('.obox must be RECTANGULAR (2026-07-13 user request — no rounding anywhere on the panel)');
 if (!/\.obox\{[^}]*background:linear-gradient\(to bottom,#15171c 0%,#0b0d11 100%\)[^}]*\}/.test(src))
   bad('.obox must carry the neutral carbon fill (children stay transparent)');
 
