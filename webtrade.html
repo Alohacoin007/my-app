@@ -801,7 +801,7 @@ if(typeof document!=='undefined'){ ['touchstart','pointerdown','click','keydown'
 // Market Watch symbols by CLASS (Forex / Stocks / Crypto). Prices are simulated in this DEMO
 // terminal (WT_DEMO) — stocks/crypto get a BASE seed + random walk like FX, honest for a demo.
 const SYMBOLS = {
-  Forex:  ['EURUSD','AUDUSD','USDJPY','GBPUSD','USDCAD','NZDUSD','USDCHF','GBPJPY','AUDJPY','EURJPY'],
+  Forex:  ['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCAD','USDCHF','NZDUSD','GBPJPY','AUDJPY','EURJPY'],   // 7 FX majors first (canonical order), then JPY crosses
   Stocks: ['AAPL','MSFT','NVDA','TSLA','AMZN','GOOGL','META'],
   Crypto: ['BTCUSD','ETHUSD','SOLUSD','XRPUSD','DOGEUSD'],
 };
@@ -818,6 +818,9 @@ const GRID  = ['USDJPY','USDCHF','EURUSD','GBPUSD'];   // the default 2×2 (TL·
 const TOP20 = ['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCAD','USDCHF','NZDUSD',   // FX grouped first
   'BTCUSD','ETHUSD','SOLUSD','XRPUSD','DOGEUSD',                               // crypto
   'AAPL','MSFT','NVDA','TSLA','AMZN','GOOGL','META','SPACEX'];                 // stocks
+// The 7 classic FX majors — pinned to the TOP of the Market Watch in this exact order, ahead of every
+// crypto/stock/cross, in EVERY view (default Top-20, class filter, search) via the symbolStore sort.
+const MAJORS = ['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCAD','USDCHF','NZDUSD'];
 const SERVER_CLS = {};   // symbol → fx_specs.cls (FX/CRYPTO/STOCK/INDEX), filled by symbolStore.load()
 const CLS_MAP = { FX:'Forex', FOREX:'Forex', CRYPTO:'Crypto', STOCK:'Stocks', STK:'Stocks', INDEX:'Index' };
 // Asset class for ANY symbol: known Market-Watch default → SYM_CAT; else the server class (fx_specs);
@@ -835,9 +838,13 @@ const symbolStore = {
     if(sp&&sp.data) sp.data.forEach(x=>{ if(x.symbol&&x.cls) SERVER_CLS[x.symbol]=String(x.cls).toUpperCase(); });
     if(pr&&pr.data&&pr.data.length){
       const live=pr.data.map(x=>x.symbol).filter(Boolean);
-      // order: Forex → Stocks → Crypto → Index → other, alphabetical within (stable MT5-like grouping)
+      // order: 7 FX majors (fixed order) → Forex → Stocks → Crypto → Index → other, alphabetical within
       const rank={Forex:0,Stocks:1,Crypto:2,Index:3};
-      live.sort((a,b)=>{ const ra=rank[catOf(a)]??9, rb=rank[catOf(b)]??9; return ra-rb || (a<b?-1:a>b?1:0); });
+      live.sort((a,b)=>{
+        const ma=MAJORS.indexOf(a), mb=MAJORS.indexOf(b);
+        if(ma>=0||mb>=0){ if(ma>=0&&mb>=0) return ma-mb; return ma>=0?-1:1; }   // majors pinned to the very top, in canonical order
+        const ra=rank[catOf(a)]??9, rb=rank[catOf(b)]??9; return ra-rb || (a<b?-1:a>b?1:0);
+      });
       this.list=live; this.loaded=true; this.notify();
     }
   } }catch(e){} },
