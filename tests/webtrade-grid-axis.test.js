@@ -37,12 +37,8 @@ if (!/cmd==='chart\.grid' && \(arg===idx \|\| \(arg==null && activeRef\.current\
   bad('a bare chart.grid must toggle the ACTIVE chart (arg==null && activeRef.current)');
 // grid stays a #2A2A2A dotted mask (dark theme)
 if (!/dark:  \{ bg:'#000000', text:'#ffffff', grid:'#2a2a2a'/.test(src)) bad('dark grid must stay #2A2A2A');
-// vertical (time) grid stays native #2A2A2A dotted; the HORIZONTAL grid is now the fixed 15-point
-// createPriceLine grid (native horzLines off) — MT5 checkerboard preserved, horizontals forced to 15 points
-if (!/grid:\{ vertLines:\{color:th0\.grid, style:DOT\}, horzLines:\{visible:false\} \}/.test(src)) bad('vertical grid dotted + native horizontals OFF (replaced by the 15-point grid)');
-if (!/const gridStep = \(s\)=>/.test(src)) bad('fixed 15-point gridStep helper missing (FX 0.00015 / JPY 0.015 / crypto weighted)');
-if (!/gridLines\.current\.push\(cs\.createPriceLine\(\{ price, color:'#2a2a2a', lineWidth:1, lineStyle:GDOT, axisLabelVisible:true/.test(src)) bad('horizontal grid must be #2A2A2A dotted createPriceLine pins with price labels (the 15-point grid)');
-if (!/if\(n<2\|\|n>GRID_CAP\)/.test(src)) bad('the 15-point grid must cap its line count (crypto flood guard)');
+// grid stays a #2A2A2A dotted mask on BOTH axes (native LWC grid — no overlay)
+if (!/grid:\{ vertLines:\{color:th0\.grid, style:DOT\}, horzLines:\{color:th0\.grid, style:DOT\} \}/.test(src)) bad('grid must be dotted on both axes');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} grid-axis problem(s).`); process.exit(1); }
-console.log('🟢 PASS: 8px axis, X-axis "DD Mon HH:MM" formatter, toolbar Grid On/Off + Ctrl+G, and the fixed 15-point horizontal createPriceLine grid (#2A2A2A dotted, capped) replacing native horizontals.');
+console.log('🟢 PASS: 8px axis (denser ticks), X-axis "DD Mon HH:MM" formatter, and a toolbar Grid On/Off + Ctrl+G toggle on the active chart (#2A2A2A dotted, both axes).');
