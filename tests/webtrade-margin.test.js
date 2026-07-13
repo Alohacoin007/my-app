@@ -62,6 +62,8 @@ if (!/\{open && !canAfford && <div className="om-closed">⚠ \{t\(.Margin Call/.
 // bottom bar: margin-call band at <100%, stop-out at the server 30% threshold
 // Margin Level colour: >100% (safe) = green (up), ≤100% (margin call / stop out) = red (down) — never red when safe
 if (!/<b className=\{marginUsed>0&&level<100\?'down':''\}>/.test(src)) bad('Margin Level must be neutral when safe (>100%) and red (down) ONLY at ≤100% — MT5-style, no green');
+// the bottom account bar keeps Profit/Margin-Level coloured: .acctline .up/.down must override the white .acctline b
+if (!/\.acctline \.up\{color:var\(--up\)\}\.acctline \.down\{color:var\(--down\)\}/.test(src)) bad('acctline .up/.down colour rule missing — Profit would render white (default theme), not red/green');
 if (!/marginUsed>0&&level<100&&level>=30 &&/.test(src)) bad('bottom bar must warn Margin Call between 30% and 100%');
 if (!/marginUsed>0&&level<30 && <b style=\{\{color:'#ff5252',marginLeft:6\}\}>⛔ Stop Out &lt;30%/.test(src)) bad('bottom bar Stop-Out warning must fire at <30% (server fx_stopout threshold), not <50%');
 
