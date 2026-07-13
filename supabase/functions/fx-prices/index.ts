@@ -58,26 +58,36 @@ Deno.serve(async (req) => {
     if (!POLY) return json({ ok: false, error: "POLYGON_KEY not set" }, 500);
     const tf = url.searchParams.get("tf") || "M15";
     const MAP: Record<string, [number, string]> = {
-      M1: [1, "minute"], M5: [5, "minute"], M15: [15, "minute"],
+      M1: [1, "minute"], M5: [5, "minute"], M15: [15, "minute"], M30: [30, "minute"],
       H1: [1, "hour"], H4: [4, "hour"], D1: [1, "day"], W1: [1, "week"],
     };
     const [mult, span] = MAP[tf] || [15, "minute"];
     const unitMs: Record<string, number> =
       { minute: 60000, hour: 3600000, day: 86400000, week: 604800000 };
-    const n = 200;   // clients validate ≥160 (webtrade fetchRealCandles) — 120 was auto-rejected
-    const to = Date.now();
-    const from = to - n * mult * (unitMs[span] || 60000) * 3; // 3x buffer for closed-market gaps
+    // DEEP HISTORY (2026-07-13): the client asks for &n= bars (H4 ≈ 6.8y · D1 ≈ 15y · W1 ≈ 30y).
+    // Polygon caps 5000/request → page BACKWARDS (sort=desc, `to` walks past the oldest bar).
+    const n = Math.max(200, Math.min(15000, parseInt(url.searchParams.get("n") || "200", 10) || 200));
     const sym = candlesSym.replace(/[^A-Za-z]/g, "").toUpperCase();
-    const aggUrl =
-      `https://api.polygon.io/v2/aggs/ticker/C:${sym}/range/${mult}/${span}/${from}/${to}?adjusted=true&sort=asc&limit=5000&apiKey=${POLY}`;
+    const earliest = Date.now() - n * mult * (unitMs[span] || 60000) * 4;   // 4x buffer for closed-market gaps
     try {
-      const r = await fetch(aggUrl);
-      const j = await r.json();
-      if (!r.ok) return json({ ok: false, error: "polygon " + r.status, detail: j }, 502);
-      const results: any[] = Array.isArray(j.results) ? j.results : [];
-      const candles = results
+      let out: any[] = [];
+      let to = Date.now();
+      for (let page = 0; page < 4 && out.length < n && to > earliest; page++) {
+        const aggUrl =
+          `https://api.polygon.io/v2/aggs/ticker/C:${sym}/range/${mult}/${span}/${earliest}/${to}?adjusted=true&sort=desc&limit=5000&apiKey=${POLY}`;
+        const r = await fetch(aggUrl);
+        const j = await r.json();
+        if (!r.ok) { if (!out.length) return json({ ok: false, error: "polygon " + r.status, detail: j }, 502); break; }
+        const results: any[] = Array.isArray(j.results) ? j.results : [];
+        if (!results.length) break;
+        out = out.concat(results);
+        to = results[results.length - 1].t - 1;   // desc → last row is the oldest of this page
+        if (results.length < 5000) break;
+      }
+      const candles = out
         .map((x) => ({ t: x.t, o: x.o, h: x.h, l: x.l, c: x.c, v: x.v || 0 }))
         .filter((c) => isFinite(c.c) && c.c > 0)
+        .sort((a, b) => a.t - b.t)
         .slice(-n);
       return json({ ok: true, symbol: sym, tf, candles });
     } catch (e) {

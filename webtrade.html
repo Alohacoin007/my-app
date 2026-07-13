@@ -1192,24 +1192,34 @@ const WINLAYOUT=[
 // historical bars. We accept the feed ONLY when it's a genuinely FULL, finite, strictly-ascending,
 // de-duplicated history (≥160 bars) — otherwise the sparse/"2 giant candles"/unsorted response is
 // dropped so it can never blank or corrupt the chart. Capped at 4s so a slow feed never stalls a tile.
+// DEEP HISTORY (2026-07-13 user request): bars per timeframe, sized to what a browser chart can
+// actually hold — H4 ≈ 6.8y · D1 ≈ 15y · W1 ≈ 30y of real history; minute TFs stay shallow on
+// purpose (10y of M1 ≈ 3.7M bars — MT5 makes the same trade-off via "Max bars in chart").
+const HIST_N={ M1:5000, M5:5000, M15:10000, M30:10000, H1:15000, H4:15000, D1:3900, W1:1560 };
 async function fetchRealCandles(symbol, tf){
   if(WT_DEMO) return null;
   try{
-    const t=tf||'M15';
+    const t=tf||'M15', n=HIST_N[t]||5000;
     // Transport is a plain GET with a QUERY STRING — the Edge reads url.searchParams, and the old
     // {body:{candles}} invoke never reached it (triple-dead path, 2026-07-13). No cron token here:
     // candles are read-only market data served before the Edge's CRON gate.
     let raw=null;
     if(catOf(symbol)==='Crypto'){
       // Binance public mirror klines — the SAME book the live WS streams; no key, real OHLC.
-      const IV={M1:'1m',M5:'5m',M15:'15m',M30:'30m',H1:'1h',H4:'4h',D1:'1d'};
-      const req=fetch('https://data-api.binance.vision/api/v3/klines?symbol='+symbol+'T&interval='+(IV[t]||'15m')+'&limit=200')
-        .then(r=>r.ok?r.json():null).then(j=>Array.isArray(j)?j.map(k=>({t:+k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4]})):null);
-      raw=await Promise.race([req,new Promise(res=>setTimeout(()=>res(null),4000))]);
+      // 1000 bars per request → walk endTime backwards up to 5 pages for the deep history.
+      const IV={M1:'1m',M5:'5m',M15:'15m',M30:'30m',H1:'1h',H4:'4h',D1:'1d',W1:'1w'};
+      const req=(async()=>{ let out=[], end=Date.now();
+        for(let p=0;p<5&&out.length<Math.min(5000,n);p++){
+          const r=await fetch('https://data-api.binance.vision/api/v3/klines?symbol='+symbol+'T&interval='+(IV[t]||'15m')+'&limit=1000&endTime='+end);
+          if(!r.ok) break; const j=await r.json(); if(!Array.isArray(j)||!j.length) break;
+          out=j.concat(out); end=j[0][0]-1; if(j.length<1000) break;
+        }
+        return out.length?out.map(k=>({t:+k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4]})):null; })();
+      raw=await Promise.race([req,new Promise(res=>setTimeout(()=>res(null),10000))]);
     } else if(catOf(symbol)==='Forex'){
-      const req=fetch('https://grxnbgtfnaayeluenvqh.supabase.co/functions/v1/fx-prices?candles='+symbol+'&tf='+t)
+      const req=fetch('https://grxnbgtfnaayeluenvqh.supabase.co/functions/v1/fx-prices?candles='+symbol+'&tf='+t+'&n='+n)
         .then(r=>r.ok?r.json():null).then(j=>(j&&Array.isArray(j.candles))?j.candles:null);
-      raw=await Promise.race([req,new Promise(res=>setTimeout(()=>res(null),4000))]);
+      raw=await Promise.race([req,new Promise(res=>setTimeout(()=>res(null),10000))]);
     } else return null;   // stocks: no real OHLC source wired yet → deterministic synth fallback
     if(!Array.isArray(raw)) return null;
     const bars=raw.map(c=>({ time:Math.floor((c.t||c.time)/1000), open:+c.o||+c.open, high:+c.h||+c.high, low:+c.l||+c.low, close:+c.c||+c.close }))
@@ -1783,7 +1793,10 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     // MT5 look: pure-black canvas, dense grey DOTTED gridlines, Tahoma scales.
     const DOT=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dotted)!=null?LightweightCharts.LineStyle.Dotted:1;
     const th0=CHART_THEME[themeBus.theme]||CHART_THEME.dark;
-    try{ box.current.innerHTML=''; }catch(e){}   // scrub any leftover canvas — a swallowed remove() failure must never stack two charts
+    // Scrub only leftover CHART roots (a swallowed remove() failure must never stack two charts).
+    // NEVER innerHTML='' — the box also holds React children (drawlayer, OrderBox) and wiping them
+    // vanished the one-click panel in production (2026-07-13 결함-로그).
+    try{ box.current.querySelectorAll('.tv-lightweight-charts').forEach(el=>el.remove()); }catch(e){}
     const c=LightweightCharts.createChart(box.current, {
       layout:{ background:{color:th0.bg}, textColor:th0.text, fontSize:8, fontFamily:"Tahoma, 'Segoe UI', Arial, sans-serif", attributionLogo:false },   // 8px axis labels → LWC packs MORE Y-price + X-time ticks (denser 23-ish grid; no tick-count API in LWC)
       grid:{ vertLines:{color:th0.grid, style:DOT}, horzLines:{color:th0.grid, style:DOT} },

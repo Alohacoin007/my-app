@@ -49,9 +49,13 @@ if (!/\(series\.current\|\|s\)\.setData\(/.test(src))
   bad('applyBars must draw on the CURRENT series (a type swap replaces it mid-flight)');
 if (!/if\(typeInit\.current\)\{ typeInit\.current=false; return; \}/.test(src))
   bad('the [chartType] effect must SKIP its mount run (it replaced the fresh series with an empty clone at boot)');
-// container is scrubbed before createChart — no stacked canvases class, ever
-if (!/box\.current\.innerHTML='';/.test(src))
-  bad('the chart container must be scrubbed before createChart (kills any stacked-canvas leak)');
+// leftover CHART ROOTS are scrubbed before createChart (no stacked canvases) — but NEVER
+// innerHTML='' : the box holds React children (drawlayer, OrderBox) and wiping them vanished
+// the one-click panel in production (2026-07-13)
+if (!/box\.current\.querySelectorAll\('\.tv-lightweight-charts'\)\.forEach\(el=>el\.remove\(\)\);/.test(src))
+  bad('scrub must target only .tv-lightweight-charts roots');
+if (/box\.current\.innerHTML=''/.test(src))
+  bad('innerHTML wipe is FORBIDDEN — it deletes the React children (OrderBox/drawlayer)');
 
 // 3) fetchRealCandles: real-or-NULL, validated (full + sorted), timed out, NOT gated by market hours
 const fr = (src.match(/async function fetchRealCandles\(symbol, tf\)\{[\s\S]*?\n\}/) || [''])[0];
@@ -59,7 +63,7 @@ if (!fr) bad('fetchRealCandles not found');
 if (!/if\(WT_DEMO\) return null;/.test(fr)) bad('fetchRealCandles must no-op in demo');
 if (!/bars\.length<160\) return null;/.test(fr)) bad('fetchRealCandles must require a FULL history (≥160) or return null (seed stays)');
 if (!/bars\[i\]\.time<=bars\[i-1\]\.time\) return null;/.test(fr)) bad('fetchRealCandles must reject unsorted/duplicate bars (LWC would blank the chart)');
-if (!/setTimeout\(\(\)=>res\(null\),4000\)/.test(fr)) bad('fetchRealCandles must time out (a slow feed must never stall the chart)');
+if (!/setTimeout\(\(\)=>res\(null\),10000\)/.test(fr)) bad('fetchRealCandles must time out (a slow deep-history feed must never stall the chart)');
 if (/\bmarketOpen\s*\(/.test(fr)) bad('fetchRealCandles must NOT call marketOpen — closed symbols must still fetch history');
 
 // 4) the seed is a LONG history for backward scroll

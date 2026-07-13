@@ -23,7 +23,12 @@ const grab = (s, re, label) => { const m = s.match(re); if (!m) bad(label + ' no
 // ── client: GET query-string transport, no secrets, per-class sources ──
 const fr = grab(src, /async function fetchRealCandles\(symbol, tf\)\{[\s\S]*?\n\}/, 'fetchRealCandles');
 if (fr && /functions\.invoke\('fx-prices'/.test(fr)) bad('the dead body-invoke transport must be gone (the Edge reads the query string)');
-if (fr && !/fx-prices\?candles='\+symbol\+'&tf='/.test(fr)) bad('FX candles must be fetched as GET ?candles=&tf=');
+if (fr && !/fx-prices\?candles='\+symbol\+'&tf='\+t\+'&n='\+n/.test(fr)) bad('FX candles must be fetched as GET ?candles=&tf=&n= (deep history)');
+// deep history depth map (2026-07-13 user request: 5-10y where the browser can take it)
+if (!/const HIST_N=\{ M1:5000, M5:5000, M15:10000, M30:10000, H1:15000, H4:15000, D1:3900, W1:1560 \};/.test(src))
+  bad('HIST_N depth map missing (H4 6.8y · D1 15y · W1 30y)');
+if (fr && !/endTime='\+end/.test(fr)) bad('crypto must PAGINATE klines (1000/req endTime walk) to reach 5000 bars');
+if (fr && !/setTimeout\(\(\)=>res\(null\),10000\)/.test(fr)) bad('deep loads need the 10s cap (seed paints at 1.2s meanwhile)');
 if (fr && /token=/.test(fr)) bad('the client must NEVER carry a cron token');
 if (fr && !/data-api\.binance\.vision\/api\/v3\/klines/.test(fr)) bad('crypto candles must come from the Binance public mirror klines');
 if (fr && !/if\(WT_DEMO\) return null;/.test(fr)) bad('demo must stay synthetic');
@@ -36,7 +41,9 @@ if (!/Math\.sqrt\(\(TF_SEC\[tf\]\|\|900\)\/900\)/.test(src))
 if (edge.indexOf('candlesSym') === -1) bad('Edge candles branch missing');
 else if (edge.indexOf('candlesSym') > edge.indexOf('CRON_SECRET not configured'))
   bad('the Edge candles branch must run BEFORE the CRON_SECRET gate (read-only market data, client-callable)');
-if (!/const n = 200;/.test(edge)) bad('the Edge must return 200 bars (client requires ≥160)');
+if (!/Math\.max\(200, Math\.min\(15000, /.test(edge)) bad('the Edge must accept &n= clamped to [200,15000]');
+if (!/sort=desc&limit=5000/.test(edge)) bad('the Edge must page Polygon (sort=desc, 5000/page) for deep history');
+if (!/M30: \[30, "minute"\]/.test(edge)) bad('the Edge tf map must include M30 (it silently served M15)');
 
 // ── behavioural: run the real client fetcher against stub fetch ──
 if (!fail) {
@@ -47,8 +54,9 @@ if (!fail) {
   const fetch_ = async (u) => { lastUrl = String(u);
     if (/binance\.vision/.test(u)) return { ok: true, json: async () => mkKlines(200) };
     return { ok: true, json: async () => ({ ok: true, candles: mkBars(200) }) }; };
+  const histn = grab(src, /const HIST_N=\{[^\n]*/, 'HIST_N');
   const fn = new Function('WT_DEMO', 'catOf', 'fetch', 'window', 'AlpexaSync',
-    fr + '\nreturn fetchRealCandles;')(false, catOf, fetch_, {}, {});
+    histn + '\n' + fr + '\nreturn fetchRealCandles;')(false, catOf, fetch_, {}, {});
   return (async () => {
     const fx = await fn('EURUSD', 'M1');
     if (!/fx-prices\?candles=EURUSD&tf=M1/.test(lastUrl)) bad('FX request must be ?candles=EURUSD&tf=M1, got ' + lastUrl);
@@ -59,7 +67,7 @@ if (!fail) {
     if (!cr || cr.length !== 200 || cr[0].close !== 62050) bad('klines rows must map to OHLC bars');
     const st = await fn('AAPL', 'M1');
     if (st !== null) bad('stocks must stay on the synth fallback (no real source wired)');
-    const short = new Function('WT_DEMO', 'catOf', 'fetch', 'window', 'AlpexaSync', fr + '\nreturn fetchRealCandles;')(
+    const short = new Function('WT_DEMO', 'catOf', 'fetch', 'window', 'AlpexaSync', histn + '\n' + fr + '\nreturn fetchRealCandles;')(
       false, catOf, async () => ({ ok: true, json: async () => ({ ok: true, candles: mkBars(120) }) }), {}, {});
     if ((await short('EURUSD', 'M1')) !== null) bad('a sparse (<160) history must be rejected (seed stays)');
     if (fail) { console.error(`\n🔴 FAIL — ${fail} real-candles problem(s).`); process.exit(1); }
