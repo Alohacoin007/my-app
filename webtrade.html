@@ -855,6 +855,10 @@ const sfx   = (s)=> catOf(s)==='Forex' ? '.FX' : catOf(s)==='Crypto' ? '.CR' : '
 const pip   = (s)=> (catOf(s)==='Stocks'||catOf(s)==='Crypto') ? 0.01 : (s.slice(3)==='JPY'||s.slice(0,3)==='JPY' ? 0.01 : 0.0001);
 const digits= (s)=> (catOf(s)==='Stocks'||catOf(s)==='Crypto') ? 2 : (s.includes('JPY') ? 3 : 5);
 const fmtPx = (s,v)=> (v==null?'—':(+v).toFixed(digits(s)));
+// MT5-style X-axis tick: "12 Jul 23:22" (UTC-aligned, matches the bucketed candle times).
+const MON3 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fmtMt5Tick = (t)=>{ const d=new Date((typeof t==='number'?t:0)*1000), p=n=>(n<10?'0':'')+n;
+  return p(d.getUTCDate())+' '+MON3[d.getUTCMonth()]+' '+p(d.getUTCHours())+':'+p(d.getUTCMinutes()); };
 // ── Trading-hours session calendar (CLIENT GATE). A regulated broker opens/closes by SESSION, not
 //    by feed freshness: prices.updated_at re-stamps even on weekends (harness finding) so it is
 //    useless as an "open" signal. Crypto 24/7; Forex Sun 22:00 → Fri 22:00 UTC; US stocks Mon–Fri
@@ -1615,9 +1619,9 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     const DOT=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dotted)!=null?LightweightCharts.LineStyle.Dotted:1;
     const th0=CHART_THEME[themeBus.theme]||CHART_THEME.dark;
     const c=LightweightCharts.createChart(box.current, {
-      layout:{ background:{color:th0.bg}, textColor:th0.text, fontSize:10, fontFamily:"Tahoma, 'Segoe UI', Arial, sans-serif", attributionLogo:false },   // slim 10px axis labels → more canvas
+      layout:{ background:{color:th0.bg}, textColor:th0.text, fontSize:8, fontFamily:"Tahoma, 'Segoe UI', Arial, sans-serif", attributionLogo:false },   // 8px axis labels → LWC packs MORE Y-price + X-time ticks (denser 23-ish grid; no tick-count API in LWC)
       grid:{ vertLines:{color:th0.grid, style:DOT}, horzLines:{color:th0.grid, style:DOT} },
-      timeScale:{ borderColor:th0.border, timeVisible:true, secondsVisible:false, ticksVisible:false, barSpacing:5, minBarSpacing:0.8, rightOffset:15 },   // SLIM time axis (font 10 → ~20px, no tick nubs — LWC has no pixel height, it is font-driven) + barSpacing/rightOffset lock
+      timeScale:{ borderColor:th0.border, timeVisible:true, secondsVisible:false, ticksVisible:false, barSpacing:5, minBarSpacing:0.8, rightOffset:15, tickMarkFormatter:fmtMt5Tick },   // X ticks = "12 Jul 23:22" (date+time); slim font packs more intervals
       rightPriceScale:{ borderColor:th0.border, ticksVisible:false, scaleMargins:{top:0.05, bottom:0.05} },   // EXPAND candle canvas vertically (0.08→0.05) → the wave amplitude fills the frame like MT5, no tick nubs
       handleScale:{ mouseWheel:false, pinch:false, axisPressedMouseMove:{time:false, price:true} },   // BAR-SPACING LOCK: wheel/pinch/time-axis-drag can NEVER re-zoom the candle width (price-axis drag still ok)
       crosshair:{ vertLine:{color:th0.cross, style:DOT, visible: themeBus.theme!=='light', labelVisible: themeBus.theme!=='light'}, horzLine:{color:th0.cross, style:DOT, visible: themeBus.theme!=='light', labelVisible: themeBus.theme!=='light'} },   // LEGEND: no crosshair lines OR axis labels on hover (free mouse, MT5-like)
@@ -1740,7 +1744,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       const W=par.clientWidth||800, H=par.clientHeight||500, f=initial||{fx:0.02,fy:0.02,fw:0.48,fh:0.48};
       geo.current={ x:Math.round(f.fx*W), y:Math.round(f.fy*H), w:Math.max(WIN_MINW,Math.round(f.fw*W)), h:Math.max(WIN_MINH,Math.round(f.fh*H)) };
       applyGeo(); resizeChart(); winMode.current='normal'; reportGeo(); }
-    else if(cmd==='chart.grid' && arg===idx && chart.current){ gridOn.current=!gridOn.current;   // right-click Grid toggle (this chart)
+    else if(cmd==='chart.grid' && (arg===idx || (arg==null && activeRef.current)) && chart.current){ gridOn.current=!gridOn.current;   // Grid toggle: right-click (this chart) OR toolbar/Ctrl+G (arg-less → the ACTIVE chart)
       try{ chart.current.applyOptions({ grid:{ vertLines:{visible:gridOn.current}, horzLines:{visible:gridOn.current} } }); }catch(e){} }
     else if(cmd==='chart.clear' && arg===idx){ clearDrawings(); }   // Delete all objects (this chart)
     else if(cmd==='chart.undo' && arg===idx){ undoDraw(); }         // Delete last object (this chart)
@@ -2648,6 +2652,8 @@ function Toolbar({ tf, chartType, tool }){
       <div className="tsep"></div>
       {/* tile windows back to a 2×2 grid */}
       <div className="tibtn" title="Tile Windows (2×2)" onClick={()=>terminalBus.emit('window.tile')}>{IC.tile}</div>
+      {/* Grid On/Off (Ctrl+G) — toggles the active chart's background dotted grid */}
+      <div className="tibtn" title="Grid On/Off (Ctrl+G)" onClick={()=>terminalBus.emit('chart.grid')} style={{fontSize:'15px',lineHeight:'26px'}}>▦</div>
       <div className="tsep"></div>
       <div className="tf">{TFS.map(t=><b key={t} className={t===tf?'on':''} onClick={()=>terminalBus.emit('chart.tf',t)}>{t}</b>)}</div>
       <div className="tbrand">ALPEXA <span>WebTrade</span></div>
@@ -3054,6 +3060,7 @@ function App(){
       if(e.ctrlKey && k==='m'){ e.preventDefault(); setView(v=>({ ...v, marketwatch:!v.marketwatch })); }
       else if(e.ctrlKey && k==='n'){ e.preventDefault(); setView(v=>({ ...v, navigator:!v.navigator })); }
       else if(e.ctrlKey && k==='t'){ e.preventDefault(); setView(v=>({ ...v, toolbox:!v.toolbox })); }
+      else if(e.ctrlKey && k==='g'){ e.preventDefault(); terminalBus.emit('chart.grid'); }   // Grid On/Off on the active chart
       else if(e.key==='F9'){ e.preventDefault(); const ac=chartsRef.current.find(c=>c.id===actRef.current)||chartsRef.current[0]; setOrderSym(s=> s||(ac&&ac.symbol)||WATCH[0]); }
       else if(e.key==='F11'){ e.preventDefault(); try{ if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }catch(_){} }
     };

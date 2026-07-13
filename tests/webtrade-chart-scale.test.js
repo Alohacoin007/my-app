@@ -2,7 +2,7 @@
 // REGRESSION (webtrade) — the main chart engine is tuned to MT5-original proportions:
 //   [1] slim candles: default barSpacing 5 (slim, sharp candles) + minBarSpacing 0.8.
 //   [2] right margin: rightOffset 15 so the newest live candle breathes off the price axis.
-//   [3] slim axes: layout fontSize 10 (was 11) + trimmed price scaleMargins (0.08) → more candle canvas.
+//   [3] slim axes: layout fontSize 8 (was 11) + trimmed price scaleMargins (0.08) → more candle canvas.
 // The boot view sets the same slim density (barSpacing 5 + rightOffset 15 + scrollToRealTime), NOT
 // fitContent (which stretched all 400 seed bars to full width and fattened the candles).
 'use strict';
@@ -24,7 +24,7 @@ if (!/minBarSpacing:0\.8/.test(blk)) bad('main chart must set minBarSpacing 0.8 
 if (!/rightOffset:15/.test(blk)) bad('main chart must set rightOffset 15 (wide right margin)');
 
 // [3] slim axis font + trimmed vertical padding + no tick nubs → bigger canvas, thinner time axis
-if (!/fontSize:10\b/.test(blk)) bad('axis label font must be slimmed to 10px (was 11)');
+if (!/fontSize:8\b/.test(blk)) bad('axis label font must be slimmed to 8px (denser ticks)');
 if (!/rightPriceScale:\{ borderColor:th0\.border, ticksVisible:false, scaleMargins:\{top:0\.05, bottom:0\.05\}/.test(blk)) bad('right price scale must expand the canvas (scaleMargins 0.05) with no tick nubs');
 // the bottom TIME axis is slimmed: font-driven ~20px (LWC 4.2 has no pixel height) + no tick marks
 if (!/timeScale:\{ borderColor:th0\.border, timeVisible:true, secondsVisible:false, ticksVisible:false,/.test(blk)) bad('time axis must drop its tick nubs (ticksVisible:false) to slim the bottom bar');
@@ -52,4 +52,4 @@ if (!/it\.chart\.timeScale\(\)\.applyOptions\(\{ barSpacing:5, rightOffset:15 \}
   bad('chartResizer must re-weld barSpacing 5 + rightOffset 15 after every resize (no rollback on splitter/window resize)');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} chart-scale problem(s).`); process.exit(1); }
-console.log('🟢 PASS: MT5 chart scale — slim candles (barSpacing 5 / minBarSpacing 0.8), wide right margin (rightOffset 15), 10px axis font + trimmed price margins (bigger canvas), dotted grid intact.');
+console.log('🟢 PASS: MT5 chart scale — slim candles (barSpacing 5 / minBarSpacing 0.8), wide right margin (rightOffset 15), 8px axis font + trimmed price margins (bigger canvas), dotted grid intact.');
