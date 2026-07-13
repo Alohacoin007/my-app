@@ -38,7 +38,8 @@ if (g[4].fx === g[0].fx && g[4].fy === g[0].fy) bad('a cascaded window must not 
 
 // the render must actually float (no tiled prop) and pass initial geometry + onClose per window
 if (/tiled maxed=|tiled onClose/.test(src)) bad('charts must NOT be rendered tiled anymore');
-if (!/initial=\{floatGeo\(i\)\}/.test(src)) bad('ChartCell must receive initial={floatGeo(i)}');
+// boot = single maximized chart (fw:1,fh:1); once a 2nd chart opens, geometry falls back to floatGeo(i) (2×2)
+if (!/initial=\{charts\.length===1\?\{fx:0,fy:0,fw:1,fh:1\}:floatGeo\(i\)\}/.test(src)) bad('ChartCell initial must be full-stage when sole, else floatGeo(i)');
 if (!/className="chartstage"/.test(src)) bad('charts must render into the floating .chartstage');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} floating-layout problem(s).`); process.exit(1); }
