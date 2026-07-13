@@ -1194,17 +1194,30 @@ const WINLAYOUT=[
 // dropped so it can never blank or corrupt the chart. Capped at 4s so a slow feed never stalls a tile.
 async function fetchRealCandles(symbol, tf){
   if(WT_DEMO) return null;
-  try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.functions){
-    const req=AlpexaSync.db.functions.invoke('fx-prices',{body:{candles:symbol,tf:tf||'M15'}});
-    const cap=new Promise(res=>setTimeout(()=>res(null),4000));
-    const x=await Promise.race([req,cap]);
-    if(!x||x.error||!x.data||!Array.isArray(x.data.candles)) return null;
-    const bars=x.data.candles.map(c=>({ time:Math.floor((c.t||c.time)/1000), open:+c.o||+c.open, high:+c.h||+c.high, low:+c.l||+c.low, close:+c.c||+c.close }))
+  try{
+    const t=tf||'M15';
+    // Transport is a plain GET with a QUERY STRING — the Edge reads url.searchParams, and the old
+    // {body:{candles}} invoke never reached it (triple-dead path, 2026-07-13). No cron token here:
+    // candles are read-only market data served before the Edge's CRON gate.
+    let raw=null;
+    if(catOf(symbol)==='Crypto'){
+      // Binance public mirror klines — the SAME book the live WS streams; no key, real OHLC.
+      const IV={M1:'1m',M5:'5m',M15:'15m',M30:'30m',H1:'1h',H4:'4h',D1:'1d'};
+      const req=fetch('https://data-api.binance.vision/api/v3/klines?symbol='+symbol+'T&interval='+(IV[t]||'15m')+'&limit=200')
+        .then(r=>r.ok?r.json():null).then(j=>Array.isArray(j)?j.map(k=>({t:+k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4]})):null);
+      raw=await Promise.race([req,new Promise(res=>setTimeout(()=>res(null),4000))]);
+    } else if(catOf(symbol)==='Forex'){
+      const req=fetch('https://grxnbgtfnaayeluenvqh.supabase.co/functions/v1/fx-prices?candles='+symbol+'&tf='+t)
+        .then(r=>r.ok?r.json():null).then(j=>(j&&Array.isArray(j.candles))?j.candles:null);
+      raw=await Promise.race([req,new Promise(res=>setTimeout(()=>res(null),4000))]);
+    } else return null;   // stocks: no real OHLC source wired yet → deterministic synth fallback
+    if(!Array.isArray(raw)) return null;
+    const bars=raw.map(c=>({ time:Math.floor((c.t||c.time)/1000), open:+c.o||+c.open, high:+c.h||+c.high, low:+c.l||+c.low, close:+c.c||+c.close }))
       .filter(b=> Number.isFinite(b.time)&&Number.isFinite(b.open)&&Number.isFinite(b.high)&&Number.isFinite(b.low)&&Number.isFinite(b.close));
     if(bars.length<160) return null;                                   // must be a FULL history
     for(let i=1;i<bars.length;i++){ if(bars[i].time<=bars[i-1].time) return null; }   // sorted+distinct or LWC rejects → empty
     return bars;
-  } }catch(e){}
+  }catch(e){}
   return null;
 }
 const TF_SEC = { M1:60, M5:300, M15:900, M30:1800, H1:3600, H4:14400, D1:86400 };
@@ -1219,7 +1232,9 @@ function synthCandles(symbol, tf){
   const end=(priceStore.get(symbol)&&priceStore.get(symbol).mid)||BASE[symbol]||1;
   // FNV-1a hash → [0,1): stable pseudo-random keyed by symbol + a bar's absolute time.
   const h=(k)=>{ let s=0x811c9dc5>>>0; const str=symbol+'|'+k; for(let i=0;i<str.length;i++){ s=Math.imul(s^str.charCodeAt(i),0x01000193); } return (s>>>0)/4294967296; };
-  const vol=(symbol.indexOf('JPY')>=0?0.0011:0.0009);   // per-bar log-return scale
+  // Per-bar log-return scale ∝ √time (diffusion): the base was tuned on M15, so an M1 fallback
+  // scales down ~3.9× (was a flat 0.0009 ≈ 9 pips/M1 bar — the "6× wilder than MT5" look).
+  const vol=(symbol.indexOf('JPY')>=0?0.0011:0.0009)*Math.sqrt((TF_SEC[tf]||900)/900);
   // integrate a deterministic zero-mean walk, then shift so the LAST close == live mid (shape fixed,
   // only a tiny vertical offset tracks the drifting mid → the chart looks stable between refreshes).
   const cum=[0]; for(let i=0;i<n;i++) cum.push(cum[i]+(h(t0+i*step)-0.5)*vol);

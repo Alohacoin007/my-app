@@ -47,23 +47,15 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   const url = new URL(req.url);
-  // FAIL-CLOSED: no CRON_SECRET → 503 (a misconfig is loud, not silently world-callable).
-  // With the secret set, require ?token=<CRON_SECRET>. Matches sports-settle/stake-accrue.
-  const CRON_SECRET = Deno.env.get("CRON_SECRET");
-  if (!CRON_SECRET) return json({ ok: false, error: "CRON_SECRET not configured (fail-closed)" }, 503);
-  if (url.searchParams.get("token") !== CRON_SECRET) {
-    return json({ ok: false, error: "unauthorized" }, 401);
-  }
-
   const POLY = Deno.env.get("POLYGON_KEY");
-  const SB_URL = Deno.env.get("SUPABASE_URL");
-  const SB_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY");
-  if (!POLY) return json({ ok: false, error: "POLYGON_KEY not set" }, 500);
 
   // ── Candle history mode: ?candles=EURUSD&tf=M15 → real OHLC bars from Polygon ──
-  // Used by the trading chart (FX only). Returns bars; never touches the DB.
+  // Used by the trading charts (FX only). Read-only market data, never touches the DB —
+  // served BEFORE the CRON gate so clients can call it WITHOUT the cron token (2026-07-13:
+  // the gate used to sit first, so every client call died 401 and charts stayed synthetic).
   const candlesSym = url.searchParams.get("candles");
   if (candlesSym) {
+    if (!POLY) return json({ ok: false, error: "POLYGON_KEY not set" }, 500);
     const tf = url.searchParams.get("tf") || "M15";
     const MAP: Record<string, [number, string]> = {
       M1: [1, "minute"], M5: [5, "minute"], M15: [15, "minute"],
@@ -72,7 +64,7 @@ Deno.serve(async (req) => {
     const [mult, span] = MAP[tf] || [15, "minute"];
     const unitMs: Record<string, number> =
       { minute: 60000, hour: 3600000, day: 86400000, week: 604800000 };
-    const n = 120;
+    const n = 200;   // clients validate ≥160 (webtrade fetchRealCandles) — 120 was auto-rejected
     const to = Date.now();
     const from = to - n * mult * (unitMs[span] || 60000) * 3; // 3x buffer for closed-market gaps
     const sym = candlesSym.replace(/[^A-Za-z]/g, "").toUpperCase();
@@ -92,6 +84,18 @@ Deno.serve(async (req) => {
       return json({ ok: false, error: "polygon candles failed: " + String(e) }, 502);
     }
   }
+
+  // FAIL-CLOSED (snapshot/upsert mode only): no CRON_SECRET → 503 (a misconfig is loud, not
+  // silently world-callable). With the secret set, require ?token=<CRON_SECRET>.
+  const CRON_SECRET = Deno.env.get("CRON_SECRET");
+  if (!CRON_SECRET) return json({ ok: false, error: "CRON_SECRET not configured (fail-closed)" }, 503);
+  if (url.searchParams.get("token") !== CRON_SECRET) {
+    return json({ ok: false, error: "unauthorized" }, 401);
+  }
+
+  const SB_URL = Deno.env.get("SUPABASE_URL");
+  const SB_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY");
+  if (!POLY) return json({ ok: false, error: "POLYGON_KEY not set" }, 500);
 
   if (!SB_URL || !SB_KEY) return json({ ok: false, error: "Supabase env missing" }, 500);
 

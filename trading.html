@@ -4238,6 +4238,21 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
     try{ if(AlpexaSync.db.functions){ var x=await AlpexaSync.db.functions.invoke('feed',{body:{t:'prices'}}); if(x&&!x.error&&Array.isArray(x.data)){ fxApplyFeed(x.data); return; } } }catch(e){}
     AlpexaSync.db.from('prices').select('symbol,mid,spr_pts').then(function(r){ if(r&&r.data) fxApplyFeed(r.data); },function(){}); }
   setTimeout(pullFeed,1000); setInterval(function(){ if(!document.hidden) pullFeed(); },1500);
+  // Realtime push (webtrade pattern, 2026-07-13): a prices UPDATE merges straight into
+  // __alpexaFXFeed — the exact shape fxApplyFeed writes — and the 1s anchor loop snaps the
+  // engine to it, so quotes match webtrade instead of lagging up to ~3s behind it. Single-row
+  // MERGE (never wipe other symbols); junk events ignored; the 1.5s poll above stays as the
+  // fallback, and the same rows are idempotent across both paths.
+  try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.channel){
+    AlpexaSync.db.channel('prices-live')
+      .on('postgres_changes',{event:'*',schema:'public',table:'prices'},function(m){
+        var row=m&&m.new; if(!row||!row.symbol) return;
+        var f=window.__alpexaFXFeed||{};
+        f[row.symbol]={mid:+row.mid||0,spr:+row.spr_pts||0,ts:Date.now()};
+        window.__alpexaFXFeed=f;
+      })
+      .subscribe();
+  } }catch(e){}
   // Kill switch: read the back-office trading-halt flag.
   window.__alpexaHalt=false;
   function pullHalt(){ if(!window.AlpexaSync||!AlpexaSync.db)return;
