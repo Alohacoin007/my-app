@@ -978,10 +978,24 @@ const positionsStore = {
     const acct=AlpexaSync.acctFor&&AlpexaSync.acctFor('fx'); if(!acct) return;   // only THIS account's positions (not every fx account RLS can see)
     const r=await AlpexaSync.db.from('positions').select('local_id,symbol,side,size,open_price,pnl,status,updated_at,meta').eq('server','fx').eq('acct_no',acct).eq('status','open').limit(200);   // real columns only (updated_at not created_at) + meta jsonb (holds sl/tp) + scoped to the logged-in account
     if(r&&r.data){ this.pos=r.data; this.notify(); } }catch(e){} },   // real load REPLACES the demo seed
+  // CLOSED-TRADE HISTORY from the server (settlements kind='fx_close') so the History tab survives a
+  // refresh. Display-only (server is the source of truth, #5). detail = "SIDE size @ open -> close"
+  // (or "STOPOUT SIDE size @ open (...)" for forced closes) → parse side/open/close out of it.
+  async loadHistory(){ try{ if(WT_DEMO || !(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me)) return;
+    const acct=AlpexaSync.acctFor&&AlpexaSync.acctFor('fx'); if(!acct) return;
+    const r=await AlpexaSync.db.from('settlements').select('local_id,symbol,stake,pnl,detail,created_at').eq('server','fx').eq('acct_no',acct).eq('kind','fx_close').order('created_at',{ascending:false}).limit(200);
+    if(!r||!r.data) return;
+    this.history = r.data.map(x=>{ const dt=String(x.detail||'');
+      const sm=dt.match(/(BUY|SELL)/i), pm=dt.match(/@\s*([\d.]+)(?:\s*->\s*([\d.]+))?/);
+      const ct=String(x.created_at||'').slice(0,19).replace('T',' ').replace(/-/g,'.');
+      return { local_id:x.local_id, symbol:x.symbol, side:sm?sm[1].toUpperCase():'—', volume:+x.stake||0,
+        open_price:pm?+pm[1]:0, close_price:(pm&&pm[2]!=null)?+pm[2]:0, open_time:'—',
+        close_time:ct, close_ms:Date.parse(x.created_at)||0, profit:+x.pnl||0 }; });
+    this.notify(); }catch(e){} },
   start(){ if(this.started) return; this.started=true;
     if(WT_DEMO){ this.acct=DEMO_ACCT; this.pos=DEMO_POS.slice(); this.notify(); }   // demo seed ONLY in demo mode; production loads the real account below
     try{ if(!WT_DEMO && window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me){   // WT_DEMO: stay server-independent (never load/overwrite demo with real)
-      this.loadAcct(); this.loadPos();                                // logged in → overwrite demo with reality
+      this.loadAcct(); this.loadPos(); this.loadHistory();            // logged in → overwrite demo with reality (+ closed-trade history)
       this.ch1=AlpexaSync.db.channel('wt-acct').on('postgres_changes',{event:'*',schema:'public',table:'accounts'},()=>this.loadAcct()).subscribe();
       this.ch2=AlpexaSync.db.channel('wt-pos').on('postgres_changes',{event:'*',schema:'public',table:'positions'},()=>this.loadPos()).subscribe();
       // 30% 스탑아웃 크론(fx_stopout)이 강제청산하면 settlements에 detail 'STOPOUT …'을 남긴다.
@@ -989,6 +1003,7 @@ const positionsStore = {
       this.ch3=AlpexaSync.db.channel('wt-stopout').on('postgres_changes',{event:'INSERT',schema:'public',table:'settlements'},(payload)=>{
         const row=payload&&payload.new;
         if(row&&typeof row.detail==='string'&&row.detail.indexOf('STOPOUT')===0){ playSnd(sndStopout); this.loadPos(); this.loadAcct(); }
+        this.loadHistory();   // any settlement insert (manual close / stopout, incl. other devices) → refresh the History tab
       }).subscribe();
     } }catch(e){} },
   notify(){ this.listeners.forEach(fn=>{ try{fn(this);}catch(e){} }); },
