@@ -387,9 +387,10 @@
   table.pos .acctline.pl-bar{overflow:visible}   /* no scroll-collapse → the sibling P/L cell stays aligned under its column */
   table.pos td.pl-total{padding:4px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700}   /* grand total under the P/L column */
   table.pos tfoot .acctline{border-top:0}
-  .xclose{width:18px;height:18px;line-height:1;padding:0;border:1px solid #5a2020;border-radius:2px;
-    background:linear-gradient(#7a2b2b,#5a1e1e);color:#ffd7d7;font-size:11px;cursor:pointer}
-  .xclose:hover{background:linear-gradient(#a03636,#7a2626);color:#fff}
+  /* bare ✕ — no red card behind it (2026-07-13 user request); hover just brightens the glyph */
+  .xclose{width:18px;height:18px;line-height:1;padding:0;border:none;border-radius:0;
+    background:transparent;color:#c86868;font-size:11px;cursor:pointer}
+  .xclose:hover{background:transparent;color:#ff5f52}
   .empty{padding:16px;color:var(--dim);text-align:center;border:none!important}
   .note{padding:2px 14px;color:var(--dim);font-size:11px}
   /* ── TIER 2: chart-window tab bar (bottommost, its own grid row) — MT5 navy/black ── */
@@ -2732,7 +2733,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
                 {marginUsed>0&&level<100&&level>=30 && <b style={{color:'#e0a020',marginLeft:6}}>⚠ Margin Call</b>}
                 {marginUsed>0&&level<30 && <b style={{color:'#ff5252',marginLeft:6}}>⛔ Stop Out &lt;30%</b>}</span>
             </div></td>
-            <td className={"pl-total "+(floating>=0?'up':'down')}>{num(floating)}</td>
+            <td className={"pl-total "+(floating>=0?'up':'down')}><span className="k" style={{marginRight:5}}>P/L</span>{num(floating)}</td>
             <td></td>
             </tr>
           </tfoot>}
