@@ -32,14 +32,23 @@ if (!/lazyHold=\{IS_MOBILE && !revealed\.has\(c\.id\)\}/.test(src)) bad('lazyHol
 //      never empty for long); a late/failed real still falls back to the seed
 if (!/bar\.current=null; candles\.current=\[\];/.test(src))
   bad('the old TF refs must be reset before loading (stale last-bar would mix into the new chart)');
-if (!/const seedTimer=setTimeout\(\(\)=>\{ if\(series\.current===s && !havePaint\) applyBars\(synthCandles\(symbol, tf\)\); \},1200\);/.test(src))
-  bad('the synth seed must be DEFERRED (~1.2s) and paint only if nothing painted yet');
+//    staleness = the load EPOCH, never series identity: the [chartType] effect legally replaces
+//    the series without a reload — the old identity check silently dropped every real history at
+//    boot and, with real-first, blanked all four charts (2026-07-13 결함-로그)
+if (!/const myEpoch=\+\+loadEpoch\.current;/.test(src))
+  bad('each history load must open a new epoch');
+if (!/const seedTimer=setTimeout\(\(\)=>\{ if\(loadEpoch\.current===myEpoch && !havePaint\) applyBars\(synthCandles\(symbol, tf\)\); \},1200\);/.test(src))
+  bad('the synth seed must be DEFERRED (~1.2s), epoch-guarded, and paint only if nothing painted yet');
 if (!/fetchRealCandles\(symbol, tf\)\.then\(real=>\{ clearTimeout\(seedTimer\);/.test(src))
   bad('a real history must cancel the pending seed (real-first, no fake flash)');
-if (!/if\(series\.current!==s\) return;/.test(src))
-  bad('a stale real response (chart recreated) must be dropped');
+if (!/if\(loadEpoch\.current!==myEpoch\) return;/.test(src))
+  bad('a stale real response (newer load started) must be dropped by EPOCH, not series identity');
 if (!/if\(real\) applyBars\(real\); else if\(!havePaint\) applyBars\(synthCandles\(symbol, tf\)\);/.test(src))
   bad('real paints when it arrives; a failed real falls back to the seed only if nothing painted');
+if (!/\(series\.current\|\|s\)\.setData\(/.test(src))
+  bad('applyBars must draw on the CURRENT series (a type swap replaces it mid-flight)');
+if (!/if\(typeInit\.current\)\{ typeInit\.current=false; return; \}/.test(src))
+  bad('the [chartType] effect must SKIP its mount run (it replaced the fresh series with an empty clone at boot)');
 // container is scrubbed before createChart — no stacked canvases class, ever
 if (!/box\.current\.innerHTML='';/.test(src))
   bad('the chart container must be scrubbed before createChart (kills any stacked-canvas leak)');

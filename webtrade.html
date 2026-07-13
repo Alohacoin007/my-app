@@ -1554,6 +1554,8 @@ function distSeg(px,py,x1,y1,x2,y2){ const dx=x2-x1,dy=y2-y1,L2=dx*dx+dy*dy;
 
 function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isActive, onActivate, savedGeo, onGeo, tiled, onClose, onSymbol, lazyHold }){
   const box=React.useRef(null), chart=React.useRef(null), series=React.useRef(null), bar=React.useRef(null);
+  const loadEpoch=React.useRef(0);        // history-load generation — bumped per (symbol/tf) load; a TYPE swap
+  const typeInit=React.useRef(true);      //   keeps the epoch, so a pending real history still lands (2026-07-13)
   const lines=React.useRef([]);           // position order-lines (green) — managed by positions effect
   const drawLines=React.useRef([]);       // USER drawing price-lines (hline/fib) — separate from positions/indicators
   const drawSeries=React.useRef([]);      // USER drawing line series (trend)
@@ -1864,18 +1866,23 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     // REAL bars only if the backend returns a validated FULL history (async, non-blocking, timed out).
     let havePaint=false;
     const applyBars=(data)=>{ try{
-      s.setData(asSeriesData(data,typeRef.current)); bar.current=data[data.length-1]; candles.current=data; havePaint=true; paintIndicators();
+      (series.current||s).setData(asSeriesData(data,typeRef.current));   // CURRENT series — a type swap replaces it mid-flight
+      bar.current=data[data.length-1]; candles.current=data; havePaint=true; paintIndicators();
       doFit(); requestAnimationFrame(doFit); setTimeout(doFit,120);   // now + next frame + a late retry (deferred CDN/layout)
     }catch(e){} };
     // REAL-FIRST (2026-07-13): reset the stale refs so the OLD timeframe's last bar can never tick
     // into the new series, then give the real history ~1.2s before the synth seed may paint — the
     // old seed-first order flashed a fake chart on every TF/symbol switch ("old chart, then new").
+    // Staleness is judged by the load EPOCH, not series identity: the [chartType] effect legally
+    // REPLACES the series without a reload (that identity check silently dropped every real history
+    // at boot and, with real-first, blanked all four charts — 2026-07-13 결함-로그).
     bar.current=null; candles.current=[];
-    const seedTimer=setTimeout(()=>{ if(series.current===s && !havePaint) applyBars(synthCandles(symbol, tf)); },1200);
+    const myEpoch=++loadEpoch.current;
+    const seedTimer=setTimeout(()=>{ if(loadEpoch.current===myEpoch && !havePaint) applyBars(synthCandles(symbol, tf)); },1200);
     fetchRealCandles(symbol, tf).then(real=>{ clearTimeout(seedTimer);
-      if(series.current!==s) return;
+      if(loadEpoch.current!==myEpoch) return;
       if(real) applyBars(real); else if(!havePaint) applyBars(synthCandles(symbol, tf));
-    }).catch(()=>{ clearTimeout(seedTimer); if(series.current===s && !havePaint) applyBars(synthCandles(symbol, tf)); });
+    }).catch(()=>{ clearTimeout(seedTimer); if(loadEpoch.current===myEpoch && !havePaint) applyBars(synthCandles(symbol, tf)); });
     // live: update ONLY the last bar's close from the shared store — throttled to ~2.5/sec
     const onTick=throttle((mids)=>{
       if(!marketOpen(symbol)) return;   // Method A (MT5): session CLOSED → abort the live-bar update so the
@@ -1904,8 +1911,11 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       try{ c.remove(); }catch(e){} };
   }, [symbol, tf, lazyHold, hydrated]);   // recreate on symbol/tf change; builds when revealed (lazy) and hydrated (idle-deferred)
 
-  // switch chart type WITHOUT recreating the whole chart (swap the price series, re-seed data)
+  // switch chart type WITHOUT recreating the whole chart (swap the price series, re-seed data).
+  // Mount run is SKIPPED: on boot it replaced the just-created series with an empty clone before
+  // the real history arrived (the boot-blank / dropped-real bug, 2026-07-13).
   React.useEffect(()=>{
+    if(typeInit.current){ typeInit.current=false; return; }
     const c=chart.current; if(!c||!series.current) return;
     try{ c.removeSeries(series.current); }catch(e){}
     const s=makePriceSeries(c, chartType||'candle', symbol); series.current=s;
