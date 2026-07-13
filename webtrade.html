@@ -1752,7 +1752,12 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       const m=mids[symbol]; if(!m) return; setPx(m.mid);
       if(!bar.current||!series.current) return;
       const b=bar.current, close=m.mid;
-      const u={ time:b.time, open:b.open, high:Math.max(b.high,close), low:Math.min(b.low,close), close };
+      // ROLL OVER: when real time crosses into a new bar bucket (M1=60s, M5=300s …), OPEN a fresh candle
+      // at the new bucket instead of forever mutating the seed's last bar (that froze the M1 last candle).
+      const step=TF_SEC[tf]||60, nowB=Math.floor(Date.now()/1000/step)*step;
+      const u = nowB>b.time
+        ? { time:nowB, open:b.close, high:Math.max(b.close,close), low:Math.min(b.close,close), close }   // new period → new bar (opens at the prior close)
+        : { time:b.time, open:b.open, high:Math.max(b.high,close), low:Math.min(b.low,close), close };     // same period → grow the current bar
       bar.current=u;
       try{ series.current.update(typeRef.current==='line' ? {time:u.time,value:close} : u); }catch(e){}
       try{ chart.current.timeScale().applyOptions({ rightOffset:15 }); }catch(e){}   // RIGHT-MARGIN LOCK: every tick re-pins the 15-bar future gap (idempotent — never yanks the scroll)

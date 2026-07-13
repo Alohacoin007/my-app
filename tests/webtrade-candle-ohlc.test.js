@@ -39,9 +39,10 @@ if (!/high:\+c\.h\|\|\+c\.high/.test(fr))   bad('fetchRealCandles must map h →
 if (!/low:\+c\.l\|\|\+c\.low/.test(fr))     bad('fetchRealCandles must map l → low');
 if (!/close:\+c\.c\|\|\+c\.close/.test(fr)) bad('fetchRealCandles must map c → close');
 
-// ── 3) live tick keeps orientation: open fixed, high=max, low=min, close=mid ──
-if (!/const u=\{ time:b\.time, open:b\.open, high:Math\.max\(b\.high,close\), low:Math\.min\(b\.low,close\), close \};/.test(src))
-  bad('onTick must preserve open + extend high=max / low=min with the live close');
+// ── 3) live tick keeps orientation within the SAME bucket: open fixed, high=max, low=min, close=mid ──
+// (the new-bucket branch opens a fresh bar at the prior close — see webtrade-bar-rollover.test.js)
+if (!/\{ time:b\.time, open:b\.open, high:Math\.max\(b\.high,close\), low:Math\.min\(b\.low,close\), close \};/.test(src))
+  bad('onTick same-bucket branch must preserve open + extend high=max / low=min with the live close');
 
 // ── 4) candle colours: up=green body-outline / down=red (LWC upColor = close≥open) ──
 if (!/upColor:ct\.upBody, downColor:ct\.downBody, wickUpColor:ct\.upLine, wickDownColor:ct\.downLine/.test(src))
