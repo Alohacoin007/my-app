@@ -40,13 +40,16 @@ if (!/\.oc-vol\{[^}]*background:rgba\(0,0,0,\.35\) !important[^}]*border-left:1p
 if (!/\.oc-vol input\{[^}]*background:transparent !important;color:#ffffff !important;font-weight:bold/.test(src))
   bad('volume input must be transparent with white bold text');
 
-// ── spread pill: element + rounded exception + the MW display formula ──
-if (!/\.obox \.oc-spr\{[^}]*border-radius:9px !important[^}]*\}/.test(src))
-  bad('spread pill needs its rounded exception (.obox * zeroes radii)');
-if (!/className="oc-spr"/.test(src)) bad('the spread pill element must render inside .obox');
-const spr = src.match(/const _ocd=[^\n]*\n[^\n]*oc-spr[^\n]*/) || src.match(/oc-spr[^\n]*/);
+// ── spread tag: RECTANGLE centred BETWEEN the two prices (2026-07-13 user request) ──
+if (/border-radius:9px/.test(src))
+  bad('the old rounded-pill radius exception must be gone (rectangle — .obox * zeroes radii)');
+if (!/\.obox \.oc-spr\{[^}]*left:50%;[^}]*transform:translate\(-50%,-50%\)[^}]*\}/.test(src))
+  bad('spread tag must sit dead-centre on the seam between the two prices');
+if (!/\.obox \.oc-spr\{[^}]*top:42px;[^}]*\}/.test(src))
+  bad('spread tag must be vertically centred in the price row (top 42px of the 64px box)');
+if (!/className="oc-spr"/.test(src)) bad('the spread tag element must render inside .obox');
 if (!/parseFloat\(fmtPx\(symbol,m\.ask\)\)-parseFloat\(fmtPx\(symbol,m\.bid\)\)/.test(src))
-  bad('spread pill must derive from the DISPLAYED bid/ask exactly like the MW row');
+  bad('spread tag must derive from the DISPLAYED bid/ask exactly like the MW row');
 
 // ── direction skin paints the SHELL (not the children) ──
 if (!/\.obox\.tick-up\{background:linear-gradient\(to bottom,#0d47c8 0%,#082d85 100%\) !important;border-color:#3095ff !important\}/.test(src))
