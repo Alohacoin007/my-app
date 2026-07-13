@@ -69,6 +69,14 @@
   table.jrnl td.t{color:#6f778a;width:150px}
   table.jrnl td.ok{color:#59c26a}
   table.jrnl td.err{color:#e5533a}
+  /* Company & licensing panel */
+  .cinfo{padding:16px 18px;max-width:660px}
+  .cinfo-hd{font-size:12.5px;font-weight:700;color:#cdd4e0;margin-bottom:12px;display:flex;align-items:center;gap:7px}
+  table.cinfo-tbl{width:100%;border-collapse:collapse;font-size:12px}
+  table.cinfo-tbl td{padding:6px 10px;border-bottom:1px solid #14181e;vertical-align:top}
+  table.cinfo-tbl td.ck{color:#6f778a;width:200px;white-space:nowrap}
+  table.cinfo-tbl td.cv{color:#c8ccd2}
+  .cinfo-note{margin-top:12px;font-size:10.5px;color:#6a7078;line-height:1.5}
   /* Mailbox — account notices from settlements */
   table.mbx{width:100%;border-collapse:collapse;font-size:11.5px}
   table.mbx th{position:sticky;top:0;background:#141414;color:var(--dim);font-weight:600;font-size:11px;text-align:right;padding:3px 10px;border-bottom:1px solid #222}
@@ -2334,6 +2342,29 @@ function MailboxTab(){
 function EmptyTab({ tab }){ const e=TAB_EMPTY[tab]||['—',tab];
   return <div className="tbxbody"><div className="tbxempty"><div className="ic">{e[0]}</div>{e[1]}</div></div>; }
 
+// Company & Licensing — the operator's own registration/licence details (informational panel, not a
+// facsimile of the government document).
+function CompanyTab(){
+  const rows=[
+    ['Legal name','Alpexa Suisse S.A.'],
+    ['Registration (Cédula)','3-101-835471'],
+    ['Municipal licence','LIC. MUN. 4439-S'],
+    ['Resolution','2026-MSJ-PT-0874'],
+    ['Issuing authority','Municipalidad de San José · Departamento de Patentes'],
+    ['Activity','Procesamiento de datos y servicios electrónicos'],
+    ['Registered address','Boulevard Dent — Adriatico Building, Piso 3, San Pedro, San José, 11501'],
+  ];
+  return (
+    <div className="tbxbody"><div className="cinfo">
+      <div className="cinfo-hd">🏛️ Company &amp; Licensing</div>
+      <table className="cinfo-tbl"><tbody>
+        {rows.map(([k,v])=><tr key={k}><td className="ck">{k}</td><td className="cv">{v}</td></tr>)}
+      </tbody></table>
+      <div className="cinfo-note">Municipal business licence (patente) issued by the Municipalidad de San José, Costa Rica.</div>
+    </div></div>
+  );
+}
+
 function StatusBar({ tool, chartType, tf }){
   const [live,setLive]=React.useState(priceStore.live);
   React.useEffect(()=> priceStore.subscribe(()=>setLive(priceStore.live)), []);
@@ -2475,6 +2506,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
       {tab==='Exposure' ? <ExposureTab pos={pos} mids={mids} equity={equity} leverage={leverage} />
        : tab==='Journal' ? <JournalTab />
        : tab==='Mailbox' ? <MailboxTab />
+       : tab==='Company' ? <CompanyTab />
        : (tab!=='Trade' && tab!=='History') ? <EmptyTab tab={tab} />
        : (<React.Fragment>
       {tab==='History' && (
