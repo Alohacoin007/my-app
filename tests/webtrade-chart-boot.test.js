@@ -25,9 +25,24 @@ if (!/new Set\(IS_MOBILE \? \(initCharts\[0\] \? \[initCharts\[0\]\.id\] : \[\]\
 if (!/const \[hydrated,setHydrated\]=React\.useState\(!IS_MOBILE\)/.test(src)) bad('desktop must hydrate immediately (hydrated = !IS_MOBILE)');
 if (!/lazyHold=\{IS_MOBILE && !revealed\.has\(c\.id\)\}/.test(src)) bad('lazyHold must be mobile-only (desktop never lazy-holds)');
 
-// 2) the chart is seeded with the deterministic history FIRST (never empty), then upgraded async
-if (!/applyBars\(synthCandles\(symbol, tf\)\);/.test(src)) bad('chart must paint the synth seed IMMEDIATELY so it is never empty');
-if (!/fetchRealCandles\(symbol, tf\)\.then\(real=>\{ if\(real && series\.current===s\) applyBars\(real\)/.test(src)) bad('chart must upgrade to REAL bars only when a validated history returns');
+// 2) REAL-FIRST paint (2026-07-13): a TF/symbol switch must NOT flash the synth chart before the
+//    real one ("old chart then new chart"). Contract:
+//    · stale refs reset BEFORE the load — the old TF's last bar must never tick into the new series
+//    · the real history gets ~1.2s to arrive; only then may the synth seed paint (never fake-first,
+//      never empty for long); a late/failed real still falls back to the seed
+if (!/bar\.current=null; candles\.current=\[\];/.test(src))
+  bad('the old TF refs must be reset before loading (stale last-bar would mix into the new chart)');
+if (!/const seedTimer=setTimeout\(\(\)=>\{ if\(series\.current===s && !havePaint\) applyBars\(synthCandles\(symbol, tf\)\); \},1200\);/.test(src))
+  bad('the synth seed must be DEFERRED (~1.2s) and paint only if nothing painted yet');
+if (!/fetchRealCandles\(symbol, tf\)\.then\(real=>\{ clearTimeout\(seedTimer\);/.test(src))
+  bad('a real history must cancel the pending seed (real-first, no fake flash)');
+if (!/if\(series\.current!==s\) return;/.test(src))
+  bad('a stale real response (chart recreated) must be dropped');
+if (!/if\(real\) applyBars\(real\); else if\(!havePaint\) applyBars\(synthCandles\(symbol, tf\)\);/.test(src))
+  bad('real paints when it arrives; a failed real falls back to the seed only if nothing painted');
+// container is scrubbed before createChart — no stacked canvases class, ever
+if (!/box\.current\.innerHTML='';/.test(src))
+  bad('the chart container must be scrubbed before createChart (kills any stacked-canvas leak)');
 
 // 3) fetchRealCandles: real-or-NULL, validated (full + sorted), timed out, NOT gated by market hours
 const fr = (src.match(/async function fetchRealCandles\(symbol, tf\)\{[\s\S]*?\n\}/) || [''])[0];

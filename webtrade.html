@@ -1781,6 +1781,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     // MT5 look: pure-black canvas, dense grey DOTTED gridlines, Tahoma scales.
     const DOT=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dotted)!=null?LightweightCharts.LineStyle.Dotted:1;
     const th0=CHART_THEME[themeBus.theme]||CHART_THEME.dark;
+    try{ box.current.innerHTML=''; }catch(e){}   // scrub any leftover canvas — a swallowed remove() failure must never stack two charts
     const c=LightweightCharts.createChart(box.current, {
       layout:{ background:{color:th0.bg}, textColor:th0.text, fontSize:8, fontFamily:"Tahoma, 'Segoe UI', Arial, sans-serif", attributionLogo:false },   // 8px axis labels → LWC packs MORE Y-price + X-time ticks (denser 23-ish grid; no tick-count API in LWC)
       grid:{ vertLines:{color:th0.grid, style:DOT}, horzLines:{color:th0.grid, style:DOT} },
@@ -1861,12 +1862,20 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     // CANDLES — paint the deterministic seed IMMEDIATELY so the grid is NEVER empty (feed-independent,
     // works for CLOSED weekend symbols too — history is never gated by market hours). Then upgrade to
     // REAL bars only if the backend returns a validated FULL history (async, non-blocking, timed out).
+    let havePaint=false;
     const applyBars=(data)=>{ try{
-      s.setData(asSeriesData(data,typeRef.current)); bar.current=data[data.length-1]; candles.current=data; paintIndicators();
+      s.setData(asSeriesData(data,typeRef.current)); bar.current=data[data.length-1]; candles.current=data; havePaint=true; paintIndicators();
       doFit(); requestAnimationFrame(doFit); setTimeout(doFit,120);   // now + next frame + a late retry (deferred CDN/layout)
     }catch(e){} };
-    applyBars(synthCandles(symbol, tf));                                                   // instant, full, never empty
-    fetchRealCandles(symbol, tf).then(real=>{ if(real && series.current===s) applyBars(real); }).catch(()=>{});   // upgrade when the feed gives a clean full history
+    // REAL-FIRST (2026-07-13): reset the stale refs so the OLD timeframe's last bar can never tick
+    // into the new series, then give the real history ~1.2s before the synth seed may paint — the
+    // old seed-first order flashed a fake chart on every TF/symbol switch ("old chart, then new").
+    bar.current=null; candles.current=[];
+    const seedTimer=setTimeout(()=>{ if(series.current===s && !havePaint) applyBars(synthCandles(symbol, tf)); },1200);
+    fetchRealCandles(symbol, tf).then(real=>{ clearTimeout(seedTimer);
+      if(series.current!==s) return;
+      if(real) applyBars(real); else if(!havePaint) applyBars(synthCandles(symbol, tf));
+    }).catch(()=>{ clearTimeout(seedTimer); if(series.current===s && !havePaint) applyBars(synthCandles(symbol, tf)); });
     // live: update ONLY the last bar's close from the shared store — throttled to ~2.5/sec
     const onTick=throttle((mids)=>{
       if(!marketOpen(symbol)) return;   // Method A (MT5): session CLOSED → abort the live-bar update so the
