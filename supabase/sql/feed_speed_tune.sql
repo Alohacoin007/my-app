@@ -12,22 +12,17 @@ select j.jobname, d.status, d.return_message, d.start_time
 -- 읽는 법: fx-prices가 '3 seconds'로 걸려 있는데 실측 5초면 그 2초는 pg_net/Edge/Polygon 왕복 지연.
 -- status가 failed로 반복되면 주기보다 그 에러(rate limit 등)가 먼저다 — 아래 튜닝 전에 해결.
 
--- ── 2) 크립토를 5초 → 3초 (안전: crypto-price는 Binance 공개 미러라 한도 여유) ──
-select cron.unschedule('crypto-prices-60s');
-select cron.schedule('crypto-prices-3s', '3 seconds', $$
-  select net.http_get(
-    url := 'https://grxnbgtfnaayeluenvqh.supabase.co/functions/v1/crypto-price'
-  );
-$$);
-
--- ── 3) FX를 2초로 (조건부: Polygon 유료 플랜일 때만) ──
--- fx-prices는 호출 1번에 전 티커를 받아온다(30/min). Polygon 무료 티어는 5 calls/min이라
--- 무료 키면 2초(30/min)는 물론 3초(20/min)도 한도 초과 → 1)의 job_run_details에서 실패가
--- 없는지 확인한 뒤에만 실행. 실패가 보이면 이 섹션은 건너뛴다.
--- select cron.unschedule('fx-prices-10s');
--- select cron.schedule('fx-prices-2s', '2 seconds', $$
---   select net.http_get(url := 'https://grxnbgtfnaayeluenvqh.supabase.co/functions/v1/fx-prices?token=<CRON_SECRET>');
--- $$);
+-- ── 2) FX·크립토 5초 → 3초 (2026-07-13 라이브 진단 확정: 실제 잡 이름은 fx-prices-5s ·
+--       crypto-price-5s, 둘 다 '5 seconds', 최근 실행 전부 succeeded/실패 0) ──
+-- alter_job은 명령·토큰을 그대로 두고 스케줄만 바꾼다 — unschedule/재등록보다 안전.
+select cron.alter_job(jobid, schedule => '3 seconds')
+  from cron.job where jobname in ('fx-prices-5s','crypto-price-5s');
+-- 확인:
+select jobname, schedule, active from cron.job where jobname like '%price%';
+-- 5분 뒤 실패 없나 재확인 (Polygon 한도 체크 — 5초(12콜/분)에서 무실패였으니 3초(20콜/분)는
+-- 유료/미러 전제. failed가 보이면 즉시 롤백):
+--   select cron.alter_job(jobid, schedule => '5 seconds')
+--     from cron.job where jobname in ('fx-prices-5s','crypto-price-5s');
 
 -- ── 4) 주식 1분은 Finnhub 무료 한도의 천장 ──
 -- stock-prices는 심볼당 1콜 × 35심볼 ≈ 35 calls/run, Finnhub 무료 60 calls/min → 1분 미만 불가.

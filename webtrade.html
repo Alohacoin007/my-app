@@ -1004,7 +1004,20 @@ const priceStore = {
   // a fetch failure just means markup 0 until the next start (server still charges it at close).
   async loadMarks(){ try{ const r=await AlpexaSync.db.from('pricing_marks').select('symbol,markup_pts');
     if(r&&r.data){ const m={}; r.data.forEach(p=>{ m[p.symbol]=Math.max(0,Math.min(50,+p.markup_pts||0)); }); this.marks=m; } }catch(e){} },
-  start(){ if(this.timer) return; this.loadMarks(); this.pull(); this.timer=setInterval(()=>this.pull(), 1000); }, // 1 poll/sec — server 1s-cached
+  // Realtime push: prices UPDATEs stream straight into the SAME _apply pipeline (one parser, one
+  // halfPx — a second parsing path would re-incubate the 2026-07-13 unit drift). Requires the
+  // prices table in the supabase_realtime publication; until then no events arrive and the 1s
+  // polling below keeps the terminal exactly as live as before. Junk events are ignored.
+  startRealtime(){ try{
+    if(this.rt || !(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.channel)) return;
+    this.rt=AlpexaSync.db.channel('prices-live')
+      .on('postgres_changes',{event:'*',schema:'public',table:'prices'},(m)=>{
+        const row=m&&m.new; if(!row||!row.symbol) return;
+        this.live=true; this._apply([row]); this.notify();
+      })
+      .subscribe();
+  }catch(e){} },
+  start(){ if(this.timer) return; this.loadMarks(); this.startRealtime(); this.pull(); this.timer=setInterval(()=>this.pull(), 1000); }, // realtime push + 1s poll fallback
   subscribe(fn){ this.listeners.add(fn); fn(this.mids); return ()=>this.listeners.delete(fn); },
   get(sym){ return this.mids[sym]; },
 };
