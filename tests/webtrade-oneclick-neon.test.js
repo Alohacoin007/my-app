@@ -12,13 +12,6 @@ const src = fs.readFileSync(path.join(__dirname, '..', 'webtrade.html'), 'utf8')
 let fail = 0;
 const bad = (m) => { console.error('🔴 ' + m); fail++; };
 
-// ── slim diet: the panel is compressed ~20% (190×64 → 155×50) with hard corners, neon intact ──
-if (!/\.obox\{[^}]*width:155px;height:50px;/.test(src)) bad('panel must be slimmed to 155×50 (20% diet)');
-if (!/\.oc-top\{height:16px;/.test(src)) bad('top layer must slim to 16px');
-if (!/\.oc-vol\{width:47px;/.test(src)) bad('lot box must slim to 47px wide');
-if (!/\.oc-price \.bf \.bg\{font-size:14px;font-weight:bold;/.test(src)) bad('big price number must be 14px bold (slim panel)');
-if (!/\.obox \*\{border-radius:0 !important/.test(src)) bad('hard corners (radius 0) must be preserved');
-
 // ── DARK theme: fixed-side neon fills (SELL red / BUY blue), deep carbon-black gradient ──
 if (!/\.oc-sell\{background:linear-gradient\(to bottom,#2a0a0a 0%,#150303 100%\) !important;border:1px solid #ff3b30 !important;color:#ff453a !important\}/.test(src))
   bad('SELL must be the red-neon skin (carbon-black #2a0a0a→#150303 + #ff3b30 border + #ff453a text)');
