@@ -476,7 +476,17 @@ function fxClosePx(m,side){
   var half=fxHalfSpread(m,mid);
   return mid+(side==='BUY'?-half:half);
 }
+// DISPLAY LOCKSTEP (2026-07-13): the quote the customer SEES is the quote the desk deals at —
+// same real mid anchor as fxClosePx, same fxHalfSpread(live spr_pts + markup) as fx_close.sql
+// AND as webtrade's halfPx, so both apps show the same price to the tick. The old displayed
+// ask (sim last + the hardcoded, randomly-"breathing" table spread) showed a spread the desk
+// never charged — display ≠ execution ≠ webtrade. Every quote/entry/close-preview/badge below
+// must read fxBidPx/fxAskPx; nothing may read `last + spread` (tests/fx-display-lockstep.test.js).
+function fxQuoteMid(m){ return (m.real&&m.bid>0)?m.bid:m.last; }
+function fxBidPx(m){ var mid=fxQuoteMid(m); return mid-fxHalfSpread(m,mid); }
+function fxAskPx(m){ var mid=fxQuoteMid(m); return mid+fxHalfSpread(m,mid); }
 window.fxPip=fxPip;window.fxHalfSpread=fxHalfSpread;window.fxClosePx=fxClosePx;
+window.fxQuoteMid=fxQuoteMid;window.fxBidPx=fxBidPx;window.fxAskPx=fxAskPx;
 // Realistic execution slippage: the fill lands a little WORSE than the quoted
 // price (buys fill higher, sells lower). Magnitude scales with the live spread;
 // STOP orders (which trigger in fast moves) slip hardest, MARKET orders less,
@@ -503,7 +513,7 @@ const HISTORY=[];
 // News & economic calendar — no demo data (would be a real feed in production).
 const NEWS=[];
 const CALENDAR=[];
-window.ALPEXA_MARKET={SYMBOLS,createMarket,fmt,POSITIONS,HISTORY,NEWS,CALENDAR,PENDING,getLotSize,isUsdBaseFx,getNotionalUSD,getMarginUSD,getPnlUSD,fxPip,fxClosePx,getUnitLabel,fmtVol};
+window.ALPEXA_MARKET={SYMBOLS,createMarket,fmt,POSITIONS,HISTORY,NEWS,CALENDAR,PENDING,getLotSize,isUsdBaseFx,getNotionalUSD,getMarginUSD,getPnlUSD,fxPip,fxClosePx,fxQuoteMid,fxBidPx,fxAskPx,getUnitLabel,fmtVol};
 </script>
 
 <script type="text/babel">
@@ -1264,7 +1274,7 @@ function Watchlist({market,onSelect,current,onDepositCrypto}){
                   const tagBg={FX:'#E3F2FD',STOCK:'#E8F5E9',CRYPTO:'#FCE4EC',INDEX:'#EDE7F6'}[s.cls]||'var(--bg-2)';
                   const tagCol={FX:'#1B3955',STOCK:'#2E7D32',CRYPTO:'#C2185B',INDEX:'#5E35B1'}[s.cls]||'var(--text-3)';
                   const now=new Date();const timeStr=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
-                  const sprPt=(s.spread*Math.pow(10,s.digits)).toFixed(0);
+                  const sprPt=((ALPEXA_MARKET.fxAskPx(s)-ALPEXA_MARKET.fxBidPx(s))*Math.pow(10,s.digits)).toFixed(0);   // LIVE dealt spread (display lockstep)
                   return(
                     <div key={s.sym} style={{display:'flex',alignItems:'center',padding:'14px 14px',gap:12,borderTop:i===0?'none':'1px solid var(--line)',borderLeft:fav?'3px solid #FBBF24':'3px solid transparent',paddingLeft:fav?11:14}}>
                       <button onClick={()=>onSelect(s.sym)} style={{flex:1,display:'flex',alignItems:'center',padding:0,background:'transparent',textAlign:'left',gap:8}}>
@@ -1303,7 +1313,7 @@ function Watchlist({market,onSelect,current,onDepositCrypto}){
           );
         })()}
         {rows.map(s=>{
-          const ask=s.last+s.spread;const up=s.chgPct>=0;const sel=current===s.sym;const fav=favs.includes(s.sym);
+          const ask=ALPEXA_MARKET.fxAskPx(s);const up=s.chgPct>=0;const sel=current===s.sym;const fav=favs.includes(s.sym);   // dealt ask (display lockstep)
           const flashClass=s.flash==='up'?'flash-up':s.flash==='down'?'flash-down':'';
           return(
             <div key={s.sym} className={flashClass} style={{width:'100%',display:'flex',alignItems:'center',padding:'10px 14px',borderBottom:'1px solid var(--line)',background:sel?'rgba(46,111,176,0.16)':'transparent',borderLeft:sel?'3px solid #1B3955':'3px solid transparent'}}>
@@ -1327,7 +1337,7 @@ function Watchlist({market,onSelect,current,onDepositCrypto}){
                   <span style={{fontSize:10,color:'var(--text-3)',fontWeight:500}}>L {ALPEXA_MARKET.fmt(s.low,s.digits)}</span>
                 </span>
                 <span className="mono" style={{width:42,textAlign:'center',display:'flex',justifyContent:'center',flexShrink:0}}>
-                  <span style={{fontSize:9.5,fontWeight:600,color:'var(--text-3)',lineHeight:1.1}}>{(s.spread*Math.pow(10,s.digits)).toFixed(0)}</span>
+                  <span style={{fontSize:9.5,fontWeight:600,color:'var(--text-3)',lineHeight:1.1}}>{((ALPEXA_MARKET.fxAskPx(s)-ALPEXA_MARKET.fxBidPx(s))*Math.pow(10,s.digits)).toFixed(0)}</span>
                 </span>
                 <span className="mono" style={{width:88,textAlign:'center',fontWeight:600,color:'#2E6FB0',display:'flex',flexDirection:'column',alignItems:'center',gap:1,flexShrink:0}}>
                   <span style={{display:'flex',alignItems:'baseline'}}>
@@ -1369,7 +1379,7 @@ function TradeTicket({market,sym,setSym,lots,setLots,onPlace}){
     if(s.cls==='CRYPTO'){ setLots(+(cryptoUsdRef.current/px).toFixed(6)); }
     else if(classChanged){ setLots((s.cls==='STOCK'||s.cls==='INDEX')?1:0.10); }
   },[s&&s.cls, s&&s.sym]);
-  const ask=s.last+s.spread;const entryPx=side==='BUY'?ask:s.last;
+  const ask=ALPEXA_MARKET.fxAskPx(s);const entryPx=side==='BUY'?ask:ALPEXA_MARKET.fxBidPx(s);   // entry at the DEALT quote (display lockstep)
   const notional=ALPEXA_MARKET.getNotionalUSD(s,vol,entryPx);
   const levSettings=getLeverageSettings();
   const lev=levSettings[s.cls]||(s.cls==='STOCK'?5:s.cls==='CRYPTO'?5:s.cls==='INDEX'?20:100);
@@ -1454,7 +1464,7 @@ function TradeTicket({market,sym,setSym,lots,setLots,onPlace}){
           </div>
           <div className="mono" style={{fontSize:10,color:'var(--text-3)',marginTop:4}}>H {ALPEXA_MARKET.fmt(s.high,s.digits)}</div>
         </button>
-        <div className="mono" style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',background:'#1B3955',color:'#fff',padding:'3px 8px',borderRadius:3,fontSize:10,fontWeight:700,letterSpacing:0.5}}>{(s.spread*Math.pow(10,s.digits)).toFixed(0)}</div>
+        <div className="mono" style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',background:'#1B3955',color:'#fff',padding:'3px 8px',borderRadius:3,fontSize:10,fontWeight:700,letterSpacing:0.5}}>{((ALPEXA_MARKET.fxAskPx(s)-ALPEXA_MARKET.fxBidPx(s))*Math.pow(10,s.digits)).toFixed(0)}</div>
       </div>
       <div style={{flex:1,overflowY:'auto',padding:'4px 12px 12px',display:'flex',flexDirection:'column',gap:8}}>
         <div style={{background:'var(--surface)',borderRadius:4,padding:'12px 14px',border:'1px solid var(--line-2)'}}>
@@ -1583,11 +1593,11 @@ function TradeTicket({market,sym,setSym,lots,setLots,onPlace}){
               {pickerRows.length===0&&(
                 <div style={{padding:'32px 16px',textAlign:'center',color:'var(--text-3)',fontSize:12}}>No symbols match this filter.</div>
               )}
-              {pickerRows.map(m=>{const a=m.last+m.spread;const sel=m.sym===sym;return(
+              {pickerRows.map(m=>{const a=ALPEXA_MARKET.fxAskPx(m);const b=ALPEXA_MARKET.fxBidPx(m);const sel=m.sym===sym;return(   // dealt quotes (display lockstep)
                 <button key={m.sym} onClick={()=>{setSym(m.sym);setPickerOpen(false);}} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'11px 16px',borderBottom:'1px solid var(--line)',textAlign:'left',background:sel?'var(--acc-3)':'transparent'}}>
                   <span style={{fontSize:13.5,fontWeight:700,color:'var(--ink)',flex:1}}>{m.sym}</span>
                   <span style={{fontSize:8.5,padding:'2px 5px',borderRadius:3,fontWeight:800,letterSpacing:0.4,background:tagBg[m.cls]||'var(--bg-2)',color:tagCol[m.cls]||'var(--text-2)'}}>{m.cls}</span>
-                  <span className="mono" style={{fontSize:12,color:'#E04141',fontWeight:600,width:70,textAlign:'right'}}>{ALPEXA_MARKET.fmt(m.last,m.digits)}</span>
+                  <span className="mono" style={{fontSize:12,color:'#E04141',fontWeight:600,width:70,textAlign:'right'}}>{ALPEXA_MARKET.fmt(b,m.digits)}</span>
                   <span className="mono" style={{fontSize:12,color:'#2E6FB0',fontWeight:600,width:70,textAlign:'right'}}>{ALPEXA_MARKET.fmt(a,m.digits)}</span>
                   {sel&&<Mi name="check_circle" size={16} style={{color:'var(--acc-2)'}}/>}
                 </button>
@@ -1643,8 +1653,8 @@ function ModifySheet({position,isPending=false,market=[],onSave,onClose}){
   const [trigger,setTrigger]=useState(position.trigger?String(position.trigger):'');
   const [,force]=useState(0);
   const liveSym=market.find(m=>m.sym===position.sym);
-  const bid=liveSym?liveSym.last:position.open;
-  const ask=liveSym?liveSym.last+liveSym.spread:position.open;
+  const bid=liveSym?ALPEXA_MARKET.fxBidPx(liveSym):position.open;   // dealt quotes (display lockstep)
+  const ask=liveSym?ALPEXA_MARKET.fxAskPx(liveSym):position.open;
   const curPx=position.side==='BUY'?bid:ask;
   const lotSize=ALPEXA_MARKET.getLotSize?ALPEXA_MARKET.getLotSize(symInfo||{sym:position.sym,cls:'FX'}):(symInfo?.cls==='FX'?100000:1);
   const tickSize=Math.pow(10,-digits);
@@ -1918,7 +1928,7 @@ function Positions({tab,setTab,liveOrders=[],pendingOrders=[],closedHistory=[],m
           {pendingOrders.map(p=>{
             const isBuy=p.side==='BUY';const symInfo=ALPEXA_MARKET.SYMBOLS.find(s=>s.sym===p.sym);
             const liveSym=market.find(m=>m.sym===p.sym);const digits=symInfo?symInfo.digits:5;
-            const curPx=liveSym?(isBuy?liveSym.last+liveSym.spread:liveSym.last):0;
+            const curPx=liveSym?(isBuy?ALPEXA_MARKET.fxAskPx(liveSym):ALPEXA_MARKET.fxBidPx(liveSym)):0;   // dealt quotes (display lockstep)
             const dist=curPx?((p.trigger-curPx)*Math.pow(10,digits)):0;
             return(
               <div key={p.id} style={{background:'var(--surface)',marginBottom:6,padding:'12px 14px'}}>
@@ -2998,7 +3008,7 @@ function ChartScreen({market,sym,setSym,accent,density,indicators,setIndicators,
     // current quantity would be worth too little or way too much for the coin).
     else if(s.cls==='CRYPTO'){const px=s.last||s.bid||1; const notl=lots*px; if(notl<10||notl>100000)setLots(+(500/px).toFixed(6));}
   },[s&&s.cls, s&&s.sym]);
-  const ask=s.last+s.spread;
+  const ask=ALPEXA_MARKET.fxAskPx(s);   // dealt ask (display lockstep)
   const up=s.chgPct>=0;
   const cur=s.series[s.series.length-1];
   const dPts=((s.last-cur.o)*Math.pow(10,s.digits)).toFixed(0);
@@ -3032,7 +3042,7 @@ function ChartScreen({market,sym,setSym,accent,density,indicators,setIndicators,
         </div>
         <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'0 4px'}}>
           <div style={{fontSize:8.5,color:'var(--text-3)',fontWeight:700,letterSpacing:0.4}}>SPREAD</div>
-          <div className="mono" style={{fontSize:13,fontWeight:700,color:'var(--ink)',marginTop:2}}>{(s.spread*Math.pow(10,s.digits)).toFixed(0)}</div>
+          <div className="mono" style={{fontSize:13,fontWeight:700,color:'var(--ink)',marginTop:2}}>{((ALPEXA_MARKET.fxAskPx(s)-ALPEXA_MARKET.fxBidPx(s))*Math.pow(10,s.digits)).toFixed(0)}</div>
         </div>
         <div className={flashClass} style={{flex:1,padding:'7px 10px',borderRadius:3,background:MT5_ASKTINT,border:'1px solid '+MT5_ASK+'22'}}>
           <div style={{fontSize:8.5,fontWeight:800,color:MT5_ASK,letterSpacing:0.8,textAlign:'right'}}>BUY · ASK</div>
@@ -3718,7 +3728,7 @@ function App(){
         const stillPending=prev.filter(p=>{
           const m=marketRef.current.state.find(s=>s.sym===p.sym);
           if(!m)return true;
-          const px=p.side==='BUY'?m.last+m.spread:m.last;
+          const px=p.side==='BUY'?ALPEXA_MARKET.fxAskPx(m):ALPEXA_MARKET.fxBidPx(m);   // pending triggers watch the DEALT quotes (display lockstep)
           let hit=false;
           if(p.otype==='LIMIT'){hit=p.side==='BUY'?px<=p.trigger:px>=p.trigger;}
           else if(p.otype==='STOP'){hit=p.side==='BUY'?px>=p.trigger:px<=p.trigger;}
