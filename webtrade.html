@@ -170,10 +170,11 @@
   .oc-buy{background:linear-gradient(to bottom,#0a1735 0%,#030815 100%) !important;border:1px solid #007aff !important;color:#3095ff !important}
   .oc-sell:hover,.oc-sell.oc-glow{box-shadow:0 0 10px rgba(255,59,48,.7) !important}
   .oc-buy:hover,.oc-buy.oc-glow{box-shadow:0 0 10px rgba(0,122,255,.7) !important}
-  /* MT5 tick flash — the price DIGITS blink blue (up) / red (down) for 160ms, then back to white.
-     Applied by direct classList from the tick handler (no re-render); colours = the side neon texts. */
-  .oc-price.tick-up .bf .sm,.oc-price.tick-up .bf .bg,.oc-price.tick-up .bf .fr{color:#3095ff !important}
-  .oc-price.tick-down .bf .sm,.oc-price.tick-down .bf .bg,.oc-price.tick-down .bf .fr{color:#ff453a !important}
+  /* MT5 one-click DIRECTION SKIN — the WHOLE panel follows the last tick, exactly like MT5:
+     up-tick → both boxes blue, down-tick → both boxes red, sticky until the direction flips.
+     Applied by direct classList on .obox from the tick handler (no re-render). Digits stay white. */
+  .obox.tick-up .oc-sell,.obox.tick-up .oc-buy{background:linear-gradient(to bottom,#0d47c8 0%,#082d85 100%) !important;border-color:#3095ff !important;color:#eaf2ff !important}
+  .obox.tick-down .oc-sell,.obox.tick-down .oc-buy{background:linear-gradient(to bottom,#c62828 0%,#7f1616 100%) !important;border-color:#ff6b60 !important;color:#ffecec !important}
   /* ── ECN order interaction (overlay only — 190x64 치수/대칭 불변) ──
      처리중: 클릭한 쪽 호가를 dim+blur, 코너에 미세 스피너. 체결완료: 패널 0.1s 플래시. */
   .obox.ecn-flash{animation:ecnFlash .1s ease-out}
@@ -1428,21 +1429,21 @@ function BigFig({ symbol, v }){
 function OrderBox({ symbol }){
   const [m,setM]=React.useState(priceStore.get(symbol)||{});
   const [vol,setVol]=React.useState('0.10');   // one-click starts at 0.1 lot (min 0.1)
-  const prevBid=React.useRef(null), prevAsk=React.useRef(null);
-  const sellPx=React.useRef(null), buyPx=React.useRef(null);   // .oc-price DOM nodes (tick flash target)
+  const prevBid=React.useRef(null);
+  const oboxEl=React.useRef(null);             // .obox DOM node (MT5 direction-skin target)
   const eng=useTradeEngine();
   const [busy,setBusy]=React.useState(null);   // null | 'sell' | 'buy' — ECN 처리중 상태(렌더용)
   const [flashOk,setFlashOk]=React.useState(false); // 체결 성공 순간 패널 플래시
   const busyRef=React.useRef(null);            // 동기 레이스 가드(state는 비동기라 클릭 중복 못 막음)
-  // MT5 tick flash — pure DOM (no re-render): blink the digits blue/red for 160ms, then revert.
-  // remove → forced reflow → add, so SAME-direction consecutive ticks re-blink (classList.add
-  // alone is a no-op while the class is still on); clearTimeout stops removal-timer pileup.
-  const flash=(el,dir)=>{ if(!el) return; if(el._ft) clearTimeout(el._ft);
-    el.classList.remove('tick-up','tick-down'); void el.offsetWidth;
-    el.classList.add(dir); el._ft=setTimeout(()=>el.classList.remove(dir),160); };
+  // MT5 direction skin — pure DOM (no re-render): the WHOLE panel turns blue on an up-tick,
+  // red on a down-tick, and KEEPS the colour until the direction flips (sticky, like MT5's
+  // one-click widget). Idempotent per direction so a run of same-way ticks does zero DOM work.
+  const paint=(el,dir)=>{ if(!el||el._dir===dir) return; el._dir=dir;
+    el.classList.remove('tick-up','tick-down'); el.classList.add(dir); };
   React.useEffect(()=> priceStore.subscribe(throttle(mids=>{ const q=mids[symbol]||{}; setM({...q});
-    if(q.bid!=null){ const p=prevBid.current; if(p!=null){ if(q.bid>p) flash(sellPx.current,'tick-up'); else if(q.bid<p) flash(sellPx.current,'tick-down'); } prevBid.current=q.bid; }
-    if(q.ask!=null){ const p=prevAsk.current; if(p!=null){ if(q.ask>p) flash(buyPx.current,'tick-up'); else if(q.ask<p) flash(buyPx.current,'tick-down'); } prevAsk.current=q.ask; }
+    if(q.bid!=null){ const p=prevBid.current;
+      if(p!=null && q.bid!==p) paint(oboxEl.current, q.bid>p?'tick-up':'tick-down');   // flat tick → keep colour
+      prevBid.current=q.bid; }
   }, 400)), [symbol]);
   const sellCls = 'oc-sell';   // fixed red-neon skin; the tick drives the 160ms digit flash above (glow = hover only)
   const buyCls  = 'oc-buy';    // fixed blue-neon skin
@@ -1481,7 +1482,7 @@ function OrderBox({ symbol }){
   React.useEffect(()=> release, []);   // stop the repeat on unmount
   const busySell=busy==='sell', busyBuy=busy==='buy';
   return (   // always shown — the 190×64 one-click panel is locked visible on every chart
-    <div className={"obox"+(flashOk?' ecn-flash':'')+(tradable?'':' oc-closed')}>
+    <div ref={oboxEl} className={"obox"+(flashOk?' ecn-flash':'')+(tradable?'':' oc-closed')}>
       <div className="oc-top">
         <div className={"oc-lbl "+sellCls+(busySell?' oc-busy':'')} title="Sell at Bid" onClick={(e)=>{e.stopPropagation();send('sell');}}>SELL</div>
         <div className="oc-vol" onClick={e=>e.stopPropagation()}>
@@ -1492,8 +1493,8 @@ function OrderBox({ symbol }){
         <div className={"oc-lbl "+buyCls+(busyBuy?' oc-busy':'')} title="Buy at Ask" onClick={(e)=>{e.stopPropagation();send('buy');}}>BUY</div>
       </div>
       <div className="oc-bot">
-        <div ref={sellPx} className={"oc-price "+sellCls+(busySell?' oc-busy':'')} title="Sell at Bid" onClick={(e)=>{e.stopPropagation();send('sell');}}><BigFig symbol={symbol} v={m.bid} />{busySell&&<span className="oc-spin" aria-hidden="true"></span>}</div>
-        <div ref={buyPx} className={"oc-price "+buyCls+(busyBuy?' oc-busy':'')} title="Buy at Ask" onClick={(e)=>{e.stopPropagation();send('buy');}}><BigFig symbol={symbol} v={m.ask} />{busyBuy&&<span className="oc-spin" aria-hidden="true"></span>}</div>
+        <div className={"oc-price "+sellCls+(busySell?' oc-busy':'')} title="Sell at Bid" onClick={(e)=>{e.stopPropagation();send('sell');}}><BigFig symbol={symbol} v={m.bid} />{busySell&&<span className="oc-spin" aria-hidden="true"></span>}</div>
+        <div className={"oc-price "+buyCls+(busyBuy?' oc-busy':'')} title="Buy at Ask" onClick={(e)=>{e.stopPropagation();send('buy');}}><BigFig symbol={symbol} v={m.ask} />{busyBuy&&<span className="oc-spin" aria-hidden="true"></span>}</div>
       </div>
     </div>
   );
