@@ -968,11 +968,16 @@ const priceStore = {
       bidHi: prev? Math.max(prev.bidHi,bid):bid, bidLo: prev? Math.min(prev.bidLo,bid):bid,
       askHi: prev? Math.max(prev.askHi,ask):ask, askLo: prev? Math.min(prev.askLo,ask):ask };
   },
-  _apply(rows){
+  _apply(rows, src){
     const now=Date.now();
     rows.forEach(p=>{
       const sym=p.symbol; if(!sym) return;   // keep EVERY priced symbol (not just WATCH) so positions on
       const mid=+p.mid||0; if(mid<=0) return; //   off-watch symbols (e.g. SPACEX) still get a live price + P&L
+      // PRIORITY GATE: a symbol with a fresh (<10s) Binance-WS tick must not be dragged backwards
+      // by the 3s cron row (poll/Realtime YIELD); after 10s of WS silence the cron feed takes back
+      // over, so a dead socket degrades to exactly the pre-WS behaviour instead of freezing.
+      if(src==='ws'){ (this.wsAt=this.wsAt||{})[sym]=now; }
+      else if(this.wsAt && this.wsAt[sym] && now-this.wsAt[sym]<10000) return;
       // spr stays in the writer's per-class units (FX pips · crypto bps · stock 0); halfPx does the
       // class-correct conversion (fx_close.sql lockstep). On a transient feed dropout keep this
       // symbol's OWN last-known spread; only a cold start with no history reads DEFAULT_SPREAD.
@@ -1017,7 +1022,29 @@ const priceStore = {
       })
       .subscribe();
   }catch(e){} },
-  start(){ if(this.timer) return; this.loadMarks(); this.startRealtime(); this.pull(); this.timer=setInterval(()=>this.pull(), 1000); }, // realtime push + 1s poll fallback
+  // Binance WS direct (crypto only, stage 3): bookTicker bid/ask off the PUBLIC data mirror
+  // (binance.vision — binance.com is geo-fenced; the crypto-prices Edge samples this SAME book,
+  // so display and execution track one upstream). Frames become {symbol, mid, spr_pts in BPS} —
+  // the exact row shape crypto-prices writes — and flow through the one _apply/halfPx pipeline
+  // tagged src='ws' for the priority gate. Auto-reconnects; a dead socket just means the 3s
+  // cron/Realtime feed takes back over after 10s (see _apply gate).
+  startCryptoWS(){ try{
+    if(this.ws || typeof WebSocket==='undefined') return;
+    const MAP={ BTCUSD:'btcusdt', ETHUSD:'ethusdt', SOLUSD:'solusdt', XRPUSD:'xrpusdt', DOGEUSD:'dogeusdt' };
+    const REV={}; Object.keys(MAP).forEach(k=>{ REV[MAP[k].toUpperCase()]=k; });
+    const ws=new WebSocket('wss://data-stream.binance.vision/stream?streams='+Object.values(MAP).map(s=>s+'@bookTicker').join('/'));
+    ws.onmessage=(ev)=>{ try{
+      const d=JSON.parse(ev.data).data; if(!d||!d.s) return;
+      const sym=REV[d.s]; if(!sym) return;
+      const b=+d.b, a=+d.a; if(!(b>0&&a>0)) return;
+      const mid=(a+b)/2, spr=Math.round((a-b)/mid*10000*100)/100;   // REAL spread in BPS — the unit crypto-prices writes
+      this.live=true; this._apply([{symbol:sym, mid, spr_pts:spr}], 'ws'); this.notify();
+    }catch(e){} };
+    ws.onclose=()=>{ this.ws=null; setTimeout(()=>this.startCryptoWS(), 5000); };
+    ws.onerror=()=>{ try{ ws.close(); }catch(e){} };
+    this.ws=ws;
+  }catch(e){} },
+  start(){ if(this.timer) return; this.loadMarks(); this.startRealtime(); this.startCryptoWS(); this.pull(); this.timer=setInterval(()=>this.pull(), 1000); }, // ws + realtime push + 1s poll fallback
   subscribe(fn){ this.listeners.add(fn); fn(this.mids); return ()=>this.listeners.delete(fn); },
   get(sym){ return this.mids[sym]; },
 };

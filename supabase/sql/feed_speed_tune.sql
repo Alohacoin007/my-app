@@ -24,10 +24,19 @@ select jobname, schedule, active from cron.job where jobname like '%price%';
 --   select cron.alter_job(jobid, schedule => '5 seconds')
 --     from cron.job where jobname in ('fx-prices-5s','crypto-price-5s');
 
--- ── 4) 주식 1분은 Finnhub 무료 한도의 천장 ──
+-- ── 4) 주식 1분은 Finnhub REST 무료 한도의 천장 ──
 -- stock-prices는 심볼당 1콜 × 35심볼 ≈ 35 calls/run, Finnhub 무료 60 calls/min → 1분 미만 불가.
--- 더 빠르게 하려면 (a) Finnhub 유료 키, 또는 (b) stock-prices Edge를 "절반씩 교대 30초" 방식으로
--- 패치(코드 변경, 검토 후 별도 제공). 크론만 당기면 rate-limit로 오히려 피드가 죽는다 — 금지.
+-- 크론만 당기면 rate-limit로 오히려 피드가 죽는다 — 금지. 돌파는 §5(웹소켓 펌프)로.
+
+-- ── 5) [3단계] 주식 실시간: stock-stream Edge (Finnhub 웹소켓 펌프) ──
+-- 사용자 선행 작업: `supabase functions deploy stock-stream` (키는 기존 FINNHUB_KEY/CRON_SECRET
+-- env 재사용, 클라 노출 없음). 매분 재기동해 소켓을 ~50초 유지하며 체결가를 prices에 즉시
+-- 업서트 → 클라는 이미 배포된 Realtime 푸시로 자동 수신. stock-prices-1m은 폴백+ALPXS로 유지.
+select cron.schedule('stock-stream-1m', '* * * * *', $$
+  select net.http_get(url := 'https://grxnbgtfnaayeluenvqh.supabase.co/functions/v1/stock-stream?token=<CRON_SECRET>');
+$$);
+-- 확인(장중): select symbol, updated_at from prices where symbol in ('AAPL','NVDA') — 초 단위로 갱신돼야 정상.
+-- 롤백: select cron.unschedule('stock-stream-1m');  (stock-prices-1m이 그대로 1분 피드 제공)
 
 -- 되돌리기: select cron.unschedule('crypto-prices-3s');  후 crypto_prices_cron.sql 재실행.
 -- 검증: 1)의 진단 쿼리 재실행 + prices.updated_at 간격 확인.
