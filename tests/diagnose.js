@@ -90,6 +90,15 @@ const CHECKS = [
   { id: 'CHART-fabricated-portfolio-history', sev: 'HIGH', files: ['crypto-live.html', 'trading.html'],
     re: /RANGE_BASIS|(?<![A-Z_])RANGE_OPEN_MULT/,
     why: 'A per-range multiplier that fabricates a portfolio chart\'s STARTING value from the current total (open = total × RANGE_BASIS/RANGE_OPEN_MULT, e.g. ALL=0.10 → a fake 10× gain) — i.e. INVENTED money-chart history with no real-data source. A wallet/total value chart must show REAL movement (holdings × real prices) or a flat line at the current value — never a synthesized random walk off a faked opening (#5 fake-motion). (Coin PRICE charts use BUY_RANGE_OPEN_MULT only as a loading placeholder AFTER fetching real CoinGecko data — excluded by the regex.)' },
+  { id: 'SPREAD-flat-fallback', sev: 'CRITICAL', files: ['webtrade.html'],
+    re: /spr_pts\s*\|\|/,
+    why: 'Spread OR-fallback (spr_pts||10) flat-lines every symbol. Use last-known: prev.spr!=null?prev.spr:seed.' },
+  { id: 'SPREAD-pip-not-ticksize', sev: 'CRITICAL', files: ['webtrade.html'],
+    re: /\b(?:spr|sp)\s*\*\s*pip\([^)]*\)\s*\/\s*2/,
+    why: 'Spread half-gap ×pip reads MT5 integer POINTS as PIPS (10× bomb). Must be ×tickSize (10^-digits).' },
+  { id: 'SPREAD-fixed-multiplier', sev: 'HIGH', files: ['webtrade.html'],
+    re: /\*\s*100000\b/,
+    why: 'Hardcoded *100000 spread formula breaks per-symbol digits. Use tickSize(sym).' },
 ];
 
 // ── Reviewed-OK exceptions (Six-Sigma control plan). Suppressed but always printed. ──
