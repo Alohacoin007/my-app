@@ -10,9 +10,9 @@ const src = fs.readFileSync(path.join(__dirname, '..', 'webtrade.html'), 'utf8')
 let fail = 0;
 const bad = (m) => { console.error('🔴 ' + m); fail++; };
 
-// default boots a single MAXIMIZED chart at M1 (1×1, full-stage — not the old squashed 2×2)
-if (!/\[\{ id:1, symbol:GRID\[0\], tf:'M1'/.test(src)) bad('default must boot a single M1 chart (GRID[0])');
-if (!/initial=\{charts\.length===1\?\{fx:0,fy:0,fw:1,fh:1\}:floatGeo\(i\)\}/.test(src)) bad('the sole default chart must open full-stage (fw:1,fh:1); multi-chart still tiles via floatGeo');
+// default boot layout is owned by webtrade-chart-boot.test.js (2026-07-13: full 2×2 GRID at M1).
+// Here we only pin the geometry rule: a lone chart goes full-stage, multi-chart tiles via floatGeo.
+if (!/initial=\{charts\.length===1\?\{fx:0,fy:0,fw:1,fh:1\}:floatGeo\(i\)\}/.test(src)) bad('a lone chart must open full-stage (fw:1,fh:1); multi-chart tiles via floatGeo');
 
 // a ResizeObserver fits the chart when the box first gets a real width
 if (!/new ResizeObserver\(doFit\)/.test(src)) bad('a ResizeObserver must drive the initial fit');

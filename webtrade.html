@@ -837,7 +837,7 @@ const SYMBOLS = {
 };
 const SYM_CAT = {}; Object.keys(SYMBOLS).forEach(cat=> SYMBOLS[cat].forEach(s=> SYM_CAT[s]=cat));
 const WATCH = [...SYMBOLS.Forex, ...SYMBOLS.Stocks, ...SYMBOLS.Crypto];
-const GRID  = ['USDJPY','USDCHF','EURUSD','GBPUSD'];   // the default 2×2 (TL·TR·BL·BR, matches the MT5 screenshot)
+const GRID  = ['EURUSD','USDJPY','GBPUSD','USDCHF'];   // the default 2×2 (TL·TR·BL·BR — 2026-07-13 user-approved login layout)
 // ── Server-driven symbol master. The Market Watch renders the LIVE symbol set from the server
 //    (prices table = what the feed actually serves), with each symbol's asset class inherited from
 //    fx_specs.cls (the same class the server margins with). No digits/active column exists server-
@@ -3204,8 +3204,9 @@ function App(){
   // refresh always shows this exact setup regardless of what was open last session).
   // BOOT 1×1 MAXIMIZED — a single full-stage chart (was a 2×2 that squashed candles to a quarter
   // height). One window fills the whole workspace so the wave amplitude runs full-height like MT5.
-  // Opening more charts still tiles 2×2 (floatGeo); only the default boot is a single maximized chart.
-  const initCharts=React.useRef([{ id:1, symbol:GRID[0], tf:'M1', type:'candle', inds:(cfg.indicators||[]).slice() }]).current;   // indicators are PER-CHART
+  // DEFAULT LOGIN LAYOUT (2026-07-13, MT5-style): boot the full 2×2 — one M1 candle chart per GRID
+  // symbol, tiled edge-to-edge by floatGeo. (The earlier single-maximized boot was retired on request.)
+  const initCharts=React.useRef(GRID.map((sym,i)=>({ id:i+1, symbol:sym, tf:'M1', type:'candle', inds:(cfg.indicators||[]).slice() }))).current;   // indicators are PER-CHART
   const [charts,setCharts]=React.useState(initCharts);   // dynamic chart windows [{id,symbol,tf,type}]
   const [activeId,setActiveId]=React.useState(initCharts[0]?initCharts[0].id:null);
   const geos=React.useRef({});   // id → last {x,y,w,h} so a re-mounted window restores where you left it

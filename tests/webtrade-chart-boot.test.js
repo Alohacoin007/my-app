@@ -12,6 +12,13 @@ const src = fs.readFileSync(path.join(__dirname, '..', 'webtrade.html'), 'utf8')
 let fail = 0;
 const bad = (m) => { console.error('🔴 ' + m); fail++; };
 
+// 0) DEFAULT LOGIN LAYOUT (2026-07-13 user request, MT5-style): boot the FULL 2×2 —
+//    TL EURUSD · TR USDJPY · BL GBPUSD · BR USDCHF, all M1 candles (floatGeo tiles them edge-to-edge).
+if (!/const GRID  = \['EURUSD','USDJPY','GBPUSD','USDCHF'\];/.test(src))
+  bad('GRID must be the approved default order: EURUSD·USDJPY·GBPUSD·USDCHF (TL·TR·BL·BR)');
+if (!/const initCharts=React\.useRef\(GRID\.map\(\(sym,i\)=>\(\{ id:i\+1, symbol:sym, tf:'M1', type:'candle', inds:\(cfg\.indicators\|\|\[\]\)\.slice\(\) \}\)\)\)\.current;/.test(src))
+  bad('login must boot ONE chart per GRID symbol (4 × M1 candle), not a single maximized chart');
+
 // 1) desktop eager reveal — all charts mount on load; mobile stays lazy (active only)
 if (!/new Set\(IS_MOBILE \? \(initCharts\[0\] \? \[initCharts\[0\]\.id\] : \[\]\) : initCharts\.map\(c=>c\.id\)\)/.test(src))
   bad('desktop must reveal ALL charts eagerly (revealed = initCharts.map ids); mobile stays lazy');
