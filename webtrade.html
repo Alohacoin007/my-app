@@ -930,6 +930,13 @@ const BASE = { EURUSD:1.143, AUDUSD:0.694, USDJPY:162.36, GBPUSD:1.3417, USDCAD:
   AAPL:229.5, MSFT:465.2, NVDA:128.4, TSLA:248.6, AMZN:198.3, GOOGL:178.9, META:562.1,   // stocks
   BTCUSD:64250, ETHUSD:3420, SOLUSD:148.5, XRPUSD:0.612, DOGEUSD:0.145 };                 // crypto
 
+// Realistic per-symbol dealing spread (points), used ONLY when the feed row omits spr_pts. The old
+// flat-10 default painted EVERY FX pair as "10.0"; majors here follow industry norms (USDJPY 1.9 =
+// the CLAUDE.md invariant). A real server spr_pts, when present, STILL wins — display honesty (#5).
+const SPREAD_PTS = { EURUSD:1.0, GBPUSD:1.2, USDJPY:1.9, AUDUSD:1.2, USDCAD:1.5, USDCHF:1.6, NZDUSD:1.8,
+  EURGBP:1.4, EURJPY:1.8, GBPJPY:2.2, AUDJPY:1.9, EURAUD:2.0, GBPAUD:2.4 };
+const defaultSpr = (s)=> SPREAD_PTS[s] || (catOf(s)==='Crypto'||catOf(s)==='Stocks' ? 10 : 1.5);
+
 const priceStore = {
   mids:{}, listeners:new Set(), timer:null, live:false,
   _set(sym,mid,half,spr,now,jit){
@@ -948,7 +955,7 @@ const priceStore = {
     rows.forEach(p=>{
       const sym=p.symbol; if(!sym) return;   // keep EVERY priced symbol (not just WATCH) so positions on
       const mid=+p.mid||0; if(mid<=0) return; //   off-watch symbols (e.g. SPACEX) still get a live price + P&L
-      const spr=(+p.spr_pts||10); this._set(sym, mid, spr*pip(sym)/2, spr, now);
+      const spr=(+p.spr_pts||defaultSpr(sym)); this._set(sym, mid, spr*pip(sym)/2, spr, now);   // server spr_pts wins; else realistic per-symbol default (not a flat 10)
     });
   },
   _simulate(){ // dev fallback: random walk + a small PERSISTENT per-symbol drift so the daily
@@ -958,8 +965,9 @@ const priceStore = {
       const cur=this.mids[sym]? this.mids[sym].mid : BASE[sym];
       // SESSION LOCKSTEP (Method A): a CLOSED symbol (weekend/after-hours FX & US stocks) must NOT random-walk
       // — freeze it at its last/close price so the whole app (chart, quotes, P&L) holds. Crypto is 24/7 → walks.
-      if(!marketOpen(sym)){ if(!this.mids[sym]) this._set(sym, cur, 10*pip(sym)/2, 10, now); return; }
-      const mid=cur*(1+(Math.random()-0.5)*0.0006 + this.drift[sym]); this._set(sym, mid, 10*pip(sym)/2, 10, now, 3*pip(sym));
+      const sp=defaultSpr(sym);   // realistic per-symbol spread (was a flat 10 for every symbol → "10.0" bomb)
+      if(!marketOpen(sym)){ if(!this.mids[sym]) this._set(sym, cur, sp*pip(sym)/2, sp, now); return; }
+      const mid=cur*(1+(Math.random()-0.5)*0.0006 + this.drift[sym]); this._set(sym, mid, sp*pip(sym)/2, sp, now, 3*pip(sym));
     });
   },
   async pull(){
