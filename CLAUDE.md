@@ -94,6 +94,7 @@
 - **아침 감시 2층 (2026-07-13):** ① Claude 루틴 `trig_01VUfQyWNpydMtCKnghmXNE5` — 매일 15:00 UTC(베가스 8시) 이 세션에서 feed-check+오늘 경기·오즈 점검 후 **능동 보고**. ② GitHub Action `daily-sports-check.yml`(main) — 매일 ~16-17 UTC **침묵 게이트**(빨강 시만 이메일, 7/7부터 전회 초록). 서로 백업 — 하나 지운다고 감시가 사라지지 않게 둘 다 유지.
 
 ## 📌 보류 백로그 (조건 충족 시 사용자에게 먼저 리마인드할 것)
+- **[보류 2026-07-14] 카본 스킨**: 시안 2종 라이브 — `fx-dashboard-preview.html`(24×24 위젯 대시보드) · `webtrade-carbon-preview.html`(터미널에 스킨 덧입힌 뷰어, 원본 무변경). 사용자가 채택 결정하면: 정식 구현은 **`?skin=carbon` 테마 레이어**(CSS 변수 + CHART_THEME carbon 항목, 기본값 MT5 유지) — 파일 복사 금지. 참고 디자인 = 브랜치 `claude/sports-betting-dashboard-dmtsy0`.
 - **[완료 2026-07-13] 시세 3단계 전체**: 크립토 = webtrade Binance WS 직결(실브라우저 초당 2회 확인) · 주식 = `stock-stream`(AAPL 1분→2~8초 실측) · FX = `fx-stream`(EURUSD 3초→평균 1.5초 실측, 120초에 91회). 상세는 위 📡 섹션. 잔여(고객 생기면): Realtime 패턴 crypto-live.html 확산(trading.html은 2026-07-13 완료) · 주식 차트 실봉(현재 합성 폴백 — Finnhub 캔들 API는 무료 티어 제한, 유료 결정 필요). 차트 실봉: FX=fx-prices ?candles(공개 분기·200봉) · 크립토=Binance klines 클라 직결(2026-07-13 라이브 검증: M1 평균 2.9핍 실구조).
 
 ## 🚚 배포 / 운영
