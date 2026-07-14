@@ -83,13 +83,13 @@ export default function Dashboard() {
     setSelections((prev) => prev.filter((s) => s.id !== id));
   }, []);
 
-  // 화이트가 기본, <html data-theme="dark">로 전환. 선택은 localStorage에 저장
-  const [theme, setTheme] = useState<"dark" | "light">("light");
+  // 다크(터미널 룩)가 기본, ☀️로 화이트 전환. 선택은 localStorage에 저장
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
   useEffect(() => {
     try {
-      if (window.localStorage.getItem("betboard-theme") === "dark") {
-        setTheme("dark");
-        document.documentElement.dataset.theme = "dark";
+      if (window.localStorage.getItem("betboard-theme-v2") === "light") {
+        setTheme("light");
+        document.documentElement.dataset.theme = "light";
       }
     } catch {
       // 스토리지가 막힌 환경에서는 기본 테마로 시작
@@ -101,7 +101,7 @@ export default function Dashboard() {
       const next = prev === "dark" ? "light" : "dark";
       document.documentElement.dataset.theme = next;
       try {
-        window.localStorage.setItem("betboard-theme", next);
+        window.localStorage.setItem("betboard-theme-v2", next);
       } catch {
         // 저장 실패는 무시
       }
