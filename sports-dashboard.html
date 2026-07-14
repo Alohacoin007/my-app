@@ -123,11 +123,11 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .obfil button{border:none; background:transparent; color:var(--lgd-dim); font-size:var(--lgd-fs-label); font-weight:700;
   height:26px; padding:0 10px; border-radius:var(--lgd-r-btn); cursor:pointer}
 .obfil button.on{background:var(--lgd-pill); color:var(--lgd-ink)}
-.obhead{display:grid; grid-template-columns:minmax(0,1fr) 86px 86px 86px; gap:6px; padding:0 10px 6px;
+.obhead{display:grid; grid-template-columns:minmax(120px,1fr) 86px 86px 86px; gap:6px; padding:0 10px 6px;
   font-size:var(--lgd-fs-label); color:var(--lgd-dim); font-weight:600; flex:none}
 .obhead span:not(:first-child){text-align:center}
 .obscroll{flex:1; min-height:0; overflow:auto; padding-bottom:8px}
-.obrow{display:grid; grid-template-columns:minmax(0,1fr) 86px 86px 86px; gap:6px; padding:8px 10px;
+.obrow{display:grid; grid-template-columns:minmax(120px,1fr) 86px 86px 86px; gap:6px; padding:8px 10px;
   border-top:1px solid var(--lgd-hair); align-items:center}
 .obg .st{font-size:var(--lgd-fs-caption); color:var(--lgd-dim); margin-bottom:3px}
 .obg .st.live{color:var(--lgd-up); font-weight:700}
@@ -216,10 +216,14 @@ const GRID=38, LKEY='alpexa.sbdash.layout.v1';
 const stage=document.getElementById('stage');
 const DEFAULT_LAYOUT={ balance:{x:1102,y:494,w:380,h:266}, leagues:{x:24,y:24,w:228,h:440},
   schedule:{x:24,y:494,w:532,h:342}, board:{x:280,y:24,w:800,h:440} };
+// 콘텐츠가 뭉개지지 않는 위젯별 최소 크기 (보드=게임열+마켓 3열, 일정=4컬럼 표)
+const MIN_SIZE={ balance:{w:300,h:200}, leagues:{w:200,h:220}, schedule:{w:420,h:220}, board:{w:520,h:260} };
 function loadLayout(){ try{ const raw=localStorage.getItem(LKEY); if(!raw) return {...DEFAULT_LAYOUT};
   const p=JSON.parse(raw); return Object.keys(DEFAULT_LAYOUT).every(k=>p[k])?p:{...DEFAULT_LAYOUT};
 }catch(e){ return {...DEFAULT_LAYOUT}; } }
 let layout=loadLayout();
+Object.keys(layout).forEach(id=>{ const m=MIN_SIZE[id]; if(!m) return;
+  if(layout[id].w<m.w) layout[id].w=m.w; if(layout[id].h<m.h) layout[id].h=m.h; });
 function saveLayout(){ try{ localStorage.setItem(LKEY, JSON.stringify(layout)); }catch(e){} }
 document.getElementById('btnReset').onclick=()=>{ try{ localStorage.removeItem(LKEY); }catch(e){}
   layout={...DEFAULT_LAYOUT}; Object.keys(layout).forEach(applyGeo); };
@@ -258,8 +262,8 @@ function makeWidget(id, title, sub, linkColor, bodyHTML){
       g.x=Math.round(g.x/GRID)*GRID; g.y=Math.round(g.y/GRID)*GRID; applyGeo(id); saveLayout(); };
     tb.addEventListener('pointermove',move); tb.addEventListener('pointerup',up);
   });
-  // 리사이즈 4방향 (스펙 §3: br 갈매기 + 좌/우/하 변)
-  const MINW=220, MINH=170;
+  // 리사이즈 4방향 (스펙 §3: br 갈매기 + 좌/우/하 변) — 최소 크기는 위젯별(콘텐츠 기반)
+  const MINW=(MIN_SIZE[id]||{}).w||220, MINH=(MIN_SIZE[id]||{}).h||170;
   ['br','r','l','b'].forEach(dir=>{
     const rz=document.createElement('div'); rz.className='rz '+dir; el.appendChild(rz);
     rz.addEventListener('pointerdown', e=>{
