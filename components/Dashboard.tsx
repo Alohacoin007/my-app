@@ -21,8 +21,9 @@ const LAYOUT_STORAGE_KEY = "betboard-layout-v1";
 const DEFAULT_LAYOUT: LayoutItem[] = [
   { i: "chart", x: 0, y: 0, w: 14, h: 13, minW: 8, minH: 7 },
   { i: "odds", x: 14, y: 0, w: 10, h: 13, minW: 6, minH: 6 },
-  { i: "schedule", x: 0, y: 13, w: 14, h: 11, minW: 6, minH: 5 },
-  { i: "betslip", x: 14, y: 13, w: 10, h: 11, minW: 6, minH: 6 },
+  { i: "schedule", x: 0, y: 13, w: 9, h: 11, minW: 5, minH: 5 },
+  { i: "betslip", x: 9, y: 13, w: 7, h: 11, minW: 5, minH: 6 },
+  { i: "wallet", x: 16, y: 13, w: 8, h: 11, minW: 5, minH: 6 },
 ];
 
 function loadLayout(): LayoutItem[] {
@@ -305,6 +306,11 @@ export default function Dashboard() {
                 }
               >
                 <BetSlip selections={selections} onRemove={removeSelection} />
+              </Widget>
+            </div>
+            <div key="wallet">
+              <Widget title="Wallet">
+                <WalletCard />
               </Widget>
             </div>
           </GridLayout>
