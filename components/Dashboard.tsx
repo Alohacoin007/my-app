@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GridLayout, type Layout, type LayoutItem } from "react-grid-layout";
+import MobileNav, { type MobileTab } from "@/components/MobileNav";
 import Widget from "@/components/Widget";
+import WalletCard from "@/components/widgets/WalletCard";
 import OddsTrendChart from "@/components/widgets/OddsTrendChart";
 import LiveOddsBoard from "@/components/widgets/LiveOddsBoard";
 import BetSlip from "@/components/widgets/BetSlip";
@@ -46,8 +48,9 @@ export default function Dashboard() {
   // 세로 24행이 컨테이너 높이에 딱 맞도록 행 높이를 역산
   const rowHeight = (height - PADDING * 2 - MARGIN * (GRID - 1)) / GRID;
 
-  // 좁은 화면(모바일)에서는 그리드 대신 세로 스택 레이아웃으로 전환
+  // 좁은 화면(모바일)에서는 그리드 대신 하단 4탭(Home·Live·My Bets·Wallet) 레이아웃으로 전환
   const isMobile = width > 0 && width < 700;
+  const [mobileTab, setMobileTab] = useState<MobileTab>("home");
 
   const onLayoutChange = useCallback((next: Layout) => {
     setLayout([...next]);
@@ -126,7 +129,7 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="flex h-dvh flex-col">
+    <div className="flex h-full flex-col">
       <header className="flex shrink-0 items-center gap-3 border-b border-hairline px-4 py-2.5">
         <h1 className="text-sm font-bold tracking-wide">
           BetBoard <span className="font-normal text-ink-muted">— Sports Betting Dashboard</span>
@@ -211,37 +214,53 @@ export default function Dashboard() {
       {/* 24행이 화면 높이에 맞춰지지만, 배치 중 잠시 밀려난 위젯은 스크롤로 접근 가능 */}
       <div ref={gridRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
         {isMobile && (
-          <div className="flex flex-col gap-2 p-2">
-            <div className="h-[300px]">
-              <Widget draggable={false} title="Odds Trend — Man City vs Arsenal (Last 24h)">
-                <OddsTrendChart />
-              </Widget>
+          <div className="flex h-full flex-col">
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {mobileTab === "home" && (
+                <div className="flex flex-col gap-2 p-2">
+                  <div className="h-[300px]">
+                    <Widget draggable={false} title="Odds Trend — Man City vs Arsenal (Last 24h)">
+                      <OddsTrendChart />
+                    </Widget>
+                  </div>
+                  <Widget draggable={false} title="Live Odds Board">
+                    <LiveOddsBoard selections={selections} onToggle={toggleSelection} />
+                  </Widget>
+                </div>
+              )}
+              {mobileTab === "live" && (
+                <div className="h-full p-2">
+                  <Widget draggable={false} title="Schedule · Scores">
+                    <GameSchedule />
+                  </Widget>
+                </div>
+              )}
+              {mobileTab === "bets" && (
+                <div className="h-full p-2">
+                  <Widget
+                    draggable={false}
+                    title="Bet Slip"
+                    badge={
+                      selections.length > 0 ? (
+                        <span className="rounded-full bg-series-1 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white">
+                          {selections.length}
+                        </span>
+                      ) : undefined
+                    }
+                  >
+                    <BetSlip selections={selections} onRemove={removeSelection} />
+                  </Widget>
+                </div>
+              )}
+              {mobileTab === "wallet" && (
+                <div className="h-full p-2">
+                  <Widget draggable={false} title="Wallet">
+                    <WalletCard />
+                  </Widget>
+                </div>
+              )}
             </div>
-            <div className="h-[370px]">
-              <Widget draggable={false} title="Live Odds Board">
-                <LiveOddsBoard selections={selections} onToggle={toggleSelection} />
-              </Widget>
-            </div>
-            <div className="h-[330px]">
-              <Widget
-                draggable={false}
-                title="Bet Slip"
-                badge={
-                  selections.length > 0 ? (
-                    <span className="rounded-full bg-series-1 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white">
-                      {selections.length}
-                    </span>
-                  ) : undefined
-                }
-              >
-                <BetSlip selections={selections} onRemove={removeSelection} />
-              </Widget>
-            </div>
-            <div className="h-[430px]">
-              <Widget draggable={false} title="Schedule · Scores">
-                <GameSchedule />
-              </Widget>
-            </div>
+            <MobileNav tab={mobileTab} onChange={setMobileTab} betCount={selections.length} />
           </div>
         )}
         {!isMobile && width > 0 && height > 0 && (
