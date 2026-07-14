@@ -15,7 +15,7 @@ function Movement({ dir }: { dir: -1 | 0 | 1 }) {
     <span
       className="text-[10px] leading-none"
       style={{ color: dir > 0 ? "var(--color-up)" : "var(--color-down)" }}
-      aria-label={dir > 0 ? "배당 상승" : "배당 하락"}
+      aria-label={dir > 0 ? "Odds up" : "Odds down"}
     >
       {dir > 0 ? "▲" : "▼"}
     </span>

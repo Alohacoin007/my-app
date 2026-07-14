@@ -30,7 +30,7 @@ export interface LiveGame {
   away: string;
   homeScore: number;
   awayScore: number;
-  status: string; // 예: "후반 63'"
+  status: string; // 예: "63'"
 }
 
 export interface UpcomingGame {
@@ -42,17 +42,17 @@ export interface UpcomingGame {
 }
 
 export const MARKET_LABELS: Record<MarketKey, string> = {
-  home: "홈 승",
-  draw: "무승부",
-  away: "원정 승",
+  home: "Home",
+  draw: "Draw",
+  away: "Away",
 };
 
 export const MATCHES: Match[] = [
   {
     id: "epl-1",
     league: "EPL",
-    home: "맨체스터 시티",
-    away: "아스날",
+    home: "Man City",
+    away: "Arsenal",
     kickoff: "22:00",
     odds: { home: 2.1, draw: 3.4, away: 3.15 },
     movement: { home: -1, draw: 0, away: 1 },
@@ -60,8 +60,8 @@ export const MATCHES: Match[] = [
   {
     id: "epl-2",
     league: "EPL",
-    home: "리버풀",
-    away: "첼시",
+    home: "Liverpool",
+    away: "Chelsea",
     kickoff: "23:30",
     odds: { home: 1.85, draw: 3.6, away: 4.2 },
     movement: { home: 1, draw: -1, away: 0 },
@@ -69,8 +69,8 @@ export const MATCHES: Match[] = [
   {
     id: "kbo-1",
     league: "KBO",
-    home: "LG 트윈스",
-    away: "두산 베어스",
+    home: "LG Twins",
+    away: "Doosan Bears",
     kickoff: "18:30",
     odds: { home: 1.72, draw: 0, away: 2.05 },
     movement: { home: 0, draw: 0, away: -1 },
@@ -78,8 +78,8 @@ export const MATCHES: Match[] = [
   {
     id: "nba-1",
     league: "NBA",
-    home: "레이커스",
-    away: "셀틱스",
+    home: "Lakers",
+    away: "Celtics",
     kickoff: "11:00",
     odds: { home: 2.45, draw: 0, away: 1.55 },
     movement: { home: 1, draw: 0, away: -1 },
@@ -90,26 +90,26 @@ export const LIVE_GAMES: LiveGame[] = [
   {
     id: "live-1",
     league: "KBO",
-    home: "SSG 랜더스",
-    away: "KIA 타이거즈",
+    home: "SSG Landers",
+    away: "KIA Tigers",
     homeScore: 4,
     awayScore: 2,
-    status: "7회 초",
+    status: "Top 7th",
   },
   {
     id: "live-2",
     league: "EPL",
-    home: "토트넘",
-    away: "뉴캐슬",
+    home: "Tottenham",
+    away: "Newcastle",
     homeScore: 1,
     awayScore: 1,
-    status: "후반 63'",
+    status: "63'",
   },
   {
     id: "live-3",
     league: "NBA",
-    home: "워리어스",
-    away: "너기츠",
+    home: "Warriors",
+    away: "Nuggets",
     homeScore: 88,
     awayScore: 91,
     status: "4Q 05:12",
@@ -117,11 +117,11 @@ export const LIVE_GAMES: LiveGame[] = [
 ];
 
 export const UPCOMING_GAMES: UpcomingGame[] = [
-  { id: "up-1", league: "EPL", home: "맨체스터 시티", away: "아스날", kickoff: "오늘 22:00" },
-  { id: "up-2", league: "EPL", home: "리버풀", away: "첼시", kickoff: "오늘 23:30" },
-  { id: "up-3", league: "KBO", home: "LG 트윈스", away: "두산 베어스", kickoff: "오늘 18:30" },
-  { id: "up-4", league: "NBA", home: "레이커스", away: "셀틱스", kickoff: "내일 11:00" },
-  { id: "up-5", league: "KBO", home: "삼성 라이온즈", away: "롯데 자이언츠", kickoff: "내일 17:00" },
+  { id: "up-1", league: "EPL", home: "Man City", away: "Arsenal", kickoff: "Today 22:00" },
+  { id: "up-2", league: "EPL", home: "Liverpool", away: "Chelsea", kickoff: "Today 23:30" },
+  { id: "up-3", league: "KBO", home: "LG Twins", away: "Doosan Bears", kickoff: "Today 18:30" },
+  { id: "up-4", league: "NBA", home: "Lakers", away: "Celtics", kickoff: "Tomorrow 11:00" },
+  { id: "up-5", league: "KBO", home: "Samsung Lions", away: "Lotte Giants", kickoff: "Tomorrow 17:00" },
 ];
 
 /** 간단한 시드 기반 의사난수 (mulberry32) — 렌더마다 동일한 시계열을 만든다. */

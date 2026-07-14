@@ -33,7 +33,7 @@ export default function GameSchedule() {
         ))}
       </ul>
 
-      <p className="px-3 pb-1 pt-3 text-[10px] font-semibold tracking-widest text-ink-muted">예정</p>
+      <p className="px-3 pb-1 pt-3 text-[10px] font-semibold tracking-widest text-ink-muted">UPCOMING</p>
       <ul className="divide-y divide-hairline">
         {UPCOMING_GAMES.map((g) => (
           <li key={g.id} className="flex items-center gap-2 px-3 py-2">

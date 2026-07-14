@@ -10,7 +10,7 @@ interface Props {
 
 /** 담긴 선택들을 조합(파라레이)으로 묶어 예상 적중액을 계산하는 베팅 슬립. */
 export default function BetSlip({ selections, onRemove }: Props) {
-  const [stake, setStake] = useState("10000");
+  const [stake, setStake] = useState("100");
   const stakeNum = Math.max(0, Number(stake.replaceAll(",", "")) || 0);
   const combinedOdds = selections.reduce((acc, s) => acc * s.odds, 1);
   const payout = selections.length > 0 ? Math.floor(stakeNum * combinedOdds) : 0;
@@ -18,8 +18,8 @@ export default function BetSlip({ selections, onRemove }: Props) {
   if (selections.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-1 px-4 text-center">
-        <p className="text-sm text-ink-2">슬립이 비어 있습니다</p>
-        <p className="text-xs text-ink-muted">배당판에서 배당률을 눌러 베팅을 담아보세요.</p>
+        <p className="text-sm text-ink-2">Your slip is empty</p>
+        <p className="text-xs text-ink-muted">Tap any odds on the board to add a bet.</p>
       </div>
     );
   }
@@ -39,7 +39,7 @@ export default function BetSlip({ selections, onRemove }: Props) {
             <button
               type="button"
               onClick={() => onRemove(s.id)}
-              aria-label={`${s.matchLabel} ${s.marketLabel} 선택 삭제`}
+              aria-label={`Remove ${s.matchLabel} ${s.marketLabel}`}
               className="shrink-0 rounded p-1 text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
             >
               <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden>
@@ -52,8 +52,9 @@ export default function BetSlip({ selections, onRemove }: Props) {
 
       <div className="shrink-0 space-y-2 border-t border-hairline px-3 py-2.5">
         <label className="flex items-center justify-between gap-2 text-xs text-ink-2">
-          베팅 금액
+          Stake
           <span className="flex items-center gap-1">
+            <span className="text-ink-muted">$</span>
             <input
               type="text"
               inputMode="numeric"
@@ -61,26 +62,25 @@ export default function BetSlip({ selections, onRemove }: Props) {
               onChange={(e) => setStake(e.target.value.replace(/[^\d]/g, ""))}
               className="w-24 rounded-md border border-hairline bg-surface-2 px-2 py-1 text-right text-sm tabular-nums text-ink outline-none focus:border-series-1"
             />
-            <span className="text-ink-muted">원</span>
           </span>
         </label>
         <div className="flex justify-between text-xs text-ink-2">
-          <span>조합 배당 ({selections.length}폴드)</span>
+          <span>Combined odds ({selections.length}-leg parlay)</span>
           <span className="font-semibold tabular-nums text-ink">{combinedOdds.toFixed(2)}</span>
         </div>
         <div className="flex justify-between text-xs text-ink-2">
-          <span>예상 적중액</span>
+          <span>Est. payout</span>
           <span className="font-semibold tabular-nums" style={{ color: "var(--color-up)" }}>
-            {payout.toLocaleString("ko-KR")}원
+            ${payout.toLocaleString("en-US")}
           </span>
         </div>
         <button
           type="button"
           disabled={stakeNum === 0}
           className="w-full rounded-md bg-series-1 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-          onClick={() => alert("프로토타입: 베팅 제출은 구현되지 않았습니다.")}
+          onClick={() => alert("Prototype: bet submission is not implemented.")}
         >
-          베팅하기
+          Place Bet
         </button>
       </div>
     </div>

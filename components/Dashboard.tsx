@@ -80,17 +80,17 @@ export default function Dashboard() {
     <div className="flex h-dvh flex-col">
       <header className="flex shrink-0 items-center gap-3 border-b border-hairline px-4 py-2.5">
         <h1 className="text-sm font-bold tracking-wide">
-          BetBoard <span className="font-normal text-ink-muted">— 스포츠 베팅 대시보드</span>
+          BetBoard <span className="font-normal text-ink-muted">— Sports Betting Dashboard</span>
         </h1>
         <p className="hidden text-xs text-ink-muted sm:block">
-          위젯 헤더를 드래그해 이동, 우하단 모서리를 끌어 크기 조절
+          Drag a widget header to move it; drag the bottom-right corner to resize
         </p>
         <button
           type="button"
           onClick={resetLayout}
           className="ml-auto rounded-md border border-hairline px-2.5 py-1 text-xs text-ink-2 transition-colors hover:border-ink-muted hover:text-ink"
         >
-          레이아웃 초기화
+          Reset layout
         </button>
       </header>
 
@@ -112,23 +112,23 @@ export default function Dashboard() {
             onLayoutChange={onLayoutChange}
           >
             <div key="chart">
-              <Widget title="배당률 추이 — 맨체스터 시티 vs 아스날 (최근 24시간)">
+              <Widget title="Odds Trend — Man City vs Arsenal (Last 24h)">
                 <OddsTrendChart />
               </Widget>
             </div>
             <div key="odds">
-              <Widget title="실시간 배당판">
+              <Widget title="Live Odds Board">
                 <LiveOddsBoard selections={selections} onToggle={toggleSelection} />
               </Widget>
             </div>
             <div key="schedule">
-              <Widget title="경기 일정 · 스코어">
+              <Widget title="Schedule · Scores">
                 <GameSchedule />
               </Widget>
             </div>
             <div key="betslip">
               <Widget
-                title="베팅 슬립"
+                title="Bet Slip"
                 badge={
                   selections.length > 0 ? (
                     <span className="rounded-full bg-series-1 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white">

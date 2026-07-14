@@ -5,8 +5,8 @@ import { buildOddsHistory } from "@/lib/data";
 import { useElementSize } from "@/lib/useElementSize";
 
 const SERIES = [
-  { key: "home" as const, label: "홈 승 (맨시티)", color: "var(--color-series-1)" },
-  { key: "away" as const, label: "원정 승 (아스날)", color: "var(--color-series-2)" },
+  { key: "home" as const, label: "Home win (Man City)", color: "var(--color-series-1)" },
+  { key: "away" as const, label: "Away win (Arsenal)", color: "var(--color-series-2)" },
 ];
 
 const PAD = { top: 12, right: 16, bottom: 24, left: 38 };
@@ -91,7 +91,7 @@ export default function OddsTrendChart() {
         onMouseLeave={() => setHover(null)}
       >
         {ready && (
-          <svg width={width} height={height} role="img" aria-label="최근 24시간 배당률 추이">
+          <svg width={width} height={height} role="img" aria-label="Odds trend over the last 24 hours">
             {/* 가로 그리드라인 + y축 눈금 */}
             {yTicks.map((t) => (
               <g key={t}>
