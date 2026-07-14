@@ -56,7 +56,11 @@ export default function Dashboard() {
   }, []);
 
   const resetLayout = useCallback(() => {
-    window.localStorage.removeItem(LAYOUT_STORAGE_KEY);
+    try {
+      window.localStorage.removeItem(LAYOUT_STORAGE_KEY);
+    } catch {
+      // 스토리지가 막힌 환경(샌드박스 iframe 등)에서도 초기화는 동작해야 한다
+    }
     setLayout(DEFAULT_LAYOUT.map((l) => ({ ...l })));
   }, []);
 
