@@ -14,7 +14,7 @@ const bad = (m) => { console.error('🔴 ' + m); fail++; };
 
 // 1) login gate exists, shows when logged out, and routes to the shared login (round-trip dest)
 if (!/function LoginGate\(\{ onClose \}\)\{/.test(wt)) bad('LoginGate component missing');
-if (!/location\.href='login\.html\?dest=webtrade\.html'/.test(wt)) bad('Log in must round-trip through login.html?dest=webtrade.html (reuse the proven auth)');
+if (!/location\.href='login\.html\?dest=webtrade\.html&skin=wt'/.test(wt)) bad('Log in must round-trip through the terminal-skinned login.html?dest=webtrade.html&skin=wt (same ONE proven auth path)');
 // login state must be decided by the REAL auth session, NOT AlpexaSync.me (a function → always truthy)
 if (/const loggedIn = !!\(window\.AlpexaSync && AlpexaSync\.me\)/.test(wt)) bad('must NOT gauge login by AlpexaSync.me (always-truthy guest function) — the gate never showed');
 if (!/AlpexaSync\.db\.auth\.getSession\(\)\.then\(r=>\{ if\(live && !\(r&&r\.data&&r\.data\.session\)\) setShowLogin\(true\)/.test(wt)) bad('login gate must show only when there is NO Supabase session');
