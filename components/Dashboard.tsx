@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { GridLayout, type Layout, type LayoutItem } from "react-grid-layout";
 import Widget from "@/components/Widget";
 import OddsTrendChart from "@/components/widgets/OddsTrendChart";
@@ -76,6 +76,26 @@ export default function Dashboard() {
     setSelections((prev) => prev.filter((s) => s.id !== id));
   }, []);
 
+  // Fullscreen API를 지원하는 환경(권한이 막힌 iframe 제외)에서만 버튼 노출
+  const [canFullscreen, setCanFullscreen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    setCanFullscreen(Boolean(document.fullscreenEnabled));
+    const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+    } else {
+      void document.documentElement.requestFullscreen().catch(() => {
+        // 권한이 없으면 조용히 무시 (버튼은 fullscreenEnabled일 때만 보인다)
+      });
+    }
+  }, []);
+
   return (
     <div className="flex h-dvh flex-col">
       <header className="flex shrink-0 items-center gap-3 border-b border-hairline px-4 py-2.5">
@@ -85,13 +105,46 @@ export default function Dashboard() {
         <p className="hidden text-xs text-ink-muted sm:block">
           Drag a widget header to move it; drag the bottom-right corner to resize
         </p>
-        <button
-          type="button"
-          onClick={resetLayout}
-          className="ml-auto rounded-md border border-hairline px-2.5 py-1 text-xs text-ink-2 transition-colors hover:border-ink-muted hover:text-ink"
-        >
-          Reset layout
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={resetLayout}
+            className="rounded-md border border-hairline px-2.5 py-1 text-xs text-ink-2 transition-colors hover:border-ink-muted hover:text-ink"
+          >
+            Reset layout
+          </button>
+          {canFullscreen && (
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+              title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              className="rounded-md border border-hairline p-1.5 text-ink-2 transition-colors hover:border-ink-muted hover:text-ink"
+            >
+              {isFullscreen ? (
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+                  <path
+                    d="M4.5 1v3.5H1M7.5 1v3.5H11M4.5 11V7.5H1M7.5 11V7.5H11"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              ) : (
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+                  <path
+                    d="M1 4.5V1h3.5M11 4.5V1H7.5M1 7.5V11h3.5M11 7.5V11H7.5"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+            </button>
+          )}
+        </div>
       </header>
 
       {/* 24행이 화면 높이에 맞춰지지만, 배치 중 잠시 밀려난 위젯은 스크롤로 접근 가능 */}
