@@ -17,12 +17,9 @@ const wt = fs.readFileSync(path.join(__dirname, '..', 'webtrade.html'), 'utf8');
 let fail = 0;
 const bad = (m) => { console.error('🔴 ' + m); fail++; };
 
-// ── fx.html: launcher with popup + blocked-popup fallback ──
-if (!/class="wt-pill" href="login\.html\?skin=wt"/.test(fx))
-  bad('fx header must carry the WebTrader launcher pointing at the skinned login');
-if (!/window\.open\(this\.href,'wtlogin'/.test(fx)) bad('the launcher must open a named popup');
-if (!/if\(w\)\{w\.focus\(\);return false;\}/.test(fx)) bad('popup blocked → the plain href navigation must take over (return true path)');
-if (!/\.wt-pill\{/.test(fx)) bad('the launcher needs its own style (visually distinct from Log in / Sign up)');
+// ── fx.html: NO separate WebTrader launcher (2026-07-14 — device routing made it redundant;
+//    the plain Log in sends PC users to the terminal automatically) ──
+if (/wt-pill|wtlogin/.test(fx)) bad('the retired WebTrader launcher must stay gone (device routing owns the landing)');
 
 // ── login.html: ONE createClient on sessionStorage (the 3-file storage lockstep survives) ──
 const clients = (lg.match(/createClient\(/g) || []).length;
