@@ -387,10 +387,16 @@
   table.pos .acctline.pl-bar{overflow:visible}   /* no scroll-collapse → the sibling P/L cell stays aligned under its column */
   table.pos td.pl-total{padding:4px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700}   /* grand total under the P/L column */
   table.pos tfoot .acctline{border-top:0}
-  /* bare ✕ — no red card behind it (2026-07-13 user request); hover just brightens the glyph */
+  /* bare ✕ — no card behind it (2026-07-13/14 user request); silver glyph, hover → white */
   .xclose{width:18px;height:18px;line-height:1;padding:0;border:none;border-radius:0;
-    background:transparent;color:#c86868;font-size:11px;cursor:pointer}
-  .xclose:hover{background:transparent;color:#ff5f52}
+    background:transparent;color:#8a94a6;font-size:11px;cursor:pointer}
+  .xclose:hover{background:transparent;color:#ffffff}
+  /* Alerts tab — add-row controls (dark cards, silver rails like the lot box) */
+  .alert-add{display:flex;gap:6px;padding:8px 10px;align-items:center}
+  .alert-add select,.alert-add input{background:#121418;border:1px solid #3c4049;color:#fff;font-size:11px;padding:3px 6px;outline:none}
+  .alert-add input{width:110px}
+  .alert-add button{background:#1B3955;border:1px solid #2E6FB0;color:#fff;font-size:11px;padding:3px 10px;cursor:pointer}
+  .alert-add button:hover{filter:brightness(1.2)}
   .empty{padding:16px;color:var(--dim);text-align:center;border:none!important}
   .note{padding:2px 14px;color:var(--dim);font-size:11px}
   /* ── TIER 2: chart-window tab bar (bottommost, its own grid row) — MT5 navy/black ── */
@@ -2474,15 +2480,84 @@ function JournalTab(){
 }
 // Mailbox — REAL account notices from the server: non-trade settlements (deposits, bonuses,
 // adjustments) for the logged-in fx account. Click a row → its full detail expands. Not trades.
+// ── Price alerts (Alerts tab). UI data ONLY → localStorage is allowed (#5: settings OK, money
+//    forbidden). The engine rides the ONE priceStore subscription; a hit fires ONCE (disarms),
+//    logs to the Journal and rings the close-bell. No server writes, no money touched. ──
+const alertHit=(a,mid)=> a.cond==='>=' ? mid>=+a.px : mid<=+a.px;
+const alertsStore={
+  list:(()=>{ try{ return JSON.parse(localStorage.getItem('alpexa.alerts')||'[]'); }catch(e){ return []; } })(),
+  listeners:new Set(), timer:null,
+  save(){ try{ localStorage.setItem('alpexa.alerts', JSON.stringify(this.list)); }catch(e){}
+    this.listeners.forEach(fn=>{ try{ fn(this.list.slice()); }catch(e){} }); },
+  add(sym,cond,px){ this.list.push({ id:Date.now()+'-'+Math.floor(Math.random()*1e4), sym, cond, px:+px, armed:true, hitAt:null }); this.save(); this.start(); },
+  remove(id){ this.list=this.list.filter(a=>a.id!==id); this.save(); },
+  subscribe(fn){ this.listeners.add(fn); fn(this.list.slice()); return ()=>this.listeners.delete(fn); },
+  start(){ if(this.timer) return;
+    this.timer=priceStore.subscribe(throttle((mids)=>{
+      let hit=false;
+      this.list.forEach(a=>{ if(!a.armed) return; const m=mids[a.sym]; if(!m||!(m.mid>0)) return;
+        if(alertHit(a,m.mid)){ a.armed=false; a.hitAt=Date.now(); hit=true;
+          journalStore.log('Alert — '+a.sym+' '+a.cond+' '+a.px+' hit @ '+fmtPx(a.sym,m.mid), 1); } });
+      if(hit){ playSnd(sndClose); this.save(); }
+    },1000)); },
+};
+function AlertsTab(){
+  const [list,setList]=React.useState(alertsStore.list);
+  const [sym,setSym]=React.useState(WATCH[0]);
+  const [cond,setCond]=React.useState('>=');
+  const [px,setPx]=React.useState('');
+  React.useEffect(()=>{ alertsStore.start(); return alertsStore.subscribe(setList); },[]);
+  const cur=priceStore.get(sym);
+  const add=()=>{ const v=+px; if(!(v>0)) return; alertsStore.add(sym,cond,v); setPx(''); };
+  return (
+    <div className="tbxbody">
+      <div className="alert-add">
+        <span className="k" style={{color:'#8890a0',fontSize:11}}>🔔 New alert:</span>
+        <select value={sym} onChange={e=>setSym(e.target.value)}>{WATCH.map(s=><option key={s} value={s}>{s}{sfx(s)}</option>)}</select>
+        <select value={cond} onChange={e=>setCond(e.target.value)}><option value=">=">Bid/Mid ≥</option><option value="<=">Bid/Mid ≤</option></select>
+        <input value={px} onChange={e=>setPx(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') add(); }} placeholder={cur&&cur.mid>0?fmtPx(sym,cur.mid):'price'} />
+        <button onClick={add}>Add Alert</button>
+      </div>
+      {!list.length ? <div className="tbxempty"><div className="ic">🔔</div>No alerts — add one above (fires once, logs to Journal + bell)</div> :
+      <div className="postbl"><table className="mbx">
+        <thead><tr><th>Symbol</th><th>Condition</th><th>Status</th><th style={{width:26}}></th></tr></thead>
+        <tbody>{list.map(a=>(
+          <tr key={a.id} className="mbx-row">
+            <td>{a.sym}{sfx(a.sym)}</td><td>{a.cond==='>=' ? '≥' : '≤'} {a.px}</td>
+            <td className={a.armed?'':'up'}>{a.armed?'⏳ Armed':('✅ Hit '+new Date(a.hitAt).toLocaleTimeString())}</td>
+            <td><button className="xclose" title="Delete alert" onClick={()=>alertsStore.remove(a.id)}>✕</button></td>
+          </tr>))}
+        </tbody></table></div>}
+    </div>);
+}
+// MT5-style account-opening mail — composed ONLY from the logged-in account's REAL data (no
+// fabricated identity, diagnose DEMO-* class). Passwords are hashed server-side and can never
+// be displayed; the mail says so honestly instead of inventing one.
+function buildWelcomeMail(me){ if(!me) return null;
+  const fx=(me.accts&&me.accts.fx)||'—';
+  return { kind:'welcome', created_at:null, pnl:null,
+    subject:'🎉 Account opened — welcome to ALPEXA WebTrade',
+    detail:'Dear '+(me.name||me.email||'trader')+',\n\n'
+      +'Your trading account is open and ready:\n'
+      +'  · Login (account):  '+fx+'\n'
+      +'  · Customer ID:      '+(me.custId||'—')+'\n'
+      +'  · Email:            '+(me.email||'—')+'\n'
+      +'  · Server:           ALPEXA-Live\n'
+      +'  · Account type:     Standard (B-Book) · USD · leverage up to 1:100\n'
+      +'  · Password:         the one you chose at signup. For your security it is never stored in plain text and never shown here — you can reset it any time from the login page.\n\n'
+      +'Good trading!\nALPEXA Dealing Desk' };
+}
 function MailboxTab(){
   const [msgs,setMsgs]=React.useState(null);   // null = loading
   const [sel,setSel]=React.useState(null);
   React.useEffect(()=>{ let live=true;
     (async()=>{ try{
       if(WT_DEMO || !(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me)){ if(live) setMsgs([]); return; }
-      const acct=AlpexaSync.acctFor&&AlpexaSync.acctFor('fx'); if(!acct){ if(live) setMsgs([]); return; }
+      const hello=buildWelcomeMail(AlpexaSync.me);
+      const acct=AlpexaSync.acctFor&&AlpexaSync.acctFor('fx'); if(!acct){ if(live) setMsgs(hello?[hello]:[]); return; }
       const r=await AlpexaSync.db.from('settlements').select('kind,symbol,pnl,detail,created_at').eq('acct_no',acct).eq('server','fx').order('created_at',{ascending:false}).limit(100);
-      if(live) setMsgs((r&&r.data)? r.data.filter(x=> x.kind && x.kind!=='fx_close' && x.kind!=='fx_open') : []);
+      const rows=(r&&r.data)? r.data.filter(x=> x.kind && x.kind!=='fx_close' && x.kind!=='fx_open') : [];
+      if(live) setMsgs(hello?[...rows,hello]:rows);   // welcome mail = the account's FIRST mail (bottom of newest-first)
     }catch(e){ if(live) setMsgs([]); } })();
     return ()=>{ live=false; }; }, []);
   if(msgs===null) return <div className="tbxbody"><div className="tbxempty"><div className="ic">📬</div>Loading…</div></div>;
@@ -2494,8 +2569,8 @@ function MailboxTab(){
       <tbody>
         {msgs.map((mm,i)=>{ const isSel=sel===i; const tm=mm.created_at?String(mm.created_at).slice(0,19).replace('T',' '):'—';
           return (<React.Fragment key={i}>
-            <tr className="mbx-row" onClick={()=>setSel(isSel?null:i)}><td>{tm}</td><td>{subj(mm.kind)}</td><td className={(+mm.pnl>=0)?'up':'down'}>{mm.pnl!=null?(+mm.pnl).toFixed(2):'—'}</td></tr>
-            {isSel && <tr className="mbx-detail"><td colSpan="3">{mm.detail||'(no detail)'}</td></tr>}
+            <tr className="mbx-row" onClick={()=>setSel(isSel?null:i)}><td>{tm}</td><td>{mm.subject||subj(mm.kind)}</td><td className={mm.pnl!=null?((+mm.pnl>=0)?'up':'down'):''}>{mm.pnl!=null?(+mm.pnl).toFixed(2):'—'}</td></tr>
+            {isSel && <tr className="mbx-detail"><td colSpan="3" style={{whiteSpace:'pre-wrap'}}>{mm.detail||'(no detail)'}</td></tr>}
           </React.Fragment>); })}
       </tbody></table></div>
   );
@@ -2667,6 +2742,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
       {tab==='Exposure' ? <ExposureTab pos={pos} mids={mids} equity={equity} leverage={leverage} />
        : tab==='Journal' ? <JournalTab />
        : tab==='Mailbox' ? <MailboxTab />
+       : tab==='Alerts' ? <AlertsTab />
        : tab==='Company' ? <CompanyTab />
        : (tab!=='Trade' && tab!=='History') ? <EmptyTab tab={tab} />
        : (<React.Fragment>
