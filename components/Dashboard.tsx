@@ -76,13 +76,13 @@ export default function Dashboard() {
     setSelections((prev) => prev.filter((s) => s.id !== id));
   }, []);
 
-  // 다크가 기본, <html data-theme="light">로 전환. 선택은 localStorage에 저장
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  // 화이트가 기본, <html data-theme="dark">로 전환. 선택은 localStorage에 저장
+  const [theme, setTheme] = useState<"dark" | "light">("light");
   useEffect(() => {
     try {
-      if (window.localStorage.getItem("betboard-theme") === "light") {
-        setTheme("light");
-        document.documentElement.dataset.theme = "light";
+      if (window.localStorage.getItem("betboard-theme") === "dark") {
+        setTheme("dark");
+        document.documentElement.dataset.theme = "dark";
       }
     } catch {
       // 스토리지가 막힌 환경에서는 기본 테마로 시작
