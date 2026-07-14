@@ -38,7 +38,7 @@ if (!/if\(it\.act==='cat'\) onCat&&onCat\(it\.arg\)/.test(src)) bad('choosing a 
 
 // pip/digits adapt to stocks/crypto (2 digits, 0.01 pip) instead of FX 5/0.0001
 if (!/catOf\(s\)==='Stocks'\|\|catOf\(s\)==='Crypto'\) \? 0\.01/.test(src)) bad('pip must be 0.01 for stocks/crypto (via catOf, so off-watch symbols work too)');
-if (!/catOf\(s\)==='Stocks'\|\|catOf\(s\)==='Crypto'\) \? 2/.test(src)) bad('digits must be 2 for stocks/crypto (via catOf)');
+if (!/catOf\(s\)==='Stocks' \? 2 : catOf\(s\)==='Crypto' \? \(\{SOLUSD:3,XRPUSD:4,DOGEUSD:5\}\[s\]\|\|2\)/.test(src)) bad('digits: stocks 2, crypto per-price-scale (BTC/ETH 2 · SOL 3 · XRP 4 · DOGE 5) via catOf');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} market-watch-class problem(s).`); process.exit(1); }
 console.log('🟢 PASS: Market Watch has Forex+Stocks+Crypto (classified via SYM_CAT, priced from BASE); right-click filters by class (Forex/Stocks/Crypto/All); pip/digits adapt.');

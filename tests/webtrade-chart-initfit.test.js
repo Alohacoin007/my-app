@@ -20,7 +20,7 @@ if (!/boxRO\.observe\(box\.current\)/.test(src)) bad('the ResizeObserver must ob
 if (!/const w=box\.current\.clientWidth, h=box\.current\.clientHeight;\s*\n?\s*if\(w<=0\|\|h<=0\) return;/.test(src)) bad('doFit must no-op while the box has no size (0-wide window)');
 // INVARIANT LOCK: doFit re-pins the MT5 slim density (barSpacing 5 + rightOffset 15) on EVERY resize
 // (not just the first), so a splitter-drag / window-resize can never roll the candle width back to fat.
-if (!/const ts=chart\.current\.timeScale\(\);\s*\n\s*try\{ ts\.applyOptions\(\{ barSpacing:5, rightOffset:15 \}\); \}catch\(_\)\{\}/.test(src)) bad('doFit must re-pin barSpacing 5 + rightOffset 15 on every resize (invariant lock)');
+if (!/const ts=chart\.current\.timeScale\(\);\s*\n\s*try\{ ts\.applyOptions\(\{ barSpacing:5, rightOffset:shiftOffset\(\) \}\); \}catch\(_\)\{\}/.test(src)) bad('doFit must re-pin barSpacing 5 + the Chart-Shift gap (shiftOffset()) on every resize (invariant lock)');
 // only the FIRST fit scrolls to the newest bar (later resizes keep the scroll), fitContent fallback
 if (!/if\(candles\.current\.length && !fitted\)\{ try\{ ts\.scrollToRealTime\(\); \}catch\(_\)\{ try\{ ts\.fitContent\(\); \}catch\(e2\)\{\} \} fitted=true; \}/.test(src)) bad('doFit must scroll-to-realtime only on the first fit, with a fitContent fallback');
 // candle load triggers the fit now + next frame + a late retry

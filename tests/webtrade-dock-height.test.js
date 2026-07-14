@@ -36,10 +36,10 @@ if (!/resizeOne\(it\)\{ try\{ const w=it\.el\.clientWidth, h=it\.el\.clientHeigh
   bad('resizeOne must resize to the full canvas clientHeight (responsive, no fixed px)');
 // [3] the wheel/pinch zoom lock + 5px/15 golden ratio remain welded
 if (!/handleScale:\{ mouseWheel:false, pinch:false/.test(src)) bad('mouseWheel/pinch zoom lock must remain');
-if (!/it\.chart\.timeScale\(\)\.applyOptions\(\{ barSpacing:5, rightOffset:15 \}\);/.test(src)) bad('resizeOne must re-weld barSpacing 5 + rightOffset 15');
+if (!/it\.chart\.timeScale\(\)\.applyOptions\(\{ barSpacing:5, rightOffset:shiftOffset\(\) \}\);/.test(src)) bad('resizeOne must re-weld barSpacing 5 + the Chart-Shift gap (shiftOffset())');
 
-// [3] the spread stays the per-row pip formula (Forex ÷pip → 1.0/pip; no ×100000 inflation)
-if (!/catOf\(sym\)==='Crypto'\|\|catOf\(sym\)==='Stocks'\?_diff:_diff\/pip\(sym\)/.test(src)) bad('spread must remain per-row (Forex ÷pip, crypto/stock raw)');
+// [3] the spread stays the per-row formula via the ONE sprText helper (Forex ÷pip; no ×100000 inflation)
+if (!/const spr=_diff==null\?'—':sprText\(sym,_diff\);/.test(src)) bad('spread must remain per-row via sprText (Forex ÷pip, stock raw, crypto adaptive decimals)');
 if (/ptScale/.test(src)) bad('the ×100000 ptScale inflation must remain removed');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} dock-height problem(s).`); process.exit(1); }

@@ -890,8 +890,12 @@ const symbolStore = {
 };
 const sfx   = (s)=> catOf(s)==='Forex' ? '.FX' : catOf(s)==='Crypto' ? '.CR' : '.STK';   // display suffix per class
 const pip   = (s)=> (catOf(s)==='Stocks'||catOf(s)==='Crypto') ? 0.01 : (s.slice(3)==='JPY'||s.slice(0,3)==='JPY' ? 0.01 : 0.0001);
-const digits= (s)=> (catOf(s)==='Stocks'||catOf(s)==='Crypto') ? 2 : (s.includes('JPY') ? 3 : 5);
+const digits= (s)=> catOf(s)==='Stocks' ? 2 : catOf(s)==='Crypto' ? ({SOLUSD:3,XRPUSD:4,DOGEUSD:5}[s]||2) : (s.includes('JPY') ? 3 : 5);   // MT5-style per-price-scale quoting — flat 2dp rounded XRP/DOGE bid==ask on screen (Spread 0.0) while fx_close charged the 10bps floor
 const fmtPx = (s,v)=> (v==null?'—':(+v).toFixed(digits(s)));
+// ONE formatter for every spread readout (MW table, MW popup tiles, one-click tag):
+// Forex → pips at .1 · Stocks → raw gap at .1 · Crypto → raw gap with digits-1 decimals so
+// sub-cent spreads (XRP 0.001, DOGE 0.0001) survive — a flat .toFixed(1) showed a lying 0.0.
+const sprText = (s,d)=> catOf(s)==='Crypto' ? d.toFixed(Math.max(1,digits(s)-1)) : (catOf(s)==='Stocks' ? d : d/pip(s)).toFixed(1);
 // MT5 SYMBOL_TRADE_TICK_SIZE / point = 10^-digits (5-digit FX 0.00001, 3-digit JPY 0.001, crypto/stock 0.01).
 // ⚠ NOT the spread unit: prices.spr_pts arrives in per-class units (FX pips · crypto bps · stock 0)
 // and converts via halfPx (fx_close.sql lockstep) — spr×tickSize was the 2026-07-13 unit-mixup bug.
@@ -1165,13 +1169,23 @@ const positionsStore = {
 const lotsOf = (p)=> (+p.size||+p.stake||0.01);
 const sideUp = (s)=> (s==='sell'||s==='SELL')?'SELL':'BUY';
 
+/* ── MT5 chart-follow toggles (toolbar, global, session-scoped like an MT5 profile):
+   · Auto Scroll ON (default) = every tick snaps the view to the live edge, MT5-authentic —
+     including while you browse history (that IS the button's job; turn it OFF to study the past).
+     OFF = the tick path never touches the time scale; the view belongs to the user.
+   · Chart Shift ON (default) = keep the 15-bar future gap on the right; OFF = flush right edge.
+   Read by the tick handler, doFit and chartResizer; the toolbar buttons flip them and emit
+   'chart.opts' so every chart re-applies instantly. ── */
+const chartOpts={ autoScroll:true, shift:true };
+const shiftOffset=()=> chartOpts.shift ? 15 : 0;
+
 /* ── chartResizer: every chart registers its instance + container. The splitter drag loop
    and window-resize call resizeAll() → chart.resize(w,h) so the 4 charts follow the layout
    instead of squishing. (autoSize is OFF so these explicit calls actually apply.) ── */
 const chartResizer = {
   items:new Set(),
   resizeOne(it){ try{ const w=it.el.clientWidth, h=it.el.clientHeight; if(w>0&&h>0){ it.chart.resize(w,h);   // fit the FULL live parent height (responsive; no fixed px)
-    try{ it.chart.timeScale().applyOptions({ barSpacing:5, rightOffset:15 }); }catch(_){} } }catch(e){} },   // weld the 5px/15 golden ratio into the splitter/window-resize path too (no rollback)
+    try{ it.chart.timeScale().applyOptions({ barSpacing:5, rightOffset:shiftOffset() }); }catch(_){} } }catch(e){} },   // weld the 5px density + the Chart-Shift gap into the splitter/window-resize path too (no rollback)
   resizeAll(){ this.items.forEach(it=>this.resizeOne(it)); },
   add(chart, el){ const it={chart,el}; this.items.add(it); this.resizeOne(it); return ()=>this.items.delete(it); },
 };
@@ -1297,6 +1311,7 @@ const COMMANDS = {
   'chart.type':       'Set chart series type (arg: candle/bar/line)',
   'chart.zoom':       'Zoom the charts (arg: in/out)',
   'chart.tool':       'Arm a drawing tool (arg: cross/vline/hline/trend/fib/text|null)',
+  'chart.opts':       'Re-apply Auto Scroll / Chart Shift to every chart (after a toolbar toggle)',
   'window.tile':      'Re-tile the chart windows to a 2×2 grid',
   'view.toggle':      'Show/hide a panel (arg: marketwatch/navigator/toolbox/toolbars/statusbar)',
 };
@@ -1533,7 +1548,7 @@ function OrderBox({ symbol }){
       </div>
       {m.bid!=null&&m.ask!=null&&(()=>{   // live spread pill — same per-row DISPLAYED-price reading as the MW table
         const d=Math.abs(parseFloat(fmtPx(symbol,m.ask))-parseFloat(fmtPx(symbol,m.bid)));
-        return <div className="oc-spr">{(catOf(symbol)==='Crypto'||catOf(symbol)==='Stocks'?d:d/pip(symbol)).toFixed(1)}</div>; })()}
+        return <div className="oc-spr">{sprText(symbol,d)}</div>; })()}
     </div>
   );
 }
@@ -1877,7 +1892,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       // 400 bars to full width → fat candles). INVARIANT LOCK: re-pin the 5px density + 15-bar margin on
       // EVERY resize so a splitter-drag / window-resize can never roll the candle width back to fat.
       const ts=chart.current.timeScale();
-      try{ ts.applyOptions({ barSpacing:5, rightOffset:15 }); }catch(_){}
+      try{ ts.applyOptions({ barSpacing:5, rightOffset:shiftOffset() }); }catch(_){}
       if(candles.current.length && !fitted){ try{ ts.scrollToRealTime(); }catch(_){ try{ ts.fitContent(); }catch(e2){} } fitted=true; }
       }catch(e){} };
     let boxRO=null; try{ boxRO=new ResizeObserver(doFit); boxRO.observe(box.current); }catch(e){}
@@ -1919,7 +1934,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       bar.current=u;
       try{ series.current.update(typeRef.current==='line' ? {time:u.time,value:close} : u); }catch(e){}
       try{ const ts=chart.current.timeScale();
-        if(ts.scrollPosition()>=13) ts.applyOptions({ rightOffset:15 });   // RIGHT-MARGIN LOCK, MT5 autoscroll rule: applyOptions(rightOffset) SCROLLS the view, so re-pin the 15-bar future gap only at the live edge — scrolled back into history (<13) the view is the user's, never yanked (2026-07-14)
+        if(chartOpts.autoScroll) ts.applyOptions({ rightOffset:shiftOffset() });   // MT5 Auto Scroll: ON → every tick snaps to the live edge (applyOptions SCROLLS — that IS the toggle's job; browsing history? toolbar OFF). OFF → the tick path never touches the time scale (2026-07-14, MT5-original semantics)
       }catch(e){}
     }, 400);
     const unsub=priceStore.subscribe(onTick);
@@ -1957,6 +1972,9 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       try{ chart.current.applyOptions({ grid:{ vertLines:{visible:gridOn.current}, horzLines:{visible:gridOn.current} } }); }catch(e){} }
     else if(cmd==='chart.clear' && arg===idx){ clearDrawings(); }   // Delete all objects (this chart)
     else if(cmd==='chart.undo' && arg===idx){ undoDraw(); }         // Delete last object (this chart)
+    else if(cmd==='chart.opts' && chart.current){ try{ const ts=chart.current.timeScale();   // MT5 toggles → ALL charts, instantly:
+      ts.applyOptions({ rightOffset:shiftOffset() });                                        //   Chart Shift gap on/off
+      if(chartOpts.autoScroll) ts.scrollToRealTime(); }catch(e){} }                          //   flipping Auto Scroll ON jumps home (MT5)
   }), [initial]);
 
   // repaint indicators whenever the active set changes (Charts → Indicators menu)
@@ -2334,7 +2352,7 @@ function MWTrading({ cat, syms=WATCH, onCtx }){
             <div className="row">
               <div className="sd sell" onClick={()=>terminalBus.emit('order.new',sym)}><span className="lbl">SELL</span><span className="pr">{big(sym,m.bid)}</span></div>
               <div className="mid"><div className="q">0.01</div><div className="sp">Spread: {(()=>{ if(m.bid==null||m.ask==null) return '—';   // same per-row reading as the MW table: |askShown−bidShown|, FX in pips
-                const d=Math.abs(parseFloat(fmtPx(sym,m.ask))-parseFloat(fmtPx(sym,m.bid))); return (catOf(sym)==='Crypto'||catOf(sym)==='Stocks'?d:d/pip(sym)).toFixed(1); })()}</div></div>
+                const d=Math.abs(parseFloat(fmtPx(sym,m.ask))-parseFloat(fmtPx(sym,m.bid))); return sprText(sym,d); })()}</div></div>
               <div className="sd buy" onClick={()=>terminalBus.emit('order.new',sym)}><span className="lbl">BUY</span><span className="pr">{big(sym,m.ask)}</span></div>
             </div>
             <div className="lh"><span>LOW <b>{fmtPx(sym,m.bidLo)}</b></span><span>HIGH <b>{fmtPx(sym,m.askHi)}</b></span></div>
@@ -2403,7 +2421,7 @@ function MarketWatch({ onPick }){
               // bid/ask: Forex → pips (÷pip) so EURUSD 0.00010→1.0, USDJPY 161.983−161.964=0.019→1.9;
               // Crypto/Stocks → raw price gap so BTC 0.10→0.1. Live, memory-only, recomputed every tick.
               const _diff=(m.ask!=null&&m.bid!=null)?Math.abs(parseFloat(askT)-parseFloat(bidT)):null;
-              const spr=_diff==null?'—':(catOf(sym)==='Crypto'||catOf(sym)==='Stocks'?_diff:_diff/pip(sym)).toFixed(1);
+              const spr=_diff==null?'—':sprText(sym,_diff);
               return (
                 <tr key={sym} className={(sym===sel?'sel':'')+(open?'':' mw-closed')} onClick={()=>setSel(sym)}
                     draggable={true} onDragStart={(e)=>{ e.dataTransfer.setData('text/mwsymbol', sym); e.dataTransfer.effectAllowed='copy'; }}
@@ -2955,6 +2973,8 @@ const IC = {
   pop:    <Svg><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18"/></Svg>,
   exp:    <Svg><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></Svg>,
   dollar: <svg viewBox="0 0 24 24" fill="none" stroke="#caa22a" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.5a2.5 2 0 0 0-2.5-1.5c-1.5 0-2.5.8-2.5 2s1 1.8 2.5 2 2.5.8 2.5 2-1 2-2.5 2a2.5 2 0 0 1-2.5-1.5M12 6.5v11"/></svg>,
+  ascroll:<Svg><path d="M4 6l9 6-9 6V6z" fill="currentColor" stroke="none"/><path d="M18 4v16"/></Svg>,   // MT5 Auto Scroll: ▶| run to the live edge
+  cshift: <Svg><path d="M15 6l-9 6 9 6V6z" fill="currentColor" stroke="none"/><path d="M19 4v16"/></Svg>, // MT5 Chart Shift: ◀ | gap off the right edge
 };
 const CHART_TYPES=[['candle',IC.candle,'Candlesticks'],['bar',IC.bar,'Bars (OHLC)'],['line',IC.line,'Line']];
 // chart drawing/analysis tools — active state now (frontend), draw handlers come later
@@ -2962,6 +2982,9 @@ const DRAW_TOOLS=[['arrow',IC.arrow,'Cursor'],['cross',IC.cross,'Crosshair'],['v
   ['trend',IC.trend,'Trend Line'],['fib',IC.fib,'Fibonacci Retracement'],['text',IC.text,'Text']];
 function Toolbar({ tf, chartType, tool }){
   const [algo,setAlgo]=React.useState(false);
+  // MT5 chart-follow toggles — local mirror of the chartOpts global for the pressed look
+  const [asOn,setAsOn]=React.useState(chartOpts.autoScroll);
+  const [shOn,setShOn]=React.useState(chartOpts.shift);
   React.useEffect(()=> terminalBus.subscribe((cmd)=>{ if(cmd==='algo.toggle') setAlgo(a=>!a); }), []);
   return (
     <div className="tools">
@@ -2976,6 +2999,14 @@ function Toolbar({ tf, chartType, tool }){
       <div className="tigrp">
         <div className="tibtn" title="Zoom In" onClick={()=>terminalBus.emit('chart.zoom','in')}>{IC.zin}</div>
         <div className="tibtn" title="Zoom Out" onClick={()=>terminalBus.emit('chart.zoom','out')}>{IC.zout}</div>
+      </div>
+      <div className="tsep"></div>
+      {/* MT5 chart-follow toggles: Auto Scroll (tick → snap to live edge) + Chart Shift (right gap) */}
+      <div className="tigrp">
+        <div className={"tibtn"+(asOn?' on':'')} title="Auto Scroll — 틱마다 최신 봉으로 (과거 보려면 끄기)"
+             onClick={()=>{ chartOpts.autoScroll=!chartOpts.autoScroll; setAsOn(chartOpts.autoScroll); terminalBus.emit('chart.opts'); }}>{IC.ascroll}</div>
+        <div className={"tibtn"+(shOn?' on':'')} title="Chart Shift — 우측 15칸 여백 on/off"
+             onClick={()=>{ chartOpts.shift=!chartOpts.shift; setShOn(chartOpts.shift); terminalBus.emit('chart.opts'); }}>{IC.cshift}</div>
       </div>
       <div className="tsep"></div>
       {/* drawing / analysis tools — click to arm (active state); draw on chart is future */}
