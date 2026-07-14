@@ -171,6 +171,50 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .wal .ra .amt.neg{color:var(--lgd-down)}
 .wal .ra .amt.pos{color:var(--lgd-up)}
 
+/* ══ Quick Bet 팝업 (레전드 주문 티켓 §8: 드래그 도트·세그먼트·스테퍼·오렌지 에러·면책·Cancel/CTA) ══ */
+.qb{position:fixed; z-index:60; width:322px; display:none; flex-direction:column;
+  background:#141617; border:1px solid rgba(255,255,255,.14); border-radius:var(--lgd-r-pop);
+  box-shadow:0 16px 44px rgba(0,0,0,.65); font-size:var(--lgd-fs-body)}
+.qb.open{display:flex}
+.qb .qh{display:flex; align-items:center; padding:10px 12px 0; cursor:grab; user-select:none}
+.qb .qh:active{cursor:grabbing}
+.qb .qh .dots{color:var(--lgd-dim); letter-spacing:1px; font-size:13px}
+.qb .qh .qx{margin-left:auto; color:var(--lgd-dim); cursor:pointer; width:22px; text-align:center}
+.qb .qh .qx:hover{color:#fff}
+.qb .qt{padding:2px 14px 10px; font-size:17px; font-weight:700}
+.qb .qt small{color:var(--lgd-dim); font-weight:400; font-size:var(--lgd-fs-label); margin-left:7px}
+.qb .seg{display:flex; gap:0; margin:0 14px 12px; background:var(--lgd-pill); border-radius:999px; padding:3px}
+.qb .seg button{flex:1; border:none; background:transparent; color:var(--lgd-dim); border-radius:999px;
+  height:30px; font-size:var(--lgd-fs-body); font-weight:700; cursor:pointer}
+.qb .seg button.on{background:var(--lgd-up); color:#04270a}
+.qb .row{display:flex; align-items:center; justify-content:space-between; padding:9px 14px;
+  border-top:1px solid var(--lgd-hair)}
+.qb .row .k{color:var(--lgd-ink)}
+.qb .row .v{font-weight:600}
+.qb .qty{display:flex; align-items:center; border:1.5px solid rgba(255,255,255,.4); border-radius:7px; overflow:hidden}
+.qb .qty input{width:70px; background:transparent; border:none; outline:none; color:#fff; font-size:var(--lgd-fs-body-lg);
+  padding:6px 9px; font-weight:600}
+.qb .qty .stp{display:flex; flex-direction:column; border-left:1px solid rgba(255,255,255,.2)}
+.qb .qty .stp span{width:24px; height:15px; display:flex; align-items:center; justify-content:center;
+  cursor:pointer; color:var(--lgd-ink); font-size:11px; line-height:1}
+.qb .qty .stp span:hover{background:var(--lgd-pill)}
+.qb .err{padding:2px 14px 10px; color:var(--lgd-down); font-size:var(--lgd-fs-label); line-height:1.5; display:none}
+.qb .err a{color:var(--lgd-down); font-weight:700}
+.qb .est{padding:10px 14px; border-top:1px solid var(--lgd-hair)}
+.qb .est .r1{display:flex; justify-content:space-between; font-weight:700}
+.qb .est .r2{display:flex; justify-content:space-between; color:var(--lgd-dim); font-size:var(--lgd-fs-label); margin-top:3px}
+.qb .pw{padding:0 14px 10px; color:var(--lgd-dim); font-size:var(--lgd-fs-label)}
+.qb .disc{padding:10px 14px; border-top:1px solid var(--lgd-hair); color:var(--lgd-dim); font-size:var(--lgd-fs-caption); line-height:1.5}
+.qb .fbtns{display:flex; gap:8px; padding:12px 14px 14px; justify-content:flex-end}
+.qb .fbtns button{border:none; border-radius:var(--lgd-r-btn); height:34px; padding:0 16px;
+  font-size:var(--lgd-fs-body); font-weight:700; cursor:pointer}
+.qb .fbtns .cxl{background:var(--lgd-pill); color:var(--lgd-ink)}
+.qb .fbtns .go{background:var(--lgd-pill); color:var(--lgd-dim)}
+.qb .fbtns .go.ready{background:rgba(0,200,5,.16); color:var(--lgd-up); border:1px solid var(--lgd-up)}
+.qb .addslip{margin:0 14px 4px; border:none; background:transparent; color:var(--lgd-dim);
+  font-size:var(--lgd-fs-label); cursor:pointer; text-align:left; padding:0}
+.qb .addslip:hover{color:var(--lgd-ink)}
+
 /* ══ Search 팝오버 (레전드 §8 실물: 입력+✕, 카테고리 필(액티브=화이트), Recent, 심볼 행) ══ */
 .spop{position:absolute; left:8px; top:42px; z-index:40; width:320px; max-height:420px; display:none;
   flex-direction:column; background:var(--lgd-surface2); border:1px solid rgba(255,255,255,.14);
@@ -532,10 +576,10 @@ document.getElementById('obFil').addEventListener('click', e=>{
   const b=e.target.closest('button'); if(!b) return;
   selLg=b.dataset.lg; renderLeagues(gamesStore.games); renderBoard(gamesStore.games); renderSchedule(gamesStore.games);
 });
-// 셀 클릭 → 슬립 leg 토글 (앱 toggle :1911 — uid=gid+'|'+sel, 라이브 게이트 재확인)
+// 셀 클릭 → Quick Bet 팝업 (레전드 주문 티켓 문법) · 팔레이는 팝업의 Add to Bet slip 경로
 document.getElementById('obList').addEventListener('click', e=>{
   const b=e.target.closest('.bet'); if(!b||b.classList.contains('sus')||b.classList.contains('dis')) return;
-  slip.toggle(b.dataset.game, b.dataset.market, b.dataset.sel, +b.dataset.am);
+  openQuickBet(b.dataset.game, b.dataset.market, b.dataset.sel, b);
 });
 
 /* ════════════════════ 세션 + 돈 데이터 (전부 서버 전용 — CLAUDE.md #5) ════════════════════
@@ -747,48 +791,154 @@ function renderSlipSummary(){
     place.disabled=!n||stake<=0; place.textContent=n?(usd(stake)+' → win '+usd(win)):'Place Bet';
   }
 }
-/* 베팅 실행 — 서버 권위 place_bet 단일 경로 (앱 1977-2035 이식; 클라 폴백 생성 절대 없음) */
-document.getElementById('slipPlace').addEventListener('click', async ()=>{
+/* 베팅 코어 — 서버 권위 place_bet 단일 경로 (앱 1977-2035 이식). 슬립·퀵벳 팝업 공용.
+   클라는 베팅 행도 잔고 차감도 절대 만들지 않는다 — 결과는 서버 재조회로만. */
+async function placeBetCore(legsArr, mode, stake){
   const m=meId();
-  if(!m){ slipNote('로그인이 필요합니다'); return; }
-  if(window.__alpexaHalt){ slipNote('Trading paused — betting is temporarily disabled'); return; }
-  const n=slip.legs.length; if(!n) return;
-  const d=comboDec(slip.legs);
-  const stake=slip.mode==='single'?slip.legs.reduce((a,l)=>a+l.stake,0):(parseInt((document.getElementById('slipStake')||{}).value)||0);
-  const pot=slip.mode==='single'?slip.legs.reduce((a,l)=>a+l.stake*dec(l.am),0):stake*d;
-  if(moneyStore.bal!=null&&stake>moneyStore.bal){ slipNote('Insufficient balance — transfer funds to Sports first'); return; }
+  if(!m) return {ok:false, msg:'로그인이 필요합니다', login:true};
+  if(window.__alpexaHalt) return {ok:false, msg:'Trading paused — betting is temporarily disabled'};
+  const n=legsArr.length; if(!n) return {ok:false, msg:''};
+  const d=comboDec(legsArr);
+  const pot=mode==='single'?legsArr.reduce((a,l)=>a+l.stake*dec(l.am),0):stake*d;
+  if(moneyStore.bal!=null&&stake>moneyStore.bal) return {ok:false, msg:'Insufficient balance — transfer funds to Sports first', fund:true};
   const _minBet=+((window.__alpexaCtrl&&window.__alpexaCtrl.minBet)||1);
-  if(stake<_minBet){ slipNote('Minimum is '+usd(_minBet)+' per bet'); return; }
+  if(stake<_minBet) return {ok:false, msg:'Minimum is '+usd(_minBet)+' per bet'};
   const _maxBet=+((window.__alpexaCtrl&&window.__alpexaCtrl.maxBet)||0);
-  if(_maxBet>0&&stake>_maxBet){ slipNote('Limit is '+usd(_maxBet)+' per bet'); return; }
-  const betType=n===1?'Single':slip.mode==='single'?'Singles':slip.mode==='sgp'?'Same Game':'Parlay';
-  const d0=comboDec(slip.legs), baseCash=Math.round(stake*0.92*100)/100;
+  if(_maxBet>0&&stake>_maxBet) return {ok:false, msg:'Limit is '+usd(_maxBet)+' per bet'};
+  const betType=n===1?'Single':mode==='single'?'Singles':mode==='sgp'?'Same Game':'Parlay';
+  const d0=comboDec(legsArr), baseCash=Math.round(stake*0.92*100)/100;
   let spTicket; try{ const k='alpexa.seq.sp', nn=parseInt(localStorage.getItem(k)||'100000',10)+1;
     localStorage.setItem(k,String(nn)); spTicket='SP-'+nn; }catch(e){ spTicket='SP-'+Math.floor(100000+Math.random()*900000); }
   const betId='b'+Date.now();
-  const legsMeta=slip.legs.map(l=>({pk:l.sel,sel:l.sel,gid:l.gid,market:l.market,gm:l.game,am:l.am,am0:l.am,
+  const legsMeta=legsArr.map(l=>({pk:l.sel,sel:l.sel,gid:l.gid,market:l.market,gm:l.game,am:l.am,am0:l.am,
     dec0:dec(l.am),tm:l.tm,kt:l.kt||'',live:l.live,lg:l.lg,st:'o'}));
   const acct=m.accts&&m.accts.sports;
-  if(!acct){ slipNote('No sports account'); return; }
+  if(!acct) return {ok:false, msg:'No sports account'};
   const fl=legsMeta[0]||{};
-  const meta={type:betType, cls:slip.mode, stake:stake, potential:pot, baseCash:baseCash, d0:d0,
+  const meta={type:betType, cls:mode, stake:stake, potential:pot, baseCash:baseCash, d0:d0,
     cashout:baseCash, ticket:spTicket, placedTs:Date.now(), legs:legsMeta};
-  const place=document.getElementById('slipPlace'); place.disabled=true;
   try{
     const res=await AlpexaSync.db.rpc('place_bet',{ p_acct:acct, p_stake:stake, p_potential:pot,
       p_symbol:betType+' · '+(fl.sel||''), p_local_id:String(betId), p_meta:meta,
       p_game:(fl.gm||''), p_pick:(fl.sel||''), p_odds:(fl.am||0), p_size:n });
     const dt=res&&res.data;
-    if((res&&res.error)||(dt&&dt.ok===false)){
-      slipNote((dt&&dt.error)||(res&&res.error&&res.error.message)||'Server rejected the bet');
-    }else{
-      slip.legs=[]; renderBoard(gamesStore.games); renderSlip(); slipNote('✓ Bet placed — '+spTicket);
-    }
-  }catch(err){ slipNote('Connection issue — please try again'); }
-  // 결과는 전부 서버 재조회로만 (베팅 행·잔고 — 클라는 아무것도 만들지 않는다)
-  moneyStore.pull(); renderSlipSummary();
+    if((res&&res.error)||(dt&&dt.ok===false))
+      return {ok:false, msg:(dt&&dt.error)||(res&&res.error&&res.error.message)||'Server rejected the bet'};
+    return {ok:true, ticket:spTicket};
+  }catch(err){ return {ok:false, msg:'Connection issue — please try again'}; }
+  finally{ moneyStore.pull(); }   // 성공/실패 모두 서버 재조회
+}
+document.getElementById('slipPlace').addEventListener('click', async ()=>{
+  const stake=slip.mode==='single'?slip.legs.reduce((a,l)=>a+l.stake,0):(parseInt((document.getElementById('slipStake')||{}).value)||0);
+  const place=document.getElementById('slipPlace'); place.disabled=true;
+  const r=await placeBetCore(slip.legs, slip.mode, stake);
+  if(r.ok){ slip.legs=[]; renderBoard(gamesStore.games); renderSlip(); slipNote('✓ Bet placed — '+r.ticket); }
+  else slipNote(r.msg);
+  renderSlipSummary();
 });
 renderSlip();
+
+/* ── Quick Bet 팝업: 셀 클릭 → 주문 티켓 (레전드 §8 크롭 해부 이식) ── */
+const qb=document.createElement('div'); qb.className='qb'; qb.id='qb';
+qb.innerHTML='<div class="qh" id="qbH"><span class="dots">⠿</span><span class="qx" id="qbX">✕</span></div>'+
+  '<div class="qt" id="qbTitle"></div>'+
+  '<div class="seg" id="qbSeg"></div>'+
+  '<div class="row"><span class="k">Market</span><span class="v" id="qbMkt"></span></div>'+
+  '<div class="row"><span class="k">Odds</span><span class="v tnum" id="qbOdds"></span></div>'+
+  '<div class="row"><span class="k">Stake</span><span class="qty"><input id="qbStake" type="number" value="20" min="0" step="5">'+
+  '<span class="stp"><span id="qbUp">＋</span><span id="qbDn">－</span></span></span></div>'+
+  '<div class="err" id="qbErr"></div>'+
+  '<div class="est"><div class="r1"><span>Est. payout</span><span class="tnum" id="qbPay"></span></div>'+
+  '<div class="r2"><span>To win</span><span class="tnum" id="qbWin"></span></div></div>'+
+  '<div class="pw tnum" id="qbPw"></div>'+
+  '<button class="addslip" id="qbAdd">+ Add to Bet slip (parlay)</button>'+
+  '<div class="disc">Once placed, bets cannot be undone. Odds are re-priced by the server at placement.</div>'+
+  '<div class="fbtns"><button class="cxl" id="qbCancel">Cancel</button><button class="go" id="qbGo" disabled>Place bet</button></div>';
+document.body.appendChild(qb);
+const qbState={ gid:null, market:null, opts:[], sel:0 };
+function qbBuildOpts(g, market, clickedSel){
+  // 클릭한 마켓의 아웃컴들 = 레전드 Buy/Sell 세그먼트의 스포츠 번역 (원정=1/홈=0, 1X2=3)
+  if(market==='1X2'){ const tw=g.threeWay||[]; return [
+    {lbl:'Home', b:tw[0]}, {lbl:'Draw', b:tw[1]}, {lbl:'Away', b:tw[2]} ].filter(o=>o.b); }
+  const arr=market==='Spread'?g.spread:market==='Total'?g.total:g.ml;
+  return [ {lbl:g.away.ab, b:arr&&arr[1]}, {lbl:g.home.ab, b:arr&&arr[0]} ].filter(o=>o.b);
+}
+function openQuickBet(gid, market, sel, anchor){
+  const g=gamesStore.games.find(x=>x.gid===gid); if(!g) return;
+  qbState.gid=gid; qbState.market=market; qbState.opts=qbBuildOpts(g,market,sel);
+  qbState.sel=Math.max(0, qbState.opts.findIndex(o=>o.b.sel===sel));
+  document.getElementById('qbTitle').innerHTML=esc(g.away.ab)+' @ '+esc(g.home.ab)+
+    '<small>'+(ICONS[g.lg]||'')+' '+(g.live?'● LIVE · ':'')+esc(g.time)+'</small>';
+  document.getElementById('qbMkt').textContent=market;
+  renderQb();
+  qb.classList.add('open');
+  // 앵커(클릭 셀) 근처에 배치 + 뷰포트 클램프
+  const r=anchor.getBoundingClientRect();
+  let x=r.right+10, y=r.top-10;
+  if(x+330>innerWidth) x=r.left-332;
+  if(x<8) x=8;
+  y=Math.max(56, Math.min(innerHeight-520, y));
+  qb.style.left=x+'px'; qb.style.top=y+'px';
+  setTimeout(()=>document.getElementById('qbStake').focus(),0);
+}
+function closeQuickBet(){ qb.classList.remove('open'); document.getElementById('qbErr').style.display='none'; }
+function qbLeg(){
+  const o=qbState.opts[qbState.sel]; if(!o) return null;
+  const g=gamesStore.games.find(x=>x.gid===qbState.gid); if(!g) return null;
+  const stake=parseInt(document.getElementById('qbStake').value)||0;
+  return {uid:qbState.gid+'|'+o.b.sel, gid:qbState.gid, market:qbState.market, sel:o.b.sel, am:+o.b.am,
+    game:g.away.ab+' @ '+g.home.ab, tm:g.time, kt:g.iso||'', live:!!g.live, lg:g.lg, stake:stake};
+}
+function renderQb(){
+  const segEl=document.getElementById('qbSeg');
+  segEl.innerHTML=qbState.opts.map((o,i)=>
+    '<button class="'+(i===qbState.sel?'on':'')+'" data-i="'+i+'">'+esc(o.lbl)+' '+fmtAm(+o.b.am)+'</button>').join('');
+  const o=qbState.opts[qbState.sel]; if(!o) return;
+  const stake=parseInt(document.getElementById('qbStake').value)||0;
+  const win=stake*(dec(+o.b.am)-1);
+  document.getElementById('qbOdds').textContent=fmtAm(+o.b.am);
+  document.getElementById('qbPay').textContent=usd(stake+win);
+  document.getElementById('qbWin').textContent=usd(win);
+  document.getElementById('qbPw').textContent=(moneyStore.authed&&moneyStore.bal!=null)?usd(moneyStore.bal)+' balance':'··· balance (log in)';
+  const err=document.getElementById('qbErr'); err.style.display='none';
+  const go=document.getElementById('qbGo');
+  let bad=null;
+  if(moneyStore.authed&&moneyStore.bal!=null&&stake>moneyStore.bal)
+    bad='You don\'t have enough balance to place this bet. <a href="sports-live.html">Transfer funds</a>';
+  if(bad){ err.innerHTML=bad; err.style.display='block'; }
+  const ready=stake>0&&!bad;
+  go.disabled=!ready; go.classList.toggle('ready',ready);
+  go.textContent='Place bet '+(stake>0?usd(stake):'');
+}
+document.getElementById('qbSeg').addEventListener('click', e=>{ const b=e.target.closest('button'); if(!b) return;
+  qbState.sel=+b.dataset.i; renderQb(); });
+document.getElementById('qbStake').addEventListener('input', renderQb);
+document.getElementById('qbUp').addEventListener('click', ()=>{ const i=document.getElementById('qbStake');
+  i.value=(parseInt(i.value)||0)+5; renderQb(); });
+document.getElementById('qbDn').addEventListener('click', ()=>{ const i=document.getElementById('qbStake');
+  i.value=Math.max(0,(parseInt(i.value)||0)-5); renderQb(); });
+document.getElementById('qbX').addEventListener('click', closeQuickBet);
+document.getElementById('qbCancel').addEventListener('click', closeQuickBet);
+document.getElementById('qbAdd').addEventListener('click', ()=>{ const l=qbLeg(); if(!l) return;
+  slip.toggle(l.gid, l.market, l.sel, l.am); closeQuickBet(); });
+document.getElementById('qbGo').addEventListener('click', async ()=>{
+  const l=qbLeg(); if(!l) return;
+  const go=document.getElementById('qbGo'); go.disabled=true; go.textContent='Placing…';
+  const r=await placeBetCore([l],'single',l.stake);
+  if(r.ok){ closeQuickBet(); slipNote('✓ Bet placed — '+r.ticket); }
+  else{ const err=document.getElementById('qbErr');
+    err.innerHTML=esc(r.msg)+(r.fund?' <a href="sports-live.html">Transfer funds</a>':r.login?' <a href="login.html">Log in</a>':'');
+    err.style.display='block'; renderQb(); }
+});
+// 팝업 드래그 (헤더 도트)
+document.getElementById('qbH').addEventListener('pointerdown', e=>{
+  if(e.target.closest('.qx')) return;
+  e.preventDefault(); const h=e.currentTarget; h.setPointerCapture(e.pointerId);
+  const r=qb.getBoundingClientRect(), ox=e.clientX-r.left, oy=e.clientY-r.top;
+  const mv=ev=>{ qb.style.left=Math.max(4,ev.clientX-ox)+'px'; qb.style.top=Math.max(52,ev.clientY-oy)+'px'; };
+  const up=()=>{ h.removeEventListener('pointermove',mv); h.removeEventListener('pointerup',up); };
+  h.addEventListener('pointermove',mv); h.addEventListener('pointerup',up);
+});
 
 /* ── Search (레전드 §8 팝오버 + / 핫키) — 스포츠 번역: 팀/경기 검색, 리그 필, Recent ── */
 const SCATS=['All','MLB','SOC','NFL','NBA','NHL','UFC','NCAAB'];
