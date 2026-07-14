@@ -64,25 +64,33 @@ Deno.serve(async (req) => {
     const [mult, span] = MAP[tf] || [15, "minute"];
     const unitMs: Record<string, number> =
       { minute: 60000, hour: 3600000, day: 86400000, week: 604800000 };
-    // DEEP HISTORY (2026-07-13): the client asks for &n= bars (H4 ≈ 6.8y · D1 ≈ 15y · W1 ≈ 30y).
-    // Polygon caps 5000/request → page BACKWARDS (sort=desc, `to` walks past the oldest bar).
+    // DEEP HISTORY (2026-07-13, repaired 2026-07-14): the client asks for &n= bars.
+    // ⚠ Polygon's `limit` counts BASE aggregates SCANNED (minutes for intraday), NOT output
+    // bars — limit=5000 on H4 scanned 5000 minutes ≈ 7 days ≈ 34 bars, and the old
+    // `results.length<5000 → break` compared OUTPUT bars to that BASE cap, killing the walk
+    // on page one (live-measured: H4 stuck at 34 · H1 at 128 · W1 400 on negative `from`).
+    // Fix: limit=50000 (Polygon max) · page backwards until EMPTY or n reached (≤8 pages)
+    // · clamp `from` to 2000-01-01. Realistic depth: D1 15y · W1 clamp-deep · H4 ≈ 1-2y.
     const n = Math.max(200, Math.min(15000, parseInt(url.searchParams.get("n") || "200", 10) || 200));
     const sym = candlesSym.replace(/[^A-Za-z]/g, "").toUpperCase();
-    const earliest = Date.now() - n * mult * (unitMs[span] || 60000) * 4;   // 4x buffer for closed-market gaps
+    const FLOOR_MS = 946684800000;   // 2000-01-01 — Polygon 400s on negative/huge-past `from` (W1 n=1560 bug)
+    const earliest = Math.max(FLOOR_MS, Date.now() - n * mult * (unitMs[span] || 60000) * 4);   // 4x buffer for closed-market gaps
+    // pages actually needed: intraday scans n*mult*(min-per-unit) base minutes at 50k/page; day+ spans scan 1 base/bar
+    const baseUnits = span === "minute" ? n * mult : span === "hour" ? n * mult * 60 : n;
+    const maxPages = Math.max(1, Math.min(8, Math.ceil(baseUnits / 50000)));
     try {
       let out: any[] = [];
       let to = Date.now();
-      for (let page = 0; page < 4 && out.length < n && to > earliest; page++) {
+      for (let page = 0; page < maxPages && out.length < n && to > earliest; page++) {
         const aggUrl =
-          `https://api.polygon.io/v2/aggs/ticker/C:${sym}/range/${mult}/${span}/${earliest}/${to}?adjusted=true&sort=desc&limit=5000&apiKey=${POLY}`;
+          `https://api.polygon.io/v2/aggs/ticker/C:${sym}/range/${mult}/${span}/${earliest}/${to}?adjusted=true&sort=desc&limit=50000&apiKey=${POLY}`;
         const r = await fetch(aggUrl);
         const j = await r.json();
         if (!r.ok) { if (!out.length) return json({ ok: false, error: "polygon " + r.status, detail: j }, 502); break; }
         const results: any[] = Array.isArray(j.results) ? j.results : [];
-        if (!results.length) break;
+        if (!results.length) break;   // start of available history — the ONLY data-driven stop
         out = out.concat(results);
         to = results[results.length - 1].t - 1;   // desc → last row is the oldest of this page
-        if (results.length < 5000) break;
       }
       const candles = out
         .map((x) => ({ t: x.t, o: x.o, h: x.h, l: x.l, c: x.c, v: x.v || 0 }))
