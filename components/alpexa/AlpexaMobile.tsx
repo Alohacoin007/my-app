@@ -199,24 +199,25 @@ export default function AlpexaMobile() {
   const [tab, setTab] = useState("home");
   const [picks, setPicks] = useState<Set<string>>(new Set());
 
-  // BetBoard와 동일한 테마 메커니즘 공유 (화이트 기본, 🌙로 다크 전환)
-  const [theme, setTheme] = useState<"dark" | "light">("light");
+  // BetBoard 터미널 느낌에 맞춰 이 화면은 다크가 기본 (☀️로 라이트 전환)
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
   useEffect(() => {
+    let saved: string | null = null;
     try {
-      if (window.localStorage.getItem("betboard-theme") === "dark") {
-        setTheme("dark");
-        document.documentElement.dataset.theme = "dark";
-      }
+      saved = window.localStorage.getItem("alpexa-theme");
     } catch {
       // 스토리지가 막힌 환경에서는 기본 테마로 시작
     }
+    const next = saved === "light" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.dataset.theme = next;
   }, []);
   const toggleTheme = useCallback(() => {
     setTheme((prev) => {
       const next = prev === "dark" ? "light" : "dark";
       document.documentElement.dataset.theme = next;
       try {
-        window.localStorage.setItem("betboard-theme", next);
+        window.localStorage.setItem("alpexa-theme", next);
       } catch {
         // 저장 실패는 무시
       }
@@ -270,15 +271,35 @@ export default function AlpexaMobile() {
               </button>
               <button type="button" aria-label="Settings" className="rounded-md p-1.5 text-ink-2 hover:bg-surface-2">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden>
-                  <circle cx="8" cy="8" r="2.2" />
-                  <path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2" strokeLinecap="round" />
+                  <path d="M2.5 5h11M2.5 11h11" strokeLinecap="round" />
+                  <circle cx="6" cy="5" r="1.6" fill="var(--color-surface)" />
+                  <circle cx="10.5" cy="11" r="1.6" fill="var(--color-surface)" />
                 </svg>
               </button>
             </div>
           </div>
           <p className="mt-3 text-[10px] font-semibold tracking-widest text-ink-muted">BALANCE · USD</p>
-          <p className="text-[28px] font-bold leading-tight">$1,351,756.36</p>
-          <div className="mt-1.5 flex items-center">
+          <div className="flex items-end gap-3">
+            <div className="min-w-0">
+              <p className="text-[28px] font-bold leading-tight">$1,351,756.36</p>
+              <p className="mt-0.5 text-xs tabular-nums" style={{ color: "var(--color-up)" }}>
+                ▲ $24,310.55 (1.8%) today
+              </p>
+            </div>
+            {/* 최근 잔액 추이 스파크라인 (BetBoard 차트 스타일: 2px 라인 + 엔드 마커) */}
+            <svg width="96" height="34" viewBox="0 0 96 34" className="mb-1 ml-auto shrink-0" aria-label="Balance trend" role="img">
+              <path
+                d="M2,26 L10,23 L18,25 L26,19 L34,21 L42,15 L50,17 L58,12 L66,14 L74,9 L82,11 L92,6"
+                fill="none"
+                stroke="var(--color-series-1)"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <circle cx="92" cy="6" r="3.5" fill="var(--color-series-1)" stroke="var(--color-surface)" strokeWidth="2" />
+            </svg>
+          </div>
+          <div className="mt-2 flex items-center">
             <p className="text-xs text-ink-2">
               Pending <span className="font-semibold tabular-nums text-ink">$112,020.00</span>
             </p>
@@ -345,7 +366,7 @@ export default function AlpexaMobile() {
             <li key={g.id} className="rounded-[10px] border border-hairline bg-surface">
               <div className="flex items-center gap-1.5 border-b border-hairline px-3 py-2">
                 <span aria-hidden className="text-xs">⚾</span>
-                <span className="text-[11px] font-semibold text-ink-2">{g.league}</span>
+                <span className="text-[11px] font-semibold tracking-wide text-ink-2">{g.league}</span>
                 <span className="ml-auto text-[11px] tabular-nums text-ink-muted">{g.datetime}</span>
                 <button type="button" aria-label="Add to favorites" className="rounded p-0.5 text-ink-muted hover:text-ink">
                   <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden>
