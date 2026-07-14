@@ -20,6 +20,7 @@ const bad = (m) => { console.error('🔴 ' + m); fail++; };
 // ── fx.html: NO separate WebTrader launcher (2026-07-14 — device routing made it redundant;
 //    the plain Log in sends PC users to the terminal automatically) ──
 if (/wt-pill|wtlogin/.test(fx)) bad('the retired WebTrader launcher must stay gone (device routing owns the landing)');
+if (!/href="login\.html\?switch=1" target="_blank" rel="noopener"/.test(fx)) bad('Log in must open in a NEW page (target=_blank, like Sign up)');
 
 // ── login.html: ONE createClient on sessionStorage (the 3-file storage lockstep survives) ──
 const clients = (lg.match(/createClient\(/g) || []).length;
