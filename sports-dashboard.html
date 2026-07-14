@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=1280"/>
+<title>ALPEXA Sports — Dashboard</title>
+<link rel="stylesheet" href="legend-ui.css"/>
+<!-- ══════════════════════════════════════════════════════════════════════════
+  ALPEXA 스포츠 대시보드 v1 (2026-07-14) — 데스크톱 전용, 레전드 디자인 언어.
+  · 디자인 = 레전드-디자인-스펙.md §1~5 (토큰은 legend-ui.css --lgd-*)
+  · 문법   = 스포츠-앱-문법-스펙.md (매트릭스/잠금/1X2/sel 계약 — 앱과 동일)
+  · 게이트 = tests/sports-dashboard-fidelity.test.js (금지 8종 + 위젯별 존재 핀)
+  v1 범위: 읽기 전용 — live_games 실데이터 4위젯 (발란스는 세션 없으면 ···).
+  베팅/캐시아웃(돈 경로)은 다음 단계에서 place_bet/cash_out RPC 단일 경로로만.
+═══════════════════════════════════════════════════════════════════════════ -->
+<style>
+html,body{height:100%; margin:0; background:var(--lgd-bg,#0B0D0E)}
+body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
+.tnum{font-variant-numeric:tabular-nums}
+
+/* ══ 헤더 (스펙 §2: h48 · 탭 필 · 중앙 상태 필 · 우측 액션) ══ */
+.hdr{display:flex; align-items:center; gap:8px; height:var(--lgd-header-h); padding:0 14px;
+  background:#000; border-bottom:1px solid var(--lgd-hair)}
+.mark{width:26px; height:26px; display:flex; align-items:center; justify-content:center;
+  color:#fff; font-family:'Arial Black',Arial,sans-serif; font-weight:900; font-size:19px; letter-spacing:-1px}
+.htab{display:flex; align-items:center; gap:8px; background:var(--lgd-pill); border-radius:var(--lgd-r-btn);
+  height:32px; padding:0 14px 0 12px; font-size:var(--lgd-fs-tab); font-weight:600; cursor:pointer; transition:background .12s}
+.htab:hover{background:var(--lgd-pill-hi)}
+.addtab{width:32px; height:32px; border-radius:var(--lgd-r-btn); display:flex; align-items:center;
+  justify-content:center; color:var(--lgd-dim); font-size:19px; cursor:pointer}
+.addtab:hover{background:var(--lgd-pill); color:var(--lgd-ink)}
+.hsp{flex:1}
+.hmid{display:flex; align-items:center; gap:8px; background:var(--lgd-pill); border-radius:999px;
+  height:32px; padding:0 14px; font-size:var(--lgd-fs-body); font-weight:600}
+.hmid .dot{width:6px; height:6px; border-radius:999px; background:#C8C8C2}
+.hmid .dot.ok{background:var(--lgd-up)}
+.hmid .dot.stale{background:var(--lgd-warn)}
+.hbtn{background:var(--lgd-pill); border:none; color:var(--lgd-ink); border-radius:var(--lgd-r-btn); height:32px;
+  padding:0 14px; font-size:var(--lgd-fs-body); font-weight:600; cursor:pointer; transition:background .12s}
+.hbtn:hover{background:var(--lgd-pill-hi)}
+.hic{width:34px; height:34px; border-radius:var(--lgd-r-btn); display:flex; align-items:center;
+  justify-content:center; color:var(--lgd-ink); cursor:pointer}
+.hic:hover{background:var(--lgd-pill)}
+.avatar{width:28px; height:28px; border-radius:999px; background:#3A3E42; display:flex;
+  align-items:center; justify-content:center; color:#101214; cursor:pointer}
+
+/* ══ 캔버스 + 점 그리드 (드래그/리사이즈 중에만) ══ */
+.stage{position:relative; height:calc(100vh - 49px); overflow:auto; background:var(--lgd-bg)}
+.dots{position:absolute; inset:0; opacity:0; transition:opacity .18s; pointer-events:none; z-index:1;
+  background-image:radial-gradient(circle, rgba(255,255,255,.15) 1.2px, transparent 1.6px);
+  background-size:38px 38px; background-position:19px 19px}
+.stage.dragging .dots{opacity:1}
+@media (prefers-reduced-motion: reduce){ .dots{transition:none} }
+
+/* ══ 위젯 크롬 (스펙 §3: 타이틀바 36 · 링크 사각형 · ⋮ · 4방향 리사이즈) ══ */
+.widget{position:absolute; display:flex; flex-direction:column; background:var(--lgd-surface);
+  border:1px solid var(--lgd-hair); border-radius:var(--lgd-r-widget); overflow:hidden; z-index:2}
+.widget.drag{box-shadow:0 12px 32px rgba(0,0,0,.6); opacity:.92; z-index:9}
+.wtb{display:flex; align-items:center; gap:9px; height:var(--lgd-titlebar-h); padding:0 10px;
+  border-bottom:1px solid var(--lgd-hair); flex:none; cursor:grab; user-select:none}
+.widget.drag .wtb{cursor:grabbing}
+.linksq{width:12px; height:12px; border-radius:3px; flex:none; cursor:pointer}
+.wtb h3{margin:0; font-size:var(--lgd-fs-widget-title); font-weight:700}
+.wtb .wsub{font-size:var(--lgd-fs-label); color:var(--lgd-dim)}
+.wtb .wsp{flex:1}
+.wtb .wic{width:24px; height:24px; display:flex; align-items:center; justify-content:center;
+  color:var(--lgd-dim); cursor:pointer; border-radius:5px}
+.wtb .wic:hover{background:var(--lgd-surface2); color:var(--lgd-ink)}
+.wbody{flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column}
+.rz{position:absolute; z-index:6}
+.rz.br{right:0; bottom:0; width:18px; height:18px; cursor:nwse-resize}
+.rz.br::after{content:""; position:absolute; right:5px; bottom:5px; width:7px; height:7px;
+  border-right:2px solid var(--lgd-dim); border-bottom:2px solid var(--lgd-dim);
+  border-bottom-right-radius:2px; opacity:0; transition:opacity .12s}
+.widget:hover .rz.br::after{opacity:1}
+.rz.r{right:-3px; top:12px; bottom:20px; width:8px; cursor:ew-resize}
+.rz.l{left:-3px; top:12px; bottom:20px; width:8px; cursor:ew-resize}
+.rz.b{bottom:-3px; left:12px; right:20px; height:8px; cursor:ns-resize}
+.rz.r:hover,.rz.l:hover,.rz.b:hover{background:rgba(255,255,255,.06); border-radius:4px}
+.wempty{flex:1; display:flex; align-items:center; justify-content:center; color:var(--lgd-dim);
+  font-size:var(--lgd-fs-label); text-align:center; padding:16px}
+
+/* ══ Balance card ══ */
+.bal{padding:14px 16px 10px; display:flex; flex-direction:column; flex:1; min-height:0}
+.bal .top{display:flex; align-items:flex-start}
+.bal .nm{font-size:16px; font-weight:600}
+.bal .dep{margin-left:auto; background:var(--lgd-pill); border:none; color:var(--lgd-ink);
+  border-radius:var(--lgd-r-btn); height:30px; padding:0 13px; font-size:var(--lgd-fs-body); font-weight:700; cursor:pointer}
+.bal .dep:hover{background:var(--lgd-pill-hi)}
+.bal .amt{font-size:24px; font-weight:600; margin-top:2px}
+.bal .sub{display:flex; gap:14px; margin-top:8px; font-size:var(--lgd-fs-label); color:var(--lgd-dim)}
+.bal .sub b{color:var(--lgd-ink); font-weight:600}
+.bal .note{margin-top:auto; font-size:var(--lgd-fs-caption); color:var(--lgd-dim)}
+
+/* ══ Leagues ══ */
+.lgs{flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column}
+.lgrow{display:flex; align-items:center; gap:10px; padding:9px 12px; cursor:pointer; border-left:2px solid transparent}
+.lgrow:hover{background:var(--lgd-surface2)}
+.lgrow.sel{background:var(--lgd-surface2); border-left-color:var(--lgd-up)}
+.lgrow .chip{width:26px; height:26px; border-radius:6px; background:var(--lgd-pill); display:flex; align-items:center;
+  justify-content:center; font-size:10px; font-weight:700; flex:none}
+.lgrow .nm{font-size:var(--lgd-fs-body); font-weight:600}
+.lgrow .cnt{margin-left:auto; font-size:var(--lgd-fs-label); color:var(--lgd-dim)}
+.lgrow .lv{display:flex; align-items:center; gap:4px; font-size:var(--lgd-fs-caption); font-weight:700; color:var(--lgd-down)}
+.lgrow .lv i{width:5px; height:5px; border-radius:99px; background:var(--lgd-down)}
+
+/* ══ Schedule ══ */
+.sch{flex:1; min-height:0; overflow:auto}
+.sch table{width:100%; border-collapse:collapse; font-size:var(--lgd-fs-body)}
+.sch th{position:sticky; top:0; background:var(--lgd-surface); text-align:right; font-size:var(--lgd-fs-label);
+  font-weight:600; color:var(--lgd-dim); padding:8px 12px; white-space:nowrap; z-index:1}
+.sch th:first-child{text-align:left}
+.sch td{padding:9px 12px; text-align:right; white-space:nowrap}
+.sch td:first-child{text-align:left; font-weight:700}
+.sch td .at{color:var(--lgd-dim); font-weight:400; margin:0 4px}
+.sch tbody tr:hover{background:var(--lgd-surface2)}
+.sch .st{font-size:var(--lgd-fs-label); color:var(--lgd-dim)}
+.sch .st.live{color:var(--lgd-up); font-weight:700}
+
+/* ══ Odds board — 구조는 앱 gameRowsHTML 계약 그대로 ══ */
+.ob{display:flex; flex-direction:column; flex:1; min-height:0}
+.obfil{display:flex; gap:4px; padding:8px 10px 6px; flex:none}
+.obfil button{border:none; background:transparent; color:var(--lgd-dim); font-size:var(--lgd-fs-label); font-weight:700;
+  height:26px; padding:0 10px; border-radius:var(--lgd-r-btn); cursor:pointer}
+.obfil button.on{background:var(--lgd-pill); color:var(--lgd-ink)}
+.obhead{display:grid; grid-template-columns:minmax(0,1fr) 86px 86px 86px; gap:6px; padding:0 10px 6px;
+  font-size:var(--lgd-fs-label); color:var(--lgd-dim); font-weight:600; flex:none}
+.obhead span:not(:first-child){text-align:center}
+.obscroll{flex:1; min-height:0; overflow:auto; padding-bottom:8px}
+.obrow{display:grid; grid-template-columns:minmax(0,1fr) 86px 86px 86px; gap:6px; padding:8px 10px;
+  border-top:1px solid var(--lgd-hair); align-items:center}
+.obg .st{font-size:var(--lgd-fs-caption); color:var(--lgd-dim); margin-bottom:3px}
+.obg .st.live{color:var(--lgd-up); font-weight:700}
+.obg .tm{font-size:var(--lgd-fs-body); font-weight:700; line-height:1.45; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.obg .tm small{color:var(--lgd-dim); font-weight:400; margin-left:5px}
+.obg .tm .sc{color:var(--lgd-ink); font-weight:600; margin-left:6px}
+.mkt{display:flex; flex-direction:column; gap:4px}
+.bet{background:var(--lgd-surface2); border:1px solid transparent; border-radius:6px; padding:4px 2px 3px;
+  text-align:center; cursor:pointer; transition:background .1s; line-height:1.25}
+.bet:hover{background:var(--lgd-pill)}
+.bet .ln{display:block; font-size:10px; color:var(--lgd-dim)}
+.bet .pr{display:block; font-size:var(--lgd-fs-label); font-weight:700}
+.bet .pr.pos{color:var(--lgd-up)}
+.bet.sel{background:rgba(0,200,5,.13); border-color:var(--lgd-up)}
+.bet.sel .pr{color:var(--lgd-up)}
+.bet.sus{cursor:not-allowed; opacity:.55}
+.bet.dis{cursor:default; opacity:.45}
+/* 축구 1X2 (앱 soc-hdr/soc1x2 구조) */
+.soc-hdr{grid-column:1/-1; display:flex; align-items:center; gap:8px; font-size:var(--lgd-fs-body); font-weight:700}
+.soc-hdr .soc-nm{color:var(--lgd-dim); font-weight:400; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.soc-hdr .soc-sc{margin-left:auto; font-weight:600}
+.soc-hdr .soc-sc.live{color:var(--lgd-up)}
+.soc1x2{grid-column:1/-1; display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-top:6px}
+</style>
+</head>
+<body class="lgd">
+
+<div class="hdr">
+  <div class="mark" title="Alpexa Sports">A</div>
+  <div class="htab">
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor"><rect x="0.5" y="0.5" width="6" height="14" rx="1.6"/><rect x="8.5" y="0.5" width="6" height="6" rx="1.6"/><rect x="8.5" y="8.5" width="6" height="6" rx="1.6"/></svg>
+    Sports betting
+  </div>
+  <div class="addtab" title="New layout (coming)">+</div>
+  <div class="hsp"></div>
+  <div class="hmid"><span>Games today</span><span class="dot" id="feedDot"></span></div>
+  <div class="hsp"></div>
+  <button class="hbtn" id="btnReset" title="레이아웃 초기화">Reset layout</button>
+  <div class="hic" title="Open app"><a href="sports-live.html" style="color:inherit;display:flex" aria-label="Open app">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M14 4h6v6M20 4l-9 9M10 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-4"/></svg></a>
+  </div>
+  <div class="avatar"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8.5" r="4"/><path d="M4 20c1.5-3.6 4.6-5.5 8-5.5s6.5 1.9 8 5.5v1H4z"/></svg></div>
+</div>
+
+<div class="stage" id="stage"><div class="dots"></div></div>
+
+<script>
+'use strict';
+/* ════════════════════ 데이터 레이어 (v1: 읽기 전용) ════════════════════
+   앱과 같은 소스·같은 계약: live_games 단일 행 id=all (앱:3635 폴백 경로와 동일).
+   30초 폴 (앱 loadLive 주기) — Realtime 푸시 승격은 데이터 동기화 스펙 확정 후.
+   ⚠ 금지: 배당 발명·클라 쓰기·1초 미만 폭주 폴링 (fidelity 하네스가 감시) */
+const SB='https://grxnbgtfnaayeluenvqh.supabase.co';
+const SBK='sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu';
+const oddsReal = (g)=> g.oddsReal !== false;   // 하위호환: 플래그 없음 = real (앱:1712)
+const fmtAm = (a)=> a>0 ? '+'+a : String(a);
+
+const gamesStore = {
+  games:[], updatedAt:0, subs:new Set(),
+  sub(f){ this.subs.add(f); return ()=>this.subs.delete(f); },
+  emit(){ this.subs.forEach(f=>{ try{ f(this.games); }catch(e){} }); },
+  async pull(){
+    try{
+      const r=await fetch(SB+'/rest/v1/live_games?id=eq.all&select=data,updated_at',
+        {headers:{apikey:SBK, Authorization:'Bearer '+SBK}});
+      const j=await r.json();
+      if(Array.isArray(j)&&j[0]&&Array.isArray(j[0].data)){
+        this.games=j[0].data; this.updatedAt=Date.parse(j[0].updated_at)||Date.now();
+        document.getElementById('feedDot').className='dot ok';
+        this.emit(); return;
+      }
+      throw 0;
+    }catch(e){ document.getElementById('feedDot').className='dot stale'; }
+  },
+  start(){ if(this.timer) return; this.pull(); this.timer=setInterval(()=>this.pull(), 30000); }   // 앱 주기와 동일
+};
+
+/* ════════════════════ 레이아웃 엔진 (스펙 §2/§5) ════════════════════ */
+const GRID=38, LKEY='alpexa.sbdash.layout.v1';
+const stage=document.getElementById('stage');
+const DEFAULT_LAYOUT={ balance:{x:1102,y:494,w:380,h:266}, leagues:{x:24,y:24,w:228,h:440},
+  schedule:{x:24,y:494,w:532,h:342}, board:{x:280,y:24,w:800,h:440} };
+function loadLayout(){ try{ const raw=localStorage.getItem(LKEY); if(!raw) return {...DEFAULT_LAYOUT};
+  const p=JSON.parse(raw); return Object.keys(DEFAULT_LAYOUT).every(k=>p[k])?p:{...DEFAULT_LAYOUT};
+}catch(e){ return {...DEFAULT_LAYOUT}; } }
+let layout=loadLayout();
+function saveLayout(){ try{ localStorage.setItem(LKEY, JSON.stringify(layout)); }catch(e){} }
+document.getElementById('btnReset').onclick=()=>{ try{ localStorage.removeItem(LKEY); }catch(e){}
+  layout={...DEFAULT_LAYOUT}; Object.keys(layout).forEach(applyGeo); };
+
+function applyGeo(id){ const el=document.getElementById('w-'+id); if(!el) return; const g=layout[id];
+  el.style.left=g.x+'px'; el.style.top=g.y+'px'; el.style.width=g.w+'px'; el.style.height=g.h+'px'; }
+
+function makeWidget(id, title, sub, linkColor, bodyHTML){
+  const el=document.createElement('div'); el.className='widget'; el.id='w-'+id;
+  el.innerHTML='<div class="wtb"><span class="linksq" style="background:'+linkColor+'"></span>'+
+    '<h3>'+title+'</h3>'+(sub?'<span class="wsub">'+sub+'</span>':'')+
+    '<span class="wsp"></span><span class="wic" title="메뉴">⋮</span></div>'+
+    '<div class="wbody">'+bodyHTML+'</div>';
+  stage.appendChild(el); applyGeo(id);
+  // 드래그 (타이틀바) — 점 그리드 + 스냅
+  const tb=el.querySelector('.wtb');
+  tb.addEventListener('pointerdown', e=>{
+    if(e.target.closest('.wic,.linksq')) return;
+    e.preventDefault(); tb.setPointerCapture(e.pointerId);
+    const g=layout[id], offX=e.clientX-g.x, offY=e.clientY-g.y;
+    stage.classList.add('dragging'); el.classList.add('drag');
+    const move=ev=>{ g.x=Math.max(0,ev.clientX-offX); g.y=Math.max(0,ev.clientY-offY); applyGeo(id); };
+    const up=()=>{ tb.removeEventListener('pointermove',move); tb.removeEventListener('pointerup',up);
+      stage.classList.remove('dragging'); el.classList.remove('drag');
+      g.x=Math.round(g.x/GRID)*GRID; g.y=Math.round(g.y/GRID)*GRID; applyGeo(id); saveLayout(); };
+    tb.addEventListener('pointermove',move); tb.addEventListener('pointerup',up);
+  });
+  // 리사이즈 4방향 (스펙 §3: br 갈매기 + 좌/우/하 변)
+  const MINW=220, MINH=170;
+  ['br','r','l','b'].forEach(dir=>{
+    const rz=document.createElement('div'); rz.className='rz '+dir; el.appendChild(rz);
+    rz.addEventListener('pointerdown', e=>{
+      e.preventDefault(); e.stopPropagation(); rz.setPointerCapture(e.pointerId);
+      const g=layout[id], x0=e.clientX, y0=e.clientY, w0=g.w, h0=g.h, l0=g.x;
+      stage.classList.add('dragging'); el.classList.add('drag');
+      const move=ev=>{ const dx=ev.clientX-x0, dy=ev.clientY-y0;
+        if(dir==='br'||dir==='r') g.w=Math.max(MINW, w0+dx);
+        if(dir==='br'||dir==='b') g.h=Math.max(MINH, h0+dy);
+        if(dir==='l'){ const w=Math.max(MINW, w0-dx); g.x=l0+w0-w; g.w=w; }
+        applyGeo(id); };
+      const up=()=>{ rz.removeEventListener('pointermove',move); rz.removeEventListener('pointerup',up);
+        stage.classList.remove('dragging'); el.classList.remove('drag');
+        const right=g.x+g.w;
+        g.w=Math.max(MINW,Math.round(g.w/GRID)*GRID); g.h=Math.max(MINH,Math.round(g.h/GRID)*GRID);
+        if(dir==='l') g.x=right-g.w; else g.x=Math.round(g.x/GRID)*GRID;
+        applyGeo(id); saveLayout(); };
+      rz.addEventListener('pointermove',move); rz.addEventListener('pointerup',up);
+    });
+  });
+  return el;
+}
+
+/* ════════════════════ 위젯 1: Balance (표시 전용 — 서버가 유일한 주인) ════════════════════
+   v1은 공개 페이지라 세션 없음 → 앱과 같은 미로드 표기 '···' (앱:2602 — 0으로 거짓 표시 금지) */
+makeWidget('balance','Account','Sports','var(--lgd-link1)',
+  '<div class="bal tnum"><div class="top"><div><div class="nm">Alpexa Sports</div>'+
+  '<div class="amt" id="balAmt">···</div></div>'+
+  '<button class="dep" onclick="location.href=\'sports-live.html\'">Deposit</button></div>'+
+  '<div class="sub"><span>Pending <b id="balPend">···</b></span><span>Credit <b id="balCred">···</b></span></div>'+
+  '<div class="note">잔고는 로그인 후 서버에서만 표시됩니다 — 다음 단계에서 세션 연동 (표시 전용, CLAUDE.md #5)</div></div>');
+
+/* ════════════════════ 위젯 2: Leagues (앱 .sports 탭의 세로화) ════════════════════ */
+const LEAGUES=[['MLB','Baseball'],['SOC','Soccer'],['NFL','Football'],['NBA','Basketball'],['NHL','Hockey'],['UFC','MMA'],['NCAAB','College BB']];
+let selLg='MLB';
+makeWidget('leagues','Leagues','','var(--lgd-link4)','<div class="lgs" id="lgs"></div>');
+function renderLeagues(games){
+  const el=document.getElementById('lgs'); if(!el) return;
+  el.innerHTML=LEAGUES.map(([lg,nm])=>{
+    const list=games.filter(g=>g.lg===lg);
+    const live=list.filter(g=>g.live).length;
+    return '<div class="lgrow'+(lg===selLg?' sel':'')+'" data-lg="'+lg+'">'+
+      '<span class="chip">'+lg.slice(0,3)+'</span><span class="nm">'+nm+'</span>'+
+      (live?'<span class="lv"><i></i>LIVE '+live+'</span>':'')+
+      '<span class="cnt tnum">'+(list.length||'—')+'</span></div>';
+  }).join('');
+}
+document.getElementById('lgs').addEventListener('click', e=>{
+  const r=e.target.closest('.lgrow'); if(!r) return;
+  selLg=r.dataset.lg; renderLeagues(gamesStore.games); renderBoard(gamesStore.games); renderSchedule(gamesStore.games);
+});
+
+/* ════════════════════ 위젯 3: Schedule ════════════════════ */
+makeWidget('schedule','Schedule','','var(--lgd-link4)',
+  '<div class="sch"><table class="tnum"><thead><tr><th>Game</th><th>Time</th><th>ML Away</th><th>ML Home</th></tr></thead><tbody id="schBody"></tbody></table></div>');
+function renderSchedule(games){
+  const el=document.getElementById('schBody'); if(!el) return;
+  const list=games.filter(g=>g.lg===selLg).slice().sort((a,b)=>String(a.iso||'').localeCompare(String(b.iso||''))).slice(0,40);
+  if(!list.length){ el.innerHTML='<tr><td colspan="4" style="color:var(--lgd-dim);font-weight:400">No games</td></tr>'; return; }
+  el.innerHTML=list.map(g=>{
+    // 서버 배열 규약: index 0=홈, 1=원정 (sports-games/index.ts:76-79)
+    const mlA=(g.ml&&g.ml[1])?fmtAm(+g.ml[1].am):null, mlH=(g.ml&&g.ml[0])?fmtAm(+g.ml[0].am):null;
+    const locked=!oddsReal(g);
+    const st=g.live?'<span class="st live">● '+esc(g.time)+'</span>':'<span class="st">'+esc(g.time)+'</span>';
+    return '<tr><td>'+esc(g.away.ab)+'<span class="at">@</span>'+esc(g.home.ab)+'</td><td>'+st+'</td>'+
+      '<td>'+(locked||mlA==null?'🔒':mlA)+'</td><td>'+(locked||mlH==null?'🔒':mlH)+'</td></tr>';
+  }).join('');
+}
+
+/* ════════════════════ 위젯 4: Odds board — 앱 gameRowsHTML 계약 그대로 ════════════════════ */
+makeWidget('board','Odds board','','var(--lgd-link4)',
+  '<div class="ob tnum"><div class="obfil" id="obFil"></div>'+
+  '<div class="obhead"><span>Today</span><span>Spread</span><span>Total</span><span>Moneyline</span></div>'+
+  '<div class="obscroll" id="obList"></div></div>');
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function renderBoard(games){
+  const el=document.getElementById('obList'); if(!el) return;
+  document.getElementById('obFil').innerHTML=LEAGUES.map(([lg])=>
+    '<button class="'+(lg===selLg?'on':'')+'" data-lg="'+lg+'">'+lg+'</button>').join('');
+  const list=games.filter(g=>g.lg===selLg).slice().sort((a,b)=>String(a.iso||'').localeCompare(String(b.iso||''))).slice(0,60);
+  if(!list.length){ el.innerHTML='<div class="wempty">No games for '+esc(selLg)+'</div>'; return; }
+  el.innerHTML=list.map(g=>{
+    try{
+      // 잠금 셀: 앱:1641 리터럴 그대로 — 노라인은 data-am 미부여가 돈 관문
+      const cell=(arr,key,i)=>{
+        if(!oddsReal(g)) return '<div class="bet sus" title="Odds unavailable — no market"><span class="ln">&nbsp;</span><span class="pr">🔒</span></div>';
+        const b=arr&&arr[i]; if(!b) return '<div></div>';
+        return '<div class="bet" data-game="'+esc(g.gid)+'" data-market="'+key+'" data-sel="'+esc(b.sel)+'" data-am="'+(+b.am)+'">'+
+          '<span class="ln">'+esc(b.ln||'')+'</span><span class="pr '+(b.am>0?'pos':'')+'">'+fmtAm(+b.am)+'</span></div>'; };
+      // 행 규약 (앱:1664): 원정팀 윗줄=index 1, 홈팀 아랫줄=index 0
+      const row=(t,i)=>'<div class="obg-row" style="display:contents">'+
+        '<div class="obg">'+(i===1?('<div class="st'+(g.live?' live':'')+'">'+(g.live?'● ':'')+esc(g.time)+'</div>'):'<div class="st">&nbsp;</div>')+
+        '<div class="tm">'+esc(t.ab)+'<small>'+esc(t.nm)+'</small>'+(t.sc!==undefined?'<span class="sc">'+esc(t.sc)+'</span>':'')+'</div></div>'+
+        cell(g.spread,'Spread',i)+cell(g.total,'Total',i)+cell(g.ml,'Moneyline',i)+'</div>';
+      // 축구 = 1X2 (앱 c3/soc1x2 계약: tw[0] Home / tw[1] Draw / tw[2] Away)
+      if(g.lg==='SOC'){
+        const tw=g.threeWay||[];
+        const c3=(b,lbl)=>{
+          if(!oddsReal(g)) return '<div class="bet sus" title="Odds unavailable — no market"><span class="ln">'+lbl+'</span><span class="pr">🔒</span></div>';
+          if(!b) return '<div class="bet dis"><span class="ln">'+lbl+'</span><span class="pr">—</span></div>';
+          return '<div class="bet" data-game="'+esc(g.gid)+'" data-market="1X2" data-sel="'+esc(b.sel)+'" data-am="'+(+b.am)+'">'+
+            '<span class="ln">'+lbl+'</span><span class="pr '+(b.am>0?'pos':'')+'">'+fmtAm(+b.am)+'</span></div>'; };
+        return '<div class="obrow"><div class="soc-hdr"><span>'+esc(g.home.ab)+'</span>'+
+          '<span class="soc-nm">'+esc(g.home.nm)+' <b>v</b> '+esc(g.away.nm)+'</span>'+
+          ((g.home.sc!==undefined&&g.away.sc!==undefined)?'<span class="soc-sc'+(g.live?' live':'')+'">'+esc(g.home.sc)+'–'+esc(g.away.sc)+'</span>':'')+
+          '<span>'+esc(g.away.ab)+'</span></div>'+
+          '<div class="soc1x2">'+c3(tw[0],'Home')+c3(tw[1],'Draw')+c3(tw[2],'Away')+'</div></div>';
+      }
+      return '<div class="obrow">'+row(g.away,1)+row(g.home,0)+'</div>';
+    }catch(e){ console.error('card render failed', g&&g.gid, e); return ''; }   // 항목별 격리 (앱:1686)
+  }).join('');
+}
+document.getElementById('obFil').addEventListener('click', e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  selLg=b.dataset.lg; renderLeagues(gamesStore.games); renderBoard(gamesStore.games); renderSchedule(gamesStore.games);
+});
+// v1: 셀 선택 = 시각 토글만 (Bet Slip 단계에서 leg 추가로 승격 — uid 규약 gid+'|'+sel)
+document.getElementById('obList').addEventListener('click', e=>{
+  const b=e.target.closest('.bet'); if(!b||b.classList.contains('sus')||b.classList.contains('dis')) return;
+  b.classList.toggle('sel');
+});
+
+/* ════════════════════ 부팅 ════════════════════ */
+gamesStore.sub(games=>{ renderLeagues(games); renderBoard(games); renderSchedule(games); });
+gamesStore.start();
+</script>
+</body>
+</html>

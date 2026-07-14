@@ -62,8 +62,8 @@ if (/liveOK|suspendUntil/.test(src)) {
   pin(/suspendUntil/, 'liveOK 조건 2: 점수 변동 서스펜드 (앱:1716)');
   pin(/__alpexaOddsStale|ODDS_STALE_MS/, 'liveOK 조건 3: 배당 신선도 (앱:1717)');
 }
-// Bet Slip이 있으면
-if (/place_bet|Est\. Payout/i.test(src)) {
+// Bet Slip이 있으면 (감지 = 실제 구현 흔적: RPC 호출 또는 슬립 UI 라벨 — 주석 언급만으로는 미발동)
+if (/rpc\(\s*['"]place_bet['"]|Est\. Payout|Place bet/i.test(src)) {
   pin(/rpc\(\s*['"]place_bet['"]/, '베팅은 place_bet RPC 단일 경로 (앱:2018)');
   pin(/p_local_id/, 'place_bet 멱등 파라미터 p_local_id (앱:2018)');
   pin(/SGP_HAIRCUT\s*=\s*0\.25|SGP_HAIRCUT=0\.25/, 'SGP 헤어컷 0.25 — 앱·SQL·정산 3곳 락스텝 (앱:1572)');
