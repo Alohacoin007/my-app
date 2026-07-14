@@ -131,9 +131,11 @@ export default function Dashboard() {
         <h1 className="text-sm font-bold tracking-wide">
           BetBoard <span className="font-normal text-ink-muted">— Sports Betting Dashboard</span>
         </h1>
-        <p className="hidden text-xs text-ink-muted sm:block">
-          Drag a widget header to move it; drag the bottom-right corner to resize
-        </p>
+        {!isMobile && (
+          <p className="hidden text-xs text-ink-muted sm:block">
+            Drag a widget header to move it; drag the bottom-right corner to resize
+          </p>
+        )}
         <div className="ml-auto flex items-center gap-2">
           {!isMobile && (
             <button
