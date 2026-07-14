@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>ALPEXA WebTrade — Carbon Skin Preview</title>
+<style>body{background:#0d0d0d;color:#898781;font:12px system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}</style>
+</head>
+<body>
+<div id="boot">carbon preview loading…</div>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+  CARBON SKIN PREVIEW (2026-07-14) — 디자인 시안 전용, 원본 무변경.
+  webtrade.html(진짜 터미널)을 fetch해서:
+    1) 카본 디자인 토큰 CSS를 </head> 직전에 덧입히고
+    2) 차트 캔버스 색(JS CHART_THEME/CANDLE_THEME 문자열)을 카본 팔레트로 치환한 뒤
+  document.write로 렌더한다. webtrade.html 파일 자체는 1바이트도 바뀌지 않으며,
+  기본 주소(webtrade.html)는 계속 순정 MT5 스킨으로 서빙된다.
+  ⚠ 문자열 치환은 프리뷰 전용 기법 — 정식 채택 시엔 ?skin=carbon 테마 레이어로 구현.
+═══════════════════════════════════════════════════════════════════════════ */
+const CARBON_CSS = `
+<style id="carbon-skin">
+/* ── carbon tokens (sports-dashboard 시안과 동일) ── */
+:root{ --bg:#0d0d0d !important; --panel:#1a1a19 !important; --panel2:#222220 !important;
+  --line:rgba(255,255,255,.1) !important; --cellbd:rgba(255,255,255,.12) !important;
+  --text:#ffffff !important; --dim:#898781 !important;
+  --up:#0ca30c !important; --down:#d03b3b !important; --accent:#3987e5 !important; --r:10px !important; }
+html,body,.terminal{background:#0d0d0d !important}
+.left,.watch,.nav,.tbx,.mwt,.postbl{background:#1a1a19 !important}
+.mwt th{background:#1a1a19 !important; border-color:rgba(255,255,255,.1) !important; color:#898781 !important}
+.mwt td{border-color:rgba(255,255,255,.05) !important}
+.win{background:#1a1a19 !important; border:1px solid rgba(255,255,255,.1) !important; border-radius:10px !important;
+  box-shadow:none !important; overflow:hidden}
+.win.active{border-color:rgba(255,255,255,.28) !important; box-shadow:0 12px 34px rgba(0,0,0,.5) !important}
+.cell-title{background:#1a1a19 !important; border-bottom:1px solid rgba(255,255,255,.1) !important;
+  color:#c3c2b7 !important; font-size:12px !important}
+.menubar,.tools{background:#0d0d0d !important; border-color:rgba(255,255,255,.1) !important}
+.tbtn,.tibtn{background:#1a1a19 !important; border:1px solid rgba(255,255,255,.1) !important; border-radius:8px !important;
+  box-shadow:none !important; color:#c3c2b7 !important; background-image:none !important}
+.tibtn.on,.tf b.on{background:rgba(57,135,229,.14) !important; border:1px solid #3987e5 !important; color:#3987e5 !important; border-radius:8px}
+.tf b{color:#898781}
+.obox,.obox.tick-up,.obox.tick-down{background:#222220 !important; background-image:none !important;
+  border:1px solid rgba(255,255,255,.1) !important; border-radius:10px !important; box-shadow:none !important}
+.obox .sell{color:#d03b3b !important} .obox .buy{color:#0ca30c !important}
+.obox .oc-spr{background:#1a1a19 !important; border:1px solid rgba(255,255,255,.1) !important; border-radius:6px !important}
+.statusbar,.tbxtabs,.histbar{background:#1a1a19 !important; border-color:rgba(255,255,255,.1) !important}
+/* preview badge */
+#carbon-badge{position:fixed; right:14px; bottom:12px; z-index:9999; font:600 10px system-ui; letter-spacing:.6px;
+  color:#3987e5; background:rgba(57,135,229,.12); border:1px solid #3987e5; border-radius:99px; padding:4px 10px; pointer-events:none}
+</style>
+<div id="carbon-badge">CARBON SKIN PREVIEW — 시안</div>
+`;
+// 차트 캔버스(JS 테마) 카본화 — 원본 문자열이 그대로 있을 때만 치환 (없으면 건너뜀 = 안전)
+const JS_SWAPS = [
+  ["dark:  { bg:'#000000', text:'#ffffff', grid:'#2a2a2a', border:'#555555', cross:'#888888' }",
+   "dark:  { bg:'#1a1a19', text:'#c3c2b7', grid:'#2c2c2a', border:'rgba(255,255,255,0.18)', cross:'#898781' }"],
+  ["dark:  { upBody:'rgba(0,0,0,0)', downBody:'#ff2b2b', upLine:'#00ff00', downLine:'#ff2b2b' }",
+   "dark:  { upBody:'rgba(0,0,0,0)', downBody:'#d03b3b', upLine:'#0ca30c', downLine:'#d03b3b' }"],
+];
+fetch('webtrade.html', {cache:'no-store'}).then(r=>{
+  if(!r.ok) throw new Error('webtrade.html '+r.status);
+  return r.text();
+}).then(src=>{
+  let out=src;
+  JS_SWAPS.forEach(([a,b])=>{ out = out.split(a).join(b); });
+  out = out.replace('</head>', CARBON_CSS + '</head>');
+  document.open(); document.write(out); document.close();
+}).catch(e=>{
+  document.getElementById('boot').textContent='프리뷰 로드 실패: '+e.message+' — webtrade.html과 같은 폴더에서 열어야 합니다';
+});
+</script>
+</body>
+</html>
