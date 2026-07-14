@@ -46,6 +46,9 @@ export default function Dashboard() {
   // 세로 24행이 컨테이너 높이에 딱 맞도록 행 높이를 역산
   const rowHeight = (height - PADDING * 2 - MARGIN * (GRID - 1)) / GRID;
 
+  // 좁은 화면(모바일)에서는 그리드 대신 세로 스택 레이아웃으로 전환
+  const isMobile = width > 0 && width < 700;
+
   const onLayoutChange = useCallback((next: Layout) => {
     setLayout([...next]);
     try {
@@ -132,13 +135,15 @@ export default function Dashboard() {
           Drag a widget header to move it; drag the bottom-right corner to resize
         </p>
         <div className="ml-auto flex items-center gap-2">
-          <button
-            type="button"
-            onClick={resetLayout}
-            className="rounded-md border border-hairline px-2.5 py-1 text-xs text-ink-2 transition-colors hover:border-ink-muted hover:text-ink"
-          >
-            Reset layout
-          </button>
+          {!isMobile && (
+            <button
+              type="button"
+              onClick={resetLayout}
+              className="rounded-md border border-hairline px-2.5 py-1 text-xs text-ink-2 transition-colors hover:border-ink-muted hover:text-ink"
+            >
+              Reset layout
+            </button>
+          )}
           <button
             type="button"
             onClick={toggleTheme}
@@ -203,7 +208,41 @@ export default function Dashboard() {
 
       {/* 24행이 화면 높이에 맞춰지지만, 배치 중 잠시 밀려난 위젯은 스크롤로 접근 가능 */}
       <div ref={gridRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-        {width > 0 && height > 0 && (
+        {isMobile && (
+          <div className="flex flex-col gap-2 p-2">
+            <div className="h-[300px]">
+              <Widget draggable={false} title="Odds Trend — Man City vs Arsenal (Last 24h)">
+                <OddsTrendChart />
+              </Widget>
+            </div>
+            <div className="h-[370px]">
+              <Widget draggable={false} title="Live Odds Board">
+                <LiveOddsBoard selections={selections} onToggle={toggleSelection} />
+              </Widget>
+            </div>
+            <div className="h-[330px]">
+              <Widget
+                draggable={false}
+                title="Bet Slip"
+                badge={
+                  selections.length > 0 ? (
+                    <span className="rounded-full bg-series-1 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white">
+                      {selections.length}
+                    </span>
+                  ) : undefined
+                }
+              >
+                <BetSlip selections={selections} onRemove={removeSelection} />
+              </Widget>
+            </div>
+            <div className="h-[430px]">
+              <Widget draggable={false} title="Schedule · Scores">
+                <GameSchedule />
+              </Widget>
+            </div>
+          </div>
+        )}
+        {!isMobile && width > 0 && height > 0 && (
           <GridLayout
             className="layout"
             layout={layout}
