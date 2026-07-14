@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=1280"/>
 <title>ALPEXA Sports — Dashboard</title>
 <link rel="stylesheet" href="legend-ui.css"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="alpexa-sync.js?v=16"></script>
 <!-- ══════════════════════════════════════════════════════════════════════════
   ALPEXA 스포츠 대시보드 v1 (2026-07-14) — 데스크톱 전용, 레전드 디자인 언어.
   · 디자인 = 레전드-디자인-스펙.md §1~5 (토큰은 legend-ui.css --lgd-*)
@@ -120,6 +122,55 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .sch .st{font-size:var(--lgd-fs-label); color:var(--lgd-dim)}
 .sch .st.live{color:var(--lgd-up); font-weight:700}
 
+/* ══ My bets (앱 ticketHTML 문법 × 레전드 스킨) ══ */
+.mb{display:flex; flex-direction:column; flex:1; min-height:0}
+.mbseg{display:flex; gap:6px; padding:10px 12px 8px; flex:none}
+.mbseg button{border:none; background:transparent; color:var(--lgd-dim); font-size:var(--lgd-fs-body); font-weight:600;
+  height:28px; padding:0 12px; border-radius:var(--lgd-r-btn); cursor:pointer}
+.mbseg button.on{background:var(--lgd-pill); color:var(--lgd-ink)}
+.mbscroll{flex:1; min-height:0; overflow:auto; padding:0 12px 12px; display:flex; flex-direction:column; gap:10px}
+.tkc{background:var(--lgd-surface2); border:1px solid var(--lgd-hair); border-radius:var(--lgd-r-widget); padding:10px 12px}
+.tkc .th{display:flex; align-items:center; gap:8px}
+.tkc .badge{font-size:var(--lgd-fs-caption); font-weight:700; padding:3px 8px; border-radius:5px; background:var(--lgd-pill)}
+.tkc .res{margin-left:auto; font-size:var(--lgd-fs-caption); font-weight:700}
+.tkc .res.open{color:var(--lgd-up)}
+.tkc .tid{font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:10px; color:var(--lgd-dim); margin:4px 0 8px}
+.tleg{display:flex; align-items:flex-start; gap:9px; padding:7px 0; border-top:1px solid var(--lgd-hair)}
+.tleg .dot{width:6px; height:6px; border-radius:99px; background:var(--lgd-dim); margin-top:5px; flex:none}
+.tleg.live .dot{background:var(--lgd-up)}
+.tleg .pk{font-size:var(--lgd-fs-body); font-weight:700}
+.tleg .gm{font-size:var(--lgd-fs-label); color:var(--lgd-dim); margin-top:2px}
+.tleg .gm .sc{color:var(--lgd-ink); font-weight:600}
+.tleg .odd{margin-left:auto; font-size:var(--lgd-fs-body); font-weight:600; white-space:nowrap}
+.tkc .ft{display:flex; align-items:center; gap:12px; padding-top:9px; border-top:1px solid var(--lgd-hair);
+  font-size:var(--lgd-fs-label); color:var(--lgd-dim); flex-wrap:wrap}
+.tkc .ft b{color:var(--lgd-ink); font-weight:600}
+.tkc .co{margin-left:auto; display:flex; gap:6px}
+.tkc .co button{border:none; border-radius:var(--lgd-r-btn); height:28px; padding:0 12px; font-size:var(--lgd-fs-label);
+  font-weight:700; cursor:pointer; background:rgba(0,200,5,.12); color:var(--lgd-up)}
+.tkc .co button:hover{background:rgba(0,200,5,.2)}
+.tkc .co .half{background:var(--lgd-pill); color:var(--lgd-ink)}
+.loginp{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:var(--lgd-dim); font-size:var(--lgd-fs-label)}
+.loginp button{background:var(--lgd-pill); border:none; color:var(--lgd-ink); border-radius:var(--lgd-r-btn); height:32px; padding:0 16px; font-weight:700; cursor:pointer}
+
+/* ══ Wallet (앱 wallet 문법 요약판) ══ */
+.wal{padding:12px 14px; display:flex; flex-direction:column; gap:10px; flex:1; min-height:0}
+.wal .row3{display:flex; gap:8px}
+.wal .stat{flex:1; background:var(--lgd-surface2); border:1px solid var(--lgd-hair); border-radius:var(--lgd-r-widget); padding:9px 11px}
+.wal .stat .l{font-size:var(--lgd-fs-caption); color:var(--lgd-dim); letter-spacing:.02em}
+.wal .stat .v{font-size:var(--lgd-fs-body-lg); font-weight:600; margin-top:3px}
+.wal .acts{display:flex; gap:8px}
+.wal .acts a{flex:1; text-align:center; background:var(--lgd-pill); color:var(--lgd-ink); text-decoration:none;
+  border-radius:var(--lgd-r-btn); height:32px; line-height:32px; font-size:var(--lgd-fs-body); font-weight:700}
+.wal .acts a:hover{background:var(--lgd-pill-hi)}
+.wal .rah{font-size:var(--lgd-fs-label); color:var(--lgd-dim); font-weight:600; margin-top:2px}
+.wal .ralist{flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column}
+.wal .ra{display:flex; align-items:center; gap:9px; padding:7px 2px; border-top:1px solid var(--lgd-hair); font-size:var(--lgd-fs-label)}
+.wal .ra .t2{color:var(--lgd-dim)}
+.wal .ra .amt{margin-left:auto; font-weight:600}
+.wal .ra .amt.neg{color:var(--lgd-down)}
+.wal .ra .amt.pos{color:var(--lgd-up)}
+
 /* ══ Odds board — 구조는 앱 gameRowsHTML 계약 그대로 ══ */
 .ob{display:flex; flex-direction:column; flex:1; min-height:0}
 .obfil{display:flex; gap:4px; padding:8px 10px 6px; flex:none}
@@ -217,10 +268,12 @@ const gamesStore = {
 /* ════════════════════ 레이아웃 엔진 (스펙 §2/§5) ════════════════════ */
 const GRID=38, LKEY='alpexa.sbdash.layout.v1';
 const stage=document.getElementById('stage');
-const DEFAULT_LAYOUT={ balance:{x:1102,y:494,w:380,h:266}, leagues:{x:24,y:24,w:228,h:440},
-  schedule:{x:24,y:494,w:532,h:342}, board:{x:280,y:24,w:800,h:440} };
+const DEFAULT_LAYOUT={ balance:{x:1102,y:24,w:380,h:228}, leagues:{x:24,y:24,w:228,h:440},
+  schedule:{x:24,y:494,w:532,h:342}, board:{x:280,y:24,w:800,h:440},
+  mybets:{x:580,y:494,w:500,h:342}, wallet:{x:1102,y:266,w:380,h:570} };
 // 콘텐츠가 뭉개지지 않는 위젯별 최소 크기 (보드=게임열+마켓 3열, 일정=4컬럼 표)
-const MIN_SIZE={ balance:{w:300,h:200}, leagues:{w:200,h:220}, schedule:{w:420,h:220}, board:{w:520,h:260} };
+const MIN_SIZE={ balance:{w:300,h:180}, leagues:{w:200,h:220}, schedule:{w:420,h:220}, board:{w:520,h:260},
+  mybets:{w:380,h:240}, wallet:{w:320,h:280} };
 function loadLayout(){ try{ const raw=localStorage.getItem(LKEY); if(!raw) return {...DEFAULT_LAYOUT};
   const p=JSON.parse(raw); return Object.keys(DEFAULT_LAYOUT).every(k=>p[k])?p:{...DEFAULT_LAYOUT};
 }catch(e){ return {...DEFAULT_LAYOUT}; } }
@@ -234,7 +287,7 @@ document.getElementById('btnReset').onclick=()=>{ try{ localStorage.removeItem(L
 function applyGeo(id){ const el=document.getElementById('w-'+id); if(!el) return; const g=layout[id];
   el.style.display=g.hidden?'none':'flex';
   el.style.left=g.x+'px'; el.style.top=g.y+'px'; el.style.width=g.w+'px'; el.style.height=g.h+'px'; }
-const WIDGET_TITLES={balance:'Account', leagues:'Leagues', schedule:'Schedule', board:'Odds board'};
+const WIDGET_TITLES={balance:'Account', leagues:'Leagues', schedule:'Schedule', board:'Odds board', mybets:'My bets', wallet:'Wallet'};
 function setHidden(id, hidden){ layout[id].hidden=hidden; applyGeo(id); saveLayout(); renderAddMenu(); }
 function renderAddMenu(){ const m=document.getElementById('addMenu'); if(!m) return;
   m.innerHTML=Object.keys(WIDGET_TITLES).map(id=>{
@@ -297,7 +350,7 @@ makeWidget('balance','Account','Sports','var(--lgd-link1)',
   '<div class="amt" id="balAmt">···</div></div>'+
   '<button class="dep" onclick="location.href=\'sports-live.html\'">Deposit</button></div>'+
   '<div class="sub"><span>Pending <b id="balPend">···</b></span><span>Credit <b id="balCred">···</b></span></div>'+
-  '<div class="note">잔고는 로그인 후 서버에서만 표시됩니다 — 다음 단계에서 세션 연동 (표시 전용, CLAUDE.md #5)</div></div>');
+  '<div class="note">잔고는 서버에서만 옵니다 (표시 전용, CLAUDE.md #5) — 로그인은 이 탭에서 login.html 경유</div></div>');
 
 /* ════════════════════ 위젯 2: Leagues (앱 .sports 탭의 세로화) ════════════════════ */
 const LEAGUES=[['MLB','Baseball'],['SOC','Soccer'],['NFL','Football'],['NBA','Basketball'],['NHL','Hockey'],['UFC','MMA'],['NCAAB','College BB']];
@@ -389,6 +442,132 @@ document.getElementById('obList').addEventListener('click', e=>{
   b.classList.toggle('sel');
 });
 
+/* ════════════════════ 세션 + 돈 데이터 (전부 서버 전용 — CLAUDE.md #5) ════════════════════
+   앱과 동일 스택(alpexa-sync 단일 클라이언트, sessionStorage 세션). 잔고·베팅은 읽기 +
+   cash_out RPC만 — 클라는 ledger/positions에 어떤 쓰기도 하지 않는다 (fidelity 금지 핀). */
+const usd=n=>'$'+(Math.round(n*100)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const meId=()=>{ try{ const m=AlpexaSync.me(); return m&&m.custId?m:null; }catch(e){ return null; } };
+const moneyStore={
+  bal:null, openBets:[], subs:new Set(), authed:false,
+  sub(f){ this.subs.add(f); return ()=>this.subs.delete(f); },
+  emit(){ this.subs.forEach(f=>{ try{ f(this); }catch(e){} }); },
+  async pull(){
+    const m=meId(); this.authed=!!m;
+    if(!m){ this.bal=null; this.openBets=[]; this.emit(); return; }
+    try{ const out=await AlpexaSync.pullBalances(); if(out&&out.sports!=null) this.bal=+out.sports; }catch(e){}
+    try{ // 앱 pullServerBets 계약 그대로 (sports-live.html:2316) — meta.legs로 티켓 복원
+      const r=await AlpexaSync.db.from('positions')
+        .select('local_id,symbol,stake,potential,game,pick,odds,size,status,meta')
+        .eq('cust_id',m.custId).eq('server','sports').eq('kind','bet').eq('status','open');
+      if(r&&!r.error&&Array.isArray(r.data)){
+        this.openBets=r.data.map(x=>{ const mt=x.meta&&typeof x.meta==='object'?x.meta:null;
+          if(mt&&mt.legs&&mt.legs.length) return {id:String(x.local_id), type:mt.type||x.symbol||'Bet',
+            ticket:mt.ticket||'', placedTs:+mt.placedTs||0, stake:+mt.stake||+x.stake||0,
+            potential:+mt.potential||+x.potential||0, cashout:+mt.cashout||0, legs:mt.legs};
+          return {id:String(x.local_id), type:x.symbol||'Bet', ticket:'', placedTs:0,
+            stake:+x.stake||0, potential:+x.potential||0, cashout:0, legs:[{sel:x.pick||'Selection', am:+x.odds||0}], viewOnly:true};
+        });
+      }
+    }catch(e){}
+    this.emit();
+  },
+  start(){ if(this.timer) return; this.pull(); this.timer=setInterval(()=>this.pull(),10000); }   // 앱 잔고 폴 주기
+};
+const ICONS={NBA:'🏀',NCAAB:'🎓',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽',UFC:'🥊'};
+const fmtStamp=ts=>{ if(!ts) return ''; const d=new Date(ts);
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+', '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); };
+
+/* ── Account 카드: 실잔고 (미로그인 '···' 유지 — 0으로 거짓 표시 금지) ── */
+moneyStore.sub(ms=>{
+  const amt=document.getElementById('balAmt'), pend=document.getElementById('balPend'), cred=document.getElementById('balCred');
+  if(!amt) return;
+  if(!ms.authed){ amt.textContent='···'; pend.textContent='···'; cred.textContent='···'; return; }
+  amt.textContent=ms.bal==null?'···':usd(ms.bal);
+  pend.textContent=usd(ms.openBets.reduce((a,b)=>a+(+b.stake||0),0));   // Pending = 오픈 스테이크 합 (앱:2537)
+  cred.textContent=usd(0);   // real mode credit=0 (앱:2467 — 캐시백 클레임 보안상 비활성)
+});
+
+/* ── My bets 위젯 (앱 ticketHTML 문법) ── */
+makeWidget('mybets','My bets','','var(--lgd-link1)',
+  '<div class="mb tnum"><div class="mbseg"><button class="on">Open</button><button disabled title="Settled는 다음 단계">Settled</button></div>'+
+  '<div class="mbscroll" id="mbList"></div></div>');
+function legState(l){ // Open 위계: Live > Awaiting result > Upcoming (앱:2110)
+  const g=gamesStore.games.find(x=>x.gid===l.gid);
+  if(g&&g.live) return 'live';
+  const kt=l.kt||(g&&g.iso);
+  if(kt&&Date.parse(kt)<Date.now()&&!g) return 'await';
+  if(kt&&Date.parse(kt)<Date.now()) return 'await';
+  return 'up';
+}
+function renderBets(){
+  const el=document.getElementById('mbList'); if(!el) return;
+  const ms=moneyStore;
+  if(!ms.authed){ el.innerHTML='<div class="loginp">로그인하면 오픈 베팅이 여기 표시됩니다'+
+    '<button onclick="location.href=\'login.html\'">Log in</button></div>'; return; }
+  if(!ms.openBets.length){ el.innerHTML='<div class="loginp">No open bets — Place a bet to see it here</div>'; return; }
+  el.innerHTML=ms.openBets.map(b=>{
+    try{
+      const states=b.legs.map(legState);
+      const st=states.includes('live')?'Live':states.includes('await')?'Awaiting result':'Upcoming';
+      const legsH=b.legs.map((l,i)=>{
+        const g=gamesStore.games.find(x=>x.gid===l.gid);
+        const icon=ICONS[(g&&g.lg)||l.lg||String(l.gid||'').split('_')[0]]||'';
+        const gm=(g&&g.live)?('<span class="sc">'+esc(g.away.ab)+' '+(g.away.sc!=null?g.away.sc:'–')+' — '+(g.home.sc!=null?g.home.sc:'–')+' '+esc(g.home.ab)+'</span> · '+esc(g.time))
+          :esc(l.gm||l.game||'')+(l.tm?' · '+(states[i]==='live'?'🔴 ':'🕒 ')+esc(l.tm):'');
+        return '<div class="tleg'+(states[i]==='live'?' live':'')+'"><span class="dot"></span>'+
+          '<div><div class="pk">'+esc(l.pk||l.sel||'Selection')+'</div><div class="gm">'+icon+' '+gm+'</div></div>'+
+          '<span class="odd">'+fmtAm(+(l.am0!=null?l.am0:l.am)||0)+'</span></div>'; }).join('');
+      const single=b.legs.length===1;
+      const badge=single?'Single':esc(String(b.type||'Parlay').split(' · ')[0])+' '+b.legs.length+' legs';
+      // 상태칩 어휘는 앱과 동일: Open/Won/Cashed Out/Push/Lost — Open 위젯은 Open+위계 표시
+      const co=(b.cashout>0&&!b.viewOnly)
+        ? '<span class="co"><button data-cash="'+esc(b.id)+'">Cash out '+usd(b.cashout)+'</button>'+
+          '<button class="half" data-cashhalf="'+esc(b.id)+'">½</button></span>' : '';
+      return '<div class="tkc"><div class="th"><span class="badge">'+badge+'</span>'+
+        '<span class="res open">Open · '+st+'</span></div>'+
+        '<div class="tid">'+esc(b.ticket||b.id)+(b.placedTs?' · '+fmtStamp(b.placedTs):'')+'</div>'+legsH+
+        '<div class="ft"><span>Stake <b>'+usd(b.stake)+'</b></span><span>Est. <b>'+usd(b.potential)+'</b></span>'+co+'</div></div>';
+    }catch(e){ console.error('card render failed', b&&b.id, e); return ''; }
+  }).join('');
+}
+moneyStore.sub(renderBets);
+gamesStore.sub(renderBets);
+// 캐시아웃: cash_out RPC 단일 경로 (서버 92% 캡 권위 — 로컬 credit 절대 금지, 앱:2179-2210)
+document.getElementById('mbList').addEventListener('click', async e=>{
+  const half=e.target.closest('[data-cashhalf]'), full=e.target.closest('[data-cash]');
+  const id=half?half.dataset.cashhalf:(full?full.dataset.cash:null); if(!id) return;
+  const frac=half?0.5:1;
+  try{
+    const res=await AlpexaSync.db.rpc('cash_out',{p_local_id:String(id), p_fraction:frac});
+    const dt=res&&res.data;
+    if((res&&res.error)||!dt||dt.ok===false){ console.error('cash out failed', res&&res.error, dt&&dt.error); }
+  }catch(err){ console.error('cash out failed', err); }
+  moneyStore.pull();   // 결과는 서버 재조회로만 반영
+});
+
+/* ── Wallet 위젯 (앱 wallet 요약판 — 돈 이동 시트는 앱으로 딥링크) ── */
+makeWidget('wallet','Wallet','','var(--lgd-link1)',
+  '<div class="wal tnum"><div class="row3">'+
+  '<div class="stat"><div class="l">BALANCE · USD</div><div class="v" id="wBal">···</div></div>'+
+  '<div class="stat"><div class="l">PENDING</div><div class="v" id="wPend">···</div></div>'+
+  '<div class="stat"><div class="l">CREDIT</div><div class="v" id="wCred">···</div></div></div>'+
+  '<div class="acts"><a href="sports-live.html">Deposit</a><a href="sports-live.html">Withdraw</a><a href="sports-live.html">Transfer</a></div>'+
+  '<div class="rah">RECENT ACTIVITY</div><div class="ralist" id="wActs"></div></div>');
+moneyStore.sub(ms=>{
+  const b=document.getElementById('wBal'), p=document.getElementById('wPend'), c=document.getElementById('wCred'), a=document.getElementById('wActs');
+  if(!b) return;
+  if(!ms.authed){ b.textContent='···'; p.textContent='···'; c.textContent='···';
+    a.innerHTML='<div class="loginp">로그인하면 활동 내역이 표시됩니다<button onclick="location.href=\'login.html\'">Log in</button></div>'; return; }
+  b.textContent=ms.bal==null?'···':usd(ms.bal);
+  p.textContent=usd(ms.openBets.reduce((x,y)=>x+(+y.stake||0),0));
+  c.textContent=usd(0);
+  // 베팅 행은 서버 동기 베팅에서 파생 (앱 renderTxns 규칙) — 입출금 행은 다음 단계(serverFinTxns 포트)
+  a.innerHTML=ms.openBets.slice().sort((x,y)=>(+y.placedTs||0)-(+x.placedTs||0)).map(bt=>
+    '<div class="ra"><span>🎫</span><span>Bet placed<div class="t2">'+esc(bt.type||'Bet')+'</div></span>'+
+    '<span class="amt neg">−'+usd(bt.stake)+'</span></div>').join('')
+    ||'<div class="loginp">No activity yet</div>';
+});
+
 /* ── Add widget 메뉴: 닫은 위젯 다시 추가 / ✓ = 이미 표시 중(클릭 시 해당 위젯 앞으로) ── */
 const addMenu=document.getElementById('addMenu');
 document.getElementById('btnAdd').onclick=(e)=>{ e.stopPropagation();
@@ -410,6 +589,7 @@ document.querySelectorAll('.widget .wic[title="메뉴"]').forEach(ic=>{
 /* ════════════════════ 부팅 ════════════════════ */
 gamesStore.sub(games=>{ renderLeagues(games); renderBoard(games); renderSchedule(games); });
 gamesStore.start();
+moneyStore.start();
 </script>
 </body>
 </html>
