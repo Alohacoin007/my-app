@@ -576,10 +576,13 @@ document.getElementById('obFil').addEventListener('click', e=>{
   const b=e.target.closest('button'); if(!b) return;
   selLg=b.dataset.lg; renderLeagues(gamesStore.games); renderBoard(gamesStore.games); renderSchedule(gamesStore.games);
 });
-// 셀 클릭 → Quick Bet 팝업 (레전드 주문 티켓 문법) · 팔레이는 팝업의 Add to Bet slip 경로
+// 셀 클릭 → 벳슬립 적재 (앱 toggle :1911 — 기본 경로. 슬립 위젯이 닫혀 있을 때만 Quick Bet 팝업 대체)
 document.getElementById('obList').addEventListener('click', e=>{
   const b=e.target.closest('.bet'); if(!b||b.classList.contains('sus')||b.classList.contains('dis')) return;
-  openQuickBet(b.dataset.game, b.dataset.market, b.dataset.sel, b);
+  if(layout.slip&&layout.slip.hidden){ openQuickBet(b.dataset.game, b.dataset.market, b.dataset.sel, b); return; }
+  slip.toggle(b.dataset.game, b.dataset.market, b.dataset.sel, +b.dataset.am);
+  const w=document.getElementById('w-slip');   // 시선 유도: 슬립 위젯 그린 플래시
+  if(w){ w.style.borderColor='var(--lgd-up)'; setTimeout(()=>{ w.style.borderColor=''; },600); }
 });
 
 /* ════════════════════ 세션 + 돈 데이터 (전부 서버 전용 — CLAUDE.md #5) ════════════════════
