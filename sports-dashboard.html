@@ -171,6 +171,32 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .wal .ra .amt.neg{color:var(--lgd-down)}
 .wal .ra .amt.pos{color:var(--lgd-up)}
 
+/* ══ Search 팝오버 (레전드 §8 실물: 입력+✕, 카테고리 필(액티브=화이트), Recent, 심볼 행) ══ */
+.spop{position:absolute; left:8px; top:42px; z-index:40; width:320px; max-height:420px; display:none;
+  flex-direction:column; background:var(--lgd-surface2); border:1px solid rgba(255,255,255,.14);
+  border-radius:var(--lgd-r-pop); box-shadow:0 12px 34px rgba(0,0,0,.6); overflow:hidden}
+.spop.open{display:flex}
+.spop .sin{display:flex; align-items:center; gap:8px; margin:10px; padding:0 10px; height:36px;
+  border:1.5px solid rgba(255,255,255,.35); border-radius:8px}
+.spop .sin:focus-within{border-color:#fff}
+.spop .sin input{flex:1; background:transparent; border:none; outline:none; color:var(--lgd-ink); font-size:var(--lgd-fs-body-lg)}
+.spop .sin .clr{color:var(--lgd-dim); cursor:pointer; font-size:15px}
+.spop .cats{display:flex; gap:6px; padding:0 10px 10px; flex-wrap:wrap}
+.spop .cat{border:none; background:var(--lgd-pill); color:var(--lgd-ink); border-radius:999px; height:28px;
+  padding:0 13px; font-size:var(--lgd-fs-label); font-weight:700; cursor:pointer}
+.spop .cat.on{background:#fff; color:#0B0D0E}
+.spop .sect{padding:6px 14px 4px; font-size:var(--lgd-fs-label); font-weight:700}
+.spop .list{flex:1; min-height:0; overflow:auto; padding-bottom:6px}
+.spop .srow{display:flex; align-items:center; gap:10px; padding:8px 14px; cursor:pointer; font-size:var(--lgd-fs-body)}
+.spop .srow:hover{background:var(--lgd-pill)}
+.spop .srow .ab{font-weight:700; min-width:76px}
+.spop .srow .ic{width:16px; text-align:center}
+.spop .srow .nm{color:var(--lgd-dim); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.spop .srow .st{font-size:var(--lgd-fs-caption); color:var(--lgd-dim)}
+.spop .srow .st.live{color:var(--lgd-up); font-weight:700}
+.spop .none{padding:14px; color:var(--lgd-dim); font-size:var(--lgd-fs-label); text-align:center}
+.obrow.flash{background:rgba(0,200,5,.08)}
+
 /* ══ Bet slip (앱 슬립 문법 × 레전드 오더엔트리 자리) ══ */
 .slip{display:flex; flex-direction:column; flex:1; min-height:0}
 .slip .modes{display:flex; gap:6px; padding:10px 12px 8px; flex:none}
@@ -454,6 +480,9 @@ function renderSchedule(games){
 
 /* ════════════════════ 위젯 4: Odds board — 앱 gameRowsHTML 계약 그대로 ════════════════════ */
 makeWidget('board','Odds board','','var(--lgd-link4)',
+  '<div class="spop" id="sPop"><div class="sin"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>'+
+  '<input id="sIn" placeholder="Search teams or games"/><span class="clr" id="sClr">✕</span></div>'+
+  '<div class="cats" id="sCats"></div><div class="sect" id="sSect">Recent</div><div class="list" id="sList"></div></div>'+
   '<div class="ob tnum"><div class="obfil" id="obFil"></div>'+
   '<div class="obhead"><span>Today</span><span>Spread</span><span>Total</span><span>Moneyline</span></div>'+
   '<div class="obscroll" id="obList"></div></div>');
@@ -489,13 +518,13 @@ function renderBoard(games){
           const on=slip.legs.some(l=>l.uid===g.gid+'|'+b.sel);
           return '<div class="bet'+(on?' sel':'')+'" data-game="'+esc(g.gid)+'" data-market="1X2" data-sel="'+esc(b.sel)+'" data-am="'+(+b.am)+'">'+
             '<span class="ln">'+lbl+'</span><span class="pr '+(b.am>0?'pos':'')+'">'+fmtAm(+b.am)+'</span></div>'; };
-        return '<div class="obrow"><div class="soc-hdr"><span>'+esc(g.home.ab)+'</span>'+
+        return '<div class="obrow" data-gid="'+esc(g.gid)+'"><div class="soc-hdr"><span>'+esc(g.home.ab)+'</span>'+
           '<span class="soc-nm">'+esc(g.home.nm)+' <b>v</b> '+esc(g.away.nm)+'</span>'+
           ((g.home.sc!==undefined&&g.away.sc!==undefined)?'<span class="soc-sc'+(g.live?' live':'')+'">'+esc(g.home.sc)+'–'+esc(g.away.sc)+'</span>':'')+
           '<span>'+esc(g.away.ab)+'</span></div>'+
           '<div class="soc1x2">'+c3(tw[0],'Home')+c3(tw[1],'Draw')+c3(tw[2],'Away')+'</div></div>';
       }
-      return '<div class="obrow">'+row(g.away,1)+row(g.home,0)+'</div>';
+      return '<div class="obrow" data-gid="'+esc(g.gid)+'">'+row(g.away,1)+row(g.home,0)+'</div>';
     }catch(e){ console.error('card render failed', g&&g.gid, e); return ''; }   // 항목별 격리 (앱:1686)
   }).join('');
 }
@@ -760,6 +789,63 @@ document.getElementById('slipPlace').addEventListener('click', async ()=>{
   moneyStore.pull(); renderSlipSummary();
 });
 renderSlip();
+
+/* ── Search (레전드 §8 팝오버 + / 핫키) — 스포츠 번역: 팀/경기 검색, 리그 필, Recent ── */
+const SCATS=['All','MLB','SOC','NFL','NBA','NHL','UFC','NCAAB'];
+let sCat='All';
+const sPop=document.getElementById('sPop');
+function recentGames(){ try{ return JSON.parse(localStorage.getItem('alpexa.sbdash.recent')||'[]'); }catch(e){ return []; } }
+function pushRecent(gid){ try{ const r=recentGames().filter(x=>x!==gid); r.unshift(gid);
+  localStorage.setItem('alpexa.sbdash.recent', JSON.stringify(r.slice(0,6))); }catch(e){} }   // UI 설정 — 돈 아님 (로컬 OK)
+function openSearch(){ sPop.classList.add('open'); renderSearch(); setTimeout(()=>document.getElementById('sIn').focus(),0); }
+function closeSearch(){ sPop.classList.remove('open'); document.getElementById('sIn').value=''; }
+function renderSearch(){
+  document.getElementById('sCats').innerHTML=SCATS.map(c=>
+    '<button class="cat'+(c===sCat?' on':'')+'" data-cat="'+c+'">'+c+'</button>').join('');
+  const q=(document.getElementById('sIn').value||'').trim().toLowerCase();
+  let pool=gamesStore.games;
+  if(sCat!=='All') pool=pool.filter(g=>g.lg===sCat);
+  let list, sect;
+  if(q){ sect='Results';
+    list=pool.filter(g=>[g.away.ab,g.away.nm,g.home.ab,g.home.nm].some(t=>String(t||'').toLowerCase().includes(q))).slice(0,12);
+  }else{ sect='Recent';
+    const rec=recentGames(); list=rec.map(gid=>pool.find(g=>g.gid===gid)).filter(Boolean);
+    if(!list.length){ sect='Today'; list=pool.slice().sort((a,b)=>String(a.iso||'').localeCompare(String(b.iso||''))).slice(0,8); }
+  }
+  document.getElementById('sSect').textContent=sect;
+  document.getElementById('sList').innerHTML=list.length?list.map(g=>
+    '<div class="srow" data-gid="'+esc(g.gid)+'" data-lg="'+esc(g.lg)+'">'+
+    '<span class="ab">'+esc(g.away.ab)+' @ '+esc(g.home.ab)+'</span>'+
+    '<span class="ic">'+(ICONS[g.lg]||'')+'</span>'+
+    '<span class="nm">'+esc(g.away.nm)+' @ '+esc(g.home.nm)+'</span>'+
+    '<span class="st'+(g.live?' live':'')+'">'+(g.live?'● ':'')+esc(g.time)+'</span></div>').join('')
+    :'<div class="none">No matches</div>';
+}
+document.getElementById('sIn').addEventListener('input', renderSearch);
+document.getElementById('sClr').addEventListener('click', ()=>{ document.getElementById('sIn').value=''; renderSearch(); });
+document.getElementById('sCats').addEventListener('click', e=>{ const c=e.target.closest('.cat'); if(!c) return;
+  sCat=c.dataset.cat; renderSearch(); });
+document.getElementById('sList').addEventListener('click', e=>{ const r=e.target.closest('.srow'); if(!r) return;
+  const gid=r.dataset.gid, lg=r.dataset.lg; pushRecent(gid);
+  if(lg&&lg!==selLg){ selLg=lg; renderLeagues(gamesStore.games); renderBoard(gamesStore.games); renderSchedule(gamesStore.games); }
+  closeSearch();
+  const row=document.querySelector('.obrow[data-gid="'+gid+'"]');
+  if(row){ row.scrollIntoView({block:'center'}); row.classList.add('flash'); setTimeout(()=>row.classList.remove('flash'),1400); }
+});
+// 열기: 보드 타이틀바 🔍(레전드 §8: 검색은 타이틀바에 산다 — 동적 삽입) + `/` 핫키 · 닫기: Esc/바깥
+(function(){ const tb=document.querySelector('#w-board .wtb');
+  const ic=document.createElement('span'); ic.className='wic'; ic.title='검색';
+  ic.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>';
+  tb.insertBefore(ic, tb.querySelector('.wic'));
+  ic.addEventListener('click', e=>{ e.stopPropagation();
+    sPop.classList.contains('open')?closeSearch():openSearch(); });
+})();
+sPop.addEventListener('click', e=>e.stopPropagation());
+document.addEventListener('click', ()=>closeSearch());
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape') closeSearch();
+  else if(e.key==='/'&&!/INPUT|TEXTAREA/.test((document.activeElement||{}).tagName||'')){ e.preventDefault(); openSearch(); }
+});
 
 /* ── Add widget 메뉴: 닫은 위젯 다시 추가 / ✓ = 이미 표시 중(클릭 시 해당 위젯 앞으로) ── */
 const addMenu=document.getElementById('addMenu');
