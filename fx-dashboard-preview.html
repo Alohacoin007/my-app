@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>ALPEXA FX — Dashboard Preview</title>
+<!-- ══════════════════════════════════════════════════════════════════════════
+  STANDALONE PREVIEW (2026-07-14) — the sports-betting-dashboard skin applied to FX.
+  · Reference: branch claude/sports-betting-dashboard-dmtsy0 (Dashboard.tsx grid math,
+    Widget.tsx frame, OddsTrendChart.tsx SVG chart, globals.css @theme tokens).
+  · This file touches NOTHING else — webtrade.html / trading.html / fx.html stay as-is.
+  · 24×24 grid fills the viewport exactly: rowHeight=(H−PAD*2−MARGIN*23)/24 (same formula).
+    Header = drag handle · bottom-right corner = resize · layout in localStorage · Reset.
+  · Charts are hand-rendered SVG (no chart lib): 2px line, 8px end marker with a 2px
+    surface ring, hairline gridlines, crosshair + tooltip, tabular-nums ticks.
+  · Data: real Supabase prices/candles when reachable; deterministic synth fallback so
+    the page renders anywhere (same real-first / synth-fallback rule as webtrade).
+═══════════════════════════════════════════════════════════════════════════════ -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+/* ── design tokens (verbatim from the reference @theme block, dark-only) ── */
+:root{
+  --color-page:#0d0d0d; --color-surface:#1a1a19; --color-surface-2:#222220;
+  --color-ink:#ffffff; --color-ink-2:#c3c2b7; --color-ink-muted:#898781;
+  --color-grid-line:#2c2c2a; --color-baseline:#383835; --color-hairline:rgba(255,255,255,.1);
+  --color-series-1:#3987e5; --color-series-2:#199e70; --color-up:#0ca30c; --color-down:#d03b3b;
+}
+*{box-sizing:border-box; margin:0}
+html,body{height:100%; color-scheme:dark; background:var(--color-page); color:var(--color-ink);
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif; overscroll-behavior:none; overflow:hidden}
+#root{height:100%; display:flex; flex-direction:column}
+.tnum{font-variant-numeric:tabular-nums}
+/* ── top bar ── */
+.topbar{display:flex; align-items:center; gap:10px; padding:10px 14px 2px}
+.topbar .logo{font-weight:800; font-size:15px; letter-spacing:.4px}
+.topbar .logo span{color:var(--color-series-1)}
+.topbar .badge{font-size:10px; color:var(--color-ink-muted); border:1px solid var(--color-hairline);
+  border-radius:99px; padding:2px 8px; letter-spacing:.5px}
+.topbar .sp{flex:1}
+.tbbtn{background:var(--color-surface); color:var(--color-ink-2); border:1px solid var(--color-hairline);
+  border-radius:8px; font-size:11px; padding:5px 11px; cursor:pointer}
+.tbbtn:hover{color:var(--color-ink); border-color:rgba(255,255,255,.22)}
+/* ── grid stage ── */
+.stage{position:relative; flex:1; min-height:0}
+/* ── widget frame (Widget.tsx) ── */
+.wframe{position:absolute; display:flex; flex-direction:column; overflow:hidden; border-radius:10px;
+  border:1px solid var(--color-hairline); background:var(--color-surface);
+  transition:border-color .15s, box-shadow .15s}
+.wframe.dragging{transition:none; z-index:30; border-color:rgba(255,255,255,.25); box-shadow:0 12px 34px rgba(0,0,0,.55)}
+.wframe:hover{border-color:rgba(255,255,255,.16)}
+.whead{display:flex; flex-shrink:0; align-items:center; gap:8px; padding:8px 12px;
+  border-bottom:1px solid var(--color-hairline); cursor:grab; user-select:none}
+.wframe.dragging .whead{cursor:grabbing}
+.whead h2{font-size:12px; font-weight:600; letter-spacing:.4px; color:var(--color-ink-2)}
+.whead .grip{color:var(--color-ink-muted); opacity:.6; flex-shrink:0}
+.whead .hbadge{margin-left:auto; font-size:10px; color:var(--color-ink-muted)}
+.wbody{min-height:0; flex:1; overflow:auto}
+/* resize chevron (react-grid-layout chrome, restyled) */
+.rz{position:absolute; right:0; bottom:0; width:18px; height:18px; cursor:nwse-resize; z-index:5}
+.rz::after{content:""; position:absolute; right:5px; bottom:5px; width:7px; height:7px;
+  border-right:2px solid var(--color-ink-muted); border-bottom:2px solid var(--color-ink-muted);
+  border-bottom-right-radius:2px; opacity:0; transition:opacity .12s}
+.wframe:hover .rz::after{opacity:1}
+/* drop placeholder */
+.placeholder{position:absolute; background:var(--color-series-1); opacity:.12; border-radius:10px; z-index:1; transition:all .1s}
+/* ── market watch board ── */
+.mwx{width:100%; border-collapse:collapse; font-size:12px}
+.mwx th{position:sticky; top:0; background:var(--color-surface); text-align:right; font-size:10px; font-weight:600;
+  color:var(--color-ink-muted); letter-spacing:.5px; padding:7px 10px; border-bottom:1px solid var(--color-hairline)}
+.mwx th:first-child{text-align:left}
+.mwx td{padding:6px 10px; text-align:right; border-bottom:1px solid rgba(255,255,255,.045); color:var(--color-ink-2)}
+.mwx td:first-child{text-align:left; color:var(--color-ink); font-weight:600}
+.mwx tr:hover td{background:var(--color-surface-2)}
+.up{color:var(--color-up)!important} .dn{color:var(--color-down)!important}
+/* ── sessions ── */
+.sess{padding:10px 12px; display:flex; flex-direction:column; gap:10px}
+.sessrow{display:flex; align-items:center; gap:10px; font-size:12px}
+.sessrow .nm{width:86px; color:var(--color-ink)}
+.sessrow .st{width:52px; font-size:10px; letter-spacing:.5px}
+.sessbar{flex:1; height:6px; border-radius:3px; background:var(--color-grid-line); overflow:hidden}
+.sessbar i{display:block; height:100%; border-radius:3px; background:var(--color-series-1)}
+.sessrow .rng{width:96px; text-align:right; color:var(--color-ink-muted); font-size:10px}
+/* ── ticket ── */
+.tkt{padding:12px; display:flex; flex-direction:column; gap:10px; font-size:12px}
+.tkt label{font-size:10px; letter-spacing:.5px; color:var(--color-ink-muted); display:block; margin-bottom:4px}
+.tkt select,.tkt input{width:100%; background:var(--color-surface-2); color:var(--color-ink);
+  border:1px solid var(--color-hairline); border-radius:8px; padding:7px 9px; font-size:12px}
+.sideseg{display:flex; gap:6px}
+.sideseg button{flex:1; padding:8px 0; border-radius:8px; border:1px solid var(--color-hairline);
+  background:var(--color-surface-2); color:var(--color-ink-2); font-weight:700; font-size:12px; cursor:pointer}
+.sideseg .buy.on{background:rgba(12,163,12,.16); border-color:var(--color-up); color:var(--color-up)}
+.sideseg .sell.on{background:rgba(208,59,59,.16); border-color:var(--color-down); color:var(--color-down)}
+.tktrow{display:flex; gap:8px}
+.tktrow>div{flex:1}
+.tktsend{margin-top:2px; padding:10px 0; border:none; border-radius:8px; background:var(--color-series-1);
+  color:#fff; font-weight:700; font-size:12px; opacity:.45; cursor:not-allowed}
+.tktnote{font-size:10px; color:var(--color-ink-muted); text-align:center}
+.tktpx{display:flex; justify-content:space-between; background:var(--color-surface-2);
+  border:1px solid var(--color-hairline); border-radius:8px; padding:8px 10px}
+.tktpx b{font-size:13px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const {useState,useEffect,useRef,useCallback,useMemo} = React;
+
+/* ══ data — real Supabase first, deterministic synth fallback ══ */
+const SB='https://grxnbgtfnaayeluenvqh.supabase.co';
+const SBK='sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu';
+const WATCH=['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCHF','USDCAD','NZDUSD','XAUUSD','BTCUSD','ETHUSD'];
+const BASE={EURUSD:1.1426,GBPUSD:1.3420,USDJPY:162.31,AUDUSD:0.6938,USDCHF:0.8071,USDCAD:1.4167,NZDUSD:0.5758,XAUUSD:3305,BTCUSD:64200,ETHUSD:3418};
+const CRYPTO=s=>s==='BTCUSD'||s==='ETHUSD';
+const pip=s=>/JPY$/.test(s)?0.01:s==='XAUUSD'?0.01:0.0001;
+const dg=s=>CRYPTO(s)?2:(s==='XAUUSD'?2:(/JPY$/.test(s)?3:5));
+// display half-spread — same hybrid rule the platform charges (FX pips feed · 10bps crypto floor)
+const half=(s,mid,spr)=>CRYPTO(s)?mid*Math.max(10,spr||0)/1e4/2:(Math.max(0.1,spr||1)*pip(s)/2);
+function synthSeed(sym){ let x=0; for(const c of sym) x=(x*31+c.charCodeAt(0))>>>0; return ()=>((x=(x*1664525+1013904223)>>>0)/2**32); }
+function synthCandles(sym,n){ const r=synthSeed(sym); let p=BASE[sym]||1; const out=[]; const t0=Date.now()-n*900000;
+  for(let i=0;i<n;i++){ const o=p, drift=(r()-.5)*.004*p; p=Math.max(p*0.2,p+drift);
+    out.push({t:t0+i*900000, c:p, o, h:Math.max(o,p)*(1+r()*.0008), l:Math.min(o,p)*(1-r()*.0008)}); }
+  return out; }
+
+const pricesStore={ mids:{}, subs:new Set(), live:false,
+  sub(f){ this.subs.add(f); return ()=>this.subs.delete(f); },
+  emit(){ this.subs.forEach(f=>{try{f(this.mids);}catch(e){}}); },
+  start(){ if(this.timer) return; const tick=async()=>{ try{
+      const r=await fetch(SB+'/rest/v1/prices?select=symbol,mid,spr_pts',{headers:{apikey:SBK,Authorization:'Bearer '+SBK}});
+      const rows=await r.json();
+      if(Array.isArray(rows)&&rows.length){ this.live=true;
+        rows.forEach(p=>{ if(!WATCH.includes(p.symbol)) return; const prev=this.mids[p.symbol];
+          this.mids[p.symbol]={mid:+p.mid, spr:+p.spr_pts||0, dir:prev?Math.sign(p.mid-prev.mid)||prev.dir:0}; });
+        this.emit(); return; }
+      throw 0;
+    }catch(e){ // synth walk (offline / sandbox)
+      WATCH.forEach(s=>{ const prev=this.mids[s]; const m=prev?prev.mid:(BASE[s]||1);
+        const nm=m*(1+(Math.random()-.5)*.0004);
+        this.mids[s]={mid:nm, spr:CRYPTO(s)?0:1.1, dir:Math.sign(nm-m)}; });
+      this.emit();
+    }};
+    tick(); this.timer=setInterval(tick,2000); } };
+
+/* ══ 24×24 grid — the reference Dashboard.tsx math, hand-rolled drag/resize ══ */
+const GRID=24, MARGIN=8, PAD=8, LKEY='alpexa-fxdash-layout-v1';
+const DEFAULT_LAYOUT=[
+  {i:'chart',    x:0,  y:0,  w:14, h:13, minW:8, minH:7},
+  {i:'board',    x:14, y:0,  w:10, h:13, minW:6, minH:6},
+  {i:'sessions', x:0,  y:13, w:14, h:11, minW:6, minH:5},
+  {i:'ticket',   x:14, y:13, w:10, h:11, minW:6, minH:6},
+];
+function loadLayout(){ try{ const raw=localStorage.getItem(LKEY); if(!raw) return DEFAULT_LAYOUT;
+  const p=JSON.parse(raw); const keys=new Set(p.map(l=>l.i));
+  return DEFAULT_LAYOUT.every(d=>keys.has(d.i))?p:DEFAULT_LAYOUT; }catch(e){ return DEFAULT_LAYOUT; } }
+const collide=(a,b)=>a.i!==b.i && a.x<b.x+b.w && b.x<a.x+a.w && a.y<b.y+b.h && b.y<a.y+a.h;
+
+function useSize(ref){ const [s,setS]=useState({w:0,h:0});
+  useEffect(()=>{ const el=ref.current; if(!el) return;
+    const ro=new ResizeObserver(()=>setS({w:el.clientWidth,h:el.clientHeight}));
+    ro.observe(el); setS({w:el.clientWidth,h:el.clientHeight}); return ()=>ro.disconnect(); },[]);
+  return s; }
+
+function Grip(){ return (
+  <svg className="grip" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+    {[0,4,8].map(y=>[0,4,8].map(x=><rect key={x+'-'+y} x={x} y={y} width="2" height="2" fill="currentColor"/>))}
+  </svg> ); }
+
+function Dashboard(){
+  const stageRef=useRef(null); const {w:W,h:H}=useSize(stageRef);
+  const [layout,setLayout]=useState(loadLayout);
+  const [ghost,setGhost]=useState(null);      // {i,x,y,w,h} snapped placeholder while dragging
+  const [dragPx,setDragPx]=useState(null);    // {i,left,top} free-following pixels
+  const colW=(W-PAD*2-MARGIN*(GRID-1))/GRID;
+  const rowH=(H-PAD*2-MARGIN*(GRID-1))/GRID;  // ← 세로 24행이 뷰포트를 정확히 채우는 역산
+  const px=it=>({ left:PAD+it.x*(colW+MARGIN), top:PAD+it.y*(rowH+MARGIN),
+    width:it.w*colW+(it.w-1)*MARGIN, height:it.h*rowH+(it.h-1)*MARGIN });
+  const save=(next)=>{ setLayout(next); try{ localStorage.setItem(LKEY,JSON.stringify(next)); }catch(e){} };
+  const reset=()=>{ try{ localStorage.removeItem(LKEY); }catch(e){} setLayout(DEFAULT_LAYOUT.map(l=>({...l}))); };
+
+  const startDrag=(e,it)=>{ if(e.button!==0) return; e.preventDefault();
+    const p0=px(it), offX=e.clientX-p0.left, offY=e.clientY-p0.top;
+    const move=ev=>{ const left=ev.clientX-offX, top=ev.clientY-offY;
+      setDragPx({i:it.i,left,top});
+      const gx=Math.max(0,Math.min(GRID-it.w,Math.round((left-PAD)/(colW+MARGIN))));
+      const gy=Math.max(0,Math.min(GRID-it.h,Math.round((top-PAD)/(rowH+MARGIN))));
+      setGhost({i:it.i,x:gx,y:gy,w:it.w,h:it.h}); };
+    const up=()=>{ window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up);
+      setDragPx(null); setGhost(g=>{ if(g){ const cand={...it,x:g.x,y:g.y};
+        if(!layout.some(o=>collide(cand,o))) save(layout.map(l=>l.i===it.i?cand:l)); } return null; }); };
+    window.addEventListener('mousemove',move); window.addEventListener('mouseup',up); };
+
+  const startResize=(e,it)=>{ if(e.button!==0) return; e.preventDefault(); e.stopPropagation();
+    const x0=e.clientX,y0=e.clientY,w0=it.w,h0=it.h;
+    const move=ev=>{ const w=Math.max(it.minW||3,Math.min(GRID-it.x,w0+Math.round((ev.clientX-x0)/(colW+MARGIN))));
+      const h=Math.max(it.minH||3,Math.min(GRID-it.y,h0+Math.round((ev.clientY-y0)/(rowH+MARGIN))));
+      setGhost({i:it.i,x:it.x,y:it.y,w,h}); };
+    const up=()=>{ window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up);
+      setGhost(g=>{ if(g){ const cand={...it,w:g.w,h:g.h};
+        if(!layout.some(o=>collide(cand,o))) save(layout.map(l=>l.i===it.i?cand:l)); } return null; }); };
+    window.addEventListener('mousemove',move); window.addEventListener('mouseup',up); };
+
+  useEffect(()=>{ pricesStore.start(); },[]);
+  const [fs,setFs]=useState(false);
+  const toggleFs=()=>{ try{ if(document.fullscreenElement){ document.exitFullscreen(); setFs(false); }
+    else{ document.documentElement.requestFullscreen(); setFs(true); } }catch(e){} };
+
+  const TITLES={chart:'EURUSD · M15 TREND', board:'MARKET WATCH', sessions:'TRADING SESSIONS', ticket:'QUICK TICKET'};
+  const BODIES={chart:TrendChart, board:Board, sessions:Sessions, ticket:Ticket};
+  const ready=W>0&&H>0;
+  return (
+    <React.Fragment>
+      <div className="topbar">
+        <div className="logo">ALPEXA <span>FX</span></div>
+        <div className="badge">DASHBOARD PREVIEW — 새 스킨 시안</div>
+        <div className="sp"></div>
+        <button className="tbbtn" onClick={reset}>Reset layout</button>
+        <button className="tbbtn" onClick={toggleFs}>{fs?'Exit fullscreen':'Fullscreen'}</button>
+      </div>
+      <div className="stage" ref={stageRef}>
+        {ready && ghost && <div className="placeholder" style={px(ghost)}></div>}
+        {ready && layout.map(it=>{ const Body=BODIES[it.i]; const p=px(it);
+          const style=(dragPx&&dragPx.i===it.i)?{...p,left:dragPx.left,top:dragPx.top}:p;
+          return (
+            <div key={it.i} className={'wframe'+((dragPx&&dragPx.i===it.i)||(ghost&&ghost.i===it.i)?' dragging':'')} style={style}>
+              <header className="whead" onMouseDown={e=>startDrag(e,it)}>
+                <Grip/><h2>{TITLES[it.i]}</h2>
+                {it.i==='board' && <span className="hbadge tnum" id="feed-badge">{pricesStore.live?'LIVE':'SIM'}</span>}
+              </header>
+              <div className="wbody"><Body/></div>
+              <div className="rz" onMouseDown={e=>startResize(e,it)}></div>
+            </div> ); })}
+      </div>
+    </React.Fragment> );
+}
+
+/* ══ widget 1 — SVG trend chart (OddsTrendChart.tsx style: 2px line, 8px end marker
+      + 2px surface ring, hairline gridlines, crosshair + tooltip, tabular-nums) ══ */
+const CPAD={top:12,right:16,bottom:24,left:52};
+function TrendChart(){
+  const wrapRef=useRef(null); const {w:width,h:height}=useSize(wrapRef);
+  const [data,setData]=useState(null); const [hover,setHover]=useState(null);
+  useEffect(()=>{ let dead=false;
+    fetch(SB+'/functions/v1/fx-prices?candles=EURUSD&tf=M15&n=200').then(r=>r.json()).then(j=>{
+      if(!dead && j&&j.ok && (j.candles||[]).length>=60) setData(j.candles.slice(-96));
+      else if(!dead) setData(synthCandles('EURUSD',96));
+    }).catch(()=>{ if(!dead) setData(synthCandles('EURUSD',96)); });
+    return ()=>{dead=true;}; },[]);
+  // the size-observed wrapper must render from the FIRST paint (an early "loading" return
+  // would mount useSize on a null ref → width stays 0 → the svg never appears)
+  const close=(data||[]).map(d=>d.c);
+  const ma=close.map((_,i)=>{ const a=close.slice(Math.max(0,i-19),i+1); return a.reduce((s,v)=>s+v,0)/a.length; });
+  const plotW=Math.max(0,width-CPAD.left-CPAD.right), plotH=Math.max(0,height-CPAD.top-CPAD.bottom);
+  const all=close.concat(ma); const step=pip('EURUSD')*25;   // clean 25-pip snap (reference: 0.25-odds snap)
+  const yMin=Math.floor(Math.min(...all)/step)*step, yMax=Math.ceil(Math.max(...all)/step)*step;
+  const ticks=[]; for(let v=yMin;v<=yMax+1e-9;v+=step) ticks.push(v);
+  const x=i=>CPAD.left+plotW*i/(close.length-1);
+  const y=v=>CPAD.top+plotH*(1-(v-yMin)/((yMax-yMin)||1));
+  const path=arr=>arr.map((v,i)=>(i?'L':'M')+x(i).toFixed(1)+','+y(v).toFixed(1)).join('');
+  const onMove=e=>{ const rect=wrapRef.current.getBoundingClientRect();
+    const i=Math.round((e.clientX-rect.left-CPAD.left)/plotW*(close.length-1));
+    setHover(Math.min(close.length-1,Math.max(0,i))); };
+  const last=close[close.length-1], first=close[0], delta=(last-first)||0, up=delta>=0;
+  const SERIES=[{k:'price',label:'EURUSD',color:'var(--color-series-1)',cur:last},
+                {k:'ma',label:'MA20',color:'var(--color-series-2)',cur:ma[ma.length-1]}];
+  const hi=hover, flip=hi!=null && hi>close.length*0.6;
+  const fmtT=t=>{ const d=new Date(t); return String(d.getUTCHours()).padStart(2,'0')+':'+String(d.getUTCMinutes()).padStart(2,'0'); };
+  const ready=width>0&&height>0&&close.length>1;
+  return (
+    <div style={{display:'flex',flexDirection:'column',height:'100%'}}>
+      <div style={{display:'flex',flexWrap:'wrap',gap:'4px 16px',padding:'8px 12px 0',fontSize:12,flexShrink:0}}>
+        {SERIES.map(s=>(
+          <div key={s.k} style={{display:'flex',alignItems:'center',gap:6}}>
+            <span style={{width:8,height:8,borderRadius:99,background:s.color,display:'inline-block'}}></span>
+            <span style={{color:'var(--color-ink-2)'}}>{s.label}</span>
+            <b className="tnum">{s.cur!=null?s.cur.toFixed(5):'—'}</b>
+          </div>))}
+        <div style={{display:'flex',alignItems:'center',gap:4,marginLeft:'auto'}} className="tnum">
+          <span style={{color:up?'var(--color-up)':'var(--color-down)'}}>{close.length>1?(up?'▲ ':'▼ ')+Math.abs(delta/pip('EURUSD')).toFixed(1)+' pips':'loading…'}</span>
+        </div>
+      </div>
+      <div ref={wrapRef} style={{position:'relative',minHeight:0,flex:1}} onMouseMove={onMove} onMouseLeave={()=>setHover(null)}>
+        {ready && <svg width={width} height={height} role="img" aria-label="EURUSD M15 trend">
+          {ticks.map(t=>(
+            <g key={t}>
+              <line x1={CPAD.left} x2={width-CPAD.right} y1={y(t)} y2={y(t)} stroke="var(--color-grid-line)" strokeWidth="1"/>
+              <text x={CPAD.left-6} y={y(t)+3} textAnchor="end" fontSize="10" fill="var(--color-ink-muted)"
+                    style={{fontVariantNumeric:'tabular-nums'}}>{t.toFixed(4)}</text>
+            </g>))}
+          {data.map((d,i)=> i%16===0 ?
+            <text key={i} x={x(i)} y={height-8} textAnchor="middle" fontSize="10" fill="var(--color-ink-muted)"
+                  style={{fontVariantNumeric:'tabular-nums'}}>{fmtT(d.t)}</text> : null)}
+          <path d={path(ma)} fill="none" stroke="var(--color-series-2)" strokeWidth="2" strokeLinejoin="round"/>
+          <path d={path(close)} fill="none" stroke="var(--color-series-1)" strokeWidth="2" strokeLinejoin="round"/>
+          {/* 8px end markers with a 2px surface ring */}
+          <circle cx={x(close.length-1)} cy={y(ma[ma.length-1])} r="4" fill="var(--color-series-2)" stroke="var(--color-surface)" strokeWidth="2"/>
+          <circle cx={x(close.length-1)} cy={y(last)} r="4" fill="var(--color-series-1)" stroke="var(--color-surface)" strokeWidth="2"/>
+          {hi!=null && (
+            <g>
+              <line x1={x(hi)} x2={x(hi)} y1={CPAD.top} y2={height-CPAD.bottom} stroke="var(--color-baseline)" strokeWidth="1"/>
+              <circle cx={x(hi)} cy={y(close[hi])} r="4" fill="var(--color-series-1)" stroke="var(--color-surface)" strokeWidth="2"/>
+              <circle cx={x(hi)} cy={y(ma[hi])} r="4" fill="var(--color-series-2)" stroke="var(--color-surface)" strokeWidth="2"/>
+            </g>)}
+        </svg>}
+        {hi!=null && ready && (
+          <div style={{position:'absolute',top:CPAD.top+6,left:flip?undefined:x(hi)+10,right:flip?(width-x(hi)+10):undefined,
+            background:'var(--color-surface-2)',border:'1px solid var(--color-hairline)',borderRadius:8,
+            padding:'6px 9px',fontSize:11,pointerEvents:'none',whiteSpace:'nowrap'}} className="tnum">
+            <div style={{color:'var(--color-ink-muted)',marginBottom:2}}>{fmtT(data[hi].t)} UTC</div>
+            <div><span style={{color:'var(--color-series-1)'}}>●</span> EURUSD <b>{close[hi].toFixed(5)}</b></div>
+            <div><span style={{color:'var(--color-series-2)'}}>●</span> MA20 <b>{ma[hi].toFixed(5)}</b></div>
+          </div>)}
+      </div>
+    </div> );
+}
+
+/* ══ widget 2 — live market watch board ══ */
+function Board(){
+  const [,force]=useState(0);
+  useEffect(()=> pricesStore.sub(()=>force(v=>v+1)),[]);
+  return (
+    <table className="mwx">
+      <thead><tr><th>SYMBOL</th><th>BID</th><th>ASK</th><th>SPREAD</th></tr></thead>
+      <tbody>
+        {WATCH.map(s=>{ const m=pricesStore.mids[s];
+          if(!m) return <tr key={s}><td>{s}</td><td colSpan="3" style={{color:'var(--color-ink-muted)'}}>—</td></tr>;
+          const h=half(s,m.mid,m.spr), bid=m.mid-h, ask=m.mid+h, d=dg(s);
+          const gap=(ask-bid), sprTxt=CRYPTO(s)?gap.toFixed(Math.max(1,d-1)):(gap/pip(s)).toFixed(1);
+          const cls=m.dir>0?'up':m.dir<0?'dn':'';
+          return (
+            <tr key={s}>
+              <td>{s}</td>
+              <td className={'tnum '+cls}>{bid.toFixed(d)}</td>
+              <td className={'tnum '+cls}>{ask.toFixed(d)}</td>
+              <td className="tnum">{sprTxt}</td>
+            </tr> ); })}
+      </tbody>
+    </table> );
+}
+
+/* ══ widget 3 — trading sessions (schedule widget analog) ══ */
+const SESSIONS=[ ['Sydney',22,7], ['Tokyo',0,9], ['London',8,17], ['New York',13,22] ];   // UTC open→close
+function Sessions(){
+  const [,force]=useState(0);
+  useEffect(()=>{ const t=setInterval(()=>force(v=>v+1),30000); return ()=>clearInterval(t); },[]);
+  const now=new Date(); const hUTC=now.getUTCHours()+now.getUTCMinutes()/60;
+  return (
+    <div className="sess">
+      {SESSIONS.map(([nm,o,c])=>{ const len=(c-o+24)%24; const el=((hUTC-o+24)%24);
+        const open=el<len; const prog=open?el/len:0;
+        return (
+          <div className="sessrow" key={nm}>
+            <span className="nm">{nm}</span>
+            <span className="st" style={{color:open?'var(--color-up)':'var(--color-ink-muted)'}}>{open?'OPEN':'CLOSED'}</span>
+            <div className="sessbar"><i style={{width:(prog*100).toFixed(1)+'%', background:open?'var(--color-series-2)':'var(--color-grid-line)'}}></i></div>
+            <span className="rng tnum">{String(o).padStart(2,'0')}:00–{String(c).padStart(2,'0')}:00 UTC</span>
+          </div> ); })}
+      <div style={{fontSize:10,color:'var(--color-ink-muted)',marginTop:2}} className="tnum">
+        {now.toUTCString().slice(17,25)} UTC · 세션 진행률은 30초마다 갱신
+      </div>
+    </div> );
+}
+
+/* ══ widget 4 — quick ticket (betslip analog; PREVIEW ONLY, no order path) ══ */
+function Ticket(){
+  const [sym,setSym]=useState('EURUSD'); const [side,setSide]=useState('BUY'); const [vol,setVol]=useState('0.10');
+  const [,force]=useState(0);
+  useEffect(()=> pricesStore.sub(()=>force(v=>v+1)),[]);
+  const m=pricesStore.mids[sym]; const d=dg(sym);
+  const h=m?half(sym,m.mid,m.spr):0, bid=m?m.mid-h:null, ask=m?m.mid+h:null;
+  return (
+    <div className="tkt">
+      <div>
+        <label>SYMBOL</label>
+        <select value={sym} onChange={e=>setSym(e.target.value)}>{WATCH.map(s=><option key={s}>{s}</option>)}</select>
+      </div>
+      <div className="tktpx tnum">
+        <span style={{color:'var(--color-down)'}}>BID <b>{bid==null?'—':bid.toFixed(d)}</b></span>
+        <span style={{color:'var(--color-up)'}}>ASK <b>{ask==null?'—':ask.toFixed(d)}</b></span>
+      </div>
+      <div className="sideseg">
+        <button className={'sell'+(side==='SELL'?' on':'')} onClick={()=>setSide('SELL')}>SELL</button>
+        <button className={'buy'+(side==='BUY'?' on':'')} onClick={()=>setSide('BUY')}>BUY</button>
+      </div>
+      <div className="tktrow">
+        <div><label>VOLUME (LOTS)</label><input className="tnum" value={vol} onChange={e=>setVol(e.target.value)}/></div>
+        <div><label>S/L</label><input className="tnum" placeholder="—"/></div>
+        <div><label>T/P</label><input className="tnum" placeholder="—"/></div>
+      </div>
+      <button className="tktsend" disabled>Send {side} {vol} {sym}</button>
+      <div className="tktnote">디자인 시안 — 주문 경로는 연결되어 있지 않습니다 (실거래는 기존 WebTrade에서)</div>
+    </div> );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Dashboard/>);
+</script>
+</body>
+</html>
