@@ -14,7 +14,7 @@ const bad = (m) => { console.error('🔴 ' + m); fail++; };
 
 // 1) login gate exists, shows when logged out, and routes to the shared login (round-trip dest)
 if (!/function LoginGate\(\{ onClose \}\)\{/.test(wt)) bad('LoginGate component missing');
-if (!/location\.href='login\.html\?dest=webtrade\.html&skin=wt'/.test(wt)) bad('Log in must round-trip through the terminal-skinned login.html?dest=webtrade.html&skin=wt (same ONE proven auth path)');
+if (!/location\.href='login\.html\?skin=wt'/.test(wt)) bad('Log in must round-trip through the terminal-skinned login.html?skin=wt (device routing lands PC back on the terminal)');
 // login state must be decided by the REAL auth session, NOT AlpexaSync.me (a function → always truthy)
 if (/const loggedIn = !!\(window\.AlpexaSync && AlpexaSync\.me\)/.test(wt)) bad('must NOT gauge login by AlpexaSync.me (always-truthy guest function) — the gate never showed');
 if (!/AlpexaSync\.db\.auth\.getSession\(\)\.then\(r=>\{ if\(live && !\(r&&r\.data&&r\.data\.session\)\) setShowLogin\(true\)/.test(wt)) bad('login gate must show only when there is NO Supabase session');
@@ -39,8 +39,21 @@ if (!/positionsStore\.loadPos\(\); positionsStore\.loadAcct\(\); playSnd\(sndClo
 
 // 4) login.html sets the chime flag on EVERY successful login (password + biometric paths)
 if ((lg.match(/sessionStorage\.setItem\('alpexa\.loginChime','1'\)/g) || []).length < 2) bad('login.html must set the login-chime flag on both the password and biometric sign-in paths');
-// 5) login.html dest override is whitelisted (no open redirect) and returns to the terminal
-if ((lg.match(/==='webtrade\.html'/g) || []).length < 2) bad('login.html must whitelist dest=webtrade.html on both redirect paths (no open redirect)');
+// 5) DEVICE ROUTING (2026-07-14): both redirect paths land via fxDest — the URL can no longer
+//    choose the landing page (dest= is gone → the open-redirect surface is zero).
+if (!/window\.location\.href=fxDest\(selServer\)/.test(lg)) bad('the password path must land via fxDest');
+if (!/window\.location\.href=fxDest\(cred\.server\)/.test(lg)) bad('the biometric path must land via fxDest');
+if (/get\('dest'\)/.test(lg)) bad('the dest= override must be fully gone (no open-redirect surface)');
+{ const fd=(lg.match(/function fxDest\(server\)\{[\s\S]*?\n\}/)||[''])[0];
+  if(!fd) bad('fxDest missing');
+  else {
+    const mk=(ua)=> new Function('navigator', fd+'\nreturn fxDest;')({userAgent:ua});
+    const pc=mk('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'), mob=mk('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile');
+    if(pc(0)!=='webtrade.html') bad('FX on a PC must land on the WebTrade terminal');
+    if(mob(0)!=='trading.html') bad('FX on a phone must land on the mobile FX app');
+    if(pc(1)!=='crypto-live.html'||mob(1)!=='crypto-live.html') bad('Crypto landing must be device-independent');
+    if(pc(2)!=='sports-live.html'||mob(2)!=='sports-live.html') bad('Sports landing must be device-independent');
+  } }
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} login-gate problem(s).`); process.exit(1); }
 console.log('🟢 PASS: WebTrade login gate reuses login.html (round-trip dest, no auth duplication); login chime plays on return; dest whitelisted.');

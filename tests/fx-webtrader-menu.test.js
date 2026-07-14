@@ -18,7 +18,7 @@ let fail = 0;
 const bad = (m) => { console.error('🔴 ' + m); fail++; };
 
 // ── fx.html: launcher with popup + blocked-popup fallback ──
-if (!/class="wt-pill" href="login\.html\?dest=webtrade\.html&skin=wt"/.test(fx))
+if (!/class="wt-pill" href="login\.html\?skin=wt"/.test(fx))
   bad('fx header must carry the WebTrader launcher pointing at the skinned login');
 if (!/window\.open\(this\.href,'wtlogin'/.test(fx)) bad('the launcher must open a named popup');
 if (!/if\(w\)\{w\.focus\(\);return false;\}/.test(fx)) bad('popup blocked → the plain href navigation must take over (return true path)');
@@ -37,7 +37,7 @@ if (!/selectServer\(0\)/.test(lg) || !/srvSeg/.test(lg)) bad('the skin must fix 
 if (!/body\.wt-skin #wrap\{/.test(lg)) bad('the dark terminal card style must exist under body.wt-skin');
 
 // ── webtrade: the gate round-trips through the SAME skinned login ──
-if (!/login\.html\?dest=webtrade\.html&skin=wt/.test(wt)) bad('webtrade LoginGate must send users to the skinned terminal login');
+if (!/login\.html\?skin=wt/.test(wt)) bad('webtrade LoginGate must send users to the skinned terminal login');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} webtrader-login problem(s).`); process.exit(1); }
 console.log('🟢 PASS: WebTrader launcher on the FX site (popup + fallback) → the ONE login.html in terminal skin (sessionStorage lockstep intact); webtrade gate uses the same skinned URL.');

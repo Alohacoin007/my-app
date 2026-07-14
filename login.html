@@ -174,6 +174,17 @@ function openServerSheet(){document.getElementById('serverSheet').style.display=
 function closeSheet(){document.getElementById('serverSheet').style.display='none';}
 function filterServers(q){renderServers(q?SERVERS.filter(s=>s.name.toLowerCase().includes(q.toLowerCase())||s.url.includes(q)):SERVERS);}
 function selectServer(i){selServer=i;const sv=document.getElementById('serverVal');if(sv){sv.textContent=SERVERS[i].name;sv.style.color='#212121';}closeSheet();syncSrvUI();}
+// DEVICE ROUTING (2026-07-14): one login, the right client per device — the URL can no longer
+// choose the landing page (the old dest= override is gone, so the open-redirect surface is zero).
+// FX on a PC lands on the WebTrade terminal; FX on a phone lands on the mobile FX app (a 4-chart
+// terminal is unusable there — MT5 ships a separate mobile app for the same reason). Crypto and
+// Sports land unchanged. Detection = the SAME UA pattern webtrade itself uses (no new invention).
+function fxDest(server){
+  var mobile=/Android|iPhone|iPad|iPod|Mobile|IEMobile|Opera Mini/i.test(navigator.userAgent||'');
+  if(server===1) return 'crypto-live.html';
+  if(server===2) return 'sports-live.html';
+  return mobile?'trading.html':'webtrade.html';
+}
 function syncSrvUI(){try{document.querySelectorAll('.srv-opt').forEach(function(b){b.classList.toggle('on',+b.dataset.srv===selServer);});}catch(e){}}
 function togglePw(){pwVisible=!pwVisible;const inp=document.getElementById('pwInput');inp.type=pwVisible?'text':'password';document.getElementById('eyeIcon').innerHTML=pwVisible?'<line x1="1" y1="1" x2="23" y2="23"/><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>':'<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';}
 function toggleSave(){savePw=!savePw;const b=document.getElementById('saveBox');b.className='checkbox'+(savePw?' on':'');b.innerHTML=savePw?'<svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>':'';}
@@ -257,12 +268,7 @@ async function doLogin(){
     document.getElementById('successScreen').style.display='flex';
     // login chime for the terminal (WebTrade plays it on the next interaction) — set on every login
     try{ sessionStorage.setItem('alpexa.loginChime','1'); }catch(e){}
-    // dest override: only a whitelisted local page (e.g. the WebTrade terminal round-trip). Falls
-    // back to the per-server landing app. No open-redirect (same-origin, fixed allow-list).
-    const _q=(function(){ try{ return new URLSearchParams(location.search).get('dest'); }catch(e){ return null; } })();
-    const _ok=(_q==='webtrade.html');
-    const dest=_ok?_q:(selServer===1?'crypto-live.html':selServer===2?'sports-live.html':'trading.html');
-    setTimeout(()=>{window.location.href=dest;},1500);
+    setTimeout(()=>{window.location.href=fxDest(selServer);},1500);
   }catch(err){ fail((err&&err.message)||'Login failed. Please try again.'); }
 }
 function switchTab(t){document.getElementById('tab-login').className='tab-btn'+(t==='login'?' active':'');document.getElementById('tab-qr').className='tab-btn'+(t==='qr'?' active':'');document.getElementById('loginForm').style.display=t==='login'?'block':'none';document.getElementById('qrForm').style.display=t==='qr'?'block':'none';if(t==='qr')startQR();else stopQR();}
@@ -379,9 +385,7 @@ async function quickLogin(){
   txt.textContent=old; btn.style.opacity='1';
   if(hasSession){
     try{ sessionStorage.setItem('alpexa.loginChime','1'); }catch(e){}
-    var _bq=(function(){ try{ return new URLSearchParams(location.search).get('dest'); }catch(e){ return null; } })();
-    var dest=(_bq==='webtrade.html')?_bq:(cred.server===1?'crypto-live.html':cred.server===2?'sports-live.html':'trading.html');
-    window.location.href=dest;
+    window.location.href=fxDest(cred.server);
   } else {
     // Session expired (or revoked) — fall back to a one-time password login. Never a lockout.
     showErr('세션이 만료됐어요 — 비밀번호로 한 번만 로그인해 주세요.');

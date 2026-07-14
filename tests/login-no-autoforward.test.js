@@ -52,8 +52,10 @@ assert(!headTagRedirect,
   'login.html has no load-time "read alpexa.me → redirect" auto-forward (the #30 stay-signed-in jump)');
 
 // 3) Sanity: the LEGIT post-auth redirect (inside the body submit handler) still exists,
-//    so we didn't break the ability to enter the app after a real login.
-assert(/const dest\s*=.*(sports-live|crypto-live|trading)\.html/.test(SRC),
+//    so we didn't break the ability to enter the app after a real login. (2026-07-14: the
+//    landing page now comes from fxDest — device routing — instead of an inline const.)
+assert(/window\.location\.href=fxDest\(selServer\)/.test(SRC) &&
+       /function fxDest\(server\)\{[\s\S]*(sports-live|crypto-live|trading)\.html/.test(SRC),
   'login.html still redirects to the app AFTER a successful login (submit handler intact)');
 
 console.log('\n' + (failed
