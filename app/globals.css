@@ -1,37 +1,77 @@
 @import "react-grid-layout/css/styles.css";
 @import "tailwindcss";
 
-/* Design tokens — dark chart palette (validated: series-1/series-2 pass CVD + 3:1 on #1a1a19) */
-@theme {
-  --color-page: #0d0d0d;
-  --color-surface: #1a1a19;
-  --color-surface-2: #222220;
-  --color-ink: #ffffff;
-  --color-ink-2: #c3c2b7;
-  --color-ink-muted: #898781;
-  --color-grid-line: #2c2c2a;
-  --color-baseline: #383835;
-  --color-hairline: rgba(255, 255, 255, 0.1);
-  --color-series-1: #3987e5;
-  --color-series-2: #199e70;
-  --color-up: #0ca30c;
-  --color-down: #d03b3b;
+/*
+ * Runtime theme tokens. Dark is the default; <html data-theme="light"> swaps
+ * the whole palette. Chart colors are validated per surface:
+ * dark #3987e5/#199e70 on #1a1a19, light #2a78d6/#1baf7a on #fcfcfb.
+ */
+:root {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #222220;
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --ink-muted: #898781;
+  --grid-line: #2c2c2a;
+  --baseline: #383835;
+  --hairline: rgba(255, 255, 255, 0.1);
+  --series-1: #3987e5;
+  --series-2: #199e70;
+  --up: #0ca30c;
+  --down: #d03b3b;
+  --shadow-drag: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-2: #f0efec;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --ink-muted: #898781;
+  --grid-line: #e1e0d9;
+  --baseline: #c3c2b7;
+  --hairline: rgba(11, 11, 11, 0.1);
+  --series-1: #2a78d6;
+  --series-2: #1baf7a;
+  --up: #006300;
+  --down: #d03b3b;
+  --shadow-drag: 0 12px 32px rgba(11, 11, 11, 0.16);
+}
+
+/* Tailwind utilities reference the runtime vars so the theme swaps live */
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-muted: var(--ink-muted);
+  --color-grid-line: var(--grid-line);
+  --color-baseline: var(--baseline);
+  --color-hairline: var(--hairline);
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-up: var(--up);
+  --color-down: var(--down);
   --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 html,
 body {
   height: 100%;
-  color-scheme: dark;
-  background: var(--color-page);
-  color: var(--color-ink);
+  background: var(--page);
+  color: var(--ink);
   font-family: var(--font-sans);
   overscroll-behavior: none;
 }
 
-/* react-grid-layout chrome, restyled for the dark surface */
+/* react-grid-layout chrome, restyled on top of the theme tokens */
 .react-grid-item.react-grid-placeholder {
-  background: var(--color-series-1);
+  background: var(--series-1);
   opacity: 0.12;
   border-radius: 10px;
 }
@@ -47,8 +87,8 @@ body {
   bottom: 5px;
   width: 7px;
   height: 7px;
-  border-right: 2px solid var(--color-ink-muted);
-  border-bottom: 2px solid var(--color-ink-muted);
+  border-right: 2px solid var(--ink-muted);
+  border-bottom: 2px solid var(--ink-muted);
   border-bottom-right-radius: 2px;
   opacity: 0;
   transition: opacity 120ms ease;
@@ -65,6 +105,6 @@ body {
 
 .react-grid-item.react-draggable-dragging .widget-frame,
 .react-grid-item.resizing .widget-frame {
-  border-color: var(--color-series-1);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  border-color: var(--series-1);
+  box-shadow: var(--shadow-drag);
 }

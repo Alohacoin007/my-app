@@ -76,6 +76,32 @@ export default function Dashboard() {
     setSelections((prev) => prev.filter((s) => s.id !== id));
   }, []);
 
+  // 다크가 기본, <html data-theme="light">로 전환. 선택은 localStorage에 저장
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem("betboard-theme") === "light") {
+        setTheme("light");
+        document.documentElement.dataset.theme = "light";
+      }
+    } catch {
+      // 스토리지가 막힌 환경에서는 기본 테마로 시작
+    }
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => {
+      const next = prev === "dark" ? "light" : "dark";
+      document.documentElement.dataset.theme = next;
+      try {
+        window.localStorage.setItem("betboard-theme", next);
+      } catch {
+        // 저장 실패는 무시
+      }
+      return next;
+    });
+  }, []);
+
   // Fullscreen API를 지원하는 환경(권한이 막힌 iframe 제외)에서만 버튼 노출
   const [canFullscreen, setCanFullscreen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -112,6 +138,34 @@ export default function Dashboard() {
             className="rounded-md border border-hairline px-2.5 py-1 text-xs text-ink-2 transition-colors hover:border-ink-muted hover:text-ink"
           >
             Reset layout
+          </button>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+            title={theme === "dark" ? "Light theme" : "Dark theme"}
+            className="rounded-md border border-hairline p-1.5 text-ink-2 transition-colors hover:border-ink-muted hover:text-ink"
+          >
+            {theme === "dark" ? (
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+                <circle cx="6" cy="6" r="2.6" stroke="currentColor" strokeWidth="1.4" />
+                <path
+                  d="M6 0.6v1.2M6 10.2v1.2M0.6 6h1.2M10.2 6h1.2M2.2 2.2l0.85 0.85M8.95 8.95l0.85 0.85M9.8 2.2l-0.85 0.85M3.05 8.95l-0.85 0.85"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+                <path
+                  d="M10.4 7.2A4.8 4.8 0 1 1 4.8 1.6a3.9 3.9 0 0 0 5.6 5.6Z"
+                  stroke="currentColor"
+                  strokeWidth="1.3"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
           </button>
           {canFullscreen && (
             <button
