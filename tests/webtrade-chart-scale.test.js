@@ -42,9 +42,11 @@ if (!/handleScale:\{ mouseWheel:false, pinch:false, axisPressedMouseMove:\{time:
 // every resize re-pins the density + right margin (splitter/window-resize can never roll back to fat)
 if (!/try\{ ts\.applyOptions\(\{ barSpacing:5, rightOffset:15 \}\); \}catch\(_\)\{\}/.test(src))
   bad('every doFit/resize must re-pin barSpacing 5 + rightOffset 15 (no rollback)');
-// every live tick re-pins the 15-bar right margin (idempotent)
-if (!/chart\.current\.timeScale\(\)\.applyOptions\(\{ rightOffset:15 \}\);/.test(src))
-  bad('every tick must re-pin rightOffset 15 (right-margin lock)');
+// every live tick re-pins the 15-bar right margin — but ONLY at the live edge (2026-07-14:
+// applyOptions(rightOffset) SCROLLS, so the unguarded form yanked history browsers forward
+// on every tick; the guard belongs to tests/webtrade-history-scroll.test.js which executes it)
+if (!/if\(ts\.scrollPosition\(\)>=\d+\) ts\.applyOptions\(\{ rightOffset:15 \}\);/.test(src))
+  bad('tick handler must re-pin rightOffset 15 at the live edge (scrollPosition-guarded right-margin lock)');
 // the shared resizer (splitter / window-resize) refits the FULL live parent height AND re-welds the lock
 if (!/resizeOne\(it\)\{ try\{ const w=it\.el\.clientWidth, h=it\.el\.clientHeight; if\(w>0&&h>0\)\{ it\.chart\.resize\(w,h\);/.test(src))
   bad('chartResizer must resize to the live parent clientWidth/clientHeight (responsive, no fixed px)');
