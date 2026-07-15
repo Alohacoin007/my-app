@@ -31,6 +31,26 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .htab{display:flex; align-items:center; gap:8px; background:var(--lgd-pill); border-radius:var(--lgd-r-btn);
   height:32px; padding:0 14px 0 12px; font-size:var(--lgd-fs-tab); font-weight:600; cursor:pointer; transition:background .12s}
 .htab:hover{background:var(--lgd-pill-hi)}
+.htab.fxtab{cursor:pointer}
+.htab.fxtab.on{outline:1px solid var(--lgd-up)}
+/* FX 오버레이 — 풀스크린 ↔ ESC 미니 (웹트레이더 임베드, 한 진실) */
+.fxov{position:fixed; inset:0; z-index:70; display:none; flex-direction:column; background:#0B0D0E}
+.fxov.open{display:flex}
+.fxov.mini{inset:auto 16px 16px auto; width:min(960px,calc(100vw - 32px)); height:min(560px,calc(100vh - 80px));
+  border:1px solid var(--lgd-hair); border-radius:12px; box-shadow:0 24px 60px rgba(0,0,0,.7); overflow:hidden}
+.fxov .fxbar{height:34px; flex:none; display:flex; align-items:center; gap:8px; padding:0 10px;
+  background:var(--lgd-surface); border-bottom:1px solid var(--lgd-hair); font-size:var(--lgd-fs-label); font-weight:700}
+.fxov .fxbar .sp{flex:1}
+.fxov .fxbar .fic{width:26px; height:26px; display:flex; align-items:center; justify-content:center;
+  border-radius:6px; color:var(--lgd-dim); cursor:pointer}
+.fxov .fxbar .fic:hover{background:var(--lgd-pill); color:var(--lgd-ink)}
+.fxov .fxbar .esc{color:var(--lgd-dim); font-weight:500; font-size:var(--lgd-fs-caption)}
+.fxov iframe{flex:1; border:0; width:100%; min-height:0}
+.tabrow{display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:6px; cursor:pointer}
+.tabrow:hover{background:var(--lgd-pill)}
+.tabrow.dis{cursor:default; color:var(--lgd-dim)}
+.tabrow.dis:hover{background:transparent}
+.tabrow .sub{margin-left:auto; color:var(--lgd-dim); font-size:var(--lgd-fs-caption)}
 .addtab{width:32px; height:32px; border-radius:var(--lgd-r-btn); display:flex; align-items:center;
   justify-content:center; color:var(--lgd-dim); font-size:19px; cursor:pointer}
 .addtab:hover{background:var(--lgd-pill); color:var(--lgd-ink)}
@@ -102,7 +122,11 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .bal .chg{font-size:var(--lgd-fs-caption); font-weight:600; margin-top:2px; min-height:14px}
 .bal .chg.up{color:var(--lgd-up)} .bal .chg.down{color:var(--lgd-down)}
 .bal .chg .dim{color:var(--lgd-dim); font-weight:500}
-.bal canvas.spark{width:100%; height:74px; flex:none; margin-top:4px}
+.bal .sparkwrap{position:relative; flex:none; margin-top:4px}
+.bal canvas.spark{width:100%; height:74px; display:block}
+.bal .enddot{position:absolute; width:6px; height:6px; border-radius:50%;
+  transform:translate(-50%,-50%); animation:dotblink 1.1s ease-in-out infinite; pointer-events:none}
+@keyframes dotblink{0%,100%{opacity:1}50%{opacity:.12}}
 .bal .ranges{display:flex; gap:1px; align-items:center; flex:none; margin:4px 0 0}
 .bal .ranges button{background:transparent; border:none; color:var(--lgd-up); font-weight:700; font-size:11px;
   padding:2px 7px; border-radius:4px; cursor:pointer; font-family:inherit; letter-spacing:.2px}
@@ -451,7 +475,16 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
     <svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor"><rect x="0.5" y="0.5" width="6" height="14" rx="1.6"/><rect x="8.5" y="0.5" width="6" height="6" rx="1.6"/><rect x="8.5" y="8.5" width="6" height="6" rx="1.6"/></svg>
     Sports betting
   </div>
-  <div class="addtab" title="New layout (coming)">+</div>
+  <div class="htab fxtab" id="fxTab" style="display:none" title="Alpexa FX — WebTrade terminal">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 17l6-7 4 4 7-9"/></svg>
+    Alpexa FX
+  </div>
+  <div style="position:relative">
+    <div class="addtab" id="btnTabs" title="Add server tab">+</div>
+    <div id="tabMenu" style="display:none; position:absolute; left:0; top:38px; z-index:50; min-width:230px;
+      background:var(--lgd-surface2); border:1px solid var(--lgd-hair); border-radius:var(--lgd-r-pop);
+      box-shadow:0 8px 24px rgba(0,0,0,.5); padding:6px; font-size:var(--lgd-fs-body)"></div>
+  </div>
   <div class="hsp"></div>
   <div class="hmid"><span>Games today</span><span class="dot" id="feedDot"></span></div>
   <div class="hsp"></div>
@@ -726,7 +759,8 @@ makeWidget('balance','Account','Sports','var(--lgd-link1)',
   '<div class="amt" id="balAmt">···</div>'+
   '<div class="chg" id="balChg"></div></div>'+
   '<button class="dep" onclick="openMoney(\'deposit\')">Deposit</button></div>'+
-  '<canvas class="spark" id="balSpark"></canvas>'+
+  '<div class="sparkwrap"><canvas class="spark" id="balSpark"></canvas>'+
+  '<span class="enddot" id="balDot" style="display:none"></span></div>'+
   '<div class="ranges" id="balRanges">'+['1D','1W','1M','3M','YTD','1Y','ALL'].map((r,i)=>
     '<button data-r="'+r+'"'+(i===0?' class="on"':'')+'>'+r+'</button>').join('')+'</div>'+
   '<div class="sect">Overview</div>'+
@@ -1021,7 +1055,8 @@ function drawSpark(ms){
   const dpr=window.devicePixelRatio||1, W=cv.clientWidth||300, H=cv.clientHeight||90;
   cv.width=W*dpr; cv.height=H*dpr;
   const cx=cv.getContext('2d'); cx.scale(dpr,dpr); cx.clearRect(0,0,W,H);
-  if(!ms.authed) return;
+  const dot=document.getElementById('balDot');
+  if(!ms.authed){ if(dot) dot.style.display='none'; return; }
   const pts=balSeries(ms);
   const t0=pts[0].ts, t1=pts[pts.length-1].ts||t0+1;
   let lo=Math.min(...pts.map(p=>p.v)), hi=Math.max(...pts.map(p=>p.v));
@@ -1034,8 +1069,9 @@ function drawSpark(ms){
   cx.beginPath();
   pts.forEach((p,i)=>{ const x=X(p.ts), y=Y(p.v); if(i===0)cx.moveTo(x,y); else cx.lineTo(x,y); });
   cx.stroke();
-  const last=pts[pts.length-1];   // 현재값 마커
-  cx.fillStyle=col; cx.beginPath(); cx.arc(X(last.ts),Y(last.v),3,0,Math.PI*2); cx.fill();
+  const last=pts[pts.length-1];   // 현재값 마커 = DOM 도트 (깜박깜박 — 사용자 확정 2026-07-15)
+  if(dot){ dot.style.display='block'; dot.style.background=col;
+    dot.style.left=X(last.ts)+'px'; dot.style.top=Y(last.v)+'px'; }
 }
 const mv=(n)=> hideAmounts?'••••':(n==null?'···':usd(n));   // §8.10: 마스킹 = 고정 4점(자릿수 은닉)
 function renderAccount(ms){
@@ -1718,7 +1754,7 @@ document.getElementById('sList').addEventListener('click', e=>{ const r=e.target
 sPop.addEventListener('click', e=>e.stopPropagation());
 document.addEventListener('click', ()=>closeSearch());
 document.addEventListener('keydown', e=>{
-  if(e.key==='Escape') closeSearch();
+  if(e.key==='Escape'){ try{ fxEsc(); }catch(err){} closeSearch(); }
   else if(e.key==='/'&&!/INPUT|TEXTAREA/.test((document.activeElement||{}).tagName||'')){ e.preventDefault(); openSearch(); }
 });
 
@@ -1773,6 +1809,49 @@ document.addEventListener('click', ()=>{ avMenu.style.display='none'; });
 function rerenderOdds(){ const gs=gamesStore.games;
   renderBoard(gs); renderSchedule(gs); renderLive(gs); renderBets();
   try{ renderSlip(); }catch(e){} }
+
+/* ── 서버 탭 (+ 메뉴): Alpexa FX = 웹트레이더 임베드 풀스크린, ESC = 미니 창 ──
+   레전드 레이아웃 탭의 알펙사 번역 — 우리 스타일(.htab 필 + 기존 메뉴 문법) 그대로.
+   FX 터미널은 iframe으로 webtrade.html "한 진실" 임베드 (복제 금지). 같은 탭·같은
+   sessionStorage라 로그인 세션이 그대로 통한다. 크립토 컴퓨터용은 미구현(이번 주). */
+const tabMenu=document.getElementById('tabMenu'), fxTab=document.getElementById('fxTab');
+let fxOv=null, fxFull=true;
+function ensureFxOv(){
+  if(fxOv) return fxOv;
+  fxOv=document.createElement('div'); fxOv.className='fxov';
+  fxOv.innerHTML='<div class="fxbar"><span>Alpexa FX — WebTrade</span><span class="esc">ESC — minimize</span><span class="sp"></span>'+
+    '<span class="fic" id="fxSize" title="Toggle size">⛶</span><span class="fic" id="fxX" title="Close">✕</span></div>'+
+    '<iframe id="fxFrame" title="Alpexa FX WebTrade terminal"></iframe>';
+  document.body.appendChild(fxOv);
+  document.getElementById('fxSize').onclick=()=>setFxSize(!fxFull);
+  document.getElementById('fxX').onclick=closeFx;
+  const fr=document.getElementById('fxFrame');
+  fr.addEventListener('load', ()=>{ try{   // 같은 출처 — iframe 안에서 눌러도 ESC가 통하게
+    fr.contentDocument.addEventListener('keydown', e=>{ if(e.key==='Escape') fxEsc(); }); }catch(e){} });
+  return fxOv;
+}
+function setFxSize(full){ fxFull=full; ensureFxOv().classList.toggle('mini', !full); }
+function openFx(){
+  ensureFxOv();
+  const fr=document.getElementById('fxFrame');
+  if(!fr.src) fr.src='webtrade.html';   // 첫 오픈에만 로드 (대시보드 부팅 무영향)
+  fxOv.classList.add('open'); setFxSize(true);
+  fxTab.style.display='flex'; fxTab.classList.add('on');
+}
+function closeFx(){ if(fxOv) fxOv.classList.remove('open'); fxTab.classList.remove('on'); }
+function fxEsc(){   // ESC 계약: 풀스크린이면 미니로 — 닫지는 않는다 (오조작 방지)
+  if(fxOv&&fxOv.classList.contains('open')&&fxFull) setFxSize(false);
+}
+fxTab.addEventListener('click', ()=>{ (fxOv&&fxOv.classList.contains('open'))?closeFx():openFx(); });
+document.getElementById('btnTabs').onclick=(e)=>{ e.stopPropagation();
+  tabMenu.innerHTML=
+    '<div class="tabrow" data-tab="fx"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 17l6-7 4 4 7-9"/></svg>Alpexa FX<span class="sub">WebTrade terminal</span></div>'+
+    '<div class="tabrow dis" data-tab="crypto">🪙 Alpexa Crypto<span class="sub">Coming this week</span></div>';
+  tabMenu.style.display=tabMenu.style.display==='block'?'none':'block'; };
+tabMenu.addEventListener('click', e=>{ const r=e.target.closest('.tabrow'); if(!r) return;
+  e.stopPropagation(); tabMenu.style.display='none';
+  if(r.dataset.tab==='fx') openFx(); });   // crypto = 예고만 (컴퓨터용 미구현)
+document.addEventListener('click', ()=>{ tabMenu.style.display='none'; });
 
 // 위젯 ⋮ 메뉴: v1 액션 = Close (레전드 §3 크롬 — 커스터마이즈 확장 예정)
 document.querySelectorAll('.widget .wic[title="Close widget"]').forEach(ic=>{

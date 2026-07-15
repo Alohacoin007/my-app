@@ -162,6 +162,15 @@ if (/withdraw_hold|app_transfer|Deposit requested/.test(src)) {
   pin(/withdrawable_for/, '출금 가능액 = 서버 withdrawable_for RPC (보너스 제외 — 앱:2856)');
   ban(/\b(balance|bal)\s*[+\-]=/, '클라 잔고 델타 — 결과는 서버 재조회로만 (낙관 갱신도 대시보드에선 금지)');
 }
+// 서버 전환 탭(+ 메뉴)이 있으면 (2026-07-15 — 레전드 레이아웃 탭의 알펙사 번역)
+if (/Alpexa FX|fxTab/.test(src)) {
+  pin(/Alpexa FX/, '+ 메뉴 항목: Alpexa FX');
+  pin(/Alpexa Crypto/, '+ 메뉴 항목: Alpexa Crypto (예고)');
+  pin(/Coming this week/, '크립토 컴퓨터용 미출시 안내 리터럴');
+  pin(/iframe[^>]*webtrade\.html|webtrade\.html[^>]*iframe|src="webtrade\.html"/, 'FX = 현재 웹트레이더 그대로 임베드 (복제 금지 — 한 진실)');
+  pin(/Escape[\s\S]{0,200}(fxOv|fxFull|mini)|fxEsc/, 'ESC = 풀스크린→미니 전환 계약');
+  ban(/crypto-desktop|crypto-webtrade/, '크립토 컴퓨터용 경로 발명 — 아직 미구현 (이번 주 제작 예정)');
+}
 // 발란스 표시가 있으면
 if (/Balance|balbar/i.test(src)) {
   pin(/'···'|>···</, '잔고 미로드 표기 ··· (앱:2602) — 0으로 거짓 표시 금지');
