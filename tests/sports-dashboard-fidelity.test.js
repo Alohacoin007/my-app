@@ -58,6 +58,13 @@ if (/Odds board|Moneyline/i.test(src)) {
   pin(/sortByPin/, '정렬 함수 sortByPin — 핀 우선 포함 (앱:1701-1705)');
   pin(/No games match/, '검색 무결과 문구 (앱:1750)');
   pin(/\.ob\.soc \.obhead\{display:none\}/, 'SOC 선택 시 컬럼헤더 숨김 (앱:1748 — 1X2는 자체 라벨)');
+  // ④ 핀 ★ (차이감사 P2): 앱과 같은 저장 키 = 앱↔대시보드 핀 동기화 (앱 g.id===gid, 앱:3612)
+  pin(/localStorage\.getItem\(\s*['"]alpexaPins['"]/, '핀 저장 키 alpexaPins — 앱과 공유해 양쪽 동기화 (앱:1127)');
+  ban(/alpexa\.sbdash\.pins/, '대시보드 자체 핀 키 — 앱과 갈라진 두 진실 (앱 키 alpexaPins 하나만)');
+  pin(/function togglePin\(/, 'togglePin 규약 (앱:1128-1131)');
+  pin(/class="pin-btn/, '★ 버튼 pin-btn 클래스 (앱:1679)');
+  pin(/Pin to top/, '★ 툴팁 리터럴 Pin to top/Unpin (앱:1679)');
+  pin(/stopPropagation\(\)[\s\S]{0,60}togglePin|togglePin[\s\S]{0,120}stopPropagation/, '★ 클릭이 행 클릭(슬립 추가)으로 새지 않게 (앱:1768)');
 }
 // 축구가 있으면
 if (/soc1x2|1X2/.test(src)) {
@@ -101,6 +108,34 @@ if (/My bets|ticketHTML|Cashed Out/i.test(src)) {
   pin(/Win rate/, '통계 4칸: Win rate (앱 renderStats)');
   pin(/ROI/, '통계 4칸: ROI');
   pin(/Push · refunded/, 'leg push 태그 리터럴 (앱:2074)');
+}
+// ⑤ Live Now 히어로/Live 위젯이 있으면 (앱 :816-827)
+if (/Live Now|live-hero/i.test(src)) {
+  pin(/Live Now/, '히어로 타이틀 리터럴 Live Now (앱:819)');
+  pin(/live-pill|lp-dot/, 'LIVE 필 + 링 애니 도트 (앱:818, CSS:262-267)');
+  pin(/live-pulse/, '이퀄라이저 4바 live-pulse (앱:821-823, CSS:271-277)');
+  pin(/In Play/, 'Live 보드 첫 컬럼 라벨 In Play (앱:825 col_inplay)');
+  pin(/liveCount|live\s*games?<\/|games<\/span>/i, '라이브 경기 수 카운트 (앱:1757)');
+}
+// ⑥ Recent Activity 필터가 있으면 (앱 :868-882, :2624-2669)
+if (/RECENT ACTIVITY|Recent Activity/i.test(src)) {
+  pin(/data-type="all"[\s\S]{0,400}data-type="deposit"[\s\S]{0,400}data-type="withdraw"[\s\S]{0,400}data-type="bet"/, '타입 필터 4종 All/Deposits/Withdrawals/Bets (앱:871-874)');
+  pin(/data-days="7"[\s\S]{0,300}data-days="30"[\s\S]{0,300}data-days="90"[\s\S]{0,300}data-days="0"/, '기간 4종 7/30/90/All time (앱:878-881)');
+  pin(/txnMatchesType/, '타입 매칭 함수 규약 (앱:2625-2629)');
+  pin(/'Bet placed'\s*,\s*'Cashout'\s*,\s*'Bet Won'|\['Bet placed','Cashout','Bet Won'/, 'bet 타입 매칭 키워드 맵 (앱:2627)');
+  pin(/txnMatchesPeriod/, '기간 매칭 함수 규약 (앱:2630-2635)');
+  pin(/No transactions in this range/, '필터 무결과 문구 (앱:2651)');
+  pin(/from\(\s*['"]requests['"]\s*\)/, '재무 활동 = 서버 requests 테이블 권위 (앱:2370) — 기기별 localStorage 금지');
+  pin(/voided/, 'voided 요청 제외 규약 (앱:2377)');
+}
+// ⑦ 배당 포맷 설정이 있으면 (앱 :1181, :1477, :1558-1564)
+if (/oddsFormat|Odds format/i.test(src)) {
+  pin(/localStorage\.getItem\(\s*['"]alpexaSettings['"]/, '설정 저장 키 alpexaSettings — 앱과 공유 (앱:1484)');
+  pin(/oddsFormat\s*===?\s*['"]decimal['"]/, 'decimal 분기 규약 (앱:1559)');
+  pin(/a\s*>\s*0\s*\?\s*\(?\s*a\s*\/\s*100\s*\+\s*1\s*\)?\s*:\s*\(?\s*100\s*\/\s*Math\.abs\(a\)\s*\+\s*1/, 'decimal 변환 공식 a>0?a/100+1:100/|a|+1 (앱:1560)');
+  pin(/toFixed\(2\)/, 'decimal 표기 소수 2자리 (앱:1561)');
+  pin(/American[\s\S]{0,80}-110 \/ \+120|-110 \/ \+120/, '옵션 서브라벨 리터럴 -110 / +120 (앱:1181)');
+  pin(/Decimal[\s\S]{0,80}1\.91 \/ 2\.20|1\.91 \/ 2\.20/, '옵션 서브라벨 리터럴 1.91 / 2.20 (앱:1181)');
 }
 // 발란스 표시가 있으면
 if (/Balance|balbar/i.test(src)) {
