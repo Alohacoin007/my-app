@@ -1828,10 +1828,23 @@ function openFx(){
   if(!fr.src) fr.src='webtrade.html';   // 첫 오픈에만 로드 (대시보드 부팅 무영향)
   fxOv.classList.add('open'); setFxSize(true);
   fxTab.style.display='flex'; fxTab.classList.add('on');
+  // 네이티브 풀스크린 (사용자 확정 2026-07-15): 서버 전환 = 화면 위까지 꽉 채움.
+  // ESC는 브라우저가 직접 처리 — iframe 어디에 포커스가 있어도 무조건 동작
+  // (라이브에서 keydown 바인딩 ESC가 안 먹히던 문제의 근본 해결).
+  try{ if(fxOv.requestFullscreen) fxOv.requestFullscreen().catch(()=>{}); }catch(e){}
 }
-function closeFx(){ if(fxOv) fxOv.classList.remove('open'); fxTab.classList.remove('on'); }
-function fxEsc(){   // ESC 계약: 풀↔미니 토글 — 닫지는 않는다 (오조작 방지; 바 없음이라 ESC가 유일한 크기 조작)
-  if(fxOv&&fxOv.classList.contains('open')) setFxSize(!fxFull);
+function closeFx(){
+  if(document.fullscreenElement){ try{ document.exitFullscreen(); }catch(e){} }
+  if(fxOv) fxOv.classList.remove('open'); fxTab.classList.remove('on');
+}
+// 브라우저 ESC로 풀스크린이 풀리면 → 인터넷 창 보이게 + 터미널은 미니로
+document.addEventListener('fullscreenchange', ()=>{
+  if(!document.fullscreenElement && fxOv && fxOv.classList.contains('open') && fxFull) setFxSize(false);
+});
+function fxEsc(){   // 폴백 (풀스크린 API 거부/미지원 환경): ESC = 풀↔미니 토글
+  if(!(fxOv&&fxOv.classList.contains('open'))) return;
+  if(document.fullscreenElement){ try{ document.exitFullscreen(); }catch(e){} return; }
+  setFxSize(!fxFull);
 }
 fxTab.addEventListener('click', ()=>{ (fxOv&&fxOv.classList.contains('open'))?closeFx():openFx(); });
 document.getElementById('btnTabs').onclick=(e)=>{ e.stopPropagation();
