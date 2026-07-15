@@ -169,6 +169,8 @@ if (/Alpexa FX|fxTab/.test(src)) {
   pin(/Coming this week/, '크립토 컴퓨터용 미출시 안내 리터럴');
   pin(/iframe[^>]*webtrade\.html|webtrade\.html[^>]*iframe|src="webtrade\.html"/, 'FX = 현재 웹트레이더 그대로 임베드 (복제 금지 — 한 진실)');
   pin(/Escape[\s\S]{0,200}(fxOv|fxFull|mini)|fxEsc/, 'ESC = 풀스크린→미니 전환 계약');
+  pin(/requestFullscreen/, '서버 전환 = 네이티브 풀스크린 (ESC는 브라우저가 처리 — 포커스 무관)');
+  pin(/sbTab/, 'Sports betting 탭 = 대시보드 풀스크린 토글 (서버 탭 공통 규칙, 2026-07-15)');
   ban(/crypto-desktop|crypto-webtrade/, '크립토 컴퓨터용 경로 발명 — 아직 미구현 (이번 주 제작 예정)');
 }
 // 발란스 표시가 있으면

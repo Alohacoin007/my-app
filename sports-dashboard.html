@@ -464,9 +464,9 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 
 <div class="hdr">
   <div class="mark" title="Alpexa Sports">A</div>
-  <div class="htab">
+  <div class="htab" id="sbTab" style="cursor:pointer" title="Fullscreen — ESC to exit">
     <svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor"><rect x="0.5" y="0.5" width="6" height="14" rx="1.6"/><rect x="8.5" y="0.5" width="6" height="6" rx="1.6"/><rect x="8.5" y="8.5" width="6" height="6" rx="1.6"/></svg>
-    Sports betting
+    Alpexa Sports
   </div>
   <div class="htab fxtab" id="fxTab" style="display:none" title="Alpexa FX — WebTrade terminal">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 17l6-7 4 4 7-9"/></svg>
@@ -1847,6 +1847,12 @@ function fxEsc(){   // 폴백 (풀스크린 API 거부/미지원 환경): ESC = 
   setFxSize(!fxFull);
 }
 fxTab.addEventListener('click', ()=>{ (fxOv&&fxOv.classList.contains('open'))?closeFx():openFx(); });
+// Alpexa Sports 탭 = 대시보드 자체 풀스크린 토글 (서버 탭 공통 규칙: 클릭=풀스크린, ESC=인터넷 창)
+document.getElementById('sbTab').addEventListener('click', ()=>{
+  closeFx();   // FX 오버레이가 떠 있으면 정리하고 스포츠로
+  if(document.fullscreenElement===document.documentElement){ try{ document.exitFullscreen(); }catch(e){} return; }
+  try{ if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(()=>{}); }catch(e){}
+});
 document.getElementById('btnTabs').onclick=(e)=>{ e.stopPropagation();
   tabMenu.innerHTML=
     '<div class="tabrow" data-tab="fx"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 17l6-7 4 4 7-9"/></svg>Alpexa FX<span class="sub">WebTrade terminal</span></div>'+
