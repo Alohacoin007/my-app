@@ -84,6 +84,15 @@ if (/[Cc]ash out/.test(src)) {
 if (/My bets|ticketHTML|Cashed Out/i.test(src)) {
   pin(/Cashed Out/, '상태칩 텍스트 Cashed Out (앱:2089)');
   pin(/Awaiting result/, 'Open 위계 중간 상태 (앱:2110)');
+  // Settled 계약 (앱 pullServerSettled :2406-2424 + renderStats :2145-2156 + refunded 규칙 :2088)
+  pin(/from\(\s*['"]settlements['"]\s*\)/, 'Settled = 서버 settlements 재구성 — 기기별 localStorage 금지 (앱:2408)');
+  pin(/local_id,ticket,symbol,stake,pnl,kind,created_at/, 'settlements select 필드 계약 (앱:2408)');
+  pin(/bet_won/, 'kind bet_won 필터 (앱:2413)');
+  pin(/bet_lost/, 'kind bet_lost 필터 (앱:2413)');
+  pin(/refunded/, 'won인데 payout≤stake = refunded(Push) 표기 규칙 (앱:2088)');
+  pin(/Win rate/, '통계 4칸: Win rate (앱 renderStats)');
+  pin(/ROI/, '통계 4칸: ROI');
+  pin(/Push · refunded/, 'leg push 태그 리터럴 (앱:2074)');
 }
 // 발란스 표시가 있으면
 if (/Balance|balbar/i.test(src)) {

@@ -153,6 +153,16 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
   font-weight:700; cursor:pointer; background:rgba(0,200,5,.12); color:var(--lgd-up)}
 .tkc .co button:hover{background:rgba(0,200,5,.2)}
 .tkc .co .half{background:var(--lgd-pill); color:var(--lgd-ink)}
+.bsgrid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding:0 12px 10px}
+.bscell{background:var(--lgd-surface2); border:1px solid var(--lgd-hair); border-radius:var(--lgd-r-widget); padding:8px 10px}
+.bscell .l{font-size:var(--lgd-fs-caption); color:var(--lgd-dim); letter-spacing:.02em}
+.bscell .v{font-size:var(--lgd-fs-body-lg); font-weight:700; margin-top:3px}
+.bscell .v.pos{color:var(--lgd-up)} .bscell .v.neg{color:var(--lgd-down)}
+.tkc .res.won{color:var(--lgd-up)} .tkc .res.lost{color:var(--lgd-down)} .tkc .res.refunded{color:var(--lgd-dim)}
+.tleg .rtag{font-size:10px; font-weight:800; margin-top:2px; text-align:right}
+.tleg .rtag.w{color:var(--lgd-up)} .tleg .rtag.l{color:var(--lgd-down)} .tleg .rtag.p{color:var(--lgd-dim)}
+.tkc .ft .win{color:var(--lgd-up)} .tkc .ft .loss{color:var(--lgd-down)}
+.tkc .setts{font-size:10px; color:var(--lgd-dim); padding-top:5px}
 .loginp{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:var(--lgd-dim); font-size:var(--lgd-fs-label)}
 .loginp button{background:var(--lgd-pill); border:none; color:var(--lgd-ink); border-radius:var(--lgd-r-btn); height:32px; padding:0 16px; font-weight:700; cursor:pointer}
 
@@ -670,8 +680,29 @@ const moneyStore={
         });
       }
     }catch(e){}
+    try{ // Settled = 서버 settlements 재구성 (앱:2406-2424) — 전 기기 동일, per-device 저장 없음
+      const r=await AlpexaSync.db.from('settlements')
+        .select('local_id,ticket,symbol,stake,pnl,kind,created_at,detail')
+        .eq('cust_id',m.custId).eq('server','sports').order('created_at',{ascending:false}).limit(50);
+      if(r&&!r.error&&Array.isArray(r.data)){
+        const out=[];
+        r.data.forEach(x=>{
+          const k=(x.kind||'').toLowerCase(); if(k!=='bet_won'&&k!=='bet_lost') return;
+          const won=k==='bet_won', stake=+x.stake||0, pnl=+x.pnl||0;
+          const ts=x.created_at?new Date(x.created_at).getTime():0;
+          let detLegs=[];
+          try{ const d=x.detail?JSON.parse(x.detail):null;
+            if(d&&Array.isArray(d.legs)) detLegs=d.legs.map(L=>({pk:L.pk||'',sel:L.pk||'',gm:L.gm||'',
+              am:+L.am||0, gid:L.gid||'', lg:L.lg||'', r:L.r||''})); }catch(e){}
+          out.push({ id:'srv-'+x.local_id, ticket:x.ticket||'', type:x.symbol||'Bet', stake:stake,
+            result:won?'won':'lost', payout:won?Math.round((stake+pnl)*100)/100:0, legs:detLegs, ts:ts });
+        });
+        this.settled=out;
+      }
+    }catch(e){}
     this.emit();
   },
+  settled:[],
   start(){ if(this.timer) return; this.pull(); this.timer=setInterval(()=>this.pull(),10000); }   // 앱 잔고 폴 주기
 };
 const ICONS={NBA:'🏀',NCAAB:'🎓',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽',UFC:'🥊'};
@@ -700,8 +731,13 @@ moneyStore.sub(ms=>{
 
 /* ── My bets 위젯 (앱 ticketHTML 문법) ── */
 makeWidget('mybets','My bets','','var(--lgd-link1)',
-  '<div class="mb tnum"><div class="mbseg"><button class="on">Open</button><button disabled title="Settled는 다음 단계">Settled</button></div>'+
+  '<div class="mb tnum"><div class="mbseg" id="mbSeg"><button class="on" data-seg="open">Open</button><button data-seg="settled">Settled</button></div>'+
   '<div class="mbscroll" id="mbList"></div></div>');
+let mbSeg='open';
+document.getElementById('mbSeg').addEventListener('click', e=>{ const b=e.target.closest('button'); if(!b) return;
+  mbSeg=b.dataset.seg;
+  document.querySelectorAll('#mbSeg button').forEach(x=>x.classList.toggle('on', x===b));
+  renderBets(); });
 function legState(l){ // Open 위계: Live > Awaiting result > Upcoming (앱:2110)
   const g=gamesStore.games.find(x=>x.gid===l.gid);
   if(g&&g.live) return 'live';
@@ -715,6 +751,42 @@ function renderBets(){
   const ms=moneyStore;
   if(!ms.authed){ el.innerHTML='<div class="loginp">로그인하면 오픈 베팅이 여기 표시됩니다'+
     '<button onclick="location.href=\'login.html\'">Log in</button></div>'; return; }
+  if(mbSeg==='settled'){
+    const sb=ms.settled;
+    if(!sb.length){ el.innerHTML='<div class="loginp">No settled bets yet</div>'; return; }
+    // 통계 4칸 (앱 renderStats): P&L / ROI / Win rate / Settled
+    const staked=sb.reduce((a,b)=>a+(b.stake||0),0), returned=sb.reduce((a,b)=>a+(b.payout||0),0), net=returned-staked;
+    const wonN=sb.filter(b=>b.result==='won').length, winRate=Math.round(wonN/sb.length*100);
+    const roi=staked?Math.round(net/staked*1000)/10:0, np=net>=0;
+    const stats='<div class="bsgrid">'+
+      '<div class="bscell"><div class="l">P&L</div><div class="v '+(np?'pos':'neg')+'">'+(np?'':'-')+'$'+Math.round(Math.abs(net)).toLocaleString()+'</div></div>'+
+      '<div class="bscell"><div class="l">ROI</div><div class="v '+(np?'pos':'neg')+'">'+roi+'%</div></div>'+
+      '<div class="bscell"><div class="l">Win rate</div><div class="v">'+winRate+'%</div></div>'+
+      '<div class="bscell"><div class="l">Settled</div><div class="v">'+sb.length+'</div></div></div>';
+    el.innerHTML=stats+sb.map(b=>{
+      try{
+        // won인데 payout≤stake = 순이익 없음 → refunded(Push) 표기 (앱:2088)
+        const dispRes=(b.result==='won'&&(+b.payout||0)<=(+b.stake||0)+0.001)?'refunded':b.result;
+        const single=(b.legs.length||1)===1;
+        const badge=single?'Single':esc(String(b.type||'Parlay').split(' · ')[0])+' '+b.legs.length+' legs';
+        const legsH=b.legs.map(l=>{
+          const rt=l.r==='won'?'<div class="rtag w">Won</div>':l.r==='lost'?'<div class="rtag l">Lost</div>'
+            :l.r==='push'?'<div class="rtag p">Push · refunded</div>':'';
+          return '<div class="tleg"><span class="dot"></span>'+
+            '<div><div class="pk">'+esc(l.pk||l.sel||'Selection')+'</div><div class="gm">'+(ICONS[l.lg]||'')+' '+esc(l.gm||'')+'</div></div>'+
+            '<div style="text-align:right"><span class="odd">'+fmtAm(+l.am||0)+'</span>'+rt+'</div></div>'; }).join('');
+        const foot=dispRes==='won'?'<span class="win">Win '+usd(b.payout)+'</span>'
+          :dispRes==='refunded'?'<span>Refund '+usd(b.payout)+'</span>'
+          :'<span class="loss">Loss '+usd(b.stake)+'</span>';
+        return '<div class="tkc"><div class="th"><span class="badge">'+badge+'</span>'+
+          '<span class="res '+dispRes+'">'+(dispRes==='won'?'Won':dispRes==='refunded'?'Push':'Lost')+'</span></div>'+
+          '<div class="tid">'+esc(b.ticket||b.id)+'</div>'+legsH+
+          '<div class="ft"><span>Stake <b>'+usd(b.stake)+'</b></span>'+foot+'</div>'+
+          (b.ts?'<div class="setts">Settled · '+fmtStamp(b.ts)+'</div>':'')+'</div>';
+      }catch(e){ console.error('card render failed', b&&b.id, e); return ''; }
+    }).join('');
+    return;
+  }
   if(!ms.openBets.length){ el.innerHTML='<div class="loginp">No open bets — Place a bet to see it here</div>'; return; }
   el.innerHTML=ms.openBets.map(b=>{
     try{
