@@ -634,22 +634,50 @@ const stage=document.getElementById('stage');
 const DEFAULT_LAYOUT={ leagues:{x:8,y:8,w:224,h:436}, board:{x:240,y:8,w:874,h:436},
   schedule:{x:8,y:452,w:541,h:396}, mybets:{x:557,y:452,w:557,h:396},
   slip:{x:1122,y:8,w:380,h:840}, balance:{x:1510,y:8,w:382,h:244}, wallet:{x:1510,y:260,w:382,h:588},
-  live:{x:240,y:8,w:874,h:436,hidden:true} };   // ⑤ Live 위젯 — 기본 숨김, Add widget으로 (사용자 확정 기본배치 무변경)
+  live:{x:240,y:8,w:874,h:436,hidden:true},   // ⑤ Live 위젯 — 기본 숨김, Add widget으로 (사용자 확정 기본배치 무변경)
+  __ref:{w:1900,h:856} };   // 이 좌표들이 유효한 기준 뷰포트 (리핏의 원점)
+const deepLayout=(o)=>JSON.parse(JSON.stringify(o));   // 리셋/기본값이 DEFAULT 객체를 참조 공유하지 않게
 // 콘텐츠가 뭉개지지 않는 위젯별 최소 크기 (보드=게임열+마켓 3열, 일정=4컬럼 표)
 const MIN_SIZE={ balance:{w:300,h:180}, leagues:{w:200,h:220}, schedule:{w:420,h:220}, board:{w:520,h:260},
   mybets:{w:380,h:240}, wallet:{w:320,h:280}, slip:{w:320,h:320}, live:{w:520,h:260} };
-function loadLayout(){ try{ const raw=localStorage.getItem(LKEY); if(!raw) return {...DEFAULT_LAYOUT};
+function loadLayout(){ try{ const raw=localStorage.getItem(LKEY); if(!raw) return deepLayout(DEFAULT_LAYOUT);
   const p=JSON.parse(raw);
   // 새 위젯 키는 기본값으로 채움 — 저장된 사용자 배치는 보존 (전부 리셋 금지)
-  Object.keys(DEFAULT_LAYOUT).forEach(k=>{ if(!p[k]) p[k]={...DEFAULT_LAYOUT[k]}; });
+  Object.keys(DEFAULT_LAYOUT).forEach(k=>{ if(!p[k]) p[k]=deepLayout(DEFAULT_LAYOUT[k]); });
   return p;
-}catch(e){ return {...DEFAULT_LAYOUT}; } }
+}catch(e){ return deepLayout(DEFAULT_LAYOUT); } }
 let layout=loadLayout();
 Object.keys(layout).forEach(id=>{ const m=MIN_SIZE[id]; if(!m) return;
   if(layout[id].w<m.w) layout[id].w=m.w; if(layout[id].h<m.h) layout[id].h=m.h; });
 function saveLayout(){ try{ localStorage.setItem(LKEY, JSON.stringify(layout)); }catch(e){} }
 document.getElementById('btnReset').onclick=()=>{ try{ localStorage.removeItem(LKEY); }catch(e){}
-  layout={...DEFAULT_LAYOUT}; Object.keys(layout).forEach(applyGeo); };
+  layout=deepLayout(DEFAULT_LAYOUT); Object.keys(layout).forEach(applyGeo); refitLayout(); };
+
+/* ── 수학적 칸 채움 (사용자 확정 2026-07-15): 뷰포트가 바뀌면(풀스크린 전환 포함)
+   저장 배치를 기준 뷰포트 → 현재 뷰포트로 선형 재사상. 끝변 매핑이라 우측·하단
+   가장자리가 정확히 vw−GAP / vh−GAP 에 닿고, 좌표를 float로 유지해 전환을 반복해도
+   반올림 드리프트가 없다 (선형 사상의 합성 = 선형 사상). ── */
+const HDR_H=48;   // 스테이지 = 헤더 아래
+function refitLayout(){
+  const vw=window.innerWidth, vh=window.innerHeight-HDR_H;
+  if(vw<500||vh<300) return;   // 비정상 뷰포트 방어
+  const ref=layout.__ref||{w:1900,h:856};
+  if(Math.abs(ref.w-vw)<2&&Math.abs(ref.h-vh)<2){ layout.__ref={w:vw,h:vh}; return; }
+  const sx=(vw-2*GAP)/(ref.w-2*GAP), sy=(vh-2*GAP)/(ref.h-2*GAP);
+  const mapX=v=>GAP+(v-GAP)*sx, mapY=v=>GAP+(v-GAP)*sy;
+  Object.keys(layout).forEach(id=>{ if(id==='__ref') return; const g=layout[id];
+    const r=mapX(g.x+g.w), b=mapY(g.y+g.h);
+    g.x=mapX(g.x); g.y=mapY(g.y); g.w=r-g.x; g.h=b-g.y;
+    // 리핏에서는 MIN_SIZE 클램프를 걸지 않는다 — 한 위젯만 늘리면 이웃과 겹쳐
+    // 선형 사상(무겹침 보존)이 깨진다. 콘텐츠는 위젯 내부 스크롤이 받치고,
+    // 절대 하한(120px)만 방어. 사용자 드래그/리사이즈 시의 MIN_SIZE는 그대로.
+    if(g.w<120)g.w=120; if(g.h<120)g.h=120;
+    applyGeo(id); });
+  layout.__ref={w:vw,h:vh}; saveLayout();
+}
+let _refitT=null;
+window.addEventListener('resize', ()=>{ clearTimeout(_refitT); _refitT=setTimeout(refitLayout,150); });
+document.addEventListener('fullscreenchange', ()=>{ clearTimeout(_refitT); _refitT=setTimeout(refitLayout,120); });
 
 function applyGeo(id){ const el=document.getElementById('w-'+id); if(!el) return; const g=layout[id];
   el.style.display=g.hidden?'none':'flex';
@@ -1872,6 +1900,7 @@ document.querySelectorAll('.widget .wic[title="Close widget"]').forEach(ic=>{
 
 /* ════════════════════ 부팅 ════════════════════ */
 gamesStore.sub(games=>{ renderLeagues(games); renderBoard(games); renderSchedule(games); renderLive(games); });
+refitLayout();   // 첫 페인트부터 현재 뷰포트를 수학적으로 채움 (저장 배치는 비율 보존)
 gamesStore.start();
 moneyStore.start();
 </script>
