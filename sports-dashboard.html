@@ -206,6 +206,7 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .mssheet .mh h3{font-size:17px; font-weight:700}
 .mssheet .mh .mx{margin-left:auto; color:var(--lgd-dim); cursor:pointer; width:26px; height:26px; display:flex; align-items:center; justify-content:center; border-radius:6px}
 .mssheet .mh .mx:hover{background:var(--lgd-pill); color:var(--lgd-ink)}
+.mssheet *{box-sizing:border-box}   /* 입력칸이 시트 폭을 넘지 않게 (padding 포함 계산) */
 .mssheet .mbody{padding:0 18px 18px; display:flex; flex-direction:column; gap:12px}
 .mssheet .lbl{font-size:var(--lgd-fs-label); color:var(--lgd-dim); font-weight:600; margin-bottom:5px}
 .mssheet .in{width:100%; background:var(--lgd-surface2); border:1px solid var(--lgd-hair); border-radius:8px;
@@ -217,10 +218,14 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .mssheet .addrbox button{background:var(--lgd-pill); border:none; color:var(--lgd-ink); border-radius:6px; padding:6px 10px;
   font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; white-space:nowrap}
 .mssheet .tfdir{display:flex; align-items:center; gap:8px}
-.mssheet .tfdir .leg{flex:1; background:var(--lgd-surface2); border:1px solid var(--lgd-hair); border-radius:8px; padding:9px 10px; text-align:center}
+.mssheet .tfdir .leg{flex:1; background:var(--lgd-surface2); border:1px solid var(--lgd-hair); border-radius:8px;
+  padding:9px 10px; text-align:center; cursor:pointer; transition:border-color .12s}
+.mssheet .tfdir .leg:hover{border-color:var(--lgd-dim)}
 .mssheet .tfdir .leg .k{font-size:var(--lgd-fs-caption); color:var(--lgd-dim)}
 .mssheet .tfdir .leg .v{font-weight:700; font-size:14px; margin-top:2px}
-.mssheet .tfdir .swap{background:var(--lgd-pill); border:none; color:var(--lgd-ink); width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:15px}
+.mssheet .tfdir .swap{background:var(--lgd-pill); border:none; color:var(--lgd-ink); width:36px; height:36px;
+  border-radius:50%; cursor:pointer; font-size:17px; flex:none}
+.mssheet .tfdir .swap:hover{background:var(--lgd-pill-hi)}
 .mssheet .sumrow{display:flex; justify-content:space-between; font-size:var(--lgd-fs-label); padding:2px 0}
 .mssheet .sumrow.big{font-weight:700; font-size:15px; padding-top:8px; border-top:1px solid var(--lgd-hair); margin-top:2px}
 .mssheet .sumrow .dim{color:var(--lgd-dim)}
@@ -1321,9 +1326,9 @@ function renderMoney(){
       '<div class="mh"><h3>Transfer</h3><span class="mx" id="msX">✕</span></div>'+
       '<div class="mbody">'+
       '<div class="hint">Move <b>USDT</b> between your servers instantly with no fees. Transfer to <b>Sports</b> to start betting.</div>'+
-      '<div class="tfdir"><div class="leg"><div class="k">From</div><div class="v" id="msFrom">'+fromNm+'</div></div>'+
-      '<button class="swap" id="msSwap" title="Swap">⇄</button>'+
-      '<div class="leg"><div class="k">To</div><div class="v" id="msTo">'+toNm+'</div></div></div>'+
+      '<div class="tfdir"><div class="leg" data-swap title="Switch direction"><div class="k">From</div><div class="v" id="msFrom">'+fromNm+'</div></div>'+
+      '<button class="swap" id="msSwap" title="Switch direction">⇄</button>'+
+      '<div class="leg" data-swap title="Switch direction"><div class="k">To</div><div class="v" id="msTo">'+toNm+'</div></div></div>'+
       '<div><div class="lbl">AMOUNT (USDT) · Available '+(fromBal!=null?usd(fromBal):'···')+'</div>'+
       '<input class="in tnum" id="msAmt" type="number" min="0" step="10" placeholder="0.00" inputmode="decimal"></div>'+
       '<div class="chips"><button data-fill="25">25%</button><button data-fill="50">50%</button><button data-fill="100">Max</button></div>'+
@@ -1349,7 +1354,10 @@ function bindMoney(){
       amt.value=(Math.floor(w*(+b.dataset.fill/100)*100)/100)||0; upd(); });
     document.getElementById('msGo').onclick=doWithdraw;
   } else {
-    document.getElementById('msSwap').onclick=()=>{ const f=tfFrom; tfFrom=tfTo; tfTo=f; renderMoney(); };
+    // 방향 전환: ⇄ 버튼 + From/To 박스 어디를 눌러도 (Sports→Crypto 역방향 포함)
+    const doSwap=()=>{ const f=tfFrom; tfFrom=tfTo; tfTo=f; renderMoney(); };
+    document.getElementById('msSwap').onclick=doSwap;
+    document.querySelectorAll('#msSheet [data-swap]').forEach(el=>{ el.onclick=doSwap; });
     document.querySelectorAll('#msSheet .chips button').forEach(b=>b.onclick=()=>{
       const src=tfFrom==='sports'?(moneyStore.withdrawable!=null?moneyStore.withdrawable:moneyStore.bal):moneyStore.balCrypto;
       amt.value=(Math.floor((src||0)*(+b.dataset.fill/100)*100)/100)||0; });
