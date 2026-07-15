@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>ALPEXA WebTrade — Carbon Skin Preview</title>
+<style>body{background:#0d0d0d;color:#898781;font:12px system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}</style>
+</head>
+<body>
+<div id="boot">carbon preview loading…</div>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+  CARBON SKIN PREVIEW (2026-07-14) — 디자인 시안 전용, 원본 무변경.
+  webtrade.html(진짜 터미널)을 fetch해서:
+    1) 카본 디자인 토큰 CSS를 </head> 직전에 덧입히고
+    2) 차트 캔버스 색(JS CHART_THEME/CANDLE_THEME 문자열)을 카본 팔레트로 치환한 뒤
+  document.write로 렌더한다. webtrade.html 파일 자체는 1바이트도 바뀌지 않으며,
+  기본 주소(webtrade.html)는 계속 순정 MT5 스킨으로 서빙된다.
+  ⚠ 문자열 치환은 프리뷰 전용 기법 — 정식 채택 시엔 ?skin=carbon 테마 레이어로 구현.
+═══════════════════════════════════════════════════════════════════════════ */
+const CARBON_CSS = `
+<style id="carbon-skin">
+/* ── carbon tokens (sports-dashboard 시안과 동일) ── */
+:root{ --bg:#0d0d0d !important; --panel:#1a1a19 !important; --panel2:#222220 !important;
+  --line:rgba(255,255,255,.1) !important; --cellbd:rgba(255,255,255,.12) !important;
+  --text:#ffffff !important; --dim:#898781 !important;
+  --up:#0ca30c !important; --down:#d03b3b !important; --accent:#3987e5 !important; --r:10px !important; }
+html,body,.terminal{background:#0d0d0d !important}
+.left,.watch,.nav,.tbx,.mwt,.postbl{background:#1a1a19 !important}
+.mwt th{background:#1a1a19 !important; border-color:rgba(255,255,255,.1) !important; color:#898781 !important}
+.mwt td{border-color:rgba(255,255,255,.05) !important}
+.win{background:#1a1a19 !important; border:1px solid rgba(255,255,255,.1) !important; border-radius:10px !important;
+  box-shadow:none !important; overflow:hidden}
+.win.active{border-color:rgba(255,255,255,.28) !important; box-shadow:0 12px 34px rgba(0,0,0,.5) !important}
+.cell-title{background:#1a1a19 !important; border-bottom:1px solid rgba(255,255,255,.1) !important;
+  color:#c3c2b7 !important; font-size:12px !important}
+.menubar,.tools{background:#0d0d0d !important; border-color:rgba(255,255,255,.1) !important}
+.tbtn,.tibtn{background:#1a1a19 !important; border:1px solid rgba(255,255,255,.1) !important; border-radius:8px !important;
+  box-shadow:none !important; color:#c3c2b7 !important; background-image:none !important}
+.tibtn.on,.tf b.on{background:rgba(57,135,229,.14) !important; border:1px solid #3987e5 !important; color:#3987e5 !important; border-radius:8px}
+.tf b{color:#898781}
+.obox,.obox.tick-up,.obox.tick-down{background:#222220 !important; background-image:none !important;
+  border:1px solid rgba(255,255,255,.1) !important; border-radius:10px !important; box-shadow:none !important}
+.obox .sell{color:#d03b3b !important} .obox .buy{color:#0ca30c !important}
+.obox .oc-spr{background:#1a1a19 !important; border:1px solid rgba(255,255,255,.1) !important; border-radius:6px !important}
+.statusbar,.tbxtabs,.histbar{background:#1a1a19 !important; border-color:rgba(255,255,255,.1) !important}
+/* ── typography: MT5 Tahoma → 대시보드 시안의 system-ui + tabular-nums ── */
+.terminal, .terminal *{font-family:system-ui,-apple-system,'Segoe UI',sans-serif !important}
+.mwt td, .mwt th, .postbl td, .postbl th, .obox, .statusbar, .oc-spr, .tf b{font-variant-numeric:tabular-nums}
+.cell-title{font-weight:600 !important; letter-spacing:.4px}
+.menu{font-size:12px !important}
+.mwt td{font-size:12px !important}
+.tbtn{font-weight:600}
+/* ── 패널 타이틀바 (Market Watch/Navigator/Toolbox): 그라데이션 → 플랫 서피스 + 그립 무드 ── */
+.mwhead{background:#1a1a19 !important; border-top:none !important; border-bottom:1px solid rgba(255,255,255,.1) !important;
+  color:#c3c2b7 !important; text-shadow:none !important; font-size:12px !important; font-weight:600 !important; height:32px !important}
+/* ── 메뉴 드롭다운/컨텍스트 메뉴: 라운드 카드 ── */
+.mdrop{background:#222220 !important; border:1px solid rgba(255,255,255,.14) !important; border-radius:10px !important;
+  box-shadow:0 12px 34px rgba(0,0,0,.55) !important; overflow:hidden}
+/* ── 선택 행: MT5 파란 하이라이트 → 은은한 액센트 틴트 ── */
+.mwt tr.sel td{background:rgba(57,135,229,.14) !important; color:#fff !important}
+.mwt tr:hover td{background:#222220}
+/* ── 하단 차트 탭: 활성 = 액센트 인디케이터 + 서피스 ── */
+.charttabs{background:#0d0d0d !important; border-color:rgba(255,255,255,.1) !important}
+.charttabs .ctab{color:#898781 !important}
+.charttabs .ctab:hover{background:#1a1a19 !important; color:#c3c2b7 !important}
+.charttabs .ctab.on{background:#1a1a19 !important; color:#fff !important}
+.charttabs .ctab.on::before{background:#3987e5 !important}
+/* ── 주문창: 버튼/입력을 시안 언어로 (SELL=다운 레드, BUY=업 그린 틴트) ── */
+.om-btns button{border-radius:8px !important; font-weight:700}
+.om-btns .om-sell{background:rgba(208,59,59,.16) !important; border:1px solid #d03b3b !important; color:#d03b3b !important}
+.om-btns .om-buy{background:rgba(12,163,12,.16) !important; border:1px solid #0ca30c !important; color:#0ca30c !important}
+.om-body input,.om-body select{background:#222220 !important; border:1px solid rgba(255,255,255,.1) !important;
+  border-radius:8px !important; color:#fff !important}
+/* ── 원클릭: 방향 표현은 유지하되 카본 언어(틴트 보더)로 ── */
+.obox.tick-up{border-color:rgba(12,163,12,.55) !important}
+.obox.tick-down{border-color:rgba(208,59,59,.55) !important}
+.obox .obtns button,.obox button{border-radius:8px !important}
+/* ── 하단 도크 탭/히스토리 버튼 ── */
+.tbxtabs .t{color:#898781 !important}
+.tbxtabs .t.on,.tbxtabs .t:hover{color:#fff !important; background:#222220 !important}
+.histbar .hb{background:#1a1a19 !important; border:1px solid rgba(255,255,255,.12) !important; border-radius:8px !important; color:#c3c2b7 !important}
+/* ── 스크롤바: 헤어라인 미니멀 ── */
+.terminal ::-webkit-scrollbar{width:8px;height:8px}
+.terminal ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14) !important; border:2px solid transparent !important;
+  border-radius:99px !important; background-clip:content-box !important}
+.terminal ::-webkit-scrollbar-track{background:transparent !important}
+/* ── 상태바/좌하단 잔고줄 ── */
+.statusbar{color:#898781 !important}
+.statusbar b{color:#fff !important}
+/* preview badge */
+#carbon-badge{position:fixed; right:14px; bottom:12px; z-index:9999; font:600 10px system-ui; letter-spacing:.6px;
+  color:#3987e5; background:rgba(57,135,229,.12); border:1px solid #3987e5; border-radius:99px; padding:4px 10px; pointer-events:none}
+</style>
+<div id="carbon-badge">CARBON SKIN PREVIEW — 시안</div>
+`;
+// 차트 캔버스(JS 테마) 카본화 — 원본 문자열이 그대로 있을 때만 치환 (없으면 건너뜀 = 안전)
+const JS_SWAPS = [
+  ["dark:  { bg:'#000000', text:'#ffffff', grid:'#2a2a2a', border:'#555555', cross:'#888888' }",
+   "dark:  { bg:'#1a1a19', text:'#c3c2b7', grid:'#2c2c2a', border:'rgba(255,255,255,0.18)', cross:'#898781' }"],
+  ["dark:  { upBody:'rgba(0,0,0,0)', downBody:'#ff2b2b', upLine:'#00ff00', downLine:'#ff2b2b' }",
+   "dark:  { upBody:'rgba(0,0,0,0)', downBody:'#d03b3b', upLine:'#0ca30c', downLine:'#d03b3b' }"],
+  // 차트 축 폰트도 시안 서체로 (Tahoma → system-ui)
+  ["fontFamily:\"Tahoma, 'Segoe UI', Arial, sans-serif\"",
+   "fontFamily:\"system-ui, -apple-system, 'Segoe UI', sans-serif\""],
+];
+fetch('webtrade.html', {cache:'no-store'}).then(r=>{
+  if(!r.ok) throw new Error('webtrade.html '+r.status);
+  return r.text();
+}).then(src=>{
+  let out=src;
+  JS_SWAPS.forEach(([a,b])=>{ out = out.split(a).join(b); });
+  out = out.replace('</head>', CARBON_CSS + '</head>');
+  document.open(); document.write(out); document.close();
+}).catch(e=>{
+  document.getElementById('boot').textContent='프리뷰 로드 실패: '+e.message+' — webtrade.html과 같은 폴더에서 열어야 합니다';
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>location.replace('../login.html');</script>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alpexa Sports — Log in</title>
+<style>
+  :root{--bg:#05070f;--line:rgba(255,255,255,.09);--text:#f4f6fb;--muted:#9aa3b8;--accent:#1e40d8;--accent2:#3a5bf0}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--text);background:var(--bg);line-height:1.6;-webkit-font-smoothing:antialiased;min-height:100vh;display:flex;flex-direction:column}
+  a{color:inherit;text-decoration:none}
+  button{font-family:inherit;cursor:pointer}
+  .glow{position:fixed;inset:0;z-index:-2;pointer-events:none}
+  .glow::before{content:"";position:absolute;top:-200px;left:50%;transform:translateX(-50%);width:900px;height:700px;background:radial-gradient(circle at center,rgba(59,130,246,.3),rgba(124,92,255,.1) 40%,transparent 70%);filter:blur(20px)}
+  body::after{content:"";position:fixed;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(5,7,15,.82),rgba(5,7,15,.94) 55%,rgba(5,7,15,.98)),url("https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1900&q=80") center/cover no-repeat}
+
+  .top{display:flex;align-items:center;justify-content:space-between;padding:20px 28px;max-width:1000px;width:100%;margin:0 auto}
+  .logo{font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:17px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;display:inline-flex;align-items:center;gap:9px;white-space:nowrap;flex:none}
+  .top{flex-wrap:nowrap}
+  .logo .mark{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:7px;background:#1e40d8;color:#fff;font-size:14px;font-weight:800;letter-spacing:0;flex:none}
+  .top .back{font-size:13px;color:var(--muted)}
+  .top .back:hover{color:#fff}
+
+  .wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:14px 24px 50px}
+  .card{width:min(900px,100%);display:grid;grid-template-columns:1fr 1.12fr;border:1px solid var(--line);border-radius:24px;overflow:hidden;background:rgba(10,14,26,.7);backdrop-filter:blur(8px)}
+
+  .side{position:relative;padding:34px 30px;background:linear-gradient(160deg,rgba(59,130,246,.38),rgba(10,14,30,.9) 70%),url("https://images.unsplash.com/photo-1471295253337-3ceaaedca402?auto=format&fit=crop&w=1000&q=80") center/cover no-repeat;border-right:1px solid var(--line);display:flex;flex-direction:column}
+  .side .brand{font-size:16px;font-weight:700;margin-bottom:auto;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.6)}
+  .side .eb{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#9bc2ff;font-weight:600;margin:30px 0 10px}
+  .side h1{font-size:24px;font-weight:500;letter-spacing:-.8px;line-height:1.2;margin-bottom:14px;text-shadow:0 1px 10px rgba(0,0,0,.5)}
+  .side p{font-size:13px;color:#dce6ff;max-width:240px}
+
+  .form{padding:32px 30px;display:flex;flex-direction:column;justify-content:center}
+  .form h2{font-size:21px;font-weight:700;margin-bottom:4px}
+  .form .switch{font-size:13px;color:var(--muted);margin-bottom:22px}
+  .form .switch a{color:#9bc2ff}
+  .field{margin-bottom:14px}
+  .field .lrow{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .field label{font-size:12px;color:var(--muted)}
+  .field .forgot{font-size:12px;color:#9bc2ff}
+  .field input{width:100%;height:44px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:11px;padding:0 13px;color:#fff;font-size:14px;outline:none;transition:border-color .15s,background .15s}
+  .field input:focus{border-color:var(--accent);background:rgba(59,130,246,.08)}
+  .field input:-webkit-autofill,.field input:-webkit-autofill:hover,.field input:-webkit-autofill:focus{
+    -webkit-text-fill-color:#fff;caret-color:#fff;-webkit-box-shadow:0 0 0 1000px #0e1424 inset;box-shadow:0 0 0 1000px #0e1424 inset;border:1px solid var(--line);transition:background-color 99999s ease 0s}
+  .err{display:none;font-size:11px;color:#ff7a6b;margin-top:5px}
+  .field.invalid .err{display:block}
+  .field.invalid input{border-color:#ff5a5a}
+  .remember{display:flex;gap:9px;align-items:center;margin:4px 0 18px;cursor:pointer}
+  .remember input{position:absolute;opacity:0;width:0;height:0}
+  .remember .box{width:18px;height:18px;border-radius:5px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.03);display:flex;align-items:center;justify-content:center;flex:none;transition:background .15s,border-color .15s}
+  .remember .box svg{opacity:0;transition:opacity .12s}
+  .remember input:checked + .box{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent}
+  .remember input:checked + .box svg{opacity:1}
+  .remember .lbl{font-size:12px;color:var(--muted)}
+  .submit{width:100%;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;transition:opacity .15s,transform .05s}
+  .submit:hover{opacity:.92}
+  .submit:active{transform:translateY(1px)}
+  .or{display:flex;align-items:center;gap:10px;margin:18px 0}
+  .or span{flex:1;height:1px;background:rgba(255,255,255,.1)}
+  .or em{font-size:11px;color:#6b7488;font-style:normal}
+  .social{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  .sbtn{border:1px solid var(--line);border-radius:11px;padding:11px;display:flex;align-items:center;justify-content:center;gap:7px;font-size:13px;color:#cdd4e4;background:rgba(255,255,255,.03);transition:background .15s}
+  .sbtn:hover{background:rgba(255,255,255,.08)}
+  .demo-note{font-size:11px;color:#6b7488;text-align:center;margin-top:14px}
+
+  .success{display:none;text-align:center;padding:30px 10px}
+  .success .ic{width:56px;height:56px;border-radius:50%;background:rgba(61,220,132,.14);display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+  .success h2{font-size:20px;font-weight:600;margin-bottom:6px}
+  .success p{color:var(--muted);font-size:14px}
+
+  @media(max-width:760px){
+    .card{grid-template-columns:1fr}
+    .side{display:none}
+    .top{padding:16px 16px}
+    .logo{font-size:15px;letter-spacing:.8px;white-space:nowrap}
+    .logo .mark{flex:none}
+    .back{font-size:12px;white-space:nowrap}
+  }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>try{window._db=window.supabase.createClient('https://grxnbgtfnaayeluenvqh.supabase.co','sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu');}catch(e){console.error('supabase init',e);}</script>
+<script>
+/* Stay signed in: if this device already has a session, go straight to the
+   dashboard. Add ?switch=1 to the URL to force the login form. */
+(function(){try{
+  if(/[?&]switch=1/.test(location.search)) return;
+  if(/(type=recovery|access_token|error_description)/.test(location.hash)) return;
+  var m=JSON.parse(localStorage.getItem('alpexa.me')||'null');
+  if(m&&m.accts&&(m.email||m.authId)){ location.replace('dashboard.html'); }
+}catch(e){}})();
+</script>
+</head>
+<body>
+  <div class="glow"></div>
+
+  <div class="top">
+    <a class="logo" href="index.html"><span class="mark">A</span>Alpexa Sports</a>
+    <a class="back" href="index.html">← Back to home</a>
+  </div>
+
+  <div class="wrap">
+    <div class="card">
+      <div class="side">
+        <div class="brand">Alpexa Sports</div>
+        <div>
+          <div class="eb">Welcome back</div>
+          <h1>Good to see you again</h1>
+          <p>Log in to check your bets, claim boosts, and pick up where you left off.</p>
+        </div>
+      </div>
+
+      <div class="form">
+        <div id="formWrap">
+          <h2>Log in</h2>
+          <div class="switch">Don't have an account? <a href="signup.html">Sign up</a></div>
+          <form id="loginForm" novalidate>
+            <div class="field" id="f-email">
+              <div class="lrow"><label for="email">Email</label></div>
+              <input type="email" id="email" placeholder="you@example.com" autocomplete="email">
+              <div class="err">Please enter a valid email.</div>
+            </div>
+            <div class="field" id="f-pass">
+              <div class="lrow"><label for="pass">Password</label><a class="forgot" href="#">Forgot?</a></div>
+              <input type="password" id="pass" placeholder="Your password" autocomplete="current-password">
+              <div class="err">Please enter your password.</div>
+            </div>
+            <label class="remember">
+              <input type="checkbox" id="remember" checked>
+              <span class="box"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+              <span class="lbl">Keep me signed in</span>
+            </label>
+            <div class="err" id="authErr" style="display:none;color:#ff7a6b;font-size:12px;margin:0 0 12px"></div>
+            <button type="submit" class="submit">Log in</button>
+            <!-- social sign-in removed: fake Google/Apple buttons triggered a Safe Browsing phishing flag -->
+
+            <div class="demo-note">18+ only. Bet responsibly.</div>
+          </form>
+        </div>
+
+        <div class="success" id="success">
+          <div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#3ddc84" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+          <h2>You're in!</h2>
+          <p id="successMsg">Signed in successfully.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  /* Real login wired to our Supabase backend (same accounts as the app). */
+  (function(){
+    var form=document.getElementById('loginForm');
+    var email=document.getElementById('email'),pass=document.getElementById('pass');
+    var errEl=document.getElementById('authErr');
+    var btn=form.querySelector('.submit');
+    function fieldBad(id,bad){document.getElementById(id).classList.toggle('invalid',bad);}
+    function showErr(msg,good){ if(!errEl)return; errEl.textContent=msg; errEl.style.color=good?'#3ddc84':'#ff7a6b'; errEl.style.display=msg?'block':'none'; }
+    function clearErr(){ showErr(''); }
+    [email,pass].forEach(function(el){el.addEventListener('input',function(){el.closest('.field').classList.remove('invalid');clearErr();});});
+
+    // Forgot password -> send a reset email; the link reuses the app's working
+    // reset screen (root /login.html handles the recovery token).
+    var forgot=document.querySelector('#f-pass .forgot');
+    if(forgot){ forgot.addEventListener('click', async function(e){
+      e.preventDefault();
+      var login=(email.value||'').trim();
+      if(!login){ fieldBad('f-email',true); showErr('Enter your email first, then tap Forgot.'); return; }
+      if(!window._db){ showErr('No server connection — check your internet.'); return; }
+      try{
+        var addr=login;
+        if(login.indexOf('@')<0){ var r=await window._db.rpc('login_email',{p_login:login.toUpperCase()}); if(r&&!r.error&&r.data){addr=r.data;} else { showErr('Account not found. Enter the email you signed up with.'); return; } }
+        var rr=await window._db.auth.resetPasswordForEmail(addr,{ redirectTo: location.origin+'/login.html' });
+        if(rr&&rr.error){ showErr(rr.error.message||'Could not send the reset email.'); return; }
+        showErr('Reset email sent to '+addr+' — check your inbox.', true);
+      }catch(e2){ showErr('Could not send the reset email. Please try again.'); }
+    }); }
+
+    form.addEventListener('submit', async function(e){
+      e.preventDefault();
+      clearErr();
+      var login=(email.value||'').trim(), pw=pass.value, ok=true;
+      if(!login){ fieldBad('f-email',true); ok=false; } else fieldBad('f-email',false);
+      if(!pw){ fieldBad('f-pass',true); ok=false; } else fieldBad('f-pass',false);
+      if(!ok) return;
+      if(!window._db){ showErr('No server connection — check your internet.'); return; }
+      var label=btn.textContent; btn.disabled=true; btn.style.opacity='.7'; btn.textContent='Logging in…';
+      var fail=function(m){ btn.disabled=false; btn.style.opacity='1'; btn.textContent=label; showErr(m); };
+      try{
+        // Allow account-number login by resolving it to the email first.
+        var addr=login;
+        if(login.indexOf('@')<0){
+          var lr=await window._db.rpc('login_email',{p_login:login.toUpperCase()});
+          if(lr.error) throw lr.error;
+          if(!lr.data){ fail('Account not found. Check it, or sign up.'); return; }
+          addr=lr.data;
+        }
+        // Real password check via Supabase Auth.
+        var au=await window._db.auth.signInWithPassword({ email:addr, password:pw });
+        if(au && au.error){
+          var msg=(au.error.message||'').toLowerCase();
+          if(msg.indexOf('invalid')>=0||msg.indexOf('credential')>=0){ fail('Wrong email or password.'); return; }
+          if(msg.indexOf('confirm')>=0){ fail('Please confirm your email first (check your inbox).'); return; }
+          fail(au.error.message||'Login failed.'); return;
+        }
+        var authId=(au&&au.data&&au.data.user)?au.data.user.id:null;
+        // Load the linked profile (by auth link first, then email).
+        var player=null;
+        if(authId){
+          var p1=await window._db.from('players').select('id,cust_id,name,email').eq('auth_id',authId).order('created_at',{ascending:true}).limit(1);
+          if(!p1.error&&p1.data&&p1.data.length) player=p1.data[0];
+        }
+        if(!player){
+          var p2=await window._db.from('players').select('id,cust_id,name,email').ilike('email',addr).order('created_at',{ascending:true}).limit(1);
+          if(!p2.error&&p2.data&&p2.data.length) player=p2.data[0];
+        }
+        if(!player){ fail('Signed in, but no profile found. Contact support.'); return; }
+        var accs=await window._db.from('accounts').select('server,acct_no,balance').eq('player_id',player.id);
+        if(accs.error) throw accs.error;
+        var accts={sports:'',crypto:'',fx:''}, bals={sports:0,crypto:0,fx:0};
+        (accs.data||[]).forEach(function(a){ if(a.server){ accts[a.server]=a.acct_no; bals[a.server]=+a.balance||0; } });
+        // If a DIFFERENT customer signs in on this device, clear the previous
+        // account's cached money data so balances don't bleed across accounts.
+        try{ var _prev=JSON.parse(localStorage.getItem('alpexa.me')||'null');
+          if(!_prev||_prev.custId!==player.cust_id){
+            ['alpexa.serverBalances','alpexa.balances','alpexa.cryptoHoldings','alpexa.staked','alpexa.sportsBalance','alpexa.cryptoBalance','alpexa.fxLive','alpexa.openBets','alpexa.settledBets','alpexa.withdrawals','alpexa.transactions','alpexa.funding','alpexa.txns','alpexa.appliedTransfers','alpexa.customer','alpexa.openDeposit','alpexa.ownerFunded'].forEach(function(k){ localStorage.removeItem(k); });
+          } }catch(e3){}
+        // Adopt the SERVER's balances as the source of truth on login.
+        try{
+          localStorage.setItem('alpexa.serverBalances', JSON.stringify({fx:bals.fx,crypto:bals.crypto,sports:bals.sports}));
+          localStorage.setItem('alpexa.balances', JSON.stringify({live:bals.fx,crypto:bals.crypto,sports:bals.sports}));
+          localStorage.setItem('alpexa.sportsBalance', String(bals.sports));
+          var _hadH=false; try{var _h=JSON.parse(localStorage.getItem('alpexa.cryptoHoldings')||'null'); _hadH=_h&&Object.keys(_h).length>0;}catch(e4){}
+          if(!_hadH){ localStorage.setItem('alpexa.cryptoHoldings', JSON.stringify({USDT:bals.crypto})); }
+        }catch(e5){}
+        // Identity (source of truth across the whole domain — app + website).
+        localStorage.setItem('alpexa.me', JSON.stringify({custId:player.cust_id,name:player.name,email:player.email,authId:authId,accts:accts}));
+        try{ localStorage.setItem('alpexa.lastServer','crypto'); }catch(e6){}
+        // Success UI -> Crypto app (default landing).
+        document.getElementById('successMsg').textContent='Signed in as '+(player.name||player.cust_id);
+        document.getElementById('formWrap').style.display='none';
+        document.getElementById('success').style.display='block';
+        setTimeout(function(){ window.location.href='dashboard.html'; }, 900);
+      }catch(err){ fail((err&&err.message)||'Login failed. Please try again.'); }
+    });
+  })();
+  </script>
+
+</body>
+</html>

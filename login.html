@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>ALPEXA SUISSE — Login</title>
+<link rel="manifest" href="manifest.json">
+<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script>
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=5">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=5">
+<link rel="shortcut icon" href="favicon.ico?v=5">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Alpexa Suisse">
+<meta name="mobile-web-app-capable" content="yes">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--accent:#1e40d8;--accent-press:#1734b0;--tint:#EEF3FE;--ink:#0F1115;--muted:#8A9099;--canvas:#F5F5F7;--surface:#fff;--soft:#F4F6F9;--line:#E6E6E9}
+/* Dark theme — applied (html.dark) when the app's theme is dark. */
+html.dark{--accent:#4f6ef7;--accent-press:#3a5bf0;--tint:rgba(79,110,247,.16);--ink:#eef2f8;--muted:#9aa6bd;--canvas:#0b0f1a;--surface:#0f1424;--soft:#1a2236;--line:rgba(255,255,255,.10)}
+html.dark .create-line{color:var(--muted)}
+html.dark .error-bar{background:rgba(229,72,77,.14);color:#ff7a7e}
+html.dark .error-bar svg{stroke:#ff7a7e}
+body{font-family:'SF Pro Display',system-ui,-apple-system,BlinkMacSystemFont,'Inter','Helvetica Neue',Arial,sans-serif;letter-spacing:-0.374px;color:var(--ink);background:var(--canvas);display:flex;justify-content:center;min-height:100dvh}
+#wrap{width:100%;max-width:430px;min-height:100dvh;background:var(--surface);display:flex;flex-direction:column;padding:0 28px;position:relative;overflow:hidden}
+.lg-head{padding-top:calc(env(safe-area-inset-top,16px) + 24px);display:flex;align-items:center;gap:10px}
+.amark{width:36px;height:36px;border-radius:11px;background:linear-gradient(160deg,#3a5bf0,#1e40d8 58%,#1734b0);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.amark svg{width:20px;height:20px}
+.wordmark{font-size:16px;font-weight:600;color:var(--ink);letter-spacing:-0.2px}
+.overline{font-size:11px;font-weight:600;letter-spacing:2.6px;color:var(--accent);margin-top:46px}
+.h1{font-size:34px;font-weight:600;letter-spacing:-1.2px;margin-top:12px}
+.error-bar{background:#FDEDED;border-radius:12px;padding:11px 14px;font-size:13px;color:#C0392B;margin-top:18px;display:none;align-items:center;gap:8px}
+.error-bar svg{width:16px;height:16px;stroke:#C0392B;fill:none;stroke-width:2;stroke-linecap:round;flex-shrink:0}
+.form{margin-top:28px;display:flex;flex-direction:column;gap:14px}
+.field-label{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.3px;margin-bottom:7px;display:block;text-transform:uppercase}
+.field-inner{display:flex;align-items:center;height:54px;padding:0 16px;background:var(--soft);border:1px solid var(--line);border-radius:14px;transition:border-color .15s}
+.field-inner:focus-within{border-color:var(--accent)}
+.field-inner input{flex:1;border:none;outline:none;font-size:16px;color:var(--ink);font-family:inherit;background:transparent;letter-spacing:-0.2px}
+.field-inner input::placeholder{color:var(--muted)}
+.field-inner .eye{background:none;border:none;cursor:pointer;padding:0 0 0 8px;display:flex;align-items:center}
+.field-inner .eye svg{width:20px;height:20px;stroke:var(--muted);fill:none;stroke-width:1.6;stroke-linecap:round}
+.forgot{text-align:right;margin-top:2px}
+.forgot .link-btn{font-size:13px;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;font-family:inherit;padding:0}
+.srv-seg{display:flex;gap:8px}
+.srv-opt{flex:1;height:48px;border:1px solid var(--line);background:var(--soft);border-radius:12px;font-family:inherit;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;transition:border-color .15s,background .15s,color .15s;letter-spacing:-.2px}
+.srv-opt.on{border-color:var(--accent);background:var(--tint);color:var(--accent)}
+.actions{margin-top:auto;padding-bottom:calc(env(safe-area-inset-bottom,18px) + 24px)}
+.btn-row{display:flex;align-items:center;gap:12px}
+.signin-btn{flex:1;height:54px;background:var(--accent);border:none;border-radius:9999px;color:#fff;font-size:17px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;transition:transform .14s,background .2s}
+.signin-btn:active{transform:scale(.97);background:var(--accent-press)}
+.bio-btn{width:54px;height:54px;border-radius:9999px;background:var(--tint);border:none;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;transition:transform .14s}
+.bio-btn:active{transform:scale(.94)}
+.bio-btn svg{width:26px;height:26px;stroke:var(--accent);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.bio-btn #bioTxt{display:none}
+.spinner{width:20px;height:20px;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.create-line{text-align:center;font-size:14px;margin-top:18px;color:#5F6470}
+.create-line .link-btn{color:var(--accent);font-weight:600;background:none;border:none;cursor:pointer;font-family:inherit;font-size:14px;padding:0}
+.success-screen{position:fixed;inset:0;background:var(--surface);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 28px}
+.suc-ico{width:76px;height:76px;border-radius:38px;background:var(--tint);display:flex;align-items:center;justify-content:center;margin-bottom:22px}
+.suc-ico svg{width:36px;height:36px;stroke:var(--accent);fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.suc-title{font-size:24px;font-weight:600;letter-spacing:-0.8px;color:var(--ink);margin-bottom:8px;text-align:center}
+.suc-sub{font-size:14px;color:var(--muted);text-align:center;line-height:1.6;margin-bottom:30px}
+.suc-btn{width:100%;max-width:330px;height:54px;background:var(--accent);border:none;border-radius:9999px;color:#fff;font-size:17px;font-weight:600;cursor:pointer;font-family:inherit}
+/* Post-login splash (replaces the old "Welcome back" screen). Coinbase-style:
+   small centered wordmark + faint parent watermark. The mark text is set per
+   server (Alpexa Sports / Crypto / FX) in JS — login.html is shared by all 3 apps. */
+.splash-screen{animation:splashIn .45s ease both}
+@keyframes splashIn{from{opacity:0}to{opacity:1}}
+.splash-mark{font-family:'Helvetica Neue',Arial,sans-serif;font-size:23px;font-weight:700;letter-spacing:4px;text-transform:uppercase;white-space:nowrap;color:#1e40d8}
+.splash-wm{position:absolute;left:0;right:0;bottom:42px;text-align:center;font-size:11px;font-weight:500;letter-spacing:.8px;color:var(--muted);opacity:.55}
+.field{margin-bottom:0}
+#toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:#1F232B;color:#fff;padding:10px 20px;border-radius:24px;font-size:13px;white-space:nowrap;display:none;z-index:200;animation:tIn .2s ease}
+@keyframes tIn{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus,input:-webkit-autofill:active{
+  -webkit-text-fill-color:var(--ink) !important;-webkit-box-shadow:0 0 0 1000px var(--soft) inset !important;
+  box-shadow:0 0 0 1000px var(--soft) inset !important;transition:background-color 9999s ease-in-out 0s;caret-color:var(--ink)}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>try{var _ss=null;try{if(window.sessionStorage){window.sessionStorage.getItem('__probe');_ss=window.sessionStorage;}}catch(e){}window._db=window.supabase.createClient('https://grxnbgtfnaayeluenvqh.supabase.co','sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu',_ss?{auth:{storage:_ss,persistSession:true,autoRefreshToken:true}}:undefined);}catch(e){console.error('supabase init',e);}</script><!-- session in sessionStorage (per-tab) — MUST match alpexa-sync.js so login carries to the app -->
+<script>
+/* NO auto-login. The login page is ALWAYS the login form — never bounce straight
+   into the app off a stored name tag. (#30) Why: `alpexa.me` is a PERSISTENT
+   localStorage tag (survives tab/browser close), but the real auth SESSION lives
+   in sessionStorage (per-tab, cleared when the browser closes). The old
+   "stay-signed-in" jump trusted the tag, so a closed-then-reopened browser (no
+   session) auto-forwarded into the app → phantom logged-out state (■■■ balance,
+   "No upcoming games") and, via the expired-redirect loop, got stuck there.
+   A returning user simply logs in again — that's the banking-app contract the
+   15-min idle auto-logout assumes. Do NOT re-add an auto-forward here. */
+</script>
+<script>
+/* Login always renders in the light (white) theme. */
+(function(){try{ document.documentElement.classList.remove('dark'); }catch(e){}})();
+</script>
+</head>
+<body>
+<div id="wrap">
+  <div class="lg-head">
+    <div class="amark"><svg viewBox="0 0 48 48" fill="none"><path d="M8 40 L24 10 L40 40 M14.5 29 L33.5 29" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+    <div class="wordmark">Alpexa Suisse</div>
+  </div>
+  <div class="overline">WELCOME BACK</div>
+  <div class="h1">Log in</div>
+  <div class="error-bar" id="errBar"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span id="errTxt"></span></div>
+  <div class="form">
+    <div>
+      <label class="field-label">Server</label>
+      <div class="srv-seg" id="srvSeg">
+        <button type="button" class="srv-opt" data-srv="0" onclick="selectServer(0)">FX</button>
+        <button type="button" class="srv-opt" data-srv="1" onclick="selectServer(1)">Crypto</button>
+        <button type="button" class="srv-opt" data-srv="2" onclick="selectServer(2)">Sports</button>
+      </div>
+    </div>
+    <div>
+      <label class="field-label">Email</label>
+      <div class="field-inner"><input id="loginInput" type="text" autocapitalize="none" autocorrect="off" placeholder="Account number or email" oninput="clearErr()"></div>
+    </div>
+    <div>
+      <label class="field-label">Password</label>
+      <div class="field-inner">
+        <input id="pwInput" type="password" placeholder="Enter your password" oninput="clearErr()" onkeydown="if(event.key==='Enter')doLogin()">
+        <button class="eye" onclick="togglePw()"><svg id="eyeIcon" viewBox="0 0 24 24"><path d="M3 12 C5.5 7 9 5 12 5 C15 5 18.5 7 21 12 C18.5 17 15 19 12 19 C9 19 5.5 17 3 12 Z"/><circle cx="12" cy="12" r="2.6"/></svg></button>
+      </div>
+    </div>
+    <div class="forgot"><button class="link-btn" onclick="doForgot()">Forgot password?</button></div>
+  </div>
+  <div class="actions">
+    <div class="btn-row">
+      <button class="signin-btn" id="signinBtn" onclick="doLogin()"><span id="signinTxt">Log in</span><div class="spinner" id="spinner"></div></button>
+      <button class="bio-btn" id="bioBtn" style="display:none" onclick="quickLogin()">
+        <svg viewBox="0 0 24 24"><path d="M5 8 V6.5 A1.5 1.5 0 0 1 6.5 5 H8 M16 5 H17.5 A1.5 1.5 0 0 1 19 6.5 V8 M19 16 V17.5 A1.5 1.5 0 0 1 17.5 19 H16 M8 19 H6.5 A1.5 1.5 0 0 1 5 17.5 V16"/><path d="M9 10 V12 M15 10 V12 M9.2 15 C10.5 16.2 13.5 16.2 14.8 15"/></svg>
+        <span id="bioTxt">Face ID</span>
+      </button>
+    </div>
+    <div class="create-line">New to Alpexa? <button class="link-btn" onclick="location.href='signup.html'">Create account</button></div>
+  </div>
+</div>
+<!-- engine-required elements kept (hidden): server picker, QR, tabs, save-pw -->
+<div style="display:none" aria-hidden="true">
+  <span id="serverVal"></span>
+  <div id="serverSheet"><div id="serverList"></div><input id="serverSearch"></div>
+  <div id="loginForm"></div><div id="qrForm"></div>
+  <span id="tab-login"></span><span id="tab-qr"></span>
+  <div id="saveBox"></div><div id="qrBox"></div><span id="qrTimer"></span>
+</div>
+<div id="successScreen" class="success-screen splash-screen" style="display:none">
+  <div class="splash-mark" id="splashMark">Alpexa Sports</div>
+</div>
+<div id="resetScreen" class="success-screen" style="display:none">
+  <div class="suc-title" style="margin-bottom:8px">Set a new password</div>
+  <div class="suc-sub" id="resetSub" style="margin-bottom:20px">Choose a new password for your account.</div>
+  <div class="field" style="width:100%;max-width:330px">
+    <label class="field-label">New password</label>
+    <div class="field-inner"><input id="resetPw" type="password" placeholder="At least 6 characters"></div>
+  </div>
+  <button class="suc-btn" style="max-width:330px;margin-top:18px" onclick="doReset()">Update password</button>
+</div>
+<div id="toast"></div>
+<script>
+const SERVERS=[
+  {name:'Alpexa FX',     url:'fx.alpexa-suisse.com:443',     color:'#2e7d32',tag:'FX & Stock',tagBg:'#e8f5e9',tagTxt:'#2e7d32'},
+  {name:'Alpexa Crypto', url:'crypto.alpexa-suisse.com:443', color:'#1565c0',tag:'Crypto',    tagBg:'#e3f2fd',tagTxt:'#1565c0'},
+  {name:'Alpexa Sports', url:'sports.alpexa-suisse.com:443', color:'#757575',tag:'Sports',    tagBg:'#f5f5f5',tagTxt:'#757575'},
+];
+let selServer=1,savePw=true,pwVisible=false,qrInterval=null,qrSec=60;
+function renderServers(list){document.getElementById('serverList').innerHTML=list.map(s=>{const i=SERVERS.indexOf(s);return`<div class="sh-item" onclick="selectServer(${i})"><div class="sh-ico" style="background:${s.color}"><svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></div><div class="sh-item-body"><div class="sh-item-name">${s.name}</div><div class="sh-item-url">${s.url}</div><span class="sh-item-tag" style="background:${s.tagBg};color:${s.tagTxt}">${s.tag}</span></div><div class="sh-chk">${i===selServer?'<svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>':''}</div></div>`;}).join('');}
+function openServerSheet(){document.getElementById('serverSheet').style.display='block';document.getElementById('serverSearch').value='';renderServers(SERVERS);setTimeout(()=>document.getElementById('serverSearch').focus(),100);}
+function closeSheet(){document.getElementById('serverSheet').style.display='none';}
+function filterServers(q){renderServers(q?SERVERS.filter(s=>s.name.toLowerCase().includes(q.toLowerCase())||s.url.includes(q)):SERVERS);}
+function selectServer(i){selServer=i;const sv=document.getElementById('serverVal');if(sv){sv.textContent=SERVERS[i].name;sv.style.color='#212121';}closeSheet();syncSrvUI();}
+// DEVICE ROUTING (2026-07-14): one login, the right client per device — the URL can no longer
+// choose the landing page (the old dest= override is gone, so the open-redirect surface is zero).
+// FX on a PC lands on the WebTrade terminal; FX on a phone lands on the mobile FX app (a 4-chart
+// terminal is unusable there — MT5 ships a separate mobile app for the same reason). Crypto and
+// Sports land unchanged. Detection = the SAME UA pattern webtrade itself uses (no new invention).
+function fxDest(server){
+  var mobile=/Android|iPhone|iPad|iPod|Mobile|IEMobile|Opera Mini/i.test(navigator.userAgent||'');
+  if(server===1) return 'crypto-live.html';
+  if(server===2) return 'sports-live.html';
+  return mobile?'trading.html':'webtrade.html';
+}
+function syncSrvUI(){try{document.querySelectorAll('.srv-opt').forEach(function(b){b.classList.toggle('on',+b.dataset.srv===selServer);});}catch(e){}}
+function togglePw(){pwVisible=!pwVisible;const inp=document.getElementById('pwInput');inp.type=pwVisible?'text':'password';document.getElementById('eyeIcon').innerHTML=pwVisible?'<line x1="1" y1="1" x2="23" y2="23"/><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>':'<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';}
+function toggleSave(){savePw=!savePw;const b=document.getElementById('saveBox');b.className='checkbox'+(savePw?' on':'');b.innerHTML=savePw?'<svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>':'';}
+function clearErr(){document.getElementById('errBar').style.display='none';}
+function showErr(msg){const b=document.getElementById('errBar');document.getElementById('errTxt').textContent=msg;b.style.display='flex';}
+async function doLogin(){
+  const login=document.getElementById('loginInput').value.trim();
+  const pw=document.getElementById('pwInput').value;
+  if(!login){showErr('Please enter your account number or email.');return;}
+  if(!pw){showErr('Please enter your password.');return;}
+  if(selServer<0){showErr('Please select a server.');return;}
+  document.getElementById('signinTxt').style.display='none';
+  document.getElementById('spinner').style.display='block';
+  document.getElementById('signinBtn').style.opacity='0.85';
+  const fail=(m)=>{document.getElementById('spinner').style.display='none';document.getElementById('signinTxt').style.display='inline';document.getElementById('signinBtn').style.opacity='1';showErr(m);};
+  try{
+    if(!window._db) throw new Error('No server connection — check your internet.');
+    // 1) Resolve the email to authenticate with (allow account-number login).
+    let email=login;
+    if(login.indexOf('@')<0){
+      // Account-number login: resolve to the email via a security-definer RPC
+      // (keeps working after players/accounts are locked by RLS — no table read).
+      const r=await window._db.rpc('login_email',{p_login:login.toUpperCase()});
+      if(r.error) throw r.error;
+      if(!r.data){ fail('Account not found. Check it, or tap "Open an Account".'); return; }
+      email=r.data;
+    }
+    // 2) REAL password check via Supabase Auth.
+    const au=await window._db.auth.signInWithPassword({ email:email, password:pw });
+    if(au && au.error){
+      const m=(au.error.message||'').toLowerCase();
+      if(m.indexOf('invalid')>=0||m.indexOf('credential')>=0){ fail('Wrong email or password.'); return; }
+      if(m.indexOf('confirm')>=0){ fail('Please confirm your email first (check your inbox).'); return; }
+      fail(au.error.message||'Login failed.'); return;
+    }
+    const authId=(au&&au.data&&au.data.user)?au.data.user.id:null;
+    // 3) Load the linked profile (by auth link first, then email).
+    let player=null;
+    if(authId){
+      const p1=await window._db.from('players').select('id,cust_id,name,email').eq('auth_id',authId).order('created_at',{ascending:true}).limit(1);
+      if(!p1.error&&p1.data&&p1.data.length) player=p1.data[0];
+    }
+    if(!player){
+      const p2=await window._db.from('players').select('id,cust_id,name,email').ilike('email',email).order('created_at',{ascending:true}).limit(1);
+      if(!p2.error&&p2.data&&p2.data.length) player=p2.data[0];
+    }
+    if(!player){ fail('Signed in, but no profile found. Contact support.'); return; }
+    const accs=await window._db.from('accounts').select('server,acct_no,balance').eq('player_id',player.id);
+    if(accs.error) throw accs.error;
+    const accts={sports:'',crypto:'',fx:''};
+    const bals={sports:0,crypto:0,fx:0};
+    (accs.data||[]).forEach(a=>{ if(a.server){ accts[a.server]=a.acct_no; bals[a.server]=+a.balance||0; } });
+    // If a DIFFERENT customer signs in on this device, wipe the previous
+    // account's cached money data so balances/positions don't bleed across
+    // accounts (the app then re-adopts this account's real balance from server).
+    // #5: money/balance/holdings are SERVER-ONLY. On login we (a) wipe any stale caches
+    // from a DIFFERENT account so nothing bleeds across accounts, and (b) do NOT seed
+    // balances into localStorage — the seeds were the cross-account "$90 showed in B"
+    // source. No cacheOwner stamp (we don't keep money local, so there's nothing to
+    // "own"/"guard"). Each app re-adopts its real balance from the server on load.
+    try{ var _prev=JSON.parse(localStorage.getItem('alpexa.me')||'null');
+      if(!_prev||_prev.custId!==player.cust_id){
+        ['alpexa.serverBalances','alpexa.balances','alpexa.cryptoHoldings','alpexa.staked','alpexa.sportsBalance','alpexa.cryptoBalance','alpexa.fxLive','alpexa.openBets','alpexa.settledBets','alpexa.positions','alpexa.cacheOwner','alpexa.withdrawals','alpexa.transactions','alpexa.funding','alpexa.txns','alpexa.appliedTransfers','alpexa.customer','alpexa.openDeposit','alpexa.ownerFunded'].forEach(function(k){ try{localStorage.removeItem(k);}catch(e){} });
+      }
+    }catch(e){}
+    // Restore identity on THIS device so the apps show the right account.
+    localStorage.setItem('alpexa.me', JSON.stringify({custId:player.cust_id,name:player.name,email:player.email,authId:authId,accts:accts}));
+    // Remember which app to land on next time (stay-signed-in auto-pass uses this).
+    try{ localStorage.setItem('alpexa.lastServer', selServer===1?'crypto':selServer===2?'sports':'fx'); }catch(e){}
+    // If "Save password" is on, keep the login on THIS device so it can be
+    // pre-filled and used by Face ID / fingerprint quick login next time.
+    try{
+      // SECURITY (D5): never store the password (base64 is plaintext-grade). Keep only
+      // the non-secret login id + server for prefill; "stay signed in" rides the
+      // persisted Supabase session (refresh token) — revocable, unlike a stored password.
+      if(savePw){ localStorage.setItem('alpexa.cred', btoa(unescape(encodeURIComponent(JSON.stringify({login:login,server:selServer}))))); }
+      else { localStorage.removeItem('alpexa.cred'); }
+    }catch(e){}
+    // Splash wordmark per server (Alpexa Sports / Crypto / FX). Parent watermark is static.
+    try{ document.getElementById('splashMark').textContent = SERVERS[selServer].name; }catch(e){}
+    document.getElementById('successScreen').style.display='flex';
+    // login chime for the terminal (WebTrade plays it on the next interaction) — set on every login
+    try{ sessionStorage.setItem('alpexa.loginChime','1'); }catch(e){}
+    setTimeout(()=>{window.location.href=fxDest(selServer);},1500);
+  }catch(err){ fail((err&&err.message)||'Login failed. Please try again.'); }
+}
+function switchTab(t){document.getElementById('tab-login').className='tab-btn'+(t==='login'?' active':'');document.getElementById('tab-qr').className='tab-btn'+(t==='qr'?' active':'');document.getElementById('loginForm').style.display=t==='login'?'block':'none';document.getElementById('qrForm').style.display=t==='qr'?'block':'none';if(t==='qr')startQR();else stopQR();}
+function buildQR(){const p=[1,1,1,1,1,1,1,0,1,0,0,0,0,0,1,0,1,0,1,1,1,0,1,1,1,0,1,0,1,0,1,0,1,0,1,1,1,0,1,1,1,0,0,0,0,0,1,0,1,1,1,1,1,1,1,0,0,1,0,1,0,0,0,1];const box=document.getElementById('qrBox');if(box)box.innerHTML=p.map(c=>`<div class="qr-cell" style="background:${c?'#212121':'transparent'}"></div>`).join('');}
+function startQR(){buildQR();qrSec=60;document.getElementById('qrTimer').textContent=qrSec;qrInterval=setInterval(()=>{qrSec--;const el=document.getElementById('qrTimer');if(el)el.textContent=qrSec;if(qrSec<=0){buildQR();qrSec=60;}},1000);}
+function stopQR(){clearInterval(qrInterval);}
+function showToast(msg){const el=document.getElementById('toast');el.textContent=msg;el.style.display='block';setTimeout(()=>{el.style.display='none';},2200);}
+
+/* ── Forgot password: send a REAL reset email, then let the user set a new one ── */
+async function doForgot(){
+  var login=(document.getElementById('loginInput').value||'').trim();
+  if(!login){ showErr('Enter your account number or email first, then tap "Forgot password?".'); return; }
+  if(!window._db){ showErr('No server connection — check your internet.'); return; }
+  var email=login;
+  try{
+    if(login.indexOf('@')<0){
+      // Account-number login: resolve to the email via the security-definer RPC.
+      var r=await window._db.rpc('login_email',{p_login:login.toUpperCase()});
+      if(r&&!r.error&&r.data){ email=r.data; }
+      else { showErr('Account not found. Enter the email you signed up with.'); return; }
+    }
+    var redirectTo=location.origin+location.pathname;
+    var rr=await window._db.auth.resetPasswordForEmail(email,{ redirectTo:redirectTo });
+    if(rr&&rr.error){ showErr(rr.error.message||'Could not send the reset email.'); return; }
+    clearErr();
+    showToast('Reset email sent to '+email+' — check your inbox');
+  }catch(e){ showErr('Could not send the reset email. Please try again.'); }
+}
+function openResetSheet(){
+  try{ document.getElementById('resetScreen').style.display='flex'; setTimeout(function(){var el=document.getElementById('resetPw'); if(el)el.focus();},150); }catch(e){}
+}
+async function doReset(){
+  var pw=(document.getElementById('resetPw').value||'');
+  if(pw.length<6){ showToast('Password must be at least 6 characters'); return; }
+  if(!window._db){ showToast('No server connection'); return; }
+  try{
+    var r=await window._db.auth.updateUser({ password:pw });
+    if(r&&r.error){ showToast(r.error.message||'Could not update password'); return; }
+    // Clear the recovery token from the URL and send them to a clean sign-in.
+    try{ history.replaceState(null,'',location.pathname); }catch(e){}
+    try{ await window._db.auth.signOut(); }catch(e){}
+    document.getElementById('resetScreen').style.display='none';
+    showToast('Password updated — please sign in');
+  }catch(e){ showToast('Could not update password. Try again.'); }
+}
+// When the user opens the reset link from their email, Supabase establishes a
+// recovery session — show the "set new password" screen.
+try{
+  if(window._db&&window._db.auth&&window._db.auth.onAuthStateChange){
+    window._db.auth.onAuthStateChange(function(event){ if(event==='PASSWORD_RECOVERY'){ openResetSheet(); } });
+  }
+  if(/type=recovery/.test(location.hash)){ setTimeout(openResetSheet,400); }
+}catch(e){}
+
+buildQR();
+// Default the server to the one chosen at signup (so login lands on the same app).
+try{ var _ls=localStorage.getItem('alpexa.lastServer'); var _idx={fx:0,live:0,crypto:1,sports:2}[_ls]; if(_idx!=null) selectServer(_idx); }catch(e){}
+syncSrvUI();
+// Came here via idle auto-logout (alpexa-sync startIdleLogout) — tell the user why.
+try{ if(/[?&]idle=1/.test(location.search)){ setTimeout(function(){ showToast('보안을 위해 자동 로그아웃되었습니다. 다시 로그인해 주세요.'); }, 350); } }catch(e){}
+
+/* ── Saved login + Face ID / fingerprint quick login ──────────────────────── */
+function getSavedCred(){ try{ var s=localStorage.getItem('alpexa.cred'); if(!s) return null; return JSON.parse(decodeURIComponent(escape(atob(s)))); }catch(e){ return null; } }
+function b64uToBuf(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var bin=atob(s),b=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++)b[i]=bin.charCodeAt(i); return b.buffer; }
+function bufToB64u(buf){ var b=new Uint8Array(buf),s=''; for(var i=0;i<b.length;i++)s+=String.fromCharCode(b[i]); return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function randBytes(n){ var a=new Uint8Array(n); (window.crypto||{}).getRandomValues&&window.crypto.getRandomValues(a); return a; }
+
+// Register a device passkey (triggers Face ID/fingerprint to set up). Stores its id.
+async function bioRegister(label){
+  if(!(window.PublicKeyCredential&&navigator.credentials)) throw new Error('no-webauthn');
+  var cred=await navigator.credentials.create({ publicKey:{
+    challenge: randBytes(32),
+    rp:{ name:'Alpexa Suisse', id: location.hostname },
+    user:{ id: randBytes(16), name: label||'alpexa user', displayName: label||'Alpexa' },
+    pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+    authenticatorSelection:{ authenticatorAttachment:'platform', userVerification:'required', residentKey:'preferred' },
+    timeout:60000, attestation:'none'
+  }});
+  if(!cred) throw new Error('no-cred');
+  try{ localStorage.setItem('alpexa.bio', bufToB64u(cred.rawId)); }catch(e){}
+  return cred;
+}
+// Ask the device to verify with Face ID/fingerprint (uses the registered passkey).
+async function bioVerify(){
+  if(!(window.PublicKeyCredential&&navigator.credentials)) throw new Error('no-webauthn');
+  var id=localStorage.getItem('alpexa.bio');
+  var pk={ challenge: randBytes(32), timeout:60000, userVerification:'required', rpId: location.hostname };
+  if(id) pk.allowCredentials=[{ type:'public-key', id: b64uToBuf(id) }];
+  var a=await navigator.credentials.get({ publicKey: pk });
+  if(!a) throw new Error('cancelled');
+  return a;
+}
+
+async function quickLogin(){
+  var cred=getSavedCred();
+  if(!cred){ showErr('저장된 로그인이 없어. 먼저 한 번 로그인해 주세요.'); return; }
+  var btn=document.getElementById('bioBtn'); var txt=document.getElementById('bioTxt');
+  var old=txt.textContent; txt.textContent='확인 중…'; btn.style.opacity='0.7';
+  try{
+    if(!localStorage.getItem('alpexa.bio')){ await bioRegister(cred.login); } // first time: set up Face ID
+    await bioVerify();                                                        // unlock with Face ID
+  }catch(e){
+    btn.style.opacity='1'; txt.textContent=old;
+    var msg=(e&&e.message)||'';
+    if(msg==='no-webauthn'){ showErr('이 기기는 Face ID 로그인을 지원하지 않아요.'); document.getElementById('bioBtn').style.display='none'; return; }
+    if(/cancel|not allowed|NotAllowed/i.test(msg)){ return; } // user cancelled — stay silent
+    showErr('Face ID 확인 실패. 비밀번호로 로그인해 주세요.'); return;
+  }
+  // Biometric OK → resume the persisted Supabase session (no stored password).
+  document.getElementById('loginInput').value=cred.login||'';
+  if(cred.server!=null) selectServer(cred.server);
+  var hasSession=false;
+  try{ var s=await window._db.auth.getSession(); hasSession=!!(s&&s.data&&s.data.session); }catch(e){}
+  txt.textContent=old; btn.style.opacity='1';
+  if(hasSession){
+    try{ sessionStorage.setItem('alpexa.loginChime','1'); }catch(e){}
+    window.location.href=fxDest(cred.server);
+  } else {
+    // Session expired (or revoked) — fall back to a one-time password login. Never a lockout.
+    showErr('세션이 만료됐어요 — 비밀번호로 한 번만 로그인해 주세요.');
+    try{ document.getElementById('pwInput').focus(); }catch(e){}
+  }
+}
+
+// On load: pre-fill the saved login + server, and offer the Face ID button.
+(async function(){
+  try{
+    var cred=getSavedCred();
+    // One-time cleanup: purge the legacy hardcoded demo account if it was ever saved on
+    // this device (it used to leak into the login field). Real accounts are untouched.
+    if(cred && cred.login==='44219982330'){
+      try{ localStorage.removeItem('alpexa.cred'); localStorage.removeItem('alpexa.bio'); localStorage.removeItem('alpexa.me'); }catch(e){}
+      cred=null;
+    }
+    if(cred){
+      // Do NOT pre-fill the account number — keep the login field empty (banking-app
+      // style) so a previous/other account never shows. Face ID still uses the saved
+      // cred internally; the number is only filled AFTER a successful Face ID auth.
+      if(cred.server!=null) selectServer(cred.server);   // (D5) no password prefill — not stored
+      // Show Face ID button only if the platform supports a built-in authenticator.
+      var ok=false;
+      try{ if(window.PublicKeyCredential&&PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable){ ok=await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable(); } }catch(e){ ok=false; }
+      if(ok){ document.getElementById('bioBtn').style.display='flex'; }
+    }
+  }catch(e){}
+})();
+</script>
+<!-- ── WebTrade TERMINAL SKIN (?skin=wt) ─────────────────────────────────────────────────
+     Same ONE proven auth path (sign-in / profile / cache-wipe / sessionStorage — untouched),
+     different clothes: dark MT5 card, "Terminal Access" branding, FX server fixed + picker
+     hidden. Zero effect without the query param, so the app login stays exactly as-is. -->
+<style>
+  body.wt-skin{background:#0b0d12}
+  body.wt-skin #wrap{background:#12151c;border:1px solid #2a3550;box-shadow:0 10px 44px rgba(0,0,0,.65)}
+  body.wt-skin .wordmark,body.wt-skin .h1{color:#eaf2ff}
+  body.wt-skin .overline{color:#3095ff;letter-spacing:2.5px}
+  body.wt-skin .amark{background:#1B3955}
+  body.wt-skin .field-label{color:#8890a0}
+  body.wt-skin .field-inner{background:#0b0d12;border-color:#3c4049}
+  body.wt-skin .field-inner input{background:transparent;color:#fff}
+  body.wt-skin .signin-btn{background:#1B3955;border:1px solid #2E6FB0}
+  body.wt-skin .create-line,body.wt-skin .forgot{color:#8890a0}
+  body.wt-skin .link-btn{color:#3095ff}
+</style>
+<script>
+(function(){ try{
+  var p=new URLSearchParams(location.search);
+  if(p.get('skin')!=='wt') return;
+  document.body.classList.add('wt-skin');
+  document.title='ALPEXA WebTrade — Terminal Access';
+  var wm=document.querySelector('.wordmark'); if(wm) wm.textContent='ALPEXA WebTrade';
+  var ov=document.querySelector('.overline'); if(ov) ov.textContent='TERMINAL ACCESS';
+  var h1=document.querySelector('.h1'); if(h1) h1.textContent='Connect to Trade Server';
+  try{ selectServer(0); }catch(e){}                      // terminal = the FX trade server, fixed
+  var seg=document.getElementById('srvSeg'); if(seg&&seg.parentElement) seg.parentElement.style.display='none';
+}catch(e){} })();
+</script>
+</body>
+</html>

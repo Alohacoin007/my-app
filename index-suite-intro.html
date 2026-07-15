@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="theme-color" content="#ffffff">
+<title>Alpexa Suisse</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=5">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=5">
+<link rel="shortcut icon" href="favicon.ico?v=5">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  :root{
+    --accent:#2F6BF6; --accent-press:#2257E6; --accent-tint:#EEF3FE;
+    --ink:#0F1115; --muted:#8A9099; --muted-light:#A3A3A9;
+    --canvas:#F5F5F7; --surface:#FFFFFF; --hairline:#ECECF0;
+  }
+  html,body{height:100%}
+  body{background:var(--canvas);color:var(--ink);
+    font-family:'SF Pro Display',system-ui,-apple-system,BlinkMacSystemFont,'Inter','Helvetica Neue',Arial,sans-serif;
+    letter-spacing:-0.374px;display:flex;justify-content:center;min-height:100dvh}
+  .screen{width:100%;max-width:440px;min-height:100dvh;background:var(--surface);
+    position:relative;overflow:hidden;display:flex;flex-direction:column}
+
+  /* ── Splash ── */
+  #splash{position:absolute;inset:0;z-index:30;background:var(--surface);
+    display:flex;align-items:center;justify-content:center;
+    transition:opacity .55s ease;}
+  #splash.hide{opacity:0;pointer-events:none}
+  #splash .mark{font-size:40px;font-weight:600;letter-spacing:-1.4px;color:var(--accent)}
+
+  /* ── Intro (horizontal 3-page pager) ── */
+  #intro{flex:1;display:flex;flex-direction:row;overflow-x:auto;overflow-y:hidden;
+    scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;
+    opacity:0;transition:opacity .6s ease}
+  #intro::-webkit-scrollbar{display:none}
+  #intro.show{opacity:1}
+  .page{min-width:100%;width:100%;height:100%;flex:none;scroll-snap-align:start;
+    display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:none;
+    padding:calc(env(safe-area-inset-top,14px) + 16px) 26px calc(env(safe-area-inset-bottom,16px) + 26px)}
+  .page::-webkit-scrollbar{display:none}
+  .page-head{display:flex;align-items:center;justify-content:space-between;flex:none}
+  .head-login{font-size:14px;font-weight:600;color:var(--accent);background:var(--accent-tint);
+    padding:7px 15px;border-radius:9999px;text-decoration:none}
+
+  .brand{font-size:17px;font-weight:600;letter-spacing:-0.4px;color:var(--accent);flex:none}
+  .overline{font-size:11px;font-weight:600;letter-spacing:2.6px;color:var(--accent)}
+  .h2{font-size:38px;font-weight:600;line-height:1.05;letter-spacing:-1.4px}
+  .h2.dim{color:var(--muted-light)}
+  @keyframes secpulse{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.12);opacity:.2}}
+  /* list rows (security / staking) */
+  .trow{display:flex;align-items:center;gap:14px;padding:12px 0;border-top:1px solid var(--hairline)}
+  .trow:last-child{border-bottom:1px solid var(--hairline)}
+  .tchip{width:40px;height:40px;border-radius:11px;background:var(--accent-tint);display:flex;align-items:center;justify-content:center;flex:none}
+  .tchip.round{border-radius:50%;width:38px;height:38px}
+  .tt{font-size:16px;font-weight:600}
+  .ts{font-size:13px;color:var(--muted);margin-top:2px}
+  .tapy{font-size:17px;font-weight:600;color:var(--accent);text-align:right}
+  .tapy small{display:block;font-size:11px;color:var(--muted);font-weight:400}
+
+  .hero{margin-top:84px;flex:none}
+  .hero span{display:block;font-size:clamp(34px,9.5vw,40px);font-weight:600;line-height:1.05;letter-spacing:-1.5px}
+  .hero .dim{color:var(--muted-light)}
+
+  .live{margin-top:26px;flex:none}
+  .live-lbl{display:flex;align-items:center;gap:8px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:livepulse 1.6s ease-in-out infinite}
+  @keyframes livepulse{0%,100%{box-shadow:0 0 0 0 rgba(47,107,246,.5)}50%{box-shadow:0 0 0 5px rgba(47,107,246,0)}}
+  .live-lbl span{font-size:12px;font-weight:600;letter-spacing:1.4px;color:var(--muted)}
+  .price-row{display:flex;align-items:center;gap:10px;margin-top:8px}
+  .price{font-size:38px;font-weight:600;letter-spacing:-1.4px;font-variant-numeric:tabular-nums}
+  .ticker{font-size:11px;font-weight:600;color:var(--accent);background:var(--accent-tint);
+    padding:3px 9px;border-radius:9999px;letter-spacing:.5px;align-self:center}
+  .chg{font-size:14px;font-weight:600;color:var(--accent)}
+  .chart{margin-top:32px;min-height:130px}
+  .chart svg{display:block;width:100%;height:auto;overflow:visible}
+
+  .markets{display:flex;margin-top:44px;flex:none}
+  .mk{flex:1}
+  .mk+.mk{padding-left:16px;border-left:1px solid var(--hairline)}
+  .mk{padding-right:16px}
+  .markets .mk:last-child{padding-right:0}
+  .mk-cat{font-size:10px;font-weight:600;letter-spacing:1.2px;color:var(--accent)}
+  .mk-pair{font-size:12px;color:var(--muted);margin-top:4px;white-space:nowrap}
+  .mk-val{font-size:19px;font-weight:600;margin-top:7px;font-variant-numeric:tabular-nums}
+  .mk-chg{font-size:12px;font-weight:600;color:var(--accent);margin-top:4px;display:flex;align-items:center;gap:5px}
+  .mk-chg .dot{width:5px;height:5px}
+
+  .bottom{margin-top:auto;padding-top:24px;flex:none}
+  .dots{display:flex;align-items:center;justify-content:center;gap:2px}
+  .dots i{display:block;width:6px;height:6px;border-radius:50%;background:rgba(0,0,0,.18);
+    cursor:pointer;box-sizing:content-box;padding:8px 7px;background-clip:content-box}
+  .dots i.on{width:20px;border-radius:9999px;background:var(--accent);background-clip:content-box}
+  .cta-row{display:flex;gap:12px;margin-top:18px}
+  .btn{flex:1;text-align:center;padding:16px 0;border-radius:9999px;font-size:17px;font-weight:600;
+    text-decoration:none;cursor:pointer;transition:transform .14s ease,background .2s ease}
+  .btn:active{transform:scale(.96)}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-primary:active{background:var(--accent-press)}
+  .btn-tint{background:var(--accent-tint);color:var(--accent)}
+  .legal{text-align:center;font-size:10px;color:var(--muted-light);margin-top:16px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="screen" id="screen" style="visibility:hidden">
+
+  <!-- Splash -->
+  <div id="splash"><div class="mark">Alpexa Suisse</div></div>
+
+  <!-- Intro: 3 swipeable pages (Markets · Security · Welcome) -->
+  <div id="intro">
+
+    <!-- Page 1 — Markets -->
+    <div class="page">
+      <div class="brand">Alpexa Suisse</div>
+
+      <div class="hero">
+        <span>Every market.</span>
+        <span class="dim">One Swiss app.</span>
+      </div>
+
+      <div class="live">
+        <div class="live-lbl"><span class="dot"></span><span>SPACEX · SPCX</span></div>
+        <div class="price-row">
+          <span class="price" id="heroPrice">—</span>
+          <span class="chg" id="heroChg">·</span>
+          <span style="font-size:13px;font-weight:600;color:var(--muted)">Today</span>
+        </div>
+        <div class="chart" id="heroChart"></div>
+      </div>
+
+      <div class="bottom">
+        <div class="dots"><i class="on" onclick="goPage(0)"></i><i onclick="goPage(1)"></i><i onclick="goPage(2)"></i></div>
+        <div class="cta-row">
+          <a class="btn btn-tint" href="login.html?switch=1">Log in</a>
+          <a class="btn btn-primary" href="signup.html">Get Started</a>
+        </div>
+        <div class="legal">© Alpexa Suisse · Markets involve risk.</div>
+      </div>
+    </div>
+
+    <!-- Page 2 — Security -->
+    <div class="page">
+      <div class="brand">Alpexa Suisse</div>
+
+      <div style="margin-top:84px;flex:none">
+        <div class="overline">SECURITY</div>
+        <div style="margin-top:14px">
+          <span class="h2" style="display:block">Assets in</span>
+          <span class="h2 dim" style="display:block">Swiss custody.</span>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;margin-top:20px;flex:none">
+        <div style="position:relative;width:82px;height:82px;display:flex;align-items:center;justify-content:center">
+          <span style="position:absolute;inset:0;border-radius:50%;background:var(--accent-tint);animation:secpulse 2.4s ease-in-out infinite"></span>
+          <svg viewBox="0 0 64 64" width="56" height="56" fill="none" style="position:relative"><path d="M32 7 L55 16 V32 C55 47 44 56 32 60 C20 56 9 47 9 32 V16 Z" stroke="#2f6bf6" stroke-width="3.4" stroke-linejoin="round"></path><path d="M22.5 32.5 l6.5 6.5 l13 -14" stroke="#2f6bf6" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </div>
+        <div style="font-size:34px;font-weight:600;letter-spacing:-1px;margin-top:10px">1 : 1</div>
+        <div style="font-size:14px;color:var(--muted);margin-top:5px">Proof of reserves · verified daily</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;margin-top:18px;flex:none">
+        <div class="trow">
+          <div class="tchip"><svg viewBox="0 0 24 24" width="21" height="21" fill="none"><path d="M12 3 V21 M4.2 7.5 L19.8 16.5 M19.8 7.5 L4.2 16.5" stroke="#2f6bf6" stroke-width="1.7" stroke-linecap="round"></path><path d="M9.5 4.5 L12 3 L14.5 4.5 M9.5 19.5 L12 21 L14.5 19.5 M6 6.6 L7.6 7.5 L7.2 9.3 M18 6.6 L16.4 7.5 L16.8 9.3 M6 17.4 L7.6 16.5 L7.2 14.7 M18 17.4 L16.4 16.5 L16.8 14.7" stroke="#2f6bf6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+          <div style="flex:1;min-width:0"><div class="tt">Hot / cold wallets</div><div class="ts">95% held in offline cold storage</div></div>
+        </div>
+        <div class="trow">
+          <div class="tchip"><svg viewBox="0 0 24 24" width="21" height="21" fill="none"><circle cx="6.5" cy="7.5" r="2.4" stroke="#2f6bf6" stroke-width="1.7"></circle><circle cx="17.5" cy="7.5" r="2.4" stroke="#2f6bf6" stroke-width="1.7"></circle><circle cx="12" cy="17" r="2.4" stroke="#2f6bf6" stroke-width="1.7"></circle><path d="M8.6 8.8 L10.6 15.2 M15.4 8.8 L13.4 15.2 M8.9 7.5 H15.1" stroke="#2f6bf6" stroke-width="1.6" stroke-linecap="round"></path></svg></div>
+          <div style="flex:1;min-width:0"><div class="tt">MPC multi-signature</div><div class="ts">Keys split across vaults — no single key</div></div>
+        </div>
+        <div class="trow">
+          <div class="tchip"><svg viewBox="0 0 24 24" width="21" height="21" fill="none"><rect x="6.5" y="6.5" width="11" height="11" rx="2" stroke="#2f6bf6" stroke-width="1.7"></rect><rect x="9.5" y="9.5" width="5" height="5" rx="1" stroke="#2f6bf6" stroke-width="1.5"></rect><path d="M9 6.5 V4 M12 6.5 V4 M15 6.5 V4 M9 17.5 V20 M12 17.5 V20 M15 17.5 V20 M6.5 9 H4 M6.5 12 H4 M6.5 15 H4 M17.5 9 H20 M17.5 12 H20 M17.5 15 H20" stroke="#2f6bf6" stroke-width="1.5" stroke-linecap="round"></path></svg></div>
+          <div style="flex:1;min-width:0"><div class="tt">HSM-secured keys</div><div class="ts">FIPS 140-2 Level 3 hardware modules</div></div>
+        </div>
+      </div>
+
+      <div class="bottom">
+        <div class="dots"><i onclick="goPage(0)"></i><i class="on" onclick="goPage(1)"></i><i onclick="goPage(2)"></i></div>
+        <div class="cta-row">
+          <a class="btn btn-tint" href="login.html?switch=1">Log in</a>
+          <a class="btn btn-primary" href="#" onclick="goPage(2);return false;">Continue</a>
+        </div>
+        <div class="legal">Regulated Swiss custody · Capital at risk</div>
+      </div>
+    </div>
+
+    <!-- Page 3 — Welcome bonus -->
+    <div class="page">
+      <div class="brand">Alpexa Suisse</div>
+
+      <div style="margin-top:84px;flex:none">
+        <div class="overline">WELCOME BONUS</div>
+        <div style="display:flex;align-items:baseline;gap:11px;margin-top:14px">
+          <span style="font-size:64px;font-weight:600;letter-spacing:-2.4px;color:var(--accent);line-height:1">$100</span>
+          <span style="font-size:26px;font-weight:600;letter-spacing:-0.6px">in Bitcoin</span>
+        </div>
+        <div style="font-size:15px;color:var(--muted);margin-top:12px;line-height:1.5;max-width:320px">Open an account &amp; fund $500 in your first week — we add $100 in BTC.</div>
+      </div>
+
+      <div class="bottom">
+        <div class="dots"><i onclick="goPage(0)"></i><i onclick="goPage(1)"></i><i class="on" onclick="goPage(2)"></i></div>
+        <div class="cta-row">
+          <a class="btn btn-tint" href="login.html?switch=1">Log in</a>
+          <a class="btn btn-primary" href="signup.html">Claim bonus</a>
+        </div>
+        <div class="legal">Bonus terms apply · Capital at risk</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // Returning, signed-in users skip the intro and go straight to their app
+  // (login.html auto-passes a valid session). Add ?intro=1 to force the landing.
+  (function(){
+    try{
+      var force=/[?&]intro=1/.test(location.search);
+      var me=JSON.parse(localStorage.getItem('alpexa.me')||'null');
+      if(!force && me && me.authId){ location.replace('login.html'); return; }
+    }catch(e){}
+    document.getElementById('screen').style.visibility='visible';
+    runSplash();
+    // boot() is called at the very bottom — after the chart helpers/series exist.
+  })();
+
+  function runSplash(){
+    var sp=document.getElementById('splash'), intro=document.getElementById('intro');
+    setTimeout(function(){ intro.classList.add('show'); }, 1100);
+    setTimeout(function(){ sp.classList.add('hide'); }, 1250);
+  }
+  // Swipe between the 3 intro pages; Continue buttons jump forward.
+  function goPage(i){
+    var pager=document.getElementById('intro');
+    var pages=pager.getElementsByClassName('page');
+    if(pages[i]) pager.scrollTo({ left: i*pager.clientWidth, behavior:'smooth' });
+  }
+  window.goPage=goPage;
+
+  // ── chart drawing helpers ──
+  function makeSeries(seed,start,vol,drift,n){   // only a fallback seed if the feed is unreachable
+    var a=seed>>>0;
+    function rng(){ a=(a+0x6D2B79F5)|0; var t=Math.imul(a^(a>>>15),1|a);
+      t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; }
+    var arr=[],v=start;
+    for(var i=0;i<n;i++){ v+=(rng()+rng()-1)*vol+drift; arr.push(v); }
+    return arr;
+  }
+  function coords(arr,w,h,pad){
+    var mn=Math.min.apply(null,arr),mx=Math.max.apply(null,arr),r=(mx-mn)||1;
+    return arr.map(function(v,i){ return [
+      +(pad+i/(arr.length-1)*(w-2*pad)).toFixed(1),
+      +(pad+3+(1-(v-mn)/r)*(h-2*pad-6)).toFixed(1) ]; });
+  }
+  function areaSVG(arr,w,h){
+    var pad=8, pts=coords(arr,w,h,pad);
+    var line=pts.map(function(p){return p.join(',');}).join(' ');
+    var last=pts[pts.length-1];
+    var d='M '+pts[0][0]+' '+pts[0][1]+' '+pts.slice(1).map(function(p){return 'L '+p[0]+' '+p[1];}).join(' ')+
+          ' L '+last[0]+' '+h+' L '+pts[0][0]+' '+h+' Z';
+    return '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="xMidYMid meet">'+
+      '<defs><linearGradient id="hg" x1="0" y1="0" x2="0" y2="1">'+
+      '<stop offset="0%" stop-color="#2f6bf6" stop-opacity="0.20"/>'+
+      '<stop offset="100%" stop-color="#2f6bf6" stop-opacity="0"/></linearGradient></defs>'+
+      '<path d="'+d+'" fill="url(#hg)"/>'+
+      '<polyline points="'+line+'" fill="none" stroke="rgba(47,107,246,0.22)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>'+
+      '<polyline points="'+line+'" fill="none" stroke="#2f6bf6" stroke-width="2" stroke-linejoin="round"/>'+
+      '<circle cx="'+last[0]+'" cy="'+last[1]+'" r="11" fill="rgba(47,107,246,0.18)"/>'+
+      '<circle cx="'+last[0]+'" cy="'+last[1]+'" r="5" fill="#2f6bf6" stroke="#fff" stroke-width="1.6"/></svg>';
+  }
+
+  // ── data ──
+  // Hero = SPACEX (SPCX) — IPO'd 2026-06-12 on NASDAQ. Real price via a free
+  // source (Stooq, no key, ~15min delayed). If that feed is blocked, the hero
+  // falls back to an illustrative line so the page still looks right.
+  var heroSeries=makeSeries(168,182,1.4,0.2,64);
+  var heroOpen=null, btcOpen=null, fxOpen=null;   // session refs for the % change
+
+  function fmtUSD2(n){ return '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function fmtUSD0(n){ return '$'+Math.round(Number(n)).toLocaleString('en-US'); }
+  function setChg(id, cur, ref){
+    var el=document.getElementById(id); if(!el) return;
+    if(ref==null || cur==null || !isFinite(cur)){ el.textContent='·'; el.style.color=''; return; }
+    var pct=(cur-ref)/ref*100, up=pct>=0;
+    el.style.color = up ? '#1AA05F' : '#E5484D';
+    el.textContent = (up?'▲ ':'▼ ')+Math.abs(pct).toFixed(2)+'%';
+  }
+  function drawHero(){
+    var c=document.getElementById('heroChart'); if(!c || !heroSeries.length) return;
+    var w=Math.round(c.clientWidth)||338, h=Math.round(w*0.42);
+    c.innerHTML=areaSVG(heroSeries,w,h);
+    var last=heroSeries[heroSeries.length-1];
+    document.getElementById('heroPrice').textContent=fmtUSD2(last);
+    setChg('heroChg', last, heroOpen!=null?heroOpen:heroSeries[0]);
+  }
+
+  // All network calls are wrapped so a blocked/failing feed never breaks the page.
+  async function getJSON(url){ var r=await fetch(url,{cache:'no-store'}); if(!r.ok) throw 0; return r.json(); }
+  async function getText(url){ var r=await fetch(url,{cache:'no-store'}); if(!r.ok) throw 0; return r.text(); }
+  // API key must NOT live in client source (scrapable). Proxy market-data calls
+  // through a server Edge function and inject the key there. Empty = feature off.
+  var FINNHUB_TOKEN = '';
+  async function fetchSPCX(){   // {c:last, o:today-open}
+    if(FINNHUB_TOKEN){
+      try{
+        var j=await getJSON('https://finnhub.io/api/v1/quote?symbol=SPCX&token='+FINNHUB_TOKEN);
+        if(j && isFinite(j.c) && j.c>0) return { c:j.c, o:(isFinite(j.o)&&j.o>0)?j.o:(isFinite(j.pc)?j.pc:null) };
+      }catch(e){}
+    }
+    // Fallback: Stooq (no key) — may be blocked by the browser (CORS).
+    try{
+      var t=await getText('https://stooq.com/q/l/?s=spcx.us&f=soc&e=csv');
+      var p=t.trim().split(/\r?\n/).pop().split(',');
+      var o=parseFloat(p[1]), c=parseFloat(p[2]);
+      if(isFinite(c)&&c>0) return { c:c, o:(isFinite(o)&&o>0)?o:null };
+    }catch(e){}
+    return null;
+  }
+  async function fetchSPCXHistory(){   // recent daily closes from Stooq
+    try{
+      var t=await getText('https://stooq.com/q/d/l/?s=spcx.us&i=d');
+      var rows=t.trim().split(/\r?\n/).slice(1);
+      var cl=rows.map(function(r){ return parseFloat(r.split(',')[4]); }).filter(function(x){ return isFinite(x)&&x>0; });
+      return cl.length ? cl : null;
+    }catch(e){ return null; }
+  }
+  async function boot(){
+    // Hero — real SPCX (price + today's % from the open). Seed the line with real
+    // daily history if we have enough points, else an illustrative line anchored
+    // to the real price; the tail then fills in with real refreshes.
+    var hist=await fetchSPCXHistory();
+    var q=await fetchSPCX();
+    if(hist && hist.length>=5){ heroSeries=hist; }
+    else if(q && q.c){ heroSeries=makeSeries(168, q.c, q.c*0.01, 0, 48); }
+    if(q && q.c){ heroSeries[heroSeries.length-1]=q.c; heroOpen=q.o; }
+    drawHero();
+    window.addEventListener('resize',drawHero);
+    setInterval(async function(){
+      var r=await fetchSPCX();
+      if(r && r.c){ heroSeries=heroSeries.slice(1).concat(r.c); if(r.o)heroOpen=r.o; drawHero(); }
+    }, 30000);
+  }
+
+  boot();
+</script>
+</body>
+</html>

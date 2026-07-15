@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Activity icons — Robinhood style</title>
+<!-- MOCKUP — proposed Robinhood-style activity-feed icons for the Wallet "Recent Activity". App not touched. -->
+<style>
+  *{box-sizing:border-box;}
+  body{margin:0;background:#eef1f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,system-ui,sans-serif;color:#0e1726;padding:28px 16px;}
+  .stack{max-width:420px;margin:0 auto;display:flex;flex-direction:column;gap:24px;}
+  .cap{font-size:12px;font-weight:800;color:#2742C9;padding:0 4px 9px;}
+  .card{background:#fff;border:1px solid #ecedf1;border-radius:16px;padding:6px 18px;}
+  .row{display:flex;align-items:center;gap:13px;padding:13px 0;border-bottom:1px solid #f1f3f7;}
+  .row:last-child{border-bottom:none;}
+  /* plain icon (matches current placement) */
+  .ic{width:34px;height:34px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:#5a6473;}
+  .ic svg{width:25px;height:25px;}
+  /* circle variant */
+  .icc{width:38px;height:38px;border-radius:50%;background:#f2f4f8;flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:#46506180;}
+  .icc svg{width:21px;height:21px;}
+  .d{flex:1;}
+  .t1{font-size:14.5px;font-weight:700;}
+  .t2{font-size:11.5px;color:#8a94a6;font-weight:600;margin-top:2px;}
+  .amt{font-weight:700;font-size:15px;font-variant-numeric:tabular-nums;}
+  .p{color:#1ba35e;} .n{color:#e5484d;}
+  .legend{display:flex;flex-wrap:wrap;gap:6px;padding:14px 14px;background:#fff;border:1px solid #ecedf1;border-radius:16px;}
+  .chip{display:flex;align-items:center;gap:7px;width:calc(50% - 3px);padding:9px 10px;border-radius:10px;background:#f7f9fc;}
+  .chip .ic{width:26px;height:26px;color:#46506190;} .chip .ic svg{width:22px;height:22px;}
+  .chip span{font-size:12.5px;font-weight:700;}
+</style>
+</head>
+<body>
+<div class="stack" id="root"></div>
+<script>
+  // Proposed icon set — distinct, clean monoline (Robinhood-ish)
+  var I = {
+    deposit:  '<path d="M4 13v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/><path d="M12 3v10"/><path d="M8 9l4 4 4-4"/>',
+    withdraw: '<path d="M4 13v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/><path d="M12 13V3"/><path d="M8 7l4-4 4 4"/>',
+    transfer: '<path d="M4 9h12"/><path d="M13 6l3 3-3 3"/><path d="M20 15H8"/><path d="M11 12l-3 3 3 3"/>',
+    bet:      '<path d="M4 7.5h16a1 1 0 0 1 1 1V11a1.6 1.6 0 0 0 0 3v2.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V14a1.6 1.6 0 0 0 0-3V8.5a1 1 0 0 1 1-1Z"/><path d="M14.5 8v8" stroke-dasharray="1.5 2.4"/>',
+    cashout:  '<circle cx="12" cy="12" r="8.2"/><path d="M12 7.6v8.8"/><path d="M14.4 9.4c0-1-1.1-1.6-2.4-1.6s-2.4.6-2.4 1.6c0 1 .9 1.4 2.4 1.8s2.4.8 2.4 1.8-1.1 1.6-2.4 1.6-2.4-.6-2.4-1.6"/>',
+    reward:   '<rect x="4" y="9.5" width="16" height="10.5" rx="1.2"/><path d="M4 13.5h16"/><path d="M12 9.5v10.5"/><path d="M12 9.5C10.8 6.7 7 7 7.5 9.2c.3 1.3 3 1.4 4.5.3Z"/><path d="M12 9.5C13.2 6.7 17 7 16.5 9.2c-.3 1.3-3 1.4-4.5.3Z"/>'
+  };
+  function svg(k){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'+I[k]+'</svg>'; }
+
+  var rows = [
+    ['bet','Bet placed','Parlay · 2 legs · 1h ago','-$20.00','n'],
+    ['transfer','Transfer','Received · Approved · 1h ago','+$274.00','p'],
+    ['deposit','Deposit','USDT · Approved · 2h ago','+$200.00','p'],
+    ['withdraw','Withdraw','USDT · Sent · 1d ago','-$50.00','n'],
+    ['cashout','Cash out','Lakers ML · 3d ago','+$42.00','p'],
+    ['reward','Reward','Loss cashback · 5d ago','+$5.00','p']
+  ];
+  function feed(iconCls){
+    return '<div class="card">'+rows.map(function(r){
+      return '<div class="row"><div class="'+iconCls+'">'+svg(r[0])+'</div>'
+        + '<div class="d"><div class="t1">'+r[1]+'</div><div class="t2">'+r[2]+'</div></div>'
+        + '<div class="amt '+r[4]+'">'+r[3]+'</div></div>';
+    }).join('')+'</div>';
+  }
+  var legend = '<div class="legend">'+['deposit','withdraw','transfer','bet','cashout','reward'].map(function(k){
+    return '<div class="chip"><div class="ic">'+svg(k)+'</div><span>'+k+'</span></div>';
+  }).join('')+'</div>';
+
+  document.getElementById('root').innerHTML =
+      '<div><div class="cap">제안 A — 아이콘만 (현재 위치 그대로)</div>'+feed('ic')+'</div>'
+    + '<div><div class="cap">제안 B — 연한 원형 배경 (로빈후드 느낌 ↑)</div>'+feed('icc')+'</div>'
+    + '<div><div class="cap">아이콘 세트 (타입별)</div>'+legend+'</div>';
+</script>
+</body>
+</html>

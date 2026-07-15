@@ -1,0 +1,2083 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Alpexa Manager · Back Office</title>
+<link rel="manifest" href="manifest-bo.json">
+<link rel="apple-touch-icon" href="icon-bo-180.png">
+<link rel="icon" type="image/png" href="icon-bo-512.png">
+<link rel="shortcut icon" href="icon-bo-512.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Alpexa BO">
+<meta name="theme-color" content="#ffffff">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,300..700,0..1,-50..200');
+  :root{ --acc:#1F2A37; --ink:#0F1B2D; --dim:#5A6478; --line:#E6EAF0; --bg:#F7F8FA;
+    --pos:#1B5E20; --pos-bg:#E8F5E9; --neg:#C62828; --neg-bg:#FFEBEE; --warn:#B06A00; --warn-bg:#FFF6E6; --card:#fff; }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{background:var(--bg)}
+  body{font-family:'Roboto',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif;color:var(--ink);max-width:500px;margin:0 auto;min-height:100vh;padding-bottom:30px;padding-left:46px}
+  .top{background:#fff;color:var(--ink);padding:9px 14px;position:sticky;top:0;z-index:20;border-bottom:1px solid var(--line)}
+  .top .row{display:flex;align-items:center;justify-content:space-between}
+  .top h1{font-size:14.5px;font-weight:800;letter-spacing:-.2px}
+  .top .sub{font-size:9.5px;color:var(--dim);margin-top:1px;font-weight:600;letter-spacing:.6px;text-transform:uppercase}
+  .pill{background:#F1F3F6;border:1px solid var(--line);border-radius:4px;padding:4px 10px;font-size:12px;font-weight:700;color:var(--ink)}
+  /* Corporate left rail: monochrome icons + small labels (Supabase-style) */
+  .tabs{position:fixed;top:0;bottom:0;width:46px;left:max(0px,calc(50% - 250px));display:flex;flex-direction:column;gap:1px;background:#fff;border-right:1px solid var(--line);padding:10px 4px;overflow-y:auto;z-index:30;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{background:none;color:var(--dim);border:none;border-radius:4px;padding:7px 1px 5px;font:600 7.5px system-ui;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;letter-spacing:.2px;white-space:nowrap}
+  .tab .msi{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;font-size:19px;line-height:1;display:inline-block;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;-webkit-font-feature-settings:'liga';font-feature-settings:'liga';user-select:none}
+  .tab.on{background:#EEF2F7;color:var(--ink);font-weight:800}
+  .tab.on .msi{font-variation-settings:'FILL' 1,'wght' 500,'GRAD' 0,'opsz' 24}
+  .sec{margin:12px 12px 5px;font-size:11px;font-weight:800;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+  .card{margin:0 12px 8px;background:var(--card);border-radius:4px;padding:10px 12px;border:1px solid var(--line);box-shadow:none}
+  .lbl{font-size:11px;color:var(--dim);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+  .big{font-size:21px;font-weight:800;letter-spacing:-.5px;margin-top:2px}
+  .pos{color:var(--pos)}.neg{color:var(--neg)}.muted{color:var(--dim)}
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 12px 8px}
+  .kpi{background:var(--card);border-radius:4px;padding:9px 11px;border:1px solid var(--line);box-shadow:none}
+  .kpi .k{font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.4px}
+  .kpi .v{font-size:17px;font-weight:800;margin-top:3px;letter-spacing:-.3px;font-variant-numeric:tabular-nums}
+  .kpi .s{font-size:10px;color:var(--dim);margin-top:1px}
+  .row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .row:last-child{border-bottom:none}
+  .row b{font-variant-numeric:tabular-nums}
+  .badge{font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:4px}
+  .badge.deposit{background:var(--pos-bg);color:var(--pos)} .badge.withdraw{background:var(--neg-bg);color:var(--neg)} .badge.transfer{background:#E3F2FD;color:#1565C0}
+  .badge.open{background:#E3F2FD;color:#1565C0}.badge.won{background:var(--pos-bg);color:var(--pos)}.badge.lost{background:var(--neg-bg);color:var(--neg)}.badge.cashed{background:#FFF3E0;color:#B06A00}
+  .req-amt{font-size:18px;font-weight:800}
+  .req-meta{font-size:12px;color:var(--dim);margin:3px 0}
+  .req-addr{font-family:ui-monospace,monospace;font-size:11px;color:var(--ink);background:#f1f3f4;border-radius:4px;padding:7px 9px;word-break:break-all;cursor:pointer;margin-top:4px}
+  .req-addr-lbl{font-size:10px;font-weight:800;color:var(--neg);text-transform:uppercase;margin-top:8px}
+  .btns{display:flex;gap:10px;margin-top:11px}
+  .btns button{flex:1;border:none;border-radius:4px;padding:12px;font:800 14px system-ui;cursor:pointer}
+  .ok{background:var(--pos);color:#fff}.no{background:#fff;color:var(--neg);border:1.5px solid #f0c0c0}
+  .in{width:100%;font-size:13.5px;color:var(--ink);background:#f1f3f4;border:1px solid var(--line);border-radius:4px;padding:10px 11px;margin-top:6px;font-family:inherit}
+  .save{margin-top:10px;background:var(--acc);color:#fff;border:none;border-radius:4px;padding:10px 16px;font:700 13px system-ui;cursor:pointer}
+  .save.ghost{background:#eef0f3;color:var(--acc)}
+  .hint{font-size:11px;color:#9aa3b2;margin-top:7px}
+  .flag{display:flex;gap:9px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .flag:last-child{border-bottom:none}
+  .empty{padding:22px 8px;text-align:center;color:#9aa3b2;font-size:13px}
+  .tag{font-size:10px;font-weight:800;color:#fff;background:var(--warn);border-radius:4px;padding:2px 6px;vertical-align:middle;margin-left:6px}
+  .danger{background:var(--neg)!important;color:#fff!important;width:100%}
+  /* Monochrome native date-picker (calendar) icon — corporate look */
+  input[type="date"]::-webkit-calendar-picker-indicator{filter:grayscale(1);opacity:.55}
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="row">
+      <div><h1>Alpexa Manager</h1><div class="sub">Back office · Operations</div></div>
+      <div class="pill"><span id="pendN">0</span> pending</div>
+    </div>
+  </div>
+  <div class="tabs" id="tabs"></div>
+  <div id="content"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Back office uses an ISOLATED admin session (own storageKey), so the admin login
+     never collides with whatever customer is signed into this browser. -->
+<script>window.ALPEXA_ADMIN_SESSION=true;</script>
+<script src="alpexa-sync.js?v=16"></script>
+<script>
+  // ── Back-office PIN lock (demo-level: deters casual access; upgrade to real
+  //    admin login before production). ──
+  (function lockGate(){
+    var PIN='0070';
+    // PIN is NOT remembered — required on every visit.
+    var ov=document.createElement('div');
+    ov.id='mgrLock';
+    ov.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#0F1B2D;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-family:Roboto,system-ui,-apple-system,sans-serif;padding:24px;text-align:center';
+    ov.innerHTML='<div style="font-size:21px;font-weight:800;letter-spacing:-.3px">Alpexa Manager</div>'+
+      '<div style="font-size:12.5px;opacity:.8;text-transform:uppercase;letter-spacing:.6px">Back office · enter PIN</div>'+
+      '<input id="mgrPin" type="password" inputmode="numeric" maxlength="8" placeholder="••••" style="width:170px;text-align:center;font-size:24px;letter-spacing:10px;padding:13px 10px;border-radius:4px;border:none;outline:none;background:#1A2740;color:#fff">'+
+      '<button id="mgrPinBtn" style="background:#1565C0;color:#fff;border:none;border-radius:4px;padding:13px 34px;font-size:15px;font-weight:700;cursor:pointer">Unlock</button>'+
+      '<div id="mgrPinErr" style="color:#ff8a8a;font-size:12.5px;height:14px"></div>';
+    document.body.appendChild(ov);
+    function tryUnlock(){ var el=document.getElementById('mgrPin'); if(el.value===PIN){ ov.remove(); } else { document.getElementById('mgrPinErr').textContent='Wrong PIN'; el.value=''; el.focus(); } }
+    ov.querySelector('#mgrPinBtn').onclick=tryUnlock;
+    ov.querySelector('#mgrPin').addEventListener('keydown',function(e){ if(e.key==='Enter')tryUnlock(); });
+    setTimeout(function(){ var el=document.getElementById('mgrPin'); if(el)el.focus(); },120);
+  })();
+  function getJSON(k,d){try{var v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}}
+  function setJSON(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+  function num(k,d){var v=parseFloat(localStorage.getItem(k));return isNaN(v)?d:v;}
+  function usd(n){return '$'+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+  // GLOBAL HTML escape. Several views (viewHistory, viewApprovals, …) call esc() but define
+  // no local copy — without this global they threw "esc is not defined" the moment they rendered
+  // a row, which killed render() so the tab click never switched pages. (Full escape: & < > " '.)
+  function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+  function k0(n){return '$'+Math.round(Number(n)||0).toLocaleString('en-US');}
+  function ago(ts){if(!ts)return '';var s=Math.floor((Date.now()-ts)/1000);if(s<60)return s+'s ago';var m=(s/60|0);if(m<60)return m+'m ago';var h=(m/60|0);if(h<24)return h+'h ago';return (h/24|0)+'d ago';}
+  // Requests pulled from the shared server (all customers). Filled by pullServer().
+  var SRV_REQS=[];
+  // Real customers + their accounts, pulled from Supabase (players/accounts tables).
+  var SRV_PLAYERS=[], SRV_ACCOUNTS=[], PLAYER_FILTER='', PLAYER_OPEN=null, PLAYER_EDIT=null;
+  var PLAYER_SORT='joined', PLAYER_DIR=-1, PLAYERS_SHOWF=false; // default: newest first · tap a sort chip again to flip
+  // Scalable positions access: never pull ALL rows. Summary = count + top-N by
+  // exposure; per-customer = query only that customer's rows (on demand).
+  var POS_TOP=[], POS_COUNT=0, POS_BY_CUST={}, OPEN_SEARCH='', OPEN_SERVER='all', OPEN_SHOWF=false, OPEN_PNL=0;
+  function custName(id){ for(var i=0;i<SRV_PLAYERS.length;i++){ if(SRV_PLAYERS[i].cust_id===id) return SRV_PLAYERS[i].name||id; } return id; }
+  function badgeKyc(k){ k=k||'pending'; var c=k==='verified'?'won':k==='rejected'?'lost':'cashed'; return '<span class="badge '+c+'">KYC '+k+'</span>'; }
+  function badgeStatus(s){ s=s||'active'; var c=s==='blocked'?'lost':s==='limited'?'cashed':s==='closed'?'open':'won'; return '<span class="badge '+c+'">'+s+'</span>'; }
+  function pullOpenSummary(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('positions').select('cust_id',{count:'exact',head:true}).eq('status','open').then(function(r){ if(r&&typeof r.count==='number'){ POS_COUNT=r.count; if(cur==='bets'&&!busyEditing())render(); } },function(){});
+    AlpexaSync.db.from('positions').select('*').eq('status','open').limit(60).then(function(r){ if(r&&r.data){ POS_TOP=r.data; if((cur==='bets'||cur==='overview')&&!busyEditing())render(); } },function(){});
+    AlpexaSync.db.from('positions').select('pnl').eq('status','open').limit(2000).then(function(r){ if(r&&r.data){ OPEN_PNL=r.data.reduce(function(a,x){return a+(+x.pnl||0);},0); if(cur==='overview'&&!busyEditing())render(); } },function(){});
+  }
+  function acctsOf(cid){ var pid=null; SRV_PLAYERS.forEach(function(p){ if(p.cust_id===cid)pid=p.id; }); if(pid==null)return []; return SRV_ACCOUNTS.filter(function(a){return a.player_id===pid;}).map(function(a){return a.acct_no;}).filter(Boolean); }
+  function pullCustPos(custId, acctNos){ if(!window.AlpexaSync||!AlpexaSync.db||!custId) return;
+    if(!acctNos) acctNos=acctsOf(custId);
+    // Match by cust_id OR any of the customer's account numbers, so positions
+    // still show even if an old position has a drifted cust_id.
+    var accs=(acctNos||[]).filter(function(a){ return a && a!=='—'; });
+    var q=AlpexaSync.db.from('positions').select('*').eq('status','open');
+    if(accs.length){ q=q.or('cust_id.eq.'+custId+',acct_no.in.('+accs.join(',')+')'); }
+    else { q=q.eq('cust_id',custId); }
+    q.limit(200).then(function(r){ if(r&&r.data){ POS_BY_CUST[custId]=r.data; if(!busyEditing())render(); } },function(){}); }
+  // #5/B: crypto holdings & stakes come from the SERVER tables (crypto_holdings /
+  // crypto_stakes) directly — not the retired client positions mirror. Needs the
+  // is_admin read policy on both tables (see supabase/sql/crypto_admin_read.sql).
+  var CRYPTO_BY_CUST={};
+  function pullCustCrypto(custId, cryptoAcct){
+    if(!window.AlpexaSync||!AlpexaSync.db||!custId||!cryptoAcct||cryptoAcct==='—') return;
+    CRYPTO_BY_CUST[custId]={holdings:[],stakes:[]};
+    AlpexaSync.db.from('crypto_holdings').select('asset,qty').eq('acct_no',cryptoAcct).then(function(r){
+      if(r&&r.data){ CRYPTO_BY_CUST[custId].holdings=r.data.filter(function(x){return (+x.qty||0)>0;}); if(!busyEditing())render(); } },function(){});
+    AlpexaSync.db.from('crypto_stakes').select('asset,usd,period').eq('acct_no',cryptoAcct).then(function(r){
+      if(r&&r.data){ CRYPTO_BY_CUST[custId].stakes=r.data.filter(function(x){return (+x.usd||0)>0;}); if(!busyEditing())render(); } },function(){}); }
+  // ALPXS price — Alpexa's own token has no market feed; the customer app prices it
+  // by a deterministic formula (crypto-live.html: $1.00 × 1.02^months from 2024-01),
+  // so the admin uses the SAME formula → the net-worth we show == what the customer sees.
+  function alpxsPriceAdmin(){ var mo=(Date.now()-Date.UTC(2024,0,1))/2629800000; return 1.00*Math.pow(1.02,mo); }
+  // Per-asset USD price: stablecoins = 1; ALPXS = formula; everything else = the SERVER
+  // mid (LIVE_FEED, the exact price real trades/stakes use). Unknown coin → 0 (never guess).
+  function cryptoPriceOf(asset){
+    if(asset==='USDT'||asset==='USDC'||asset==='USD'||asset==='DAI'||asset==='BUSD') return 1;
+    if(asset==='ALPXS') return alpxsPriceAdmin();
+    return (LIVE_FEED[asset]&&+LIVE_FEED[asset].mid)||0;
+  }
+  // Real crypto net worth = Σ(holding qty × price) + Σ(stake USD). Crypto money lives in
+  // crypto_holdings/crypto_stakes (NOT accounts.balance), so this is the true balance.
+  // Returns null until the customer's holdings have been pulled (caller falls back).
+  function cryptoUsdVal(custId){
+    var cb=CRYPTO_BY_CUST[custId]; if(cb===undefined) return null;
+    var v=0;
+    (cb.holdings||[]).forEach(function(x){ v+=(+x.qty||0)*cryptoPriceOf(x.asset); });
+    (cb.stakes||[]).forEach(function(x){ v+=(+x.usd||0); });
+    return v;
+  }
+  // SINGLE SOURCE for a customer's crypto USD value — count it ONCE, everywhere.
+  // crypto_holdings is the truth; accounts.balance(crypto) is only a SERVER MIRROR of
+  // the same holdings (sync_crypto_balance). So use live holdings when loaded, else the
+  // mirror — NEVER both (adding both = the 2× / $18M double-count bug, #22). Every total
+  // that includes crypto MUST go through here and MUST exclude crypto from its
+  // accounts.balance sum, so the value can never be summed twice from two sources.
+  function cryptoOnce(custId, mirrorBal){ var v=cryptoUsdVal(custId); return (v!=null)?v:(+mirrorBal||0); }
+  // Shared renderer for one open position/bet/holding (with Close/Void control).
+  function posRowHTML(x){
+    var s=x.server, who=custName(x.cust_id)||x.cust_id||'';
+    var right, cls='pos';
+    if(s==='fx'){ right=((+x.pnl>=0?'+':'')+usd(x.pnl||0)); cls=(+x.pnl<0?'neg':'pos'); }
+    else if(s==='sports'){ right='→ '+usd(x.potential||0); cls='open'; }
+    else { right=usd(x.stake||0); cls='muted'; }
+    var _op=+x.open_price||0; var _opTxt=_op?(_op>=100?_op.toFixed(3):_op.toFixed(5)):'0';
+    var sub = s==='fx' ? ((x.side||'')+' '+(x.size||0)+' @ '+_opTxt)
+            : s==='sports' ? ('Stake '+usd(x.stake||0))
+            : (x.kind==='stake'?'Staked':'Holding');
+    var esc=function(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');};
+    var label=s==='sports'?'Void':'Close';
+    return '<div class="row"><span><b>'+(x.symbol||'')+'</b>'+
+      '<div class="req-meta" style="margin:2px 0 0">👤 '+who+' · '+(x.acct_no||'')+'</div>'+
+      '<div class="req-meta" style="margin:1px 0 0">'+sub+'</div></span>'+
+      '<span style="text-align:right"><div class="'+cls+'" style="font-weight:800">'+right+'</div>'+
+        '<button class="save ghost" data-close="'+esc(x.cust_id)+'|'+esc(x.server)+'|'+esc(x.local_id)+'" style="margin-top:5px;padding:5px 11px;font-size:11.5px">'+label+'</button>'+
+        '<button data-posdel="'+esc(x.cust_id)+'|'+esc(x.server)+'|'+esc(x.local_id)+'" title="Force-remove a ghost position (app no longer has it)" style="margin:5px 0 0 5px;padding:5px 9px;font-size:11.5px;border:1px solid #f1b0b7;background:#fdecea;color:#c0392b;border-radius:4px;cursor:pointer">🗑</button>'+
+      '</span></div>';
+  }
+  // Force-remove a position row directly from the server (ghost cleanup — used
+  // when the customer's app no longer has it but a stale row lingers here).
+  function posForceDelete(cid,srv,lid){
+    if(!confirm('Force-remove this position record from the server?\n\nUse only for GHOST positions (the app no longer shows it). This does NOT close a real open position.')) return;
+    AlpexaSync.db.from('positions').delete().eq('cust_id',cid).eq('server',srv).eq('local_id',lid).then(function(r){
+      if(r&&r.error){ toast('Error: '+r.error.message,true); return; }
+      try{ logAction('force_del_position',cid,srv+' · '+lid); }catch(e){}
+      toast('Ghost position removed ✓'); pullOpenSummary();
+      if(PLAYER_OPEN){ POS_BY_CUST[PLAYER_OPEN]=undefined; pullCustPos(PLAYER_OPEN); }
+      render();
+    },function(){ toast('Failed',true); });
+  }
+  // Save edited customer profile + per-server balances back to Supabase.
+  function savePlayer(custId){
+    if(!window.AlpexaSync||!AlpexaSync.db){ toast('Not connected to server',true); return; }
+    var p=null; SRV_PLAYERS.forEach(function(x){ if(x.cust_id===custId)p=x; }); if(!p){ toast('Customer not found',true); return; }
+    var patch={ name:val('ed_name'), email:val('ed_email'), phone:val('ed_phone'), dob:val('ed_dob'), country:val('ed_country'), leverage:val('ed_lev'), currency:val('ed_cur'), kyc:val('ed_kyc'), status:val('ed_status') };
+    AlpexaSync.db.from('players').update(patch).eq('cust_id',custId).then(function(r){ if(r&&r.error)toast('Profile error: '+r.error.message,true); },function(){});
+    var accs=SRV_ACCOUNTS.filter(function(a){ return a.player_id===p.id; });
+    ['fx','crypto','sports'].forEach(function(s){
+      var a=null; accs.forEach(function(x){ if(x.server===s)a=x; }); if(!a)return;
+      var b=parseFloat(val('ed_bal_'+s)); if(isNaN(b))return; b=Math.round(b*100)/100;
+      var oldB=+a.balance||0;
+      if(Math.abs(b-oldB)<=0.009) return;   // no change
+      if(s==='crypto'){
+        // Crypto balance lives in crypto_holdings (separate subsystem) — keep existing path.
+        AlpexaSync.db.from('accounts').update({balance:b}).eq('acct_no',a.acct_no).then(function(){},function(){});
+        AlpexaSync.db.from('commands').insert({cust_id:custId,server:s,action:'set_balance',local_id:String(b),status:'pending'}).then(function(){},function(){});
+      } else {
+        // SERVER-AUTHORITATIVE (sports/fx): admin_set_balance posts a corrective ledger
+        // entry as admin — works after the accounts/ledger write-locks; no client delta.
+        AlpexaSync.db.rpc('admin_set_balance',{p_acct:a.acct_no,p_target:b}).then(function(r){
+          var d=r&&r.data; if((r&&r.error)||(d&&d.ok===false)) toast('Set balance failed: '+((d&&d.error)||(r&&r.error&&r.error.message)||'')+' — signed in as admin?',true);
+        },function(){ toast('Set balance failed (network)',true); });
+        if(s==='fx' && b<oldB){
+          var hasPos=(POS_BY_CUST[custId]||[]).some(function(x){ return x.server==='fx'; });
+          if(hasPos) toast('⚠️ FX lowered with open positions — stop-out may liquidate them',true);
+        }
+      }
+    });
+    try{ logAction('edit_customer', custId, 'profile · balances · KYC '+patch.kyc+' · status '+patch.status); }catch(e){}
+    toast('Saved ✓ — synced'); PLAYER_EDIT=null; render(); setTimeout(pullPlayers,500);
+  }
+  // Manual bonus: credit a customer's crypto wallet (USDT) as an APPROVED deposit.
+  // Reuses the deposit machinery so it's recorded (integrity monitor stays happy —
+  // no false 🚩) and reaches the app within ~4s. Customer can buy BTC with it.
+  function giveBonus(custId){
+    if(!window.AlpexaSync||!AlpexaSync.db){ toast('Not connected to server',true); return; }
+    var p=null; SRV_PLAYERS.forEach(function(x){ if(x.cust_id===custId)p=x; }); if(!p){ toast('Customer not found',true); return; }
+    var amt=parseFloat(val('ed_bonus_amt')); if(isNaN(amt)||amt<=0){ toast('Enter a bonus amount',true); return; }
+    amt=Math.round(amt*100)/100;
+    var ca=null; SRV_ACCOUNTS.forEach(function(x){ if(x.player_id===p.id && x.server==='crypto')ca=x; });
+    if(!ca){ toast('No crypto account for this customer',true); return; }
+    if(!confirm('Give '+(p.name||custId)+' a $'+amt.toFixed(2)+' crypto (USDT) bonus?\n\nIt is credited to their crypto wallet and recorded as a deposit.')) return;
+    var lid='bonus-'+Date.now();
+    AlpexaSync.db.from('requests').insert({
+      local_id: lid, cust_id: custId, name: p.name||'', acct_no: ca.acct_no,
+      server:'crypto', type:'deposit', amount:amt, fee:0, net:amt,
+      asset:'USDT', network:'ERC-20', from_label:'Bonus (admin)', status:'pending'
+    }).then(function(ins){
+      if(ins&&ins.error){ toast('Bonus error: '+ins.error.message,true); return; }
+      AlpexaSync.updateRequest(lid,{status:'approved'}).then(function(res){
+        if(res&&res.error){ toast('Bonus approve error: '+res.error.message,true); return; }
+        try{ logAction('bonus', custId, '$'+amt.toFixed(2)+' USDT crypto bonus'); }catch(e){}
+        toast('Bonus sent: $'+amt.toFixed(2)+' → '+(p.name||custId)+' ✓');
+        setTimeout(function(){ try{pullServer&&pullServer();}catch(e){} try{pullPlayers&&pullPlayers();}catch(e){} }, 400);
+      });
+    }, function(){ toast('Bonus failed (network)',true); });
+  }
+  // Give ALPXS token (a COIN, not USDT cash). Crypto money lives in
+  // crypto_holdings(acct_no, asset, qty) — the admin_give_alpxs RPC (is_admin
+  // gated, SECURITY DEFINER, idempotent via ref) is the ONLY write path. The
+  // client never touches crypto_holdings directly. Mirrors giveBonus's UX.
+  function giveAlpxs(custId){
+    if(!window.AlpexaSync||!AlpexaSync.db){ toast('Not connected to server',true); return; }
+    var p=null; SRV_PLAYERS.forEach(function(x){ if(x.cust_id===custId)p=x; }); if(!p){ toast('Customer not found',true); return; }
+    var qty=parseFloat(val('ed_alpxs_qty')); if(isNaN(qty)||qty<=0){ toast('Enter an ALPXS amount',true); return; }
+    qty=Math.round(qty*100)/100;
+    var ca=null; SRV_ACCOUNTS.forEach(function(x){ if(x.player_id===p.id && x.server==='crypto')ca=x; });
+    if(!ca){ toast('No crypto account for this customer',true); return; }
+    if(!confirm('Give '+(p.name||custId)+' '+qty+' ALPXS tokens?\n\nCredited to their crypto wallet as ALPXS coin.')) return;
+    var ref='alpxs-'+custId+'-'+Date.now();
+    AlpexaSync.db.rpc('admin_give_alpxs',{p_ref:ref, p_acct:ca.acct_no, p_qty:qty}).then(function(r){
+      if(r&&r.error){ toast('ALPXS error: '+r.error.message,true); return; }
+      var d=r&&r.data; if(d&&d.ok===false){ toast('ALPXS: '+(d.error||'rejected'),true); return; }
+      try{ logAction('bonus', custId, qty+' ALPXS token grant'); }catch(e){}
+      toast((d&&d.duplicate?'Already granted (no double-credit) ✓':'Sent: '+qty+' ALPXS → '+(p.name||custId)+' ✓'));
+      setTimeout(function(){ try{pullServer&&pullServer();}catch(e){} try{pullPlayers&&pullPlayers();}catch(e){} try{CRYPTO_BY_CUST[custId]=undefined;}catch(e){} }, 400);
+    }, function(){ toast('ALPXS failed (network)',true); });
+  }
+  // Permanently remove a customer: profile + all accounts + open positions.
+  // Transaction history (requests) and audit logs are kept on purpose.
+  // Note: the auth login (email/password) lives in auth.users and is removed
+  // separately via the Supabase dashboard or the admin backend (M4).
+  function deletePlayer(custId){
+    if(!window.AlpexaSync||!AlpexaSync.db){ toast('Not connected to server',true); return; }
+    var p=null; SRV_PLAYERS.forEach(function(x){ if(x.cust_id===custId)p=x; });
+    if(!p){ toast('Customer not found',true); return; }
+    var nm=p.name||custId;
+    // SOFT-DELETE: never hard-delete a customer (regulatory record-keeping +
+    // recovery). Mark the profile CLOSED; all data — accounts, positions,
+    // requests, settlements, activity — is kept and fully restorable.
+    if(!confirm('Close '+nm+' ('+custId+')?\n\nMarks the account CLOSED. Their data is KEPT and can be restored anytime. Nothing is deleted.')) return;
+    AlpexaSync.db.from('players').update({status:'closed'}).eq('cust_id',custId).then(function(r){
+      if(r&&r.error){ toast('Close failed: '+r.error.message,true); return; }
+      try{ logAction('close_customer', custId, 'marked CLOSED (soft-delete, data kept) ('+nm+')'); }catch(e){}
+      SRV_PLAYERS.forEach(function(x){ if(x.cust_id===custId) x.status='closed'; });
+      PLAYER_EDIT=null; PLAYER_OPEN=null;
+      toast('Closed ✓ — data kept, restorable'); render(); setTimeout(pullPlayers,500);
+    },function(){ toast('Close failed (check connection)',true); });
+  }
+  function reopenPlayer(custId){
+    if(!window.AlpexaSync||!AlpexaSync.db){ toast('Not connected to server',true); return; }
+    var p=null; SRV_PLAYERS.forEach(function(x){ if(x.cust_id===custId)p=x; });
+    if(!p){ toast('Customer not found',true); return; }
+    var nm=p.name||custId;
+    if(!confirm('Reopen '+nm+' ('+custId+')?\n\nRestores the account to active.')) return;
+    AlpexaSync.db.from('players').update({status:'active'}).eq('cust_id',custId).then(function(r){
+      if(r&&r.error){ toast('Reopen failed: '+r.error.message,true); return; }
+      try{ logAction('reopen_customer', custId, 'restored to active ('+nm+')'); }catch(e){}
+      SRV_PLAYERS.forEach(function(x){ if(x.cust_id===custId) x.status='active'; });
+      toast('Reopened ✓'); render(); setTimeout(pullPlayers,500);
+    },function(){ toast('Reopen failed (check connection)',true); });
+  }
+  var SRV_MAP={fx:'Alpexa FX',live:'Alpexa FX',stocks:'Alpexa Crypto',crypto:'Alpexa Crypto',demo:'Alpexa Sports',sports:'Alpexa Sports'};
+  function pullPlayers(){
+    if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('players').select('id,cust_id,name,email,created_at,phone,dob,country,server,leverage,currency,kyc,status').then(function(r){
+      if(r&&r.data){ SRV_PLAYERS=r.data; if((cur==='players'||cur==='watch')&&!busyEditing())render(); }
+    },function(){
+      // Older DB without the profile columns — fall back to the core fields.
+      AlpexaSync.db.from('players').select('id,cust_id,name,email,created_at').then(function(r2){ if(r2&&r2.data){SRV_PLAYERS=r2.data; if((cur==='players'||cur==='watch')&&!busyEditing())render();} },function(){});
+    });
+    AlpexaSync.db.from('accounts').select('player_id,server,acct_no,balance,bonus').then(function(r){
+      if(r&&r.data){ SRV_ACCOUNTS=r.data; if((cur==='players'||cur==='watch')&&!busyEditing())render(); }
+    },function(){});
+  }
+  // Approximate balance for a customer = approved deposits − approved withdrawals.
+  // (Live balances live on the customer's device; this is the server-side proxy.)
+  function custBalance(custId){
+    var dep=0,wd=0;
+    SRV_REQS.forEach(function(r){ if(r.cust_id!==custId||r.status!=='approved')return;
+      if(r.type==='deposit')dep+=(+r.amount||0); else if(r.type==='withdraw')wd+=(+r.amount||0); });
+    return dep-wd;
+  }
+  // ── Integrity / tamper monitor (read-only) ──
+  // Compares each customer's ACTUAL balance (what their app reported) with what
+  // the server records can EXPLAIN: a generous demo opening + approved deposits −
+  // withdrawals + recorded trade P&L. A large positive gap = more money than the
+  // records justify → likely localStorage tampering. Tune the two constants.
+  var INTEGRITY_FLAG_GAP=50000;  // flag if actual exceeds explained by more than this
+  function acctIntegrity(p){
+    if(!p) return {actual:0,explained:0,gap:0,flagged:false};
+    var cid=p.cust_id, dep=0, wd=0, pnl=0, actual=0, opening=0;
+    SRV_REQS.forEach(function(r){ if(r.cust_id!==cid||r.status!=='approved')return;
+      if(r.type==='deposit')dep+=(+r.amount||0); else if(r.type==='withdraw')wd+=(+r.amount||0); });
+    SRV_SETTLE.forEach(function(s){ if(s.cust_id===cid)pnl+=(+s.pnl||0); });
+    // opening = sum of each account's welcome bonus (non-withdrawable) — the REAL starting
+    // funds (Sports $100 + FX $100 + Crypto $0). Was a stale $100 constant that ignored the
+    // FX welcome, so a fresh account showed a false +$100 integrity gap.
+    // accounts.balance for crypto is a SERVER MIRROR of crypto_holdings value (sync_crypto_balance
+    // sets it to Σholdings×price + stakes) — the SAME money as cryptoUsdVal, so NEVER add both.
+    // Sum only FX+Sports cash here; keep the crypto mirror as a fallback for when live holdings
+    // haven't been pulled yet.
+    var cryptoMirror=0;
+    SRV_ACCOUNTS.forEach(function(a){ if(a.player_id===p.id){ if(a.server==='crypto'){ cryptoMirror=(+a.balance||0); } else { actual+=(+a.balance||0); opening+=(+a.bonus||0); } } });
+    // Crypto counted ONCE via the single source. Added to BOTH sides: it shows in the displayed
+    // total, but the GAP still polices only CASH (FX+Sports) — crypto is RLS-locked (client can't
+    // tamper) and admin-granted/market-priced, so this cash tamper-monitor must not flag it.
+    // (Without this, an admin ALPXS bonus shows as an unexplained gap and wrongly blocks withdrawals.)
+    var crypto=cryptoOnce(cid, cryptoMirror);
+    var explained=opening+dep-wd+pnl+crypto, actualT=actual+crypto, gap=actualT-explained;
+    return {actual:actualT,explained:explained,gap:gap,dep:dep,wd:wd,pnl:pnl,opening:opening,crypto:crypto,flagged:gap>INTEGRITY_FLAG_GAP};
+  }
+  // Withdrawal guard: a WITHDRAW approval is risky if the customer's balance can't
+  // be explained by their records (possible ledger tampering / self-credit, 🚩).
+  // Returns the integrity info if it should be guarded, else null.
+  function withdrawGuard(rq){
+    if(!rq || (rq.type||'')!=='withdraw') return null;
+    var p=null; for(var i=0;i<SRV_PLAYERS.length;i++){ if(SRV_PLAYERS[i].cust_id===rq.custId){ p=SRV_PLAYERS[i]; break; } }
+    if(!p) return null;
+    try{ var ig=acctIntegrity(p); return ig.flagged?ig:null; }catch(e){ return null; }
+  }
+  // Presence: customers whose app reported a heartbeat in the last 90 seconds.
+  var ONLINE=[];
+  function pullOnline(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    var cutoff=new Date(Date.now()-90000).toISOString();
+    AlpexaSync.db.from('players').select('cust_id,name,email,last_seen,last_app').gt('last_seen',cutoff).order('last_seen',{ascending:false}).limit(300).then(function(r){ if(r&&r.data){ ONLINE=r.data; if(cur==='online'&&!busyEditing())render(); } },function(){}); }
+  // Audit log: record every back-office action (approval, edit, force-action).
+  var LOGS=[];
+  function logAction(action,target,detail){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('logs').insert({actor:'back-office',action:action,target_cust:target||'',detail:detail||''}).then(function(){ if(cur==='logs')pullLogs(); },function(){}); }
+  function pullLogs(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('logs').select('*').order('created_at',{ascending:false}).limit(100).then(function(r){ if(r&&r.data){ LOGS=r.data; if(cur==='logs'&&!busyEditing())render(); } },function(){}); }
+  function srvToLocal(r){return {id:r.local_id,ts:r.created_at?Date.parse(r.created_at):Date.now(),
+    type:r.type,server:r.server,amount:+r.amount||0,fee:+r.fee||0,net:+r.net||0,
+    asset:r.asset,network:r.network,address:r.address,from:r.from_label,to:r.to_label,
+    status:r.status,decidedTs:r.decided_at?Date.parse(r.decided_at):0,txid:r.txid||'',
+    custName:r.name,custId:r.cust_id,acctNo:r.acct_no,_srv:true};}
+  function reqs(){
+    var srv=SRV_REQS.map(srvToLocal), local=getJSON('alpexa.withdrawals',[]);
+    var seen={},out=[]; srv.forEach(function(w){seen[w.id]=true;out.push(w);});
+    local.forEach(function(w){if(!seen[w.id])out.push(w);}); return out;
+  }
+  function openB(){return getJSON('alpexa.openBets',[]);}
+  function settB(){return getJSON('alpexa.settledBets',[]);}
+  // (Removed dead localStorage money readers sportsBal/cryptoBal/fxBal — #5: the back
+  //  office reads balances from the SERVER accounts table, not same-browser localStorage.
+  //  Confirmed 0 call sites.)
+  function CO_ADDR(){return localStorage.getItem('alpexa.companyAddr')||'0x6B1c8941698Affc56757eF9Be1723Ec43F720966';}
+  // demo customer identity + 3 account numbers (generated once; real server issues these per user)
+  function customer(){
+    // Back-office: when a request carries no customer name/acct, show an honest "—"
+    // placeholder. Never fabricate a demo identity (was 'Player #1001 / demo@alpexa.io',
+    // which leaked fake names + random account numbers into the approvals queue).
+    var c=getJSON('alpexa.customer',null);
+    if(!c) return {id:'—',name:'—',email:'',acct:{sports:'—',crypto:'—',fx:'—'}};
+    return c;
+  }
+
+  function finance(){
+    var R=reqs(), ob=openB(), sb=settB();
+    var dep=R.filter(function(w){return w.type==='deposit'&&w.status==='approved';}).reduce(function(a,w){return a+(+w.amount||0);},0);
+    var wd =R.filter(function(w){return w.type==='withdraw'&&w.status==='approved';}).reduce(function(a,w){return a+(+w.amount||0);},0);
+    var turnover=ob.reduce(function(a,b){return a+(+b.stake||0);},0)+sb.reduce(function(a,b){return a+(+b.stake||0);},0);
+    var settledStake=sb.reduce(function(a,b){return a+(+b.stake||0);},0);
+    var payouts=sb.reduce(function(a,b){return a+(((b.result==='won'||b.result==='cashed')?(+b.payout||0):0));},0);
+    var ggr=settledStake-payouts;
+    var liab=ob.reduce(function(a,b){return a+(+b.potential||0);},0);
+    return {dep:dep,wd:wd,turnover:turnover,ggr:ggr,payouts:payouts,net:dep-wd,liab:liab,openCount:ob.length,
+      hold: settledStake? (ggr/settledStake*100):0, pending:R.filter(function(w){return w.status==='pending';}).length};
+  }
+
+  // Core tabs (always visible) vs the rest, tucked behind a "More" toggle so the
+  // day-to-day back office stays simple. Nothing is removed — just hidden.
+  var TABS_CORE=[['overview','Overview','dashboard'],['online','Online','sensors'],['approvals','Approvals','task_alt'],['players','Players','group'],['wallet','Wallet','account_balance_wallet']];
+  var TABS_MORE=[['watch','Watch','visibility'],['history','History','receipt_long'],['report','Report','monitoring'],['pricing','Pricing','tune'],['risk','Risk','gpp_maybe'],['bets','Open','candlestick_chart'],['agents','Agents','handshake'],['logs','Logs','list_alt'],['config','Config','settings']];
+  var TABS=TABS_CORE.concat(TABS_MORE);
+  var SHOW_MORE=false;
+  var cur='overview';
+  function renderTabs(){
+    // Always show More-tab when its panel is open, so the current selection is visible.
+    var inMore=TABS_MORE.some(function(t){return t[0]===cur;});
+    var list=TABS_CORE.slice();
+    if(SHOW_MORE||inMore) list=list.concat(TABS_MORE);
+    var html=list.map(function(t){return '<button class="tab '+(t[0]===cur?'on':'')+'" data-t="'+t[0]+'"><span class="msi">'+(t[2]||'circle')+'</span><span>'+t[1]+'</span></button>';}).join('');
+    html+='<button class="tab" data-more="1" style="margin-top:4px;color:var(--acc)"><span class="msi">'+((SHOW_MORE||inMore)?'expand_less':'more_horiz')+'</span><span>'+((SHOW_MORE||inMore)?'Less':'More')+'</span></button>';
+    document.getElementById('tabs').innerHTML=html;
+    document.querySelectorAll('.tab[data-more]').forEach(function(b){b.onclick=function(){SHOW_MORE=!SHOW_MORE;renderTabs();};});
+    document.querySelectorAll('.tab[data-t]').forEach(function(b){b.onclick=function(){cur=b.getAttribute('data-t');
+      if(cur==='watch'){pullSettle();pullServer();pullPlayers();}
+      if(cur==='history'||cur==='report'){pullSettle();pullServer();}
+      if(cur==='agents'){pullAgents();pullSettle();}
+      if(cur==='wallet'){pullWallet(true);}
+      if(cur==='pricing'){pullPricing();}
+      render();};});
+  }
+  function render(){
+    var f=finance();
+    var pn=document.getElementById('pendN'); if(pn)pn.textContent=f.pending;
+    renderTabs();
+    var c=document.getElementById('content'), h='';
+    if(cur==='overview')h=viewOverview(f);
+    else if(cur==='report')h=viewReport();
+    else if(cur==='approvals')h=viewApprovals();
+    else if(cur==='history')h=viewHistory();
+    else if(cur==='players')h=viewPlayers(f);
+    else if(cur==='online')h=viewOnline();
+    else if(cur==='watch')h=viewWatch();
+    else if(cur==='risk')h=viewRisk(f);
+    else if(cur==='bets')h=viewBets();
+    else if(cur==='wallet')h=viewWallet();
+    else if(cur==='pricing')h=viewPricing();
+    else if(cur==='agents')h=viewAgents();
+    else if(cur==='logs')h=viewLogs();
+    else if(cur==='config')h=viewConfig();
+    c.innerHTML=h; wire();
+  }
+  function kpi(k,v,s,cls){return '<div class="kpi"><div class="k">'+k+'</div><div class="v '+(cls||'')+'">'+v+'</div><div class="s">'+(s||'')+'</div></div>';}
+
+  function viewOverview(f){
+    var custCount=SRV_PLAYERS.length;
+    var totalBal=SRV_ACCOUNTS.reduce(function(a,x){return a+(+x.balance||0);},0);
+    var bySrv={fx:0,crypto:0,sports:0};
+    SRV_ACCOUNTS.forEach(function(x){ if(bySrv[x.server]!=null) bySrv[x.server]+=(+x.balance||0); });
+    var dep=SRV_REQS.filter(function(w){return (w.type||'')==='deposit'&&w.status==='approved';}).reduce(function(a,w){return a+(+w.amount||0);},0);
+    var wd =SRV_REQS.filter(function(w){return (w.type||'')==='withdraw'&&w.status==='approved';}).reduce(function(a,w){return a+(+w.amount||0);},0);
+    var pend=SRV_REQS.filter(function(w){return (w.status||'')==='pending';}).length;
+    var net=dep-wd;
+    var connected=(window.AlpexaSync&&AlpexaSync.db);
+    return '<div class="sec">All customers · live</div>'+
+      '<div class="kpis">'+
+        kpi('Customers',custCount,'registered')+
+        kpi('Total balances',k0(totalBal),'Equity '+k0(totalBal+OPEN_PNL)+' · P/L '+(OPEN_PNL>=0?'+':'-')+k0(Math.abs(OPEN_PNL)),'pos')+
+        kpi('Deposits',k0(dep),'approved')+
+        kpi('Withdrawals',k0(wd),'approved')+
+        kpi('Net cash',(net<0?'-':'')+k0(Math.abs(net)),'dep - wd',net>=0?'pos':'neg')+
+        kpi('Pending',pend,'awaiting approval',pend>0?'neg':'')+
+      '</div>'+
+      '<div class="card"><div class="row"><span>Live (FX) balances</span><b>'+usd(bySrv.fx)+'</b></div>'+
+        '<div class="row"><span>Crypto balances</span><b>'+usd(bySrv.crypto)+'</b></div>'+
+        '<div class="row"><span>Sports balances</span><b>'+usd(bySrv.sports)+'</b></div>'+
+        '<div class="row"><span>Pending approvals</span><b>'+pend+'</b></div></div>'+
+      apiUsageCard()+
+      '<div class="hint" style="margin:0 14px">'+(connected?'Aggregated across all customers · Supabase, real-time.':'Not connected to server.')+'</div>';
+  }
+  // Live quota for the sports odds data provider (The Odds API, free ~500/mo).
+  var API_USAGE=null;
+  function pullApiUsage(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('api_usage').select('*').then(function(r){ if(r&&r.data){ var m={}; r.data.forEach(function(x){ m[x.provider]=x; }); API_USAGE=m; if(cur==='overview'&&!busyEditing())render(); } },function(){}); }
+  function apiUsageCard(){
+    var u=API_USAGE&&API_USAGE.odds_api; if(!u) return '';
+    var rem=+u.remaining||0, used=+u.used||0, total=rem+used;
+    var low=rem<=50, warn=rem<=150;
+    var when=u.updated_at?ago(Date.parse(u.updated_at)):'';
+    var bar=total>0?Math.max(2,Math.round(rem/total*100)):0;
+    var col=low?'var(--neg)':warn?'var(--warn)':'var(--pos)';
+    var h='<div class="sec">Data feeds</div><div class="card"'+(low?' style="border-color:#f1b0b7"':'')+'>'+
+      '<div class="row" style="border:none;padding:0 0 4px"><span><b>Sports odds API</b><div class="req-meta" style="margin:2px 0 0">The Odds API · updated '+when+'</div></span>'+
+      '<b style="color:'+col+'">'+rem.toLocaleString()+' left</b></div>'+
+      '<div style="height:8px;background:#eef0f3;border-radius:4px;overflow:hidden;margin-top:4px"><div style="height:100%;width:'+bar+'%;background:'+col+'"></div></div>'+
+      '<div class="req-meta" style="margin-top:5px">'+used.toLocaleString()+' used of '+total.toLocaleString()+' this month</div>'+
+      (low?'<div class="hint" style="color:var(--neg);font-weight:700;margin:6px 0 0">⚠ Almost out — upgrade The Odds API to a paid plan to keep live sports data flowing.</div>'
+          :warn?'<div class="hint" style="color:var(--warn);margin:6px 0 0">Getting low — plan a paid upgrade soon.</div>':'')+
+      '</div>';
+    return h;
+  }
+
+  var REPORT_RANGE='today', REPORT_FROM='', REPORT_TO='', REPORT_SHOWF=false;
+  // Finished trades reported by the apps (FX closes, bet results) → company P&L.
+  var SRV_SETTLE=[];
+  function pullSettle(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('settlements').select('*').order('created_at',{ascending:false}).limit(2000).then(function(r){ if(r&&r.data){ SRV_SETTLE=r.data; if((cur==='report'||cur==='players'||cur==='history'||cur==='watch')&&!busyEditing())render(); } },function(){}); }
+  // Internal user-to-user transfers (payments table) — so the back office can see them.
+  var SRV_PAYMENTS=[];
+  function pullPayments(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('payments').select('*').order('created_at',{ascending:false}).limit(500).then(function(r){ if(r&&r.data){ SRV_PAYMENTS=r.data; if((cur==='players'||cur==='history')&&!busyEditing())render(); } },function(){}); }
+  // Full activity log: every buy/sell/stake/bet/trade each customer makes.
+  var SRV_ACTIVITY=[];
+  function pullActivity(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('activity').select('*').order('created_at',{ascending:false}).limit(1500).then(function(r){ if(r&&r.data){ SRV_ACTIVITY=r.data; if((cur==='players'||cur==='history')&&!busyEditing())render(); } },function(){}); }
+  function viewReport(){
+    if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Report</div><div class="card"><div class="empty">Not connected to server.</div></div>';
+    var now=Date.now(), cutoff=0, hi=Infinity, label='All time';
+    if(REPORT_RANGE==='today'){ var d=new Date(); d.setHours(0,0,0,0); cutoff=d.getTime(); label='Today'; }
+    else if(REPORT_RANGE==='7d'){ cutoff=now-7*86400e3; label='Last 7 days'; }
+    else if(REPORT_RANGE==='30d'){ cutoff=now-30*86400e3; label='Last 30 days'; }
+    else if(REPORT_RANGE==='custom'){
+      // Default the calendar to the last 7 days the first time it opens.
+      if(!REPORT_FROM){ REPORT_FROM=new Date(now-7*86400e3).toISOString().slice(0,10); }
+      if(!REPORT_TO){ REPORT_TO=new Date(now).toISOString().slice(0,10); }
+      cutoff=new Date(REPORT_FROM+'T00:00:00').getTime()||0;
+      hi=(new Date(REPORT_TO+'T23:59:59').getTime())||Infinity;
+      label=REPORT_FROM+' → '+REPORT_TO;
+    }
+    var inRange=function(ts){ if(cutoff && !(ts && ts>=cutoff)) return false; if(hi<Infinity && !(ts && ts<=hi)) return false; return true; };
+    var R=SRV_REQS.filter(function(r){ return inRange(r.created_at?Date.parse(r.created_at):0); });
+    var sum=function(t){ return R.filter(function(r){return (r.type||'')===t && r.status==='approved';}).reduce(function(a,r){return a+(+r.amount||0);},0); };
+    var cnt=function(t){ return R.filter(function(r){return (r.type||'')===t && r.status==='approved';}).length; };
+    var dep=sum('deposit'), wd=sum('withdraw'), tf=sum('transfer'), net=dep-wd;
+    var pend=SRV_REQS.filter(function(r){return r.status==='pending';}).length;
+    var newCust=SRV_PLAYERS.filter(function(p){ return inRange(p.created_at?Date.parse(p.created_at):0); }).length;
+    var h='<div class="sec" style="display:flex;align-items:center;justify-content:space-between">Report · '+label+
+      '<button data-rfil="1" style="background:'+(REPORT_SHOWF?'var(--acc)':'#fff')+';border:1px solid var(--line);border-radius:4px;padding:5px 11px;font:700 11px system-ui;color:'+(REPORT_SHOWF?'#fff':'var(--ink)')+';cursor:pointer">Period '+(REPORT_SHOWF?'▴':'▾')+'</button></div>';
+    if(REPORT_SHOWF){
+      var RANGES=[['today','Today'],['7d','7d'],['30d','30d'],['all','All'],['custom','Custom']];
+      h+='<div style="display:flex;gap:6px;margin:0 12px 8px">'+RANGES.map(function(x){
+        var on=REPORT_RANGE===x[0];
+        return '<button data-rr="'+x[0]+'" style="flex:1;background:'+(on?'var(--acc)':'#F1F3F6')+';color:'+(on?'#fff':'var(--dim)')+';border-radius:4px;padding:8px 0;font:700 11.5px system-ui;border:none;cursor:pointer">'+x[1]+'</button>';
+      }).join('')+'</div>';
+      if(REPORT_RANGE==='custom'){
+        h+='<div class="card" style="padding:10px 12px;display:flex;gap:8px;align-items:center">'+
+          '<input type="date" class="in" id="rpFrom" value="'+REPORT_FROM+'" style="margin-top:0;flex:1">'+
+          '<span class="muted" style="font-weight:700">→</span>'+
+          '<input type="date" class="in" id="rpTo" value="'+REPORT_TO+'" style="margin-top:0;flex:1">'+
+        '</div>';
+      }
+    }
+    h+='<div class="sec">'+label+' · summary</div>'+
+      '<div class="kpis">'+
+        kpi('Deposits',k0(dep),cnt('deposit')+' approved','pos')+
+        kpi('Withdrawals',k0(wd),cnt('withdraw')+' approved','neg')+
+        kpi('Transfers',k0(tf),cnt('transfer')+' approved')+
+        kpi('Net cash',(net<0?'-':'')+k0(Math.abs(net)),'deposits − withdrawals',net>=0?'pos':'neg')+
+        kpi('New signups',newCust,'in period')+
+        kpi('Pending now',pend,'awaiting approval',pend>0?'neg':'')+
+      '</div>';
+    // ── Company P&L: customer losses are our gain, customer wins are our cost ──
+    var S=SRV_SETTLE.filter(function(s){ return inRange(s.created_at?Date.parse(s.created_at):0); });
+    var custWin=0, custLoss=0, tradeFees=0, nTrades=0;
+    S.forEach(function(s){ if(s.kind==='crypto_fee'){ tradeFees+=(+s.stake||0); return; }
+      nTrades++; var p=+s.pnl||0; if(p>0)custWin+=p; else custLoss+=-p; });
+    var fees=R.filter(function(r){return r.status==='approved';}).reduce(function(a,r){return a+(+r.fee||0);},0)+tradeFees;
+    var coPnl=custLoss-custWin+fees;
+    h+='<div class="sec">'+label+' · company P&amp;L</div>'+
+      '<div class="kpis">'+
+        kpi('Customer losses','+'+k0(custLoss),'we keep','pos')+
+        kpi('Customer wins','-'+k0(custWin),'we pay out','neg')+
+        kpi('Fees earned','+'+k0(fees),'deposit/withdraw + trade fees','pos')+
+        kpi('Company P&L',(coPnl<0?'-':'+')+k0(Math.abs(coPnl)),nTrades+' settled trades',coPnl>=0?'pos':'neg')+
+      '</div>';
+    // Per-app breakdown of the same numbers.
+    var APPS=[['fx','Alpexa FX'],['crypto','Alpexa Crypto'],['sports','Alpexa Sports']];
+    h+='<div class="sec">Company P&amp;L · by app</div><div class="card">';
+    APPS.forEach(function(ap){
+      var s=ap[0], lossS=0, winS=0, nS=0, tFeeS=0;
+      S.forEach(function(x){ if((x.server||'')!==s)return;
+        if(x.kind==='crypto_fee'){ tFeeS+=(+x.stake||0); return; }
+        nS++; var p=+x.pnl||0; if(p>0)winS+=p; else lossS+=-p; });
+      var feeS=R.filter(function(r){return r.status==='approved' && (r.server||'')===s;}).reduce(function(a,r){return a+(+r.fee||0);},0)+tFeeS;
+      var netS=lossS-winS+feeS;
+      h+='<div class="row"><span><b>'+ap[1]+'</b>'+
+        '<div class="req-meta" style="margin:2px 0 0">we keep +'+k0(lossS)+' · we pay -'+k0(winS)+' · fees +'+k0(feeS)+' · '+nS+' trades</div></span>'+
+        '<b class="'+(netS>=0?'pos':'neg')+'">'+(netS<0?'-':'+')+k0(Math.abs(netS))+'</b></div>';
+    });
+    h+='</div>';
+    h+='<div class="hint" style="margin:0 14px 10px">Customers lose → we profit (<b style="color:var(--pos)">green</b>) · customers win → we pay (<b style="color:var(--neg)">red</b>). Each individual trade: <b>History</b> tab.</div>';
+    var sDay={};
+    S.forEach(function(s){ var k=(s.created_at||'').slice(0,10); if(!k)return; sDay[k]=(sDay[k]||0)+(-(+s.pnl||0)); });
+    var sDays=Object.keys(sDay).sort().reverse().slice(0,14);
+    // Only worth showing when the period spans multiple days — a single day
+    // just repeats the Company P&L KPI above.
+    if(sDays.length>1){ h+='<div class="sec">Company P&amp;L by day</div><div class="card">';
+      sDays.forEach(function(k){ var v=sDay[k]; h+='<div class="row"><span>'+k+'</span><b class="'+(v>=0?'pos':'neg')+'">'+(v<0?'-':'+')+k0(Math.abs(v))+'</b></div>'; });
+      h+='</div>'; }
+    h+='<div class="hint" style="margin:0 14px 10px">Trade results are recorded from app version FX v76 / Sports v1.2.27 onward (older trades aren\'t included). Crypto spot P&amp;L: planned.</div>';
+    var byDay={};
+    R.forEach(function(r){ if(r.status!=='approved')return; var k=(r.created_at||'').slice(0,10); if(!k)return; byDay[k]=byDay[k]||{dep:0,wd:0}; if(r.type==='deposit')byDay[k].dep+=(+r.amount||0); else if(r.type==='withdraw')byDay[k].wd+=(+r.amount||0); });
+    var days=Object.keys(byDay).sort().reverse().slice(0,14);
+    if(days.length>1){ h+='<div class="sec">By day</div><div class="card">';
+      days.forEach(function(k){ var v=byDay[k]; h+='<div class="row"><span>'+k+'</span><span><b class="pos">+'+k0(v.dep)+'</b> &nbsp;<b class="neg">-'+k0(v.wd)+'</b></span></div>'; });
+      h+='</div>'; }
+    h+='<div class="hint" style="margin:0 14px">Approved cash flow. (Large scale → server-side daily aggregates, planned.)</div>';
+    return h;
+  }
+  function viewApprovals(){
+    var cust=customer();
+    var all=reqs(), pend=all.filter(function(w){return w.status==='pending';}),
+        done=all.filter(function(w){return w.status!=='pending';}).sort(function(a,b){return (b.decidedTs||0)-(a.decidedTs||0);}).slice(0,8);
+    var h='<div class="sec">Pending approvals</div>';
+    if(!pend.length) h+='<div class="card"><div class="empty">No pending requests 👍</div></div>';
+    pend.forEach(function(w){
+      var t=w.type||'withdraw', label=t==='deposit'?'DEPOSIT':t==='transfer'?'TRANSFER':'WITHDRAW';
+      var meta=t==='transfer'?((w.from||'Sports')+' → '+(w.to||'Crypto')):((w.asset||'USDT')+(w.network?' ('+w.network+')':''));
+      h+='<div class="card"><div class="row" style="border:none;padding:0 0 6px"><span class="badge '+t+'">'+label+'</span><span class="req-amt">'+usd(w.amount)+'</span></div>'+
+        '<div class="req-meta">👤 '+esc(w.custName||cust.name||cust.id)+' · '+esc(w.acctNo||cust.acct.sports)+(w.custId?(' · '+esc(w.custId)):'')+'</div>'+
+        '<div class="req-meta">'+esc(w.server)+' · '+meta+' · '+ago(w.ts)+'</div>'+
+        (t==='withdraw'?'<div class="req-meta">You receive (after fee): <b>'+usd(w.net)+'</b></div>':'')+
+        (w.address?('<div class="req-addr-lbl">'+(t==='withdraw'?'▶ Send '+usd(w.net)+' USDT to · user wallet':'Deposit address')+'</div><div class="req-addr" data-copy="'+esc(w.address)+'">'+esc(w.address)+'</div>'):'')+
+        (t==='withdraw'
+          ? '<input class="in" id="tx_'+w.id+'" spellcheck="false" autocomplete="off" placeholder="Paste tx hash (txid) after sending" style="margin-top:8px;font-family:ui-monospace,monospace;font-size:11.5px">'+
+            '<div class="btns"><button class="ok" data-paid="'+w.id+'">Mark Paid ✓</button><button class="no" data-no="'+w.id+'">Reject</button></div>'+
+            '<div class="hint">Send the USDT from your wallet/exchange to the address above, then paste the transaction hash and tap Mark Paid.</div></div>'
+          : '<div class="btns"><button class="ok" data-ok="'+w.id+'">Approve</button><button class="no" data-no="'+w.id+'">Reject</button></div></div>');
+    });
+    h+='<div class="sec">Recently processed</div><div class="card">';
+    if(!done.length) h+='<div class="empty">Nothing processed yet.</div>';
+    done.forEach(function(w){var t=w.type||'withdraw',label=t==='deposit'?'Deposit':t==='transfer'?'Transfer':'Withdraw';
+      h+='<div class="row"><span>'+label+' · '+usd(w.amount)+'</span><span class="badge '+(w.status==='approved'?'won':'lost')+'">'+(w.status==='approved'?'Approved':'Rejected')+'</span></div>';});
+    h+='</div>';
+    return h;
+  }
+
+  // ── History: full transaction log for ALL customers, with edit/fix ──
+  var HIST_FILTER='', EDIT_ID=null, HIST_SERVER='all', HIST_FROM='', HIST_TO='', HIST_SHOWF=false, HIST_OPEN=null, TRADE_EDIT=null;
+  // Delete or correct a settled-trade ledger record (e.g. wrong P&L from a bug).
+  function tradeDelete(sid){
+    if(!confirm('Delete this trade record? It will be removed from company P&L and agent commissions.\n\n(Customer balance is NOT changed — adjust it in Players if needed.)')) return;
+    AlpexaSync.db.from('settlements').delete().eq('id',sid).then(function(r){
+      if(r&&r.error){ toast('Delete failed: '+r.error.message+' (run the settlements delete SQL)',true); return; }
+      SRV_SETTLE=SRV_SETTLE.filter(function(x){ return String(x.id)!==String(sid); });
+      try{ logAction('delete_trade', '', 'settlement #'+sid); }catch(e){}
+      toast('Trade record deleted ✓'); render();
+    },function(){ toast('Delete failed',true); });
+  }
+  function tradeSavePnl(sid){
+    var v=parseFloat(val('tEdPnl')); if(isNaN(v)){ toast('Enter a number',true); return; }
+    v=Math.round(v*100)/100;
+    var det=val('tEdDetail');
+    AlpexaSync.db.from('settlements').update({pnl:v,detail:det}).eq('id',sid).then(function(r){
+      if(r&&r.error){ toast('Error: '+r.error.message,true); return; }
+      SRV_SETTLE.forEach(function(x){ if(String(x.id)===String(sid)){x.pnl=v;x.detail=det;} });
+      try{ logAction('edit_trade', '', 'settlement #'+sid+' → pnl '+v); }catch(e){}
+      TRADE_EDIT=null; toast('Trade updated ✓'); render();
+    },function(){ toast('Save failed',true); });
+  }
+  function statusBadge(s){var cls=s==='approved'?'won':s==='rejected'?'lost':'open';var t=s==='approved'?'Approved':s==='rejected'?'Rejected':'Pending';return '<span class="badge '+cls+'">'+t+'</span>';}
+  function typeLabel(t){return t==='deposit'?'Deposit':t==='transfer'?'Transfer':t==='withdraw'?'Withdraw':(t||'—');}
+  function findReq(id){var all=reqs();for(var i=0;i<all.length;i++){if(all[i].id===id)return all[i];}return null;}
+  function viewHistory(){
+    // Money moves (deposits/withdrawals/transfers) + settled trades, one timeline.
+    var KINDS3={fx_close:'FX close',bet_won:'Bet won',bet_lost:'Bet lost',bet_cashout:'Cashout',bet_void:'Void',crypto_fee:'Fee'};
+    var trades=SRV_SETTLE.map(function(x){ return {_trade:true, id:'t'+x.id, sid:x.id, kind:x.kind, ticket:x.ticket||'', detail:x.detail||'', ts:x.created_at?Date.parse(x.created_at):0,
+      custId:x.cust_id||'', custName:custName(x.cust_id)||'', acctNo:x.acct_no||'', server:x.server||'',
+      symbol:x.symbol||'', kindL:KINDS3[x.kind]||x.kind||'Trade', stake:+x.stake||0, pnl:(x.kind==='crypto_fee'?-(+x.stake||0):(+x.pnl||0))}; });
+    var all=reqs().slice().concat(trades).sort(function(a,b){return (b.ts||0)-(a.ts||0);});
+    // App filter (fx / crypto / sports) + custom date range.
+    if(HIST_SERVER!=='all'){ all=all.filter(function(w){ return (w.server||'')===HIST_SERVER; }); }
+    var lo=HIST_FROM?(new Date(HIST_FROM+'T00:00:00').getTime()||0):0;
+    var hiH=HIST_TO?(new Date(HIST_TO+'T23:59:59').getTime()||Infinity):Infinity;
+    if(lo||hiH<Infinity){ all=all.filter(function(w){ var t=+w.ts||0; return t>=lo && t<=hiH; }); }
+    var q=(HIST_FILTER||'').toLowerCase();
+    if(q){ all=all.filter(function(w){
+      if(w._trade) return ((w.custName+' '+w.custId+' '+w.acctNo+' '+w.server+' '+w.symbol+' '+w.kindL+' trade').toLowerCase().indexOf(q)>=0);
+      return (((w.custName||'')+' '+(w.acctNo||'')+' '+(w.custId||'')+' '+(w.type||'')+' '+(w.server||'')+' '+(w.status||'')+' '+w.amount).toLowerCase().indexOf(q)>=0);}); }
+    var filtersOn=(HIST_SERVER!=='all'||HIST_FROM||HIST_TO||HIST_FILTER);
+    var h='<div class="sec" style="display:flex;align-items:center;justify-content:space-between">History · '+all.length+
+      '<span style="display:flex;gap:6px">'+
+      '<button data-hrefresh="1" style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:5px 10px;font:700 11px system-ui;color:var(--ink);cursor:pointer">↻</button>'+
+      '<button data-hfil="1" style="background:'+(HIST_SHOWF?'var(--acc)':'#fff')+';border:1px solid var(--line);border-radius:4px;padding:5px 11px;font:700 11px system-ui;color:'+(HIST_SHOWF?'#fff':'var(--ink)')+';cursor:pointer">Filter'+(filtersOn?' ●':' ▾')+'</button></span></div>';
+    if(HIST_SHOWF){
+      h+='<div class="card" style="padding:10px 12px"><input class="in" id="histSearch" placeholder="Search name, account, type, trade…" value="'+(HIST_FILTER||'').replace(/"/g,'&quot;')+'" style="margin-top:0">'+
+      '<div style="display:flex;gap:6px;margin-top:8px">'+[['all','All'],['fx','FX'],['crypto','Crypto'],['sports','Sports']].map(function(x){
+        var on=HIST_SERVER===x[0];
+        return '<button data-hs="'+x[0]+'" style="flex:1;background:'+(on?'var(--acc)':'#F1F3F6')+';color:'+(on?'#fff':'var(--dim)')+';border-radius:4px;padding:8px 0;font:700 12px system-ui;border:none;cursor:pointer">'+x[1]+'</button>';
+      }).join('')+'</div>'+
+      '<div style="display:flex;gap:8px;align-items:center;margin-top:8px">'+
+        '<input type="date" class="in" id="hsFrom" value="'+HIST_FROM+'" style="margin-top:0;flex:1">'+
+        '<span class="muted" style="font-weight:700">→</span>'+
+        '<input type="date" class="in" id="hsTo" value="'+HIST_TO+'" style="margin-top:0;flex:1">'+
+        ((HIST_FROM||HIST_TO)?'<button data-hsclear="1" style="background:#fdecea;color:#c0392b;border:none;border-radius:4px;padding:8px 10px;font:700 11.5px system-ui;cursor:pointer">✕</button>':'')+
+      '</div></div>';
+    }
+    if(!all.length){ h+='<div class="card"><div class="empty">No transactions found.</div></div>'; return h; }
+    all.slice(0,150).forEach(function(w){
+      var key=String(w._trade?w.id:('r'+w.id)), open=(HIST_OPEN===key);
+      var caret='<span class="muted" style="font-size:10px">'+(open?'▾':'▸')+'</span>';
+      if(w._trade){
+        var p=w.pnl, bcls=w.kindL==='Void'?'open':(p>=0?'won':'lost');
+        h+='<div class="card" style="padding:8px 12px">'+
+          '<div class="row" data-hopen="'+key+'" style="border:none;padding:0;cursor:pointer">'+
+          '<span style="display:flex;align-items:center;gap:6px;min-width:0">'+caret+'<span class="badge '+bcls+'">'+w.kindL.toUpperCase()+'</span><b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px">'+esc(w.custName||w.custId||'—')+'</b></span>'+
+          '<b class="'+(p>=0?'pos':'neg')+'" style="white-space:nowrap;padding-left:8px">'+(p<0?'-':'+')+usd(Math.abs(p))+'</b></div>';
+        if(open){
+          h+='<div class="req-meta" style="margin-top:6px">👤 '+esc(w.custName||w.custId||'—')+(w.acctNo?(' · '+esc(w.acctNo)):'')+(w.custId?(' · '+esc(w.custId)):'')+'</div>'+
+          (w.ticket?'<div class="req-meta" style="font-family:ui-monospace,monospace">🎫 '+esc(w.ticket)+'</div>':'')+
+          '<div class="req-meta">'+esc(w.server)+' · '+esc(w.symbol||'')+' · stake '+usd(w.stake)+' · '+(w.ts?new Date(w.ts).toLocaleString():'')+'</div>'+
+          (w.detail?'<div class="req-meta" style="font-family:ui-monospace,monospace">'+esc(w.detail)+'</div>':'');
+          if(String(TRADE_EDIT)===String(w.sid)){
+            h+='<label class="lbl" style="display:block;margin-top:8px">P&amp;L (USD) — customer view (+ = customer won)</label>'+
+              '<input class="in" id="tEdPnl" type="number" step="0.01" value="'+(+w.pnl||0)+'">'+
+              '<label class="lbl" style="display:block;margin-top:8px">Detail / order price</label>'+
+              '<input class="in" id="tEdDetail" value="'+String(w.detail||'').replace(/"/g,'&quot;')+'">'+
+              '<div class="btns"><button class="ok" data-tsave="'+w.sid+'">Save</button><button class="no" data-tcancel="1">Cancel</button></div>';
+          } else {
+            h+='<div class="btns"><button class="save ghost" data-tedit="'+w.sid+'">✏️ Edit</button><button class="no" data-tdel="'+w.sid+'">Void record</button></div>';
+          }
+          h+='<div class="hint" style="color:#c0392b">Edits the LEDGER only (company P&amp;L / agent commission). Customer balance is separate — adjust it in Players if needed.</div>';
+        }
+        h+='</div>';
+        return;
+      }
+      var meta=w.type==='transfer'?((w.from||'?')+' → '+(w.to||'?')):((w.asset||'')+(w.network?' ('+w.network+')':''));
+      if(EDIT_ID===w.id){
+        h+='<div class="card" style="border:2px solid var(--acc)">'+
+          '<div class="row" style="border:none;padding:0 0 6px"><span class="badge '+(w.type||'')+'">'+typeLabel(w.type).toUpperCase()+'</span><span class="req-meta">'+esc(w.custName||'')+' · '+esc(w.acctNo||'')+'</span></div>'+
+          '<label class="lbl">Status</label>'+
+          '<select class="in" id="edStatus"><option value="pending"'+(w.status==='pending'?' selected':'')+'>Pending</option><option value="approved"'+(w.status==='approved'?' selected':'')+'>Approved</option><option value="rejected"'+(w.status==='rejected'?' selected':'')+'>Rejected</option></select>'+
+          '<label class="lbl" style="display:block;margin-top:8px">Amount (USD)</label>'+
+          '<input class="in" id="edAmount" type="number" value="'+(w.amount||0)+'">'+
+          (w.address!=null?('<label class="lbl" style="display:block;margin-top:8px">Address / destination</label><input class="in" id="edAddress" value="'+(w.address||'').replace(/"/g,'&quot;')+'">'):'')+
+          '<div class="btns"><button class="ok" data-save="'+w.id+'">Save</button><button class="no" data-cancel="1">Cancel</button></div>'+
+          '<button class="save danger" data-del="'+w.id+'" style="margin-top:8px">Delete this transaction</button>'+
+        '</div>';
+      } else {
+        h+='<div class="card" style="padding:8px 12px">'+
+          '<div class="row" data-hopen="'+key+'" style="border:none;padding:0;cursor:pointer">'+
+          '<span style="display:flex;align-items:center;gap:6px;min-width:0">'+caret+'<span class="badge '+(w.type||'')+'">'+typeLabel(w.type).toUpperCase()+'</span><b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px">'+esc(w.custName||'—')+'</b></span>'+
+          '<b style="white-space:nowrap;padding-left:8px">'+usd(w.amount)+'</b></div>';
+        if(open){
+          h+='<div class="req-meta" style="margin-top:6px">👤 '+esc(w.custName||'—')+' · '+esc(w.acctNo||'')+(w.custId?(' · '+esc(w.custId)):'')+'</div>'+
+          '<div class="req-meta">'+(w.server||'')+' · '+meta+' · '+ago(w.ts)+'</div>'+
+          (w.txid?('<div class="req-meta">✅ Paid · <a href="https://etherscan.io/tx/'+w.txid+'" target="_blank" rel="noopener" style="color:var(--acc);font-weight:700">View on Etherscan ↗</a></div>'):'')+
+          '<div class="row" style="border:none;padding:6px 0 0"><span>'+statusBadge(w.status)+'</span><button class="save ghost" data-edit="'+w.id+'" style="margin-top:0;padding:7px 14px">Edit</button></div>';
+        }
+        h+='</div>';
+      }
+    });
+    return h;
+  }
+  function applyEditLocal(id,patch){
+    for(var j=0;j<SRV_REQS.length;j++){if(SRV_REQS[j].local_id===id){if(patch.status!=null)SRV_REQS[j].status=patch.status;if(patch.amount!=null)SRV_REQS[j].amount=patch.amount;if(patch.address!=null)SRV_REQS[j].address=patch.address;break;}}
+    var loc=getJSON('alpexa.withdrawals',[]);var ch=false;for(var i=0;i<loc.length;i++){if(loc[i].id===id){if(patch.status!=null)loc[i].status=patch.status;if(patch.amount!=null)loc[i].amount=patch.amount;if(patch.address!=null)loc[i].address=patch.address;ch=true;break;}}if(ch)setJSON('alpexa.withdrawals',loc);
+  }
+  function editSave(id){
+    var st=val('edStatus'); var amt=parseFloat(val('edAmount'))||0; var ad=document.getElementById('edAddress'); var addr=ad?ad.value:null;
+    var patch={status:st,amount:amt}; if(addr!=null)patch.address=addr;
+    applyEditLocal(id,patch); EDIT_ID=null; render();
+    if(window.AlpexaSync&&AlpexaSync.db){ AlpexaSync.updateRequest(id,patch).then(function(res){ if(res&&res.error)toast('Server error: '+res.error.message,true); else toast('Saved ✓ — synced to app'); pullServer(); }); }
+    else toast('Saved locally (offline)',true);
+  }
+  function editDelete(id){
+    // VOID (soft) — keeps the record for the audit trail; excluded from totals.
+    if(!confirm('Void this transaction?\n\nIt is KEPT for records (marked voided) and excluded from cash totals — not permanently deleted.'))return;
+    for(var j=0;j<SRV_REQS.length;j++){if(SRV_REQS[j].local_id===id)SRV_REQS[j].status='voided';}
+    var loc=getJSON('alpexa.withdrawals',[]); for(var i=0;i<loc.length;i++){if(loc[i].id===id)loc[i].status='voided';} setJSON('alpexa.withdrawals',loc);
+    EDIT_ID=null; render();
+    if(window.AlpexaSync&&AlpexaSync.db){ AlpexaSync.deleteRequest(id).then(function(res){ if(res&&res.error)toast('Server error: '+res.error.message,true); else toast('Voided ✓ — kept for records'); pullServer(); }); }
+  }
+
+  function viewPlayers(f){
+    if(!window.AlpexaSync||!AlpexaSync.db){
+      return '<div class="sec">Customers</div><div class="card"><div class="empty">Not connected to server.</div></div>';
+    }
+    var byPlayer={};
+    SRV_ACCOUNTS.forEach(function(a){ (byPlayer[a.player_id]=byPlayer[a.player_id]||[]).push(a); });
+    var totOf=function(p){ var t=0,has=false,cm=0; (byPlayer[p.id]||[]).forEach(function(a){ if(a.server==='crypto'){cm=+a.balance||0;return;} var b=+a.balance||0; t+=b; if(b>0)has=true; }); var cv=cryptoOnce(p.cust_id,cm); t+=cv; return (has||cv)?t:custBalance(p.cust_id); };
+    var cmp={ name:function(a,b){ return (a.name||'').localeCompare(b.name||''); },
+              bal:function(a,b){ return totOf(a)-totOf(b); },
+              joined:function(a,b){ return (a.created_at||'').localeCompare(b.created_at||''); } }[PLAYER_SORT]||function(){return 0;};
+    var list=SRV_PLAYERS.slice().sort(function(a,b){ return cmp(a,b)*PLAYER_DIR; });
+    var q=(PLAYER_FILTER||'').toLowerCase();
+    if(q) list=list.filter(function(p){ return (((p.name||'')+' '+(p.email||'')+' '+(p.cust_id||'')).toLowerCase().indexOf(q)>=0); });
+    var filtersOn=(PLAYER_FILTER||PLAYER_SORT!=='joined'||PLAYER_DIR!==-1);
+    var h='<div class="sec" style="display:flex;align-items:center;justify-content:space-between">Customers · '+SRV_PLAYERS.length+
+      '<button data-pfil="1" style="background:'+(PLAYERS_SHOWF?'var(--acc)':'#fff')+';border:1px solid var(--line);border-radius:4px;padding:5px 11px;font:700 11px system-ui;color:'+(PLAYERS_SHOWF?'#fff':'var(--ink)')+';cursor:pointer">Filter'+(PLAYERS_SHOWF?' ▴':(filtersOn?' ●':' ▾'))+'</button></div>';
+    if(PLAYERS_SHOWF){
+      var arrow=PLAYER_DIR===1?' ↑':' ↓';
+      h+='<div class="card" style="padding:10px 12px"><input class="in" id="plSearch" placeholder="Search name, email, ID…" value="'+(PLAYER_FILTER||'').replace(/"/g,'&quot;')+'" style="margin-top:0">'+
+        '<div style="display:flex;gap:6px;margin-top:8px">'+[['name','Name'],['bal','Balance'],['joined','Joined']].map(function(x){
+          var on=PLAYER_SORT===x[0];
+          return '<button data-psort="'+x[0]+'" style="flex:1;background:'+(on?'var(--acc)':'#F1F3F6')+';color:'+(on?'#fff':'var(--dim)')+';border:none;border-radius:4px;padding:7px 0;font:700 11.5px system-ui;cursor:pointer">'+x[1]+(on?arrow:'')+'</button>';
+        }).join('')+'</div></div>';
+    }
+    if(!SRV_PLAYERS.length){ h+='<div class="card"><div class="empty">No customers yet (or loading…)</div></div>'; return h; }
+    if(!list.length){ h+='<div class="card"><div class="empty">No customers match.</div></div>'; return h; }
+    list.forEach(function(p){
+      var accs=byPlayer[p.id]||[]; var m={}; var tot=0; var hasBal=false;
+      accs.forEach(function(a){ m[a.server]=a; if(a.server==='crypto')return; var b=+a.balance||0; tot+=b; if(b>0)hasBal=true; });
+      if(!hasBal) tot=custBalance(p.cust_id); // fallback until the app pushes real-time balances
+      // Crypto counted ONCE via the single source (live holdings, else the mirror — never both).
+      tot+=cryptoOnce(p.cust_id, m['crypto']?m['crypto'].balance:0);
+      var bv=function(s){ return m[s]? usd(+m[s].balance||0) : '—'; };
+      var an=function(s){ return m[s]? m[s].acct_no : '—'; };
+      var joined=p.created_at?new Date(p.created_at).toLocaleDateString():'';
+      var cid=p.cust_id;
+      var open=(PLAYER_OPEN===cid);
+      var editing=(open && PLAYER_EDIT===cid);
+      var esc=function(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');};
+      var bn=function(s){ return m[s]?(+m[s].balance||0):0; };
+      var kyc=p.kyc||'pending', stt=p.status||'active';
+      h+='<div class="card" style="padding:9px 12px">'+
+        '<div class="row" data-pl="'+esc(cid)+'" style="border:none;padding:0;cursor:pointer"><span style="display:flex;align-items:center;gap:6px;min-width:0"><span class="muted" style="font-size:10px">'+(open?'▾':'▸')+'</span><b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.name||cid||'—')+'</b>'+(acctIntegrity(p).flagged?' <span title="Balance exceeds what records explain — possible tampering" style="font-size:12px">🚩</span>':'')+'</span><b class="'+(tot>=0?'pos':'neg')+'" style="white-space:nowrap;padding-left:8px">'+usd(tot)+'</b></div>';
+      if(open){
+        h+='<div class="req-meta" style="margin-top:6px">'+esc(p.email||'')+(joined?(' · joined '+esc(joined)):'')+'</div>'+
+        '<div style="margin:5px 0 2px">'+badgeKyc(kyc)+' '+badgeStatus(stt)+'</div>';
+        var ig=acctIntegrity(p);
+        h+='<div class="card" style="padding:8px 10px;margin:6px 0;background:'+(ig.flagged?'#fff6f6':'#f7f9fc')+';border:1px solid '+(ig.flagged?'#f1b0b7':'var(--line)')+'">'+
+          '<div class="lbl" style="margin:0 0 4px">Integrity check '+(ig.flagged?'<span style="color:#c0392b">🚩 review</span>':'<span style="color:#1B5E20">✓ ok</span>')+'</div>'+
+          '<div class="row" style="border:none;padding:1px 0"><span class="muted">Actual balance</span><b>'+usd(ig.actual)+'</b></div>'+
+          '<div class="row" style="border:none;padding:1px 0"><span class="muted">Explained by records</span><b>'+usd(ig.explained)+'</b></div>'+
+          '<div class="row" style="border:none;padding:1px 0"><span class="muted">Gap (actual − explained)</span><b class="'+(ig.gap>INTEGRITY_FLAG_GAP?'neg':'pos')+'">'+(ig.gap>=0?'+':'')+usd(ig.gap)+'</b></div>'+
+          '<div class="req-meta" style="margin-top:4px">opening '+usd(ig.opening)+' + deposits '+usd(ig.dep)+' − withdrawals '+usd(ig.wd)+' + trade P&L '+(ig.pnl>=0?'+':'')+usd(ig.pnl)+(ig.crypto?' + crypto holdings '+usd(ig.crypto)+' (market value, not cash-monitored)':'')+'</div>'+
+          (ig.flagged?'<div class="hint" style="color:#c0392b">More money than deposits/trades explain. Review before approving any withdrawal.</div>':'')+
+        '</div>';
+      }
+      if(editing){
+        h+='<label class="lbl" style="margin-top:8px">Name</label><input class="in" id="ed_name" value="'+esc(p.name)+'">'+
+          '<label class="lbl" style="display:block;margin-top:8px">Email</label><input class="in" id="ed_email" value="'+esc(p.email)+'">'+
+          '<label class="lbl" style="display:block;margin-top:8px">Phone</label><input class="in" id="ed_phone" value="'+esc(p.phone)+'">'+
+          '<label class="lbl" style="display:block;margin-top:8px">Date of birth</label><input class="in" id="ed_dob" value="'+esc(p.dob)+'">'+
+          '<label class="lbl" style="display:block;margin-top:8px">Country</label><input class="in" id="ed_country" value="'+esc(p.country)+'">'+
+          '<label class="lbl" style="display:block;margin-top:8px">Leverage</label><input class="in" id="ed_lev" value="'+esc(p.leverage)+'">'+
+          '<label class="lbl" style="display:block;margin-top:8px">Currency</label><input class="in" id="ed_cur" value="'+esc(p.currency)+'">'+
+          '<label class="lbl" style="display:block;margin-top:8px">KYC status</label>'+
+          '<select class="in" id="ed_kyc"><option value="pending"'+(kyc==='pending'?' selected':'')+'>pending</option><option value="verified"'+(kyc==='verified'?' selected':'')+'>verified</option><option value="rejected"'+(kyc==='rejected'?' selected':'')+'>rejected</option></select>'+
+          '<label class="lbl" style="display:block;margin-top:8px">Account status</label>'+
+          '<select class="in" id="ed_status"><option value="active"'+(stt==='active'?' selected':'')+'>active</option><option value="limited"'+(stt==='limited'?' selected':'')+'>limited</option><option value="blocked"'+(stt==='blocked'?' selected':'')+'>blocked</option></select>'+
+          '<label class="lbl" style="display:block;margin-top:8px">Live (FX) balance</label><input class="in" id="ed_bal_fx" type="number" step="0.01" value="'+bn('fx')+'">'+
+          '<label class="lbl" style="display:block;margin-top:8px">Crypto balance</label><input class="in" id="ed_bal_crypto" type="number" step="0.01" value="'+bn('crypto')+'">'+
+          '<label class="lbl" style="display:block;margin-top:8px">Sports balance</label><input class="in" id="ed_bal_sports" type="number" step="0.01" value="'+bn('sports')+'">'+
+          '<div class="btns"><button class="ok" data-savepl="'+esc(cid)+'">Save</button><button class="no" data-cancelpl="1">Cancel</button></div>'+
+          '<div style="margin-top:14px;padding-top:12px;border-top:1px dashed #ddd"></div>'+
+          '<label class="lbl" style="display:block">🎁 Give crypto bonus (USDT)</label>'+
+          '<div style="display:flex;gap:6px;margin-top:4px"><input class="in" id="ed_bonus_amt" type="number" step="0.01" placeholder="e.g. 100" style="flex:1"><button class="ok" data-bonuspl="'+esc(cid)+'" style="width:auto;padding:0 16px;white-space:nowrap">Give</button></div>'+
+          '<div class="hint">Credited to the crypto wallet as a deposit — clean (no integrity flag), reaches the app in ~4s. Customer can buy BTC with it.</div>'+
+          '<div class="hint">Balance changes reach the app within ~4s (even while it\'s open). Crypto: coins/stakes are kept — only USDT cash is adjusted.</div>'+
+          '<div style="margin-top:12px;padding-top:10px;border-top:1px dashed #ddd"></div>'+
+          '<label class="lbl" style="display:block">🪙 Give ALPXS token</label>'+
+          '<div style="display:flex;gap:6px;margin-top:4px"><input class="in" id="ed_alpxs_qty" type="number" step="1" min="0" placeholder="e.g. 100" style="flex:1"><button class="ok" data-alpxspl="'+esc(cid)+'" style="width:auto;padding:0 16px;white-space:nowrap;background:#1e40d8;border-color:#1e40d8">Give</button></div>'+
+          '<div class="hint">Credited as ALPXS coin (qty) to the crypto wallet — not USDT cash. For gifting the Alpexa token to close friends/VIPs. Reaches the app in ~4s.</div>'+
+          (stt==='closed'
+            ? '<button data-reopenpl="'+esc(cid)+'" style="width:100%;margin-top:16px;padding:11px;border:1px solid #9ccc9c;background:#eefaee;color:#1B5E20;border-radius:4px;font-weight:700;font-size:13px;cursor:pointer">↻ Reopen account</button>'+
+              '<div class="hint">This customer is CLOSED. Reopen restores active status — their data was kept all along.</div>'
+            : '<button data-delpl="'+esc(cid)+'" style="width:100%;margin-top:16px;padding:11px;border:1px solid #e0a96d;background:#fff4e6;color:#b45309;border-radius:4px;font-weight:700;font-size:13px;cursor:pointer">🔒 Close account (keeps data)</button>'+
+              '<div class="hint">Marks the account CLOSED. Profile, accounts, positions &amp; history are KEPT and fully restorable — nothing is deleted.</div>');
+      } else if(open){
+        h+='<div class="row"><span>Live (FX)</span><b>'+bv('fx')+'<span class="muted" style="font-weight:500"> · '+an('fx')+'</span></b></div>'+
+          '<div class="row"><span>Crypto</span><b>'+(cryptoUsdVal(cid)!=null?usd(cryptoUsdVal(cid)):bv('crypto'))+'<span class="muted" style="font-weight:500"> · '+an('crypto')+'</span></b></div>'+
+          '<div class="row"><span>Sports</span><b>'+bv('sports')+'<span class="muted" style="font-weight:500"> · '+an('sports')+'</span></b></div>';
+        if(open){
+          h+='<div class="row"><span>Phone</span><b class="muted">'+(p.phone||'—')+'</b></div>'+
+            '<div class="row"><span>Date of birth</span><b class="muted">'+(p.dob||'—')+'</b></div>'+
+            '<div class="row"><span>Country</span><b class="muted">'+(p.country||'—')+'</b></div>'+
+            '<div class="row"><span>Signup server</span><b class="muted">'+(SRV_MAP[p.server]||p.server||'—')+'</b></div>'+
+            '<div class="row"><span>Leverage</span><b class="muted">'+(p.leverage||'—')+'</b></div>'+
+            '<div class="row"><span>Currency</span><b class="muted">'+(p.currency||'—')+'</b></div>';
+          // Which agent(s) introduced this customer (referral / manual link).
+          var myAg=SRV_ALINKS.filter(function(l){ return l.cust_id===cid; });
+          var agTxt = myAg.length ? myAg.map(function(l){ return agentName(l.agent_code)+' ('+l.agent_code+(myAg.length>1?(' · '+(+l.share||100)+'%'):'')+')'; }).join(', ') : 'None (direct)';
+          h+='<div class="row"><span>Agent</span><b class="'+(myAg.length?'':'muted')+'" style="text-align:right">'+agTxt+'</b></div>';
+          // Direct per-customer query (NOT the capped POS_TOP) so positions show
+          // even when the server has many other open positions. Matches by cust_id
+          // OR any of this customer's account numbers (cust_id drift-safe).
+          var myAccts=[an('fx'),an('crypto'),an('sports')].filter(function(a){ return a&&a!=='—'; });
+          if(POS_BY_CUST[cid]===undefined){ POS_BY_CUST[cid]=[]; pullCustPos(cid,myAccts); }
+          var op=(POS_BY_CUST[cid]&&POS_BY_CUST[cid].length)?POS_BY_CUST[cid]
+                 :POS_TOP.filter(function(x){ return x.cust_id===cid || myAccts.indexOf(x.acct_no)>=0; });
+          h+='<div class="lbl" style="margin-top:12px">Open positions ('+op.length+')</div>';
+          if(!op.length){ h+='<div class="req-meta" style="margin:4px 0">None open.</div>'; }
+          op.forEach(function(x){ h+=posRowHTML(x); });
+          // Crypto holdings/stakes — read DIRECTLY from crypto_holdings/crypto_stakes (#5/B),
+          // not the retired positions mirror. Identified by the customer's crypto account.
+          var cAcct=an('crypto');
+          if(CRYPTO_BY_CUST[cid]===undefined){ CRYPTO_BY_CUST[cid]={holdings:[],stakes:[]}; pullCustCrypto(cid,cAcct); }
+          var cb=CRYPTO_BY_CUST[cid]||{holdings:[],stakes:[]};
+          h+='<div class="lbl" style="margin-top:12px">Crypto holdings ('+(cb.holdings.length+cb.stakes.length)+')</div>';
+          if(!cb.holdings.length&&!cb.stakes.length){ h+='<div class="req-meta" style="margin:4px 0">None.</div>'; }
+          cb.holdings.forEach(function(x){ h+='<div class="row"><span><b>'+(x.asset||'')+'</b> <span class="muted" style="font-size:10.5px">Holding</span></span><b class="muted">'+(+x.qty||0)+'</b></div>'; });
+          cb.stakes.forEach(function(x){ h+='<div class="row"><span><b>'+(x.asset||'')+'</b> <span class="muted" style="font-size:10.5px">Staked'+(x.period?(' · '+esc(x.period)):'')+'</span></span><b class="muted">'+usd(+x.usd||0)+'</b></div>'; });
+          var KINDS2={fx_close:'FX close',bet_won:'Bet won',bet_lost:'Bet lost',bet_cashout:'Cashout',bet_void:'Void',crypto_fee:'Fee'};
+          var tr=SRV_SETTLE.filter(function(x){ return x.cust_id===cid; }).slice(0,15);
+          h+='<div class="lbl" style="margin-top:12px">Recent trades ('+tr.length+')</div>';
+          if(!tr.length){ h+='<div class="req-meta" style="margin:4px 0">No settled trades yet.</div>'; }
+          tr.forEach(function(x){ var p=(x.kind==='crypto_fee')?-(+x.stake||0):(+x.pnl||0);
+            var when=x.created_at?new Date(x.created_at).toLocaleString():'';
+            h+='<div class="row"><span><b>'+(x.symbol||KINDS2[x.kind]||x.kind||'Trade')+'</b> <span class="muted" style="font-size:10.5px">'+(KINDS2[x.kind]||x.kind||'')+'</span>'+
+              '<div class="req-meta" style="margin:2px 0 0">'+(x.ticket?(x.ticket+' · '):'')+(x.server||'')+' · '+when+'</div></span>'+
+              '<b class="'+(p>=0?'pos':'neg')+'">'+(p<0?'-':'+')+usd(Math.abs(p))+'</b></div>'; });
+          // Internal user-to-user transfers (sent / received via email or account number).
+          var myAccU=acctsOf(cid).map(function(a){return String(a).toUpperCase();}).concat([String(cid).toUpperCase()]);
+          var pmts=SRV_PAYMENTS.filter(function(p){ return p.from_cust===cid || myAccU.indexOf(String(p.to_acct||'').toUpperCase())>=0; }).slice(0,15);
+          h+='<div class="lbl" style="margin-top:12px">Transfers ('+pmts.length+')</div>';
+          if(!pmts.length){ h+='<div class="req-meta" style="margin:4px 0">No internal transfers.</div>'; }
+          pmts.forEach(function(p){ var out=(p.from_cust===cid); var when=p.created_at?new Date(p.created_at).toLocaleString():'';
+            h+='<div class="row"><span><b>'+(out?'Sent':'Received')+'</b> <span class="muted" style="font-size:10.5px">'+(p.asset||'USDT')+' · '+(p.status||'')+'</span>'+
+              '<div class="req-meta" style="margin:2px 0 0">'+(out?('to '+esc(p.to_acct||'')):('from '+esc(p.from_name||p.from_cust||'')))+' · '+when+'</div></span>'+
+              '<b class="'+(out?'neg':'pos')+'">'+(out?'-':'+')+usd(+p.amount||0)+'</b></div>'; });
+          // Full activity log: buys, sells, stakes, bets, FX opens for this customer.
+          var ACTLBL={buy:'Buy',sell:'Sell',stake:'Stake',unstake:'Unstake',bet:'Bet',trade_open:'FX open',send:'Send',receive:'Receive',deposit:'Deposit',withdraw:'Withdraw',swap:'Swap'};
+          var APPIC={crypto:'🪙',fx:'📈',sports:'🏈'};
+          var acts=SRV_ACTIVITY.filter(function(x){ return x.cust_id===cid; }).slice(0,25);
+          h+='<div class="lbl" style="margin-top:12px">Activity ('+acts.length+')</div>';
+          if(!acts.length){ h+='<div class="req-meta" style="margin:4px 0">No activity recorded yet.</div>'; }
+          acts.forEach(function(x){ var when=x.created_at?new Date(x.created_at).toLocaleString():'';
+            h+='<div class="row"><span style="min-width:0"><b>'+(APPIC[x.server]||'')+' '+(ACTLBL[x.kind]||esc(x.kind)||'—')+'</b> <span class="muted" style="font-size:10.5px">'+esc(x.symbol||'')+'</span>'+
+              '<div class="req-meta" style="margin:2px 0 0">'+(x.ticket?(esc(x.ticket)+' · '):'')+esc(x.detail||'')+' · '+when+'</div></span>'+
+              '<b class="muted">'+(x.amount?usd(+x.amount):'')+'</b></div>'; });
+          h+='<button class="save ghost" data-editpl="'+esc(cid)+'" style="width:100%;margin-top:10px">Edit profile &amp; balances</button>';
+        }
+        h+='<div class="row" style="border:none;padding:6px 0 0"><span class="hint" style="margin:0">ID '+(cid||'—')+'</span><button class="save ghost" data-cust="'+esc(cid)+'" style="margin-top:0;padding:7px 12px">Transactions</button></div>';
+      }
+      h+='</div>';
+    });
+    return h;
+  }
+
+  function viewOnline(){
+    if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Online now</div><div class="card"><div class="empty">Not connected to server.</div></div>';
+    var APP={fx:'Live (FX)',crypto:'Crypto',sports:'Sports'};
+    var h='<div class="sec">Online now · '+ONLINE.length+'</div>';
+    if(!ONLINE.length){ h+='<div class="card"><div class="empty">No customers online right now.<br>(Customers show here while their app is open.)</div></div>'; return h; }
+    h+='<div class="card">';
+    ONLINE.forEach(function(p){
+      var ts=p.last_seen?Date.parse(p.last_seen):0;
+      var app=APP[p.last_app]||p.last_app||'';
+      h+='<div class="row"><span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#22C55E;margin-right:8px;vertical-align:middle"></span><b>'+esc(p.name||p.cust_id||'—')+'</b>'+
+        '<div class="req-meta" style="margin:2px 0 0 17px">'+(app?app+' · ':'')+(p.cust_id||'')+' · '+ago(ts)+'</div></span>'+
+        '<button class="save ghost" data-pcust="'+(p.cust_id||'').replace(/"/g,'&quot;')+'" style="margin-top:0;padding:6px 12px">View</button></div>';
+    });
+    h+='</div><div class="hint" style="margin:0 14px">Online = active in the last 90 seconds · refreshes ~3s. Tap View to open the customer.</div>';
+    return h;
+  }
+  function barP(v,max){var p=Math.min(100,Math.round(v/Math.max(1,max)*100));var col=p>80?'var(--neg)':p>50?'var(--warn)':'var(--pos)';
+    return '<div style="height:10px;background:#eef0f3;border-radius:4px;margin-top:8px;overflow:hidden"><div style="height:100%;width:'+p+'%;background:'+col+'"></div></div><div class="hint" style="margin-top:4px">'+p+'% of bankroll committed</div>';}
+  // Sports risk + hedging.
+  var RISK_POS=[], HEDGES=[], RISK_OPEN=null;
+  function decOdds(am){ am=+am||0; return am>0?1+am/100:am<0?1+100/(-am):2; }
+  function pullRisk(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('positions').select('*').eq('status','open').eq('server','sports').limit(1000).then(function(r){ if(r&&r.data){ RISK_POS=r.data; if(cur==='risk'&&!busyEditing())render(); } },function(){});
+    AlpexaSync.db.from('hedges').select('*').order('created_at',{ascending:false}).limit(500).then(function(r){ if(r&&r.data){ HEDGES=r.data; if(cur==='risk'&&!busyEditing())render(); } },function(){}); }
+  function recordHedge(game,pick,amount,odds){
+    if(!window.AlpexaSync||!AlpexaSync.db){ toast('Not connected to server',true); return; }
+    var book=prompt('Record hedge for "'+pick+'"\nRecommended lay-off: $'+Math.round(amount)+' at odds '+(+odds).toFixed(2)+'\n\nWhere did you place it? (e.g., Betfair):');
+    if(book===null) return;
+    AlpexaSync.db.from('hedges').insert({game:game,pick:pick,amount:Math.round(amount*100)/100,odds:Math.round((+odds||0)*100)/100,book:book||'manual'}).then(function(r){ if(r&&r.error)toast('Error: '+r.error.message,true); else { toast('Hedge recorded ✓'); setTimeout(pullRisk,300); } },function(){});
+    try{ logAction('hedge','',game+' · '+pick+' · $'+Math.round(amount)+' @ '+(book||'manual')); }catch(e){}
+  }
+  // ── Watch: today's orders across ALL servers, with automatic risk flags. ──
+  // Reads server data already loaded (settlements / requests / accounts / players).
+  // Thresholds are conservative defaults; tune here.
+  var WATCH_THRESH={ stake:1000, payout:5000, withdraw:5000, velocity:15, cashouts:5 };
+  var WATCH_SRV='all', WATCH_SEV=0;
+  function viewWatch(){
+    var t0=new Date(); t0.setHours(0,0,0,0); var dayStart=t0.getTime();
+    var TH=WATCH_THRESH;
+    var nameOf={}; SRV_PLAYERS.forEach(function(p){ nameOf[p.cust_id]=p.name||p.cust_id; });
+    var ts=function(x){ return x ? new Date(x).getTime() : 0; };
+    var setl=(SRV_SETTLE||[]).filter(function(s){ return ts(s.created_at)>=dayStart; });
+    var reqs=(SRV_REQS||[]).filter(function(w){ return ts(w.created_at)>=dayStart; });
+    if(WATCH_SRV!=='all'){ setl=setl.filter(function(s){return (s.server||'')===WATCH_SRV;}); reqs=reqs.filter(function(w){return (w.server||'')===WATCH_SRV;}); }
+    // per-customer tallies for behaviour flags
+    var byC={};
+    function bump(c){ if(!c)c='—'; if(!byC[c])byC[c]={cust:c,orders:0,stake:0,pnl:0,cashouts:0,dep:0,wd:0,srv:{}}; return byC[c]; }
+    setl.forEach(function(s){ var u=bump(s.cust_id); u.orders++; u.stake+=(+s.stake||0); u.pnl+=(+s.pnl||0); if(String(s.kind||'').indexOf('cashout')>=0)u.cashouts++; if(s.server)u.srv[s.server]=1; });
+    reqs.forEach(function(w){ var u=bump(w.cust_id); if((w.type||'')==='deposit')u.dep+=(+w.amount||0); if((w.type||'')==='withdraw')u.wd+=(+w.amount||0); });
+    var flags=[];
+    function flag(sev,t,cust,srv,amt,reason){ flags.push({sev:sev,ts:t,cust:cust,nm:nameOf[cust]||cust||'—',srv:srv||'',amt:amt,reason:reason}); }
+    // per-order flags
+    setl.forEach(function(s){ var t=ts(s.created_at);
+      if((+s.stake||0)>=TH.stake) flag(2,t,s.cust_id,s.server,+s.stake,'High stake · '+k0(s.stake));
+      var payout=(+s.stake||0)+(+s.pnl||0);
+      if(String(s.kind||'').indexOf('won')>=0 && payout>=TH.payout) flag(3,t,s.cust_id,s.server,payout,'Big payout · '+k0(payout));
+    });
+    reqs.forEach(function(w){ var t=ts(w.created_at);
+      if((w.type||'')==='withdraw' && (+w.amount||0)>=TH.withdraw) flag(3,t,w.cust_id,w.server,+w.amount,'Large withdrawal · '+k0(w.amount)+(w.status==='pending'?' (pending)':''));
+    });
+    // per-customer behaviour flags
+    Object.keys(byC).forEach(function(k){ var u=byC[k];
+      if(u.orders>=TH.velocity) flag(2,Date.now(),u.cust,Object.keys(u.srv).join(','),u.orders,'High velocity · '+u.orders+' orders today');
+      if(u.dep>0 && u.wd>0) flag(2,Date.now(),u.cust,'',u.wd,'Deposit→withdraw churn · in '+k0(u.dep)+' / out '+k0(u.wd));
+      if(u.cashouts>=TH.cashouts) flag(1,Date.now(),u.cust,'',u.cashouts,'Frequent cashouts · '+u.cashouts+' today');
+    });
+    // integrity: negative balances (any server)
+    (SRV_ACCOUNTS||[]).forEach(function(a){ if((+a.balance||0)<-0.01 && (WATCH_SRV==='all'||a.server===WATCH_SRV)) flag(3,Date.now(),'',a.server,+a.balance,'NEGATIVE balance · '+a.acct_no+' '+k0(a.balance)); });
+    if(WATCH_SEV>0) flags=flags.filter(function(x){return x.sev>=WATCH_SEV;});
+    flags.sort(function(a,b){ return (b.sev-a.sev)||(b.ts-a.ts); });
+    // summary
+    var volume=setl.reduce(function(a,s){return a+(+s.stake||0);},0);
+    var nCash=setl.filter(function(s){return String(s.kind||'').indexOf('cashout')>=0;}).length;
+    var depT=reqs.filter(function(w){return (w.type||'')==='deposit';}).reduce(function(a,w){return a+(+w.amount||0);},0);
+    var wdT=reqs.filter(function(w){return (w.type||'')==='withdraw';}).reduce(function(a,w){return a+(+w.amount||0);},0);
+    var sevCol={3:'var(--neg)',2:'#D97706',1:'var(--dim)'};
+    var sevLbl={3:'HIGH',2:'MED',1:'LOW'};
+    var srvPill={fx:'FX',sports:'SP',crypto:'CR',live:'FX'};
+    var h='<div class="sec">Watch · today · all servers</div>';
+    h+='<div class="kpis">'+
+      kpi('Orders today',setl.length,k0(volume)+' volume')+
+      kpi('Cashouts',nCash,'')+
+      kpi('Deposits',k0(depT),'today')+
+      kpi('Withdrawals',k0(wdT),'today',wdT>depT?'neg':'')+
+      '</div>';
+    // filters
+    var srvs=[['all','All'],['sports','Sports'],['fx','FX'],['crypto','Crypto']];
+    h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 14px 2px">'+srvs.map(function(s){return '<button class="wf" data-wsrv="'+s[0]+'" style="font:600 11px system-ui;padding:5px 10px;border-radius:14px;border:1px solid var(--line);background:'+(WATCH_SRV===s[0]?'var(--ink)':'#fff')+';color:'+(WATCH_SRV===s[0]?'#fff':'var(--dim)')+'">'+s[1]+'</button>';}).join('')+
+      '<span style="flex:1"></span>'+
+      [[0,'All'],[2,'Med+'],[3,'High']].map(function(s){return '<button class="wf" data-wsev="'+s[0]+'" style="font:600 11px system-ui;padding:5px 10px;border-radius:14px;border:1px solid var(--line);background:'+(WATCH_SEV===s[0]?'var(--ink)':'#fff')+';color:'+(WATCH_SEV===s[0]?'#fff':'var(--dim)')+'">'+s[1]+'</button>';}).join('')+'</div>';
+    h+='<div class="sec">Flagged · '+flags.length+'</div>';
+    if(!flags.length){ h+='<div class="hint" style="margin:0 14px">No risk flags today for this filter. ✓</div>'; return h; }
+    h+=flags.slice(0,120).map(function(x){
+      return '<div class="row" style="align-items:flex-start">'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="display:flex;align-items:center;gap:6px">'+
+            '<span style="font:800 8.5px system-ui;color:#fff;background:'+sevCol[x.sev]+';padding:1px 5px;border-radius:3px">'+sevLbl[x.sev]+'</span>'+
+            (x.srv?'<span style="font:700 8.5px ui-monospace;color:var(--dim)">'+(srvPill[x.srv]||String(x.srv).toUpperCase())+'</span>':'')+
+            '<b style="font-size:12.5px">'+esc(x.nm||'—')+'</b>'+
+          '</div>'+
+          '<div style="font-size:11.5px;color:var(--ink);margin-top:2px">'+esc(x.reason)+'</div>'+
+          '<div style="font-size:10px;color:var(--dim);margin-top:1px">'+(x.cust?x.cust+' · ':'')+(x.ts?ago(x.ts):'')+'</div>'+
+        '</div></div>';
+    }).join('');
+    return h;
+  }
+  function viewRisk(f){
+    if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Risk</div><div class="card"><div class="empty">Not connected to server.</div></div>';
+    var esc=function(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');};
+    var pos=RISK_POS.slice();
+    var singles=pos.filter(function(x){return (+x.size||1)<=1;});
+    var parlays=pos.filter(function(x){return (+x.size||1)>1;});
+    var games={};
+    singles.forEach(function(x){ var g=x.game||'(unknown game)'; games[g]=games[g]||{stake:0,picks:{}}; games[g].stake+=(+x.stake||0);
+      var pk=x.pick||x.symbol||'?'; var p=games[g].picks[pk]=games[g].picks[pk]||{stake:0,payout:0,n:0,decSum:0}; p.stake+=(+x.stake||0); p.payout+=(+x.potential||0); p.n++; p.decSum+=decOdds(x.odds); });
+    var gameArr=Object.keys(games).map(function(g){ var G=games[g]; var worst=0, wp='';
+      Object.keys(G.picks).forEach(function(pk){ var net=G.stake - G.picks[pk].payout; if(net<worst){worst=net;wp=pk;} });
+      return {game:g, stake:G.stake, picks:G.picks, worst:worst, worstPick:wp}; }).sort(function(a,b){return a.worst-b.worst;});
+    var totalLiab=0; gameArr.forEach(function(g){ if(g.worst<0) totalLiab+=g.worst; });
+    var parlayLiab=parlays.reduce(function(a,x){return a+(+x.potential||0);},0);
+    var limit=num('alpexa.riskLimit',20000);
+    // hedges grouped by game|pick
+    var hg={}; HEDGES.forEach(function(hh){ var k=(hh.game||'')+'|'+(hh.pick||''); hg[k]=hg[k]||{amt:0,recoup:0}; hg[k].amt+=(+hh.amount||0); hg[k].recoup+=((+hh.amount||0)*((+hh.odds||1)-1)); });
+    var totalHedged=HEDGES.reduce(function(a,hh){return a+(+hh.amount||0);},0);
+    var h='<div class="sec">Risk · exposure by event</div>'+
+      '<div class="kpis">'+
+        kpi('Worst-case liability',(totalLiab<0?'-':'')+k0(Math.abs(totalLiab)),'if worst outcomes hit','neg')+
+        kpi('Hedged so far',k0(totalHedged),HEDGES.length+' lay-offs','pos')+
+      '</div>';
+    if(!gameArr.length && !parlays.length){ h+='<div class="card"><div class="empty">No open sports bets. (Place bets in the app, keep it open ~15s.)</div></div>'; }
+    if(gameArr.length){ h+='<div class="sec">Events · '+gameArr.length+'</div>'; }
+    gameArr.forEach(function(g){
+      var over=g.worst <= -limit, open=(RISK_OPEN===g.game);
+      // One line per event: name + worst-case. Details (picks + hedge calc) on expand.
+      h+='<div class="card" style="padding:9px 12px">'+
+        '<div class="row" data-rg="'+esc(g.game)+'" style="border:none;padding:0;cursor:pointer">'+
+        '<span style="display:flex;align-items:center;gap:6px;min-width:0"><span class="muted" style="font-size:10px">'+(open?'▾':'▸')+'</span><b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+g.game+'</b>'+(over?'<span style="font-size:10px">🔴</span>':'')+'</span>'+
+        '<b class="'+(g.worst<0?'neg':'pos')+'" style="white-space:nowrap;padding-left:8px">'+(g.worst>=0?'+':'')+k0(g.worst)+'</b></div>';
+      if(!open){ h+='</div>'; return; }
+      Object.keys(g.picks).forEach(function(pk){ var P=g.picks[pk]; var net=g.stake - P.payout;
+        h+='<div class="row" style="border:none;padding:9px 0 4px"><span><b>'+pk+'</b><div class="req-meta" style="margin:2px 0 0">'+P.n+' bet(s) · stake '+usd(P.stake)+' · payout '+usd(P.payout)+'</div></span>'+
+          '<span class="'+(net<0?'neg':'pos')+'" style="font-weight:800">'+(net>=0?'+':'')+k0(net)+'</span></div>';
+        // Hedge box appears under EVERY losing (red) pick, so any exposure can be covered.
+        if(net<0){
+          var L=-net; var dec=(P.decSum/P.n)||2; var H=L/Math.max(0.01,dec-1);
+          var k=g.game+'|'+pk; var hAmt=(hg[k]||{}).amt||0; var hRecoup=(hg[k]||{}).recoup||0; var netAfter=net+hRecoup;
+          h+='<div style="background:#FFF6E6;border-radius:4px;padding:10px 12px;margin:2px 0 10px">'+
+            '<div class="lbl" style="color:var(--warn);margin-bottom:4px">⚖️ To cover this '+k0(net)+' — place this bet:</div>'+
+            '<div style="font-size:14.5px;font-weight:700;line-height:1.55">Bet <span style="color:var(--acc)">'+usd(H)+'</span> on <b>'+pk+'</b> @ odds <b>'+dec.toFixed(2)+'</b></div>'+
+            '<div class="hint" style="margin:4px 0 0">If it wins, you win back ~'+usd(L)+' to cancel the loss. Exchange odds differ? amount = '+usd(L)+' ÷ (odds − 1).</div>'+
+            (hAmt>0?('<div class="row" style="border:none;padding:6px 0 0"><span>Already hedged '+usd(hAmt)+' → net</span><b class="'+(netAfter<0?'neg':'pos')+'">'+k0(netAfter)+'</b></div>'):'')+
+            '<button class="save" data-hedge="'+esc(g.game)+'|'+esc(pk)+'|'+Math.round(H*100)/100+'|'+dec.toFixed(2)+'" style="width:100%;margin-top:7px;padding:9px">Record hedge ✓</button>'+
+          '</div>';
+        }
+      });
+      h+='</div>';
+    });
+    if(parlays.length){ h+='<div class="sec">Parlays / multi · '+parlays.length+'</div><div class="card">'+
+      '<div class="row"><span>Combined potential liability</span><b class="neg">'+k0(parlayLiab)+'</b></div>'+
+      '<div class="hint">Parlays span multiple games — shown as combined max payout.</div></div>'; }
+    h+='<div class="hint" style="margin:0 14px">🔴 alert when a game\'s worst-case exceeds '+usd(limit)+'. Record a hedge after laying it off externally — net exposure updates.</div>';
+    return h;
+  }
+
+  // Open bets & trades — summary + per-customer search (scales to many customers,
+  // never pulls the whole table).
+  function viewBets(){
+    if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Open bets &amp; trades</div><div class="card"><div class="empty">Not connected to server.</div></div>';
+    var APPN={all:'All apps',fx:'FX',crypto:'Crypto',sports:'Sports'};
+    var srvOK=function(x){ return OPEN_SERVER==='all' || (x.server||'')===OPEN_SERVER; };
+    var filtersOn=(OPEN_SEARCH||OPEN_SERVER!=='all');
+    var h='<div class="sec" style="display:flex;align-items:center;justify-content:space-between">Open · '+APPN[OPEN_SERVER]+
+      '<button data-ofil="1" style="background:'+(OPEN_SHOWF?'var(--acc)':'#fff')+';border:1px solid var(--line);border-radius:4px;padding:5px 11px;font:700 11px system-ui;color:'+(OPEN_SHOWF?'#fff':'var(--ink)')+';cursor:pointer">Filter'+(OPEN_SHOWF?' ▴':(filtersOn?' ●':' ▾'))+'</button></div>';
+    if(OPEN_SHOWF){
+      h+='<div class="card" style="padding:10px 12px"><input class="in" id="openSearch" placeholder="Search a customer (name / ID)…" value="'+(OPEN_SEARCH||'').replace(/"/g,'&quot;')+'" style="margin-top:0">'+
+        '<div style="display:flex;gap:6px;margin-top:8px">'+[['all','All'],['fx','FX'],['crypto','Crypto'],['sports','Sports']].map(function(x){
+          var on=OPEN_SERVER===x[0];
+          return '<button data-os="'+x[0]+'" style="flex:1;background:'+(on?'var(--acc)':'#F1F3F6')+';color:'+(on?'#fff':'var(--dim)')+';border:none;border-radius:4px;padding:8px 0;font:700 12px system-ui;cursor:pointer">'+x[1]+'</button>';
+        }).join('')+'</div></div>';
+    }
+    h+='<div class="kpis">'+
+        kpi('Open items',POS_COUNT,'live, all customers')+
+        kpi('Showing','top '+POS_TOP.filter(srvOK).length,'by exposure')+
+      '</div>';
+    if(OPEN_SEARCH){
+      var q=OPEN_SEARCH.toLowerCase();
+      var matches=SRV_PLAYERS.filter(function(p){ return (((p.name||'')+' '+(p.cust_id||'')+' '+(p.email||'')).toLowerCase().indexOf(q)>=0); }).slice(0,10);
+      if(!matches.length){ h+='<div class="card"><div class="empty">No customer matches.</div></div>'; return h; }
+      matches.forEach(function(p){
+        if(POS_BY_CUST[p.cust_id]===undefined){ POS_BY_CUST[p.cust_id]=[]; pullCustPos(p.cust_id); }
+        var list=(POS_BY_CUST[p.cust_id]||[]).filter(srvOK);
+        h+='<div class="sec">'+esc(p.name||p.cust_id)+' · '+list.length+' open</div><div class="card">';
+        if(!list.length) h+='<div class="empty">No open positions.</div>';
+        list.forEach(function(x){ h+=posRowHTML(x); });
+        h+='</div>';
+      });
+      return h;
+    }
+    h+='<div class="sec">Open positions · '+POS_COUNT+'</div><div class="card">';
+    var top=POS_TOP.filter(srvOK);
+    if(!top.length) h+='<div class="empty">No open positions'+(OPEN_SERVER!=='all'?(' for '+OPEN_SERVER):'')+'. (Customers open their app ~15s to report.)</div>';
+    top.forEach(function(x){ h+=posRowHTML(x); });
+    h+='</div>';
+    h+='<div class="hint" style="margin:0 14px">Tap <b>Filter</b> to pick an app or search a customer. Close/Void applies on the customer\'s next sync (~4s).</div>';
+    return h;
+  }
+  // Send a force-close / void command to the customer's app.
+  function sendCommand(custId,server,localId){
+    if(!window.AlpexaSync||!AlpexaSync.db){ toast('Not connected to server',true); return; }
+    if(!confirm('Force '+(server==='sports'?'void':'close')+' this item for '+custId+'?')) return;
+    try{ logAction(server==='sports'?'force_void':'force_close', custId, server+' · '+localId); }catch(e){}
+    if(server==='sports'){
+      // SERVER-AUTHORITATIVE: admin_void_bet refunds the stake + removes the position as admin.
+      AlpexaSync.db.rpc('admin_void_bet',{p_local_id:localId}).then(function(r){
+        var d=r&&r.data; if((r&&r.error)||(d&&d.ok===false)) toast('Void failed: '+((d&&d.error)||(r&&r.error&&r.error.message)||'')+' — signed in as admin?',true);
+        else toast('Voided ✓ — refunded $'+((d&&d.refunded)||0));
+      },function(){ toast('Void failed (network)',true); });
+      return;
+    }
+    AlpexaSync.db.from('commands').insert({cust_id:custId,server:server,action:'close',local_id:localId,status:'pending'}).then(function(r){
+      if(r&&r.error)toast('Error: '+r.error.message,true); else toast('Sent ✓ — applies on next customer sync');
+    },function(){ toast('Send failed',true); });
+  }
+
+  function actionLabel(a){ return ({approve:'✅ Approved',reject:'❌ Rejected',edit_customer:'✏️ Edited customer',force_close:'🛑 Force-closed',force_void:'🛑 Voided bet',edit_txn:'✏️ Edited transaction',delete_txn:'🗑 Deleted transaction'})[a]||a||'Action'; }
+  function viewLogs(){
+    if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Audit log</div><div class="card"><div class="empty">Not connected to server.</div></div>';
+    var h='<div class="sec">Audit log · recent '+LOGS.length+'</div>';
+    if(!LOGS.length){ h+='<div class="card"><div class="empty">No activity logged yet. Approve/edit something to see it here.</div></div>'; return h; }
+    h+='<div class="card">';
+    LOGS.forEach(function(l){
+      var ts=l.created_at?Date.parse(l.created_at):0;
+      var who=l.target_cust?(' · '+esc(custName(l.target_cust))):'';
+      h+='<div class="row"><span><b>'+actionLabel(l.action)+'</b>'+who+
+        (l.detail?('<div class="req-meta" style="margin:2px 0 0">'+esc(l.detail)+'</div>'):'')+'</span>'+
+        '<span class="muted" style="font-size:11px;white-space:nowrap">'+ago(ts)+'</span></div>';
+    });
+    h+='</div><div class="hint" style="margin:0 14px">Every approval, edit and force-action is recorded. (Actor = back office; real admin name once login is added.)</div>';
+    return h;
+  }
+  function cfgRow(label,id,val){return '<div class="lbl" style="margin-top:10px">'+label+'</div><input class="in" id="'+id+'" type="number" step="0.5" value="'+val+'">';}
+  // ── Treasury wallet: company custody address on Ethereum mainnet.
+  // Read-only data (balances, USDT transfers) comes straight from public RPC —
+  // works on any phone, no wallet extension needed. Signing (payouts) uses the
+  // injected wallet (MetaMask / Coinbase; Ledger connects through MetaMask).
+  var USDT_CT='0xdac17f958d2ee523a2206206994597c13d831ec7';
+  var RPCS=['https://ethereum-rpc.publicnode.com','https://eth.llamarpc.com','https://cloudflare-eth.com'];
+  var WAL={eth:null,usdt:null,ins:[],outs:[],lastPull:0,pulling:false,acct:null,acctEth:null,acctUsdt:null,chain:null,err:''};
+  function hexPad(a){ return String(a).replace('0x','').toLowerCase().padStart(64,'0'); }
+  function rpc(method,params,i){ i=i||0;
+    return fetch(RPCS[i],{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:method,params:params||[]})})
+      .then(function(r){return r.json();})
+      .then(function(j){ if(j&&j.result!==undefined&&j.result!==null) return j.result; throw new Error((j&&j.error&&j.error.message)||'rpc error'); })
+      .catch(function(e){ if(i+1<RPCS.length) return rpc(method,params,i+1); throw e; });
+  }
+  function fromWei(h){ try{ return Number(BigInt(h))/1e18; }catch(e){ return parseInt(h,16)/1e18; } }
+  function fromU6(h){ try{ return Number(BigInt(h))/1e6; }catch(e){ return parseInt(h,16)/1e6; } }
+  function pullWallet(force){
+    if(WAL.pulling) return; var now=Date.now();
+    if(!force && now-WAL.lastPull<12000) return;
+    WAL.pulling=true; WAL.lastPull=now;
+    var co=CO_ADDR();
+    var TT='0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+    Promise.all([
+      rpc('eth_getBalance',[co,'latest']),
+      rpc('eth_call',[{to:USDT_CT,data:'0x70a08231'+hexPad(co)},'latest']),
+      rpc('eth_blockNumber',[])
+    ]).then(function(r){
+      WAL.eth=fromWei(r[0]); WAL.usdt=fromU6(r[1]); WAL.err='';
+      var latest=parseInt(r[2],16), from='0x'+Math.max(0,latest-25000).toString(16); // ≈ last 3½ days
+      return Promise.all([
+        rpc('eth_getLogs',[{address:USDT_CT,fromBlock:from,toBlock:'latest',topics:[TT,null,'0x'+hexPad(co)]}]).catch(function(){return [];}),
+        rpc('eth_getLogs',[{address:USDT_CT,fromBlock:from,toBlock:'latest',topics:[TT,'0x'+hexPad(co),null]}]).catch(function(){return [];})
+      ]);
+    }).then(function(r){
+      var map=function(list,dir){ return list.map(function(x){ return {dir:dir,amt:fromU6(x.data),from:'0x'+x.topics[1].slice(26),to:'0x'+x.topics[2].slice(26),tx:x.transactionHash,blk:parseInt(x.blockNumber,16)}; }); };
+      WAL.ins=map(r[0]||[],'in').reverse().slice(0,15); WAL.outs=map(r[1]||[],'out').reverse().slice(0,15);
+      WAL.pulling=false; if(cur==='wallet'&&!busyEditing())render();
+    }).catch(function(e){ WAL.err=String((e&&e.message)||e); WAL.pulling=false; if(cur==='wallet')render(); });
+  }
+  function walletConnect(){
+    if(!window.ethereum){ toast('No wallet found — install MetaMask, or open this page inside the MetaMask app browser',true); return; }
+    window.ethereum.request({method:'eth_requestAccounts'}).then(function(a){
+      WAL.acct=(a&&a[0])||null;
+      return window.ethereum.request({method:'eth_chainId'});
+    }).then(function(c){ WAL.chain=c; render(); pullAcct(); },
+            function(){ toast('Connect cancelled',true); });
+  }
+  function pullAcct(){ if(!WAL.acct)return;
+    Promise.all([ rpc('eth_getBalance',[WAL.acct,'latest']), rpc('eth_call',[{to:USDT_CT,data:'0x70a08231'+hexPad(WAL.acct)},'latest']) ])
+    .then(function(r){ WAL.acctEth=fromWei(r[0]); WAL.acctUsdt=fromU6(r[1]); if(cur==='wallet'&&!busyEditing())render(); },function(){});
+  }
+  function payWithWallet(id){
+    var w=findReq(id); if(!w){ toast('Request not found',true); return; }
+    if(!WAL.acct){ toast('Connect a wallet first',true); return; }
+    if(WAL.chain && WAL.chain!=='0x1'){ toast('Switch your wallet to Ethereum Mainnet first',true); return; }
+    var amt=+(w.net||w.amount)||0, addr=(w.address||'').trim();
+    if(!(amt>0)){ toast('Bad amount',true); return; }
+    if(!/^0x[0-9a-fA-F]{40}$/.test(addr)){ toast('Customer address is not a valid 0x… address',true); return; }
+    if(!confirm('Send '+usd(amt)+' USDT to\n'+addr+'\n\nfrom '+WAL.acct+' ?\n\nThis is a REAL mainnet transaction.')) return;
+    var units=Math.round(amt*1e6);
+    var data='0xa9059cbb'+hexPad(addr)+units.toString(16).padStart(64,'0');
+    window.ethereum.request({method:'eth_sendTransaction',params:[{from:WAL.acct,to:USDT_CT,data:data}]})
+      .then(function(hash){ markPaid(id,hash); toast('Sent ✓ '+String(hash).slice(0,12)+'…'); setTimeout(pullAcct,4000); setTimeout(function(){pullWallet(true);},8000); },
+            function(e){ toast('Cancelled / failed: '+String((e&&e.message)||'').slice(0,70),true); });
+  }
+  function shortAddr(a){ a=String(a||''); return a.slice(0,6)+'…'+a.slice(-4); }
+  function viewWallet(){
+    var co=CO_ADDR();
+    var pendWd=reqs().filter(function(w){ return w.status==='pending' && (w.type||'withdraw')==='withdraw'; });
+    var pendDp=reqs().filter(function(w){ return w.status==='pending' && w.type==='deposit'; });
+    // Auto-match: incoming USDT vs pending deposit requests (same amount ±1 cent).
+    var matchOf=function(t){ var m=null; pendDp.forEach(function(d){ if(Math.abs((+d.amount||0)-t.amt)<=0.01) m=m||d; }); return m; };
+    var liab=SRV_ACCOUNTS.reduce(function(a,x){ return a+(+x.balance||0); },0);
+    var cover=(WAL.usdt!=null&&liab>0)?(WAL.usdt/liab*100):null;
+    var h='<div class="sec" style="display:flex;align-items:center;justify-content:space-between">Treasury · company wallet'+
+      '<button data-wrefresh="1" style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:5px 10px;font:700 11px system-ui;color:var(--ink);cursor:pointer">↻</button></div>';
+    if(WAL.err) h+='<div class="card" style="border-color:#f1b0b7"><div class="req-meta" style="color:var(--neg)">Chain read error: '+WAL.err+' — tap ↻ to retry.</div></div>';
+    h+='<div class="kpis">'+
+      kpi('USDT (treasury)',WAL.usdt==null?'…':usd(WAL.usdt),'company custody','pos')+
+      kpi('ETH (for gas)',WAL.eth==null?'…':(Math.round(WAL.eth*10000)/10000)+' ETH','pays network fees')+
+      kpi('Customer balances',usd(liab),'what we owe customers')+
+      kpi('Coverage',cover==null?'—':(Math.round(cover*10)/10)+'%','treasury ÷ liabilities',cover!=null?(cover>=100?'pos':'neg'):'')+
+    '</div>';
+    h+='<div class="card"><div class="lbl">Company deposit address (ERC-20)</div>'+
+      '<div class="req-addr" data-copy="'+co+'" style="margin-top:6px">'+co+'</div>'+
+      '<div class="hint">All customer deposits land here (centralized custody). Tap to copy · <a href="https://etherscan.io/address/'+co+'" target="_blank" rel="noopener" style="color:var(--acc);font-weight:700">Etherscan ↗</a></div></div>';
+    // Signing wallet
+    h+='<div class="sec">Payout wallet</div><div class="card">';
+    if(!WAL.acct){
+      h+='<button data-wconnect="1" style="width:100%;background:var(--acc);color:#fff;border:none;border-radius:4px;padding:11px;font:700 13px system-ui;cursor:pointer">Connect wallet (MetaMask / Coinbase)</button>'+
+        '<div class="hint">Ledger user? Plug it in, then in MetaMask choose <b>Connect hardware wallet → Ledger</b> — signing stays on the device. Phone: open this page inside the MetaMask app browser.</div>';
+    } else {
+      h+='<div class="row"><span>Connected</span><b class="mono" style="font-size:12px">'+shortAddr(WAL.acct)+'</b></div>'+
+        '<div class="row"><span>USDT</span><b>'+(WAL.acctUsdt==null?'…':usd(WAL.acctUsdt))+'</b></div>'+
+        '<div class="row"><span>ETH (gas)</span><b>'+(WAL.acctEth==null?'…':(Math.round(WAL.acctEth*10000)/10000)+' ETH')+'</b></div>'+
+        ((WAL.chain&&WAL.chain!=='0x1')?'<div class="req-meta" style="color:var(--neg)">⚠ Wallet is not on Ethereum Mainnet — switch network in the wallet.</div>':'')+
+        '<button data-wdisc="1" class="save ghost" style="width:100%;margin-top:8px;padding:8px">Disconnect</button>';
+    }
+    h+='</div>';
+    // Pending withdrawals → one-click pay
+    h+='<div class="sec">Withdrawals to pay · '+pendWd.length+'</div>';
+    if(!pendWd.length){ h+='<div class="card"><div class="empty">No pending withdrawals 👍</div></div>'; }
+    pendWd.forEach(function(w){
+      var ok=WAL.acct && /^0x[0-9a-fA-F]{40}$/.test((w.address||'').trim());
+      h+='<div class="card" style="padding:9px 12px"><div class="row" style="border:none;padding:0">'+
+        '<span style="min-width:0"><b style="font-size:12.5px">'+esc(w.custName||w.custId||'—')+'</b>'+
+        '<div class="req-meta" style="margin:2px 0 0">'+esc(shortAddr(w.address))+' · net '+usd(w.net||w.amount)+'</div></span>'+
+        '<button data-wpay="'+w.id+'" style="background:'+(ok?'var(--pos)':'#c8cfd8')+';color:#fff;border:none;border-radius:4px;padding:8px 14px;font:700 12px system-ui;cursor:pointer;white-space:nowrap" '+(ok?'':'disabled')+'>Pay ▸</button></div></div>';
+    });
+    if(pendWd.length && !WAL.acct) h+='<div class="hint" style="margin:0 14px 8px">Connect a wallet above to enable Pay.</div>';
+    // Incoming with auto-match
+    h+='<div class="sec">Incoming (last ~3 days) · '+WAL.ins.length+'</div>';
+    if(!WAL.ins.length){ h+='<div class="card"><div class="empty">'+(WAL.usdt==null?'Loading chain data…':'No incoming USDT in the window.')+'</div></div>'; }
+    else{ h+='<div class="card">';
+      WAL.ins.forEach(function(t){ var m=matchOf(t);
+        h+='<div class="row"><span style="min-width:0"><b class="pos">+'+usd(t.amt)+'</b>'+
+          '<div class="req-meta" style="margin:2px 0 0">from '+shortAddr(t.from)+' · <a href="https://etherscan.io/tx/'+t.tx+'" target="_blank" rel="noopener" style="color:var(--acc)">tx ↗</a>'+
+          (m?(' · matches <b>'+esc(m.custName||m.custId)+'</b> deposit'):'')+'</div></span>'+
+          (m?('<button data-ok="'+m.id+'" style="background:var(--pos);color:#fff;border:none;border-radius:4px;padding:7px 12px;font:700 11.5px system-ui;cursor:pointer;white-space:nowrap">Credit ✓</button>'):'')+
+        '</div>'; });
+      h+='</div>'; }
+    // Outgoing
+    h+='<div class="sec">Outgoing (last ~3 days) · '+WAL.outs.length+'</div>';
+    if(!WAL.outs.length){ h+='<div class="card"><div class="empty">No outgoing USDT in the window.</div></div>'; }
+    else{ h+='<div class="card">';
+      WAL.outs.forEach(function(t){
+        h+='<div class="row"><span style="min-width:0"><b class="neg">-'+usd(t.amt)+'</b>'+
+          '<div class="req-meta" style="margin:2px 0 0">to '+shortAddr(t.to)+' · <a href="https://etherscan.io/tx/'+t.tx+'" target="_blank" rel="noopener" style="color:var(--acc)">tx ↗</a></div></span></div>'; });
+      h+='</div>'; }
+    h+='<div class="hint" style="margin:0 14px 10px">Live from Ethereum mainnet (refreshes ~12s on this tab). "Credit ✓" approves the matched deposit request — the customer\'s app balance updates in seconds.</div>';
+    return h;
+  }
+  // ── Pricing (dealing desk): per-symbol live quotes + markup in points ──
+  var PRICE_APP='fx', PRICE_MARKS={}, PRICE_FILTER='', PRICE_CLS='ALL';
+  // Reference instruments (base bid, digits, base spread in points, class).
+  var FX_INSTR=[
+    ['EURUSD','Euro / US Dollar','FX',1.08388,5,0.8],['GBPUSD','British Pound / USD','FX',1.26776,5,1.0],
+    ['USDJPY','US Dollar / Yen','FX',156.360,3,1.2],['AUDUSD','Australian / US Dollar','FX',0.66094,5,1.4],
+    ['USDCHF','US Dollar / Swiss Franc','FX',0.91028,5,1.2],['USDCAD','US Dollar / Canadian','FX',1.36392,5,1.5],
+    ['NZDUSD','New Zealand / USD','FX',0.60315,5,1.6],['EURGBP','Euro / British Pound','FX',0.85412,5,1.2],
+    ['EURJPY','Euro / Japanese Yen','FX',169.580,3,1.5],['GBPJPY','British Pound / Yen','FX',198.420,3,2.5],
+    ['XAUUSD','Gold Spot','METAL',2347.95,2,18.0],['XAGUSD','Silver Spot','METAL',30.417,3,25.0],
+    ['AAPL','Apple Inc.','STOCK',219.18,2,3.0],['TSLA','Tesla Inc.','STOCK',247.18,2,4.0],
+    ['NVDA','NVIDIA Corp.','STOCK',128.40,2,3.5],['MSFT','Microsoft Corp.','STOCK',441.20,2,3.5],
+    ['AMZN','Amazon.com','STOCK',186.30,2,3.0],['ORCL','Oracle Corp.','STOCK',140.65,2,3.0],
+    ['SPACEX','SpaceX','STOCK',150.00,2,10.0],
+    ['BTCUSD','Bitcoin / USD','CRYPTO',67250.0,1,30.0],['ETHUSD','Ethereum / USD','CRYPTO',3512.0,2,25.0],
+    ['SOLUSD','Solana / USD','CRYPTO',172.40,2,20.0],['SPX500','S&P 500 Index','INDEX',5430.0,1,4.0],
+    ['NAS100','Nasdaq 100','INDEX',19250.0,1,5.0],['US30','Dow Jones 30','INDEX',38900.0,1,6.0]
+  ];
+  // Crypto instruments (plain coin symbols matching the Crypto app).
+  var CRYPTO_INSTR=[
+    ['BTC','Bitcoin',76988.90,2],['ETH','Ethereum',2116.51,2],['SOL','Solana',86.26,2],
+    ['BNB','BNB',612.40,2],['XRP','XRP',0.6234,4],['ADA','Cardano',0.4523,4],
+    ['AVAX','Avalanche',36.50,2],['DOT','Polkadot',6.82,3],['LINK','Chainlink',9.60,3],
+    ['DOGE','Dogecoin',0.1542,4],['TON','Toncoin',5.42,3],['MATIC','Polygon',0.582,4]
+  ];
+  var SPORTS_MARGIN=0; // house margin % applied to all odds (loaded from server)
+  var PRICE_LIVE={}, PRICE_SPR={}, PRICE_DIR={}, CRYPTO_LIVE={}, CRYPTO_DIR={};
+  FX_INSTR.forEach(function(r){ PRICE_LIVE[r[0]]=r[3]; PRICE_SPR[r[0]]=r[5]; PRICE_DIR[r[0]]=1; });
+  CRYPTO_INSTR.forEach(function(r){ CRYPTO_LIVE[r[0]]=r[2]; CRYPTO_DIR[r[0]]=1; });
+  // ── Unit model (dealing desk) ────────────────────────────────────────────
+  // DB stores spread + markup in PIPS (the server unit fx_open/fx_close charges
+  // with). The desk DISPLAYS them in POINTS (value of the last shown price digit)
+  // so the visible bid↔ask gap == the Spr number == what the server actually charges.
+  //   fxPipOf(sym): MUST equal the fx-prices Edge / fx_open pip() exactly, or the
+  //     shown quote diverges from the charged one (gold/KRW were 10-100x off before).
+  //   pointsPerPip = pip / (10^-digits) = pip × 10^digits  (how many display-points a pip is).
+  //   1 display-point = (1/pointsPerPip) pips  (the markup step, converted before storing).
+  function fxPipOf(sym){ if(/JPY$/.test(sym))return 0.01; if(sym==='XAUUSD')return 0.01; if(sym==='XAGUSD')return 0.001; return 0.0001; }
+  function fxPPP(sym,dg){ return fxPipOf(sym)*Math.pow(10,dg); }   // points per 1 pip
+  function cryptoTick(){ CRYPTO_INSTR.forEach(function(r){ var cur=CRYPTO_LIVE[r[0]]||r[2];
+    var nx=cur*(1+(Math.random()-0.5)*2*0.0009 + (r[2]-cur)/r[2]*0.03); CRYPTO_DIR[r[0]]=nx>=cur?1:-1; CRYPTO_LIVE[r[0]]=nx; }); }
+  // Real server feed (Polygon → prices table) for the dealing desk. FX/metals
+  // come from here as-is; stocks/indices/crypto (no paid feed) keep simulating.
+  var LIVE_FEED={};
+  function pullLivePrices(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('prices').select('symbol,mid,spr_pts').then(function(r){
+      if(r&&r.data){ var f={}; r.data.forEach(function(p){ f[p.symbol]={mid:+p.mid||0,spr:+p.spr_pts||0}; }); LIVE_FEED=f;
+        if(cur==='pricing'&&PRICE_APP==='fx'&&!busyEditing())render(); } },function(){}); }
+  function priceTick(){ FX_INSTR.forEach(function(r){
+    var sym=r[0], lf=LIVE_FEED[sym];
+    if(lf && lf.mid>0){ // REAL feed — show it exactly, markup is added in viewPricing
+      PRICE_DIR[sym]=(lf.mid>=(PRICE_LIVE[sym]||r[3]))?1:-1; PRICE_LIVE[sym]=lf.mid; if(lf.spr>0)PRICE_SPR[sym]=lf.spr; return; }
+    // No real feed for this symbol (stocks/indices/crypto) — simulate.
+    var cur=PRICE_LIVE[sym]||r[3];
+    var step=(r[2]==='CRYPTO'?0.0008:r[2]==='STOCK'||r[2]==='INDEX'?0.0004:0.00015);
+    var nx=cur*(1+(Math.random()-0.5)*2*step + (r[3]-cur)/r[3]*0.04);
+    PRICE_DIR[sym]=nx>=cur?1:-1; PRICE_LIVE[sym]=nx;
+    var sp=PRICE_SPR[sym]||r[5]; var spike=Math.random()<0.06?(1+Math.random()*1.5):1;
+    sp=sp*(1+(Math.random()-0.5)*0.25)*spike + (r[5]-sp)*0.18;
+    PRICE_SPR[sym]=Math.max(r[5]*0.5,Math.min(r[5]*3,sp));
+  }); }
+  // Publish the FX price feed so EVERY client shows the same quote (the
+  // stepping-stone to a real server-side feed). Runs in the background while a
+  // manager tab is open; apps fall back to their own sim if the feed goes stale.
+  function publishPrices(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    var rows=FX_INSTR.map(function(r){ return {symbol:r[0], mid:Math.round((PRICE_LIVE[r[0]]||r[3])*1e6)/1e6, spr_pts:Math.round((PRICE_SPR[r[0]]||r[5])*100)/100, updated_at:new Date().toISOString()}; });
+    AlpexaSync.db.from('prices').upsert(rows,{onConflict:'symbol'}).then(function(){},function(){});
+  }
+  // NOTE: publishPrices() is intentionally NOT called anymore — the fx-prices
+  // Edge Function (Polygon) now owns the prices table. We only READ it here, so
+  // the manager can never overwrite the real market feed with a simulation.
+  setInterval(function(){ if(document.hidden) return; pullLivePrices(); priceTick();
+    if(cur==='pricing'&&PRICE_APP==='crypto') cryptoTick();
+    if(cur==='pricing'&&PRICE_APP!=='sports'&&!busyEditing()) render(); },1500);
+  function pullPricing(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('pricing_marks').select('*').then(function(r){ if(r&&r.data){ var m={}; r.data.forEach(function(p){ m[p.symbol]=+p.markup_pts||0; }); PRICE_MARKS=m; if(cur==='pricing'&&!busyEditing())render(); } },function(){});
+    AlpexaSync.db.from('pricing').select('*').eq('server','sports').limit(1).then(function(r){ var p=r&&r.data&&r.data[0]; if(p){ SPORTS_MARGIN=+p.spread_mult||0; if(cur==='pricing'&&PRICE_APP==='sports'&&!busyEditing())render(); } },function(){}); }
+  function viewPricing(){
+    if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Pricing</div><div class="card"><div class="empty">Not connected to server.</div></div>';
+    var APPS=[['fx','FX'],['crypto','Crypto'],['sports','Sports']];
+    var h='<div class="sec" style="display:flex;align-items:center;justify-content:space-between">Pricing · dealing desk'+
+      '<span style="display:flex;align-items:center;gap:8px">'+
+      '<button data-prefresh="1" style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:5px 10px;font:700 10.5px system-ui;cursor:pointer;color:var(--ink)">↻ Refresh</button>'+
+      '<span style="display:inline-flex;align-items:center;gap:4px;font:700 10px system-ui;color:var(--pos)"><span style="width:7px;height:7px;border-radius:50%;background:var(--pos);display:inline-block"></span>LIVE</span>'+
+      '</span></div>';
+    h+='<div style="display:flex;gap:6px;margin:0 12px 10px">'+APPS.map(function(x){
+      var on=PRICE_APP===x[0];
+      return '<button data-papp="'+x[0]+'" style="flex:1;background:'+(on?'var(--acc)':'#F1F3F6')+';color:'+(on?'#fff':'var(--dim)')+';border:none;border-radius:4px;padding:9px 0;font:700 12.5px system-ui;cursor:pointer">'+x[1]+'</button>';
+    }).join('')+'</div>';
+    if(PRICE_APP==='crypto'){
+      var q2=(PRICE_FILTER||'').toLowerCase();
+      var clist=CRYPTO_INSTR.filter(function(r){ return !q2||((r[0]+' '+r[1]).toLowerCase().indexOf(q2)>=0); });
+      h+='<div class="card" style="padding:9px 12px"><input class="in" id="prSearch" placeholder="Search coin…" value="'+(PRICE_FILTER||'').replace(/"/g,'&quot;')+'" style="margin-top:0"></div>';
+      h+='<div class="card" style="padding:3px 8px">'+
+        '<div class="row" style="padding:5px 0;border-bottom:1px solid var(--line)"><span class="lbl" style="width:46px;text-align:center">Coin</span><span class="lbl" style="flex:1;text-align:center">Buy</span><span class="lbl" style="width:42px;text-align:center">Spr</span><span class="lbl" style="flex:1;text-align:center">Sell</span><span class="lbl" style="width:74px;text-align:center">Mk%</span></div>';
+      clist.forEach(function(r){
+        var sym=r[0], px=CRYPTO_LIVE[sym]||r[2], dg=r[3], mk=+PRICE_MARKS[sym]||0, up=CRYPTO_DIR[sym]>=0;
+        var buy=px*(1+mk/100), sell=px*(1-mk/100);
+        var sprPct=(buy>0?((buy-sell)/buy*100):0);                          // round-trip spread %
+        h+='<div class="row" style="align-items:center;padding:6px 0">'+
+          '<span style="width:46px;text-align:center;overflow:hidden"><b style="font-size:11px">'+sym+'</b></span>'+
+          '<span style="flex:1;text-align:center;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+buy.toFixed(dg)+'</b></span>'+
+          '<span style="width:42px;text-align:center;font-variant-numeric:tabular-nums;font-size:10px;font-weight:700;color:'+(mk>0?'var(--neg)':'var(--dim)')+'">'+sprPct.toFixed(1)+'%</span>'+
+          '<span style="flex:1;text-align:center;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:10.5px">'+sell.toFixed(dg)+'</b></span>'+
+          '<span style="width:74px;display:flex;gap:3px;justify-content:center;align-items:center">'+
+            '<button data-pmk="'+sym+'|-" style="width:19px;height:19px;border:1px solid var(--line);background:#fff;border-radius:4px;font:700 12px system-ui;cursor:pointer;color:var(--ink)">−</button>'+
+            '<span style="font-variant-numeric:tabular-nums;font-size:9.5px;color:'+(mk>0?'var(--neg)':'var(--dim)')+';min-width:20px;text-align:center">'+mk.toFixed(1)+'</span>'+
+            '<button data-pmk="'+sym+'|+" style="width:19px;height:19px;border:1px solid var(--line);background:#fff;border-radius:4px;font:700 12px system-ui;cursor:pointer;color:var(--ink)">+</button>'+
+          '</span></div>';
+      });
+      h+='</div>';
+      h+='<div class="card"><div class="row" style="border:none;padding:2px 0"><span class="lbl">Reset</span><button data-preset="1" style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:6px 12px;font:700 11px system-ui;cursor:pointer;color:var(--ink)">↻ Reset all</button></div></div>';
+      h+='<div class="hint" style="margin:0 14px">Markup % = how much worse than mid the customer buys/sells (your spread). Applies in ~5s. Recorded as company fee revenue.</div>';
+      return h;
+    }
+    if(PRICE_APP==='sports'){
+      var m=Math.max(0,Math.min(15,+SPORTS_MARGIN||0));
+      h+='<div class="card">'+
+        '<div class="lbl">House margin · '+m.toFixed(1)+'%</div>'+
+        '<input type="range" id="sp_m" min="0" max="15" step="0.5" value="'+m+'" style="width:100%;margin:8px 0" oninput="document.getElementById(\'sp_m_v\').textContent=(+this.value).toFixed(1)+\'%\'">'+
+        '<div class="req-meta">Lowers every payout by this margin (the bookmaker edge). <b id="sp_m_v">'+m.toFixed(1)+'%</b> · 0% = fair odds, 15% = max.</div>'+
+        '<div class="btns"><button class="ok" data-spsave="1">Apply to all Sports clients</button><button class="no" data-spreset="1">Reset to 0%</button></div>'+
+        '<div class="hint">Applies within ~5s on every customer\'s Sports app.</div></div>';
+      h+='<div class="sec">Odds preview</div><div class="card">';
+      [['Even',2.00],['Favourite',1.50],['Underdog',3.50],['Longshot',6.00]].forEach(function(o){
+        var adj=1+(o[1]-1)*(1-m/100);
+        h+='<div class="row"><span>'+o[0]+' · '+o[1].toFixed(2)+'</span><b class="'+(m>0?'neg':'pos')+'">→ '+adj.toFixed(2)+'</b></div>'; });
+      h+='</div><div class="hint" style="margin:0 14px">Higher margin = lower payouts = more house edge on every bet.</div>';
+      return h;
+    }
+    var DGMAP={}; FX_INSTR.forEach(function(r){ DGMAP[r[0]]=r[4]; });
+    var totalMk=0; Object.keys(PRICE_MARKS).forEach(function(k){ var dg=DGMAP[k]; if(dg) totalMk+=(+PRICE_MARKS[k]||0)*fxPPP(k,dg); });
+    h+='<div class="card" style="padding:9px 12px"><input class="in" id="prSearch" placeholder="Search symbol…" value="'+(PRICE_FILTER||'').replace(/"/g,'&quot;')+'" style="margin-top:0">'+
+      '<div style="display:flex;gap:5px;margin-top:8px;flex-wrap:wrap">'+['ALL','FX','STOCK','CRYPTO','INDEX','METAL'].map(function(c){
+        var on=PRICE_CLS===c; return '<button data-pcls="'+c+'" style="flex:1;min-width:54px;background:'+(on?'var(--acc)':'#F1F3F6')+';color:'+(on?'#fff':'var(--dim)')+';border:none;border-radius:4px;padding:6px 0;font:700 10.5px system-ui;cursor:pointer">'+c+'</button>';
+      }).join('')+'</div></div>';
+    var q=(PRICE_FILTER||'').toLowerCase();
+    var list=FX_INSTR.filter(function(r){ return (PRICE_CLS==='ALL'||r[2]===PRICE_CLS) && (!q||((r[0]+' '+r[1]).toLowerCase().indexOf(q)>=0)); });
+    h+='<div class="card" style="padding:3px 8px">'+
+      '<div class="row" style="padding:5px 0;border-bottom:1px solid var(--line)"><span class="lbl" style="width:46px;text-align:center">Sym</span><span class="lbl" style="flex:1;text-align:center">Bid</span><span class="lbl" style="width:32px;text-align:center">Spr·pt</span><span class="lbl" style="flex:1;text-align:center">Ask</span><span class="lbl" style="width:74px;text-align:center">Mk</span></div>';
+    if(!list.length) h+='<div class="empty">No instruments match.</div>';
+    list.forEach(function(r){
+      var sym=r[0], mid=PRICE_LIVE[sym]||r[3], dg=r[4], mk=+PRICE_MARKS[sym]||0, up=PRICE_DIR[sym]>=0;
+      var liveSprPip=PRICE_SPR[sym]||r[5];                                // LIVE liquidity spread in PIPS (Polygon feed — floats)
+      var totPip=Math.max(0.1, liveSprPip+mk);                            // live + markup, PIPS (== server fx_open)
+      var point=Math.pow(10,-dg);                                        // value of the last shown digit
+      // TRUE floating spread: bid/ask are the live quotes (mid ± half the live+markup
+      // spread) and drift with the market. Spr is NOT computed separately — it IS the
+      // difference between the DISPLAYED bid and ask, so the number on screen always
+      // equals the gap the eye sees (11 stays 11), and it floats as prices move.
+      var effPt=Math.max(0.1, totPip*fxPPP(sym,dg));                      // live+markup spread in points (float)
+      var half=(effPt*point)/2;
+      var bidR=+(mid-half).toFixed(dg), askR=+(mid+half).toFixed(dg);     // the ROUNDED quotes actually shown
+      var bid=bidR, ask=askR;
+      var effPtShown=Math.max(1, Math.round((askR-bidR)/point));          // = the visible (ask − bid), in points
+      var mkPt=Math.round(mk*fxPPP(sym,dg));                              // markup shown in POINTS
+      h+='<div class="row" style="align-items:center;padding:6px 0">'+
+        '<span style="width:46px;text-align:center;overflow:hidden"><b style="font-size:10px">'+sym+'</b></span>'+
+        '<span style="flex:1;text-align:center;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:11px">'+bid.toFixed(dg)+'</b></span>'+
+        '<span style="width:32px;text-align:center;font-variant-numeric:tabular-nums;font-size:10px;font-weight:700;color:'+(mk>0?'var(--neg)':mk<0?'var(--pos)':'var(--dim)')+'">'+effPtShown+'</span>'+
+        '<span style="flex:1;text-align:center;font-variant-numeric:tabular-nums"><b class="'+(up?'pos':'neg')+'" style="font-size:11px">'+ask.toFixed(dg)+'</b></span>'+
+        '<span style="width:74px;display:flex;gap:3px;justify-content:center;align-items:center">'+
+          '<button data-pmk="'+sym+'|-" style="width:19px;height:19px;border:1px solid var(--line);background:#fff;border-radius:4px;font:700 12px system-ui;cursor:pointer;color:var(--ink)">−</button>'+
+          '<span style="font-variant-numeric:tabular-nums;font-size:9.5px;color:'+(mk>0?'var(--neg)':mk<0?'var(--pos)':'var(--dim)')+';min-width:18px;text-align:center">'+(mkPt>0?'+':'')+mkPt+'</span>'+
+          '<button data-pmk="'+sym+'|+" style="width:19px;height:19px;border:1px solid var(--line);background:#fff;border-radius:4px;font:700 12px system-ui;cursor:pointer;color:var(--ink)">+</button>'+
+        '</span></div>';
+    });
+    h+='</div>';
+    h+='<div class="card"><div class="row" style="border:none;padding:2px 0"><span class="lbl">Total markup added</span>'+
+      '<span style="display:flex;align-items:center;gap:10px"><b class="'+(totalMk>0?'neg':'pos')+'">'+(totalMk>0?'+':'')+Math.round(totalMk)+' pt</b>'+
+      '<button data-preset="1" style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:6px 12px;font:700 11px system-ui;cursor:pointer;color:var(--ink)">↻ Reset all</button></span></div></div>';
+    h+='<div class="hint" style="margin:0 14px">Floating spread: Spr·pt is exactly the on-screen (ask − bid) in points, so it always matches the quotes and floats with the market. Markup ± the live spread: + widens · − narrows below raw (house absorbs it). Applies to every FX app within ~5s. − / + steps 1pt.</div>';
+    return h;
+  }
+  function pricingMark(sym,dir){
+    // Step by 1 display-POINT, but STORE in PIPS (the unit fx_open/fx_close charge with).
+    // 1 point = 1/pointsPerPip pips; round to 4dp so tiny pip fractions don't accumulate.
+    var row=FX_INSTR.filter(function(r){return r[0]===sym;})[0]; var dg=row?row[4]:5;
+    var stepPip=1/fxPPP(sym,dg);
+    var cur=+PRICE_MARKS[sym]||0; var nx=Math.round((cur+(dir==='+'?stepPip:-stepPip))*1e4)/1e4;
+    nx=Math.max(-50,Math.min(50,nx)); PRICE_MARKS[sym]=nx;   // − allowed: narrow below raw (house absorbs)
+    if(cur===nx){ render(); return; }
+    render();
+    var nxPt=Math.round(nx*fxPPP(sym,dg));                   // markup in points for the toast
+    AlpexaSync.db.from('pricing_marks').upsert({symbol:sym,markup_pts:nx,updated_at:new Date().toISOString()},{onConflict:'symbol'}).then(function(r){
+      if(r&&r.error)toast('Error: '+r.error.message+' (run the pricing_marks SQL?)',true);
+      else toast(sym+' markup '+(nxPt>0?'+':'')+nxPt+'pt saved · live on apps in ~5s ✓');
+    },function(){});
+  }
+  function pricingResetAll(){
+    if(!confirm('Reset ALL markups to 0?')) return;
+    var syms=Object.keys(PRICE_MARKS); PRICE_MARKS={}; render();
+    syms.forEach(function(s){ AlpexaSync.db.from('pricing_marks').upsert({symbol:s,markup_pts:0,updated_at:new Date().toISOString()},{onConflict:'symbol'}).then(function(){},function(){}); });
+    try{ logAction('pricing_reset','','all markups → 0'); }catch(e){}
+    toast('All markups reset ✓');
+  }
+  function saveSportsMargin(mOv){
+    var m=(mOv!=null)?mOv:parseFloat(val('sp_m')); if(!isFinite(m))m=0; m=Math.max(0,Math.min(15,m));
+    SPORTS_MARGIN=m;
+    AlpexaSync.db.from('pricing').upsert({server:'sports',spread_mult:m,bias_bps:0,updated_at:new Date().toISOString()},{onConflict:'server'}).then(function(r){
+      if(r&&r.error){ toast('Error: '+r.error.message+' (run the pricing SQL?)',true); return; }
+      try{ logAction('pricing_sports','','house margin '+m.toFixed(1)+'%'); }catch(e){}
+      toast('Sports margin applied ✓ — clients update in ~5s'); render();
+    },function(){ toast('Save failed',true); });
+  }
+  // ── Agents (IB / affiliates): recruit customers, earn commission ──
+  // FX: $ per lot (spread-markup rebate) · Crypto: % of trade fees ·
+  // Sports: % of the agent's WHOLE customer pool NET loss (anti-hedge-abuse).
+  var SRV_AGENTS=[], SRV_ALINKS=[], SRV_APAY=[], AGENT_OPEN=null, AG_RANGE='all';
+  function pullAgents(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('agents').select('*').order('created_at',{ascending:false}).then(function(r){ if(r&&r.data){ SRV_AGENTS=r.data; if(cur==='agents'&&!busyEditing())render(); } },function(){});
+    AlpexaSync.db.from('agent_links').select('*').then(function(r){ if(r&&r.data){ SRV_ALINKS=r.data; if(cur==='agents'&&!busyEditing())render(); } },function(){});
+    AlpexaSync.db.from('agent_payouts').select('*').order('created_at',{ascending:false}).limit(200).then(function(r){ if(r&&r.data){ SRV_APAY=r.data; if(cur==='agents'&&!busyEditing())render(); } },function(){}); }
+  function agentName(code){ var n=code; SRV_AGENTS.forEach(function(a){ if(a.code===code&&a.name)n=a.name; }); return n; }
+  // Decide an agent payout. Crypto → pay with the connected wallet (or paste a
+  // txid); bank → mark paid after sending; internal → credit the agent's own
+  // crypto trading account instantly (no real money moves).
+  function apSet(id,patch,okMsg){
+    AlpexaSync.db.from('agent_payouts').update(Object.assign({decided_at:new Date().toISOString()},patch)).eq('id',id).then(function(r){
+      if(r&&r.error){ toast('Error: '+r.error.message,true); return; }
+      toast(okMsg||'Done ✓'); pullAgents();
+    },function(){ toast('Failed',true); });
+  }
+  function apFind(id){ var p=null; SRV_APAY.forEach(function(x){ if(String(x.id)===String(id))p=x; }); return p; }
+  function agentPayWallet(id){
+    var p=apFind(id); if(!p)return;
+    if(!WAL.acct){ toast('Connect a wallet in the Wallet tab first',true); return; }
+    if(WAL.chain && WAL.chain!=='0x1'){ toast('Switch your wallet to Ethereum Mainnet first',true); return; }
+    var amt=+p.amount||0, addr=(p.dest||'').trim();
+    if(!/^0x[0-9a-fA-F]{40}$/.test(addr)){ toast('Destination is not a valid 0x… address',true); return; }
+    if(!confirm('Send '+usd(amt)+' USDT commission to agent '+agentName(p.agent_code)+'\n'+addr+' ?\n\nThis is a REAL mainnet transaction.')) return;
+    var data='0xa9059cbb'+hexPad(addr)+Math.round(amt*1e6).toString(16).padStart(64,'0');
+    window.ethereum.request({method:'eth_sendTransaction',params:[{from:WAL.acct,to:USDT_CT,data:data}]})
+      .then(function(hash){ try{ logAction('agent_payout', p.agent_code, usd(amt)+' USDT · tx '+String(hash).slice(0,12)+'…'); }catch(e){}
+        apSet(id,{status:'approved',txid:String(hash)},'Paid ✓ '+String(hash).slice(0,10)+'…'); },
+            function(e){ toast('Cancelled / failed: '+String((e&&e.message)||'').slice(0,70),true); });
+  }
+  function agentPayManual(id){
+    var p=apFind(id); if(!p)return;
+    var tx=prompt('Mark '+usd(p.amount)+' ('+p.method+') as paid to '+agentName(p.agent_code)+'.\nOptional: paste the txid / bank reference:','');
+    if(tx===null) return;
+    try{ logAction('agent_payout', p.agent_code, usd(p.amount)+' '+p.method+(tx?(' · '+tx.slice(0,16)):'')); }catch(e){}
+    apSet(id,{status:'approved',txid:tx||''},'Marked paid ✓');
+  }
+  function agentPayInternal(id){
+    var p=apFind(id); if(!p)return;
+    var cid=(p.dest||'').trim().toUpperCase();
+    var pl=null; SRV_PLAYERS.forEach(function(x){ if((x.cust_id||'').toUpperCase()===cid)pl=x; });
+    if(!pl){ toast('No customer with ID '+cid,true); return; }
+    var acc=null; SRV_ACCOUNTS.forEach(function(a){ if(a.player_id===pl.id&&a.server==='crypto')acc=a; });
+    if(!acc){ toast('That customer has no crypto account',true); return; }
+    var nb=Math.round(((+acc.balance||0)+(+p.amount||0))*100)/100;
+    if(!confirm('Credit '+usd(p.amount)+' commission to '+(pl.name||cid)+'\'s crypto account?\nNew balance: '+usd(nb))) return;
+    AlpexaSync.db.from('accounts').update({balance:nb}).eq('acct_no',acc.acct_no).then(function(){},function(){});
+    AlpexaSync.db.from('commands').insert({cust_id:pl.cust_id,server:'crypto',action:'set_balance',local_id:String(nb),status:'pending'}).then(function(){},function(){});
+    try{ logAction('agent_payout', p.agent_code, usd(p.amount)+' → internal '+cid); }catch(e){}
+    apSet(id,{status:'approved',txid:'internal:'+cid},'Credited ✓ — reaches the app in ~4s');
+  }
+  function agentCommission(code,lo,hi){
+    var ag=null; SRV_AGENTS.forEach(function(a){ if(a.code===code)ag=a; }); ag=ag||{};
+    var share={}; SRV_ALINKS.forEach(function(l){ if(l.agent_code===code) share[l.cust_id]=(+l.share||100)/100; });
+    var fxLots=0, sportsNet=0, cryptoFees=0, n=0;
+    SRV_SETTLE.forEach(function(s){
+      var sh=share[s.cust_id]; if(sh==null)return;
+      var t=s.created_at?Date.parse(s.created_at):0; if(!(t>=lo&&t<=hi))return; n++;
+      if(s.server==='fx'&&s.kind==='fx_close'){ fxLots+=(+s.stake||0)*sh; }
+      else if(s.server==='sports'&&String(s.kind||'').indexOf('bet_')===0){ sportsNet+=(-(+s.pnl||0))*sh; }
+      else if(s.kind==='crypto_fee'){ cryptoFees+=(+s.stake||0)*sh; }
+    });
+    var cFx=fxLots*(+ag.fx_per_lot||0), cSp=sportsNet*((+ag.sports_net_pct||0)/100), cCr=cryptoFees*((+ag.crypto_fee_pct||0)/100);
+    return {fxLots:fxLots,sportsNet:sportsNet,cryptoFees:cryptoFees,cFx:cFx,cSp:cSp,cCr:cCr,total:cFx+cSp+cCr,n:n};
+  }
+  function agRange(){ var now=Date.now(), lo=0, hi=Infinity, label='All time';
+    if(AG_RANGE==='today'){ var d=new Date(); d.setHours(0,0,0,0); lo=d.getTime(); label='Today'; }
+    else if(AG_RANGE==='7d'){ lo=now-7*86400e3; label='Last 7 days'; }
+    else if(AG_RANGE==='30d'){ lo=now-30*86400e3; label='Last 30 days'; }
+    return {lo:lo,hi:hi,label:label}; }
+  function viewAgents(){
+    if(!window.AlpexaSync||!AlpexaSync.db) return '<div class="sec">Agents</div><div class="card"><div class="empty">Not connected to server.</div></div>';
+    var rg=agRange();
+    var h='<div class="sec" style="display:flex;align-items:center;justify-content:space-between">Agents · '+SRV_AGENTS.length+
+      '<button data-agnew="1" style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:5px 11px;font:700 11px system-ui;color:var(--ink);cursor:pointer">＋ New agent</button></div>';
+    // Commission window filter (handler [data-agr] at wire() was orphaned — buttons were never rendered).
+    var AGR=[['today','Today'],['7d','7d'],['30d','30d'],['all','All']];
+    h+='<div style="display:flex;gap:6px;margin:8px 12px 4px">'+AGR.map(function(x){ var on=AG_RANGE===x[0];
+      return '<button data-agr="'+x[0]+'" style="flex:1;background:'+(on?'var(--acc)':'#F1F3F6')+';color:'+(on?'#fff':'var(--dim)')+';border-radius:4px;padding:8px 0;font:700 11.5px system-ui;border:none;cursor:pointer">'+x[1]+'</button>';
+    }).join('')+'</div>';
+    h+='<div class="hint" style="margin:0 14px 8px">Commission window: '+rg.label+'</div>';
+    // Pending commission payout requests from the partner portal.
+    var pendP=SRV_APAY.filter(function(p){ return p.status==='pending'; });
+    if(pendP.length){
+      var MNAME={crypto:'USDT (ERC-20)',bank:'Bank transfer',internal:'Trading account'};
+      h+='<div class="sec">Payout requests · '+pendP.length+'</div>';
+      pendP.forEach(function(p){
+        h+='<div class="card" style="padding:9px 12px">'+
+          '<div class="row" style="border:none;padding:0"><span><b style="font-size:12.5px">'+agentName(p.agent_code)+'</b> <span class="muted">· '+p.agent_code+'</span>'+
+          '<div class="req-meta" style="margin:2px 0 0">'+(MNAME[p.method]||p.method)+' · '+(p.created_at?ago(Date.parse(p.created_at)):'')+'</div></span>'+
+          '<b>'+usd(p.amount)+'</b></div>'+
+          '<div class="req-addr" data-copy="'+String(p.dest||'').replace(/"/g,'&quot;')+'" style="margin-top:6px">'+(p.dest||'—')+'</div>'+
+          '<div class="btns">'+
+            (p.method==='crypto'?'<button class="ok" data-apw="'+p.id+'">Pay ▸ wallet</button>':'')+
+            (p.method==='internal'?'<button class="ok" data-api="'+p.id+'">Credit ✓</button>':'')+
+            ((p.method==='bank'||p.method==='crypto')?'<button class="save ghost" data-apm="'+p.id+'" style="flex:1;margin-top:0">Mark paid</button>':'')+
+            '<button class="no" data-apr="'+p.id+'">Reject</button>'+
+          '</div></div>';
+      });
+    }
+    if(!SRV_AGENTS.length){ h+='<div class="card"><div class="empty">No agents yet — tap ＋ New agent.<br>(If adding errors, run the agents SQL first.)</div></div>'; return h; }
+    SRV_AGENTS.forEach(function(a){
+      var code=a.code, open=(AGENT_OPEN===code);
+      var links=SRV_ALINKS.filter(function(l){ return l.agent_code===code; });
+      var c=agentCommission(code,rg.lo,rg.hi);
+      var esc=function(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');};
+      h+='<div class="card">'+
+        '<div class="row" data-agopen="'+esc(code)+'" style="border:none;padding:0 0 6px;cursor:pointer"><b>'+(a.name||code)+' <span class="muted" style="font-weight:600;font-size:11px">'+(open?'▲':'▼')+'</span></b>'+
+        '<b class="'+(c.total>=0?'pos':'neg')+'">'+(c.total<0?'-':'')+usd(Math.abs(c.total))+'</b></div>'+
+        '<div class="req-meta">'+code+' · PIN '+(a.pin||'—')+' · '+(a.email||'')+' · '+links.length+' customer(s) · '+c.n+' trades</div>';
+      if(open){
+        // Shareable signup link — new customers auto-link to this agent.
+        var refUrl=location.href.replace(/[^\/]*(\?.*)?(#.*)?$/,'')+'signup.html?ref='+code;
+        h+='<div class="lbl" style="margin-top:10px">Referral link · tap to copy &amp; send to customers</div>'+
+          '<div class="req-addr" data-copy="'+esc(refUrl)+'">'+refUrl+'</div>';
+        h+='<div class="row" style="margin-top:6px"><span>FX · '+(Math.round(c.fxLots*100)/100)+' lots × $'+(+a.fx_per_lot||0)+'</span><b class="pos">'+usd(c.cFx)+'</b></div>'+
+          '<div class="row"><span>Crypto · fees '+usd(c.cryptoFees)+' × '+(+a.crypto_fee_pct||0)+'%</span><b class="pos">'+usd(c.cCr)+'</b></div>'+
+          '<div class="row"><span>Sports · pool net '+(c.sportsNet<0?'-':'')+usd(Math.abs(c.sportsNet))+' × '+(+a.sports_net_pct||0)+'%</span><b class="'+(c.cSp>=0?'pos':'neg')+'">'+(c.cSp<0?'-':'')+usd(Math.abs(c.cSp))+'</b></div>'+
+          (c.cSp<0?'<div class="hint" style="color:#c0392b">Sports pool is negative (customers won) — carry it over; pay $0 this period.</div>':'');
+        // Commission money summary: earned + manual adjustments − payouts = available.
+        var pays=SRV_APAY.filter(function(p){ return p.agent_code===code; });
+        var adjA=0, paidA=0, pendA=0;
+        pays.forEach(function(p){ if(p.method==='adjust'){ if(p.status==='approved')adjA+=(+p.amount||0); }
+          else if(p.status==='approved')paidA+=(+p.amount||0); else if(p.status==='pending')pendA+=(+p.amount||0); });
+        var availA=Math.max(0, Math.max(0,c.total)+adjA-paidA-pendA);
+        h+=(adjA!==0?('<div class="row"><span>Adjustments</span><b class="'+(adjA>=0?'pos':'neg')+'">'+(adjA<0?'-':'+')+usd(Math.abs(adjA))+'</b></div>'):'')+
+          '<div class="row"><span>Paid out'+(pendA>0?(' · pending '+usd(pendA)):'')+'</span><b>'+usd(paidA)+'</b></div>'+
+          '<div class="row"><span><b>Available to withdraw</b></span><b class="pos">'+usd(availA)+'</b></div>'+
+          '<div class="lbl" style="margin-top:14px">Adjust commission (+ bonus / − deduct)</div>'+
+          '<div style="display:flex;gap:8px;margin-top:2px">'+
+          '<input class="in" id="ag_adj_'+esc(code)+'" type="number" step="0.01" placeholder="+100 or -50" style="margin-top:0;flex:1">'+
+          '<input class="in" id="ag_adjr_'+esc(code)+'" placeholder="Reason (e.g. June bonus)" style="margin-top:0;flex:2">'+
+          '<button class="ok" data-agadj="'+esc(code)+'" style="border:none;border-radius:4px;padding:0 14px;font:700 12px system-ui;cursor:pointer">Apply</button></div>'+
+          '<div class="lbl" style="margin-top:12px">Linked customers</div>';
+        if(!links.length) h+='<div class="req-meta" style="margin:4px 0">None yet.</div>';
+        links.forEach(function(l){ h+='<div class="row"><span>'+(custName(l.cust_id)||l.cust_id)+' <span class="muted">· '+l.cust_id+'</span></span>'+
+          '<span><b>'+(+l.share||100)+'%</b> <button class="save ghost" data-aglinkdel="'+l.id+'" style="margin:0 0 0 8px;padding:5px 10px;font-size:11px">✕</button></span></div>'; });
+        h+='<div style="display:flex;gap:8px;margin-top:8px">'+
+          '<input class="in" id="ag_lc_'+esc(code)+'" placeholder="Customer ID (P-1234)" style="margin-top:0;flex:2">'+
+          '<input class="in" id="ag_ls_'+esc(code)+'" type="number" placeholder="%" value="100" style="margin-top:0;flex:1">'+
+          '<button class="ok" data-aglink="'+esc(code)+'" style="border:none;border-radius:4px;padding:0 14px;font:700 12px system-ui;cursor:pointer">Link</button></div>'+
+          '<div class="lbl" style="margin-top:14px">Rates</div>'+
+          '<div style="display:flex;gap:8px">'+
+          '<span style="flex:1"><label class="lbl">FX $/lot</label><input class="in" id="ag_fx_'+esc(code)+'" type="number" step="0.5" value="'+(+a.fx_per_lot||0)+'" style="margin-top:2px"></span>'+
+          '<span style="flex:1"><label class="lbl">Crypto %</label><input class="in" id="ag_cr_'+esc(code)+'" type="number" step="1" value="'+(+a.crypto_fee_pct||0)+'" style="margin-top:2px"></span>'+
+          '<span style="flex:1"><label class="lbl">Sports %</label><input class="in" id="ag_sp_'+esc(code)+'" type="number" step="1" value="'+(+a.sports_net_pct||0)+'" style="margin-top:2px"></span></div>'+
+          '<div class="btns"><button class="ok" data-agsave="'+esc(code)+'">Save rates</button><button class="save ghost" data-agpin="'+esc(code)+'" style="flex:1;margin-top:0">Reset PIN</button></div>'+
+          '<button class="no" data-agdel="'+esc(code)+'" style="width:100%;margin-top:8px">Delete agent</button>';
+      }
+      h+='</div>';
+    });
+    h+='<div class="hint" style="margin:0 14px 10px">Agents sign in at <b>agent.html</b> with their code + PIN to see their own commission. Crypto fee recording: coming with the crypto P&amp;L upgrade.</div>';
+    return h;
+  }
+  // "+ New agent" → small popup (survives the 3s re-render since it lives on <body>).
+  function agentPopup(){
+    if(document.getElementById('agPop')) return;
+    var ov=document.createElement('div');
+    ov.id='agPop';
+    ov.style.cssText='position:fixed;inset:0;z-index:1500;background:rgba(15,27,45,.45);display:flex;align-items:center;justify-content:center;padding:24px';
+    ov.innerHTML='<div style="background:#fff;border:1px solid #E6EAF0;border-radius:4px;width:100%;max-width:340px;padding:16px" onclick="event.stopPropagation()">'+
+      '<div style="font:800 14px system-ui;margin-bottom:10px">New agent</div>'+
+      '<label class="lbl">Name</label><input class="in" id="agp_name" placeholder="Agent name" autocomplete="off">'+
+      '<label class="lbl" style="display:block;margin-top:8px">Email</label><input class="in" id="agp_email" placeholder="agent@email.com" autocomplete="off">'+
+      '<div class="btns"><button class="ok" id="agp_ok">Add</button><button class="no" id="agp_no">Cancel</button></div>'+
+      '<div class="hint">Code &amp; PIN auto-generated · default rates: FX $5/lot · Crypto 20% of fees · Sports 30% of pool net loss.</div></div>';
+    ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+    document.body.appendChild(ov);
+    document.getElementById('agp_no').onclick=function(){ ov.remove(); };
+    document.getElementById('agp_ok').onclick=function(){ agentAdd(ov); };
+    setTimeout(function(){ var n=document.getElementById('agp_name'); if(n)n.focus(); },50);
+  }
+  function agentAdd(ov){
+    var nm=(document.getElementById('agp_name').value||'').trim(), em=(document.getElementById('agp_email').value||'').trim();
+    if(!nm){ toast('Enter the agent\'s name',true); return; }
+    var code='AG-'+Math.floor(1000+Math.random()*9000), pin=String(Math.floor(1000+Math.random()*9000));
+    AlpexaSync.db.from('agents').insert({code:code,name:nm,email:em,pin:pin,status:'active',fx_per_lot:5,crypto_fee_pct:20,sports_net_pct:30}).then(function(r){
+      if(r&&r.error){ toast('Error: '+r.error.message+' (run the agents SQL?)',true); return; }
+      try{ logAction('agent_add', code, nm); }catch(e){}
+      if(ov)ov.remove();
+      toast('Agent added ✓ '+code+' · PIN '+pin); AGENT_OPEN=code; pullAgents();
+    },function(){ toast('Add failed',true); });
+  }
+  function agentLink(code){
+    var cid=(val('ag_lc_'+code)||'').trim().toUpperCase(), sh=parseFloat(val('ag_ls_'+code)); if(isNaN(sh)||sh<=0||sh>100)sh=100;
+    if(!cid){ toast('Enter a customer ID',true); return; }
+    // Case-insensitive match → store the canonical ID from the server.
+    var canon=null; SRV_PLAYERS.forEach(function(p){ if((p.cust_id||'').toUpperCase()===cid)canon=p.cust_id; });
+    if(!canon){ toast('No customer with ID '+cid+' — check the Players tab',true); return; }
+    var dup=false; SRV_ALINKS.forEach(function(l){ if(l.agent_code===code && l.cust_id===canon)dup=true; });
+    if(dup){ toast('Already linked to this agent',true); return; }
+    AlpexaSync.db.from('agent_links').insert({agent_code:code,cust_id:canon,share:sh}).then(function(r){
+      if(r&&r.error){ toast('Error: '+r.error.message,true); return; }
+      try{ logAction('agent_link', canon, code+' · '+sh+'%'); }catch(e){}
+      toast('Linked ✓'); pullAgents();
+    },function(){ toast('Link failed',true); });
+  }
+  function agentResetPin(code){
+    var pin=String(Math.floor(1000+Math.random()*9000));
+    if(!confirm('Reset PIN for '+agentName(code)+' ('+code+')?\nThe new PIN will be '+pin+' — give it to the agent.')) return;
+    AlpexaSync.db.from('agents').update({pin:pin}).eq('code',code).then(function(r){
+      if(r&&r.error){ toast('Error: '+r.error.message,true); return; }
+      try{ logAction('agent_pin_reset', code, 'new PIN issued'); }catch(e){}
+      toast('New PIN for '+code+': '+pin); pullAgents();
+    },function(){ toast('Failed',true); });
+  }
+  function agentAdjust(code){
+    var amt=parseFloat(val('ag_adj_'+code)), reason=val('ag_adjr_'+code)||'';
+    if(isNaN(amt)||!amt){ toast('Enter an amount — use a minus sign to deduct',true); return; }
+    amt=Math.round(amt*100)/100;
+    if(!confirm((amt>0?'Add ':'Deduct ')+usd(Math.abs(amt))+(amt>0?' to ':' from ')+agentName(code)+'\'s commission?'+(reason?('\nReason: '+reason):''))) return;
+    AlpexaSync.db.from('agent_payouts').insert({agent_code:code,amount:amt,method:'adjust',dest:reason,status:'approved'}).then(function(r){
+      if(r&&r.error){ toast('Error: '+r.error.message,true); return; }
+      try{ logAction('agent_adjust', code, (amt>0?'+':'')+usd(amt)+(reason?(' · '+reason):'')); }catch(e){}
+      toast('Adjusted ✓'); pullAgents();
+    },function(){ toast('Failed',true); });
+  }
+  function agentSave(code){
+    var patch={ fx_per_lot:parseFloat(val('ag_fx_'+code))||0, crypto_fee_pct:parseFloat(val('ag_cr_'+code))||0, sports_net_pct:parseFloat(val('ag_sp_'+code))||0 };
+    AlpexaSync.db.from('agents').update(patch).eq('code',code).then(function(r){
+      if(r&&r.error){ toast('Error: '+r.error.message,true); return; }
+      try{ logAction('agent_rates', code, JSON.stringify(patch)); }catch(e){}
+      toast('Rates saved ✓'); pullAgents();
+    },function(){ toast('Save failed',true); });
+  }
+  function agentDel(code){
+    if(!confirm('Delete agent '+code+'? Their customer links are removed too (customers stay).')) return;
+    AlpexaSync.db.from('agent_links').delete().eq('agent_code',code).then(function(){
+      AlpexaSync.db.from('agents').delete().eq('code',code).then(function(r){
+        if(r&&r.error){ toast('Error: '+r.error.message,true); return; }
+        try{ logAction('agent_del', code, ''); }catch(e){}
+        AGENT_OPEN=null; toast('Agent deleted ✓'); pullAgents();
+      },function(){ toast('Delete failed',true); });
+    },function(){ toast('Delete failed',true); });
+  }
+  // Global controls shared with all apps (e.g. the trading-halt kill switch).
+  var CONTROLS={};
+  function pullControls(){ if(!window.AlpexaSync||!AlpexaSync.db) return;
+    AlpexaSync.db.from('controls').select('*').then(function(r){ if(r&&r.data){ var m={}; r.data.forEach(function(x){ m[x.key]=x.val; }); CONTROLS=m; if(cur==='config'&&!busyEditing())render(); } },function(){}); }
+  function setHalt(v){
+    if(v==='1' && !confirm('HALT all trading now? New orders/bets get blocked in every app.')) return;
+    if(v==='0' && !confirm('Resume trading? Customers can place orders again.')) return;
+    AlpexaSync.db.from('controls').upsert({key:'trading_halt',val:v,updated_at:new Date().toISOString()},{onConflict:'key'}).then(function(r){
+      if(r&&r.error){ toast('Error: '+r.error.message+' (run the controls SQL?)',true); return; }
+      CONTROLS.trading_halt=v; try{ logAction(v==='1'?'trading_halt':'trading_resume','',''); }catch(e){}
+      toast(v==='1'?'🛑 Trading HALTED — apps update in ~5s':'▶ Trading resumed'); render();
+    },function(){ toast('Failed',true); });
+  }
+  function setLiveBetting(v){
+    if(v==='1' && !confirm('Turn LIVE (in-play) betting ON?\nGames auto-suspend on each score change (~15s) and when odds are stale — anti-arbitrage.')) return;
+    if(v==='0' && !confirm('Turn live betting OFF? Customers can only bet pre-match.')) return;
+    AlpexaSync.db.from('controls').upsert({key:'live_betting',val:v,updated_at:new Date().toISOString()},{onConflict:'key'}).then(function(r){
+      if(r&&r.error){ toast('Error: '+r.error.message+' (run the controls SQL?)',true); return; }
+      CONTROLS.live_betting=v; try{ logAction(v==='1'?'live_betting_on':'live_betting_off','',''); }catch(e){}
+      toast(v==='1'?'🟢 Live betting ON — apps update in ~5s':'⚪ Live betting OFF'); render();
+    },function(){ toast('Failed',true); });
+  }
+  // Operator settings live in `controls` (server) — single source of truth, shared
+  // across manager devices and read by the apps. cnum reads a server value with a
+  // default; setControl writes it (admin-only via RLS, so customers can't tamper).
+  function cnum(k,def){ var v=CONTROLS&&CONTROLS[k]; return (v==null||v==='')?def:(+v||0); }
+  function setControl(k,v){ if(!window.AlpexaSync||!AlpexaSync.db) return; CONTROLS[k]=String(v);
+    AlpexaSync.db.from('controls').upsert({key:k,val:String(v),updated_at:new Date().toISOString()},{onConflict:'key'}).then(function(r){ if(r&&r.error) toast('Save failed: '+r.error.message,true); },function(){ toast('Save failed',true); }); }
+  // ── Admin authentication (Stage A for RLS) ──
+  // The back office signs in as a real Supabase admin account so AlpexaSync's
+  // queries carry an admin JWT — this is what keeps full access AFTER RLS is
+  // locked. PIN still gates local access. Nothing breaks while RLS is open.
+  var ADMIN_AUTH={loaded:false,email:null,uid:null,isAdmin:false};
+  function pullAdminAuth(){
+    if(!window.AlpexaSync||!AlpexaSync.db||!AlpexaSync.db.auth) return;
+    AlpexaSync.db.auth.getUser().then(function(r){
+      var u=r&&r.data&&r.data.user;
+      ADMIN_AUTH.uid=u?u.id:null; ADMIN_AUTH.email=u?u.email:null; ADMIN_AUTH.loaded=true;
+      if(!u){ ADMIN_AUTH.isAdmin=false; if(cur==='config')render(); return; }
+      AlpexaSync.db.rpc('is_admin').then(function(rr){
+        ADMIN_AUTH.isAdmin=!!(rr&&rr.data===true); if(cur==='config')render();
+      },function(){ ADMIN_AUTH.isAdmin=false; if(cur==='config')render(); });
+    },function(){});
+  }
+  function adminSignIn(){
+    var email=(val('adminEmail')||'').trim(), pw=val('adminPw')||'';
+    if(!email||!pw){ toast('Enter admin email and password',true); return; }
+    toast('Signing in…');
+    AlpexaSync.db.auth.signInWithPassword({email:email,password:pw}).then(function(r){
+      if(r&&r.error){ toast('Login failed: '+r.error.message,true); return; }
+      toast('Signed in ✓ — checking admin'); pullAdminAuth(); setTimeout(pullAdminAuth,900);
+    },function(){ toast('Login error',true); });
+  }
+  function adminSignOut(){
+    if(!confirm('Sign the back office out of the admin account?')) return;
+    AlpexaSync.db.auth.signOut().then(function(){ ADMIN_AUTH={loaded:true,email:null,uid:null,isAdmin:false}; toast('Signed out'); render(); },function(){});
+  }
+  function viewConfig(){
+    var aa=ADMIN_AUTH;
+    var adminCard='<div class="sec">Admin account</div>'+
+      '<div class="card"'+(aa.uid&&!aa.isAdmin?' style="border-color:#f1b0b7;background:#fff6f6"':'')+'>'+
+      (aa.uid
+        ? '<div class="row" style="border:none;padding:0 0 6px"><span><b>Signed in</b><div class="req-meta" style="margin:2px 0 0">'+(aa.email||'')+'</div></span><b class="'+(aa.isAdmin?'pos':'neg')+'">'+(aa.isAdmin?'ADMIN ✓':'NOT ADMIN')+'</b></div>'+
+          (aa.isAdmin
+            ? '<div class="hint">Authenticated as an admin — full access stays after RLS is locked.</div>'
+            : '<div class="hint" style="color:#c0392b">This account isn\'t in the admins table. Run the admins SQL with this email, then Sign out &amp; back in.</div>')+
+          '<button class="save ghost" id="adminOut" style="margin-top:6px;width:100%">Sign out</button>'
+        : '<div class="lbl">Sign in as the admin account (do this before RLS lockdown)</div>'+
+          '<input class="in" id="adminEmail" placeholder="admin email" autocomplete="off" spellcheck="false">'+
+          '<input class="in" id="adminPw" type="password" placeholder="password" style="margin-top:6px">'+
+          '<button class="save" id="adminIn" style="margin-top:6px;width:100%">Sign in</button>'+
+          '<div class="hint">Establishes the Supabase admin session this back office uses. PIN still gates local access; RLS is still open so nothing changes yet.</div>'
+      )+'</div>';
+    var halted=(CONTROLS&&CONTROLS.trading_halt==='1');
+    return adminCard+'<div class="sec">Emergency</div>'+
+      '<div class="card"'+(halted?' style="border-color:#f1b0b7;background:#fff6f6"':'')+'>'+
+        '<div class="row" style="border:none;padding:0 0 6px"><span><b>🛑 Halt all trading</b>'+
+        '<div class="req-meta" style="margin:2px 0 0">Instantly blocks NEW orders/bets in all 3 apps. Open positions &amp; withdrawals are unaffected.</div></span>'+
+        '<b class="'+(halted?'neg':'pos')+'">'+(halted?'HALTED':'LIVE')+'</b></div>'+
+        '<button class="'+(halted?'ok':'no')+'" data-halt="'+(halted?'0':'1')+'" style="width:100%">'+(halted?'▶ Resume trading':'🛑 HALT all trading now')+'</button>'+
+        '<div class="hint">Use the moment something looks wrong (bad prices, abuse). Takes effect on every app within ~5s.</div></div>'+
+      (function(){ var lb=(CONTROLS&&CONTROLS.live_betting==='1');
+        return '<div class="sec">Sports · Live (in-play) betting</div>'+
+        '<div class="card">'+
+          '<div class="row" style="border:none;padding:0 0 6px"><span><b>'+(lb?'🟢 Live betting ON':'⚪ Live betting OFF')+'</b>'+
+          '<div class="req-meta" style="margin:2px 0 0">When ON, customers can bet on in-progress games. Anti-arbitrage: each game auto-suspends ~15s on every score change, and when our odds go stale.</div></span>'+
+          '<b class="'+(lb?'pos':'neg')+'">'+(lb?'ON':'OFF')+'</b></div>'+
+          '<button class="'+(lb?'no':'ok')+'" data-live="'+(lb?'0':'1')+'" style="width:100%">'+(lb?'⚪ Turn live betting OFF':'🟢 Turn live betting ON')+'</button>'+
+          '<div class="hint">Pre-match betting always works. This switch only controls in-play. Updates apps within ~5s.</div></div>';
+      })()+
+      '<div class="sec">Limits (#5)</div>'+
+      '<div class="card">'+cfgRow('Max bet (USDT)','cfgMaxBet',cnum('maxBet',5000))+cfgRow('Max deposit (USDT)','cfgMaxDep',cnum('maxDeposit',50000))+cfgRow('Max withdrawal (USDT)','cfgMaxWd',cnum('maxWithdraw',50000))+
+        '<button class="save" id="saveLimits">Save limits</button><div class="hint">Per-request caps (demo — wired to app next).</div></div>'+
+      '<div class="sec">Lines / margin (#9)</div>'+
+      '<div class="card">'+cfgRow('House margin / vig (%)','cfgMargin',cnum('margin',5))+'<button class="save" id="saveMargin">Save margin</button>'+
+        '<div class="hint">Your built-in edge. (Odds currently come from the best book feed.)</div></div>'+
+      '<div class="sec">Promotions (#10)</div>'+
+      '<div class="card">'+cfgRow('Loss cashback (%)','cfgCashback',cnum('cashback',5))+'<button class="save" id="savePromo">Save promo</button>'+
+        '<div class="hint">Players earn this % of losses back as credit.</div></div>'+
+      '<div class="sec">Payments</div>'+
+      '<div class="card"><div class="lbl">Company deposit wallet · USDT (ERC-20)</div>'+
+        '<input class="in" id="coAddrIn" spellcheck="false" autocomplete="off">'+
+        '<div style="display:flex;gap:8px"><button class="save" id="coSave">Save</button><button class="save ghost" id="coCopy">Copy</button></div>'+
+        cfgRow('Withdrawal network fee (USDT)','cfgFee',cnum('wdFee',5))+'<button class="save" id="saveFee">Save fee</button>'+
+        '<div class="hint">Match Coinbase\'s current send fee.</div></div>';
+      // "Reset all demo data" REMOVED: it was a leftover from the localStorage-money era. Money
+      // is server-only now, so it reset nothing real — but it cleared every alpexa* localStorage
+      // key INCLUDING the back office's own admin session (alpexa-admin-auth), silently logging
+      // the operator out → empty back office. A footgun with a misleading "$50,000 fresh" message.
+  }
+
+  function toast(msg,bad){var t=document.getElementById('mtoast');if(!t){t=document.createElement('div');t.id='mtoast';t.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99999;padding:10px 16px;border-radius:4px;font:600 13px system-ui;color:#fff;max-width:90%;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.25)';document.body.appendChild(t);}t.textContent=msg;t.style.background=bad?'#C62828':'#1B5E20';t.style.display='block';clearTimeout(window.__mt);window.__mt=setTimeout(function(){t.style.display='none';},3500);}
+  function decide(id,status){
+    var rq=findReq(id);
+    // WITHDRAWAL GUARD: block paying out an integrity-flagged account (possible
+    // self-credit / tampering) unless the admin explicitly overrides.
+    if(status==='approved'){
+      var ig=withdrawGuard(rq);
+      if(ig){
+        if(!confirm('🚩 BLOCKED — possible tampering\n\nThis customer\'s balance ('+usd(ig.actual)+') exceeds what their deposits/trades explain ('+usd(ig.explained)+') by '+usd(ig.gap)+'.\n\nApproving this WITHDRAWAL could pay out funds they did NOT legitimately earn. Review the Integrity check on their profile first.\n\nApprove anyway? (only if you are sure)')) {
+          try{ logAction('blocked_withdraw', rq?rq.custId:'', 'withdrawal approval blocked — integrity 🚩 gap '+usd(ig.gap)+' (#'+id+')'); }catch(e){}
+          toast('Blocked — account flagged (🚩). Not approved.',true); return;
+        }
+      }
+    }
+    try{ logAction(status==='approved'?'approve':'reject', rq?rq.custId:'', (rq?(typeLabel(rq.type)+' '+usd(rq.amount)):'')+' (#'+id+')'); }catch(e){}
+    // local copy (this device's own requests, if any)
+    var loc=getJSON('alpexa.withdrawals',[]); for(var i=0;i<loc.length;i++){if(loc[i].id===id){loc[i].status=status;loc[i].decidedTs=Date.now();break;}} setJSON('alpexa.withdrawals',loc);
+    // server cache (so the UI updates instantly) + server write (so the customer's app sees it)
+    for(var j=0;j<SRV_REQS.length;j++){if(SRV_REQS[j].local_id===id){SRV_REQS[j].status=status;SRV_REQS[j].decided_at=new Date().toISOString();break;}}
+    render();
+    if(window.AlpexaSync&&AlpexaSync.db){
+      AlpexaSync.setStatus(id,status).then(function(res){
+        if(res&&res.error){ toast('Server error: '+res.error.message,true); }
+        else if(res&&res.data&&res.data.length===0){ toast('⚠ No matching server row (id '+id+')',true); }
+        else { toast(status==='approved'?'Approved on server ✓':'Rejected on server ✓'); }
+        pullServer();
+      });
+    } else { toast('⚠ Not connected to server',true); }
+  }
+  // Manual payout: record the on-chain tx hash and approve the withdrawal.
+  function markPaid(id, txOverride){
+    // WITHDRAWAL GUARD: same tampering check before a manual payout.
+    var _ig=withdrawGuard(findReq(id));
+    if(_ig){ if(!confirm('🚩 BLOCKED — possible tampering\n\nBalance ('+usd(_ig.actual)+') exceeds explained ('+usd(_ig.explained)+') by '+usd(_ig.gap)+'. Paying out could release funds not legitimately earned.\n\nPay anyway? (only if sure)')){ toast('Blocked — account flagged (🚩).',true); return; } }
+    var el=document.getElementById('tx_'+id); var tx=(txOverride!=null)?String(txOverride):(el?(el.value||'').trim():'');
+    if(tx && !/^0x[0-9a-fA-F]{6,}$/.test(tx)){ if(!confirm('That doesn\'t look like a tx hash (0x…). Mark paid anyway?')) return; }
+    for(var j=0;j<SRV_REQS.length;j++){ if(SRV_REQS[j].local_id===id){ SRV_REQS[j].status='approved'; SRV_REQS[j].txid=tx; SRV_REQS[j].decided_at=new Date().toISOString(); break; } }
+    var loc=getJSON('alpexa.withdrawals',[]); for(var i=0;i<loc.length;i++){ if(loc[i].id===id){ loc[i].status='approved'; loc[i].txid=tx; loc[i].decidedTs=Date.now(); break; } } setJSON('alpexa.withdrawals',loc);
+    render();
+    try{ var rq=findReq(id); logAction('approve', rq?rq.custId:'', 'withdraw '+(rq?usd(rq.amount):'')+(tx?(' · tx '+tx.slice(0,12)+'…'):' (no txid)')); }catch(e){}
+    if(window.AlpexaSync&&AlpexaSync.db){
+      AlpexaSync.db.from('requests').update({status:'approved',txid:tx,decided_at:new Date().toISOString()}).eq('local_id',id).then(function(r){
+        if(r&&r.error)toast('Server error: '+r.error.message,true); else toast('Marked paid ✓ — synced'); pullServer();
+      },function(){ toast('Save failed',true); });
+    } else { toast('⚠ Not connected to server',true); }
+  }
+  function copy(t){try{if(navigator.clipboard)navigator.clipboard.writeText(t);}catch(e){}}
+  function flash(b,txt){if(!b)return;var o=b.textContent;b.textContent=txt||'Saved ✓';setTimeout(function(){b.textContent=o;},1200);}
+  function val(id){var e=document.getElementById(id);return e?(e.value||'0'):'0';}
+  function wire(){
+    document.querySelectorAll('[data-ok]').forEach(function(b){b.onclick=function(){decide(b.getAttribute('data-ok'),'approved');};});
+    document.querySelectorAll('[data-no]').forEach(function(b){b.onclick=function(){decide(b.getAttribute('data-no'),'rejected');};});
+    document.querySelectorAll('[data-paid]').forEach(function(b){b.onclick=function(){markPaid(b.getAttribute('data-paid'));};});
+    document.querySelectorAll('[data-copy]').forEach(function(b){b.onclick=function(){copy(b.getAttribute('data-copy'));flash(b,'Copied!');};});
+    document.querySelectorAll('[data-edit]').forEach(function(b){b.onclick=function(){EDIT_ID=b.getAttribute('data-edit');render();};});
+    document.querySelectorAll('[data-save]').forEach(function(b){b.onclick=function(){editSave(b.getAttribute('data-save'));};});
+    document.querySelectorAll('[data-del]').forEach(function(b){b.onclick=function(){editDelete(b.getAttribute('data-del'));};});
+    document.querySelectorAll('[data-cancel]').forEach(function(b){b.onclick=function(){EDIT_ID=null;render();};});
+    var hs=document.getElementById('histSearch'); if(hs){hs.oninput=function(){HIST_FILTER=hs.value;render();var n=document.getElementById('histSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
+    document.querySelectorAll('[data-hs]').forEach(function(b){b.onclick=function(){HIST_SERVER=b.getAttribute('data-hs');render();};});
+    var hf=document.getElementById('hsFrom'); if(hf) hf.onchange=function(){ HIST_FROM=this.value; render(); };
+    var ht=document.getElementById('hsTo'); if(ht) ht.onchange=function(){ HIST_TO=this.value; render(); };
+    document.querySelectorAll('[data-hsclear]').forEach(function(b){b.onclick=function(){HIST_FROM='';HIST_TO='';render();};});
+    document.querySelectorAll('[data-hrefresh]').forEach(function(b){b.onclick=function(){toast('Refreshing…');pullSettle();pullServer();pullPlayers();};});
+    document.querySelectorAll('[data-hfil]').forEach(function(b){b.onclick=function(){HIST_SHOWF=!HIST_SHOWF;render();};});
+    document.querySelectorAll('[data-hopen]').forEach(function(b){b.onclick=function(){var k=b.getAttribute('data-hopen');HIST_OPEN=(HIST_OPEN===k?null:k);TRADE_EDIT=null;render();};});
+    document.querySelectorAll('[data-tedit]').forEach(function(b){b.onclick=function(){TRADE_EDIT=b.getAttribute('data-tedit');render();};});
+    document.querySelectorAll('[data-tcancel]').forEach(function(b){b.onclick=function(){TRADE_EDIT=null;render();};});
+    document.querySelectorAll('[data-tsave]').forEach(function(b){b.onclick=function(){tradeSavePnl(b.getAttribute('data-tsave'));};});
+    document.querySelectorAll('[data-tdel]').forEach(function(b){b.onclick=function(){tradeDelete(b.getAttribute('data-tdel'));};});
+    var ps=document.getElementById('plSearch'); if(ps){ps.oninput=function(){PLAYER_FILTER=ps.value;render();var n=document.getElementById('plSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
+    document.querySelectorAll('[data-cust]').forEach(function(b){b.onclick=function(){HIST_FILTER=b.getAttribute('data-cust');cur='history';render();};});
+    document.querySelectorAll('[data-pl]').forEach(function(b){b.onclick=function(){var id=b.getAttribute('data-pl');PLAYER_OPEN=(PLAYER_OPEN===id?null:id);if(PLAYER_OPEN!==id)PLAYER_EDIT=null;else{pullOpenSummary();pullSettle();POS_BY_CUST[id]=undefined;pullCustPos(id);}render();};});
+    document.querySelectorAll('[data-editpl]').forEach(function(b){b.onclick=function(){PLAYER_EDIT=b.getAttribute('data-editpl');render();};});
+    document.querySelectorAll('[data-savepl]').forEach(function(b){b.onclick=function(){savePlayer(b.getAttribute('data-savepl'));};});
+    document.querySelectorAll('[data-bonuspl]').forEach(function(b){b.onclick=function(){giveBonus(b.getAttribute('data-bonuspl'));};});
+    document.querySelectorAll('[data-alpxspl]').forEach(function(b){b.onclick=function(){giveAlpxs(b.getAttribute('data-alpxspl'));};});
+    document.querySelectorAll('[data-halt]').forEach(function(b){b.onclick=function(){setHalt(b.getAttribute('data-halt'));};});
+    document.querySelectorAll('[data-live]').forEach(function(b){b.onclick=function(){setLiveBetting(b.getAttribute('data-live'));};});
+    document.querySelectorAll('[data-cancelpl]').forEach(function(b){b.onclick=function(){PLAYER_EDIT=null;render();};});
+    document.querySelectorAll('[data-delpl]').forEach(function(b){b.onclick=function(){deletePlayer(b.getAttribute('data-delpl'));};});
+    document.querySelectorAll('[data-reopenpl]').forEach(function(b){b.onclick=function(){reopenPlayer(b.getAttribute('data-reopenpl'));};});
+    document.querySelectorAll('[data-agr]').forEach(function(b){b.onclick=function(){AG_RANGE=b.getAttribute('data-agr');render();};});
+    document.querySelectorAll('[data-agopen]').forEach(function(b){b.onclick=function(){var c=b.getAttribute('data-agopen');AGENT_OPEN=(AGENT_OPEN===c?null:c);render();};});
+    document.querySelectorAll('[data-papp]').forEach(function(b){b.onclick=function(){PRICE_APP=b.getAttribute('data-papp');render();};});
+    document.querySelectorAll('[data-pcls]').forEach(function(b){b.onclick=function(){PRICE_CLS=b.getAttribute('data-pcls');render();};});
+    document.querySelectorAll('[data-pmk]').forEach(function(b){b.onclick=function(){var p=(b.getAttribute('data-pmk')||'').split('|');pricingMark(p[0],p[1]);};});
+    var _prf=document.querySelector('[data-prefresh]'); if(_prf)_prf.onclick=function(){ pullLivePrices(); pullPricing(); toast('Live prices & markups refreshed ✓'); };
+    document.querySelectorAll('[data-preset]').forEach(function(b){b.onclick=pricingResetAll;});
+    document.querySelectorAll('[data-spsave]').forEach(function(b){b.onclick=function(){saveSportsMargin();};});
+    document.querySelectorAll('[data-spreset]').forEach(function(b){b.onclick=function(){saveSportsMargin(0);};});
+    var prs=document.getElementById('prSearch'); if(prs){prs.oninput=function(){PRICE_FILTER=prs.value;render();var n=document.getElementById('prSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
+    document.querySelectorAll('[data-agnew]').forEach(function(b){b.onclick=agentPopup;});
+    document.querySelectorAll('[data-apw]').forEach(function(b){b.onclick=function(){agentPayWallet(b.getAttribute('data-apw'));};});
+    document.querySelectorAll('[data-apm]').forEach(function(b){b.onclick=function(){agentPayManual(b.getAttribute('data-apm'));};});
+    document.querySelectorAll('[data-api]').forEach(function(b){b.onclick=function(){agentPayInternal(b.getAttribute('data-api'));};});
+    document.querySelectorAll('[data-apr]').forEach(function(b){b.onclick=function(){if(confirm('Reject this payout request?'))apSet(b.getAttribute('data-apr'),{status:'rejected'},'Rejected ✓');};});
+    document.querySelectorAll('[data-agadj]').forEach(function(b){b.onclick=function(){agentAdjust(b.getAttribute('data-agadj'));};});
+    document.querySelectorAll('[data-agpin]').forEach(function(b){b.onclick=function(){agentResetPin(b.getAttribute('data-agpin'));};});
+    document.querySelectorAll('[data-psort]').forEach(function(b){b.onclick=function(){var s=b.getAttribute('data-psort');
+      if(PLAYER_SORT===s){ PLAYER_DIR=-PLAYER_DIR; }
+      else { PLAYER_SORT=s; PLAYER_DIR=(s==='name'?1:-1); } // name: A→Z · balance/joined: big/new first
+      render();};});
+    document.querySelectorAll('[data-aglink]').forEach(function(b){b.onclick=function(){agentLink(b.getAttribute('data-aglink'));};});
+    document.querySelectorAll('[data-agsave]').forEach(function(b){b.onclick=function(){agentSave(b.getAttribute('data-agsave'));};});
+    document.querySelectorAll('[data-agdel]').forEach(function(b){b.onclick=function(){agentDel(b.getAttribute('data-agdel'));};});
+    document.querySelectorAll('[data-aglinkdel]').forEach(function(b){b.onclick=function(){
+      AlpexaSync.db.from('agent_links').delete().eq('id',b.getAttribute('data-aglinkdel')).then(function(){ toast('Unlinked ✓'); pullAgents(); },function(){ toast('Failed',true); });};});
+    document.querySelectorAll('[data-close]').forEach(function(b){b.onclick=function(){var p=(b.getAttribute('data-close')||'').split('|');sendCommand(p[0],p[1],p[2]);};});
+    document.querySelectorAll('[data-posdel]').forEach(function(b){b.onclick=function(){var p=(b.getAttribute('data-posdel')||'').split('|');posForceDelete(p[0],p[1],p[2]);};});
+    var os=document.getElementById('openSearch'); if(os){os.oninput=function(){OPEN_SEARCH=os.value;render();var n=document.getElementById('openSearch');if(n){n.focus();var v=n.value;n.value='';n.value=v;}};}
+    document.querySelectorAll('[data-ofil]').forEach(function(b){b.onclick=function(){OPEN_SHOWF=!OPEN_SHOWF;render();};});
+    document.querySelectorAll('[data-os]').forEach(function(b){b.onclick=function(){OPEN_SERVER=b.getAttribute('data-os');render();};});
+    document.querySelectorAll('[data-pcust]').forEach(function(b){b.onclick=function(){PLAYER_OPEN=b.getAttribute('data-pcust');PLAYER_FILTER='';cur='players';render();};});
+    document.querySelectorAll('[data-rr]').forEach(function(b){b.onclick=function(){REPORT_RANGE=b.getAttribute('data-rr');if(REPORT_RANGE!=='custom')REPORT_SHOWF=false;render();};});
+    document.querySelectorAll('[data-rfil]').forEach(function(b){b.onclick=function(){REPORT_SHOWF=!REPORT_SHOWF;render();};});
+    document.querySelectorAll('[data-pfil]').forEach(function(b){b.onclick=function(){PLAYERS_SHOWF=!PLAYERS_SHOWF;render();};});
+    document.querySelectorAll('[data-wrefresh]').forEach(function(b){b.onclick=function(){toast('Refreshing chain…');pullWallet(true);pullAcct();};});
+    document.querySelectorAll('[data-wconnect]').forEach(function(b){b.onclick=walletConnect;});
+    document.querySelectorAll('[data-wdisc]').forEach(function(b){b.onclick=function(){WAL.acct=null;WAL.acctEth=null;WAL.acctUsdt=null;render();};});
+    document.querySelectorAll('[data-wpay]').forEach(function(b){b.onclick=function(){payWithWallet(b.getAttribute('data-wpay'));};});
+    var rf=document.getElementById('rpFrom'); if(rf) rf.onchange=function(){ REPORT_FROM=this.value; render(); };
+    var rt=document.getElementById('rpTo'); if(rt) rt.onchange=function(){ REPORT_TO=this.value; render(); };
+    document.querySelectorAll('[data-hedge]').forEach(function(b){b.onclick=function(){var p=(b.getAttribute('data-hedge')||'').split('|');recordHedge(p[0],p[1],+p[2],+p[3]);};});
+    document.querySelectorAll('[data-rg]').forEach(function(b){b.onclick=function(){var g=b.getAttribute('data-rg');RISK_OPEN=(RISK_OPEN===g?null:g);render();};});
+    document.querySelectorAll('[data-wsrv]').forEach(function(b){b.onclick=function(){WATCH_SRV=b.getAttribute('data-wsrv');render();};});
+    document.querySelectorAll('[data-wsev]').forEach(function(b){b.onclick=function(){WATCH_SEV=+b.getAttribute('data-wsev');render();};});
+    var g;
+    if(g=document.getElementById('kycToggle'))g.onclick=function(){var k=(CONTROLS&&CONTROLS.kyc)||'pending';setControl('kyc',k==='verified'?'pending':'verified');render();};
+    if(g=document.getElementById('rgSave'))g.onclick=function(){var st=getJSON('alpexaSettings',{});st.depositLimit=parseFloat(val('rgDep'))||0;st.lossLimit=parseFloat(val('rgLoss'))||0;var d=parseFloat(val('rgSE'))||0;st.selfExcludeUntil=d>0?Date.now()+d*86400000:0;setJSON('alpexaSettings',st);flash(g,'Saved ✓');render();};
+    if(g=document.getElementById('adminIn'))g.onclick=function(){adminSignIn();};
+    if(g=document.getElementById('adminOut'))g.onclick=function(){adminSignOut();};
+    if(g=document.getElementById('saveLimits'))g.onclick=function(){setControl('maxBet',val('cfgMaxBet'));setControl('maxDeposit',val('cfgMaxDep'));setControl('maxWithdraw',val('cfgMaxWd'));flash(g);};
+    if(g=document.getElementById('saveMargin'))g.onclick=function(){setControl('margin',val('cfgMargin'));flash(g);};
+    if(g=document.getElementById('savePromo'))g.onclick=function(){setControl('cashback',val('cfgCashback'));flash(g);};
+    if(g=document.getElementById('saveFee'))g.onclick=function(){setControl('wdFee',val('cfgFee'));flash(g);};
+    var ai=document.getElementById('coAddrIn'); if(ai)ai.value=CO_ADDR();
+    if(g=document.getElementById('coSave'))g.onclick=function(){var v=(ai.value||'').trim();if(v){setControl('companyAddr',v);localStorage.setItem('alpexa.companyAddr',v);}flash(g);};
+    if(g=document.getElementById('coCopy'))g.onclick=function(){copy((ai.value||'').trim());flash(g,'Copied!');};
+    // resetBtn removed — see the Config view note (footgun that wiped the admin session).
+  }
+
+  // Don't redraw while the operator is mid-edit or typing a search (would lose input).
+  function busyEditing(){ var ae=document.activeElement; if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.tagName==='SELECT')) return true; return (cur==='history' && (EDIT_ID || TRADE_EDIT || (document.activeElement && (document.activeElement.id==='histSearch'||document.activeElement.id==='hsFrom'||document.activeElement.id==='hsTo'||document.activeElement.id==='tEdPnl'||document.activeElement.id==='tEdDetail')))) || (cur==='players' && (PLAYER_EDIT || (document.activeElement && document.activeElement.id==='plSearch'))) || (cur==='bets' && document.activeElement && document.activeElement.id==='openSearch') || (cur==='report' && document.activeElement && (document.activeElement.id==='rpFrom'||document.activeElement.id==='rpTo')) || (cur==='agents' && document.activeElement && String(document.activeElement.id||'').indexOf('ag_')===0) || (cur==='pricing' && document.activeElement && (document.activeElement.id==='prSearch'||document.activeElement.id==='sp_m')); }
+  window.addEventListener('storage',function(e){ if(e.key&&e.key.indexOf('alpexa')===0 && !busyEditing()) render(); });
+  setInterval(function(){ if(cur==='overview'||cur==='approvals'||cur==='risk'||cur==='bets') render(); }, 4000);
+  // Pull every customer's requests from the shared server.
+  function pullServer(){ if(!window.AlpexaSync||!AlpexaSync.db) return; AlpexaSync.pullAll().then(function(rows){ SRV_REQS=rows||[]; if(!busyEditing()) render(); }).catch(function(){}); }
+  pullServer(); pullPlayers(); pullOpenSummary(); pullOnline(); pullSettle(); pullPayments(); pullActivity(); pullAgents(); pullPricing(); pullLivePrices(); pullApiUsage(); pullControls(); pullAdminAuth();
+  setInterval(function(){ if(!document.hidden){ pullServer(); pullPlayers();
+    if(cur==='bets') pullOpenSummary();
+    if(cur==='players'&&PLAYER_OPEN){ pullCustPos(PLAYER_OPEN); pullSettle(); pullPayments(); pullActivity(); }
+    if(cur==='online') pullOnline();
+    if(cur==='overview') pullApiUsage();
+    if(cur==='config') pullControls();
+    if(cur==='report'||cur==='history') pullSettle();
+    if(cur==='agents'){ pullAgents(); pullSettle(); }
+    if(cur==='wallet'){ pullWallet(); }
+    if(cur==='logs') pullLogs();
+    if(cur==='risk') pullRisk();
+    if(cur==='players' && PLAYER_OPEN){ pullOpenSummary(); pullSettle(); }
+  } }, 3000);
+  // M4-3: Supabase Realtime — the server pushes row changes to the back office
+  // the instant they happen (positions, players, requests, settlements, accounts,
+  // controls) instead of waiting for the poll above. The polling stays as a safety
+  // net in case Realtime isn't enabled on a table. Debounced so a burst of rows
+  // triggers a single refresh. Shows a small "● Live" badge once connected.
+  (function(){
+    if(!window.AlpexaSync||!AlpexaSync.db||!AlpexaSync.db.channel) return;
+    var t={};
+    function deb(key,fn){ clearTimeout(t[key]); t[key]=setTimeout(function(){ if(!document.hidden) fn(); },250); }
+    function onPos(){ deb('pos',function(){ pullOpenSummary(); if(cur==='players'&&PLAYER_OPEN) pullCustPos(PLAYER_OPEN); }); }
+    function onPlayers(){ deb('ply',function(){ pullPlayers(); pullOnline(); }); }
+    function onReq(){ deb('req',function(){ pullServer(); }); }
+    function onSettle(){ deb('set',function(){ pullSettle(); }); }
+    function onAcct(){ deb('acc',function(){ pullPlayers(); }); }
+    function onCtrl(){ deb('ctl',function(){ pullControls(); }); }
+    try{
+      AlpexaSync.db.channel('mgr-rt')
+        .on('postgres_changes',{event:'*',schema:'public',table:'positions'},onPos)
+        .on('postgres_changes',{event:'*',schema:'public',table:'players'},onPlayers)
+        .on('postgres_changes',{event:'*',schema:'public',table:'requests'},onReq)
+        .on('postgres_changes',{event:'*',schema:'public',table:'settlements'},onSettle)
+        .on('postgres_changes',{event:'*',schema:'public',table:'accounts'},onAcct)
+        .on('postgres_changes',{event:'*',schema:'public',table:'controls'},onCtrl)
+        .subscribe(function(status){
+          try{ if(status==='SUBSCRIBED'){ var L=document.getElementById('rtLive'); if(!L){ L=document.createElement('div'); L.id='rtLive'; L.textContent='● Live'; L.style.cssText='position:fixed;right:8px;top:8px;z-index:2147483646;background:#0a7d33;color:#fff;font:700 10px system-ui;padding:3px 8px;border-radius:10px;opacity:.9'; document.body.appendChild(L); } } }catch(e){}
+        });
+    }catch(e){}
+  })();
+  render();
+  // Version stamp so we can tell at a glance if the latest manager loaded.
+  (function(){try{var b=document.createElement('div');b.textContent='Mgr v85';
+  b.style.cssText='position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483647;background:#16243F;color:#fff;font:700 11px system-ui;padding:5px 10px;border-radius:4px;opacity:.95;box-shadow:0 3px 10px rgba(0,0,0,.3)';
+  document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .5s';b.style.opacity='0';},3500);setTimeout(function(){b.remove();},4200);}catch(e){}})();
+</script>
+</body>
+</html>

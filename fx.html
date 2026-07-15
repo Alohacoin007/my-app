@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>
+  /* Always open the landing at the TOP (header) — even via the browser Back arrow,
+     bfcache restore, or refresh. Stops the page from restoring the old footer scroll. */
+  try{ if('scrollRestoration' in history) history.scrollRestoration='manual'; }catch(e){}
+  window.addEventListener('pageshow', function(){ try{ window.scrollTo(0,0); }catch(e){} });
+</script>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alpexa FX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#05070f;--surface:#0c1120;--surface2:#141a2c;--line:rgba(255,255,255,.09);
+    --text:#f4f6fb;--muted:#9aa3b8;--accent:#1e40d8;--accent2:#3a5bf0;
+    --font-display:'Space Grotesk',-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  }
+  h1,h2{font-family:var(--font-display)}
+  .kicker{display:inline-flex;align-items:center;gap:11px;font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);margin-bottom:24px}
+  .kicker .kline{width:32px;height:2px;background:#1e40d8;flex:none}
+  *{box-sizing:border-box;margin:0;padding:0}
+  /* ===== Light (white) theme ===== */
+  body.light{--bg:#f4f6fb;--surface:#ffffff;--surface2:#eef1f7;--line:#e7ebf2;--text:#0e1726;--muted:#5a6478}
+  body.light .glow{display:none}
+  body.light::after{background:radial-gradient(1100px 620px at 72% 6%,rgba(30,64,216,.08),transparent 58%),linear-gradient(180deg,#f6f8fd,#eef2f8)}
+  body.light header{background:#fff;backdrop-filter:none}
+  body.light .gradient-text{background:none;-webkit-text-fill-color:var(--text);color:var(--text)}
+  body.light .pill{background:#1e40d8;color:#fff;border:none}
+  body.light .pill:hover{background:#1e40d8;filter:brightness(1.09)}
+  body.light .store{background:#fff;color:var(--text);border:2px solid var(--line);box-shadow:0 4px 14px rgba(16,24,40,.06)}
+  body.light .store .lg{color:var(--text)}
+  body.light .card{background:#fff;border:2px solid var(--line);box-shadow:0 6px 22px rgba(16,24,40,.06)}
+  body.light .vtier{background:#fff;border:2px solid var(--line);box-shadow:0 6px 22px rgba(16,24,40,.06)}
+  body.light .vtier li{color:#3a4658}
+  body.light .vtier .vname{color:var(--text)}
+  body.light .vtier.vtop{border-color:transparent;background:linear-gradient(180deg,rgba(59,130,246,.1),#fff);box-shadow:0 0 0 1px rgba(59,130,246,.3)}
+  body.light .vtier.vtop .vbadge{background:rgba(59,130,246,.14);color:var(--accent)}
+  body.light .ev-card{background:#fff;border:2px solid var(--line);box-shadow:0 6px 22px rgba(16,24,40,.06)}
+  body.light .ev-title{color:var(--text)}
+  body.light .ev-sport{color:#3a4658;background:#eef1f7}
+  body.light .ev-card.feat{border-color:transparent;background:linear-gradient(180deg,rgba(59,130,246,.12),#fff);box-shadow:0 0 0 1px rgba(59,130,246,.3)}
+  body.light .titem{border-right:1px solid rgba(0,0,0,.07)}
+  body.light .cta{background:linear-gradient(135deg,rgba(59,130,246,.12),rgba(124,92,255,.08));border:2px solid var(--line)}
+  body.light .cta p{color:#3a4658}
+  body.light .fb-logo{color:var(--text)}
+  body.light .foot-col a{color:#3a4658}
+  body.light .foot-col a:hover{color:var(--text)}
+  body.light .wordmark{color:rgba(0,0,0,.05)}
+  /* Light phone screen */
+  body.light .screen{background:#fff}
+  body.light .statusbar{background:#fff;color:#0e1726;border-bottom:1px solid var(--line)}
+  body.light .statusbar .time{color:#0e1726}
+  body.light .statusbar .sicons{filter:invert(1) brightness(.25)}
+  body.light .ph-appbar{background:#fff;color:#0e1726;border-bottom:1px solid var(--line)}
+  body.light .ph-appbar .brand{color:#0e1726}
+  body.light .ph-appbar .tabs{color:#6b7686}
+  body.light .ph-appbar .tabs span:first-child{color:#0e1726}
+  body.light .bal-card{background:#fff;color:#0e1726;border-bottom:1px solid var(--line)}
+  body.light .bal-icons{color:#6b7686}
+  body.light .bal-amount{background:linear-gradient(120deg,#0e1726 35%,#1e40d8);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  body.light .bal-chip{color:#3a4658;background:#f2f4f8;border:2px solid var(--line)}
+  body.light .bal-chip b{color:#0e1726}
+  body.light .app-body{background:#fff}
+  body.light .g-card{background:#f7f9fc;border:2px solid var(--line)}
+  body.light .g-league{color:#0e1726}
+  body.light .g-team{color:#0e1726}
+  body.light .g-ab{color:#6b7686;background:#fff;border:2px solid var(--line)}
+  body.light .g-score{color:#0e1726;background:#eef1f7}
+  body.light .o-box{background:#fff;border:2px solid var(--line)}
+  body.light .o-box .ln{color:#6b7686}
+  body.light .pr.pos{color:#16a34a}
+  body.light .pr.neg{color:#3a4658}
+  body.light .app-nav{background:#fff;border-top:1px solid var(--line)}
+  .theme-toggle{width:36px;height:36px;border-radius:50%;border:2px solid var(--line);background:rgba(255,255,255,.06);color:var(--text);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;transition:background .15s}
+  .theme-toggle:hover{background:rgba(255,255,255,.12)}
+  body.light .theme-toggle{background:#eef1f7}
+  body.light .theme-toggle:hover{background:#e3e8f0}
+  html{scroll-behavior:smooth}
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--text);background:var(--bg);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  a{color:inherit;text-decoration:none}
+  button{font-family:inherit;cursor:pointer}
+  .eyebrow{display:none}
+  .gradient-text{background:none;-webkit-text-fill-color:#fff;color:#fff}
+
+  /* glow */
+  .glow{position:fixed;inset:0;z-index:-2;pointer-events:none}
+  .glow::before{content:"";position:absolute;top:-200px;left:50%;transform:translateX(-50%);width:900px;height:700px;background:radial-gradient(circle at center,rgba(59,130,246,.35),rgba(124,92,255,.12) 40%,transparent 70%);filter:blur(20px)}
+  body::after{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(1100px 620px at 72% 6%,rgba(30,64,216,.20),transparent 58%),linear-gradient(180deg,#0a0d17,#070a12 58%,#05070d)}
+
+  /* Header */
+  header{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:20px;padding:14px 26px;background:rgba(5,7,15,.6);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+  /* Header matches the Markets page (markets.html) so switching pages shows an identical bar. */
+  .logo{font-size:16px;font-weight:800;letter-spacing:.4px;display:flex;align-items:center;gap:10px}
+  .logo .mark{width:26px;height:26px;border-radius:6px;background:#1e40d8;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff;letter-spacing:0;flex:none}
+  nav{display:flex;gap:26px;flex:1}
+  nav a{color:var(--muted);font-size:14px;transition:color .15s}
+  nav a:hover{color:var(--text)}
+  /* Identical to the Markets page nav (markets.html) so the bar doesn't shift between pages. */
+  .cmenu{display:flex;gap:26px;flex:1}
+  .cmenu a{color:#d4dbe8;font-size:14px;font-weight:600;line-height:normal;padding:4px 0;border-bottom:2px solid transparent;
+    transition:color .15s;white-space:nowrap;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  .cmenu a:hover{color:#fff}
+  body.light .cmenu a{color:#5a6478}
+  body.light .cmenu a:hover{color:#0e1726}
+  @media(max-width:820px){ .cmenu{display:none} header>a[href*="login.html"]{margin-left:auto} }
+  .pill{display:inline-flex;align-items:center;gap:7px;background:#1e40d8;color:#fff;font-size:13px;font-weight:600;letter-spacing:.2px;padding:9px 16px;border:none;border-radius:0;transition:filter .15s,transform .05s}
+  .pill:hover{filter:brightness(1.09)}
+  .pill:active{transform:translateY(1px)}
+  .pill:hover{background:rgba(255,255,255,.12);border-color:rgba(123,150,255,.5)}
+  .pill .arrow{width:20px;height:20px;border-radius:4px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center}
+  .pill .arrow svg{display:block}
+
+  /* Hero */
+  .hero{max-width:1120px;margin:0 auto;padding:80px 28px 64px;display:grid;grid-template-columns:1.1fr .9fr;gap:56px;align-items:center}
+  .hero h1{font-size:clamp(48px,7.8vw,88px);font-weight:700;letter-spacing:-2.8px;line-height:1.0;margin-bottom:22px}
+  .hero .sub{color:var(--muted);font-size:clamp(15px,1.7vw,17px);line-height:1.6;margin-bottom:30px;max-width:400px}
+  .hero-cta{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+  .cta-primary{background:#1e40d8;color:#fff;font-size:15px;font-weight:700;letter-spacing:.2px;padding:15px 30px;border:none;border-radius:0;cursor:pointer;transition:filter .15s,transform .05s}
+  .cta-primary:hover{filter:brightness(1.09)}
+  .cta-primary:active{transform:translateY(1px)}
+  .cta-secondary{font-size:14px;font-weight:600;color:var(--muted);transition:color .15s}
+  .cta-secondary:hover{color:#fff}
+  .stores{display:flex;gap:12px;flex-wrap:wrap}
+  .store{display:inline-flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);border:2px solid var(--line);color:#fff;padding:12px 20px;border-radius:14px;transition:background .15s}
+  .store:hover{background:rgba(255,255,255,.12)}
+  .store .st{font-size:10px;color:var(--muted);line-height:1.1}
+  .store .lg{font-size:16px;font-weight:600;line-height:1.1}
+
+  /* Phone */
+  .phone-wrap{display:flex;justify-content:center;position:relative}
+  .phone-wrap::before{content:"";position:absolute;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(30,64,216,.45),transparent 65%);filter:blur(30px);z-index:0}
+  .phone{position:relative;z-index:1;width:286px;max-width:80vw;padding:10px;border-radius:54px;background:linear-gradient(150deg,#3a3d43,#0a0b0e 50%,#202227);box-shadow:0 34px 80px rgba(0,0,0,.65),inset 0 0 0 1.5px rgba(255,255,255,.06),inset 0 0 0 3px #050608}
+  .phone::before{content:"";position:absolute;left:-2px;top:120px;width:2.5px;height:32px;background:#16181d;border-radius:3px 0 0 3px;box-shadow:0 52px 0 #16181d}
+  .phone::after{content:"";position:absolute;right:-2px;top:152px;width:2.5px;height:72px;background:#16181d;border-radius:0 3px 3px 0}
+  .screen{position:relative;border-radius:42px;overflow:hidden;background:#0a0e1a}
+  .statusbar{position:relative;height:44px;background:#0c1120;display:flex;align-items:center;justify-content:space-between;padding:0 22px;color:#fff}
+  .statusbar .time{font-size:13px;font-weight:600;letter-spacing:.3px}
+  .statusbar .sicons{display:flex;align-items:center;gap:6px}
+  .island{position:absolute;top:9px;left:50%;transform:translateX(-50%);width:80px;height:23px;background:#000;border-radius:999px}
+  .island::after{content:"";position:absolute;right:11px;top:50%;transform:translateY(-50%);width:8px;height:8px;border-radius:50%;background:#0c1f38;box-shadow:inset 0 0 0 1.5px rgba(120,160,255,.45)}
+  .ph-appbar{background:#0c1120;color:#f4f6fb;padding:16px 16px 14px;border-bottom:1px solid var(--line)}
+  .ph-appbar .brand{font-size:16px;font-weight:700;letter-spacing:-.3px;display:flex;align-items:center;gap:7px}
+  .ph-appbar .brand .m{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center}
+  .ph-appbar .tabs{display:flex;gap:14px;margin-top:14px;font-size:11px;color:var(--muted)}
+  .ph-appbar .tabs span:first-child{font-weight:600;color:#fff;border-bottom:2px solid var(--accent);padding-bottom:4px}
+  .ph-body{padding:14px}
+  .live-dot{width:6px;height:6px;border-radius:50%;background:#fff;display:inline-block;animation:pulse 1.4s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .sect{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:10px}
+  .feat{position:relative;border:2px solid var(--line);border-radius:18px;padding:15px;overflow:hidden;background:linear-gradient(160deg,rgba(59,130,246,.12),rgba(124,92,255,.04))}
+  .feat::before{content:"";position:absolute;top:-44px;right:-34px;width:130px;height:130px;background:radial-gradient(circle,rgba(99,140,255,.4),transparent 70%);filter:blur(8px)}
+  .feat-top{position:relative;display:flex;justify-content:space-between;align-items:center}
+  .livepill{display:inline-flex;align-items:center;gap:5px;font-size:9px;font-weight:700;letter-spacing:.6px;color:#fff;background:linear-gradient(135deg,#ff4d4f,#ff7a45);padding:4px 9px;border-radius:999px}
+  .qtime{font-size:10px;color:var(--muted)}
+  .teams{position:relative;display:flex;align-items:center;justify-content:space-between;margin:16px 4px 14px}
+  .team{display:flex;flex-direction:column;align-items:center;gap:7px;width:60px}
+  .badge{width:40px;height:40px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.4)}
+  .badge.kc{background:linear-gradient(135deg,#e23744,#9e1124)}
+  .badge.phi{background:linear-gradient(135deg,#2a915c,#0c3b24)}
+  .tname{font-size:11px;color:#cdd4e4;font-weight:500}
+  .score{font-size:24px;font-weight:800;letter-spacing:1px;color:#fff}
+  .score span{color:var(--muted);margin:0 6px;font-weight:300}
+  .mk-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;position:relative}
+  .mk-row .mk{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;font-weight:600}
+  .mk-row .more{font-size:10px;color:#9bc2ff}
+  .odds2{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .o2{display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px;border-radius:13px;border:2px solid var(--line);background:rgba(255,255,255,.03);transition:transform .12s}
+  .o2:active{transform:scale(.97)}
+  .o2 .ol{font-size:9px;color:var(--muted)}
+  .o2 .ov{font-size:16px;font-weight:700;color:#dce6ff}
+  .o2.sel{border-color:transparent;background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 8px 20px rgba(59,130,246,.45)}
+  .o2.sel .ol{color:rgba(255,255,255,.85)}
+  .o2.sel .ov{color:#fff}
+  .ph-slip{margin-top:12px;display:flex;align-items:center;justify-content:space-between;padding:11px 12px;border-radius:15px;background:linear-gradient(135deg,rgba(59,130,246,.2),rgba(124,92,255,.12));border:2px solid var(--line)}
+  .ph-slip .sl1{font-size:9px;color:var(--muted);letter-spacing:.5px}
+  .ph-slip .sl2{font-size:13px;font-weight:700;color:#fff;margin-top:1px}
+  .ph-slip .slgo{width:32px;height:32px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(59,130,246,.4)}
+  /* App: balance card */
+  .bal-card{position:relative;overflow:hidden;padding:34px 14px 8px;color:#fff;background:#0a0e1a;border-bottom:1px solid var(--line)}
+  .bal-card::before{content:"";position:absolute;top:-70px;right:-55px;width:150px;height:150px;background:radial-gradient(circle,rgba(30,64,216,.28),transparent 70%);filter:blur(8px)}
+  .bal-top{position:relative;display:flex;justify-content:space-between;align-items:center}
+  .bal-brand{font-size:12.5px;font-weight:700;letter-spacing:-.2px}
+  .bal-icons{display:flex;gap:9px;color:#cdd4e4}
+  .bal-icons svg{display:block;width:13px;height:13px}
+  .bal-label{position:relative;font-size:7px;letter-spacing:1.1px;color:var(--muted);margin-top:5px;font-weight:600}
+  .bal-amount{position:relative;font-size:16px;font-weight:800;letter-spacing:-.5px;margin-top:0;background:linear-gradient(120deg,#fff 35%,#7d93f0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .bal-row{position:relative;display:flex;align-items:center;gap:4px;margin-top:6px;width:100%}
+  .bal-chip{display:inline-flex;align-items:center;height:21px;font-size:7px;letter-spacing:.2px;color:#cdd4e4;background:rgba(255,255,255,.06);border:2px solid var(--line);padding:0 7px;border-radius:6px;font-weight:600;white-space:nowrap}
+  .bal-chip b{font-weight:800;margin-left:2px;color:#fff}
+  .bal-chip .grn{color:#3ddc84}
+  .bal-dep{margin-left:auto;display:inline-flex;align-items:center;justify-content:center;gap:2px;height:21px;font-size:8px;font-weight:700;color:#fff;background:#1e40d8;border:none;padding:0 10px;border-radius:6px;cursor:pointer;white-space:nowrap}
+  /* App: match list */
+  .app-body{padding:11px 11px 4px;background:#0a0e1a}
+  .mkt-head{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:4px;font-size:9px;color:var(--muted);font-weight:600;padding:2px 6px 8px}
+  .mkt-head span{text-align:center}
+  .mkt-head span:first-child{text-align:left}
+  .g-card{border:2px solid var(--line);border-radius:14px;padding:11px;background:rgba(255,255,255,.03)}
+  .g-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .g-league{font-size:10px;color:#cdd4e4;font-weight:600}
+  .g-time{font-size:9px;color:var(--muted)}
+  .g-row{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:4px;align-items:center;margin-bottom:6px}
+  .g-row:last-child{margin-bottom:0}
+  .g-team{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#f4f6fb}
+  .g-ab{font-size:7px;font-weight:700;color:var(--muted);background:rgba(255,255,255,.07);border:2px solid var(--line);border-radius:5px;padding:3px 4px;letter-spacing:.5px}
+  .o-box{border:2px solid var(--line);border-radius:8px;padding:0 2px;text-align:center;background:rgba(255,255,255,.02);height:40px;display:flex;flex-direction:column;justify-content:center;gap:2px}
+  .o-box .ln{font-size:8px;color:#aeb6c8;font-weight:600}
+  .o-box .pr{font-size:11px;font-weight:700}
+  .pr.pos{color:#3ddc84}
+  .pr.neg{color:#dce6ff}
+  .pr{transition:color .25s}
+  .g-livepill{display:inline-flex;align-items:center;gap:4px;font-size:7px;font-weight:700;letter-spacing:.5px;color:#fff;background:linear-gradient(135deg,#ff4d4f,#ff7a45);padding:2px 6px;border-radius:999px;vertical-align:middle;margin-left:4px}
+  .g-livedot{width:5px;height:5px;border-radius:50%;background:#fff;display:inline-block;animation:pulse 1.3s infinite}
+  .g-score{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;margin-left:7px;font-size:11px;font-weight:800;color:#fff;background:rgba(255,255,255,.08);border-radius:5px;padding:0 4px}
+  .g-score.bump{animation:scorebump .6s ease}
+  @keyframes scorebump{0%{transform:scale(1)}40%{transform:scale(1.4);color:#3ddc84}100%{transform:scale(1)}}
+  .o-box{transition:border-color .3s,background .3s}
+  .o-box.flash{animation:oddsflash .9s ease}
+  @keyframes oddsflash{0%{background:rgba(30,64,216,.32);border-color:#1e40d8}100%{background:rgba(255,255,255,.02);border-color:var(--line)}}
+  /* App: bottom nav */
+  .app-nav{display:grid;grid-template-columns:repeat(4,1fr);padding:9px 4px 11px;margin-top:10px;background:#0c1120;border-top:1px solid var(--line)}
+  .nav-i{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:9px;color:var(--muted);font-weight:500}
+  .nav-i.on{color:#3a5bf0}
+  .nav-i svg{display:block}
+
+  /* Stats */
+  .stats{max-width:1120px;margin:0 auto;padding:24px 28px 64px;display:grid;grid-template-columns:repeat(4,1fr);gap:20px;border-top:1px solid var(--line)}
+  .stat .n{font-size:clamp(28px,4vw,40px);font-weight:700;letter-spacing:-1px}
+  .stat .l{color:var(--muted);font-size:13px;margin-top:2px}
+
+  /* Features */
+  .features{max-width:1120px;margin:0 auto;padding:72px 28px}
+  .features .head{text-align:center;margin-bottom:48px}
+  .features h2{font-size:clamp(28px,4vw,40px);font-weight:700;letter-spacing:-1px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  .card{padding:30px;border:2px solid var(--line);border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.01));transition:transform .2s,border-color .2s}
+  .card:hover{transform:translateY(-4px);border-color:#1e40d8}
+  .card .num{display:none}
+  .card h3{font-size:19px;font-weight:600;margin-bottom:10px}
+  .card p{color:var(--muted);font-size:14px}
+
+  /* VIP tiers */
+  .vip{max-width:1120px;margin:0 auto;padding:8px 28px 72px}
+  .vip .head{text-align:center;margin-bottom:40px}
+  .vip h2{font-size:clamp(28px,4vw,40px);font-weight:700;letter-spacing:-1px}
+  .vip .lead{text-align:center;color:var(--muted);margin-top:8px}
+  .vip-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .vtier{position:relative;border:2px solid var(--line);border-radius:0;padding:24px 20px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.01));display:flex;flex-direction:column;transition:transform .2s}
+  .vtier:hover{transform:translateY(-4px)}
+  .vtier .vbadge{width:44px;height:44px;border-radius:12px;background:rgba(59,130,246,.12);color:#7c9bff;display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+  .vtier.vtop .vbadge{background:rgba(255,255,255,.12);color:#fff}
+  .vtier .vname{font-size:18px;font-weight:700;margin-bottom:4px}
+  .vtier .vreq{font-size:12px;color:var(--muted);margin-bottom:16px}
+  .vtier ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+  .vtier li{font-size:13px;color:#cdd4e4;display:flex;gap:8px;align-items:flex-start;line-height:1.45}
+  .vtier li svg{flex:none;margin-top:3px;color:#3ddc84}
+  .vtier.vtop{border-color:transparent;background:linear-gradient(180deg,rgba(59,130,246,.22),rgba(124,92,255,.12));box-shadow:0 0 0 1px rgba(123,150,255,.45)}
+  .vtier .ribbon{position:absolute;top:16px;right:16px;font-size:10px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));padding:3px 10px;border-radius:999px}
+
+  /* Event calendar */
+  .events{max-width:1120px;margin:0 auto;padding:8px 28px 72px}
+  .events .head{text-align:center;margin-bottom:36px}
+  .events h2{font-size:clamp(28px,4vw,40px);font-weight:700;letter-spacing:-1px}
+  .events .lead{text-align:center;color:var(--muted);margin-top:8px}
+  .ev-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .ev-card{position:relative;border:2px solid var(--line);border-radius:18px;padding:20px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.01));transition:transform .2s,border-color .2s;display:flex;flex-direction:column;gap:14px;min-height:170px}
+  .ev-card:hover{transform:translateY(-4px);border-color:rgba(59,130,246,.5)}
+  .ev-date{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:52px;height:56px;border-radius:13px;background:rgba(59,130,246,.12);color:#9bc2ff}
+  .ev-date .m{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+  .ev-date .d{font-size:19px;font-weight:800;line-height:1}
+  .ev-title{font-size:16px;font-weight:600;line-height:1.3}
+  .ev-meta{display:flex;align-items:center;gap:8px;margin-top:auto}
+  .ev-sport{font-size:11px;color:#cdd4e4;background:rgba(255,255,255,.05);border:2px solid var(--line);padding:3px 9px;border-radius:999px}
+  .ev-go{font-size:12px;color:#9bc2ff;margin-left:auto}
+  .ev-card.feat{border-color:transparent;background:linear-gradient(180deg,rgba(59,130,246,.2),rgba(124,92,255,.1));box-shadow:0 0 0 1px rgba(123,150,255,.4)}
+  .ev-card.feat .ev-date{background:rgba(255,255,255,.14);color:#fff}
+  .ev-tag{position:absolute;top:14px;right:14px;font-size:10px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));padding:3px 9px;border-radius:999px}
+
+  /* CTA */
+  .trust{max-width:1120px;margin:0 auto 70px;padding:0 28px}
+  .trust-grid{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .titem{display:flex;gap:12px;align-items:center;padding:22px 18px;border-right:1px solid rgba(255,255,255,.07)}
+  .titem:last-child{border-right:none}
+  .titem .ic{color:#7c9bff;flex:none;display:flex;align-items:center;justify-content:center}
+  .titem h4{font-size:14px;font-weight:600;margin-bottom:2px}
+  .titem p{font-size:12px;color:var(--muted);line-height:1.5}
+  .cta{max-width:1120px;margin:0 auto 28px;padding:56px 28px;text-align:center;border-radius:28px;background:linear-gradient(135deg,rgba(59,130,246,.22),rgba(124,92,255,.18));border:2px solid var(--line);position:relative;overflow:hidden}
+  .cta h2{font-size:clamp(26px,4vw,38px);font-weight:700;letter-spacing:-1px;margin-bottom:12px}
+  .cta p{color:#c5cde0;margin-bottom:28px}
+  .cta .stores{justify-content:center}
+
+  footer{border-top:1px solid var(--line);padding:56px 36px 80px;color:var(--muted);overflow:hidden}
+  .foot-grid{position:relative;z-index:2;max-width:1200px;margin:0 auto;display:grid;grid-template-columns:2.3fr 1fr 1fr;gap:32px}
+  .fb-logo{font-size:19px;font-weight:700;letter-spacing:1px;color:#f4f6fb;line-height:1.1}
+  .fb-logo small{display:block;font-size:10px;letter-spacing:3px;color:var(--muted);font-weight:600;margin-top:2px}
+  .fb-top{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+  .award{width:80px;flex:none}
+  .award svg{display:block;width:100%;height:auto}
+  .foot-logo{color:var(--text)}
+  body.light .foot-logo{color:var(--text)}
+  .foot-brand .cpy{margin-top:22px;font-size:12px;color:var(--muted)}
+  .foot-brand .cpy a{display:inline-block;margin-top:6px;border-bottom:1px solid var(--muted);letter-spacing:1px;text-transform:uppercase;font-size:11px}
+  .foot-col h4{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:20px}
+  .foot-col a{display:block;font-size:15px;color:#cdd4e4;margin-bottom:13px;transition:color .15s}
+  .foot-col a:hover{color:#fff}
+  .foot-col a .arr{color:var(--muted);font-size:12px;margin-left:2px}
+  .wordmark{position:relative;z-index:1;pointer-events:none;text-align:center;font-size:clamp(90px,26vw,380px);font-weight:700;letter-spacing:-5px;color:rgba(255,255,255,.05);line-height:.78;margin-top:24px;user-select:none;white-space:nowrap}
+  .resp-bar{text-align:center;font-size:11px;color:var(--muted);padding:16px;border-top:1px solid var(--line);margin-top:14px}
+
+  @media(max-width:880px){
+    nav{display:none}
+    /* Tighten the header so the logo + Log in / Sign up stay on ONE line on phones */
+    header{padding:10px 16px;gap:14px}
+    .logo{font-size:13.5px;letter-spacing:.4px;white-space:nowrap}
+    .logo .mark{width:22px;height:22px;font-size:12px;border-radius:6px}
+    .theme-toggle{width:30px;height:30px}
+    .theme-toggle svg{width:15px;height:15px}
+    /* Stop the Log in link + Sign up button from wrapping to two lines */
+    header>a,header .pill,header .theme-toggle{white-space:nowrap;flex:none}
+    header>a[href="login.html"]{font-size:12px!important;font-weight:600!important;margin-right:0!important}
+    /* Match Sign up to the Log in size — same font, slim height */
+    header .pill{padding:6px 13px;font-size:12px;font-weight:600;line-height:1.4}
+    header .pill .arrow{display:none}
+    .hero{grid-template-columns:1fr;text-align:center;gap:44px;padding-top:48px}
+    .hero .sub{margin-left:auto;margin-right:auto}
+    .stores{justify-content:center}
+    .phone-wrap{order:-1}
+    .stats{grid-template-columns:repeat(2,1fr)}
+    .grid{grid-template-columns:1fr}
+    .vip-grid{grid-template-columns:1fr 1fr}
+    .ev-grid{grid-template-columns:1fr 1fr}
+    .trust-grid{grid-template-columns:1fr 1fr}
+    .titem:nth-child(2n){border-right:none}
+    .titem:nth-child(1),.titem:nth-child(2){border-bottom:1px solid rgba(255,255,255,.07)}
+    .foot-grid{grid-template-columns:1fr 1fr;gap:28px}
+    .foot-brand{grid-column:1 / -1}
+    .foot-brand .cpy{margin-top:20px}
+    .wordmark{font-size:24vw}
+  }
+  /* ===== visual simplify ===== */
+  .hero .stores{display:none}
+  /* Content sheet — a clear break from the hero ad above (gap + white sheet + top edge). */
+  .lp-body{position:relative;z-index:2;background:#fff;margin-top:0;padding-top:0}
+  body.light .lp-body{background:#fff}
+  /* Simple final CTA — no box, just centered text + the hero's buttons */
+  .lp-cta{max-width:720px;margin:0 auto;padding:64px 28px 88px;text-align:center}
+  .lp-cta h2{font-size:clamp(26px,3.6vw,34px);font-weight:800;letter-spacing:-1px;color:var(--text)}
+  .lp-cta p{color:var(--muted);margin-top:12px;font-size:15px}
+  .lp-cta-btns{display:flex;gap:14px;justify-content:center;margin-top:28px;flex-wrap:wrap}
+  .pill .arrow{display:none}
+  .pill{padding:9px 16px}
+  /* Mobile: stack the trust badges instead of a 4-col row */
+  @media(max-width:760px){ .trust-grid{grid-template-columns:1fr 1fr} .titem{border-right:none} }
+  .store{box-shadow:none!important}
+  .card{box-shadow:inset 0 1px 0 rgba(255,255,255,.05)!important}
+  body.light .card{box-shadow:inset 0 1px 0 rgba(255,255,255,.7)!important}
+  .card:hover{box-shadow:inset 0 1px 0 rgba(30,64,216,.4)!important}
+  .bal-icons{display:none}
+  .cta{background:rgba(255,255,255,.04)!important;border:2px solid var(--line)!important}
+  body.light .cta{background:#f6f8fc!important}
+  .liveboard{max-width:1120px;margin:0 auto;padding:36px 28px 64px}
+  .lb-head{margin-bottom:22px}
+  .lb-head h2{font-size:clamp(26px,4vw,42px);font-weight:700;letter-spacing:-1.2px;margin-top:4px}
+  .lb-grid{display:grid;grid-template-columns:1fr 338px;gap:20px;align-items:start}
+  .lb-game{border:2px solid var(--line);border-radius:16px;background:var(--surface);padding:15px 16px;margin-bottom:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+  .lb-gtop{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:12px}
+  .lb-league{color:var(--muted);font-weight:600;letter-spacing:.3px}
+  .lb-live{display:inline-flex;align-items:center;gap:5px;color:#e5484d;font-weight:700;font-size:11px}
+  .lb-live::before{content:"";width:6px;height:6px;border-radius:50%;background:#e5484d;animation:lbpulse 1.3s infinite}
+  .lb-time{color:var(--muted)}
+  @keyframes lbpulse{0%,100%{opacity:1}50%{opacity:.25}}
+  .lb-mkhead{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:6px;font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;padding:0 2px 8px}
+  .lb-mkhead span{text-align:center}.lb-mkhead span:first-child{text-align:left}
+  .lb-r{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:6px;align-items:center;margin-bottom:6px}
+  .lb-r:last-child{margin-bottom:0}
+  .lb-team{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--text)}
+  .lb-ab{width:27px;height:27px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;flex:none}
+  .lb-sc{font-size:12px;font-weight:800;color:var(--text);background:var(--surface2);border-radius:5px;padding:1px 6px}
+  .lb-odd{border:2px solid var(--line);border-radius:9px;background:var(--surface2);padding:0 3px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;height:46px;display:flex;flex-direction:column;justify-content:center;gap:2px}
+  .lb-odd .ln{font-size:9.5px;color:var(--muted)}
+  .lb-odd .v{font-size:13px;font-weight:700;color:var(--text)}
+  .lb-odd:hover{border-color:#1e40d8}
+  .lb-odd.sel{background:#1e40d8;border-color:#1e40d8}
+  .lb-odd.sel .v,.lb-odd.sel .ln{color:#fff}
+  .oarr{font-size:8px;margin-left:6px}.oarr.up{color:#16a34a}.oarr.down{color:#e5484d}
+  @keyframes lbflash{0%{background:rgba(30,64,216,.32)}100%{background:var(--surface2)}}
+  .lb-odd.upd:not(.sel){animation:lbflash .9s ease-out}
+  .lb-slip{border:2px solid var(--line);border-radius:16px;background:var(--surface);overflow:hidden;position:sticky;top:80px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+  .lb-shead{padding:13px 16px;border-bottom:1px solid var(--line);font-size:14px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+  .lb-scnt{font-size:12px;color:var(--muted);font-weight:600}
+  .lb-sbody{padding:8px 16px;max-height:260px;overflow:auto}
+  .lb-empty{text-align:center;color:var(--muted);font-size:12.5px;padding:28px 8px;line-height:1.5}
+  .lb-sel{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .lb-sel:last-child{border-bottom:none}
+  .lb-sel .pk{font-size:13px;font-weight:600;color:var(--text)}.lb-sel .sb{font-size:11px;color:var(--muted);margin-top:2px}
+  .lb-right{display:flex;align-items:center;gap:9px}
+  .lb-sel .so{font-size:13px;font-weight:700;color:#7d93f0}
+  .lb-sel .rm{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1}
+  .lb-sfoot{padding:13px 16px;border-top:1px solid var(--line);background:rgba(255,255,255,.02)}
+  .lb-stake{display:flex;align-items:center;gap:8px;margin-bottom:11px}
+  .lb-stake label{font-size:12px;color:var(--muted)}
+  .lb-stake input{flex:1;height:36px;border:2px solid var(--line);border-radius:8px;background:var(--surface2);color:var(--text);padding:0 11px;font-size:16px;outline:none}
+  .lb-stake input:focus{border-color:#1e40d8}
+  .lb-calc{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px}
+  .lb-calc.tot{font-size:15px;color:var(--text);font-weight:700}
+  .lb-calc.tot span:last-child{color:#7d93f0}
+  .lb-place{width:100%;background:#1e40d8;color:#fff;border:none;border-radius:5px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;margin-top:9px;transition:filter .15s}
+  .lb-place:hover{filter:brightness(1.08)}
+  .lb-place:disabled{background:#2c3346;color:#6b7488;cursor:not-allowed}
+  .lb-note{font-size:10px;color:var(--muted);text-align:center;margin-top:9px}
+  @media(max-width:820px){.lb-grid{grid-template-columns:1fr}.lb-slip{position:static}}
+  .js .reveal-t{opacity:0;transform:translateY(28px);transition:opacity .8s cubic-bezier(.2,.6,.2,1),transform .8s cubic-bezier(.2,.6,.2,1)}
+  .js .reveal-t.in{opacity:1;transform:none}
+  .js .reveal-t.d1{transition-delay:.08s}.js .reveal-t.d2{transition-delay:.16s}.js .reveal-t.d3{transition-delay:.24s}
+  @media(prefers-reduced-motion:reduce){.js .reveal-t{opacity:1!important;transform:none!important}}
+  /* ── Hero (landing) — left: strengths ad · right: live quotes ── */
+  .hero{max-width:1180px;margin:0 auto;padding:96px 36px 66px;display:block;text-align:center}
+  .h-left{min-width:0}
+  .h-eyebrow{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11px;letter-spacing:3px;
+    text-transform:uppercase;color:var(--accent);margin-bottom:22px}
+  .h-title{font-family:var(--font-display);font-size:clamp(34px,4.4vw,56px);font-weight:600;line-height:1.02;
+    letter-spacing:-1.6px;text-transform:uppercase;color:var(--text)}
+  .h-strength{margin-top:44px;font-size:16px;font-weight:600;color:var(--text);letter-spacing:.2px}
+  .h-strength .dot{color:var(--accent);margin:0 8px}
+  .numwrap{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:nowrap}
+  @media(max-width:560px){ .numwrap{flex-wrap:wrap} }
+  .big0{font-family:var(--font-display);font-size:clamp(116px,17vw,252px);font-weight:600;line-height:.7;letter-spacing:-9px;color:var(--accent)}
+  .num-r{padding-bottom:0}
+  .nk{font-family:var(--font-display);font-size:clamp(34px,5.1vw,68px);font-weight:700;line-height:.95;letter-spacing:-2px;text-transform:uppercase;color:var(--text);text-align:left}
+  .nu{margin-top:9px;font-size:10.5px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted)}
+  /* crossfade slogans — both stacked in one grid cell, fade in place (no horizontal motion → never clips into the widget). slide 1 fixed content; slide 2 = 500:1 */
+  .h-slides{display:grid}
+  .h-slide{grid-area:1/1;display:flex;flex-direction:column;justify-content:center;opacity:0;transition:opacity 1.1s ease;pointer-events:none}
+  .h-slide.on{opacity:1;pointer-events:auto}
+  /* Mobile: no cross-fade — instant switch so the big rotating slides never overlap. */
+  @media(max-width:600px){ .h-slide{transition:none} .h-slide:not(.on){visibility:hidden} }
+  .big0.n2{font-size:clamp(100px,14.5vw,216px);letter-spacing:-7px}
+  .big0.n3b{font-size:clamp(116px,17vw,252px);letter-spacing:-9px}
+  .h-dots{margin-top:46px;display:flex;justify-content:center;gap:9px}
+  .h-dots button{width:9px;height:9px;border-radius:50%;border:none;background:#cfd6e2;cursor:pointer;padding:0;transition:width .25s,background .25s}
+  .h-dots button.on{background:var(--accent);width:26px;border-radius:5px}
+  .h-cta{margin-top:40px;display:flex;justify-content:center;gap:14px;flex-wrap:wrap}
+  .btn-lg{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:700;letter-spacing:.2px;
+    padding:13px 24px;border-radius:0;text-decoration:none;transition:filter .15s,background .15s,color .15s}
+  .btn-lg.solid{background:var(--accent);color:#fff}
+  .btn-lg.solid:hover{filter:brightness(1.08)}
+  .btn-lg.outline{background:transparent;color:#1e40d8;border:4px solid #1e40d8;border-radius:0}
+  .btn-lg.outline:hover{background:rgba(30,64,216,.07);border-color:#1e40d8}
+
+  /* ── Live spreads strip — full-width proof band under the hero ── */
+  .livestrip{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--surface)}
+  .ls-in{max-width:1180px;margin:0 auto;padding:26px 36px 30px}
+  .ls-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .ls-title{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text)}
+  .ls-dot{width:8px;height:8px;border-radius:50%;background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.16)}
+  .ls-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .ls-tile{background:#fff;border:1px solid #eaedf3;border-radius:0;padding:15px 18px;box-shadow:0 4px 16px rgba(16,24,40,.04)}
+  .ls-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:13px}
+  .ls-vals{display:grid;grid-template-columns:1fr .74fr 1fr;align-items:center}
+  .ls-v{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;padding:0 8px}
+  .ls-v:nth-child(n+2){border-left:1px solid #eef1f6}
+  .ls-k{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#9aa3b2}
+  .ls-v.fl{animation:qfl .6s ease}
+  @keyframes qfl{0%{background:rgba(47,107,246,.10)}100%{background:transparent}}
+  .ls-foot{margin-top:18px;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted)}
+  .ls-foot a{color:var(--accent);text-decoration:none;font-weight:700}
+  /* shared cell styling (reused by tiles) */
+  .q-toggle{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:.5px;color:#5a6478;cursor:pointer;user-select:none}
+  .q-sw{width:32px;height:17px;border-radius:9px;background:#cfd5e0;position:relative;transition:background .2s;flex:none}
+  .q-sw::after{content:'';position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+  .q-sw.on{background:#16a34a}
+  .q-sw.on::after{left:17px}
+  .q-sym{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:#0e1726}
+  .q-sym .star{color:#c7ccd6;flex:none}
+  .fxb{font-size:8px;font-weight:800;letter-spacing:.5px;color:#6b7280;background:#f2f4f8;padding:2px 5px;border-radius:3px}
+  .q-name{font-size:11px;color:#8a94a6;font-weight:500;text-align:right}
+  .q-price{display:flex;align-items:baseline;justify-content:center;font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1;color:#3a4658}
+  .q-price .big{font-size:17px;font-weight:800;letter-spacing:-.3px}
+  .q-bid .q-price{color:#e5484d}
+  .q-ask .q-price{color:#2f6bf6}
+  .q-spr{font-family:ui-monospace,monospace;font-size:17px;font-weight:800;color:#3a4658}
+  @media(max-width:820px){ .ls-grid{grid-template-columns:1fr 1fr} }
+  @media(max-width:900px){ .hero{padding:56px 20px 36px} .ls-in{padding:24px 20px 28px} }
+  @media(max-width:520px){ .ls-grid{grid-template-columns:1fr} }
+
+  /* ── Economic calendar + news ── */
+  .calnews{max-width:1180px;margin:0 auto;padding:64px 36px 20px}
+  .cn-eyebrow{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+  .cn-h{font-family:var(--font-display);font-size:clamp(26px,3.4vw,40px);font-weight:600;letter-spacing:-1px;margin-bottom:28px;color:var(--text)}
+  .cn-grid{display:grid;grid-template-columns:1.5fr 1fr;gap:24px}
+  .cn-card{background:var(--surface);border:2px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 6px 22px rgba(16,24,40,.04)}
+  .cn-head{display:flex;align-items:baseline;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line)}
+  .cn-title{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text)}
+  .cn-dot{width:8px;height:8px;border-radius:50%;background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.15)}
+  .cn-sub{font-size:11px;color:var(--muted)}
+  .cn-widget{height:480px}
+  .cn-widget .tradingview-widget-container,.cn-widget .tradingview-widget-container__widget{height:100%}
+  .cn-note{margin-top:14px;font-size:11px;color:var(--muted);opacity:.7}
+  /* custom economic calendar (free feed) */
+  .cal-headrow,.cal-row{display:grid;grid-template-columns:50px 40px 1fr 48px 56px 56px;gap:10px;align-items:center;padding:11px 20px;border-bottom:1px solid var(--line)}
+  .cal-headrow{font-size:9.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+  .cal-row{font-size:13px}
+  .calbody{max-height:474px;overflow:auto}
+  .cal-day{padding:7px 20px;background:var(--surface2);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)}
+  .cal-time{font-family:ui-monospace,monospace;color:var(--muted)}
+  .cal-cur{font-weight:700;color:var(--text)}
+  .cal-ev{color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cal-imp{display:flex;gap:3px}
+  .cal-imp i{width:5px;height:5px;border-radius:50%;background:#e5484d}
+  .cal-imp i.m{background:#f5a623}.cal-imp i.l{background:#3a9bdc}.cal-imp i.o{background:#e2e6ee}
+  .cal-v{font-family:ui-monospace,monospace;text-align:right;color:var(--text);font-weight:600;font-size:12.5px}
+  .cal-v.f{color:var(--muted);font-weight:500}
+  .cal-empty{padding:44px 20px;text-align:center;color:var(--muted);font-size:13px}
+  @media(max-width:820px){ .calnews{padding:52px 20px 12px} .cn-grid{grid-template-columns:1fr} }
+
+  /* ── Footer (sports-style wordmark, white version) ── */
+  .site-foot{position:relative;overflow:hidden;background:var(--surface);border-top:1px solid var(--line);padding:64px 36px 24px}
+  .foot-grid{position:relative;z-index:2;max-width:1200px;margin:0 auto;display:grid;grid-template-columns:2.3fr 1fr 1fr;gap:32px}
+  .fb-logo{font-family:var(--font-display);font-size:19px;font-weight:700;letter-spacing:1px;color:var(--text);line-height:1.1;text-transform:uppercase}
+  .fb-logo small{display:block;font-size:10px;letter-spacing:3px;color:var(--muted);font-weight:600;margin-top:3px}
+  .foot-brand .cpy{margin-top:72px;font-size:12px;color:var(--muted);line-height:1.7}
+  .foot-brand .cpy a{display:inline-block;margin-top:6px;border-bottom:1px solid #b9c1d0;letter-spacing:1px;text-transform:uppercase;font-size:11px;color:var(--muted);text-decoration:none}
+  .foot-col h4{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:20px}
+  .foot-col a{display:block;font-size:15px;color:var(--text);margin-bottom:13px;text-decoration:none;transition:color .15s}
+  .foot-col a:hover{color:var(--accent)}
+  .wordmark{position:relative;z-index:1;pointer-events:none;text-align:center;font-family:var(--font-display);font-size:clamp(90px,26vw,380px);font-weight:700;letter-spacing:-5px;color:rgba(14,23,38,.05);line-height:.78;margin-top:18px;user-select:none;white-space:nowrap}
+  .resp-bar{position:relative;z-index:2;text-align:center;font-size:11px;color:var(--muted);padding:18px 20px 0;border-top:1px solid var(--line);margin-top:6px;max-width:1200px;margin-left:auto;margin-right:auto;line-height:1.5}
+  @media(max-width:820px){ .site-foot{padding:52px 20px 20px} .foot-grid{grid-template-columns:1fr 1fr;gap:28px 24px} }
+
+</style>
+</head>
+<body class="light">
+<script>document.documentElement.classList.add('js')</script>
+  <div class="glow"></div>
+
+  <header>
+    <a class="logo" href="/" style="flex:none"><span class="mark">A</span>Alpexa FX</a>
+    <nav class="cmenu">
+      <a href="markets.html">Markets</a>
+      <a href="ib.html">IB</a>
+      <a href="about.html">About</a>
+    </nav>
+    <a href="login.html?switch=1" target="_blank" rel="noopener" style="font-size:13px;font-weight:600;color:var(--muted)">Log in</a>
+    <button class="pill" onclick="window.open('signup.html','_blank','noopener')">Sign up</button>
+  </header>
+
+  <!-- Markets ticker tape — real values from the sparkline-cache (row id='strip'), indices only
+       (no fx, no crypto). One continuous sideways-flowing marquee, flush under the hero; reads
+       ONE cached row and never touches a data provider itself. -->
+  <style>
+   .tkbar{background:#fff;position:relative;overflow:hidden}
+   .tkbar::before,.tkbar::after{content:"";position:absolute;top:0;bottom:0;width:40px;z-index:2;pointer-events:none}
+   .tkbar::before{left:0;background:linear-gradient(90deg,#fff 20%,rgba(255,255,255,0))}
+   .tkbar::after{right:0;background:linear-gradient(270deg,#fff 20%,rgba(255,255,255,0))}
+   .tk-track{display:flex;width:max-content;animation:tkflow linear infinite;
+     backface-visibility:hidden;-webkit-font-smoothing:antialiased}
+   .tkbar:hover .tk-track{animation-play-state:paused}
+   @keyframes tkflow{from{transform:translate3d(0,0,0)}to{transform:translate3d(-50%,0,0)}}
+   .tk-item{display:flex;align-items:center;gap:9px;padding:13px 26px;white-space:nowrap;
+     text-decoration:none}
+   .tk-nm{font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+     font-weight:800;font-size:15.5px;color:#0b1220;letter-spacing:-.2px}
+   .tk-v{font-family:'Roboto Mono',ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+     font-size:14px;font-weight:500;color:#5b6577}
+   .tk-c{font-family:'Roboto Mono',ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:13.5px;font-weight:700;
+     display:inline-flex;align-items:center;gap:3px}
+   .tk-c.up{color:#16a34a} .tk-c.dn{color:#e5484d}
+   .tk-c .ar{font-size:10px}
+   @media(max-width:600px){ .tk-item{padding:12px 18px;gap:7px} }
+  </style>
+  <div class="tkbar" id="tkbar" style="display:none">
+    <div class="tk-track" id="tkTrack"></div>
+  </div>
+  <script>
+  (function(){
+    var URL_='https://grxnbgtfnaayeluenvqh.supabase.co';
+    var KEY_='sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu';
+    var ORDER=['US','Europe','Asia'];   // stock indices only (no fx, no crypto)
+    // format a value by magnitude: >=1000 → commas 2dp; 100-1000 → 2dp; FX 1-100 → 4dp; sub-1 → 5dp.
+    function fmtVal(v){
+      var a=Math.abs(v);
+      if(a>=1000) return v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+      if(a>=100)  return v.toFixed(2);
+      if(a>=1)    return v.toFixed(4);
+      return v.toFixed(5);
+    }
+    function esc(s){return String(s).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+    function itemHTML(c){
+      var pts=c.v-c.prev, pct=c.prev?(pts/c.prev*100):0, up=pts>=0, cls=up?'up':'dn';
+      return '<a class="tk-item" href="markets.html">'
+        +'<span class="tk-nm">'+esc(c.n)+'</span>'
+        +'<span class="tk-v">'+fmtVal(c.v)+'</span>'
+        +'<span class="tk-c '+cls+'">'+(up?'+':'')+pct.toFixed(2)+'%<span class="ar">'+(up?'▲':'▼')+'</span></span>'
+        +'</a>';
+    }
+    function load(){
+      fetch(URL_+'/rest/v1/sparklines?id=eq.strip&select=data',{headers:{apikey:KEY_,Authorization:'Bearer '+KEY_}})
+        .then(function(r){return r.ok?r.json():null;})
+        .then(function(j){
+          var d=j&&j[0]&&j[0].data; if(!d) return;
+          var items=[];
+          ORDER.forEach(function(t){ (d[t]||[]).forEach(function(c){ if(c&&c.v>0) items.push(c); }); });
+          if(!items.length) return;
+          var one=items.map(itemHTML).join('');
+          var track=document.getElementById('tkTrack');
+          track.innerHTML=one+one;              // duplicate → seamless -50% loop
+          track.style.animationDuration=(items.length*10)+'s';   // slow, readable glide
+          document.getElementById('tkbar').style.display='';
+        }).catch(function(){});
+    }
+    load();
+  })();
+  </script>
+
+  <section class="hero" id="top">
+    <div class="h-left">
+      <div class="h-slides" id="hslides">
+        <div class="h-slide on">
+          <div class="numwrap">
+            <div class="big0">0.0</div>
+            <div class="num-r"><div class="nk">Tight<br>spreads.</div></div>
+          </div>
+        </div>
+        <div class="h-slide">
+          <div class="numwrap">
+            <div class="big0 n2">500:1</div>
+            <div class="num-r"><div class="nk">Max<br>leverage.</div></div>
+          </div>
+        </div>
+        <div class="h-slide">
+          <div class="numwrap">
+            <div class="big0 n3b">80</div>
+            <div class="num-r"><div class="nk">Liquidity<br>banks.</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="h-strength">0.0 spreads<span class="dot">·</span>500:1 leverage<span class="dot">·</span>ECN execution</div>
+      <div class="h-cta">
+        <a class="btn-lg solid" href="signup.html" target="_blank" rel="noopener">Open account</a>
+        <a class="btn-lg outline" href="signup.html" target="_blank" rel="noopener">Try demo</a>
+      </div>
+      <div class="h-dots" id="hdots"><button class="on" aria-label="Slide: tight spreads"></button><button aria-label="Slide: 500:1 leverage"></button><button aria-label="Slide: ECN aggregation"></button></div>
+    </div>
+  </section>
+
+  <!-- Liquidity-provider strip — STATIC: centered title above a centered row of 8 tier-1 wordmarks -->
+  <style>
+   .lpticker{background:var(--surface);border-bottom:1px solid var(--line);overflow:hidden}
+   .lpt-track{display:flex;flex-direction:column;align-items:center;gap:9px;padding:13px 24px}   /* title + banks stacked, both centered */
+   .lpt-track .lead{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:10.5px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);opacity:.5;text-align:center}
+   .lpt-banks{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 34px}
+   .lpt-track .b{font-family:Georgia,"Times New Roman",serif;font-size:15px;font-weight:600;letter-spacing:.2px;color:var(--muted);opacity:.6;filter:grayscale(1)}
+  </style>
+  <div class="lpticker" aria-label="Liquidity providers">
+    <div class="lpt-track">
+      <span class="lead">Liquidity providers</span>
+      <div class="lpt-banks"><span class="b">J.P.Morgan</span><span class="b">Citi</span><span class="b">Barclays</span><span class="b">UBS</span><span class="b">Deutsche&nbsp;Bank</span><span class="b">Goldman&nbsp;Sachs</span><span class="b">Morgan&nbsp;Stanley</span><span class="b">HSBC</span></div>
+    </div>
+  </div>
+
+  <div class="lp-body">
+  <style>
+   /* Markets cards — direction B (minimal line): white cards, black heading, blue line icon. */
+   .features{position:relative}
+   .features::before{content:"";position:absolute;inset:-1px 0;pointer-events:none;z-index:0;
+     background:radial-gradient(680px 340px at 15% 0%,rgba(30,64,216,.06),transparent 62%)}
+   .features .head,.features .grid{position:relative;z-index:1}
+   .features .card{position:relative;overflow:hidden;background:#fff!important;border:2px solid #1e40d8!important;
+     border-radius:0!important;box-shadow:0 4px 16px rgba(16,24,40,.04)!important;
+     transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
+   .features .card:hover{transform:translateY(-6px)!important;border-color:transparent!important;box-shadow:0 18px 38px rgba(30,64,216,.13)!important}
+   .mcard-ic{display:flex;color:#1e40d8;margin-bottom:16px}
+   .features .card h3{color:#0b1220}
+   .mcard-go{margin-top:20px;font-weight:800;font-size:14px;color:#1e40d8}
+  </style>
+  <!-- Markets (multi-asset) -->
+  <section class="features" id="crypto">
+    <div class="head">
+      <span class="kicker"><span class="kline"></span>10,000 Markets</span>
+      <h2>Trade the world&rsquo;s markets</h2>
+    </div>
+    <div class="grid">
+      <a class="card mcard mcard-fx" href="markets.html?tab=fx">
+        <div class="mcard-ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div>
+        <h3>Forex</h3>
+        <p>Majors, minors and exotics — deep ECN liquidity aggregated from 80 tier&#8209;1 banks, spreads from 0.0 pips.</p>
+        <div class="mcard-go">Explore FX &rarr;</div>
+      </a>
+      <a class="card mcard mcard-stock" href="markets.html?tab=stock">
+        <div class="mcard-ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></div>
+        <h3>Stocks</h3>
+        <p>US blue chips and high&#8209;momentum names, priced live — trade the moves that make the headlines.</p>
+        <div class="mcard-go">Explore stocks &rarr;</div>
+      </a>
+      <a class="card mcard mcard-crypto" href="markets.html?tab=crypto">
+        <div class="mcard-ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.8 7.6h3.5a2.1 2.1 0 0 1 0 4.2H9.8m0 0h4a2.1 2.1 0 0 1 0 4.3H9.8m1.2-11.6v13"/></svg></div>
+        <h3>Crypto</h3>
+        <p>Bitcoin, Ethereum and the majors — 24/7, on the same account and the same platform as FX.</p>
+        <div class="mcard-go">Explore crypto &rarr;</div>
+      </a>
+    </div>
+  </section>
+
+  <!-- Account tiers -->
+  <section class="vip">
+    <div class="head">
+      <span class="kicker" style="justify-content:center"><span class="kline"></span>Accounts</span>
+      <h2>An account for every trader</h2>
+      <p class="lead">No hidden markups. Upgrade any time.</p>
+    </div>
+    <div class="grid">
+      <div class="vtier">
+        <div class="vbadge"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></div>
+        <div class="vname">Standard</div>
+        <div class="vreq">From $100 &middot; commission&#8209;free</div>
+        <ul>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Spreads from 0.8 pips</li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>All three asset classes</li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Web, desktop &amp; mobile</li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Negative balance protection</li>
+        </ul>
+      </div>
+      <div class="vtier vtop">
+        <div class="ribbon">Popular</div>
+        <div class="vbadge"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg></div>
+        <div class="vname">Raw ECN</div>
+        <div class="vreq">From $500 &middot; $3.50 / lot</div>
+        <ul>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Raw spreads from 0.0 pips</li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Priority order execution</li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Advanced charts &amp; tools</li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>24/5 priority support</li>
+        </ul>
+      </div>
+      <div class="vtier">
+        <div class="vbadge"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3 7h7l-5.5 4.5L18.5 22 12 17.5 5.5 22l2-8.5L2 9h7z"/></svg></div>
+        <div class="vname">Pro</div>
+        <div class="vreq">From $10,000</div>
+        <ul>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Deepest liquidity tier</li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Dedicated account manager</li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Custom leverage &amp; swaps</li>
+          <li><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>VPS &amp; API access</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Trust / safety -->
+  <section class="trust">
+    <div class="trust-grid">
+      <div class="titem"><span class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M12 3 3 8h18z"/><path d="M4 10.5v9M9 10.5v9M15 10.5v9M20 10.5v9"/></svg></span><div><h4>Segregated funds</h4><p>Client money is held separately at tier&#8209;1 banks.</p></div></div>
+      <div class="titem"><span class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg></span><div><h4>Negative balance protection</h4><p>You can never lose more than you deposit.</p></div></div>
+      <div class="titem"><span class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></span><div><h4>256&#8209;bit encryption</h4><p>Bank&#8209;grade security on every session.</p></div></div>
+      <div class="titem"><span class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span><div><h4>Independent audits</h4><p>Balances and execution reviewed regularly.</p></div></div>
+    </div>
+  </section>
+
+  <!-- Final CTA -->
+  <section class="lp-cta">
+    <h2>Start trading in minutes</h2>
+    <p>Open an account in 60 seconds &mdash; or explore risk&#8209;free with a demo.</p>
+    <div class="lp-cta-btns">
+      <a class="btn-lg solid" href="signup.html" target="_blank" rel="noopener">Open account</a>
+      <a class="btn-lg outline" href="signup.html" target="_blank" rel="noopener">Try demo</a>
+    </div>
+  </section>
+  </div>
+
+  <footer class="site-foot">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <div class="fb-top">
+          <a class="logo foot-logo" href="/"><span class="mark">A</span>Alpexa FX</a>
+          <div class="award" title="Best Forex Broker 2026" aria-label="Best Forex Broker 2026">
+            <svg viewBox="0 0 108 126" xmlns="http://www.w3.org/2000/svg" role="img">
+              <defs>
+                <linearGradient id="awBlue" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#4a6bf0"/><stop offset=".5" stop-color="#1e40d8"/><stop offset="1" stop-color="#1631a8"/>
+                </linearGradient>
+              </defs>
+              <path d="M16 14 H92 V72 C92 96 66 110 54 116 C42 110 16 96 16 72 Z" fill="none" stroke="url(#awBlue)" stroke-width="2.6" stroke-linejoin="round"/>
+              <path d="M22 20 H86 V70 C86 91 65 103 54 108 C43 103 22 91 22 70 Z" fill="none" stroke="url(#awBlue)" stroke-width="1"/>
+              <path d="M54 27 L55.9 32.4 L61.6 32.5 L57 36 L58.7 41.5 L54 38.2 L49.3 41.5 L51 36 L46.4 32.5 L52.1 32.4 Z" fill="url(#awBlue)"/>
+              <text x="54" y="61" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="20" font-weight="800" letter-spacing="-.5" fill="#0e1726">2026</text>
+              <text x="54" y="77" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-size="8" font-weight="800" letter-spacing=".7" fill="#1e40d8">BEST FOREX</text>
+              <text x="54" y="88" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-size="6.5" font-weight="800" letter-spacing=".1" fill="#1e40d8">ECN/STP BROKER</text>
+            </svg>
+          </div>
+          <div class="award" title="Best Forex Broker 2025" aria-label="Best Forex Broker 2025">
+            <svg viewBox="0 0 108 126" xmlns="http://www.w3.org/2000/svg" role="img">
+              <path d="M16 14 H92 V72 C92 96 66 110 54 116 C42 110 16 96 16 72 Z" fill="none" stroke="url(#awBlue)" stroke-width="2.6" stroke-linejoin="round"/>
+              <path d="M22 20 H86 V70 C86 91 65 103 54 108 C43 103 22 91 22 70 Z" fill="none" stroke="url(#awBlue)" stroke-width="1"/>
+              <path d="M54 27 L55.9 32.4 L61.6 32.5 L57 36 L58.7 41.5 L54 38.2 L49.3 41.5 L51 36 L46.4 32.5 L52.1 32.4 Z" fill="url(#awBlue)"/>
+              <text x="54" y="61" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="20" font-weight="800" letter-spacing="-.5" fill="#0e1726">2025</text>
+              <text x="54" y="77" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-size="8" font-weight="800" letter-spacing=".7" fill="#1e40d8">BEST FOREX</text>
+              <text x="54" y="88" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-size="6.5" font-weight="800" letter-spacing=".1" fill="#1e40d8">ECN/STP BROKER</text>
+            </svg>
+          </div>
+        </div>
+        <div class="cpy">© 2026, Alpexa FX · An Alpexa Suisse company<br><a href="fx-risk.html">Risk Disclosure</a></div>
+      </div>
+      <div class="foot-col">
+        <h4>Menu</h4>
+        <a href="markets.html">Markets</a><a href="ib.html">IB</a><a href="about.html">About</a>
+      </div>
+      <div class="foot-col">
+        <h4>Account</h4>
+        <a href="webtrade.html?theme=legend" target="_blank" rel="noopener">Log in</a><a href="signup.html" target="_blank" rel="noopener">Open account</a><a href="agent.html" rel="noopener">IB Portal</a>
+      </div>
+    </div>
+    <div class="wordmark">ALPEXA</div>
+    <div class="resp-bar">Trading forex and CFDs on margin carries a high level of risk and may not be suitable for all investors. Leverage can work against you — only trade with capital you can afford to lose.</div>
+  </footer>
+
+    <script>
+  /* FX site is white-only — force the light theme regardless of any stored preference. */
+  try{ document.body.classList.add('light'); }catch(e){}
+  </script>
+  <script>
+  /* Crossfade hero slogans — both stacked in one grid cell, fade in place (no horizontal
+     motion, so nothing ever slides into the quotes widget or gets clipped). 5s auto-advance,
+     pause on hover, dot controls, respect prefers-reduced-motion (no auto-advance). */
+  (function(){
+    var host=document.getElementById('hslides'), dotsEl=document.getElementById('hdots');
+    if(!host||!dotsEl) return;
+    var slides=host.querySelectorAll('.h-slide'), dots=dotsEl.querySelectorAll('button');
+    var n=slides.length, idx=0, timer=null, paused=false, reduce=false;
+    try{ reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
+    function paint(){
+      for(var i=0;i<n;i++){ slides[i].classList.toggle('on', i===idx); }
+      for(var j=0;j<dots.length;j++){ dots[j].classList.toggle('on', j===idx); }
+    }
+    function go(i){ idx=(i+n)%n; paint(); }
+    function start(){ if(reduce) return; stop(); timer=setInterval(function(){ if(!paused) go(idx+1); }, 8500); }
+    function stop(){ if(timer){ clearInterval(timer); timer=null; } }
+    for(var k=0;k<dots.length;k++){ (function(m){ dots[m].addEventListener('click',function(){ go(m); start(); }); })(k); }
+    host.addEventListener('mouseenter',function(){ paused=true; });
+    host.addEventListener('mouseleave',function(){ paused=false; });
+    paint(); start();
+  })();
+  </script>
+
+</body>
+</html>
