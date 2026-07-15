@@ -576,8 +576,17 @@ function renderAddMenu(){ const m=document.getElementById('addMenu'); if(!m) ret
   }).join('');
 }
 
+/* 클릭한 위젯 = 맨 앞 (레전드 창 동작). z를 2..N으로 재정규화해
+   정렬 가이드(z45)·검색/QB 팝업(z40/60) 아래를 항상 유지 — 카운터 무한증가 없음. */
+const zOrder=[];
+function bringToFront(id){
+  const i=zOrder.indexOf(id); if(i>=0) zOrder.splice(i,1); zOrder.push(id);
+  zOrder.forEach((wid,k)=>{ const el=document.getElementById('w-'+wid); if(el) el.style.zIndex=2+k; });
+}
 function makeWidget(id, title, sub, linkColor, bodyHTML){
   const el=document.createElement('div'); el.className='widget'; el.id='w-'+id;
+  zOrder.push(id);
+  el.addEventListener('pointerdown', ()=>bringToFront(id), true);   // 캡처: 드래그·본문 클릭 모두
   el.innerHTML='<div class="wtb"><span class="linksq" style="background:'+linkColor+'"></span>'+
     '<h3>'+title+'</h3>'+(sub?'<span class="wsub">'+sub+'</span>':'')+
     '<span class="wsp"></span><span class="wic" title="메뉴">⋮</span></div>'+
@@ -1369,8 +1378,9 @@ document.getElementById('btnAdd').onclick=(e)=>{ e.stopPropagation();
   renderAddMenu(); addMenu.style.display=addMenu.style.display==='none'?'block':'none'; };
 addMenu.addEventListener('click', e=>{ const r=e.target.closest('.addrow'); if(!r) return;
   const id=r.dataset.id;
-  if(layout[id].hidden){ setHidden(id,false); }         // 다시 추가 (기존 자리·크기 복원)
-  else{ const el=document.getElementById('w-'+id);      // 이미 있음 → 잠깐 하이라이트로 위치 알림
+  if(layout[id].hidden){ setHidden(id,false); bringToFront(id); }   // 다시 추가 (기존 자리·크기 복원 + 맨 앞)
+  else{ const el=document.getElementById('w-'+id);      // 이미 있음 → 맨 앞 + 잠깐 하이라이트로 위치 알림
+    bringToFront(id);
     el.style.borderColor='var(--lgd-up)'; setTimeout(()=>{ el.style.borderColor=''; },700); }
   addMenu.style.display='none'; });
 document.addEventListener('click', ()=>{ addMenu.style.display='none'; });
