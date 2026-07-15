@@ -645,9 +645,16 @@ const moneyStore={
   bal:null, openBets:[], subs:new Set(), authed:false,
   sub(f){ this.subs.add(f); return ()=>this.subs.delete(f); },
   emit(){ this.subs.forEach(f=>{ try{ f(this); }catch(e){} }); },
+  rg:{selfExcludeUntil:0, lossLimit:0},
   async pull(){
     const m=meId(); this.authed=!!m;
     if(!m){ this.bal=null; this.openBets=[]; this.emit(); return; }
+    try{ // RG 설정은 서버 소유(players) — localStorage 클리어로 우회 불가 (앱:1498-1507)
+      const r=await AlpexaSync.db.from('players').select('self_exclude_until,loss_limit')
+        .eq('cust_id',m.custId).limit(1);
+      const pr=r&&r.data&&r.data[0];
+      if(pr){ this.rg.selfExcludeUntil=+pr.self_exclude_until||0; this.rg.lossLimit=+pr.loss_limit||0; }
+    }catch(e){}
     try{ const out=await AlpexaSync.pullBalances(); if(out&&out.sports!=null) this.bal=+out.sports; }catch(e){}
     try{ // 앱 pullServerBets 계약 그대로 (sports-live.html:2316) — meta.legs로 티켓 복원
       const r=await AlpexaSync.db.from('positions')
@@ -724,7 +731,10 @@ function renderBets(){
       const single=b.legs.length===1;
       const badge=single?'Single':esc(String(b.type||'Parlay').split(' · ')[0])+' '+b.legs.length+' legs';
       // 상태칩 어휘는 앱과 동일: Open/Won/Cashed Out/Push/Lost — Open 위젯은 Open+위계 표시
-      const co=(b.cashout>0&&!b.viewOnly)
+      // 앱과 락스텝(:2116): 캐시아웃 버튼은 실 라이브 배당 피드 연결 전까지 숨김 —
+      // 아래 doCashout 경로(cash_out RPC)는 코드에 유지, 앱이 다시 켤 때 함께 켠다.
+      const CASHOUT_ENABLED=false;
+      const co=(CASHOUT_ENABLED&&b.cashout>0&&!b.viewOnly)
         ? '<span class="co"><button data-cash="'+esc(b.id)+'">Cash out '+usd(b.cashout)+'</button>'+
           '<button class="half" data-cashhalf="'+esc(b.id)+'">½</button></span>' : '';
       return '<div class="tkc"><div class="th"><span class="badge">'+badge+'</span>'+
@@ -851,6 +861,22 @@ async function placeBetCore(legsArr, mode, stake){
   const m=meId();
   if(!m) return {ok:false, msg:'로그인이 필요합니다', login:true};
   if(window.__alpexaHalt) return {ok:false, msg:'Trading paused — betting is temporarily disabled'};
+  // P1 가드 (스펙 §8 차이감사): 자기배제 + 일일 손실 한도 — 앱 isLocked/checkLossLimit (:1439-1448, :1978-1979)
+  if(moneyStore.rg.selfExcludeUntil&&moneyStore.rg.selfExcludeUntil>Date.now())
+    return {ok:false, msg:'Account locked — Self-exclusion is active'};
+  if(moneyStore.rg.lossLimit>0){
+    // 오늘 베팅 스테이크 합 — 서버 ledger(kind=bet, betstake-)에서 파생: 기기·탭 무관, 위조 불가
+    let lost=0;
+    try{ const t0=new Date(); t0.setHours(0,0,0,0);
+      const m=meId();
+      const r=await AlpexaSync.db.from('ledger').select('amount')
+        .eq('cust_id',m.custId).eq('server','sports').eq('kind','bet')
+        .gte('created_at', t0.toISOString());
+      if(r&&Array.isArray(r.data)) r.data.forEach(x=>{ if(+x.amount<0) lost+=-x.amount; });
+    }catch(e){}
+    if(lost>=moneyStore.rg.lossLimit)
+      return {ok:false, msg:'Loss limit reached — Daily limit '+usd(moneyStore.rg.lossLimit)+' hit'};
+  }
   const n=legsArr.length; if(!n) return {ok:false, msg:''};
   const d=comboDec(legsArr);
   const pot=mode==='single'?legsArr.reduce((a,l)=>a+l.stake*dec(l.am),0):stake*d;

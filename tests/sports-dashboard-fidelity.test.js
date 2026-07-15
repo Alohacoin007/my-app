@@ -68,6 +68,11 @@ if (/rpc\(\s*['"]place_bet['"]|Est\. Payout|Place bet/i.test(src)) {
   pin(/p_local_id/, 'place_bet 멱등 파라미터 p_local_id (앱:2018)');
   pin(/SGP_HAIRCUT\s*=\s*0\.25|SGP_HAIRCUT=0\.25/, 'SGP 헤어컷 0.25 — 앱·SQL·정산 3곳 락스텝 (앱:1572)');
   pin(/Est\. Payout/, 'Est. Payout 라벨 (앱:1073)');
+  // P1 돈 관문 (스펙 §8 차이감사 1·2번): RG 가드는 서버 소유 players에서 — 빠지면 우회 베팅 구멍
+  pin(/self_exclude_until/, '자기배제 가드 — players.self_exclude_until 서버 소유 검사 (앱:1439,1978)');
+  pin(/Self-exclusion is active/, '자기배제 차단 문구 (앱 리터럴)');
+  pin(/loss_limit|lossLimit/, '일일 손실 한도 가드 (앱:1440-1448,1979)');
+  pin(/Loss limit reached/, '손실 한도 차단 문구 (앱 리터럴)');
   pin(/\+'\|'\+|\+ *'\|' *\+/, 'leg uid = gid+"|"+sel 규약 (앱:1643)');
 }
 // 캐시아웃이 있으면
