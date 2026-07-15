@@ -89,15 +89,27 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
   font-size:var(--lgd-fs-label); text-align:center; padding:16px}
 
 /* ══ Balance card ══ */
-.bal{padding:14px 16px 10px; display:flex; flex-direction:column; flex:1; min-height:0}
-.bal .top{display:flex; align-items:flex-start}
-.bal .nm{font-size:16px; font-weight:600}
+/* ══ 발란스 카드 — 레전드 §8.10 실물 확정 (헤더→스파크→레인지탭→키-밸류 섹션, 좌우 ~22px) ══ */
+.bal{padding:14px 22px 14px; display:flex; flex-direction:column; flex:1; min-height:0; overflow:auto}
+.bal .top{display:flex; align-items:flex-start; flex:none}
+.bal .nm{font-size:17px; font-weight:700}
 .bal .dep{margin-left:auto; background:var(--lgd-pill); border:none; color:var(--lgd-ink);
-  border-radius:var(--lgd-r-btn); height:30px; padding:0 13px; font-size:var(--lgd-fs-body); font-weight:700; cursor:pointer}
+  border-radius:6px; height:28px; padding:0 12px; font-size:var(--lgd-fs-body); font-weight:700; cursor:pointer}
 .bal .dep:hover{background:var(--lgd-pill-hi)}
-.bal .amt{font-size:24px; font-weight:600; margin-top:2px}
-.bal .sub{display:flex; gap:14px; margin-top:8px; font-size:var(--lgd-fs-label); color:var(--lgd-dim)}
-.bal .sub b{color:var(--lgd-ink); font-weight:600}
+.bal .amt{font-size:23px; font-weight:700; margin-top:2px}
+.bal .chg{font-size:var(--lgd-fs-label); font-weight:600; margin-top:3px; min-height:16px}
+.bal .chg.up{color:var(--lgd-up)} .bal .chg.down{color:var(--lgd-down)}
+.bal .chg .dim{color:var(--lgd-dim); font-weight:500}
+.bal canvas.spark{width:100%; height:90px; flex:none; margin-top:6px}
+.bal .ranges{display:flex; gap:2px; align-items:center; flex:none; margin:6px 0 0}
+.bal .ranges button{background:transparent; border:none; color:var(--lgd-up); font-weight:700; font-size:12px;
+  padding:3px 8px; border-radius:5px; cursor:pointer; font-family:inherit; letter-spacing:.2px}
+.bal .ranges button.on{background:var(--lgd-up); color:#0B0D0E}   /* §8.10: 유일한 solid-액센트 반전 */
+.bal .sect{font-size:14px; font-weight:700; margin-top:16px; flex:none}
+.bal .kv{display:flex; justify-content:space-between; align-items:center; min-height:28px; flex:none}
+.bal .kv .k{color:var(--lgd-ink)}
+.bal .kv .v{font-weight:600}
+.bal .kv .v.pos{color:var(--lgd-up)} .bal .kv .v.neg{color:var(--lgd-down)}
 
 /* ══ Leagues ══ */
 .lgs{flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column}
@@ -697,11 +709,24 @@ function makeWidget(id, title, sub, linkColor, bodyHTML){
 
 /* ════════════════════ 위젯 1: Balance (표시 전용 — 서버가 유일한 주인) ════════════════════
    v1은 공개 페이지라 세션 없음 → 앱과 같은 미로드 표기 '···' (앱:2602 — 0으로 거짓 표시 금지) */
+/* 레전드 §8.10 4층 문법: 헤더(이름→큰 잔고→▲변화) → 스파크라인(ledger 역산) → 레인지탭 →
+   키-밸류 섹션(Overview/P&L/Open bets). Margin 프로모는 생략(§8.10 — 스포츠 대응물 없음,
+   잔고 위젯 내 크레딧 판촉은 규제 스포츠북 관행 위반). 전부 서버 read-only 표시. */
+const kvRow=(k,id)=>'<div class="kv"><span class="k">'+k+'</span><span class="v tnum" id="'+id+'">···</span></div>';
 makeWidget('balance','Account','Sports','var(--lgd-link1)',
   '<div class="bal tnum"><div class="top"><div><div class="nm">Alpexa Sports</div>'+
-  '<div class="amt" id="balAmt">···</div></div>'+
+  '<div class="amt" id="balAmt">···</div>'+
+  '<div class="chg" id="balChg"></div></div>'+
   '<button class="dep" onclick="openMoney(\'deposit\')">Deposit</button></div>'+
-  '<div class="sub"><span>Pending <b id="balPend">···</b></span><span>Credit <b id="balCred">···</b></span></div></div>');
+  '<canvas class="spark" id="balSpark"></canvas>'+
+  '<div class="ranges" id="balRanges">'+['1D','1W','1M','3M','YTD','1Y','ALL'].map((r,i)=>
+    '<button data-r="'+r+'"'+(i===0?' class="on"':'')+'>'+r+'</button>').join('')+'</div>'+
+  '<div class="sect">Overview</div>'+
+  kvRow('Balance','balOvBal')+kvRow('Pending','balPend')+kvRow('Credit','balCred')+kvRow('Total assets','balTot')+
+  '<div class="sect">Profit & loss</div>'+
+  kvRow('Today','balPTd')+kvRow('YTD','balPYtd')+kvRow('Win rate','balPWr')+kvRow('ROI','balPRoi')+
+  '<div class="sect">Open bets</div>'+
+  kvRow('Total wager','balOw')+kvRow('Est. payout','balOe')+'</div>');
 
 /* ════════════════════ 위젯 2: Leagues (앱 .sports 탭의 세로화) ════════════════════ */
 const LEAGUES=[['MLB','Baseball'],['SOC','Soccer'],['NFL','Football'],['NBA','Basketball'],['NHL','Hockey'],['UFC','MMA'],['NCAAB','College BB']];
@@ -868,7 +893,15 @@ const moneyStore={
     }catch(e){}
     try{ const out=await AlpexaSync.pullBalances();
       if(out&&out.sports!=null) this.bal=+out.sports;
-      if(out&&out.crypto!=null) this.balCrypto=+out.crypto; }catch(e){}
+      if(out&&out.crypto!=null) this.balCrypto=+out.crypto;
+      if(out&&out.fx!=null) this.balFx=+out.fx; }catch(e){}
+    try{ // 스파크라인/오늘 변화용 ledger — 읽기 전용 (불변식: balance == 오프닝 + Σledger)
+      const r=await AlpexaSync.db.from('ledger').select('amount,created_at')
+        .eq('cust_id',m.custId).eq('server','sports')
+        .order('created_at',{ascending:false}).limit(800);
+      if(r&&!r.error&&Array.isArray(r.data))
+        this.ledger=r.data.map(x=>({amt:+x.amount||0, ts:x.created_at?new Date(x.created_at).getTime():0}));
+    }catch(e){}
     try{ // 출금 가능액 = 서버 withdrawable_for RPC (보너스·잠금자금 제외 — 앱:2856). 서버가 최종 관문.
       const acct=m.accts&&m.accts.sports;
       if(acct){ const r=await AlpexaSync.db.rpc('withdrawable_for',{p_acct:acct});
@@ -937,7 +970,7 @@ const moneyStore={
     }catch(e){}
     this.emit();
   },
-  settled:[], finTxns:[], balCrypto:null, withdrawable:null,
+  settled:[], finTxns:[], balCrypto:null, balFx:null, withdrawable:null, ledger:[],
   start(){ if(this.timer) return; this.pull(); this.timer=setInterval(()=>this.pull(),10000); }   // 앱 잔고 폴 주기
 };
 const ICONS={NBA:'🏀',NCAAB:'🎓',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽',UFC:'🥊'};
@@ -954,15 +987,94 @@ function pullControls(){ if(!(window.AlpexaSync&&AlpexaSync.db)) return;
 }
 setTimeout(pullControls,1300); setInterval(()=>{ if(!document.hidden) pullControls(); },5000);
 
-/* ── Account 카드: 실잔고 (미로그인 '···' 유지 — 0으로 거짓 표시 금지) ── */
-moneyStore.sub(ms=>{
-  const amt=document.getElementById('balAmt'), pend=document.getElementById('balPend'), cred=document.getElementById('balCred');
-  if(!amt) return;
-  if(!ms.authed){ amt.textContent='···'; pend.textContent='···'; cred.textContent='···'; return; }
-  amt.textContent=ms.bal==null?'···':usd(ms.bal);
-  pend.textContent=usd(ms.openBets.reduce((a,b)=>a+(+b.stake||0),0));   // Pending = 오픈 스테이크 합 (앱:2537)
-  cred.textContent=usd(0);   // real mode credit=0 (앱:2467 — 캐시백 클레임 보안상 비활성)
+/* ── Account 카드 렌더 (레전드 §8.10) — 미로그인 '···' 유지, 0으로 거짓 표시 금지 ── */
+let balRange='1D';
+let hideAmounts=false; try{ hideAmounts=localStorage.getItem('alpexa.sbdash.mask')==='1'; }catch(e){}   // UI 설정 — 돈 아님, 로컬 OK
+const RANGE_MS={ '1D':86400e3, '1W':7*86400e3, '1M':30*86400e3, '3M':90*86400e3, '1Y':365*86400e3 };
+function rangeCutoff(){ if(balRange==='ALL') return 0;
+  if(balRange==='YTD'){ const y=new Date(); return new Date(y.getFullYear(),0,1).getTime(); }
+  return Date.now()-RANGE_MS[balRange]; }
+/* 잔고 곡선 = 현재 잔고에서 ledger를 거꾸로 걸어 역산: balance_at(t) = now − Σ ledger(t..now).
+   불변식(accounts.balance == 오프닝 + Σledger)이 정확성을 보장 — 클라 쓰기 0, 표시 전용. */
+function balSeries(ms){
+  const rows=(ms.ledger||[]).slice().sort((a,b)=>a.ts-b.ts);   // 과거→현재
+  const pts=[]; let run=+ms.bal||0;   // 표시 전용 역산 커서 (서버 잔고는 불변)
+  for(let i=rows.length-1;i>=0;i--){ pts.unshift({ts:rows[i].ts, v:run}); run-=rows[i].amt; }
+  pts.unshift({ts:rows.length?rows[0].ts-1:Date.now()-86400e3, v:run});   // 창 시작점(당시 잔고)
+  pts.push({ts:Date.now(), v:+ms.bal||0});
+  const cut=rangeCutoff();
+  const inWin=pts.filter(p=>p.ts>=cut);
+  if(!inWin.length||inWin[0].ts>cut){ const before=pts.filter(p=>p.ts<cut);
+    inWin.unshift({ts:cut, v:before.length?before[before.length-1].v:(+ms.bal||0)}); }
+  return inWin;
+}
+function drawSpark(ms){
+  const cv=document.getElementById('balSpark'); if(!cv) return;
+  const dpr=window.devicePixelRatio||1, W=cv.clientWidth||300, H=cv.clientHeight||90;
+  cv.width=W*dpr; cv.height=H*dpr;
+  const cx=cv.getContext('2d'); cx.scale(dpr,dpr); cx.clearRect(0,0,W,H);
+  if(!ms.authed) return;
+  const pts=balSeries(ms);
+  const t0=pts[0].ts, t1=pts[pts.length-1].ts||t0+1;
+  let lo=Math.min(...pts.map(p=>p.v)), hi=Math.max(...pts.map(p=>p.v));
+  if(hi-lo<1e-9){ lo-=1; hi+=1; }   // 평평한 곡선(변화 0)도 중앙선으로
+  const X=t=>4+(W-8)*((t-t0)/Math.max(1,t1-t0)), Y=v=>H-8-(H-16)*((v-lo)/(hi-lo));
+  const up=pts[pts.length-1].v>=pts[0].v;
+  cx.strokeStyle=up?'#00C805':'#EB5D2A'; cx.lineWidth=1.6;
+  cx.setLineDash([2,3]);   // §8.10: 그린 점선 스타일, 축·그리드 없음
+  cx.beginPath();
+  pts.forEach((p,i)=>{ const x=X(p.ts), y=Y(p.v); if(i===0)cx.moveTo(x,y); else{ cx.lineTo(x,Y(pts[i-1].v)); cx.lineTo(x,y); } });   // 계단(잔고는 이산 변화)
+  cx.stroke(); cx.setLineDash([]);
+}
+const mv=(n)=> hideAmounts?'••••':(n==null?'···':usd(n));   // §8.10: 마스킹 = 고정 4점(자릿수 은닉)
+function renderAccount(ms){
+  const $=id=>document.getElementById(id); if(!$('balAmt')) return;
+  const ids=['balAmt','balOvBal','balPend','balCred','balTot','balPTd','balPYtd','balPWr','balPRoi','balOw','balOe'];
+  if(!ms.authed){ ids.forEach(i=>{ $(i).textContent='···'; }); $('balChg').textContent=''; drawSpark(ms); return; }
+  $('balAmt').textContent=mv(ms.bal);
+  // ▲ 변화 = 오늘 ledger 합 (자정 이후 순변화)
+  const t0=new Date(); t0.setHours(0,0,0,0);
+  const chg=(ms.ledger||[]).filter(l=>l.ts>=t0.getTime()).reduce((a,l)=>a+l.amt,0);
+  const ce=$('balChg'); ce.className='chg '+(chg>=0?'up':'down');
+  ce.innerHTML=(chg>=0?'▲ ':'▼ ')+(hideAmounts?'••••':usd(Math.abs(chg)))+' <span class="dim">Today</span>';
+  const pend=ms.openBets.reduce((a,b)=>a+(+b.stake||0),0);   // Pending = 오픈 스테이크 합 (앱:2537)
+  $('balOvBal').textContent=mv(ms.bal);
+  $('balPend').textContent=mv(pend);
+  $('balCred').textContent=mv(0);   // real mode credit=0 (앱:2467 — 캐시백 클레임 보안상 비활성)
+  const tot=(ms.bal!=null||ms.balCrypto!=null||ms.balFx!=null)?((+ms.bal||0)+(+ms.balCrypto||0)+(+ms.balFx||0)):null;
+  $('balTot').textContent=mv(tot);   // Total assets 전서버 (§8.9 번역)
+  // P&L = settlements 집계 (통계 위젯과 같은 데이터원 — 실현 손익만, 규제 브로커 의미론)
+  const sb=ms.settled||[], y0=new Date(new Date().getFullYear(),0,1).getTime();
+  const pnl=b=>(+b.payout||0)-(+b.stake||0);
+  const pTd=sb.filter(b=>b.ts>=t0.getTime()).reduce((a,b)=>a+pnl(b),0);
+  const pYtd=sb.filter(b=>b.ts>=y0).reduce((a,b)=>a+pnl(b),0);
+  const setV=(id,v)=>{ const el=$(id); el.textContent=hideAmounts?'••••':((v>0?'+':v<0?'−':'')+usd(Math.abs(v))); el.className='v tnum '+(v>0?'pos':v<0?'neg':''); };
+  setV('balPTd',pTd); setV('balPYtd',pYtd);
+  const wonN=sb.filter(b=>b.result==='won').length;
+  const staked=sb.reduce((a,b)=>a+(+b.stake||0),0), net=sb.reduce((a,b)=>a+pnl(b),0);
+  $('balPWr').textContent=sb.length?Math.round(wonN/sb.length*100)+'%':'—';
+  $('balPRoi').textContent=staked?(Math.round(net/staked*1000)/10)+'%':'—';
+  $('balOw').textContent=mv(pend);   // Total wager = 오픈 스테이크 합
+  $('balOe').textContent=mv(ms.openBets.reduce((a,b)=>a+(+b.potential||0),0));   // Est. payout (추정 — 서버 정산과 무관)
+  drawSpark(ms);
+}
+moneyStore.sub(renderAccount);
+document.getElementById('balRanges').addEventListener('click', e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  balRange=b.dataset.r;
+  document.querySelectorAll('#balRanges button').forEach(x=>x.classList.toggle('on', x===b));
+  drawSpark(moneyStore);
 });
+// 눈-사선 토글 — 타이틀바 상주 (§8.10). 상태는 UI 설정이라 localStorage OK (돈 아님).
+(function(){
+  const tb=document.querySelector('#w-balance .wtb'), menu=tb.querySelector('.wic');
+  const ic=document.createElement('span'); ic.className='wic'; ic.id='balEye'; ic.title='Hide balances';
+  ic.innerHTML='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/><line x1="3" y1="21" x2="21" y2="3"/></svg>';
+  tb.insertBefore(ic, menu);
+  ic.addEventListener('click', e=>{ e.stopPropagation();
+    hideAmounts=!hideAmounts; try{ localStorage.setItem('alpexa.sbdash.mask', hideAmounts?'1':'0'); }catch(err){}
+    renderAccount(moneyStore); });
+})();
 
 /* ── My bets 위젯 (앱 ticketHTML 문법) ── */
 makeWidget('mybets','My bets','','var(--lgd-link1)',

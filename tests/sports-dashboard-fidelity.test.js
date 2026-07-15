@@ -166,6 +166,19 @@ if (/withdraw_hold|app_transfer|Deposit requested/.test(src)) {
 if (/Balance|balbar/i.test(src)) {
   pin(/'···'|>···</, '잔고 미로드 표기 ··· (앱:2602) — 0으로 거짓 표시 금지');
 }
+// 레전드 발란스 카드 위젯이 있으면 (스펙 §8.10 실물 확정 — 2026-07-15 캡처)
+if (/Total assets|Profit & loss/.test(src)) {
+  pin(/Overview/, '섹션 라벨 Overview (§8.10)');
+  pin(/Profit & loss/, '섹션 라벨 Profit & loss (§8.10)');
+  pin(/'1D','1W','1M','3M','YTD','1Y','ALL'/, '레인지 탭 7종 순서 1D~ALL (§8.10)');
+  pin(/Total assets/, 'Overview 행: Total assets 전서버 합 (§8.9 번역)');
+  pin(/Total wager/, 'Open bets 행: Total wager (§8.10 Futures 번역)');
+  pin(/Est\. payout/, 'Open bets 행: Est. payout — 서버 정산과 무관한 추정 표기 (§8.10)');
+  pin(/hideAmounts/, '눈-사선 잔고 마스킹 토글 (§8.10 — 민감 수치 위젯 상주 토글)');
+  pin(/'••••'/, '마스킹 = 고정 4점 •••• (자릿수 은닉, §8.10)');
+  pin(/from\(\s*['"]ledger['"]\s*\)\s*\.\s*select/, '스파크라인 = ledger 읽기 전용 역산 (balance_now − Σledger) — 클라 쓰기 0');
+  ban(/Enable margin/i, '마진 프로모 이식 — 스포츠 대응물 없음, 잔고 위젯 내 크레딧 판촉 금지 (§8.10 생략 권고)');
+}
 // live_games를 읽으면
 if (/live_games/.test(src)) {
   pin(/\.eq\(\s*['"]id['"]\s*,\s*['"]all['"]\s*\)|id=eq\.all/, 'live_games 단일 행(id=all) 계약 (앱:3635)');
