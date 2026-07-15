@@ -2985,6 +2985,15 @@ function Toolbar({ tf, chartType, tool }){
   // MT5 chart-follow toggles — local mirror of the chartOpts global for the pressed look
   const [asOn,setAsOn]=React.useState(chartOpts.autoScroll);
   const [shOn,setShOn]=React.useState(chartOpts.shift);
+  // 서버 전환 + 메뉴 (대시보드 헤더 +와 같은 역할 — 탭 스트립 = 서버 변경)
+  const [srvMenu,setSrvMenu]=React.useState(false);
+  React.useEffect(()=>{ if(!srvMenu) return;
+    const close=()=>setSrvMenu(false);
+    document.addEventListener('click', close);
+    return ()=>document.removeEventListener('click', close); }, [srvMenu]);
+  // 이동은 window.top 기준: 터미널이 스포츠 대시보드 iframe 안에 떠 있을 때
+  // 같은 창에 대시보드가 또 열리는 중첩을 막는다 (same-origin).
+  const goSrv=(p)=>{ try{ (window.top&&window.top!==window?window.top:window).location.href=p; }catch(e){ location.href=p; } };
   React.useEffect(()=> terminalBus.subscribe((cmd)=>{ if(cmd==='algo.toggle') setAlgo(a=>!a); }), []);
   return (
     <div className="tools">
@@ -3019,7 +3028,16 @@ function Toolbar({ tf, chartType, tool }){
       <div className="tibtn" title="Grid On/Off (Ctrl+G)" onClick={()=>terminalBus.emit('chart.grid')} style={{fontSize:'15px',lineHeight:'26px'}}>▦</div>
       <div className="tsep"></div>
       <div className="tf">{TFS.map(t=><b key={t} className={t===tf?'on':''} onClick={()=>terminalBus.emit('chart.tf',t)}>{t}</b>)}</div>
-      <div className="tbrand">ALPEXA <span>WebTrade</span></div>
+      {/* 서버 전환 + — 브랜드 앞, 툴바 아이콘 크기 그대로. 메뉴는 MT5 ctxmenu 문법 재사용 */}
+      <div style={{position:'relative',marginLeft:'auto',display:'flex',alignItems:'center',gap:'8px'}}>
+        <div className="tibtn" title="Switch server" style={{fontSize:'15px',lineHeight:'26px'}}
+          onClick={(e)=>{e.stopPropagation();setSrvMenu(v=>!v);}}>＋</div>
+        {srvMenu && <div className="ctxmenu" style={{position:'absolute',right:0,top:'29px',left:'auto'}}>
+          <div className="ci" onClick={()=>goSrv('sports-dashboard.html')}>🏟️ Alpexa Sports — Web dashboard</div>
+          <div className="ci dis">🪙 Alpexa Crypto — Coming this week</div>
+        </div>}
+        <div className="tbrand" style={{marginLeft:0}}>ALPEXA <span>WebTrade</span></div>
+      </div>
     </div>
   );
 }
