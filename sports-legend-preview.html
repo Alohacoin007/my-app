@@ -1,0 +1,216 @@
+<!doctype html>
+<!-- ═══════════════════════════════════════════════════════════════════════════
+  ALPEXA SPORTS × LEGEND — 리디자인 시안 (2026-07-15)
+  ⚠️ 정적 시안입니다 — 실데이터·실코드 아님. 배당·점수·잔고 전부 하드코딩 샘플.
+  원본 sports-live.html 무변경 (카본 스킨 전례: 채택 시 ?skin=legend 테마 레이어로 정식 구현).
+  디자인 언어: 레전드-디자인-스펙.md §1 토큰 (legend-ui.css --lgd-*) — 구조·문법은 앱 그대로,
+  스킨(색·radius·타이포·그림자)만 레전드 다크로 번역.
+═══════════════════════════════════════════════════════════════════════════ -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alpexa Sports — Legend skin preview</title>
+<link rel="stylesheet" href="legend-ui.css">
+<style>
+/* ── 시안 무대 ── */
+body{margin:0; background:#050607; display:flex; align-items:flex-start; justify-content:center;
+  gap:28px; padding:28px; min-height:100vh}
+.note{color:#8B9096; font:12px/1.6 Inter,Pretendard,sans-serif; max-width:260px; padding-top:8px}
+.note b{color:#F5F6F7}
+.note .chip{display:inline-block; background:#26292C; color:#F5F6F7; border-radius:999px;
+  padding:2px 9px; font-size:11px; font-weight:700; margin:2px 4px 2px 0}
+/* ── 폰 프레임 ── */
+.phone{width:390px; height:844px; background:var(--lgd-bg,#0B0D0E); border-radius:34px;
+  border:1px solid #26292C; box-shadow:0 30px 80px rgba(0,0,0,.75); overflow:hidden;
+  display:flex; flex-direction:column; font-family:Inter,Pretendard,-apple-system,sans-serif;
+  color:var(--lgd-ink,#F5F6F7); position:relative}
+.scroll{flex:1; overflow:auto; min-height:0; scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+
+/* ── 헤더/발란스 (앱 .header 번역: 라이트 파랑 → 레전드 다크, 잔고 tabular) ── */
+.hd{padding:16px 16px 12px; background:var(--lgd-surface,#16181A); border-bottom:1px solid rgba(255,255,255,.06)}
+.hd .r1{display:flex; align-items:center; gap:10px}
+.hd .brand{font-size:16px; font-weight:800; letter-spacing:-.2px}
+.hd .sp{flex:1}
+.hd .srv{display:flex; align-items:center; gap:6px; background:#26292C; border-radius:999px;
+  padding:4px 10px; font-size:11px; font-weight:700; color:#F5F6F7}
+.hd .srv i{width:7px; height:7px; border-radius:50%; background:#00C805; display:inline-block}
+.hd .ic{width:30px; height:30px; display:flex; align-items:center; justify-content:center;
+  color:#8B9096; border-radius:8px}
+.hd .bal-lbl{font-size:11px; color:#8B9096; font-weight:600; letter-spacing:.5px; margin-top:14px}
+.hd .bal{font-size:28px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:-.4px; margin-top:2px}
+.hd .chg{font-size:12px; font-weight:700; color:#00C805; margin-top:3px}
+.hd .chg .dim{color:#8B9096; font-weight:500}
+.hd .acts{display:flex; gap:8px; margin-top:12px}
+.hd .acts button{flex:1; background:#26292C; border:none; color:#F5F6F7; border-radius:8px;
+  padding:9px 0; font:700 12.5px Inter,sans-serif; cursor:pointer}
+.hd .acts button.pri{background:#00C805; color:#03210a}
+
+/* ── 스포츠 탭 스트립 (앱 .sports 번역: 활성 = 레전드 필 반전) ── */
+.tabs{display:flex; gap:6px; padding:12px 16px 4px; overflow-x:auto; scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none; background:transparent; color:#8B9096; border:1px solid #26292C; border-radius:999px;
+  padding:6px 13px; font-size:12.5px; font-weight:700; white-space:nowrap}
+.tab.on{background:#F5F6F7; color:#0B0D0E; border-color:transparent}
+
+/* ── 컬럼 헤더 (앱 .colhead 그대로 — 라벨·순서 불변) ── */
+.colhead{display:grid; grid-template-columns:1fr 64px 64px 64px; gap:6px; padding:12px 16px 6px;
+  font-size:10.5px; font-weight:700; color:#8B9096; letter-spacing:.5px; text-transform:uppercase}
+.colhead span:not(:first-child){text-align:center}
+
+/* ── 경기 카드 (앱 .card 문법 유지: ch 헤더 + 매트릭스 2행, 원정 위/홈 아래) ── */
+.card{margin:6px 12px; background:var(--lgd-surface,#16181A); border:1px solid rgba(255,255,255,.05);
+  border-radius:12px; padding:10px 10px 12px}
+.card .ch{display:flex; align-items:center; gap:7px; font-size:11px; color:#8B9096; font-weight:600; padding:0 4px 8px}
+.card .ch .st{margin-left:auto; font-weight:700}
+.card .ch .st.live{color:#00C805}
+.card .ch .live-dot{width:6px; height:6px; border-radius:50%; background:#00C805; display:inline-block;
+  margin-right:4px; animation:blink 1.1s infinite}
+@keyframes blink{50%{opacity:.15}}
+.card .ch .star{color:rgba(139,144,150,.4); font-size:13px}
+.row{display:grid; grid-template-columns:1fr 64px 64px 64px; gap:6px; align-items:center; padding:3px 0}
+.row .tm{display:flex; align-items:center; gap:8px; font-size:13.5px; font-weight:700; min-width:0}
+.row .tm .ab{color:#8B9096; font-weight:600; font-size:11px; width:30px}
+.row .tm .sc{margin-left:auto; padding-right:8px; font-weight:800; font-variant-numeric:tabular-nums}
+.bet{background:#1D2023; border:1px solid transparent; border-radius:8px; text-align:center;
+  padding:5px 2px 4px; line-height:1.25; cursor:pointer}
+.bet .ln{display:block; font-size:9.5px; color:#8B9096}
+.bet .pr{display:block; font-size:12.5px; font-weight:800; font-variant-numeric:tabular-nums}
+.bet .pr.pos{color:#00C805}
+.bet.sel{background:rgba(0,200,5,.14); border-color:#00C805}
+.bet.sel .pr{color:#00C805}
+.bet.sus{opacity:.5; cursor:not-allowed}
+.bet.sus .pr{color:#8B9096}
+
+/* ── 하단 네비 (앱 .nav 번역: 라벨 4종 불변, 활성 그린) ── */
+.nav{flex:none; display:flex; background:var(--lgd-surface,#16181A); border-top:1px solid rgba(255,255,255,.07);
+  padding:8px 0 22px}
+.nav .ni{flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+  font-size:10px; font-weight:700; color:#8B9096}
+.nav .ni.on{color:#00C805}
+.nav .ni svg{width:21px; height:21px}
+/* 슬립 도크 (앱 슬립 열림 버튼 번역) */
+.slipdock{position:absolute; left:16px; right:16px; bottom:78px; background:#00C805; color:#03210a;
+  border-radius:12px; padding:12px 16px; display:flex; align-items:center; font:800 13px Inter,sans-serif;
+  box-shadow:0 12px 30px rgba(0,200,5,.25)}
+.slipdock .n{background:#03210a; color:#00C805; width:20px; height:20px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; font-size:11px; margin-right:9px}
+.slipdock .sp{flex:1}
+</style>
+</head>
+<body class="lgd">
+
+<div class="phone">
+  <div class="hd">
+    <div class="r1">
+      <span class="brand">Alpexa Sports</span>
+      <span class="sp"></span>
+      <span class="srv"><i></i>Sports</span>
+      <span class="ic"><svg viewBox="0 0 24 24" width="19" height="19" fill="none"><path d="M6 9a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 19a2 2 0 0 0 4 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+      <span class="ic"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+    </div>
+    <div class="bal-lbl">BALANCE · USD</div>
+    <div class="bal">$1,351,756.36</div>
+    <div class="chg">▲ $2,140.00 <span class="dim">Today</span></div>
+    <div class="acts">
+      <button class="pri">Deposit</button><button>Withdraw</button><button>Transfer</button>
+    </div>
+  </div>
+
+  <div class="scroll">
+    <div class="tabs">
+      <span class="tab on">⚾ MLB</span><span class="tab">⚽ Soccer</span><span class="tab">🏈 NFL</span>
+      <span class="tab">🏀 NBA</span><span class="tab">🏒 NHL</span><span class="tab">🥊 UFC</span>
+    </div>
+
+    <div class="colhead"><span>Today</span><span>Spread</span><span>Total</span><span>Moneyline</span></div>
+
+    <!-- LIVE 카드 (깜박 도트 + 그린 시계 + 점수 강조) -->
+    <div class="card">
+      <div class="ch">⚾ MLB <span class="st live"><span class="live-dot"></span>LIVE · Top 7</span> <span class="star">★</span></div>
+      <div class="row">
+        <div class="tm"><span class="ab">NYM</span>Mets<span class="sc">4</span></div>
+        <div class="bet"><span class="ln">+1.5</span><span class="pr">-175</span></div>
+        <div class="bet"><span class="ln">O 8.5</span><span class="pr pos">+103</span></div>
+        <div class="bet sel"><span class="ln">&nbsp;</span><span class="pr">+116</span></div>
+      </div>
+      <div class="row">
+        <div class="tm"><span class="ab">PHI</span>Phillies<span class="sc">2</span></div>
+        <div class="bet"><span class="ln">-1.5</span><span class="pr pos">+158</span></div>
+        <div class="bet"><span class="ln">U 8.5</span><span class="pr pos">+100</span></div>
+        <div class="bet"><span class="ln">&nbsp;</span><span class="pr">-127</span></div>
+      </div>
+    </div>
+
+    <!-- 실배당 카드 (pos 그린 / 음수 잉크 — 레전드 수치 문법) -->
+    <div class="card">
+      <div class="ch">⚾ MLB <span class="st">Fri 5:35 PM</span> <span class="star">★</span></div>
+      <div class="row">
+        <div class="tm"><span class="ab">TB</span>Rays</div>
+        <div class="bet"><span class="ln">+1.5</span><span class="pr">-140</span></div>
+        <div class="bet"><span class="ln">O 9.0</span><span class="pr">-110</span></div>
+        <div class="bet"><span class="ln">&nbsp;</span><span class="pr pos">+124</span></div>
+      </div>
+      <div class="row">
+        <div class="tm"><span class="ab">BOS</span>Red Sox</div>
+        <div class="bet"><span class="ln">-1.5</span><span class="pr pos">+120</span></div>
+        <div class="bet"><span class="ln">U 9.0</span><span class="pr">-110</span></div>
+        <div class="bet"><span class="ln">&nbsp;</span><span class="pr">-146</span></div>
+      </div>
+    </div>
+
+    <!-- 잠금 카드 (오즈 불변식: 실라인 없음 = 🔒, 클릭 불가) -->
+    <div class="card">
+      <div class="ch">⚾ MLB <span class="st">Fri 11:05 PM</span> <span class="star">★</span></div>
+      <div class="row">
+        <div class="tm"><span class="ab">LAD</span>Dodgers</div>
+        <div class="bet sus"><span class="ln">&nbsp;</span><span class="pr">🔒</span></div>
+        <div class="bet sus"><span class="ln">&nbsp;</span><span class="pr">🔒</span></div>
+        <div class="bet sus"><span class="ln">&nbsp;</span><span class="pr">🔒</span></div>
+      </div>
+      <div class="row">
+        <div class="tm"><span class="ab">NYY</span>Yankees</div>
+        <div class="bet sus"><span class="ln">&nbsp;</span><span class="pr">🔒</span></div>
+        <div class="bet sus"><span class="ln">&nbsp;</span><span class="pr">🔒</span></div>
+        <div class="bet sus"><span class="ln">&nbsp;</span><span class="pr">🔒</span></div>
+      </div>
+    </div>
+    <div style="height:150px"></div>
+  </div>
+
+  <div class="slipdock"><span class="n">1</span>Bet slip<span class="sp"></span>Mets ML +116 ›</div>
+
+  <div class="nav">
+    <div class="ni on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>Home</div>
+    <div class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Live</div>
+    <div class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h5"/></svg>My Bets</div>
+    <div class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M16 12.5h.01"/></svg>Wallet</div>
+  </div>
+</div>
+
+<div class="note">
+  <b>Alpexa Sports × Legend — static preview</b><br><br>
+  Structure and grammar are the app's, untouched — only the skin is translated:<br><br>
+  <span class="chip">bg #0B0D0E</span><span class="chip">surface #16181A</span>
+  <span class="chip">up #00C805</span><span class="chip">ink #F5F6F7</span>
+  <span class="chip">Inter · tabular-nums</span><br><br>
+  · Positive odds = Legend green, negative = ink<br>
+  · Active tab = ink-on-white pill inversion<br>
+  · LIVE = blinking dot + green clock<br>
+  · Locked games stay 🔒 (money gate unchanged)<br>
+  · Selected cell = green tint + green border<br><br>
+  Static mock — no real data, no real code.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+  채택 시 정식 구현 경로 (카본 스킨 전례와 동일):
+  1) ?skin=legend 쿼리 → sports-live.html에 CSS 변수 오버라이드 레이어 1블록 주입
+     (--bg/--surface/--accent/--text/--dim/--line ≈ 15개 변수 + .bet.pos 그린 규칙).
+     기본값은 현행 라이트 유지 — 옛 고객 무영향.
+  2) 예상 규모: CSS 변수 치환 위주 ~200줄, JS 무변경 (돈 경로·문법 0 터치).
+  3) 위험: 서비스워커 캐시로 옛/새 스킨 혼재 가능(네트워크 우선이라 짧음) ·
+     라이트/다크 병행 시 대비비 재검(WCAG 4.5:1) · 스크린샷 기반 회귀는 verify 렌더 스모크로.
+═══════════════════════════════════════════════════════════════════════════ -->
+</body>
+</html>
