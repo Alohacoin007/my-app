@@ -1020,11 +1020,14 @@ function drawSpark(ms){
   if(hi-lo<1e-9){ lo-=1; hi+=1; }   // 평평한 곡선(변화 0)도 중앙선으로
   const X=t=>4+(W-8)*((t-t0)/Math.max(1,t1-t0)), Y=v=>H-8-(H-16)*((v-lo)/(hi-lo));
   const up=pts[pts.length-1].v>=pts[0].v;
-  cx.strokeStyle=up?'#00C805':'#EB5D2A'; cx.lineWidth=1.6;
-  cx.setLineDash([2,3]);   // §8.10: 그린 점선 스타일, 축·그리드 없음
+  const col=up?'#00C805':'#EB5D2A';
+  // 솔리드 라인 + 끝점 도트 (사용자 확정 2026-07-15 — 점선 폐기). 축·그리드 없음 유지.
+  cx.strokeStyle=col; cx.lineWidth=1.8; cx.lineJoin='round'; cx.lineCap='round';
   cx.beginPath();
-  pts.forEach((p,i)=>{ const x=X(p.ts), y=Y(p.v); if(i===0)cx.moveTo(x,y); else{ cx.lineTo(x,Y(pts[i-1].v)); cx.lineTo(x,y); } });   // 계단(잔고는 이산 변화)
-  cx.stroke(); cx.setLineDash([]);
+  pts.forEach((p,i)=>{ const x=X(p.ts), y=Y(p.v); if(i===0)cx.moveTo(x,y); else cx.lineTo(x,y); });
+  cx.stroke();
+  const last=pts[pts.length-1];   // 현재값 마커
+  cx.fillStyle=col; cx.beginPath(); cx.arc(X(last.ts),Y(last.v),3,0,Math.PI*2); cx.fill();
 }
 const mv=(n)=> hideAmounts?'••••':(n==null?'···':usd(n));   // §8.10: 마스킹 = 고정 4점(자릿수 은닉)
 function renderAccount(ms){
