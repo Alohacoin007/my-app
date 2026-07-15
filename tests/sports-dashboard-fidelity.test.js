@@ -158,5 +158,16 @@ if (/live_games/.test(src)) {
   pin(/\.eq\(\s*['"]id['"]\s*,\s*['"]all['"]\s*\)|id=eq\.all/, 'live_games 단일 행(id=all) 계약 (앱:3635)');
 }
 
+/* ── [4] 영어 전용 UI (2026-07-15 사용자 지시): 설정에 한국어 전환이 생기기 전까지
+   사용자 노출 문자열에 한글 금지. 주석(HTML/JS)은 개발 문서라 허용 — 제거 후 스캔. ── */
+{
+  const noCmt = src
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:'"])\/\/[^\n]*/gm, '$1');
+  const kor = noCmt.match(/[가-힣][^\n'"<]{0,30}/g) || [];
+  if (kor.length) bad('[영어전용] 사용자 노출 한글 ' + kor.length + '곳 — 예: ' + kor.slice(0, 3).join(' · '));
+}
+
 if (fail) { console.error(`\n🔴 FAIL — fidelity ${fail}건: 대시보드가 앱 문법 또는 레전드 스펙에서 이탈.`); process.exit(1); }
 console.log('🟢 PASS: sports-dashboard fidelity — 금지 핀 전체 통과 + 구현된 위젯의 계약 정합 확인.');
