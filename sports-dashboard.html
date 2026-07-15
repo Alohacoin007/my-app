@@ -38,13 +38,6 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .fxov.open{display:flex}
 .fxov.mini{inset:auto 16px 16px auto; width:min(960px,calc(100vw - 32px)); height:min(560px,calc(100vh - 80px));
   border:1px solid var(--lgd-hair); border-radius:12px; box-shadow:0 24px 60px rgba(0,0,0,.7); overflow:hidden}
-.fxov .fxbar{height:34px; flex:none; display:flex; align-items:center; gap:8px; padding:0 10px;
-  background:var(--lgd-surface); border-bottom:1px solid var(--lgd-hair); font-size:var(--lgd-fs-label); font-weight:700}
-.fxov .fxbar .sp{flex:1}
-.fxov .fxbar .fic{width:26px; height:26px; display:flex; align-items:center; justify-content:center;
-  border-radius:6px; color:var(--lgd-dim); cursor:pointer}
-.fxov .fxbar .fic:hover{background:var(--lgd-pill); color:var(--lgd-ink)}
-.fxov .fxbar .esc{color:var(--lgd-dim); font-weight:500; font-size:var(--lgd-fs-caption)}
 .fxov iframe{flex:1; border:0; width:100%; min-height:0}
 .tabrow{display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:6px; cursor:pointer}
 .tabrow:hover{background:var(--lgd-pill)}
@@ -1818,13 +1811,11 @@ const tabMenu=document.getElementById('tabMenu'), fxTab=document.getElementById(
 let fxOv=null, fxFull=true;
 function ensureFxOv(){
   if(fxOv) return fxOv;
+  // 크롬 없음 (사용자 확정 2026-07-15: 상단 바 삭제 — 허가 없는 디자인 추가 금지).
+  // 조작은 기존 것만: ESC = 풀↔미니 토글, 헤더 Alpexa FX 탭 = 닫기/열기.
   fxOv=document.createElement('div'); fxOv.className='fxov';
-  fxOv.innerHTML='<div class="fxbar"><span>Alpexa FX — WebTrade</span><span class="esc">ESC — minimize</span><span class="sp"></span>'+
-    '<span class="fic" id="fxSize" title="Toggle size">⛶</span><span class="fic" id="fxX" title="Close">✕</span></div>'+
-    '<iframe id="fxFrame" title="Alpexa FX WebTrade terminal"></iframe>';
+  fxOv.innerHTML='<iframe id="fxFrame" title="Alpexa FX WebTrade terminal"></iframe>';
   document.body.appendChild(fxOv);
-  document.getElementById('fxSize').onclick=()=>setFxSize(!fxFull);
-  document.getElementById('fxX').onclick=closeFx;
   const fr=document.getElementById('fxFrame');
   fr.addEventListener('load', ()=>{ try{   // 같은 출처 — iframe 안에서 눌러도 ESC가 통하게
     fr.contentDocument.addEventListener('keydown', e=>{ if(e.key==='Escape') fxEsc(); }); }catch(e){} });
@@ -1839,8 +1830,8 @@ function openFx(){
   fxTab.style.display='flex'; fxTab.classList.add('on');
 }
 function closeFx(){ if(fxOv) fxOv.classList.remove('open'); fxTab.classList.remove('on'); }
-function fxEsc(){   // ESC 계약: 풀스크린이면 미니로 — 닫지는 않는다 (오조작 방지)
-  if(fxOv&&fxOv.classList.contains('open')&&fxFull) setFxSize(false);
+function fxEsc(){   // ESC 계약: 풀↔미니 토글 — 닫지는 않는다 (오조작 방지; 바 없음이라 ESC가 유일한 크기 조작)
+  if(fxOv&&fxOv.classList.contains('open')) setFxSize(!fxFull);
 }
 fxTab.addEventListener('click', ()=>{ (fxOv&&fxOv.classList.contains('open'))?closeFx():openFx(); });
 document.getElementById('btnTabs').onclick=(e)=>{ e.stopPropagation();
