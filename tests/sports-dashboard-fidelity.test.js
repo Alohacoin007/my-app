@@ -149,6 +149,19 @@ if (/Sign out/i.test(src)) {
   ban(/AlpexaSync\.me\(\)/, 'AlpexaSync.me()로 로그인 판정 — 게스트 자동생성 때문에 authed 영원히 참 (2026-07-15 결함)');
   pin(/auth\.getSession\(\)/, '세션 실존 확인 — 태그만 믿으면 유령 로그인: 세션 없는 탭에서 RLS가 전 행을 숨겨 돈 기능 전멸 (앱:725-741 게이트)');
 }
+// 💰 돈 이동 시트가 있으면 (입금·출금·이체 — 2026-07-15 사용자 승인 이식)
+if (/withdraw_hold|app_transfer|Deposit requested/.test(src)) {
+  pin(/rpc\(\s*['"]withdraw_hold['"]/, '출금 = withdraw_hold RPC 단일 경로 — 서버가 원자적으로 재검사+요청+ledger 차감 (앱:2963)');
+  pin(/'wd_'\s*\+\s*Date\.now\(\)/, '출금 멱등 id wd_<ts> (앱:2961)');
+  pin(/rpc\(\s*['"]app_transfer['"]/, '이체 = app_transfer RPC 단일 경로 (앱:2803)');
+  pin(/'xfer-'\s*\+\s*Date\.now\(\)/, '이체 멱등 ref xfer- 규약 (앱:2802)');
+  pin(/'dp_'\s*\+\s*Date\.now\(\)/, '입금 요청 id dp_<ts> (앱:2717)');
+  pin(/pushRequest\(/, '입금 = AlpexaSync.pushRequest 재사용 — requests 계약을 두 벌 만들지 않는다 (sync:62-77)');
+  pin(/deposit_limit/, '입금 한도 가드 — players.deposit_limit 서버 소유 (앱:1449,2715)');
+  pin(/\^0x\[0-9a-fA-F\]\{40\}\$/, '출금 주소 검증 0x+40hex (앱:2951)');
+  pin(/withdrawable_for/, '출금 가능액 = 서버 withdrawable_for RPC (보너스 제외 — 앱:2856)');
+  ban(/\b(balance|bal)\s*[+\-]=/, '클라 잔고 델타 — 결과는 서버 재조회로만 (낙관 갱신도 대시보드에선 금지)');
+}
 // 발란스 표시가 있으면
 if (/Balance|balbar/i.test(src)) {
   pin(/'···'|>···</, '잔고 미로드 표기 ··· (앱:2602) — 0으로 거짓 표시 금지');

@@ -184,6 +184,49 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .wal .ra .amt.neg{color:var(--lgd-down)}
 .wal .ra .amt.pos{color:var(--lgd-up)}
 
+/* ══ 돈 이동 시트 (입금·출금·이체 — 중앙 모달, 레전드 토큰) ══ */
+.msov{position:fixed; inset:0; z-index:80; background:rgba(0,0,0,.6); display:none}
+.msov.open{display:block}
+.mssheet{position:fixed; z-index:81; left:50%; top:50%; transform:translate(-50%,-50%); width:380px; max-width:calc(100vw - 32px);
+  max-height:calc(100vh - 48px); overflow:auto; display:none; flex-direction:column; background:#141617;
+  border:1px solid rgba(255,255,255,.14); border-radius:14px; box-shadow:0 24px 60px rgba(0,0,0,.7); font-size:var(--lgd-fs-body)}
+.mssheet.open{display:flex}
+.mssheet .mh{display:flex; align-items:center; padding:16px 18px 10px}
+.mssheet .mh h3{font-size:17px; font-weight:700}
+.mssheet .mh .mx{margin-left:auto; color:var(--lgd-dim); cursor:pointer; width:26px; height:26px; display:flex; align-items:center; justify-content:center; border-radius:6px}
+.mssheet .mh .mx:hover{background:var(--lgd-pill); color:var(--lgd-ink)}
+.mssheet .mbody{padding:0 18px 18px; display:flex; flex-direction:column; gap:12px}
+.mssheet .lbl{font-size:var(--lgd-fs-label); color:var(--lgd-dim); font-weight:600; margin-bottom:5px}
+.mssheet .in{width:100%; background:var(--lgd-surface2); border:1px solid var(--lgd-hair); border-radius:8px;
+  padding:11px 12px; color:var(--lgd-ink); font-size:15px; font-family:inherit; outline:none}
+.mssheet .in:focus{border-color:var(--lgd-dim)}
+.mssheet .addrbox{display:flex; align-items:center; gap:8px; background:var(--lgd-surface2); border:1px solid var(--lgd-hair);
+  border-radius:8px; padding:10px 12px}
+.mssheet .addrbox code{flex:1; font-size:12px; word-break:break-all; color:var(--lgd-ink); font-family:ui-monospace,monospace}
+.mssheet .addrbox button{background:var(--lgd-pill); border:none; color:var(--lgd-ink); border-radius:6px; padding:6px 10px;
+  font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; white-space:nowrap}
+.mssheet .tfdir{display:flex; align-items:center; gap:8px}
+.mssheet .tfdir .leg{flex:1; background:var(--lgd-surface2); border:1px solid var(--lgd-hair); border-radius:8px; padding:9px 10px; text-align:center}
+.mssheet .tfdir .leg .k{font-size:var(--lgd-fs-caption); color:var(--lgd-dim)}
+.mssheet .tfdir .leg .v{font-weight:700; font-size:14px; margin-top:2px}
+.mssheet .tfdir .swap{background:var(--lgd-pill); border:none; color:var(--lgd-ink); width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:15px}
+.mssheet .sumrow{display:flex; justify-content:space-between; font-size:var(--lgd-fs-label); padding:2px 0}
+.mssheet .sumrow.big{font-weight:700; font-size:15px; padding-top:8px; border-top:1px solid var(--lgd-hair); margin-top:2px}
+.mssheet .sumrow .dim{color:var(--lgd-dim)}
+.mssheet .chips{display:flex; gap:6px}
+.mssheet .chips button{flex:1; background:var(--lgd-surface2); border:1px solid var(--lgd-hair); color:var(--lgd-dim);
+  border-radius:7px; padding:7px 0; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit}
+.mssheet .chips button:hover{color:var(--lgd-ink)}
+.mssheet .go{background:var(--lgd-up); border:none; color:#03210a; border-radius:9px; padding:13px; font-size:15px;
+  font-weight:800; cursor:pointer; font-family:inherit; margin-top:2px}
+.mssheet .go:disabled{opacity:.45; cursor:not-allowed}
+.mssheet .err{color:var(--lgd-warn); font-size:var(--lgd-fs-label); min-height:15px}
+.mssheet .hint{font-size:var(--lgd-fs-caption); color:var(--lgd-dim); line-height:1.5}
+.mssheet .seg2{display:flex; gap:6px; margin-bottom:2px}
+.mssheet .seg2 button{flex:1; background:var(--lgd-surface2); border:1px solid var(--lgd-hair); color:var(--lgd-dim);
+  border-radius:7px; padding:8px 0; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit}
+.mssheet .seg2 button.on{background:var(--lgd-pill); color:var(--lgd-ink); border-color:transparent}
+
 /* ══ Quick Bet 팝업 (레전드 주문 티켓 §8: 드래그 도트·세그먼트·스테퍼·오렌지 에러·면책·Cancel/CTA) ══ */
 .qb{position:fixed; z-index:60; width:322px; display:none; flex-direction:column;
   background:#141617; border:1px solid rgba(255,255,255,.14); border-radius:var(--lgd-r-pop);
@@ -658,7 +701,7 @@ function makeWidget(id, title, sub, linkColor, bodyHTML){
 makeWidget('balance','Account','Sports','var(--lgd-link1)',
   '<div class="bal tnum"><div class="top"><div><div class="nm">Alpexa Sports</div>'+
   '<div class="amt" id="balAmt">···</div></div>'+
-  '<button class="dep" onclick="location.href=\'sports-live.html\'">Deposit</button></div>'+
+  '<button class="dep" onclick="openMoney(\'deposit\')">Deposit</button></div>'+
   '<div class="sub"><span>Pending <b id="balPend">···</b></span><span>Credit <b id="balCred">···</b></span></div>'+
   '<div class="note">Balance is server-only and display-only here. Log in from the avatar menu (top right).</div></div>');
 
@@ -804,7 +847,7 @@ const moneyStore={
   bal:null, openBets:[], subs:new Set(), authed:false, sessAbsent:false,
   sub(f){ this.subs.add(f); return ()=>this.subs.delete(f); },
   emit(){ this.subs.forEach(f=>{ try{ f(this); }catch(e){} }); },
-  rg:{selfExcludeUntil:0, lossLimit:0},
+  rg:{selfExcludeUntil:0, lossLimit:0, depositLimit:0},
   async pull(){
     /* 유령 세션 게이트 (앱:725-741 이식): 신원 태그(alpexa.me)는 영구 localStorage,
        세션은 탭별 sessionStorage — 태그만 있고 이 탭에 세션이 없으면 RLS가 전 행을
@@ -819,12 +862,20 @@ const moneyStore={
     this.authed=!!m;
     if(!m){ this.bal=null; this.openBets=[]; this.emit(); return; }
     try{ // RG 설정은 서버 소유(players) — localStorage 클리어로 우회 불가 (앱:1498-1507)
-      const r=await AlpexaSync.db.from('players').select('self_exclude_until,loss_limit')
+      const r=await AlpexaSync.db.from('players').select('self_exclude_until,loss_limit,deposit_limit')
         .eq('cust_id',m.custId).limit(1);
       const pr=r&&r.data&&r.data[0];
-      if(pr){ this.rg.selfExcludeUntil=+pr.self_exclude_until||0; this.rg.lossLimit=+pr.loss_limit||0; }
+      if(pr){ this.rg.selfExcludeUntil=+pr.self_exclude_until||0; this.rg.lossLimit=+pr.loss_limit||0;
+        this.rg.depositLimit=+pr.deposit_limit||0; }
     }catch(e){}
-    try{ const out=await AlpexaSync.pullBalances(); if(out&&out.sports!=null) this.bal=+out.sports; }catch(e){}
+    try{ const out=await AlpexaSync.pullBalances();
+      if(out&&out.sports!=null) this.bal=+out.sports;
+      if(out&&out.crypto!=null) this.balCrypto=+out.crypto; }catch(e){}
+    try{ // 출금 가능액 = 서버 withdrawable_for RPC (보너스·잠금자금 제외 — 앱:2856). 서버가 최종 관문.
+      const acct=m.accts&&m.accts.sports;
+      if(acct){ const r=await AlpexaSync.db.rpc('withdrawable_for',{p_acct:acct});
+        if(r&&!r.error&&r.data!=null) this.withdrawable=+r.data; }
+    }catch(e){}
     try{ // 재무 활동 = 서버 requests 테이블 권위 (앱 pullServerActivity :2368-2395 그대로) —
       // 전 기기 동일·서버 잔고와 일치. per-device localStorage 원천 금지.
       const r=await AlpexaSync.db.from('requests')
@@ -888,7 +939,7 @@ const moneyStore={
     }catch(e){}
     this.emit();
   },
-  settled:[], finTxns:[],
+  settled:[], finTxns:[], balCrypto:null, withdrawable:null,
   start(){ if(this.timer) return; this.pull(); this.timer=setInterval(()=>this.pull(),10000); }   // 앱 잔고 폴 주기
 };
 const ICONS={NBA:'🏀',NCAAB:'🎓',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽',UFC:'🥊'};
@@ -1024,7 +1075,7 @@ makeWidget('wallet','Wallet','','var(--lgd-link1)',
   '<div class="stat"><div class="l">BALANCE · USD</div><div class="v" id="wBal">···</div></div>'+
   '<div class="stat"><div class="l">PENDING</div><div class="v" id="wPend">···</div></div>'+
   '<div class="stat"><div class="l">CREDIT</div><div class="v" id="wCred">···</div></div></div>'+
-  '<div class="acts"><a href="sports-live.html">Deposit</a><a href="sports-live.html">Withdraw</a><a href="sports-live.html">Transfer</a></div>'+
+  '<div class="acts"><a href="#" data-money="deposit">Deposit</a><a href="#" data-money="withdraw">Withdraw</a><a href="#" data-money="transfer">Transfer</a></div>'+
   // ⑥ 필터: 타입 4종 + 기간 4종 (앱 :868-882 리터럴 그대로)
   '<div class="rah">RECENT ACTIVITY<button class="tf-datesel" id="txnDateSel"><span id="txnDateLbl">7 days</span> <span class="chev">▾</span></button></div>'+
   '<div class="tf-period-pop" id="txnPeriod">'+
@@ -1092,6 +1143,163 @@ document.addEventListener('click', ()=>{ const p=document.getElementById('txnPer
 document.getElementById('txnType').onclick=e=>{ const bt=e.target.closest('.tft'); if(!bt) return;
   document.querySelector('#txnType .tft.active').classList.remove('active'); bt.classList.add('active');
   txnType=bt.dataset.type; renderActs(); };
+document.getElementById('w-wallet').addEventListener('click', e=>{ const a=e.target.closest('[data-money]');
+  if(!a) return; e.preventDefault(); openMoney(a.dataset.money); });
+
+/* ════════════════════ 💰 돈 이동 시트 (입금·출금·이체 — 서버 RPC 단일 경로) ════════════════════
+   앱 문법 그대로 이식 (READ-BEFORE-WRITE 표 승인, 2026-07-15):
+   · 입금 = pushRequest(dp_<ts>) + deposit_limit 가드 (앱:2713-2726)
+   · 출금 = withdraw_hold RPC(wd_<ts>) — 서버 원자적 재검사+요청+ledger 차감, 0x+40hex 검증,
+            withdrawable_for 캡 (앱:2943-2989)
+   · 이체 = app_transfer RPC(xfer-<ref>) — 원자·멱등, Crypto↔Sports (앱:2803)
+   금지: 클라 잔고 델타·로컬 정산·이중 경로. 결과는 오직 moneyStore.pull() 재조회. */
+const DEPOSIT_ADDR_DEFAULT='0x6B1c8941698Affc56757eF9Be1723Ec43F720966';
+function companyAddr(){ try{ var c=(window.__alpexaCtrl&&window.__alpexaCtrl.companyAddr);
+  return (c&&String(c).trim())||DEPOSIT_ADDR_DEFAULT; }catch(e){ return DEPOSIT_ADDR_DEFAULT; } }
+function wdFee(){ try{ var c=(window.__alpexaCtrl&&window.__alpexaCtrl.wdFee); var x=parseFloat(c);
+  return (!isNaN(x)&&x>=0)?x:5; }catch(e){ return 5; } }   // 서버 컨트롤 (앱:2831)
+// 오늘 승인/대기 입금 합 — 서버 requests(finTxns)에서 파생 (기기 무관). deposit_limit 가드용.
+function depositedToday(){ const t0=new Date(); t0.setHours(0,0,0,0); const ts0=t0.getTime(); let d=0;
+  (moneyStore.finTxns||[]).forEach(t=>{ if(t.t1==='Deposit'&&t.amt>0&&t.ts>=ts0) d+=t.amt; }); return d; }
+
+const msOv=document.createElement('div'); msOv.className='msov'; msOv.id='msOv';
+const msSheet=document.createElement('div'); msSheet.className='mssheet'; msSheet.id='msSheet';
+document.body.appendChild(msOv); document.body.appendChild(msSheet);
+let msMode='deposit', tfFrom='crypto', tfTo='sports';
+function closeMoney(){ msOv.classList.remove('open'); msSheet.classList.remove('open'); }
+msOv.addEventListener('click', closeMoney);
+function openMoney(mode){
+  const m=meId();
+  if(!(m&&moneyStore.authed)){ goLogin(); return; }   // 유령 세션 게이트와 정합 — 세션 없으면 로그인부터
+  msMode=mode; renderMoney(); msOv.classList.add('open'); msSheet.classList.add('open');
+}
+function msNum(id){ return parseFloat((document.getElementById(id)||{}).value)||0; }
+function renderMoney(){
+  const bal=moneyStore.bal, wAvail=(moneyStore.withdrawable!=null?moneyStore.withdrawable:bal);
+  const cry=moneyStore.balCrypto;
+  if(msMode==='deposit'){
+    msSheet.innerHTML=
+      '<div class="mh"><h3>Deposit</h3><span class="mx" id="msX">✕</span></div>'+
+      '<div class="mbody">'+
+      '<div class="hint">Send <b>USDT (ERC-20)</b> to the company address below, then enter the amount and submit. Credited once the back office confirms receipt.</div>'+
+      '<div><div class="lbl">COMPANY DEPOSIT ADDRESS · USDT (ERC-20)</div>'+
+      '<div class="addrbox"><code id="msAddr">'+esc(companyAddr())+'</code><button id="msCopy">Copy</button></div></div>'+
+      '<div><div class="lbl">AMOUNT SENT (USDT)</div><input class="in tnum" id="msAmt" type="number" min="0" step="10" placeholder="0.00" inputmode="decimal"></div>'+
+      '<div class="err" id="msErr"></div>'+
+      '<button class="go" id="msGo">Submit deposit</button>'+
+      '<div class="hint">First time only, the provider verifies your ID. Already have USDT? Just send it.</div></div>';
+  } else if(msMode==='withdraw'){
+    msSheet.innerHTML=
+      '<div class="mh"><h3>Withdraw</h3><span class="mx" id="msX">✕</span></div>'+
+      '<div class="mbody">'+
+      '<div class="hint">Withdrawals are sent in <b>USDT</b>, routed automatically through the Crypto server — no manual transfer needed.</div>'+
+      '<div><div class="lbl">USDT (ERC-20) ADDRESS</div><input class="in" id="msWdAddr" spellcheck="false" autocomplete="off" placeholder="0x…"></div>'+
+      '<div><div class="lbl">AMOUNT (USDT) · Withdrawable '+(wAvail!=null?usd(wAvail):'···')+'</div>'+
+      '<input class="in tnum" id="msAmt" type="number" min="0" step="10" placeholder="0.00" inputmode="decimal"></div>'+
+      '<div class="chips"><button data-fill="25">25%</button><button data-fill="50">50%</button><button data-fill="100">Max</button></div>'+
+      '<div><div class="sumrow"><span class="dim">Network fee</span><span class="tnum">'+usd(wdFee())+'</span></div>'+
+      '<div class="sumrow big"><span>You receive</span><span class="tnum" id="msNet">'+usd(0)+'</span></div></div>'+
+      '<div class="err" id="msErr"></div>'+
+      '<button class="go" id="msGo">Request withdrawal</button></div>';
+  } else {
+    const fromNm=tfFrom==='sports'?'Sports':'Crypto', toNm=tfTo==='sports'?'Sports':'Crypto';
+    const fromBal=tfFrom==='sports'?wAvail:cry;   // Sports 출금가능(보너스 제외), Crypto 전액
+    msSheet.innerHTML=
+      '<div class="mh"><h3>Transfer</h3><span class="mx" id="msX">✕</span></div>'+
+      '<div class="mbody">'+
+      '<div class="hint">Move <b>USDT</b> between your servers instantly with no fees. Transfer to <b>Sports</b> to start betting.</div>'+
+      '<div class="tfdir"><div class="leg"><div class="k">From</div><div class="v" id="msFrom">'+fromNm+'</div></div>'+
+      '<button class="swap" id="msSwap" title="Swap">⇄</button>'+
+      '<div class="leg"><div class="k">To</div><div class="v" id="msTo">'+toNm+'</div></div></div>'+
+      '<div><div class="lbl">AMOUNT (USDT) · Available '+(fromBal!=null?usd(fromBal):'···')+'</div>'+
+      '<input class="in tnum" id="msAmt" type="number" min="0" step="10" placeholder="0.00" inputmode="decimal"></div>'+
+      '<div class="chips"><button data-fill="25">25%</button><button data-fill="50">50%</button><button data-fill="100">Max</button></div>'+
+      '<div class="err" id="msErr"></div>'+
+      '<button class="go" id="msGo">Transfer</button></div>';
+  }
+  bindMoney();
+}
+function msErr(t){ const e=document.getElementById('msErr'); if(e) e.textContent=t||''; }
+function bindMoney(){
+  document.getElementById('msX').onclick=closeMoney;
+  const amt=document.getElementById('msAmt');
+  if(msMode==='deposit'){
+    document.getElementById('msCopy').onclick=()=>{ const a=companyAddr();
+      try{ navigator.clipboard.writeText(a); document.getElementById('msCopy').textContent='Copied ✓'; }catch(e){} };
+    document.getElementById('msGo').onclick=doDeposit;
+  } else if(msMode==='withdraw'){
+    const upd=()=>{ const v=msNum('msAmt'), net=Math.max(0,v-wdFee());
+      document.getElementById('msNet').textContent=usd(v>0?net:0); };
+    amt.oninput=upd;
+    document.querySelectorAll('#msSheet .chips button').forEach(b=>b.onclick=()=>{
+      const w=(moneyStore.withdrawable!=null?moneyStore.withdrawable:moneyStore.bal)||0;
+      amt.value=(Math.floor(w*(+b.dataset.fill/100)*100)/100)||0; upd(); });
+    document.getElementById('msGo').onclick=doWithdraw;
+  } else {
+    document.getElementById('msSwap').onclick=()=>{ const f=tfFrom; tfFrom=tfTo; tfTo=f; renderMoney(); };
+    document.querySelectorAll('#msSheet .chips button').forEach(b=>b.onclick=()=>{
+      const src=tfFrom==='sports'?(moneyStore.withdrawable!=null?moneyStore.withdrawable:moneyStore.bal):moneyStore.balCrypto;
+      amt.value=(Math.floor((src||0)*(+b.dataset.fill/100)*100)/100)||0; });
+    document.getElementById('msGo').onclick=doTransfer;
+  }
+}
+async function doDeposit(){
+  const m=meId(); if(!m){ goLogin(); return; }
+  const v=msNum('msAmt');
+  if(v<=0){ msErr('Enter a deposit amount'); return; }
+  // 입금 한도 가드 — players.deposit_limit(서버 소유). 오늘 입금 합은 서버 requests 파생.
+  const lim=+((moneyStore.rg&&moneyStore.rg.depositLimit)||0);
+  if(lim>0 && depositedToday()+v>lim){ msErr('Daily deposit limit '+usd(lim)+' exceeded'); return; }
+  const go=document.getElementById('msGo'); go.disabled=true; go.textContent='Submitting…';
+  const reqId='dp_'+Date.now();
+  try{
+    // 입금 요청 = requests 테이블 (앱 pushRequest 재사용 — 계약 한 벌). 잔고는 서버 승인 후 반영.
+    await AlpexaSync.pushRequest({ id:reqId, type:'deposit', server:'Sports', asset:'USDT',
+      network:'ERC-20', address:companyAddr(), amount:v, fee:0, net:v, status:'pending' });
+    closeMoney();
+  }catch(e){ go.disabled=false; go.textContent='Submit deposit'; msErr('Couldn’t submit — please try again'); return; }
+  finally{ moneyStore.pull(); }
+}
+async function doWithdraw(){
+  const m=meId(); if(!m){ goLogin(); return; }
+  const v=msNum('msAmt'), addr=(document.getElementById('msWdAddr').value||'').trim();
+  if(v<=0){ msErr('Enter a withdrawal amount'); return; }
+  const wAvail=(moneyStore.withdrawable!=null?moneyStore.withdrawable:moneyStore.bal);
+  if(wAvail!=null && v>wAvail){ msErr('Exceeds withdrawable '+usd(wAvail)+' (bonus & locked funds excluded)'); return; }
+  if(!/^0x[0-9a-fA-F]{40}$/.test(addr)){ msErr('Invalid address — 0x followed by 40 hex characters'); return; }
+  const fee=wdFee(); if(v<=fee){ msErr('Amount must exceed the network fee '+usd(fee)); return; }
+  const acct=m.accts&&m.accts.sports;
+  if(!(window.AlpexaSync&&AlpexaSync.db&&acct)){ msErr('No server connection — nothing was deducted. Try again.'); return; }
+  const go=document.getElementById('msGo'); go.disabled=true; go.textContent='Requesting…';
+  const wid='wd_'+Date.now();
+  let res; try{ res=await AlpexaSync.db.rpc('withdraw_hold',{p_id:wid,p_acct:acct,p_amount:v,p_fee:fee,p_asset:'USDT',p_network:'ERC-20',p_address:addr}); }catch(e){ res={error:e}; }
+  const dt=res&&res.data;
+  if((res&&res.error)||!dt||dt.ok===false){
+    go.disabled=false; go.textContent='Request withdrawal';
+    msErr((dt&&dt.error)||(res&&res.error&&res.error.message)||'Withdrawal not submitted — nothing was deducted.');
+    return;   // 서버 원자적: 실패면 아무것도 안 함
+  }
+  closeMoney(); moneyStore.pull();   // 서버가 hold+요청 생성 — 잔고는 재조회로만 (클라 델타 없음)
+}
+async function doTransfer(){
+  const m=meId(); if(!m){ goLogin(); return; }
+  const v=msNum('msAmt');
+  if(v<=0){ msErr('Enter an amount'); return; }
+  const src=tfFrom==='sports'?(moneyStore.withdrawable!=null?moneyStore.withdrawable:moneyStore.bal):moneyStore.balCrypto;
+  if(src!=null && v>src){ msErr(tfFrom==='sports'?'Bonus is non-transferable — transferable '+usd(src):'Insufficient '+((tfFrom==='sports')?'Sports':'Crypto')+' balance'); return; }
+  const fromAcct=m.accts&&m.accts[tfFrom], toAcct=m.accts&&m.accts[tfTo];
+  if(!fromAcct||!toAcct){ msErr('Account not found — re-login and try again'); return; }
+  const go=document.getElementById('msGo'); go.disabled=true; go.textContent='Transferring…';
+  const ref='xfer-'+Date.now()+'-'+Math.random().toString(36).slice(2,7);
+  let r; try{ r=await AlpexaSync.db.rpc('app_transfer',{p_ref:ref,p_from:fromAcct,p_to:toAcct,p_amount:v}); }catch(e){ r={error:e}; }
+  const res=r&&r.data;
+  if((r&&r.error)||!res||res.ok===false){
+    go.disabled=false; go.textContent='Transfer';
+    msErr((res&&res.error)||(r&&r.error&&r.error.message)||'Transfer failed — try again');
+    return;
+  }
+  closeMoney(); moneyStore.pull();   // 원자·멱등 — 잔고는 서버 재조회로만
+}
 
 /* ── Bet slip 위젯: 앱 슬립 문법 (모드 3종·per-leg 스테이크·Est. Payout·place_bet 단일 경로) ── */
 makeWidget('slip','Bet slip','','var(--lgd-link4)',
