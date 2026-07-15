@@ -52,7 +52,9 @@ if (/get\('dest'\)/.test(lg)) bad('the dest= override must be fully gone (no ope
     if(pc(0)!=='webtrade.html') bad('FX on a PC must land on the WebTrade terminal');
     if(mob(0)!=='trading.html') bad('FX on a phone must land on the mobile FX app');
     if(pc(1)!=='crypto-live.html'||mob(1)!=='crypto-live.html') bad('Crypto landing must be device-independent');
-    if(pc(2)!=='sports-live.html'||mob(2)!=='sports-live.html') bad('Sports landing must be device-independent');
+    // Sports mirrors FX device routing (2026-07-15): PC → widget dashboard, phone → app.
+    if(pc(2)!=='sports-dashboard.html') bad('Sports on a PC must land on the widget dashboard (컴퓨터용)');
+    if(mob(2)!=='sports-live.html') bad('Sports on a phone must land on the mobile app');
   } }
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} login-gate problem(s).`); process.exit(1); }

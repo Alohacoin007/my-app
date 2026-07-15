@@ -187,7 +187,14 @@ function fxDest(server){
   // open-redirect surface stays zero. Token is consumed on first use (no sticky loops).
   var dest2=''; try{ dest2=sessionStorage.getItem('alpexa.dest2')||''; sessionStorage.removeItem('alpexa.dest2'); }catch(e){}
   if(server===1) return 'crypto-live.html';
-  if(server===2) return dest2==='sports-dashboard' ? 'sports-dashboard.html' : 'sports-live.html';
+  if(server===2){
+    // Device routing, mirroring FX below: PC → the widget DASHBOARD (컴퓨터용),
+    // phone → the mobile app. An explicit return-token still wins either way
+    // (dashboard round-trip, or a path back to the app), and is consumed once above.
+    if(dest2==='sports-live') return 'sports-live.html';
+    if(dest2==='sports-dashboard') return 'sports-dashboard.html';
+    return mobile ? 'sports-live.html' : 'sports-dashboard.html';
+  }
   return mobile?'trading.html':'webtrade.html';
 }
 function syncSrvUI(){try{document.querySelectorAll('.srv-opt').forEach(function(b){b.classList.toggle('on',+b.dataset.srv===selServer);});}catch(e){}}
