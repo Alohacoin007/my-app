@@ -147,6 +147,7 @@ if (/Sign out/i.test(src)) {
   pin(/Log in/, '로그아웃 상태 메뉴 항목 Log in');
   pin(/getItem\(\s*['"]alpexa\.me['"]/, '로그인 판정 = 실제 신원 태그(alpexa.me) 직접 읽기');
   ban(/AlpexaSync\.me\(\)/, 'AlpexaSync.me()로 로그인 판정 — 게스트 자동생성 때문에 authed 영원히 참 (2026-07-15 결함)');
+  pin(/auth\.getSession\(\)/, '세션 실존 확인 — 태그만 믿으면 유령 로그인: 세션 없는 탭에서 RLS가 전 행을 숨겨 돈 기능 전멸 (앱:725-741 게이트)');
 }
 // 발란스 표시가 있으면
 if (/Balance|balbar/i.test(src)) {
