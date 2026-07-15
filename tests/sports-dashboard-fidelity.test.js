@@ -35,6 +35,7 @@ ban(/['"]-140['"]|[^\d]-140\s*,\s*120[^\d]/, '가짜 배당 기본값(-140/120) 
 ban(/rpc\(\s*['"]place_bet['"][^)]*market\s*:\s*['"]?prop/i, '프롭 place_bet 제출 — 서버가 검증 불가로 거절 (sql:65-73)');
 ban(/gradeLeg[\s\S]{0,400}?(credit|payout|ledger)/, '클라 정산/지급 — 정산은 sports-settle 단독 (앱:2249-2260)');
 ban(/setInterval\([^)]*,\s*[0-9]{1,3}\)/, '1초 미만 폭주 폴링 — 피드 주기(30s/9s)를 초과하는 이득이 없고 DB만 두들김');
+ban(/type=["']password["']/, '대시보드에 비밀번호 입력 — 자격증명 수집은 login.html 단일 관문 (계정 관문 이원화 금지)');
 
 /* ── [2] 레전드 디자인 핀 (디자인 스펙 §1) — 파일 존재 시 무조건 ─────────────── */
 pin(/legend-ui\.css/, 'legend-ui.css 미사용 — 디자인 토큰·Inter·선명도는 공용 자산에서만 가져온다');
@@ -136,6 +137,16 @@ if (/oddsFormat|Odds format/i.test(src)) {
   pin(/toFixed\(2\)/, 'decimal 표기 소수 2자리 (앱:1561)');
   pin(/American[\s\S]{0,80}-110 \/ \+120|-110 \/ \+120/, '옵션 서브라벨 리터럴 -110 / +120 (앱:1181)');
   pin(/Decimal[\s\S]{0,80}1\.91 \/ 2\.20|1\.91 \/ 2\.20/, '옵션 서브라벨 리터럴 1.91 / 2.20 (앱:1181)');
+}
+// 로그인/사인아웃 메뉴가 있으면 (아바타 통합 — 2026-07-15)
+if (/Sign out/i.test(src)) {
+  pin(/auth\.signOut\(\)/, '로그아웃 = supabase auth.signOut() (alpexa-sync:330 계약)');
+  pin(/'alpexa\.me'[\s\S]{0,40}'alpexa\.userName'[\s\S]{0,40}'alpexa\.userEmail'/, '로컬 신원 태그 3종 제거 — 유령 세션 방지 (alpexa-sync:332-335, 결함 #30)');
+  pin(/login\.html\?switch=1/, '사인아웃 착지 = login.html?switch=1 — 자동 재로그인 방지 (alpexa-sync:310)');
+  pin(/alpexa\.dest2/, '대시보드 복귀 = 고정 토큰 allowlist(alpexa.dest2) — URL로 착지 지정 금지(오픈리다이렉트 0, login.html fxDest)');
+  pin(/Log in/, '로그아웃 상태 메뉴 항목 Log in');
+  pin(/getItem\(\s*['"]alpexa\.me['"]/, '로그인 판정 = 실제 신원 태그(alpexa.me) 직접 읽기');
+  ban(/AlpexaSync\.me\(\)/, 'AlpexaSync.me()로 로그인 판정 — 게스트 자동생성 때문에 authed 영원히 참 (2026-07-15 결함)');
 }
 // 발란스 표시가 있으면
 if (/Balance|balbar/i.test(src)) {

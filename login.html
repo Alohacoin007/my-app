@@ -181,8 +181,13 @@ function selectServer(i){selServer=i;const sv=document.getElementById('serverVal
 // Sports land unchanged. Detection = the SAME UA pattern webtrade itself uses (no new invention).
 function fxDest(server){
   var mobile=/Android|iPhone|iPad|iPod|Mobile|IEMobile|Opera Mini/i.test(navigator.userAgent||'');
+  // Closed-allowlist return hop (2026-07-15): the sports DASHBOARD sets a fixed TOKEN
+  // (sessionStorage, this tab only) before sending the customer here. Only a known token
+  // maps to a hardcoded page — the URL still cannot choose the landing page, so the
+  // open-redirect surface stays zero. Token is consumed on first use (no sticky loops).
+  var dest2=''; try{ dest2=sessionStorage.getItem('alpexa.dest2')||''; sessionStorage.removeItem('alpexa.dest2'); }catch(e){}
   if(server===1) return 'crypto-live.html';
-  if(server===2) return 'sports-live.html';
+  if(server===2) return dest2==='sports-dashboard' ? 'sports-dashboard.html' : 'sports-live.html';
   return mobile?'trading.html':'webtrade.html';
 }
 function syncSrvUI(){try{document.querySelectorAll('.srv-opt').forEach(function(b){b.classList.toggle('on',+b.dataset.srv===selServer);});}catch(e){}}
