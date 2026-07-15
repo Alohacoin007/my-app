@@ -55,6 +55,9 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
   background-image:radial-gradient(circle, rgba(255,255,255,.15) 1.2px, transparent 1.6px);
   background-size:38px 38px; background-position:19px 19px}
 .stage.dragging .dots{opacity:1}
+.algn{position:absolute; background:var(--lgd-up); z-index:45; pointer-events:none}
+.algn.v{width:1px; top:0; bottom:0}
+.algn.h{height:1px; left:0; right:0}
 @media (prefers-reduced-motion: reduce){ .dots{transition:none} }
 
 /* ══ 위젯 크롬 (스펙 §3: 타이틀바 36 · 링크 사각형 · ⋮ · 4방향 리사이즈) ══ */
@@ -399,7 +402,33 @@ const gamesStore = {
 };
 
 /* ════════════════════ 레이아웃 엔진 (스펙 §2/§5) ════════════════════ */
-const GRID=38, LKEY='alpexa.sbdash.layout.v1';
+const GRID=38, FINE=8, SNAP=6, GAP=8, LKEY='alpexa.sbdash.layout.v1';
+/* 스마트 정렬: 다른 위젯 모서리/8px 갭/가터에 ±6px 접근 시 자석 스냅 + 초록 가이드라인.
+   스냅 없으면 8px 미세 격자. (점 그리드 38px는 시각 리듬 — 실제 정밀도는 여기) */
+const guides={ els:[], clear(){ this.els.forEach(e=>e.remove()); this.els=[]; },
+  v(x){ const e=document.createElement('div'); e.className='algn v'; e.style.left=x+'px';
+    stage.appendChild(e); this.els.push(e); },
+  h(y){ const e=document.createElement('div'); e.className='algn h'; e.style.top=y+'px';
+    stage.appendChild(e); this.els.push(e); } };
+function snapAxis(cands, v){ let best=null;
+  for(const c of cands){ const d=Math.abs(c.at-v); if(d<=SNAP&&(!best||d<best.d)) best={...c,d}; }
+  return best; }
+function othersOf(id){ return Object.keys(layout).filter(k=>k!==id&&!layout[k].hidden).map(k=>layout[k]); }
+// 드래그용 후보: x축(내 왼쪽 좌표 기준) / y축(내 위 좌표 기준) — guide는 기준 모서리 위치
+function dragCands(id, w, h){
+  const xs=[{at:GAP, guide:GAP}], ys=[{at:GAP, guide:GAP}];
+  othersOf(id).forEach(o=>{
+    xs.push({at:o.x, guide:o.x});                    // 좌변 정렬
+    xs.push({at:o.x+o.w-w, guide:o.x+o.w});          // 우변 정렬
+    xs.push({at:o.x+o.w+GAP, guide:o.x+o.w+GAP/2});  // 오른쪽 이웃 갭
+    xs.push({at:o.x-w-GAP, guide:o.x-GAP/2});        // 왼쪽 이웃 갭
+    ys.push({at:o.y, guide:o.y});
+    ys.push({at:o.y+o.h-h, guide:o.y+o.h});
+    ys.push({at:o.y+o.h+GAP, guide:o.y+o.h+GAP/2});
+    ys.push({at:o.y-h-GAP, guide:o.y-GAP/2});
+  });
+  return {xs,ys};
+}
 const stage=document.getElementById('stage');
 const DEFAULT_LAYOUT={ leagues:{x:8,y:8,w:224,h:436}, board:{x:240,y:8,w:874,h:436},
   schedule:{x:8,y:452,w:541,h:396}, mybets:{x:557,y:452,w:557,h:396},
@@ -445,10 +474,21 @@ function makeWidget(id, title, sub, linkColor, bodyHTML){
     e.preventDefault(); tb.setPointerCapture(e.pointerId);
     const g=layout[id], offX=e.clientX-g.x, offY=e.clientY-g.y;
     stage.classList.add('dragging'); el.classList.add('drag');
-    const move=ev=>{ g.x=Math.max(0,ev.clientX-offX); g.y=Math.max(0,ev.clientY-offY); applyGeo(id); };
+    const cands=dragCands(id, g.w, g.h);
+    const move=ev=>{
+      let x=Math.max(0,ev.clientX-offX), y=Math.max(0,ev.clientY-offY);
+      guides.clear();
+      const sx=snapAxis(cands.xs,x), sy=snapAxis(cands.ys,y);
+      if(sx){ x=sx.at; guides.v(sx.guide); }
+      if(sy){ y=sy.at; guides.h(sy.guide); }
+      g.x=x; g.y=y; applyGeo(id); };
     const up=()=>{ tb.removeEventListener('pointermove',move); tb.removeEventListener('pointerup',up);
-      stage.classList.remove('dragging'); el.classList.remove('drag');
-      g.x=Math.round(g.x/GRID)*GRID; g.y=Math.round(g.y/GRID)*GRID; applyGeo(id); saveLayout(); };
+      stage.classList.remove('dragging'); el.classList.remove('drag'); guides.clear();
+      // 가이드 스냅이 안 잡힌 축은 8px 미세 격자로
+      const sx=snapAxis(cands.xs,g.x), sy=snapAxis(cands.ys,g.y);
+      if(!sx) g.x=Math.round(g.x/FINE)*FINE;
+      if(!sy) g.y=Math.round(g.y/FINE)*FINE;
+      applyGeo(id); saveLayout(); };
     tb.addEventListener('pointermove',move); tb.addEventListener('pointerup',up);
   });
   // 리사이즈 4방향 (스펙 §3: br 갈매기 + 좌/우/하 변) — 최소 크기는 위젯별(콘텐츠 기반)
@@ -459,16 +499,27 @@ function makeWidget(id, title, sub, linkColor, bodyHTML){
       e.preventDefault(); e.stopPropagation(); rz.setPointerCapture(e.pointerId);
       const g=layout[id], x0=e.clientX, y0=e.clientY, w0=g.w, h0=g.h, l0=g.x;
       stage.classList.add('dragging'); el.classList.add('drag');
+      // 모서리 스냅 후보: 이웃의 변(정렬)·변±8(갭)
+      const eXs=[], eYs=[];
+      othersOf(id).forEach(o=>{ eXs.push({at:o.x-GAP, guide:o.x-GAP/2},{at:o.x, guide:o.x},{at:o.x+o.w, guide:o.x+o.w});
+        eYs.push({at:o.y-GAP, guide:o.y-GAP/2},{at:o.y, guide:o.y},{at:o.y+o.h, guide:o.y+o.h}); });
       const move=ev=>{ const dx=ev.clientX-x0, dy=ev.clientY-y0;
-        if(dir==='br'||dir==='r') g.w=Math.max(MINW, w0+dx);
-        if(dir==='br'||dir==='b') g.h=Math.max(MINH, h0+dy);
-        if(dir==='l'){ const w=Math.max(MINW, w0-dx); g.x=l0+w0-w; g.w=w; }
+        guides.clear();
+        if(dir==='br'||dir==='r'){ let r=l0+Math.max(MINW,w0+dx);
+          const sn=snapAxis(eXs,r); if(sn){ r=sn.at; guides.v(sn.guide); } g.w=Math.max(MINW,r-g.x); }
+        if(dir==='br'||dir==='b'){ let btm=g.y+Math.max(MINH,h0+dy);
+          const sn=snapAxis(eYs,btm); if(sn){ btm=sn.at; guides.h(sn.guide); } g.h=Math.max(MINH,btm-g.y); }
+        if(dir==='l'){ let x=l0+Math.min(dx,w0-MINW);
+          const sn=snapAxis(eXs,x); if(sn){ x=sn.at; guides.v(sn.guide); }
+          const w=Math.max(MINW,l0+w0-x); g.x=l0+w0-w; g.w=w; }
         applyGeo(id); };
       const up=()=>{ rz.removeEventListener('pointermove',move); rz.removeEventListener('pointerup',up);
-        stage.classList.remove('dragging'); el.classList.remove('drag');
-        const right=g.x+g.w;
-        g.w=Math.max(MINW,Math.round(g.w/GRID)*GRID); g.h=Math.max(MINH,Math.round(g.h/GRID)*GRID);
-        if(dir==='l') g.x=right-g.w; else g.x=Math.round(g.x/GRID)*GRID;
+        stage.classList.remove('dragging'); el.classList.remove('drag'); guides.clear();
+        // 스냅 안 걸린 치수만 8px 미세 격자
+        const right=g.x+g.w, btm=g.y+g.h;
+        if(!snapAxis(eXs,right)) g.w=Math.max(MINW,Math.round(g.w/FINE)*FINE);
+        if(!snapAxis(eYs,btm)) g.h=Math.max(MINH,Math.round(g.h/FINE)*FINE);
+        if(dir==='l'){ if(!snapAxis(eXs,g.x)) g.x=right-g.w; }
         applyGeo(id); saveLayout(); };
       rz.addEventListener('pointermove',move); rz.addEventListener('pointerup',up);
     });
