@@ -50,6 +50,14 @@ if (/Odds board|Moneyline/i.test(src)) {
   pin(/data-game=[\s\S]{0,80}data-market=[\s\S]{0,80}data-sel=[\s\S]{0,80}data-am=/, '셀 data-* 4속성 계약 (앱:1647)');
   pin(/am>0\s*\?\s*'pos'\s*:\s*''|class="(pr|am) pos"/, '플러스 배당 pos 클래스 (앱:1648)');
   pin(/oddsReal\s*!==\s*false/, 'oddsReal 하위호환 게이트 (플래그 없음=real, 앱:1712)');
+  // ③ 묶음 (차이감사 P2 4·6·7번): 정렬 위계·검색 필터·SOC 헤더 숨김 — 앱 :1689-1704, :1748
+  pin(/function matchGame\(/, '검색 = 보드 필터 matchGame (앱:1690)');
+  pin(/g\.home\.nm,g\.home\.ab,g\.away\.nm,g\.away\.ab,g\.lg/, 'matchGame 매칭 필드 5종 계약 (앱:1693)');
+  pin(/_liveRank/, '정렬 위계: live→upcoming→finished (앱:1700)');
+  pin(/_kickTs/, '정렬 2차: 킥오프 임박순 (앱:1699)');
+  pin(/sortByPin/, '정렬 함수 sortByPin — 핀 우선 포함 (앱:1701-1705)');
+  pin(/No games match/, '검색 무결과 문구 (앱:1750)');
+  pin(/\.ob\.soc \.obhead\{display:none\}/, 'SOC 선택 시 컬럼헤더 숨김 (앱:1748 — 1X2는 자체 라벨)');
 }
 // 축구가 있으면
 if (/soc1x2|1X2/.test(src)) {

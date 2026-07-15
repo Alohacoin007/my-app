@@ -296,6 +296,7 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .obhead{display:grid; grid-template-columns:minmax(120px,1fr) 86px 86px 86px; gap:6px; padding:0 10px 6px;
   font-size:var(--lgd-fs-label); color:var(--lgd-dim); font-weight:600; flex:none}
 .obhead span:not(:first-child){text-align:center}
+.ob.soc .obhead{display:none}   /* SOC = 1X2 자체 라벨 → 매트릭스 헤더 숨김 (앱:1748) */
 .obscroll{flex:1; min-height:0; overflow:auto; padding-bottom:8px}
 .obrow{display:grid; grid-template-columns:minmax(120px,1fr) 86px 86px 86px; gap:6px; padding:8px 10px;
   border-top:1px solid var(--lgd-hair); align-items:center}
@@ -383,6 +384,23 @@ function liveReason(g){
   if(window.__alpexaOddsStale) return 'Odds updating — try again';
   return 'Live betting unavailable';
 }
+
+/* 검색 = 보드 필터 (앱 :1689-1693) — 쿼리 중엔 리그 필터 무시하고 전 종목 검색 */
+let gameQuery='';
+function matchGame(g){
+  if(!gameQuery)return true;
+  const q=gameQuery.toLowerCase();
+  return [g.home.nm,g.home.ab,g.away.nm,g.away.ab,g.lg].some(s=>String(s||'').toLowerCase().includes(q));
+}
+/* 정렬: 핀 우선 → LIVE → 킥오프 임박 → 종료 마지막 (앱 :1698-1705 이식; kickoff→iso) */
+const pinnedGames=new Set((()=>{ try{ return JSON.parse(localStorage.getItem('alpexa.sbdash.pins')||'[]'); }catch(e){ return []; } })());
+function _kickTs(g){ var t=Date.parse((g&&g.iso)||''); return isNaN(t)?Infinity:t; }
+function _liveRank(g){ return (g&&g.live)?0:((g&&g.state==='post')?2:1); }
+const sortByPin=(a,b)=>{
+  var p=(pinnedGames.has(b.gid)?1:0)-(pinnedGames.has(a.gid)?1:0); if(p) return p;
+  var r=_liveRank(a)-_liveRank(b); if(r) return r;
+  return _kickTs(a)-_kickTs(b);
+};
 
 const gamesStore = {
   games:[], updatedAt:0, subs:new Set(),
@@ -571,7 +589,7 @@ makeWidget('schedule','Schedule','','var(--lgd-link4)',
   '<div class="sch"><table class="tnum"><thead><tr><th>Game</th><th>Time</th><th>ML Away</th><th>ML Home</th></tr></thead><tbody id="schBody"></tbody></table></div>');
 function renderSchedule(games){
   const el=document.getElementById('schBody'); if(!el) return;
-  const list=games.filter(g=>g.lg===selLg).slice().sort((a,b)=>String(a.iso||'').localeCompare(String(b.iso||''))).slice(0,40);
+  const list=games.filter(g=>g.lg===selLg).slice().sort(sortByPin).slice(0,40);
   if(!list.length){ el.innerHTML='<tr><td colspan="4" style="color:var(--lgd-dim);font-weight:400">No games</td></tr>'; return; }
   el.innerHTML=list.map(g=>{
     // 서버 배열 규약: index 0=홈, 1=원정 (sports-games/index.ts:76-79)
@@ -596,8 +614,9 @@ function renderBoard(games){
   const el=document.getElementById('obList'); if(!el) return;
   document.getElementById('obFil').innerHTML=LEAGUES.map(([lg])=>
     '<button class="'+(lg===selLg?'on':'')+'" data-lg="'+lg+'">'+lg+'</button>').join('');
-  const list=games.filter(g=>g.lg===selLg).slice().sort((a,b)=>String(a.iso||'').localeCompare(String(b.iso||''))).slice(0,60);
-  if(!list.length){ el.innerHTML='<div class="wempty">No games for '+esc(selLg)+'</div>'; return; }
+  document.querySelector('#w-board .ob').classList.toggle('soc', selLg==='SOC'&&!gameQuery);
+  const list=(gameQuery?games.filter(matchGame):games.filter(g=>g.lg===selLg)).slice().sort(sortByPin).slice(0,60);
+  if(!list.length){ el.innerHTML='<div class="wempty">'+(gameQuery?('No games match "'+esc(gameQuery)+'"'):('No games for '+esc(selLg)))+'</div>'; return; }
   el.innerHTML=list.map(g=>{
     try{
       // 잠금 셀: 앱:1641 리터럴 그대로 — 노라인은 data-am 미부여가 돈 관문
@@ -1100,7 +1119,7 @@ function recentGames(){ try{ return JSON.parse(localStorage.getItem('alpexa.sbda
 function pushRecent(gid){ try{ const r=recentGames().filter(x=>x!==gid); r.unshift(gid);
   localStorage.setItem('alpexa.sbdash.recent', JSON.stringify(r.slice(0,6))); }catch(e){} }   // UI 설정 — 돈 아님 (로컬 OK)
 function openSearch(){ sPop.classList.add('open'); renderSearch(); setTimeout(()=>document.getElementById('sIn').focus(),0); }
-function closeSearch(){ sPop.classList.remove('open'); document.getElementById('sIn').value=''; }
+function closeSearch(){ sPop.classList.remove('open'); document.getElementById('sIn').value=''; if(gameQuery){ gameQuery=''; renderBoard(gamesStore.games); } }
 function renderSearch(){
   document.getElementById('sCats').innerHTML=SCATS.map(c=>
     '<button class="cat'+(c===sCat?' on':'')+'" data-cat="'+c+'">'+c+'</button>').join('');
@@ -1123,8 +1142,10 @@ function renderSearch(){
     '<span class="st'+(g.live?' live':'')+'">'+(g.live?'● ':'')+esc(g.time)+'</span></div>').join('')
     :'<div class="none">No matches</div>';
 }
-document.getElementById('sIn').addEventListener('input', renderSearch);
-document.getElementById('sClr').addEventListener('click', ()=>{ document.getElementById('sIn').value=''; renderSearch(); });
+document.getElementById('sIn').addEventListener('input', ()=>{
+  gameQuery=(document.getElementById('sIn').value||'').trim();   // 팝오버 타이핑 = 보드 실시간 필터 (앱 홈 검색바 동작)
+  renderSearch(); renderBoard(gamesStore.games); });
+document.getElementById('sClr').addEventListener('click', ()=>{ document.getElementById('sIn').value=''; gameQuery=''; renderSearch(); renderBoard(gamesStore.games); });
 document.getElementById('sCats').addEventListener('click', e=>{ const c=e.target.closest('.cat'); if(!c) return;
   sCat=c.dataset.cat; renderSearch(); });
 document.getElementById('sList').addEventListener('click', e=>{ const r=e.target.closest('.srow'); if(!r) return;
