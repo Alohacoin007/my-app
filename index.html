@@ -112,6 +112,11 @@
     border:none;cursor:pointer;white-space:nowrap}
   .gpill:hover{filter:brightness(1.08)}
   @media(max-width:640px){ .hd-live{display:none!important} }
+  body.light header{background:rgba(255,255,255,.92);border-bottom:1px solid var(--line)}
+  body.light .logo{color:#0e1726}
+  body.light .logo .mark{background:#0e1726;color:#fff}
+  body.light .hd-live{background:#f2f4f8;border-color:#e3e8f0;color:#0e1726}
+  body.light .hd-login{background:#f2f4f8;border-color:#e3e8f0;color:#0e1726}
   nav{display:flex;gap:26px;flex:1}
   nav a{color:var(--muted);font-size:14px;transition:color .15s}
   nav a:hover{color:var(--text)}
@@ -377,7 +382,7 @@
     .theme-toggle{width:30px;height:30px}
     .theme-toggle svg{width:15px;height:15px}
     /* Stop the Log in link + Sign up button from wrapping to two lines */
-    header>a,header .gpill,header .hd-login{white-space:nowrap;flex:none}
+    header>a,header .gpill,header .hd-login,header .theme-toggle{white-space:nowrap;flex:none}
     header>a[href="login.html"]{font-size:12px!important;font-weight:600!important;margin-right:0!important}
     /* Match Sign up to the Log in size — same font, slim height */
     header .gpill{padding:6px 13px;font-size:12px} header .hd-login{padding:6px 11px;font-size:12px}
@@ -479,6 +484,7 @@
     <span style="flex:1"></span>
     <span class="hd-live" id="hdLive"><i></i><span id="hdLiveTxt"></span></span>
     <span style="flex:1"></span>
+    <button class="theme-toggle" id="themeBtn" aria-label="Toggle theme"></button>
     <a class="hd-login" href="login.html?switch=1" rel="noopener">Log in</a>
     <button class="gpill" onclick="window.open('signup.html','_blank','noopener')">Sign up</button>
   </header>
@@ -798,7 +804,22 @@
   })();
   </script>
 
-  <!-- (테마 토글 제거 — 2026-07-15 시안 C: 다크 단일. body.light CSS는 미도달 상태로 잔존) -->
+  <script>
+  (function(){
+    var b=document.body;
+    var sun='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>';
+    var moon='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+    try{ var t=localStorage.getItem('alpexa_theme'); if(t==='dark') b.classList.remove('light'); else if(t==='light') b.classList.add('light'); }catch(e){}
+    var btn=document.getElementById('themeBtn');
+    function paint(){ btn.innerHTML = b.classList.contains('light') ? moon : sun; }
+    paint();
+    btn.addEventListener('click',function(){
+      b.classList.toggle('light');
+      try{ localStorage.setItem('alpexa_theme', b.classList.contains('light')?'light':'dark'); }catch(e){}
+      paint();
+    });
+  })();
+  </script>
 <script>
 (function(){
   var board=document.getElementById('lbBoard'); if(!board) return;
