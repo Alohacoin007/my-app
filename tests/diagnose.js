@@ -99,6 +99,9 @@ const CHECKS = [
   { id: 'SPREAD-fixed-multiplier', sev: 'HIGH', files: ['webtrade.html'],
     re: /\*\s*100000\b/,
     why: 'Hardcoded *100000 spread formula breaks per-symbol digits. Use tickSize(sym).' },
+  { id: 'BODY-classname-assign', sev: 'HIGH', files: DEPLOYED,
+    re: /body\.className\s*=(?![=+])/,
+    why: 'Wholesale assignment to body.className wipes EVERY other body class — including the `dark` theme class (2026-07-16: tapping Parlay in the bet slip flipped dark→light on a real device). Swap state classes with classList.remove/add (e.g. setModeClass), never replace the whole className.' },
 ];
 
 // ── Reviewed-OK exceptions (Six-Sigma control plan). Suppressed but always printed. ──

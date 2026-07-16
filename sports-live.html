@@ -1977,8 +1977,9 @@
     toggleProps(b.dataset.game,b.dataset.market,b.dataset.sel,+b.dataset.am);
     openProps(gid); // re-render to reflect selection
   });
-  // 모드 클래스는 교체가 아니라 스왑 — body.className='m-…' 통째 대입은 body의 다른
+  // 모드 클래스는 교체가 아니라 스왑 — body의 className 통째 대입(='m-…')은 body의 다른
   // 클래스('dark' 테마!)까지 지워버린다 (팔레이 클릭 시 다크→라이트 실기기 버그 2026-07-16).
+  // diagnose.js BODY-classname-assign이 이 클래스를 정적으로 차단한다.
   function setModeClass(){ body.classList.remove('m-single','m-parlay','m-sgp'); body.classList.add('m-'+mode); }
   document.querySelectorAll('.mode').forEach(m=>m.onclick=()=>{if(m.classList.contains('disabled'))return;
     document.querySelector('.mode.active').classList.remove('active');m.classList.add('active');mode=m.dataset.mode;setModeClass();syncSlip();});
