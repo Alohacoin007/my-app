@@ -114,7 +114,9 @@ async function main() {
   if (ageMin != null && ageMin > 15) fails.push('피드 STALE(>15분) — sports-games 크론 확인');
 
   // window = games kicking off within [now-6h, +7d]
-  const win = all.filter((g) => { const t = Date.parse(g.iso || ''); return isNaN(t) ? true : (t >= NOW - GRACE && t <= WIN_END); });
+  // LIVE 경기는 시작 시각과 무관하게 항상 창에 포함 — ⛳ 골프처럼 며칠짜리 이벤트는
+  // 시작 후 6h grace를 금방 벗어나 감시에서 사라졌다(디 오픈 2일차부터 미집계 버그).
+  const win = all.filter((g) => { if (g.live) return true; const t = Date.parse(g.iso || ''); return isNaN(t) ? true : (t >= NOW - GRACE && t <= WIN_END); });
 
   const byLg = {};
   for (const g of win) {
