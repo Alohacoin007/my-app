@@ -42,6 +42,33 @@
   .ibcard .fn a:hover{color:#fff}
 
 
+  /* 파트너 신청 팝업 (2026-07-15 사용자 확정): CTA → 모달 → broker-apply Edge → 회사 이메일 */
+  .apov{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.62);padding:20px}
+  .apov.open{display:flex}
+  .apsheet{background:#101316;border:1px solid rgba(255,255,255,.12);border-radius:18px;width:min(430px,100%);
+    padding:30px 28px 26px;position:relative;text-align:left;color:#E9EDF3}
+  .apsheet h3{font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:-.4px;color:#fff;margin:0 0 6px}
+  .apsheet .apsub{font-size:13px;color:#9AA1AB;margin:0 0 20px;line-height:1.5}
+  .apsheet label{display:block;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#8B9096;margin:14px 0 6px}
+  .apsheet input,.apsheet textarea{width:100%;background:#0B0D10;border:1px solid rgba(255,255,255,.14);border-radius:10px;
+    color:#fff;font-family:inherit;font-size:14.5px;padding:11px 12px;outline:none;transition:border-color .15s}
+  .apsheet input:focus,.apsheet textarea:focus{border-color:#CDF138}
+  .apsheet textarea{min-height:84px;resize:vertical}
+  .apsheet .hp{position:absolute;left:-9999px;top:-9999px;height:1px;width:1px;opacity:0}
+  .apsend{margin-top:22px;width:100%;display:inline-flex;align-items:center;justify-content:center;
+    background:#CDF138;color:#101418;font-size:15px;font-weight:700;padding:13px 0;border:none;border-radius:999px;cursor:pointer}
+  .apsend:hover{filter:brightness(1.05)}
+  .apsend:disabled{opacity:.55;cursor:default}
+  .aperr{display:none;margin-top:12px;font-size:12.5px;color:#ff8b7a}
+  .apx{position:absolute;top:14px;right:14px;width:30px;height:30px;border:none;border-radius:50%;background:rgba(255,255,255,.08);
+    color:#c6cdd9;font-size:15px;cursor:pointer;line-height:1}
+  .apx:hover{background:rgba(255,255,255,.16);color:#fff}
+  .apok{display:none;text-align:center;padding:26px 4px 10px}
+  .apok .big{font-size:38px;margin-bottom:12px}
+  .apok h4{font-family:var(--display);font-size:20px;font-weight:700;color:#fff;margin:0 0 8px}
+  .apok p{font-size:13.5px;color:#9AA1AB;margin:0;line-height:1.6}
+
   footer.site{border-top:1px solid var(--line);padding:40px 26px 22px;text-align:center;font-size:12px;color:var(--muted);overflow:hidden}
   .wordmark{text-align:center;font-family:var(--display);font-size:clamp(72px,21vw,300px);font-weight:700;letter-spacing:-4px;
     color:#0B0C09;line-height:.82;margin:0 0 30px;user-select:none;white-space:nowrap}  /* 알펙사 글자 검은색 (2026-07-15 사용자 확정) */
@@ -115,7 +142,7 @@
       <h2>Earn up to $8 per lot, paid weekly</h2>
       <p class="bd">Join the Alpexa introducing&#8209;broker program. Refer traders to one multi&#8209;asset
         account — FX, stocks and crypto — and watch commission accrue in real time on your dashboard.</p>
-      <a class="go" href="signup.html" target="_blank" rel="noopener">Become a partner</a>
+      <a class="go" href="signup.html" id="apOpen">Become a partner</a>
       <svg class="art" viewBox="0 0 320 320" role="img" aria-label="Orbital line illustration">
         <g fill="none" stroke="#fff" stroke-width="1.1">
           <ellipse cx="160" cy="160" rx="148" ry="92"/>
@@ -130,6 +157,64 @@
         See full terms in the <a href="agent.html">IB Portal</a>.</p>
     </div>
   </div>
+
+  <!-- 파트너 신청 모달 — broker-apply Edge (저장 + 회사 이메일 통지, reply-to=신청자) -->
+  <div class="apov" id="apOv">
+    <div class="apsheet" role="dialog" aria-modal="true" aria-labelledby="apTitle">
+      <button class="apx" id="apX" aria-label="Close">&#10005;</button>
+      <div id="apForm">
+        <h3 id="apTitle">Become a partner</h3>
+        <p class="apsub">Tell us who you are — our partnership team will reply by email.</p>
+        <label for="apName">Full name</label>
+        <input id="apName" maxlength="200" autocomplete="name">
+        <label for="apMail">Email</label>
+        <input id="apMail" type="email" maxlength="200" autocomplete="email">
+        <label for="apNotes">Notes <span style="text-transform:none;letter-spacing:0;color:#6b7280">(optional)</span></label>
+        <textarea id="apNotes" maxlength="4000" placeholder="Your audience, clients or expected volume"></textarea>
+        <input class="hp" id="apHp" name="company" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <button class="apsend" id="apSend">Submit application</button>
+        <div class="aperr" id="apErr"></div>
+      </div>
+      <div class="apok" id="apOk">
+        <div class="big">&#10003;</div>
+        <h4>Application received</h4>
+        <p>Thanks — our partnership team will contact you<br>at your email within one business day.</p>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function(){
+    var EP='https://grxnbgtfnaayeluenvqh.supabase.co/functions/v1/broker-apply';
+    var ov=document.getElementById('apOv'), err=document.getElementById('apErr'), btn=document.getElementById('apSend');
+    function open(){ ov.classList.add('open'); document.getElementById('apName').focus(); }
+    function close(){ ov.classList.remove('open'); }
+    document.getElementById('apOpen').addEventListener('click',function(e){ e.preventDefault(); open(); });
+    document.getElementById('apX').addEventListener('click',close);
+    ov.addEventListener('click',function(e){ if(e.target===ov) close(); });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape') close(); });
+    btn.addEventListener('click',function(){
+      var name=document.getElementById('apName').value.trim();
+      var mail=document.getElementById('apMail').value.trim();
+      err.style.display='none';
+      if(!name){ err.textContent='Please enter your name.'; err.style.display='block'; return; }
+      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)){ err.textContent='Please enter a valid email.'; err.style.display='block'; return; }
+      btn.disabled=true; btn.textContent='Sending…';
+      fetch(EP,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ name:name, email:mail,
+          notes:document.getElementById('apNotes').value.trim(),
+          company:document.getElementById('apHp').value })})
+      .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return {ok:r.ok&&j.ok!==false, j:j}; }); })
+      .then(function(res){
+        if(res.ok){ document.getElementById('apForm').style.display='none';
+          document.getElementById('apOk').style.display='block'; }
+        else{ err.textContent='Something went wrong — please try again.'; err.style.display='block';
+          btn.disabled=false; btn.textContent='Submit application'; }
+      })
+      .catch(function(){ err.textContent='Network error — please try again.'; err.style.display='block';
+        btn.disabled=false; btn.textContent='Submit application'; });
+    });
+  })();
+  </script>
 
   <footer class="site">
     <div class="wordmark">ALPEXA</div>
