@@ -1977,8 +1977,11 @@
     toggleProps(b.dataset.game,b.dataset.market,b.dataset.sel,+b.dataset.am);
     openProps(gid); // re-render to reflect selection
   });
+  // 모드 클래스는 교체가 아니라 스왑 — body.className='m-…' 통째 대입은 body의 다른
+  // 클래스('dark' 테마!)까지 지워버린다 (팔레이 클릭 시 다크→라이트 실기기 버그 2026-07-16).
+  function setModeClass(){ body.classList.remove('m-single','m-parlay','m-sgp'); body.classList.add('m-'+mode); }
   document.querySelectorAll('.mode').forEach(m=>m.onclick=()=>{if(m.classList.contains('disabled'))return;
-    document.querySelector('.mode.active').classList.remove('active');m.classList.add('active');mode=m.dataset.mode;body.className='m-'+mode;syncSlip();});
+    document.querySelector('.mode.active').classList.remove('active');m.classList.add('active');mode=m.dataset.mode;setModeClass();syncSlip();});
   slipbar.onclick=openSlip;document.getElementById('closeSheet').onclick=closeSheet;overlay.onclick=closeSheet;
   function openSlip(){if(legs.length){restoreSlip();sheet.classList.add('show');overlay.classList.add('show');}}
   function closeSheet(){sheet.classList.remove('show');overlay.classList.remove('show');restoreSlip();}
@@ -1993,7 +1996,7 @@
     slipbar.classList.toggle('show',n>0);if(n===0)closeSheet();
     const oneGame=gameCount()===1&&n>=2,sgpTab=document.querySelector('[data-mode="sgp"]');
     sgpTab.classList.toggle('disabled',!oneGame);
-    if(mode==='sgp'&&!oneGame){sgpTab.classList.remove('active');document.querySelector('[data-mode="parlay"]').classList.add('active');mode='parlay';body.className='m-parlay';}
+    if(mode==='sgp'&&!oneGame){sgpTab.classList.remove('active');document.querySelector('[data-mode="parlay"]').classList.add('active');mode='parlay';setModeClass();}
     if(!legsEl.dataset.props)drawLegs();calc();
   }
   function drawLegs(){
