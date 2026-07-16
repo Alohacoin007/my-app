@@ -174,12 +174,17 @@ async function main() {
     if (cat && Array.isArray(cat.data)) {
       const KNOWN_GOLF = ['golf_masters_tournament_winner', 'golf_pga_championship_winner',
         'golf_the_open_championship_winner', 'golf_us_open_winner'];
+      // 기준선(2026-07-16 카탈로그 실측): 여자 대회 키는 축구·크리켓뿐, 골프 없음.
+      // 매일 같은 키를 "신규"로 울리면 무시당한다(오탐 poka-yoke) — 기준선 밖 diff만 알림.
+      const KNOWN_WOMENS = ['cricket_icc_world_cup_womens', 'cricket_t20_world_cup_womens',
+        'soccer_fifa_world_cup_womens', 'soccer_germany_bundesliga_women', 'soccer_uefa_champs_league_women'];
       const golfKeys = cat.data.filter((s) => /^golf/.test(s.key || '')).map((s) => s.key);
       const newGolf = golfKeys.filter((k) => !KNOWN_GOLF.includes(k));
       const womens = cat.data.filter((s) => /lpga|women/i.test((s.key || '') + ' ' + (s.title || '') + ' ' + (s.group || ''))).map((s) => s.key);
-      const fresh = [...new Set([...newGolf, ...womens])];
-      if (fresh.length) console.log('  📣 신규 배당 키 감지: ' + fresh.join(', ') + ' — ⛳ 확장 검토 대상(여자골프 백로그)');
-      else console.log('  골프 키 감시: 신규/여자(LPGA) 키 없음 (카탈로그 골프 ' + golfKeys.length + '개)');
+      const newWomens = womens.filter((k) => !KNOWN_WOMENS.includes(k));
+      const fresh = [...new Set([...newGolf, ...newWomens])];
+      if (fresh.length) console.log('  📣 신규 배당 키 감지: ' + fresh.join(', ') + ' — ⛳ 확장 검토 대상(여자골프 백로그). 반복 알림이면 KNOWN_* 기준선에 등록.');
+      else console.log('  골프 키 감시: 신규 골프/여자(LPGA) 키 없음 (골프 ' + golfKeys.length + ' · 여자키 기준선 ' + womens.length + '/' + KNOWN_WOMENS.length + ')');
     } else {
       console.log('  골프 키 감시: 카탈로그(__sports_list) 미적재 — sports-odds 최신 버전 배포 후 하루 내 적재됨');
     }
