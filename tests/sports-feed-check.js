@@ -161,9 +161,29 @@ async function main() {
     if (r.ok) odds = await r.json();
   } catch (_e) { /* network — skip the extra report */ }
   if (odds) {
-    const stale = odds.filter((o) => o.updated_at && (NOW - new Date(o.updated_at).getTime()) > 15 * 60000);
-    console.log('\n  오즈 테이블(C7): ' + odds.length + '개 리그' + (stale.length ? '  ⚠️ 스테일(>15분): ' + stale.map((o) => o.sport).join(', ') + ' — sports-odds 크론 확인' : '  ✅ 전부 신선'));
-    const bySport = {}; odds.forEach((o) => { bySport[o.sport] = Array.isArray(o.data) ? o.data : []; });
+    // 신선도 기준은 폴링 주기별: 팀 스포츠 ≤9분 주기 → 15분 / ⛳ 골프 outright 30분(대기)
+    // 주기 → 70분 / __sports_list 카탈로그 일 1회 → 26시간. 일괄 15분이면 골프가 매일
+    // 가짜 스테일 경보를 낸다(2026-07-16 사전 차단).
+    const thrOf = (s) => s === '__sports_list' ? 26 * 3600e3 : /^golf/.test(s) ? 70 * 60000 : 15 * 60000;
+    const stale = odds.filter((o) => o.updated_at && (NOW - new Date(o.updated_at).getTime()) > thrOf(o.sport));
+    const nLg = odds.filter((o) => o.sport !== '__sports_list').length;
+    console.log('\n  오즈 테이블(C7): ' + nLg + '개 리그' + (stale.length ? '  ⚠️ 스테일: ' + stale.map((o) => o.sport).join(', ') + ' — sports-odds 크론 확인' : '  ✅ 전부 신선'));
+    // ── ⛳ 골프/여자골프(LPGA) 키 감시 (사용자 요청 2026-07-16) — 프로바이더 카탈로그에
+    // 새 골프 키나 여자 대회 키가 생기면 알림(비실패). 카탈로그 행은 sports-odds가 일 1회 적재.
+    const cat = odds.find((o) => o.sport === '__sports_list');
+    if (cat && Array.isArray(cat.data)) {
+      const KNOWN_GOLF = ['golf_masters_tournament_winner', 'golf_pga_championship_winner',
+        'golf_the_open_championship_winner', 'golf_us_open_winner'];
+      const golfKeys = cat.data.filter((s) => /^golf/.test(s.key || '')).map((s) => s.key);
+      const newGolf = golfKeys.filter((k) => !KNOWN_GOLF.includes(k));
+      const womens = cat.data.filter((s) => /lpga|women/i.test((s.key || '') + ' ' + (s.title || '') + ' ' + (s.group || ''))).map((s) => s.key);
+      const fresh = [...new Set([...newGolf, ...womens])];
+      if (fresh.length) console.log('  📣 신규 배당 키 감지: ' + fresh.join(', ') + ' — ⛳ 확장 검토 대상(여자골프 백로그)');
+      else console.log('  골프 키 감시: 신규/여자(LPGA) 키 없음 (카탈로그 골프 ' + golfKeys.length + '개)');
+    } else {
+      console.log('  골프 키 감시: 카탈로그(__sports_list) 미적재 — sports-odds 최신 버전 배포 후 하루 내 적재됨');
+    }
+    const bySport = {}; odds.forEach((o) => { if (o.sport !== '__sports_list') bySport[o.sport] = Array.isArray(o.data) ? o.data : []; });
     const OK = { NFL: 'americanfootball_nfl', NBA: 'basketball_nba', MLB: 'baseball_mlb', NHL: 'icehockey_nhl' };
     const socAll = Object.keys(bySport).filter((k) => k.indexOf('soccer_') === 0).flatMap((k) => bySport[k]);
     const cls = {};

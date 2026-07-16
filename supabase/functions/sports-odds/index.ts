@@ -177,6 +177,33 @@ Deno.serve(async (req) => {
     }
   }
 
+  // 📋 SPORTS CATALOG — once a day store the full /v4/sports list (FREE endpoint, zero
+  // quota cost) into sports_odds under '__sports_list'. The ops session can't reach the
+  // Odds API directly (network policy), so the morning routine reads THIS row to watch
+  // for new golf / LPGA keys appearing. The API key stays server-side, as always.
+  try {
+    let wantCat = false;
+    if (only === "__sports_list") wantCat = true;
+    else if (!only && !force) wantCat = now - (updated["__sports_list"] || 0) >= 24 * 3600 * 1000;
+    if (wantCat) {
+      const r = await fetch(`https://api.the-odds-api.com/v4/sports/?all=true&apiKey=${KEY}`);
+      if (r.ok) {
+        const list = await r.json();
+        if (Array.isArray(list) && list.length) {
+          await fetch(`${SB_URL}/rest/v1/sports_odds?on_conflict=sport`, {
+            method: "POST",
+            headers: {
+              "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`,
+              "Content-Type": "application/json",
+              "Prefer": "resolution=merge-duplicates,return=minimal",
+            },
+            body: JSON.stringify({ sport: "__sports_list", data: list, updated_at: new Date().toISOString() }),
+          });
+        }
+      }
+    }
+  } catch (_e) { /* catalog is best-effort — never blocks odds polling */ }
+
   // Report the account-wide quota to the back office (only if we actually called).
   if (remaining != null) {
     try {
