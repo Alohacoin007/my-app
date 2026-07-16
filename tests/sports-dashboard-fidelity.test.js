@@ -168,7 +168,9 @@ if (/Alpexa FX|fxTab/.test(src)) {
   pin(/Alpexa Crypto/, '+ 메뉴 항목: Alpexa Crypto (예고)');
   pin(/Coming this week/, '크립토 컴퓨터용 미출시 안내 리터럴');
   pin(/iframe[^>]*webtrade\.html|webtrade\.html[^>]*iframe|src="webtrade\.html"/, 'FX = 현재 웹트레이더 그대로 임베드 (복제 금지 — 한 진실)');
-  pin(/Escape[\s\S]{0,200}(fxOv|fxFull|mini)|fxEsc/, 'ESC = 풀스크린→미니 전환 계약');
+  pin(/function fxEsc[\s\S]{0,120}closeFx/, 'ESC = FX 오버레이 닫고 대시보드 복귀 (2026-07-15 사용자: 미니 잔상 폐기)');
+  pin(/fullscreenchange[\s\S]{0,300}closeFx/, '브라우저 ESC(풀스크린 해제) → 오버레이 완전 닫힘');
+  ban(/fxov\.mini|classList\.toggle\(['"]mini/, '미니 오버레이 잔상 — 대시보드 위 어중간한 창 금지 (2026-07-15 사용자 버그)');
   pin(/requestFullscreen/, '서버 전환 = 네이티브 풀스크린 (ESC는 브라우저가 처리 — 포커스 무관)');
   pin(/sbTab/, 'Sports betting 탭 = 대시보드 풀스크린 토글 (서버 탭 공통 규칙, 2026-07-15)');
   pin(/refitLayout/, '뷰포트 변경(풀스크린 포함) 시 수학적 칸 채움 재사상 (사용자 확정 2026-07-15)');

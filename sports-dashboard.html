@@ -33,11 +33,9 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .htab:hover{background:var(--lgd-pill-hi)}
 .htab.fxtab{cursor:pointer}
 .htab.fxtab.on{outline:1px solid var(--lgd-up)}
-/* FX 오버레이 — 풀스크린 ↔ ESC 미니 (웹트레이더 임베드, 한 진실) */
+/* FX 오버레이 — 풀스크린 전용, ESC = 닫고 대시보드 복귀 (2026-07-15 사용자: 미니 잔상 폐기) */
 .fxov{position:fixed; inset:0; z-index:70; display:none; flex-direction:column; background:#0B0D0E}
 .fxov.open{display:flex}
-.fxov.mini{inset:auto 16px 16px auto; width:min(960px,calc(100vw - 32px)); height:min(560px,calc(100vh - 80px));
-  border:1px solid var(--lgd-hair); border-radius:12px; box-shadow:0 24px 60px rgba(0,0,0,.7); overflow:hidden}
 .fxov iframe{flex:1; border:0; width:100%; min-height:0}
 .tabrow{display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:6px; cursor:pointer}
 .tabrow:hover{background:var(--lgd-pill)}
@@ -1836,11 +1834,11 @@ function rerenderOdds(){ const gs=gamesStore.games;
    FX 터미널은 iframe으로 webtrade.html "한 진실" 임베드 (복제 금지). 같은 탭·같은
    sessionStorage라 로그인 세션이 그대로 통한다. 크립토 컴퓨터용은 미구현(이번 주). */
 const tabMenu=document.getElementById('tabMenu'), fxTab=document.getElementById('fxTab');
-let fxOv=null, fxFull=true;
+let fxOv=null;
 function ensureFxOv(){
   if(fxOv) return fxOv;
   // 크롬 없음 (사용자 확정 2026-07-15: 상단 바 삭제 — 허가 없는 디자인 추가 금지).
-  // 조작은 기존 것만: ESC = 풀↔미니 토글, 헤더 Alpexa FX 탭 = 닫기/열기.
+  // 조작은 기존 것만: ESC = 닫고 대시보드 복귀, 헤더 Alpexa FX 탭 = 닫기/열기.
   fxOv=document.createElement('div'); fxOv.className='fxov';
   fxOv.innerHTML='<iframe id="fxFrame" title="Alpexa FX WebTrade terminal"></iframe>';
   document.body.appendChild(fxOv);
@@ -1849,12 +1847,11 @@ function ensureFxOv(){
     fr.contentDocument.addEventListener('keydown', e=>{ if(e.key==='Escape') fxEsc(); }); }catch(e){} });
   return fxOv;
 }
-function setFxSize(full){ fxFull=full; ensureFxOv().classList.toggle('mini', !full); }
 function openFx(){
   ensureFxOv();
   const fr=document.getElementById('fxFrame');
   if(!fr.src) fr.src='webtrade.html';   // 첫 오픈에만 로드 (대시보드 부팅 무영향)
-  fxOv.classList.add('open'); setFxSize(true);
+  fxOv.classList.add('open');
   fxTab.style.display='flex'; fxTab.classList.add('on');
   // 네이티브 풀스크린 (사용자 확정 2026-07-15): 서버 전환 = 화면 위까지 꽉 채움.
   // ESC는 브라우저가 직접 처리 — iframe 어디에 포커스가 있어도 무조건 동작
@@ -1865,14 +1862,14 @@ function closeFx(){
   if(document.fullscreenElement){ try{ document.exitFullscreen(); }catch(e){} }
   if(fxOv) fxOv.classList.remove('open'); fxTab.classList.remove('on');
 }
-// 브라우저 ESC로 풀스크린이 풀리면 → 인터넷 창 보이게 + 터미널은 미니로
+// 브라우저 ESC로 풀스크린이 풀리면 → 오버레이 완전 닫고 대시보드 복귀
+// (2026-07-15 사용자: 미니 잔상이 대시보드 위에 어중간하게 남는 문제 폐기)
 document.addEventListener('fullscreenchange', ()=>{
-  if(!document.fullscreenElement && fxOv && fxOv.classList.contains('open') && fxFull) setFxSize(false);
+  if(!document.fullscreenElement && fxOv && fxOv.classList.contains('open')) closeFx();
 });
-function fxEsc(){   // 폴백 (풀스크린 API 거부/미지원 환경): ESC = 풀↔미니 토글
+function fxEsc(){   // 폴백 (풀스크린 API 거부/미지원 환경): ESC = 닫기
   if(!(fxOv&&fxOv.classList.contains('open'))) return;
-  if(document.fullscreenElement){ try{ document.exitFullscreen(); }catch(e){} return; }
-  setFxSize(!fxFull);
+  closeFx();
 }
 fxTab.addEventListener('click', ()=>{ (fxOv&&fxOv.classList.contains('open'))?closeFx():openFx(); });
 // Alpexa Sports 탭 = 대시보드 자체 풀스크린 토글 (서버 탭 공통 규칙: 클릭=풀스크린, ESC=인터넷 창)
