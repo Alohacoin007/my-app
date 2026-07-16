@@ -33,7 +33,23 @@ const SPORTS = [
   // Soccer — incl. the FIFA World Cup (in season). Real odds so the app/board no longer
   // shows placeholder soccer prices. Smart polling only spends credits when live/stale.
   "soccer_fifa_world_cup", "soccer_epl", "soccer_usa_mls", "soccer_uefa_champs_league",
+  // ⛳ Golf majors — OUTRIGHT (tournament winner) markets, not h2h. Off-season keys just
+  // 404 (no credits burned) and pick themselves back up when the season starts.
+  "golf_masters_tournament_winner", "golf_pga_championship_winner",
+  "golf_the_open_championship_winner", "golf_us_open_winner",
 ];
+// Sports priced as outrights (winner futures): different market param + a slower
+// refresh — outright boards move in hours, not seconds, so 30 min saves credits.
+const OUTRIGHTS = new Set([
+  "golf_masters_tournament_winner", "golf_pga_championship_winner",
+  "golf_the_open_championship_winner", "golf_us_open_winner",
+]);
+const STALE_OUTRIGHT_MS = 30 * 60 * 1000;
+// While a golf tournament is IN PLAY the outright board must stay fresh (stale prices
+// during a Sunday charge = arbitrage against the house) → 5-min refresh, not 30.
+// place_bet enforces the same freshness server-side (live outright legs need a fresh
+// oddsTs), so if this polling ever stalls, live golf betting locks itself.
+const STALE_OUTRIGHT_LIVE_MS = 5 * 60 * 1000;
 const ESPN_PATH: Record<string, string> = {
   americanfootball_nfl: "football/nfl",
   basketball_nba: "basketball/nba",
@@ -45,6 +61,11 @@ const ESPN_PATH: Record<string, string> = {
   soccer_epl: "soccer/eng.1",
   soccer_usa_mls: "soccer/usa.1",
   soccer_uefa_champs_league: "soccer/uefa.champions",
+  // All golf majors share the one ESPN golf scoreboard for live detection.
+  golf_masters_tournament_winner: "golf/pga",
+  golf_pga_championship_winner: "golf/pga",
+  golf_the_open_championship_winner: "golf/pga",
+  golf_us_open_winner: "golf/pga",
 };
 const STALE_MS = 9 * 60 * 1000; // refresh an idle league's odds ~every 10 min
 
@@ -119,9 +140,13 @@ Deno.serve(async (req) => {
   const now = Date.now();
   const live = (only || force) ? new Set(candidates) : await liveSports(candidates);
   const updated = (only || force) ? {} : await lastUpdated(SB_URL, SB_KEY);
-  const toPoll = candidates.filter((sp) =>
-    only || force || live.has(sp) || (now - (updated[sp] || 0) >= STALE_MS)
-  );
+  const toPoll = candidates.filter((sp) => {
+    if (only || force) return true;
+    const age = now - (updated[sp] || 0);
+    // Outrights never poll every minute — live tournament: 5 min, idle: 30 min.
+    if (OUTRIGHTS.has(sp)) return age >= (live.has(sp) ? STALE_OUTRIGHT_LIVE_MS : STALE_OUTRIGHT_MS);
+    return live.has(sp) || age >= STALE_MS;
+  });
   const skipped = candidates.filter((sp) => !toPoll.includes(sp));
 
   const out: any[] = [];
@@ -129,8 +154,9 @@ Deno.serve(async (req) => {
 
   for (const sp of toPoll) {
     try {
+      const markets = OUTRIGHTS.has(sp) ? "outrights" : "h2h,spreads,totals";
       const oddsUrl =
-        `https://api.the-odds-api.com/v4/sports/${sp}/odds/?apiKey=${KEY}&regions=us&markets=h2h,spreads,totals&oddsFormat=american`;
+        `https://api.the-odds-api.com/v4/sports/${sp}/odds/?apiKey=${KEY}&regions=us&markets=${markets}&oddsFormat=american`;
       const r = await fetch(oddsUrl);
       remaining = r.headers.get("x-requests-remaining") ?? remaining;
       usedH = r.headers.get("x-requests-used") ?? usedH;

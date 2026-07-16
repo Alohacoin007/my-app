@@ -232,6 +232,15 @@
   .soc-sc{font-size:13px;font-weight:800;color:var(--text);background:var(--surface-2);border-radius:5px;padding:1px 7px;flex:0 0 auto}
   .soc-sc.live{color:var(--live)}
   .soc1x2{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:4px 12px 12px}
+  /* ⛳ golf outright card (tournament winner) */
+  .golf-hdr{display:flex;align-items:baseline;gap:8px;padding:9px 12px 6px}
+  .golf-tt{flex:1;font-size:13.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .golf-sub{font-size:10.5px;font-weight:700;letter-spacing:.4px;color:var(--dim);text-transform:uppercase;flex:0 0 auto}
+  .golf-list{padding:0 12px 12px}
+  .golf-row{display:flex;align-items:center;gap:8px;padding:3px 0}
+  .golf-nm{flex:1;font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .golf-row .bet{flex:0 0 76px;padding:7px 0}
+  .golf-more{padding:9px 0 2px;text-align:center;font-size:12px;font-weight:700;color:var(--accent);cursor:pointer}
   .more-mkt{display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;border-top:1px solid var(--line);font-size:12px;font-weight:700;color:var(--accent);cursor:pointer}
   .more-mkt .cnt{color:var(--dim)}
   /* play-by-play ticker */
@@ -806,6 +815,7 @@
         <div class="sport" data-sport="NHL">🏒 NHL</div>
         <div class="sport" data-sport="SOC">⚽ Soccer</div>
         <div class="sport" data-sport="UFC">🥊 UFC</div>
+        <div class="sport" data-sport="GOLF">⛳ Golf</div>
       </div>
       <div class="colhead-wrap" id="colheadUp"><div class="colhead"><span data-i18n="col_today">Today</span><span data-i18n="col_spread">Spread</span><span data-i18n="col_total">Total</span><span data-i18n="col_ml">Moneyline</span></div></div>
       <div class="list" id="list"></div>
@@ -1658,7 +1668,23 @@
         if(g.live&&!liveOK(g)) return `<div class="bet sus" title="${liveReason(g)}"><span class="ln">${lbl}</span><span class="pr">🔒</span></div>`;
         return `<div class="bet${on?' sel':''}" data-game="${g.id}" data-market="1X2" data-sel="${b.sel}" data-am="${b.am}"><span class="ln">${lbl}</span><span class="pr ${b.am>0?'pos':''}">${fmtAm(b.am)}</span></div>`; };
       const tw=g.core.threeWay||[];
-      const matrixHTML=isSoc
+      // ⛳ GOLF = OUTRIGHT (tournament winner): one card per tournament, one row per
+      // player (market='Outright', sel=player name). Top 8 shown; rest behind an expander.
+      const isGolf=g.lg==='GOLF';
+      const golfHTML=()=>{
+        const oc=g.core.outright||[];
+        if(!oddsReal(g)||!oc.length) return `<div class="golf-hdr"><span class="golf-tt">${g.name||'Tournament'}</span><span class="golf-sub">Winner</span></div>
+          <div class="golf-list"><div class="bet sus" title="Odds unavailable — no market"><span class="ln">Winner odds</span><span class="pr">🔒</span></div></div>`;
+        const prow=(b)=>{
+          if(g.live&&!liveOK(g)) return `<div class="golf-row"><span class="golf-nm">${b.sel}</span><div class="bet sus" title="${liveReason(g)}"><span class="pr">🔒</span></div></div>`;
+          const on=legs.some(l=>l.uid===g.id+'|'+b.sel);
+          return `<div class="golf-row"><span class="golf-nm">${b.sel}</span><div class="bet${on?' sel':''}" data-game="${g.id}" data-market="Outright" data-sel="${b.sel}" data-am="${b.am}"><span class="pr ${b.am>0?'pos':''}">${fmtAm(b.am)}</span></div></div>`;};
+        const open=golfExpanded.has(g.id), top=oc.slice(0,8), rest=oc.slice(8);
+        return `<div class="golf-hdr"><span class="golf-tt">${g.name||'Tournament'}</span><span class="golf-sub">Winner</span></div>
+          <div class="golf-list">${top.map(prow).join('')}${rest.length?(open?rest.map(prow).join(''):`<div class="golf-more" data-golfmore="${g.id}">Show all ${oc.length} players</div>`):''}</div>`;};
+      const matrixHTML=isGolf
+        ? golfHTML()
+        : isSoc
         ? `<div class="soc-hdr"><span class="bd">${g.home.ab}</span><span class="soc-nm">${g.home.nm} <b>v</b> ${g.away.nm}</span>${(g.home.sc!==undefined&&g.away.sc!==undefined)?`<span class="soc-sc${g.live?' live':''}">${g.home.sc}–${g.away.sc}</span>`:''}<span class="bd">${g.away.ab}</span></div>
            <div class="soc1x2">${c3(tw[0],'Home')}${c3(tw[1],'Draw')}${c3(tw[2],'Away')}</div>`
         : `<div class="matrix">${row(g.away,1)}${row(g.home,0)}</div>`;
@@ -1677,7 +1703,7 @@
       }
       const isPinned=pinnedGames.has(g.id);
       const pinBtn=`<button class="pin-btn${isPinned?' pinned':''}" data-pin="${g.id}" title="${isPinned?'Unpin':'Pin to top'}">★</button>`;
-      return `<div class="card${isPinned?' pinned':''}"><div class="ch"><span class="lg">${({NBA:'🏀',NCAAB:'🎓',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽',UFC:'🥊'})[g.lg]||'🏈'} ${g.lg==='SOC'?'Soccer':g.lg}</span>
+      return `<div class="card${isPinned?' pinned':''}"><div class="ch"><span class="lg">${({NBA:'🏀',NCAAB:'🎓',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽',UFC:'🥊',GOLF:'⛳'})[g.lg]||'🏈'} ${g.lg==='SOC'?'Soccer':g.lg==='GOLF'?'Golf':g.lg}</span>
         <div class="ch-r"><span class="st${g.live?' live':''}">${g.live?'LIVE '+g.time:gameTimeLabel(g)}</span>${pinBtn}</div></div>
         ${matrixHTML}
         ${playHTML}
@@ -1687,10 +1713,11 @@
     }).join('');
   }
   let gameQuery='';
+  const golfExpanded=new Set();   // ⛳ tournaments whose full player board is open
   function matchGame(g){
     if(!gameQuery)return true;
     const q=gameQuery.toLowerCase();
-    return [g.home.nm,g.home.ab,g.away.nm,g.away.ab,g.lg].some(s=>s.toLowerCase().includes(q));
+    return [g.home.nm,g.home.ab,g.away.nm,g.away.ab,g.lg,g.name||''].some(s=>s.toLowerCase().includes(q));
   }
   // sort: pinned first → LIVE → soonest kickoff (today before tomorrow before the
   // day after) → finished last. Keeps the nearest games at the top instead of the
@@ -1745,8 +1772,8 @@
       '<div class="skel-row"><div class="skel-line"></div><div class="skel-line"></div><div class="skel-line"></div></div>'+
       '</div>'; } return h; }
   function renderGames(){
-    // Soccer cards are 1X2 (self-labeled Home/Draw/Away) → hide the Spread/Total/ML header.
-    try{ var _soc=curSport==='SOC'; ['colheadUp','colheadLive'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display=_soc?'none':''; }); }catch(e){}
+    // Soccer (1X2) and golf (outright) cards are self-labeled → hide the Spread/Total/ML header.
+    try{ var _soc=curSport==='SOC'||curSport==='GOLF'; ['colheadUp','colheadLive'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display=_soc?'none':''; }); }catch(e){}
     const emptyMsg=gameQuery?`No games match "${gameQuery}"`:'No upcoming games';
     const base=(gameQuery?GAMES.filter(matchGame):GAMES.filter(g=>g.lg===curSport)).slice().sort(sortByPin);
     // Before the first live_games load resolves, show a skeleton instead of a blank/empty msg.
@@ -1762,6 +1789,10 @@
     document.querySelectorAll('.bet').forEach(b=>{
       if(b.closest('#legs'))return;
       b.onclick=()=>toggle(b.dataset.game,b.dataset.market,b.dataset.sel,+b.dataset.am);
+    });
+    // ⛳ golf "Show all players" expander (state survives re-renders)
+    document.querySelectorAll('[data-golfmore]').forEach(m=>{
+      m.onclick=()=>{golfExpanded.add(m.dataset.golfmore);renderGames();};
     });
     document.querySelectorAll('[data-expand]').forEach(m=>m.onclick=()=>openProps(m.dataset.expand));
     document.querySelectorAll('.pin-btn').forEach(p=>{
@@ -1840,8 +1871,8 @@
       document.body.appendChild(el);
       el.querySelector('#lcovBack').onclick=closeCoverage;
     }
-    const lgIcon=({NBA:'🏀',NCAAB:'🎓',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽',UFC:'🥊'})[g.lg]||'🏈';
-    el.querySelector('.lcov-hd-lg').textContent=lgIcon+' '+(g.lg==='SOC'?'Soccer':g.lg);
+    const lgIcon=({NBA:'🏀',NCAAB:'🎓',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽',UFC:'🥊',GOLF:'⛳'})[g.lg]||'🏈';
+    el.querySelector('.lcov-hd-lg').textContent=lgIcon+' '+(g.lg==='SOC'?'Soccer':g.lg==='GOLF'?'Golf':g.lg);
     el.classList.add('open');
     renderCoverage();
   }
@@ -1914,7 +1945,8 @@
     if(i>-1)legs.splice(i,1);
     else{const g=GAMES.find(x=>x.id===gid);
       if(g&&g.live&&!liveOK(g)){ showToast('🔒','Live betting',liveReason(g)); return; }
-      legs.push({uid,gid,market,sel,am,game:g.away.ab+' @ '+g.home.ab,tm:g.time,kt:g.kickoff||'',live:!!g.live,lg:g.lg,stake:20});}
+      const gm=g.lg==='GOLF'?(g.name||'Golf'):(g.away.ab+' @ '+g.home.ab);   // ⛳ tournament title, not "@ GOLF"
+      legs.push({uid,gid,market,sel,am,game:gm,tm:g.time,kt:g.kickoff||'',live:!!g.live,lg:g.lg,stake:20});}
     renderGames();syncSlip();
   }
 
@@ -3601,9 +3633,12 @@
       // the game is kept but shown LOCKED (🔒 Odds unavailable) and place_bet rejects it.
       // Only drop a game for missing markets when it CLAIMS a real line (malformed feed).
       var noLine = g.oddsReal===false;
+      var isGolf=g.lg==='GOLF', outright=g.outright||[];
       if(!noLine){
-        // Soccer needs the 1X2 (threeWay); other sports need the 2-sided spread/total/ml.
-        if(isSoc){ if(tw.length<3) return null; }
+        // Soccer needs the 1X2 (threeWay); golf needs the outright winner board;
+        // other sports need the 2-sided spread/total/ml.
+        if(isGolf){ if(outright.length<2) return null; }
+        else if(isSoc){ if(tw.length<3) return null; }
         else if(sp.length<2||to.length<2||ml.length<2) return null;
       }
       var home={ab:(g.home&&g.home.ab)||'',nm:(g.home&&g.home.nm)||'Home'};
@@ -3611,9 +3646,10 @@
       if(g.live){ if(g.home&&g.home.sc!=null)home.sc=g.home.sc; if(g.away&&g.away.sc!=null)away.sc=g.away.sc; }
       return { id:g.gid, lg:g.lg, state:(g.live?'in':'pre'), live:!!g.live, real:true,
         oddsReal: g.oddsReal!==false,   // false = no real line → render locked, not bettable
+        name:g.name||'',                // ⛳ tournament title (golf cards + search)
         kickoff:(g.live?'':(g.iso||'')),
         time:(g.live ? (g.time||'Live') : (g.iso ? (fmtKick(g.iso)||g.time||'TBD') : (g.time||'TBD'))),
-        home:home, away:away, core:{spread:sp,total:to,ml:ml,threeWay:tw}, props:[] };
+        home:home, away:away, core:{spread:sp,total:to,ml:ml,threeWay:tw,outright:outright}, props:[] };
     }
     // ⚡ Overload guard: read games through the 1s-cache `feed` Edge (all users collapse to
     // ~1 DB read/sec). Backward-compatible: if the Edge isn't deployed / errors, returns null

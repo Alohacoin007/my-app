@@ -29,6 +29,13 @@ const IMMINENT = NOW + 2 * 86400e3;       // next 48h — odds MUST be real by n
 const ymd = (t) => new Date(t).toISOString().slice(0, 10);
 
 function oddsStatus(g) {
+  // ⛳ GOLF = outright(우승자) 마켓 — ml/spread/total이 원래 없다. 실보드는 outright 배열
+  // + oddsReal:true (sports-games가 원자적으로 세팅). 빈 보드는 잠금(MISSING) — 가짜 없음.
+  if (g.lg === 'GOLF') {
+    const oc = g.outright || [];
+    if (g.oddsReal === true && oc.length >= 2) return 'REAL';
+    return 'MISSING';
+  }
   if (g.lg === 'SOC') {
     const tw = g.threeWay || [];
     if (tw.length < 3) return 'MISSING';
@@ -56,6 +63,7 @@ function structOK(g) {
   // A no-line game (oddsReal:false) is INTENTIONALLY empty — locked, not broken. Only a
   // game that CLAIMS a real line must carry full, well-formed markets.
   if (g.oddsReal === false) return true;
+  if (g.lg === 'GOLF') return (g.outright || []).length >= 2;   // ⛳ 우승자 보드만 있으면 정상
   if (g.lg === 'SOC') return (g.threeWay || []).length >= 3 || (g.ml || []).length >= 2;
   return (g.spread || []).length >= 2 && (g.total || []).length >= 2 && (g.ml || []).length >= 2;
 }

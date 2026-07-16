@@ -34,6 +34,7 @@ declare
   v_gid text; v_mk text; v_key text; v_sel text; v_srv_am numeric; v_dec numeric;
   v_combo numeric := 1; v_nlegs int := 0; v_gid0 text; v_all_same boolean := true;
   v_new_legs jsonb := '[]'::jsonb; v_potential numeric;
+  v_outright_gids text[] := '{}';   -- ⛳ one winner pick per tournament (industry standard)
   c_haircut constant numeric := 0.25;
   c_max_liab constant numeric := 25000;   -- max house exposure (payout − stake) per bet
 begin
@@ -69,10 +70,30 @@ begin
                when 'spread'    then 'spread'
                when 'total'     then 'total'
                when '1x2'       then 'threeWay'   -- ⚽ soccer 1X2 → live_games `threeWay` array (Home/Draw/Away)
+               when 'outright'  then 'outright'   -- ⛳ golf tournament winner → live_games `outright` array
                else null end;
     if v_key is null then return jsonb_build_object('ok',false,'error','market not offered: '||coalesce(v_mk,'?')); end if;
+    -- ⛳ Two outright winners in ONE tournament can't both win → real books reject the
+    -- parlay outright rather than sell a guaranteed-loss combo. So do we.
+    if v_key = 'outright' then
+      if v_gid = any(v_outright_gids) then
+        return jsonb_build_object('ok',false,'error','only one winner pick per tournament');
+      end if;
+      v_outright_gids := v_outright_gids || v_gid;
+    end if;
     select g.value into v_game from jsonb_array_elements(v_games) g where g.value->>'gid' = v_gid limit 1;
     if v_game is null then return jsonb_build_object('ok',false,'error','game not available'); end if;
+    -- ⛳ IN-PLAY FRESHNESS GATE: during a live tournament the outright board moves with
+    -- every hole — accepting a stale board price is arbitrage against the house. A live
+    -- outright leg needs an oddsTs stamped within 15 min (sports-odds polls live golf
+    -- every 5). If polling stalls, live golf betting locks ITSELF (fail-closed).
+    -- Pre-tournament boards are static → no freshness requirement.
+    if v_key = 'outright' and coalesce((v_game->>'live')::boolean, false) then
+      if (v_game->>'oddsTs') is null
+         or now() - ((v_game->>'oddsTs')::timestamptz) > interval '15 minutes' then
+        return jsonb_build_object('ok',false,'error','odds updating — try again shortly');
+      end if;
+    end if;
     -- NO-LINE GATE: sports-games flags oddsReal:false when The Odds API had no line and we
     -- left a fabricated -140/120 placeholder. Never accept a bet on a made-up line (the
     -- house would otherwise honor it). Missing flag = real (backward-compat pre-deploy).

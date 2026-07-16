@@ -22,12 +22,24 @@ const GAMES = [
   // fabricated -140/120 placeholder and flags oddsReal:false. place_bet MUST reject
   // any leg here — the house won't honor a made-up line (regulated-book doctrine).
   { gid: 'MLB_PH', oddsReal: false, ml: [{ sel: 'Reds ML', am: -140 }, { sel: 'Phillies ML', am: 120 }] },
+  // ⛳ GOLF = OUTRIGHT (tournament winner): app sends market='Outright'; live_games keys
+  // the array as `outright`. One tournament, many players, sel = player name.
+  { gid: 'GOLF_401', oddsReal: true, outright: [
+    { sel: 'Scottie Scheffler', am: 450 }, { sel: 'Rory McIlroy', am: 700 }, { sel: 'Jon Rahm', am: 1400 } ] },
+  // Golf tournament whose outright board hasn't loaded (no real prices) → locked.
+  { gid: 'GOLF_402', oddsReal: false, outright: [] },
+  // LIVE golf: bettable only while the board is FRESH (oddsTs ≤ 15 min) — a stale in-play
+  // outright price is arbitrage against the house. Pre-tournament boards need no stamp.
+  { gid: 'GOLF_403', oddsReal: true, live: true, oddsTs: new Date(Date.now() - 2 * 60000).toISOString(),
+    outright: [{ sel: 'Scottie Scheffler', am: 250 }] },
+  { gid: 'GOLF_404', oddsReal: true, live: true, oddsTs: new Date(Date.now() - 40 * 60000).toISOString(),
+    outright: [{ sel: 'Rory McIlroy', am: 400 }] },
 ];
 
 // The app sends the market LABEL ('Moneyline'/'Spread'/'Total'/'1X2'), but live_games
 // keys the arrays as ml/spread/total/threeWay — place_bet must MAP label → key (the bug
 // this catches). Matched case-insensitively (mirrors the SQL's lower(v_mk)).
-const MK = { moneyline: 'ml', spread: 'spread', total: 'total', '1x2': 'threeWay' };
+const MK = { moneyline: 'ml', spread: 'spread', total: 'total', '1x2': 'threeWay', outright: 'outright' };
 // server line lookup; returns null if the selection isn't offered (→ reject, fail-safe)
 function serverAm(games, gid, marketLabel, sel) {
   const key = MK[String(marketLabel).toLowerCase()]; if (!key) return null;   // props/unknown label → reject
@@ -38,10 +50,21 @@ function serverAm(games, gid, marketLabel, sel) {
 // re-price: ignore client am entirely; combine SERVER decimals; SGP haircut if one game
 function reprice(legs, games, stake) {
   let combo = 1, gid0 = null, allSame = true;
+  const outrightGids = [];   // ⛳ one winner pick per tournament (mirrors the SQL guard)
   for (const l of legs) {
+    if (String(l.market).toLowerCase() === 'outright') {
+      if (outrightGids.includes(l.gid)) return { ok: false, error: 'only one winner pick per tournament' };
+      outrightGids.push(l.gid);
+    }
     // GATE: reject any leg from a game with no real line (oddsReal:false). Mirrors the
     // place_bet SQL guard — a fabricated placeholder line is never bettable.
     const gm = games.find((x) => x.gid === l.gid);
+    // ⛳ IN-PLAY FRESHNESS GATE (mirrors the SQL): a LIVE tournament's outright leg is
+    // accepted only when its board carries an oddsTs within 15 min. Fail-closed.
+    if (String(l.market).toLowerCase() === 'outright' && gm && gm.live === true) {
+      const ts = Date.parse(gm.oddsTs || '');
+      if (isNaN(ts) || Date.now() - ts > 15 * 60000) return { ok: false, error: 'odds updating' };
+    }
     if (gm && gm.oddsReal === false) return { ok: false, error: 'odds unavailable' };
     const sam = serverAm(games, l.gid, l.market, l.sel);
     if (sam === null) return { ok: false, error: 'line not offered' };  // FAIL SAFE
@@ -108,6 +131,40 @@ console.log('\n=== NO-LINE GAME (oddsReal:false) → not bettable (2026-07-08) =
   // GREEN: the SAME matchup, once real odds load (oddsReal:true), prices normally.
   const REALGAMES = GAMES.map((g) => g.gid === 'MLB_PH' ? { ...g, oddsReal: true } : g);
   ok('same game with real odds loaded → accepted + priced', reprice(phBet, REALGAMES, 20).potential === Math.round(20 * decOf(-140) * 100) / 100);
+}
+
+console.log('\n=== ⛳ GOLF OUTRIGHT (tournament winner) — 2026-07-16 ===');
+{
+  // GREEN: a winner pick prices from the SERVER outright board, client am ignored.
+  const win = [{ gid: 'GOLF_401', market: 'Outright', sel: 'Scottie Scheffler', am: 100000 }];
+  ok('winner pick re-priced from SERVER +450, not client +100000',
+     reprice(win, GAMES, 20).potential === Math.round(20 * decOf(450) * 100) / 100);
+  // A player not on the priced board (missed the top-N cut / not offered) fails safe.
+  ok('unlisted player → REJECT (line not offered)',
+     reprice([{ gid: 'GOLF_401', market: 'Outright', sel: 'Unknown Player', am: 5000 }], GAMES, 20).ok === false);
+  // Locked tournament (no real outright prices yet) → unbettable, same NO-LINE gate.
+  ok('tournament without real prices (oddsReal:false) → REJECT',
+     reprice([{ gid: 'GOLF_402', market: 'Outright', sel: 'Anyone', am: 500 }], GAMES, 20).ok === false);
+  // Two winners in ONE tournament can't both win — books reject the combo; so do we.
+  const both = [{ gid: 'GOLF_401', market: 'Outright', sel: 'Scottie Scheffler', am: 450 },
+                { gid: 'GOLF_401', market: 'Outright', sel: 'Rory McIlroy', am: 700 }];
+  ok('two winner picks in one tournament → REJECT', reprice(both, GAMES, 20).ok === false);
+  // Cross-sport parlay (golf winner × NBA ml) is legitimate → product, no haircut.
+  const cross = [{ gid: 'GOLF_401', market: 'Outright', sel: 'Rory McIlroy', am: 700 },
+                 { gid: 'NBA_2', market: 'Moneyline', sel: 'GSW ML', am: -200 }];
+  ok('golf × NBA parlay priced (product, no haircut)',
+     reprice(cross, GAMES, 20).potential === Math.round(20 * decOf(700) * decOf(-200) * 100) / 100);
+  // IN-PLAY freshness: live tournament + fresh board (2 min) prices; stale (40 min) locks.
+  ok('LIVE tournament + FRESH board (2 min) → accepted',
+     reprice([{ gid: 'GOLF_403', market: 'Outright', sel: 'Scottie Scheffler', am: 250 }], GAMES, 20).potential === Math.round(20 * decOf(250) * 100) / 100);
+  ok('LIVE tournament + STALE board (40 min) → REJECT (fail-closed)',
+     reprice([{ gid: 'GOLF_404', market: 'Outright', sel: 'Rory McIlroy', am: 400 }], GAMES, 20).ok === false);
+  ok('LIVE tournament + MISSING oddsTs → REJECT (fail-closed)',
+     reprice([{ gid: 'GOLF_403', market: 'Outright', sel: 'Scottie Scheffler', am: 250 }],
+             GAMES.map((g) => g.gid === 'GOLF_403' ? { ...g, oddsTs: undefined } : g), 20).ok === false);
+  // Pre-tournament board (GOLF_401, not live) needs NO freshness stamp — prices are static.
+  ok('PRE-tournament board without oddsTs → accepted',
+     reprice([{ gid: 'GOLF_401', market: 'Outright', sel: 'Jon Rahm', am: 1400 }], GAMES, 20).potential === Math.round(20 * decOf(1400) * 100) / 100);
 }
 
 console.log('\n' + (pass ? '🟢 place_bet re-prices from server lines (client odds can\'t inflate)' : '🔴 odds exploit open') + '\n');

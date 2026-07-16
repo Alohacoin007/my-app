@@ -29,6 +29,47 @@ const LEAGUES = [
   { lg: "SOC", sport: "Soccer",     path: "soccer/fifa.world" },
 ];
 
+// ⛳ Golf — OUTRIGHT (tournament winner) events. A golf "game" is one tournament:
+// gid = "GOLF_<espnEventId>", markets empty except `outright` (filled by the odds
+// overlay below). No real outright prices → oddsReal:false → locked, unbettable
+// (same NO FABRICATION gate as team sports). Old clients that require ml/spread/
+// total simply drop these entries, so this is deploy-order safe.
+async function fetchGolf(out: any[]) {
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  const ymd = (x: Date) => "" + x.getUTCFullYear() + p2(x.getUTCMonth() + 1) + p2(x.getUTCDate());
+  const range = ymd(new Date()) + "-" + ymd(new Date(Date.now() + 8 * 86400000));
+  const base = "https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard";
+  const cp = (u: string) => "https://corsproxy.io/?url=" + encodeURIComponent(u);
+  const tries = [base + "?dates=" + range, cp(base + "?dates=" + range), base, cp(base)];
+  const before = out.length;
+  for (const u of tries) {
+    try {
+      const res = await fetch(u, { cache: "no-store" });
+      if (!res.ok) continue;
+      const d = await res.json();
+      for (const ev of (d.events || [])) {
+        try {
+          const st = (ev.status && ev.status.type) ? ev.status.type : {};
+          const state = st.state; // "pre" | "in" | "post"
+          if (state === "post") continue; // finished tournaments aren't bettable
+          const nm = ev.name || ev.shortName || "Golf";
+          out.push({
+            gid: "GOLF_" + ev.id, lg: "GOLF", sport: "Golf",
+            live: state === "in", time: state === "in" ? (st.shortDetail || "Live") : fmtTime(ev.date),
+            iso: ev.date || "",
+            name: nm, // tournament title — used by clients AND by the outright odds matcher
+            // home/away stubs so generic 2-team renderers never crash on a GOLF row
+            home: { ab: "GOLF", nm }, away: { ab: "", nm: "" },
+            spread: [], total: [], ml: [], outright: [],
+            oddsReal: false, // flips true only when the overlay attaches real outright prices
+          });
+        } catch (_e) { /* skip one event */ }
+      }
+      if (out.length > before) return;
+    } catch (_e) { /* try next mirror */ }
+  }
+}
+
 // Build spread/total/ml in the app's leg format ({ln,am,sel}) from ESPN odds,
 // with sensible defaults when a market is missing. am = American odds; sel is the
 // exact selection string the settler's gradeLeg parses ("Team ML", "Over 45.5"...).
@@ -134,15 +175,71 @@ function oddsToCore(ev: any, home: any, away: any): any {
   if (ov && un && ov.point != null && un.point != null) core.total = [{ ln: "Over " + ov.point, am: ov.price, sel: "Over " + ov.point }, { ln: "Under " + un.point, am: un.price, sel: "Under " + un.point }];
   return (core.ml || core.spread || core.total || core.threeWay) ? core : null;
 }
+// ⛳ Which Odds-API golf key prices a given ESPN tournament name. Strict on purpose:
+// a wrong match would pin another tournament's winner odds to this event (money bug).
+// "The Open" must NOT swallow "U.S. Open" / "3M Open" / "Houston Open" etc.
+const GOLF_KEY_MATCH: Record<string, (n: string) => boolean> = {
+  golf_masters_tournament_winner: (n) => n.indexOf("masters") >= 0,
+  golf_pga_championship_winner: (n) => n.indexOf("pga championship") >= 0,
+  golf_us_open_winner: (n) => n.indexOf("u.s. open") >= 0 || n.indexOf("us open") >= 0,
+  golf_the_open_championship_winner: (n) =>
+    (n.indexOf("open championship") >= 0 || /\bthe (\d+\w{0,2} )?open\b/.test(n)) &&
+    n.indexOf("u.s.") < 0 && n.indexOf("us open") < 0 && n.indexOf("pga") < 0 && n.indexOf("women") < 0,
+};
+// Best (highest-decimal, same rule as bestOutcome) outright price per player, favorites
+// first, capped at 60 names so the live_games row stays small. sel = the player's name
+// exactly as priced — place_bet re-prices against it and sports-settle grades against it.
+function outrightToCore(ev: any): any[] {
+  const best: Record<string, number> = {};
+  (ev.bookmakers || []).forEach((bk: any) => {
+    const m = (bk.markets || []).find((x: any) => x.key === "outrights"); if (!m) return;
+    (m.outcomes || []).forEach((o: any) => {
+      const nm = String(o.name || "").trim(); if (!nm || typeof o.price !== "number") return;
+      if (best[nm] == null || decP(o.price) > decP(best[nm])) best[nm] = o.price;
+    });
+  });
+  return Object.keys(best)
+    .sort((a, b) => decP(best[a]) - decP(best[b]))
+    .slice(0, 60)
+    .map((nm) => ({ ln: "", am: best[nm], sel: nm }));
+}
 async function overlayRealOdds(games: any[], SB_URL: string, H: Record<string, string>) {
   try {
-    const res = await fetch(`${SB_URL}/rest/v1/sports_odds?select=sport,data`, { headers: H });
+    const res = await fetch(`${SB_URL}/rest/v1/sports_odds?select=sport,data,updated_at`, { headers: H });
     if (!res.ok) return;
     const rows = await res.json();
     const bySport: Record<string, any[]> = {};
-    (rows || []).forEach((row: any) => { if (row && row.sport) bySport[row.sport] = Array.isArray(row.data) ? row.data : []; });
+    const byUpd: Record<string, string> = {};
+    (rows || []).forEach((row: any) => {
+      if (!row || !row.sport) return;
+      bySport[row.sport] = Array.isArray(row.data) ? row.data : [];
+      if (row.updated_at) byUpd[row.sport] = row.updated_at;
+    });
     games.forEach((g: any) => {
       let data: any[] = [];
+      if (g.lg === "GOLF") {
+        // Tournament-name match against the golf_* outright feeds, then require a
+        // UNIQUE event within ±6 days of the ESPN start date — ambiguous → stay locked.
+        const n = String(g.name || "").toLowerCase();
+        const gt = Date.parse(g.iso || "");
+        const hits: any[] = []; let hitKey = "";
+        Object.keys(bySport).forEach((k) => {
+          const match = GOLF_KEY_MATCH[k]; if (!match || !match(n)) return;
+          (bySport[k] || []).forEach((e: any) => {
+            const et = Date.parse(e.commence_time || "");
+            if (isNaN(gt) || isNaN(et) || Math.abs(et - gt) <= 6 * 86400000) { hits.push(e); hitKey = k; }
+          });
+        });
+        if (hits.length !== 1) return;
+        const outright = outrightToCore(hits[0]);
+        if (outright.length >= 2) {
+          g.outright = outright; g.oddsReal = true;
+          // Freshness stamp for the money gate: place_bet only accepts a LIVE
+          // tournament's outright leg when this board was refreshed recently.
+          if (byUpd[hitKey]) g.oddsTs = byUpd[hitKey];
+        }
+        return;
+      }
       if (g.lg === "SOC") {
         // Soccer competitions live under several odds keys (soccer_fifa_world_cup,
         // soccer_epl, soccer_usa_mls, …) but all share lg:"SOC". Team names are unique,
@@ -244,7 +341,7 @@ Deno.serve(async (req) => {
   const H = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json" };
 
   const games: any[] = [];
-  await Promise.all(LEAGUES.map((L) => fetchLeague(L, games)));
+  await Promise.all([...LEAGUES.map((L) => fetchLeague(L, games)), fetchGolf(games)]);
 
   // Overlay the REAL odds the app already uses (sports_odds table) so the
   // dashboard's live_games carries the same real moneyline/spread/total.

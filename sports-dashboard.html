@@ -399,6 +399,12 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .soc-hdr .soc-sc{margin-left:auto; font-weight:600}
 .soc-hdr .soc-sc.live{color:var(--lgd-up)}
 .soc1x2{grid-column:1/-1; display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-top:6px}
+/* ⛳ 골프 outright (앱 golf-list/golf-row 구조) */
+.golf-list{grid-column:1/-1; margin-top:6px}
+.golf-row{display:flex; align-items:center; gap:8px; padding:2px 0}
+.golf-nm{flex:1; font-size:var(--lgd-fs-body); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.golf-row .bet{flex:0 0 72px}
+.golf-more{padding:7px 0 2px; text-align:center; font-size:var(--lgd-fs-label); font-weight:700; color:var(--lgd-up); cursor:pointer}
 /* ④ 핀 ★ — 앱 :196-199 이식 (pinned 골드 #ff9500은 의미색이라 그대로, 나머지는 레전드 dim) */
 .pin-btn{background:none;border:none;font-size:13px;line-height:1;cursor:pointer;color:rgba(139,144,150,.35);
   padding:0 3px;transition:.18s;font-family:inherit;-webkit-user-select:none;user-select:none}
@@ -554,10 +560,13 @@ let gameQuery='';
 function matchGame(g){
   if(!gameQuery)return true;
   const q=gameQuery.toLowerCase();
-  return [g.home.nm,g.home.ab,g.away.nm,g.away.ab,g.lg].some(s=>String(s||'').toLowerCase().includes(q));
+  return [g.home.nm,g.home.ab,g.away.nm,g.away.ab,g.lg,g.name||''].some(s=>String(s||'').toLowerCase().includes(q));
 }
+/* 슬립/퀵벳 공용 경기 라벨 — ⛳ 골프는 "@ GOLF"가 아니라 대회명 */
+function gLabel(g){ return g ? (g.lg==='GOLF' ? (g.name||'Golf') : (g.away.ab+' @ '+g.home.ab)) : ''; }
 /* 정렬: 핀 우선 → LIVE → 킥오프 임박 → 종료 마지막 (앱 :1698-1705 이식; kickoff→iso)
    핀 저장 = 앱과 같은 키 alpexaPins (앱:1127, g.id===gid 앱:3612) → 앱↔대시보드 핀 동기화 */
+const golfExpanded=new Set();   // ⛳ 전체 선수 보드가 펼쳐진 대회 (세션 한정)
 let pinnedGames=new Set();
 try{ const s=JSON.parse(localStorage.getItem('alpexaPins')||'[]'); if(Array.isArray(s)) pinnedGames=new Set(s); }catch(e){}
 function togglePin(id){   // 앱:1128-1131 그대로
@@ -791,7 +800,7 @@ makeWidget('balance','Account','Sports','var(--lgd-link1)',
   kvRow('Total wager','balOw')+kvRow('Est. payout','balOe')+'</div>');
 
 /* ════════════════════ 위젯 2: Leagues (앱 .sports 탭의 세로화) ════════════════════ */
-const LEAGUES=[['MLB','Baseball','⚾'],['SOC','Soccer','⚽'],['NFL','Football','🏈'],['NBA','Basketball','🏀'],['NHL','Hockey','🏒'],['UFC','MMA','🥊'],['NCAAB','College BB','🏀']];
+const LEAGUES=[['MLB','Baseball','⚾'],['SOC','Soccer','⚽'],['GOLF','Golf','⛳'],['NFL','Football','🏈'],['NBA','Basketball','🏀'],['NHL','Hockey','🏒'],['UFC','MMA','🥊'],['NCAAB','College BB','🏀']];
 let selLg='MLB';
 makeWidget('leagues','Leagues','','var(--lgd-link4)','<div class="lgs" id="lgs"></div>');
 function renderLeagues(games){
@@ -818,10 +827,16 @@ function renderSchedule(games){
   const list=games.filter(g=>g.lg===selLg).slice().sort(sortByPin).slice(0,40);
   if(!list.length){ el.innerHTML='<tr><td colspan="4" style="color:var(--lgd-dim);font-weight:400">No games</td></tr>'; return; }
   el.innerHTML=list.map(g=>{
+    const st=g.live?'<span class="st live">● '+esc(g.time)+'</span>':'<span class="st">'+esc(g.time)+'</span>';
+    const locked=!oddsReal(g);
+    // ⛳ 골프 = 대회명 + 우승배당 1위(페이버릿) 표시 — 2팀 ML 칸이 없음
+    if(g.lg==='GOLF'){
+      const fav=(g.outright&&g.outright[0])?fmtAm(+g.outright[0].am):null;
+      return '<tr><td>'+esc(g.name||g.home.nm||'Golf')+'</td><td>'+st+'</td>'+
+        '<td colspan="2">'+(locked||fav==null?'🔒':('Fav '+fav))+'</td></tr>';
+    }
     // 서버 배열 규약: index 0=홈, 1=원정 (sports-games/index.ts:76-79)
     const mlA=(g.ml&&g.ml[1])?fmtAm(+g.ml[1].am):null, mlH=(g.ml&&g.ml[0])?fmtAm(+g.ml[0].am):null;
-    const locked=!oddsReal(g);
-    const st=g.live?'<span class="st live">● '+esc(g.time)+'</span>':'<span class="st">'+esc(g.time)+'</span>';
     return '<tr><td>'+esc(g.away.ab)+'<span class="at">@</span>'+esc(g.home.ab)+'</td><td>'+st+'</td>'+
       '<td>'+(locked||mlA==null?'🔒':mlA)+'</td><td>'+(locked||mlH==null?'🔒':mlH)+'</td></tr>';
   }).join('');
@@ -864,6 +879,27 @@ function gameRowHTML(g){
         '<div class="obg">'+(i===1?('<div class="st'+(g.live?' live':'')+'">'+(g.live?'● ':'')+esc(g.time)+'</div>'):'<div class="st">'+pinBtn+'</div>')+
         '<div class="tm">'+esc(t.ab)+'<small>'+esc(t.nm)+'</small>'+(t.sc!==undefined?'<span class="sc">'+esc(t.sc)+'</span>':'')+'</div></div>'+
         cell(g.spread,'Spread',i)+cell(g.total,'Total',i)+cell(g.ml,'Moneyline',i)+'</div>';
+      // ⛳ 골프 = OUTRIGHT (대회 우승자): 대회 헤더 + 선수별 우승배당 행 (앱 golfHTML 계약:
+      // market='Outright', sel=선수명, uid=gid|sel). 상위 8명 + 전체 펼침. 잠금/라이브
+      // 게이트는 팀 종목과 동일 — data-am 미부여가 돈 관문.
+      if(g.lg==='GOLF'){
+        const oc=g.outright||[];
+        const hdr='<div class="soc-hdr"><span>⛳</span><span class="soc-nm">'+esc(g.name||g.home.nm||'Tournament')+'</span>'+
+          '<span class="st'+(g.live?' live':'')+'">'+(g.live?'● ':'')+esc(g.time)+'</span>'+pinBtn+'</div>';
+        if(!oddsReal(g)||!oc.length)
+          return '<div class="obrow" data-gid="'+esc(g.gid)+'">'+hdr+
+            '<div class="golf-list"><div class="bet sus" title="Odds unavailable — no market"><span class="ln">Winner odds</span><span class="pr">🔒</span></div></div></div>';
+        const prow=(b)=>{
+          if(g.live&&!liveOK(g)) return '<div class="golf-row"><span class="golf-nm">'+esc(b.sel)+'</span><div class="bet sus" title="'+esc(liveReason(g))+'"><span class="pr">🔒</span></div></div>';
+          const on=slip.legs.some(l=>l.uid===g.gid+'|'+b.sel);
+          return '<div class="golf-row"><span class="golf-nm">'+esc(b.sel)+'</span>'+
+            '<div class="bet'+(on?' sel':'')+'" data-game="'+esc(g.gid)+'" data-market="Outright" data-sel="'+esc(b.sel)+'" data-am="'+(+b.am)+'">'+
+            '<span class="pr '+(b.am>0?'pos':'')+'">'+fmtAm(+b.am)+'</span></div></div>'; };
+        const open=golfExpanded.has(g.gid), top=oc.slice(0,8), rest=oc.slice(8);
+        return '<div class="obrow" data-gid="'+esc(g.gid)+'">'+hdr+'<div class="golf-list">'+top.map(prow).join('')+
+          (rest.length?(open?rest.map(prow).join(''):'<div class="golf-more" data-golfmore="'+esc(g.gid)+'">Show all '+oc.length+' players</div>'):'')+
+          '</div></div>';
+      }
       // 축구 = 1X2 (앱 c3/soc1x2 계약: tw[0] Home / tw[1] Draw / tw[2] Away)
       if(g.lg==='SOC'){
         const tw=g.threeWay||[];
@@ -892,6 +928,8 @@ document.getElementById('obFil').addEventListener('click', e=>{
 function boardClick(e){
   const pb=e.target.closest('.pin-btn');   // ④ ★ 클릭은 행/셀 클릭으로 새지 않게 (앱:1768)
   if(pb){ e.stopPropagation(); togglePin(pb.dataset.pin); return; }
+  const gm=e.target.closest('[data-golfmore]');   // ⛳ 전체 선수 펼침 (재렌더에도 유지)
+  if(gm){ golfExpanded.add(gm.dataset.golfmore); renderBoard(gamesStore.games); return; }
   const b=e.target.closest('.bet'); if(!b||b.classList.contains('sus')||b.classList.contains('dis')) return;
   if(layout.slip&&layout.slip.hidden){ openQuickBet(b.dataset.game, b.dataset.market, b.dataset.sel, b); return; }
   slip.toggle(b.dataset.game, b.dataset.market, b.dataset.sel, +b.dataset.am);
@@ -1502,7 +1540,7 @@ const slip={
     else{
       const g=gamesStore.games.find(x=>x.gid===gid);
       if(g&&g.live&&!liveOK(g)){ slipNote(liveReason(g)); return; }
-      this.legs.push({uid,gid,market,sel,am, game:g?(g.away.ab+' @ '+g.home.ab):'', tm:g?g.time:'',
+      this.legs.push({uid,gid,market,sel,am, game:gLabel(g), tm:g?g.time:'',
         kt:g?(g.iso||''):'', live:!!(g&&g.live), lg:g?g.lg:'', stake:20});   // 기본 스테이크 20 (앱:1917)
     }
     renderBoard(gamesStore.games); renderSlip();
@@ -1666,7 +1704,7 @@ function qbLeg(){
   const g=gamesStore.games.find(x=>x.gid===qbState.gid); if(!g) return null;
   const stake=parseInt(document.getElementById('qbStake').value)||0;
   return {uid:qbState.gid+'|'+o.b.sel, gid:qbState.gid, market:qbState.market, sel:o.b.sel, am:+o.b.am,
-    game:g.away.ab+' @ '+g.home.ab, tm:g.time, kt:g.iso||'', live:!!g.live, lg:g.lg, stake:stake};
+    game:gLabel(g), tm:g.time, kt:g.iso||'', live:!!g.live, lg:g.lg, stake:stake};
 }
 function renderQb(){
   const segEl=document.getElementById('qbSeg');

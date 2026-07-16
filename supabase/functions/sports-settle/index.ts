@@ -119,6 +119,53 @@ async function fetchUFCResults(out: Record<string, Result>) {
   }
 }
 
+// ⛳ Golf OUTRIGHT winners — gid "GOLF_<espnEventId>" → champion's name. Only FINAL
+// tournaments with an unambiguous winner land in the map; anything else stays
+// ungraded (bet stays open) rather than guessing. Same 6-day catch-up window (#33).
+async function fetchGolfWinners(out: Record<string, string>) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const ymd = (d: Date) => `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}`;
+  const today = new Date(); const from = new Date(today.getTime() - 6 * 86400000);
+  const direct = `https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard?dates=${ymd(from)}-${ymd(today)}`;
+  const tries = [direct, "https://corsproxy.io/?url=" + encodeURIComponent(direct)];
+  for (const u of tries) {
+    try {
+      const res = await fetch(u, { cache: "no-store" });
+      if (!res.ok) continue;
+      const d = await res.json();
+      for (const ev of (d.events || [])) {
+        try {
+          const st = (ev.status && ev.status.type) ? ev.status.type : {};
+          if (st.state !== "post") continue; // only FINAL tournaments
+          const cs = (ev.competitions && ev.competitions[0] && ev.competitions[0].competitors) || [];
+          const nameOf = (c: any) => { const a = c.athlete || {}; return a.displayName || a.shortName || a.fullName || ""; };
+          // Champion = the explicit winner flag; fallback: exactly ONE player at position 1
+          // (a tie at #1 on a "final" board = unresolved playoff → leave ungraded).
+          let champs = cs.filter((c: any) => c.winner === true);
+          if (!champs.length) champs = cs.filter((c: any) => String(c?.status?.position?.id || "") === "1");
+          if (champs.length !== 1) continue;
+          const nm = nameOf(champs[0]); if (!nm) continue;
+          out["GOLF_" + ev.id] = nm;
+        } catch (_e) { /* skip event */ }
+      }
+      return;
+    } catch (_e) { /* try next mirror */ }
+  }
+}
+// Player-name match for grading (Odds API sel vs ESPN winner). Exact normalized
+// equality first; else token subset ("S. Scheffler" ⊆ "Scottie Scheffler" fails safely —
+// initials are dropped as short tokens, leaving "scheffler" ⊆ full name).
+function normPlayer(s: string): string { return String(s || "").toLowerCase().replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim(); }
+function playerMatch(a: string, b: string): boolean {
+  const A = normPlayer(a), B = normPlayer(b);
+  if (!A || !B) return false;
+  if (A === B) return true;
+  const at = A.split(" ").filter((t) => t.length > 2), bt = B.split(" ").filter((t) => t.length > 2);
+  if (!at.length || !bt.length) return false;
+  const [short, long] = at.length <= bt.length ? [at, bt] : [bt, at];
+  return short.every((t) => long.includes(t));
+}
+
 function teamSide(team: string, r: Result): "home" | "away" | null {
   const t = (team || "").toLowerCase().trim(); if (!t) return null;
   if (r.homeNm && r.homeNm.toLowerCase() === t) return "home";
@@ -184,12 +231,13 @@ Deno.serve(async (req) => {
   if (!SB_URL || !SB_KEY) return json({ ok: false, error: "Supabase env missing" }, 500);
   const H = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json" };
 
-  // 1) Final scores from ESPN (team leagues + UFC bouts).
+  // 1) Final scores from ESPN (team leagues + UFC bouts + golf tournament winners).
   const results: Record<string, Result> = {};
-  await Promise.all([...LEAGUES.map((L) => fetchLeagueResults(L, results)), fetchUFCResults(results)]);
+  const golfWin: Record<string, string> = {};
+  await Promise.all([...LEAGUES.map((L) => fetchLeagueResults(L, results)), fetchUFCResults(results), fetchGolfWinners(golfWin)]);
   // Debug: ?debug=1 returns the final-game results map (gid -> score) so we can
   // craft a controlled test bet on a real finished game.
-  if (url.searchParams.get("debug")) return json({ ok: true, results });
+  if (url.searchParams.get("debug")) return json({ ok: true, results, golfWin });
 
   // 2) Open sports bets.
   const posRes = await fetch(`${SB_URL}/rest/v1/positions?server=eq.sports&status=eq.open&select=id,cust_id,acct_no,local_id,stake,meta,symbol`, { headers: H });
@@ -206,8 +254,16 @@ Deno.serve(async (req) => {
       let allDone = true, anyLost = false, decMul = 1;
       const legResults: any[] = [];
       for (const l of legs) {
-        const r = results[l.gid]; if (!r) { allDone = false; break; }
-        const g = gradeLeg(l, r); if (g === null) { allDone = false; break; }
+        let g: string | null;
+        if (/outright/i.test(String(l.market || ""))) {
+          // ⛳ OUTRIGHT: graded only against a FINAL tournament's confirmed champion.
+          // No winner yet (still playing / playoff / no data) → bet stays open.
+          const w = golfWin[l.gid]; if (!w) { allDone = false; break; }
+          g = playerMatch(l.sel || l.pk || "", w) ? "won" : "lost"; // cut/WD/runner-up = not the winner = lost
+        } else {
+          const r = results[l.gid]; if (!r) { allDone = false; break; }
+          g = gradeLeg(l, r); if (g === null) { allDone = false; break; }
+        }
         if (g === "lost") anyLost = true; else if (g === "won") decMul *= decOf(l);
         legResults.push({ pk: (l.sel || l.pk || ""), gm: (l.gm || l.game || ""), am: (+l.am || 0), gid: (l.gid || ""), lg: (l.lg || ""), r: g });
       }
