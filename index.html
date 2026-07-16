@@ -344,12 +344,17 @@
 
   /* CTA */
   .trust{max-width:1120px;margin:0 auto 70px;padding:0 28px}
-  .trust-grid{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--surface)}
-  .titem{display:block;text-align:center;padding:32px 20px;border-right:1px solid var(--line)}
-  .titem:last-child{border-right:none}
-  .titem .ic{color:var(--accent);display:flex;justify-content:center;margin-bottom:11px}
-  .titem h4{font-size:14px;font-weight:700;margin-bottom:4px;color:var(--text)}
-  .titem p{font-size:11.5px;color:var(--muted);line-height:1.5}
+  /* 신뢰 캡슐 — 레퍼런스 문법 (2026-07-15 사용자 확정): 아웃라인 캡슐 + 그린 세그먼트 하이라이트 순회 */
+  .trust-caps{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:18px;padding:8px 20px}
+  .tc-row{display:flex;border:1px solid rgba(255,255,255,.16);border-radius:999px;overflow:hidden}
+  .tc-seg{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    padding:16px 18px;border-radius:999px;transition:background .45s ease,color .45s ease}
+  .tc-seg b{font-size:14.5px;font-weight:700;color:var(--text);letter-spacing:-.2px;transition:color .45s ease}
+  .tc-seg small{font-size:11.5px;color:var(--muted);transition:color .45s ease}
+  .tc-seg.on{background:#00C805}
+  .tc-seg.on b{color:#04250B}
+  .tc-seg.on small{color:rgba(4,37,11,.75)}
+  @media(max-width:640px){ .tc-seg b{font-size:12.5px} .tc-seg small{font-size:10.5px} .tc-seg{padding:12px 10px} }
   .cta{max-width:1120px;margin:0 auto 28px;padding:56px 28px;text-align:center;border-radius:28px;background:linear-gradient(135deg,rgba(0,200,5,.22),rgba(10,209,108,.18));border:1px solid var(--line);position:relative;overflow:hidden}
   .cta h2{font-size:clamp(26px,4vw,38px);font-weight:700;letter-spacing:-1px;margin-bottom:12px}
   .cta p{color:#c5cde0;margin-bottom:28px}
@@ -499,7 +504,7 @@
     <span style="flex:1"></span>
     <button class="theme-toggle" id="themeBtn" aria-label="Toggle theme"></button>
     <button class="gpill" onclick="window.open('signup.html','_blank','noopener')">Sign up</button>
-    <a class="hd-login" href="login.html?switch=1" rel="noopener">Log in</a>
+    <a class="hd-login" href="login.html?switch=1" rel="noopener">My Account</a>
   </header>
 
   <!-- Live odds ticker — populated from the same live_games feed as the board. -->
@@ -715,22 +720,14 @@
   </section>
 
   <section class="trust">
-    <div class="trust-grid">
-      <div class="titem">
-        <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg></span>
-        <div><h4>Licensed & regulated</h4><p>Costa Rica jurisdiction</p></div>
+    <div class="trust-caps" id="trustCaps">
+      <div class="tc-row">
+        <span class="tc-seg on"><b>Licensed &amp; regulated</b><small>Costa Rica jurisdiction</small></span>
+        <span class="tc-seg"><b>Secure &amp; encrypted</b><small>Bank-grade security</small></span>
       </div>
-      <div class="titem">
-        <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
-        <div><h4>Secure & encrypted</h4><p>Bank-grade security</p></div>
-      </div>
-      <div class="titem">
-        <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 10-12h-7l0-8z"/></svg></span>
-        <div><h4>Fast, reliable payouts</h4><p>Instant USDT withdrawals</p></div>
-      </div>
-      <div class="titem">
-        <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 5.6a5.5 5.5 0 0 0-7.8 0L12 6.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 22l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg></span>
-        <div><h4>18+ · Responsible gaming</h4><p>Limits & self-exclusion</p></div>
+      <div class="tc-row">
+        <span class="tc-seg"><b>Fast, reliable payouts</b><small>Instant USDT withdrawals</small></span>
+        <span class="tc-seg"><b>18+ &middot; Responsible gaming</b><small>Limits &amp; self-exclusion</small></span>
       </div>
     </div>
   </section>
@@ -848,6 +845,15 @@
   })();
   </script>
 
+  <script>
+  (function(){ // 신뢰 캡슐 하이라이트 순회
+    try{
+      if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      var segs=[].slice.call(document.querySelectorAll('#trustCaps .tc-seg')); if(!segs.length) return;
+      var i=0; setInterval(function(){ segs[i].classList.remove('on'); i=(i+1)%segs.length; segs[i].classList.add('on'); },2600);
+    }catch(e){}
+  })();
+  </script>
   <script>
   (function(){
     var b=document.body;
