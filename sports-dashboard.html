@@ -486,8 +486,8 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
       box-shadow:0 8px 24px rgba(0,0,0,.5); padding:6px; font-size:var(--lgd-fs-body)"></div>
   </div>
   <button class="hbtn" id="btnReset" title="Reset layout">Reset layout</button>
-  <div class="hic" title="Open app"><a href="sports-live.html" style="color:inherit;display:flex" aria-label="Open app">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M14 4h6v6M20 4l-9 9M10 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-4"/></svg></a>
+  <div class="hic" id="btnFull" title="Full screen" role="button" aria-label="Toggle full screen" style="cursor:pointer">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M14 4h6v6M20 4l-9 9M10 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-4"/></svg>
   </div>
   <div style="position:relative">
     <div class="avatar" id="btnAv" style="cursor:pointer; position:relative"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8.5" r="4"/><path d="M4 20c1.5-3.6 4.6-5.5 8-5.5s6.5 1.9 8 5.5v1H4z"/></svg>
@@ -1872,6 +1872,11 @@ function fxEsc(){   // 폴백 (풀스크린 API 거부/미지원 환경): ESC = 
   closeFx();
 }
 fxTab.addEventListener('click', ()=>{ (fxOv&&fxOv.classList.contains('open'))?closeFx():openFx(); });
+// 헤더 화살표 = 풀스크린 토글 (2026-07-15 사용자 확정 — 구 Open app 링크 대체)
+document.getElementById('btnFull').addEventListener('click', ()=>{
+  if(document.fullscreenElement===document.documentElement){ try{ document.exitFullscreen(); }catch(e){} return; }
+  try{ if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(()=>{}); }catch(e){}
+});
 // Alpexa Sports 탭 = 대시보드 자체 풀스크린 토글 (서버 탭 공통 규칙: 클릭=풀스크린, ESC=인터넷 창)
 document.getElementById('sbTab').addEventListener('click', ()=>{
   closeFx();   // FX 오버레이가 떠 있으면 정리하고 스포츠로
