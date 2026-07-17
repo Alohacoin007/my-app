@@ -460,6 +460,10 @@ body.light .tk.float{box-shadow:0 18px 52px rgba(15,23,40,.28)}
 .stg .mini.grn{background:var(--lgd-up); color:#04250B}
 .stg .hint2{font-size:10.5px; color:var(--lgd-dim); margin-top:4px; min-height:13px}
 .stg .hint2.ok{color:var(--lgd-up)} .stg .hint2.bad{color:#FF9500}
+.stg .langs{display:flex; gap:6px; padding:2px 14px 8px; flex-wrap:wrap}
+.stg .langs button{background:var(--lgd-pill); border:1px solid transparent; color:var(--lgd-ink);
+  font-size:11.5px; font-weight:700; border-radius:7px; padding:6px 11px; cursor:pointer; font-family:inherit}
+.stg .langs button.on{background:rgba(0,200,5,.10); border-color:var(--lgd-up); color:var(--lgd-up)}
 .stg .btm{padding:8px 14px 14px; display:flex; flex-direction:column; gap:8px; margin-top:auto}
 .stg .btm button{background:var(--lgd-pill); border:none; color:var(--lgd-down); font-size:12px;
   font-weight:700; border-radius:8px; height:32px; cursor:pointer; font-family:inherit}
@@ -559,12 +563,12 @@ body.light #tabMenu, body.light #addMenu{box-shadow:0 8px 24px rgba(15,23,40,.18
   <div class="hmid"><span>Crypto dashboard · DEV</span><span class="dot" id="feedDot"></span></div>
   <div class="hsp"></div>
   <div style="position:relative">
-    <button class="hbtn" id="btnAdd">Add widget</button>
+    <button class="hbtn" id="btnAdd" data-i18n="Add widget">Add widget</button>
     <div id="addMenu" style="display:none; position:absolute; right:0; top:38px; z-index:50; min-width:180px;
       background:var(--lgd-surface2); border:1px solid var(--lgd-hair); border-radius:var(--lgd-r-pop);
       box-shadow:0 8px 24px rgba(0,0,0,.5); padding:6px; font-size:var(--lgd-fs-body)"></div>
   </div>
-  <button class="hbtn" id="btnReset" title="Reset layout">Reset layout</button>
+  <button class="hbtn" id="btnReset" title="Reset layout" data-i18n="Reset layout">Reset layout</button>
   <div class="hic" id="btnTheme" title="Light / Dark" role="button" aria-label="Toggle theme" style="cursor:pointer">
     <svg id="thMoon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
     <svg id="thSun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
@@ -678,12 +682,28 @@ function bringToFront(id){
   const i=zOrder.indexOf(id); if(i>=0) zOrder.splice(i,1); zOrder.push(id);
   zOrder.forEach((wid,k)=>{ const el=document.getElementById('w-'+wid); if(el) el.style.zIndex=2+k; });
 }
+/* ════ 멀티랭귀지 (2026-07-17 사장님 지시) — UI 뼈대 우선. EN·中文·日本語·한국어·Français.
+   데이터(가격·배당·코인명·금액)는 만국공통이라 원문 유지. 언어 설정은 UI라 localStorage OK. ════ */
+const LANG={ cur:(localStorage.getItem('alpexa.dash.lang')||'en') };
+const LANGS=[['en','EN'],['zh','中文'],['ja','日本語'],['ko','한국어'],['fr','Français']];
+const I18N={
+ zh:{ 'Account':'账户','Portfolio':'投资组合','Markets':'市场','Chart':'图表','Trade':'交易','Swap':'兑换','Staking':'质押','Open orders':'未成交订单','Activity':'活动','Money moves':'资金操作','Settings':'设置','Add widget':'添加组件','Reset layout':'重置布局','Profile':'个人资料','Accounts':'账户','Display':'显示','Trading & fees':'交易与手续费','Rewards':'奖励','Support':'支持','Language':'语言','Dark':'深色','Light':'浅色','Fee tier':'手续费等级','Tax lot method':'计税方式','Default network':'默认网络','Withdrawal limit':'提现限额','Your referral link':'推荐链接','Redeem a code':'兑换代码','Apply':'应用','Version':'版本','Sign out':'退出登录','Sign out all devices':'退出所有设备','Send':'发送','Receive':'接收','Transfer':'转账','Fund':'充值','Withdraw':'提现','Name':'姓名','Email':'邮箱','Customer ID':'客户编号' },
+ ja:{ 'Account':'アカウント','Portfolio':'ポートフォリオ','Markets':'マーケット','Chart':'チャート','Trade':'取引','Swap':'スワップ','Staking':'ステーキング','Open orders':'未約定注文','Activity':'アクティビティ','Money moves':'入出金・送金','Settings':'設定','Add widget':'ウィジェット追加','Reset layout':'レイアウト初期化','Profile':'プロフィール','Accounts':'アカウント','Display':'表示','Trading & fees':'取引・手数料','Rewards':'特典','Support':'サポート','Language':'言語','Dark':'ダーク','Light':'ライト','Fee tier':'手数料区分','Tax lot method':'税ロット方式','Default network':'デフォルトネットワーク','Withdrawal limit':'出金限度額','Your referral link':'紹介リンク','Redeem a code':'コードを利用','Apply':'適用','Version':'バージョン','Sign out':'ログアウト','Sign out all devices':'全端末からログアウト','Send':'送金','Receive':'受取','Transfer':'振替','Fund':'入金','Withdraw':'出金','Name':'名前','Email':'メール','Customer ID':'顧客ID' },
+ ko:{ 'Account':'계정','Portfolio':'포트폴리오','Markets':'마켓','Chart':'차트','Trade':'거래','Swap':'스왑','Staking':'스테이킹','Open orders':'미체결 주문','Activity':'활동','Money moves':'자금 이동','Settings':'설정','Add widget':'위젯 추가','Reset layout':'레이아웃 초기화','Profile':'프로필','Accounts':'계좌','Display':'디스플레이','Trading & fees':'거래·수수료','Rewards':'리워드','Support':'지원','Language':'언어','Dark':'다크','Light':'라이트','Fee tier':'수수료 등급','Tax lot method':'세금 로트 방식','Default network':'기본 네트워크','Withdrawal limit':'출금 한도','Your referral link':'내 추천 링크','Redeem a code':'코드 사용','Apply':'적용','Version':'버전','Sign out':'로그아웃','Sign out all devices':'모든 기기 로그아웃','Send':'보내기','Receive':'받기','Transfer':'이체','Fund':'입금','Withdraw':'출금','Name':'이름','Email':'이메일','Customer ID':'고객 ID' },
+ fr:{ 'Account':'Compte','Portfolio':'Portefeuille','Markets':'Marchés','Chart':'Graphique','Trade':'Trader','Swap':'Échange','Staking':'Staking','Open orders':'Ordres ouverts','Activity':'Activité','Money moves':'Mouvements','Settings':'Paramètres','Add widget':'Ajouter un widget','Reset layout':'Réinitialiser','Profile':'Profil','Accounts':'Comptes','Display':'Affichage','Trading & fees':'Frais & trading','Rewards':'Récompenses','Support':'Assistance','Language':'Langue','Dark':'Sombre','Light':'Clair','Fee tier':'Niveau de frais','Tax lot method':'Méthode fiscale','Default network':'Réseau par défaut','Withdrawal limit':'Limite de retrait','Your referral link':'Lien de parrainage','Redeem a code':'Utiliser un code','Apply':'Appliquer','Version':'Version','Sign out':'Déconnexion','Sign out all devices':'Déconnecter tous les appareils','Send':'Envoyer','Receive':'Recevoir','Transfer':'Transfert','Fund':'Dépôt','Withdraw':'Retrait','Name':'Nom','Email':'E-mail','Customer ID':'ID client' }
+};
+function t(str){ const d=I18N[LANG.cur]; return (d&&d[str])||str; }
+function applyLang(){ document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent=t(el.getAttribute('data-i18n')); });
+  document.querySelectorAll('#sgLangs [data-lang]').forEach(b=>b.classList.toggle('on',b.dataset.lang===LANG.cur)); }
+function setLang(code){ LANG.cur=code; try{ localStorage.setItem('alpexa.dash.lang',code); }catch(e){} applyLang();
+  try{ sgLoad(); }catch(e){} }
+
 function makeWidget(id, title, sub, linkColor, bodyHTML){
   const el=document.createElement('div'); el.className='widget'; el.id='w-'+id;
   zOrder.push(id);
   el.addEventListener('pointerdown', ()=>bringToFront(id), true);
   el.innerHTML='<div class="wtb"><span class="linksq" style="background:'+linkColor+'"></span>'+
-    '<h3>'+title+'</h3>'+(sub?'<span class="wsub">'+sub+'</span>':'')+
+    '<h3 data-i18n="'+title+'">'+t(title)+'</h3>'+(sub?'<span class="wsub">'+sub+'</span>':'')+
     '<span class="wsp"></span><span class="wic" title="Close widget">⋮</span></div>'+
     '<div class="wbody">'+bodyHTML+'</div>';
   stage.appendChild(el); applyGeo(id);
@@ -874,9 +894,9 @@ makeWidget('trade','Trade','','var(--lgd-link2)',
   '</div></div>');
 makeWidget('money','Money moves','','var(--lgd-link3)',
   '<div class="mm tnum">'+
-  '<div class="mtabs"><span class="on" data-p="send">Send</span><span data-p="receive">Receive</span>'+
-  '<span data-p="transfer">Transfer</span>'+
-  '<span data-p="fund">Fund</span><span data-p="withdraw">Withdraw</span></div>'+
+  '<div class="mtabs"><span class="on" data-p="send" data-i18n="Send">Send</span><span data-p="receive" data-i18n="Receive">Receive</span>'+
+  '<span data-p="transfer" data-i18n="Transfer">Transfer</span>'+
+  '<span data-p="fund" data-i18n="Fund">Fund</span><span data-p="withdraw" data-i18n="Withdraw">Withdraw</span></div>'+
   '<div class="pane on" data-pane="send">'+
   '<div class="fld"><div class="l">To — account no. or email</div>'+
   '<input id="mmTo" placeholder="CR-123456 or name@email.com"/><div class="hint" id="mmToH"></div></div>'+
@@ -959,28 +979,30 @@ makeWidget('orders','Open orders','','var(--lgd-link3)',
   '<div class="od tnum"><div class="odh" id="odCount"></div><div id="odList"></div></div>');
 makeWidget('settings','Settings','','var(--lgd-link2)',
   '<div class="stg tnum">'+
-  '<div class="sect2">Profile</div><div id="sgProf"></div>'+
-  '<div class="sect2">Accounts</div><div id="sgAccts"></div>'+
-  '<div class="sect2">Display</div>'+
-  '<div class="rowbtns"><button id="sgDark">Dark</button><button id="sgLight">Light</button></div>'+
-  '<div class="sect2">Trading & fees</div>'+
-  '<div class="kv2"><span class="l">Fee tier</span><span class="v">Maker 0.10% · Taker 0.20%</span></div>'+
-  '<div class="kv2"><span class="l">Tax lot method</span><span class="v">HIFO (default)</span></div>'+
-  '<div class="kv2"><span class="l">Default network</span><span class="v">ERC-20 · Ethereum</span></div>'+
-  '<div class="kv2"><span class="l">Withdrawal limit</span><span class="v">$50,000 / day</span></div>'+
-  '<div class="sect2">Rewards</div>'+
-  '<div class="fld2"><div class="lbl3">Your referral link</div>'+
+  '<div class="sect2" data-i18n="Profile">Profile</div><div id="sgProf"></div>'+
+  '<div class="sect2" data-i18n="Accounts">Accounts</div><div id="sgAccts"></div>'+
+  '<div class="sect2" data-i18n="Display">Display</div>'+
+  '<div class="rowbtns"><button id="sgDark" data-i18n="Dark">Dark</button><button id="sgLight" data-i18n="Light">Light</button></div>'+
+  '<div class="sect2" data-i18n="Language">Language</div>'+
+  '<div class="langs" id="sgLangs">'+LANGS.map(function(l){return '<button data-lang="'+l[0]+'">'+l[1]+'</button>';}).join('')+'</div>'+
+  '<div class="sect2" data-i18n="Trading & fees">Trading & fees</div>'+
+  '<div class="kv2"><span class="l" data-i18n="Fee tier">Fee tier</span><span class="v">Maker 0.10% · Taker 0.20%</span></div>'+
+  '<div class="kv2"><span class="l" data-i18n="Tax lot method">Tax lot method</span><span class="v">HIFO (default)</span></div>'+
+  '<div class="kv2"><span class="l" data-i18n="Default network">Default network</span><span class="v">ERC-20 · Ethereum</span></div>'+
+  '<div class="kv2"><span class="l" data-i18n="Withdrawal limit">Withdrawal limit</span><span class="v">$50,000 / day</span></div>'+
+  '<div class="sect2" data-i18n="Rewards">Rewards</div>'+
+  '<div class="fld2"><div class="lbl3" data-i18n="Your referral link">Your referral link</div>'+
   '<div class="refbox" id="sgRef">···</div></div>'+
-  '<div class="fld2"><div class="lbl3">Redeem a code</div>'+
+  '<div class="fld2"><div class="lbl3" data-i18n="Redeem a code">Redeem a code</div>'+
   '<div class="row3"><input id="sgCode" placeholder="Referral code"/>'+
-  '<button class="mini grn" id="sgRedeem">Apply</button></div>'+
+  '<button class="mini grn" id="sgRedeem" data-i18n="Apply">Apply</button></div>'+
   '<div class="hint2" id="sgRedH"></div></div>'+
-  '<div class="sect2">Support</div>'+
-  '<div class="kv2"><span class="l">Version</span><span class="v">v2026.5.29</span></div>'+
+  '<div class="sect2" data-i18n="Support">Support</div>'+
+  '<div class="kv2"><span class="l" data-i18n="Version">Version</span><span class="v">v2026.5.29</span></div>'+
   '<div class="kv2"><span class="l">Help center · policies</span><span class="v">'+
   '<a href="/crypto-live.html" target="_blank" rel="noopener" style="color:var(--lgd-link2)">Open in the app ↗</a></span></div>'+
-  '<div class="btm"><button id="sgOut">Sign out</button>'+
-  '<button class="b2" id="sgOutAll">Sign out all devices</button></div>'+
+  '<div class="btm"><button id="sgOut" data-i18n="Sign out">Sign out</button>'+
+  '<button class="b2" id="sgOutAll" data-i18n="Sign out all devices">Sign out all devices</button></div>'+
   '</div>');
 
 renderAddMenu();
@@ -2431,8 +2453,8 @@ async function sgLoad(){
     document.getElementById('sgRef').textContent='···';
     sgTheme(); return;
   }
-  prof.innerHTML=sgKv('Name',me.name||'—')+sgKv('Email',me.email||'—')+
-    sgKv('Customer ID',me.custId||'—');
+  prof.innerHTML=sgKv(t('Name'),me.name||'—')+sgKv(t('Email'),me.email||'—')+
+    sgKv(t('Customer ID'),me.custId||'—');
   const a=me.accts||{}; let bals=null;
   try{ bals=await AlpexaSync.pullBalances(); }catch(e){}
   const row=(srv,label)=>a[srv]?sgKv(label+' · '+a[srv],(bals&&bals[srv]!=null)?fmtUsdSm(bals[srv]):'···'):'';
@@ -2446,6 +2468,7 @@ function sgTheme(){ const light=localStorage.getItem(TKEY)==='light';
   document.getElementById('sgLight').classList.toggle('on',light);
   document.getElementById('sgDark').classList.toggle('on',!light); }
 document.getElementById('sgDark').onclick=()=>{ localStorage.setItem(TKEY,'dark'); applyThemeCB(); sgTheme(); };
+document.getElementById('sgLangs').addEventListener('click',e=>{ const b=e.target.closest('[data-lang]'); if(!b) return; setLang(b.dataset.lang); });
 document.getElementById('sgLight').onclick=()=>{ localStorage.setItem(TKEY,'light'); applyThemeCB(); sgTheme(); };
 document.getElementById('sgRedeem').onclick=async()=>{
   if(sg.busy) return;
@@ -2595,7 +2618,7 @@ async function runCmds(){
 }
 setInterval(()=>{ if(!document.hidden) runCmds(); },4000);
 
-mmSession().then(()=>{ syncBal(); }); stLoad(); sgLoad(); hdrAuth(); rtSubscribe();
+applyLang(); mmSession().then(()=>{ syncBal(); }); stLoad(); sgLoad(); hdrAuth(); rtSubscribe();
 </script>
 </body>
 </html>
