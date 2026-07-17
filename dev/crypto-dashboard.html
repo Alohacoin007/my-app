@@ -536,7 +536,7 @@ body.light #tabMenu, body.light #addMenu{box-shadow:0 8px 24px rgba(15,23,40,.18
     Alpexa Sports
   </div>
   <div class="htab" id="cbTab" title="Alpexa Crypto" style="cursor:default">
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor"><rect x="0.5" y="0.5" width="6" height="14" rx="1.6"/><rect x="8.5" y="0.5" width="6" height="6" rx="1.6"/><rect x="8.5" y="8.5" width="6" height="6" rx="1.6"/></svg>
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor"><rect x="1.4" y="4.2" width="4.4" height="6.6" rx="1.2"/><rect x="3.1" y="1.6" width="1" height="2.6"/><rect x="3.1" y="10.8" width="1" height="2.6"/><rect x="9.2" y="2.4" width="4.4" height="6.6" rx="1.2"/><rect x="10.9" y="0" width="1" height="2.4"/><rect x="10.9" y="9" width="1" height="3.2"/></svg>
     Alpexa Crypto
   </div>
   <div style="position:relative">
@@ -1185,8 +1185,15 @@ const MK_NAMES={}; MK_CATALOG.forEach(([s,n])=>MK_NAMES[s]=n);
 function alpxsPrice(){ const months=(Date.now()-Date.UTC(2024,0,1))/(30.44*86400e3);
   return 1.00*Math.pow(1.02,months); }   // 앱 :775 공식 사본
 const mk={ list:(()=>{ try{ const s=JSON.parse(localStorage.getItem(MK_KEY)||'null');
-    if(Array.isArray(s)&&s.length) return s; }catch(e){}
-    return ['BTC','ETH','SOL','AVAX','DOGE','XRP','PEPE','LINK','BNB']; })(),
+    if(Array.isArray(s)&&s.length){
+      // 1회 마이그레이션 (2026-07-17 사장님 지시): 기존 저장 리스트에도 ALPXS 기본 포함.
+      // 이후 사용자가 빼면 다시 안 넣는다 (플래그).
+      try{ if(!s.includes('ALPXS')&&!localStorage.getItem('alpexa.cbdash.watch.alpxs1')){
+        s.push('ALPXS'); localStorage.setItem('alpexa.cbdash.watch.alpxs1','1');
+        localStorage.setItem(MK_KEY,JSON.stringify(s)); } }catch(e2){}
+      return s; }
+  }catch(e){}
+    return ['BTC','ETH','SOL','AVAX','DOGE','XRP','PEPE','LINK','BNB','ALPXS']; })(),
   q:{}, dir:-1, ws:null, wsLive:false, _t:0 };
 function mkSave(){ try{ localStorage.setItem(MK_KEY,JSON.stringify(mk.list)); }catch(e){} }
 function mkFmtPx(v){ if(v==null||!isFinite(v)) return '—';
