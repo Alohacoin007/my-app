@@ -19,7 +19,9 @@ pin(/Switch server/, '+ 버튼 타이틀 리터럴 Switch server');
 pin(/Alpexa Sports/, '메뉴 항목: Alpexa Sports (웹 대시보드)');
 pin(/sports-dashboard\.html/, '스포츠 착지 = sports-dashboard.html (컴퓨터용)');
 pin(/Alpexa Crypto/, '메뉴 항목: Alpexa Crypto');
-pin(/Coming this week/, '크립토 컴퓨터용 미출시 안내 리터럴');
+// 2026-07-17 계약 변경(사장님 지시): 크립토 대시보드 출시 — 'Coming this week' 잠금 해제,
+// 서버 메뉴에서 크립토 대시보드로 전환. (활성화 시 경로가 crypto-dashboard.html로 갱신될 예정)
+pin(/goSrv\('\/dev\/crypto-dashboard\.html'\)}>Alpexa Crypto/, '크립토 전환 = 대시보드 경로(goSrv)');
 pin(/window\.top[\s\S]{0,120}location\.href|top\.location\.href/, '이동은 window.top — iframe 중첩 방지');
 pin(/srvmenu/, '메뉴 = 전용 다크 스타일(툴바 팔레트) — ctxmenu는 라이트 고정이라 다크 스킨서 깨짐 (2026-07-15 사용자 보고)');
 pin(/>Alpexa Sports</, '항목 이름 정확히 Alpexa Sports (서버명 3종 규칙)');

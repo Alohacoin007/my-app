@@ -1014,14 +1014,13 @@ document.getElementById('goFx').onclick=()=>{ location.href='/webtrade.html'; };
 setInterval(()=>{ const el=document.getElementById('feedDot'); if(!el) return;
   el.classList.toggle('ok', !!mk.lastTick&&(Date.now()-mk.lastTick)<15000); },3000);
 /* ── 테마 토글 (라이트/다크) — 취향 저장, 기본 다크(레전드) ── */
-const TKEY='alpexa.cbdash.theme.v2';   // 분리 키 (2026-07-17 사장님 확정): 크립토 = 라이트 기본.
-                                        // 옛 키들 무시 — 이 키 없으면 light로 시작
-function applyThemeCB(){ const light=(localStorage.getItem(TKEY)||'light')==='light';   // 기본 = 라이트
+const TKEY='alpexa.cbdash.theme.v2';   // 2026-07-17 최종: 기본 다크 (전 대시보드 통일)
+function applyThemeCB(){ const light=localStorage.getItem(TKEY)==='light';   // 기본 = 다크
   document.body.classList.toggle('light', light);   // classList — className 통째 대입 금지 (결함-로그 2026-07-16)
   document.getElementById('thMoon').style.display=light?'none':'';
   document.getElementById('thSun').style.display=light?'':'none'; }
 document.getElementById('btnTheme').onclick=()=>{
-  const cur=(localStorage.getItem(TKEY)||'light');   // 기본 라이트 기준으로 토글
+  const cur=(localStorage.getItem(TKEY)||'dark');
   localStorage.setItem(TKEY, cur==='light'?'dark':'light'); applyThemeCB();
   renderWal(); };
 applyThemeCB();
@@ -2595,6 +2594,16 @@ async function runCmds(){
 }
 setInterval(()=>{ if(!document.hidden) runCmds(); },4000);
 
+/* 기본 풀스크린 (2026-07-17 사장님 지시) — 브라우저 보안상 자동 진입은 불가(제스처 필수)
+   → 첫 클릭/키입력에서 1회 진입. ESC로 나가면 다시 강제하지 않는다. */
+(function(){
+  let done=false;
+  const go=()=>{ if(done) return; done=true;
+    try{ if(!document.fullscreenElement&&document.documentElement.requestFullscreen)
+      document.documentElement.requestFullscreen().catch(()=>{}); }catch(e){}
+    document.removeEventListener('pointerdown',go,true); document.removeEventListener('keydown',go,true); };
+  document.addEventListener('pointerdown',go,true); document.addEventListener('keydown',go,true);
+})();
 mmSession().then(()=>{ syncBal(); }); stLoad(); sgLoad(); hdrAuth(); rtSubscribe();
 </script>
 </body>
