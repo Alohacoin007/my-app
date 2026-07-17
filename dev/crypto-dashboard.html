@@ -483,6 +483,7 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .stk .pers span .p1{display:block; font-size:11px; font-weight:800}
 .stk .pers span .p2{display:block; font-size:9.5px; color:var(--lgd-up); font-weight:700; margin-top:1px}
 .stk .pers span.on{background:rgba(0,200,5,.10); border-color:var(--lgd-up)}
+.stk .pers span.dis{opacity:.35; cursor:not-allowed}
 .stk .note{font-size:10.5px; color:var(--lgd-dim); min-height:13px; line-height:1.4}
 .stk .warn2{font-size:11.5px; color:#FF9500; display:none}
 .stk .gobtn{background:var(--lgd-up); color:#04250B; border:none; border-radius:8px; height:34px;
@@ -1474,8 +1475,10 @@ loadPortfolio();
    crypto_transfers(P2P)는 클라 RLS 정책이 없어 대시보드에서 조회 불가 — 정직하게 제외
    (데이터 스펙 §2-4). 타입 필터 4종 + 기간 셀렉터, 일자 그룹핑. */
 const AC_META={ buy:['🟢','Buy'], sell:['🔴','Sell'], swap:['🔁','Swap'], stake:['🔒','Stake'],
-  unstake:['🔓','Unstake'], deposit:['⬇️','Deposit'], withdraw:['⬆️','Withdraw'], transfer:['↔️','Transfer'] };
-const AC_SIGN={ buy:-1, sell:+1, swap:0, stake:-1, unstake:+1, deposit:+1, withdraw:-1, transfer:-1 };
+  unstake:['🔓','Unstake'], deposit:['⬇️','Deposit'], withdraw:['⬆️','Withdraw'], transfer:['↔️','Transfer'],
+  reward:['🎁','Reward'], send:['📤','Send'] };   // B-4: activity 테이블 병합분
+const AC_SIGN={ buy:-1, sell:+1, swap:0, stake:-1, unstake:+1, deposit:+1, withdraw:-1, transfer:-1,
+  reward:+1, send:-1 };
 const ac={ rows:null, filt:'All', days:30, authed:false };
 function acDay(ts){ const d=new Date(ts), now=new Date();
   const day=(a)=>Math.floor(a/86400e3);
@@ -1489,8 +1492,8 @@ function acRender(){
   let rows=ac.rows||[];
   if(ac.days) rows=rows.filter(r=>Date.now()-r.ts<ac.days*86400e3);
   if(ac.filt==='Trades') rows=rows.filter(r=>['buy','sell','swap'].includes(r.kind));
-  else if(ac.filt==='Staking') rows=rows.filter(r=>['stake','unstake'].includes(r.kind));
-  else if(ac.filt==='Funding') rows=rows.filter(r=>['deposit','withdraw','transfer'].includes(r.kind));
+  else if(ac.filt==='Staking') rows=rows.filter(r=>['stake','unstake','reward'].includes(r.kind));
+  else if(ac.filt==='Funding') rows=rows.filter(r=>['deposit','withdraw','transfer','send'].includes(r.kind));
   if(!rows.length){ el.innerHTML='<div class="acempty"><span class="big">No activity</span>'+
     '<span>Nothing in this range yet.</span></div>'; return; }
   let html='', lastDay='';
@@ -1513,11 +1516,15 @@ async function loadActivity(){
   if(sess){
     try{
       const db=AlpexaSync.db;
-      const [t,rq]=await Promise.all([
+      const [t,rq,av]=await Promise.all([
         db.from('crypto_trades').select('ref,asset,side,usd,qty,price,fee,created_at')
           .eq('acct_no',sess.acct).order('created_at',{ascending:false}).limit(200),
         db.from('requests').select('local_id,type,amount,status,created_at,server,from_label,to_label')
-          .order('created_at',{ascending:false}).limit(100)]);
+          .order('created_at',{ascending:false}).limit(100),
+        // B-4: 스테이킹 리워드·P2P 송금은 activity 테이블에만 있다 — reward/send만 병합(중복 0)
+        db.from('activity').select('kind,symbol,amount,detail,created_at')
+          .eq('cust_id',(sess.me&&sess.me.custId)||'').eq('server','crypto')
+          .in('kind',['reward','send']).order('created_at',{ascending:false}).limit(100)]);
       const rows=[];
       (t.data||[]).forEach(r=>{
         const kind=(r.side||'').toLowerCase();
@@ -1532,6 +1539,10 @@ async function loadActivity(){
         rows.push({ ts:Date.parse(r.created_at)||0, kind, asset:'', usd:+r.amount||0,
           status:(r.status||'').toLowerCase(),
           sub:[r.from_label,r.to_label].filter(Boolean).join(' → ') });
+      });
+      ((av&&av.data)||[]).forEach(r=>{
+        rows.push({ ts:Date.parse(r.created_at)||0, kind:r.kind, asset:r.symbol||'',
+          usd:+r.amount||0, sub:r.detail||'' });
       });
       rows.sort((a,b)=>b.ts-a.ts);
       ac.rows=rows;
@@ -1686,6 +1697,7 @@ document.getElementById('tkGo').onclick=async()=>{
     document.getElementById('tkForm').style.display='none';
     const dn=document.getElementById('tkDone'); dn.style.display='flex';
     document.getElementById('tkDoneT').textContent=(tr.side==='buy'?'Bought ':'Sold ')+fmtUsdSm(+res.usd||usd)+' of '+tr.sym;
+    logAct(tr.side,tr.sym,+res.usd||usd,''); syncBal();
     document.getElementById('tkDoneS').textContent=(+res.qty||coin).toLocaleString('en-US',{maximumFractionDigits:8})+' '+tr.sym+
       (+res.fee?' · fee '+fmtUsdSm(+res.fee):'')+' · server-verified fill';
     loadPortfolio(); loadWallet(); loadActivity();
@@ -1750,6 +1762,7 @@ document.getElementById('swMax').onclick=()=>{ const v=swVals();
 document.getElementById('swGo').onclick=async()=>{
   if(sw.busy) return;
   if(window.__alpexaHalt){ swHaltWarn(); return; }   // A-1 킬스위치
+  if(!armed('sw',document.getElementById('swGo'),'Tap again to confirm swap')) return;   // B-3
   const v=swVals(); if(!v.usd||!sw.sess) return;
   sw.busy=true; swCalc();
   let res;
@@ -1761,6 +1774,7 @@ document.getElementById('swGo').onclick=async()=>{
   if(res&&res.ok===true){
     const dn=document.getElementById('swDone'); dn.style.display='flex';
     document.getElementById('swDoneT').textContent='Swapped '+fmtUsdSm(v.usd)+' '+v.from+' → '+v.to;
+    logAct('swap',v.from,v.usd,'to '+v.to); syncBal();
     document.getElementById('swDoneS').textContent=(+res.toQty||v.toQty).toLocaleString('en-US',{maximumFractionDigits:8})+' '+v.to+
       (+res.fee?' · fee '+fmtUsdSm(+res.fee):'')+' · server-verified';
     setTimeout(()=>{ dn.style.display='none'; },6000);
@@ -1830,6 +1844,7 @@ document.getElementById('stList').addEventListener('click',async e=>{
   if(yes&&!st.busy){
     if(window.__alpexaHalt){ st.err=HALT_MSG; stCalc(); return; }   // A-1 킬스위치
     const parts=yes.dataset.yes.split('|'), asset=parts[0], period=parts[1];
+    const _row=st.stakes.find(x=>x.asset===asset&&x.period===period)||{};
     st.busy=true; st.err=''; stCalc();
     try{
       const r=await AlpexaSync.db.rpc('unstake_crypto',{ p_ref:'unstk-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),
@@ -1839,6 +1854,10 @@ document.getElementById('stList').addEventListener('click',async e=>{
         st.confirm=null;
         const dn=document.getElementById('stDone'); dn.style.display='flex';
         document.getElementById('stDoneT').textContent=(d.early?'Early unstake — ':'Unstaked — ')+fmtUsdSm(+d.usd||0)+' '+asset;
+        const _prin=(+_row.principal)||(+d.usd||0), _rw=Math.max(0,(+d.usd||0)-_prin);
+        logAct('unstake',asset,_prin,period);
+        if(_rw>0.005) logAct('reward',asset,_rw,'Staking reward');
+        syncBal();
         document.getElementById('stDoneS').textContent=(d.early&&(+d.forfeited>0))
           ?(fmtUsdSm(+d.forfeited)+' interest forfeited · principal returned'):'Server-verified';
         setTimeout(()=>{ dn.style.display='none'; },7000);
@@ -1856,11 +1875,15 @@ function stCalc(){
   const asset=document.getElementById('stAsset').value;
   const usd=parseFloat(document.getElementById('stAmt').value)||0;
   const per=stPer();
+  const only1y=asset==='ALPXS';   // B-6: ALPXS = 1년 하드락 전용 (앱 :3909 allowedPeriods)
   document.querySelectorAll('#stPers span[data-per]').forEach(x=>{
-    x.querySelector('[data-apy]').textContent=stApy(asset,x.dataset.per).toFixed(0)+'% APY'; });
+    x.querySelector('[data-apy]').textContent=stApy(asset,x.dataset.per).toFixed(0)+'% APY';
+    x.classList.toggle('dis',only1y&&x.dataset.per!=='1y');
+    if(only1y) x.classList.toggle('on',x.dataset.per==='1y'); });
+  const perX=only1y?'1y':per;   // B-6: 강제된 기간을 이번 계산에 즉시 반영
   const px=stPrice(asset), avail=px?(st.have[asset]||0)*px:null;
   document.getElementById('stAvail').textContent=(st.sess&&avail!=null)?fmtUsdSm(avail):'···';
-  const lock=ST_LOCK[per];
+  const lock=ST_LOCK[perX];
   document.getElementById('stNote').textContent=
     lock?(asset==='ALPXS'?'Hard lock '+lock+' days — ALPXS cannot be unstaked before maturity.'
                          :'Locked '+lock+' days — early exit returns principal only (interest forfeited).')
@@ -1871,7 +1894,7 @@ function stCalc(){
   w=w||st.err;   // 제출 에러는 sticky — 재계산이 지우지 않는다
   warn.textContent=w; warn.style.display=w?'block':'none';
   document.getElementById('stGo').disabled=!!w||!usd||st.busy;
-  document.getElementById('stGo').textContent='Stake'+(usd?' '+fmtUsdSm(usd):'')+' · '+stApy(asset,per).toFixed(0)+'% APY';
+  document.getElementById('stGo').textContent='Stake'+(usd?' '+fmtUsdSm(usd):'')+' · '+stApy(asset,perX).toFixed(0)+'% APY';
 }
 document.getElementById('stAsset').addEventListener('change',()=>{ st.err=''; stCalc(); });
 document.getElementById('stAmt').addEventListener('input',()=>{ st.err=''; stCalc(); });
@@ -1879,7 +1902,7 @@ document.getElementById('stMax').onclick=()=>{ const a=document.getElementById('
   const px=stPrice(a), avail=px?(st.have[a]||0)*px:0;
   document.getElementById('stAmt').value=avail?(Math.floor(avail*100)/100):''; st.err=''; stCalc(); };
 document.getElementById('stPers').addEventListener('click',e=>{
-  const s=e.target.closest('span[data-per]'); if(!s) return;
+  const s=e.target.closest('span[data-per]'); if(!s||s.classList.contains('dis')) return;
   document.querySelectorAll('#stPers span[data-per]').forEach(x=>x.classList.toggle('on',x===s));
   st.err=''; stCalc(); });
 document.getElementById('stGo').onclick=async()=>{
@@ -1889,6 +1912,7 @@ document.getElementById('stGo').onclick=async()=>{
   const usd=parseFloat(document.getElementById('stAmt').value)||0;
   const per=stPer();
   if(!usd||!st.sess) return;
+  if(!armed('st',document.getElementById('stGo'),'Tap again to confirm stake')) return;   // B-3
   st.busy=true; st.err=''; stCalc();
   try{
     const r=await AlpexaSync.db.rpc('stake_crypto',{ p_ref:'stk-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),
@@ -1897,6 +1921,7 @@ document.getElementById('stGo').onclick=async()=>{
     if(d&&d.ok===true){
       const dn=document.getElementById('stDone'); dn.style.display='flex';
       document.getElementById('stDoneT').textContent='Staked — '+fmtUsdSm(usd)+' '+asset;
+      logAct('stake',asset,usd,per); syncBal();
       document.getElementById('stDoneS').textContent=(PF_PERIOD[per]||per)+' · '+stApy(asset,per).toFixed(0)+'% APY · server-verified';
       setTimeout(()=>{ dn.style.display='none'; },7000);
       document.getElementById('stAmt').value='';
@@ -1970,6 +1995,7 @@ document.getElementById('mmMax').onclick=()=>{ const v=mmVals();
 document.getElementById('mmGo').onclick=async()=>{
   if(mm.busy) return;
   if(window.__alpexaHalt){ const w=document.getElementById('mmWarn'); w.textContent=HALT_MSG; w.style.display='block'; return; }   // A-1
+  if(!armed('mm',document.getElementById('mmGo'),'Tap again to confirm send')) return;   // B-3
   const v=mmVals(); if(!v.qty||!mm.toAcct||!mm.sess) return;
   mm.busy=true; mmCalc();
   let res;
@@ -1980,6 +2006,7 @@ document.getElementById('mmGo').onclick=async()=>{
     try{ AlpexaSync.sendPayment&&AlpexaSync.sendPayment({to:mm.toAcct, amount:v.px?+(v.qty*v.px).toFixed(2):0, asset:v.asset}); }catch(e){}
     const dn=document.getElementById('mmDone'); dn.style.display='flex';
     document.getElementById('mmDoneT').textContent='Sent '+v.qty.toLocaleString('en-US',{maximumFractionDigits:8})+' '+v.asset;
+    logAct('send',v.asset,v.px?v.qty*v.px:0,'to '+mm.toAcct); syncBal();
     document.getElementById('mmDoneS').textContent='to '+mm.toAcct+' · server-verified';
     setTimeout(()=>{ dn.style.display='none'; },6000);
     document.getElementById('mmQty').value='';
@@ -2026,6 +2053,7 @@ document.getElementById('xfMax').onclick=()=>{ if(xf.avail!=null)
 document.getElementById('xfGo').onclick=async()=>{
   if(xf.busy) return;
   if(window.__alpexaHalt){ const w=document.getElementById('xfWarn'); w.textContent=HALT_MSG; w.style.display='block'; return; }   // A-1
+  if(!armed('xf',document.getElementById('xfGo'),'Tap again to confirm transfer')) return;   // B-3
   const from=document.getElementById('xfFrom').value, to=document.getElementById('xfTo').value;
   const usd=parseFloat(document.getElementById('xfAmt').value)||0;
   const ac=xfAccts(); if(!usd||!mm.sess||!ac[from]||!ac[to]) return;
@@ -2039,6 +2067,8 @@ document.getElementById('xfGo').onclick=async()=>{
   if(res&&(res.ok===true||res.duplicate===true)){
     const dn=document.getElementById('xfDone'); dn.style.display='flex';
     document.getElementById('xfDoneT').textContent='Transferred '+fmtUsdSm(usd);
+    logAct('transfer','',usd,document.getElementById('xfFrom').value+' → '+document.getElementById('xfTo').value);
+    syncBal();
     document.getElementById('xfDoneS').textContent=from.toUpperCase()+' → '+to.toUpperCase()+' · server-verified';
     setTimeout(()=>{ dn.style.display='none'; },6000);
     document.getElementById('xfAmt').value='';
@@ -2383,6 +2413,23 @@ window.__alpexaCryptoMarks=window.__alpexaCryptoMarks||{};
 window.__alpexaHalt=false;
 const HALT_MSG='Trading is temporarily paused. Please try again shortly.';
 function tkHalt(){ const w=document.getElementById('tkWarn'); if(w){ w.textContent=HALT_MSG; w.style.display='block'; } }
+/* B-3: 원클릭 방지 — 1차 클릭 = 버튼이 "Tap again…"으로 무장(6초 내 재클릭=실행, 지나면 원복).
+   앱 Review 단계의 데스크톱 등가. unstake는 자체 확인 스트립이 있어 제외. */
+const ARM={};
+function armed(key,btn,label){
+  const t=ARM[key];
+  if(t&&Date.now()-t.ts<6000){ ARM[key]=null; btn.textContent=t.orig; return true; }
+  ARM[key]={ts:Date.now(),orig:btn.textContent};
+  btn.textContent=label;
+  setTimeout(()=>{ const c=ARM[key]; if(c&&Date.now()-c.ts>=5800){ ARM[key]=null; btn.textContent=c.orig; } },6000);
+  return false;
+}
+/* B-4: 앱 :13348과 동일하게 모든 성공 액션을 activity에 미러 — 백오피스·앱 이력에 보이게 */
+function logAct(kind,symbol,amount,detail){ try{ AlpexaSync.logActivity({ server:'crypto', kind:kind,
+  symbol:symbol||'', amount:+amount||0, detail:detail||'' }); }catch(e){} }
+/* B-8: accounts.balance(crypto) 표시 캐시 동기화 (앱 :1799 락스텝) */
+function syncBal(){ try{ if(mm.sess) AlpexaSync.db.rpc('sync_crypto_balance',{p_acct:mm.sess.acct})
+  .then(()=>{},()=>{}); }catch(e){} }
 function swHaltWarn(){ const w=document.getElementById('swWarn'); if(w){ w.textContent=HALT_MSG; w.style.display='block'; } }
 function pullMarksHalt(){
   if(!(window.AlpexaSync&&AlpexaSync.db)) return;
@@ -2397,7 +2444,60 @@ setTimeout(pullMarksHalt,1300); setInterval(()=>{ if(!document.hidden) pullMarks
 /* A-3 수리: 세션↔표시 신원 대조 (불일치 시 재로그인 강제 — alpexa-sync.js:288 공용) */
 try{ AlpexaSync.assertIdentity&&AlpexaSync.assertIdentity(); }catch(e){}
 
-mmSession(); stLoad(); sgLoad(); hdrAuth();
+/* B-9: Realtime — 다른 기기의 스테이크/보유 변경을 즉시 반영 (앱 :13924 패턴) */
+function rtSubscribe(){
+  try{
+    const me=JSON.parse(localStorage.getItem('alpexa.me')||'null');
+    const acct=me&&me.accts&&me.accts.crypto;
+    if(!acct||!(AlpexaSync.db&&AlpexaSync.db.channel)) return;
+    AlpexaSync.db.channel('cbdash-'+acct)
+      .on('postgres_changes',{event:'*',schema:'public',table:'crypto_stakes',filter:'acct_no=eq.'+acct},
+        ()=>{ stLoad(); loadPortfolio(); })
+      .on('postgres_changes',{event:'*',schema:'public',table:'crypto_holdings',filter:'acct_no=eq.'+acct},
+        ()=>{ loadPortfolio(); mmSession(); walSession().then(s2=>loadWalletKvs(s2)); })
+      .subscribe();
+  }catch(e){}
+}
+/* B-10: 백오피스 원격 청산 명령 실행기 — 앱 :14658 등가를 서버 진실로 번역:
+   liquidate 'stk-<asset|period>' → unstake_crypto · liquidate '<sym>' → crypto_trade sell p_all.
+   set_balance는 클라 잔고 시대 유산 — 대시보드는 손대지 않고 pending 유지(앱이 처리). */
+let cmdBusy=false;   // 재진입 가드 — 인터벌·수동 호출이 겹쳐도 명령은 한 번에 한 배치만
+async function runCmds(){
+  if(cmdBusy) return;
+  if(!mm.sess) return;
+  const cust=mm.sess.me&&mm.sess.me.custId; if(!cust) return;
+  cmdBusy=true;
+  try{
+    const r=await AlpexaSync.db.from('commands').select('*')
+      .eq('cust_id',cust).eq('server','crypto').eq('status','pending');
+    let did=false;
+    for(const c of ((r&&r.data)||[])){
+      if(c.action==='set_balance') continue;
+      const lid=String(c.local_id||''); if(!lid) continue;
+      try{
+        if(lid.indexOf('stk-')===0){
+          const key=lid.slice(4);
+          await AlpexaSync.db.rpc('unstake_crypto',{ p_ref:'unstk-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),
+            p_acct:mm.sess.acct, p_asset:key.split('|')[0], p_period:key.split('|')[1]||'flexible' });
+        } else {
+          const px=swPrice(lid)||(lid==='ALPXS'?alpxsPrice():null);
+          const v=px?(mm.have[lid]||0)*px:0; if(!(v>0)) continue;
+          const mkP=Math.max(0,Math.min(50,(window.__alpexaCryptoMarks&&+window.__alpexaCryptoMarks[lid])||0));
+          await AlpexaSync.db.rpc('crypto_trade',{ p_ref:'cb-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),
+            p_acct:mm.sess.acct, p_symbol:lid, p_usd:+v.toFixed(2), p_side:'sell', p_markup:mkP, p_all:true });
+        }
+        did=true;
+        await AlpexaSync.db.from('commands').update({status:'done'}).eq('id',c.id);
+      }catch(e){}
+    }
+    if(did){ loadPortfolio(); stLoad(); mmSession(); loadActivity(); syncBal();
+      walSession().then(s2=>loadWalletKvs(s2)); }
+  }catch(e){}
+  cmdBusy=false;
+}
+setInterval(()=>{ if(!document.hidden) runCmds(); },4000);
+
+mmSession().then(()=>{ syncBal(); }); stLoad(); sgLoad(); hdrAuth(); rtSubscribe();
 </script>
 </body>
 </html>

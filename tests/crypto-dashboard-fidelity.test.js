@@ -55,6 +55,16 @@ const PINS = [
   ['A-4 Transak 계약(walletAddress+partnerOrderId)', /walletAddress:RC_EXT\.address[\s\S]{0,200}partnerOrderId/],
   ['B-2 와이어 매칭 참조(ALPX-<custId>)',       /'ALPX-'\+String\(c\)\.toUpperCase\(\)/],
   ['B-1 온체인 출금 USDT 한정(WD_NET)',         /const WD_NET=\{ USDT:'ERC-20 · Ethereum' \};/],
+  ['B-3 2단 확인 — swap',                       /armed\('sw',/],
+  ['B-3 2단 확인 — send',                       /armed\('mm',/],
+  ['B-3 2단 확인 — transfer',                   /armed\('xf',/],
+  ['B-3 2단 확인 — stake',                      /armed\('st',/],
+  ['B-4 activity 병합(reward·send)',            /\.in\('kind',\['reward','send'\]\)/],
+  ['B-4 성공 액션 activity 미러(logAct)',        /AlpexaSync\.logActivity\(\{ server:'crypto'/],
+  ['B-6 ALPXS 스테이크 1y 전용',                /asset==='ALPXS';\s*\/\/ B-6/],
+  ['B-8 sync_crypto_balance 동기화',            /rpc\('sync_crypto_balance'/],
+  ['B-9 Realtime 구독(stakes·holdings)',        /postgres_changes[\s\S]{0,200}crypto_stakes[\s\S]{0,400}crypto_holdings/],
+  ['B-10 원격청산 set_balance 불가침',          /if\(c\.action==='set_balance'\) continue;/],
 ];
 PINS.forEach(([name, re]) => ok('PIN ' + name, re.test(html)));
 
