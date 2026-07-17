@@ -1009,14 +1009,15 @@ document.getElementById('goSports').onclick=()=>{ location.href='/sports-dashboa
 setInterval(()=>{ const el=document.getElementById('feedDot'); if(!el) return;
   el.classList.toggle('ok', !!mk.lastTick&&(Date.now()-mk.lastTick)<15000); },3000);
 /* ── 테마 토글 (라이트/다크) — 취향 저장, 기본 다크(레전드) ── */
-const TKEY='alpexa.dash.theme';   // 공용 키 (2026-07-17): 스포츠·크립토 대시보드 테마 공유, 기본 다크
-                                  // (옛 alpexa.cbdash.theme 저장값은 의도적으로 무시 — "처음 셋팅=다크")
-function applyThemeCB(){ const light=localStorage.getItem(TKEY)==='light';
+const TKEY='alpexa.cbdash.theme.v2';   // 분리 키 (2026-07-17 사장님 확정): 크립토 = 라이트 기본.
+                                        // 옛 키들 무시 — 이 키 없으면 light로 시작
+function applyThemeCB(){ const light=(localStorage.getItem(TKEY)||'light')==='light';   // 기본 = 라이트
   document.body.classList.toggle('light', light);   // classList — className 통째 대입 금지 (결함-로그 2026-07-16)
   document.getElementById('thMoon').style.display=light?'none':'';
   document.getElementById('thSun').style.display=light?'':'none'; }
 document.getElementById('btnTheme').onclick=()=>{
-  localStorage.setItem(TKEY, localStorage.getItem(TKEY)==='light'?'dark':'light'); applyThemeCB();
+  const cur=(localStorage.getItem(TKEY)||'light');   // 기본 라이트 기준으로 토글
+  localStorage.setItem(TKEY, cur==='light'?'dark':'light'); applyThemeCB();
   renderWal(); };
 applyThemeCB();
 
