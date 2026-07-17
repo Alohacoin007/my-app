@@ -431,7 +431,6 @@ makeWidget('markets','Markets','','var(--lgd-link4)',
   '<span class="sortable" id="mkSortChg">CHANGE % <span id="mkArr">▼</span></span>'+
   '<span>BID</span><span>ASK</span></div>'+
   '<div class="mlist" id="mkList"></div>'+
-  '<div class="madd" id="mkAdd">+ Add</div>'+
   '<div class="mpop" id="mkPop">'+
   '<div class="srch"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>'+
   '<input id="mkQ" placeholder="Search crypto"/><span class="x" id="mkQx">✕</span></div>'+
@@ -676,7 +675,9 @@ function mkRender(){
         (r.chg==null?'—':(up?'▲ ':'▼ ')+Math.abs(r.chg).toFixed(2)+'%')+'</span>'+
       '<span class="px">'+mkFmtPx(r.bid)+'</span>'+
       '<span class="px">'+mkFmtPx(r.ask)+'</span></div>';
-  }).join('');
+  }).join('')
+  // + Add는 리스트 "마지막 행 바로 아래" (레전드 문법 — 사용자 스크린샷 2026-07-16)
+  +'<div class="madd" id="mkAdd">+&nbsp; Add</div>';
   rows.forEach(r=>{ if(mk.q[r.s]) mk.q[r.s]._f=''; });
 }
 function mkTouch(s,last,chg,bid,ask){
@@ -723,6 +724,11 @@ setInterval(()=>{ if(!document.hidden) mkPoll(); },8000);
 document.getElementById('mkSortChg').onclick=()=>{ mk.dir=-mk.dir;
   document.getElementById('mkArr').textContent=mk.dir<0?'▼':'▲'; mkRender(); };
 document.getElementById('mkList').addEventListener('click',e=>{
+  // + Add (리스트 안, 재렌더마다 재생성 → 위임 바인딩)
+  if(e.target.closest('.madd')){ e.stopPropagation();
+    mkPop.classList.toggle('open');
+    if(mkPop.classList.contains('open')){ mkRenderPlist(); document.getElementById('mkQ').focus(); }
+    return; }
   const r=e.target.closest('.mrow'); if(!r) return;
   window.__cbSel=r.dataset.sym;   // W4 Chart가 이 선택을 읽는다 (다음 단계)
   document.dispatchEvent(new CustomEvent('cb-sel',{detail:r.dataset.sym}));
@@ -737,9 +743,6 @@ function mkRenderPlist(){
       return '<div class="prow'+(inL?' in':'')+'" data-sym="'+s+'"><span class="ps">'+s+'</span>'+
         '<span class="pn">'+n+'</span><span class="ck">'+(inL?'✓':'')+'</span></div>'; }).join('');
 }
-document.getElementById('mkAdd').onclick=e=>{ e.stopPropagation();
-  mkPop.classList.toggle('open'); if(mkPop.classList.contains('open')){ mkRenderPlist();
-    document.getElementById('mkQ').focus(); } };
 mkPop.addEventListener('click',e=>{ e.stopPropagation();
   const row=e.target.closest('.prow'); if(!row) return;
   const s=row.dataset.sym, i=mk.list.indexOf(s);
