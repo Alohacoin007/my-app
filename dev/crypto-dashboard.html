@@ -403,6 +403,37 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
   font-weight:700; border-radius:6px; padding:4px 10px; cursor:pointer; font-family:inherit}
 .od .empty2{padding:14px; font-size:11px; color:var(--lgd-dim); line-height:1.5}
 
+/* ══ 설정 패널 (Settings) ══ */
+.stg{flex:1; min-height:0; display:flex; flex-direction:column; overflow:auto}
+.stg .sect2{padding:10px 14px 5px; font-size:10.5px; font-weight:800; letter-spacing:.6px;
+  color:var(--lgd-dim); text-transform:uppercase}
+.stg .kv2{display:flex; align-items:center; padding:6px 14px; font-size:11.5px}
+.stg .kv2 .l{color:var(--lgd-dim)}
+.stg .kv2 .v{margin-left:auto; font-weight:600; text-align:right; word-break:break-all}
+.stg .empty2{padding:4px 14px 8px; font-size:11px; color:var(--lgd-dim)}
+.stg .rowbtns{display:flex; gap:8px; padding:2px 14px 6px}
+.stg .rowbtns button{flex:1; background:var(--lgd-pill); border:1px solid transparent; color:var(--lgd-ink);
+  font-size:11.5px; font-weight:700; border-radius:7px; height:30px; cursor:pointer; font-family:inherit}
+.stg .rowbtns button.on{background:rgba(0,200,5,.10); border-color:var(--lgd-up)}
+.stg .fld2{padding:2px 14px 8px}
+.stg .lbl3{font-size:10.5px; font-weight:700; letter-spacing:.5px; color:var(--lgd-dim);
+  text-transform:uppercase; margin-bottom:4px}
+.stg .refbox{background:var(--lgd-pill); border-radius:7px; padding:8px 10px; font-size:11px;
+  font-weight:600; word-break:break-all; user-select:all}
+.stg .row3{display:flex; gap:8px}
+.stg .row3 input{flex:1; min-width:0; box-sizing:border-box; background:var(--lgd-pill); border:none;
+  color:var(--lgd-ink); border-radius:7px; padding:8px 10px; font-size:12px; font-weight:600;
+  font-family:inherit; outline:none}
+.stg .mini{background:var(--lgd-pill-hi); border:none; color:var(--lgd-ink); font-size:11px;
+  font-weight:700; border-radius:7px; padding:0 12px; height:32px; cursor:pointer; font-family:inherit}
+.stg .mini.grn{background:var(--lgd-up); color:#04250B}
+.stg .hint2{font-size:10.5px; color:var(--lgd-dim); margin-top:4px; min-height:13px}
+.stg .hint2.ok{color:var(--lgd-up)} .stg .hint2.bad{color:#FF9500}
+.stg .btm{padding:8px 14px 14px; display:flex; flex-direction:column; gap:8px; margin-top:auto}
+.stg .btm button{background:var(--lgd-pill); border:none; color:var(--lgd-down); font-size:12px;
+  font-weight:700; border-radius:8px; height:32px; cursor:pointer; font-family:inherit}
+.stg .btm .b2{color:var(--lgd-dim)}
+
 /* ══ W7 Staking ══ */
 .stk{flex:1; min-height:0; display:flex; flex-direction:column; overflow:auto}
 .stk .sect2{padding:9px 14px 5px; font-size:10.5px; font-weight:800; letter-spacing:.6px;
@@ -544,11 +575,12 @@ const DEFAULT_LAYOUT={
   chart:{x:884,y:8,w:660,h:504},   portfolio:{x:884,y:520,w:660,h:328},
   trade:{x:1552,y:8,w:340,h:504},  money:{x:1552,y:520,w:340,h:328},
   swap:{x:1208,y:8,w:336,h:420,hidden:true}, orders:{x:1208,y:436,w:336,h:412,hidden:true},
+  settings:{x:760,y:88,w:380,h:640,hidden:true},
   __ref:{w:1900,h:856} };
 const deepLayout=(o)=>JSON.parse(JSON.stringify(o));
 const MIN_SIZE={ balance:{w:300,h:220}, staking:{w:300,h:240}, markets:{w:400,h:260}, activity:{w:400,h:220},
   chart:{w:480,h:280}, portfolio:{w:440,h:220}, trade:{w:300,h:320}, money:{w:300,h:200},
-  swap:{w:300,h:300}, orders:{w:300,h:220} };
+  swap:{w:300,h:300}, orders:{w:300,h:220}, settings:{w:320,h:320} };
 function loadLayout(){ try{ const raw=localStorage.getItem(LKEY); if(!raw) return deepLayout(DEFAULT_LAYOUT);
   const p=JSON.parse(raw);
   Object.keys(DEFAULT_LAYOUT).forEach(k=>{ if(!p[k]) p[k]=deepLayout(DEFAULT_LAYOUT[k]); });
@@ -586,7 +618,8 @@ function applyGeo(id){ const el=document.getElementById('w-'+id); if(!el) return
   el.style.display=g.hidden?'none':'flex';
   el.style.left=g.x+'px'; el.style.top=g.y+'px'; el.style.width=g.w+'px'; el.style.height=g.h+'px'; }
 const WIDGET_TITLES={ balance:'Account', portfolio:'Portfolio', markets:'Markets', chart:'Chart',
-  trade:'Trade', swap:'Swap', staking:'Staking', orders:'Open orders', activity:'Activity', money:'Money moves' };
+  trade:'Trade', swap:'Swap', staking:'Staking', orders:'Open orders', activity:'Activity', money:'Money moves',
+  settings:'Settings' };
 function setHidden(id, hidden){ layout[id].hidden=hidden; applyGeo(id); saveLayout(); renderAddMenu(); }
 function renderAddMenu(){ const m=document.getElementById('addMenu'); if(!m) return;
   m.innerHTML=Object.keys(WIDGET_TITLES).map(id=>{
@@ -879,6 +912,31 @@ makeWidget('swap','Swap','','var(--lgd-link2)',
   '</div>');
 makeWidget('orders','Open orders','','var(--lgd-link3)',
   '<div class="od tnum"><div class="odh" id="odCount"></div><div id="odList"></div></div>');
+makeWidget('settings','Settings','','var(--lgd-link2)',
+  '<div class="stg tnum">'+
+  '<div class="sect2">Profile</div><div id="sgProf"></div>'+
+  '<div class="sect2">Accounts</div><div id="sgAccts"></div>'+
+  '<div class="sect2">Display</div>'+
+  '<div class="rowbtns"><button id="sgDark">Dark</button><button id="sgLight">Light</button></div>'+
+  '<div class="sect2">Trading & fees</div>'+
+  '<div class="kv2"><span class="l">Fee tier</span><span class="v">Maker 0.10% · Taker 0.20%</span></div>'+
+  '<div class="kv2"><span class="l">Tax lot method</span><span class="v">HIFO (default)</span></div>'+
+  '<div class="kv2"><span class="l">Default network</span><span class="v">ERC-20 · Ethereum</span></div>'+
+  '<div class="kv2"><span class="l">Withdrawal limit</span><span class="v">$50,000 / day</span></div>'+
+  '<div class="sect2">Rewards</div>'+
+  '<div class="fld2"><div class="lbl3">Your referral link</div>'+
+  '<div class="refbox" id="sgRef">···</div></div>'+
+  '<div class="fld2"><div class="lbl3">Redeem a code</div>'+
+  '<div class="row3"><input id="sgCode" placeholder="Referral code"/>'+
+  '<button class="mini grn" id="sgRedeem">Apply</button></div>'+
+  '<div class="hint2" id="sgRedH"></div></div>'+
+  '<div class="sect2">Support</div>'+
+  '<div class="kv2"><span class="l">Version</span><span class="v">v2026.5.29</span></div>'+
+  '<div class="kv2"><span class="l">Help center · policies</span><span class="v">'+
+  '<a href="/crypto-live.html" target="_blank" rel="noopener" style="color:var(--lgd-link2)">Open in the app ↗</a></span></div>'+
+  '<div class="btm"><button id="sgOut">Sign out</button>'+
+  '<button class="b2" id="sgOutAll">Sign out all devices</button></div>'+
+  '</div>');
 
 renderAddMenu();
 refitLayout();
@@ -2175,7 +2233,73 @@ document.querySelector('#w-money .mtabs').addEventListener('click',e=>{
   if(t.dataset.p==='fund') fdCalc();
   if(t.dataset.p==='receive') rcRender();
 });
-mmSession(); stLoad();
+/* ════════════════════ 설정 패널 (Settings) — 앱 Account §7 이식 ════════════════════
+   표시값은 앱 하드코드 그대로(수수료 티어·HIFO·$50K/day·버전 — crypto-live.html:9157/9181/9257/9270).
+   Redeem = redeem_referral RPC (서버가 고객당 1회 강제 + ALPXS 지급 — 앱 :9514 계약).
+   Sign out = 앱 doSignOut 동일(:253-257): auth.signOut + alpexa.me 제거 → login.html?switch=1. */
+const sg={ sess:null, busy:false };
+function sgKv(l,v){ return '<div class="kv2"><span class="l">'+l+'</span><span class="v">'+v+'</span></div>'; }
+async function sgLoad(){
+  sg.sess=await walSession();
+  const prof=document.getElementById('sgProf'), acc=document.getElementById('sgAccts');
+  const me=sg.sess&&sg.sess.me;
+  if(!me){
+    prof.innerHTML='<div class="empty2">Sign in to see your profile.</div>';
+    acc.innerHTML='<div class="empty2">···</div>';
+    document.getElementById('sgRef').textContent='···';
+    sgTheme(); return;
+  }
+  prof.innerHTML=sgKv('Name',me.name||'—')+sgKv('Email',me.email||'—')+
+    sgKv('Customer ID',me.custId||'—');
+  const a=me.accts||{}; let bals=null;
+  try{ bals=await AlpexaSync.pullBalances(); }catch(e){}
+  const row=(srv,label)=>a[srv]?sgKv(label+' · '+a[srv],(bals&&bals[srv]!=null)?fmtUsdSm(bals[srv]):'···'):'';
+  acc.innerHTML=(row('crypto','Crypto')+row('fx','FX')+row('sports','Sports'))||'<div class="empty2">···</div>';
+  const code=String(me.custId||'').toUpperCase();   // 앱 alpexaRefLink 동일
+  document.getElementById('sgRef').textContent=
+    'https://app.alpexa-suisse.com/signup.html'+(code?('?ref='+encodeURIComponent(code)):'');
+  sgTheme();
+}
+function sgTheme(){ const light=localStorage.getItem(TKEY)==='light';
+  document.getElementById('sgLight').classList.toggle('on',light);
+  document.getElementById('sgDark').classList.toggle('on',!light); }
+document.getElementById('sgDark').onclick=()=>{ localStorage.setItem(TKEY,'dark'); applyThemeCB(); sgTheme(); };
+document.getElementById('sgLight').onclick=()=>{ localStorage.setItem(TKEY,'light'); applyThemeCB(); sgTheme(); };
+document.getElementById('sgRedeem').onclick=async()=>{
+  if(sg.busy) return;
+  const h=document.getElementById('sgRedH');
+  const code=(document.getElementById('sgCode').value||'').trim();
+  h.className='hint2';
+  if(!sg.sess){ h.textContent='Sign in to redeem a code.'; h.className='hint2 bad'; return; }
+  if(!code){ h.textContent='Enter a code.'; h.className='hint2 bad'; return; }
+  sg.busy=true; h.textContent='Checking…';
+  try{
+    const r=await AlpexaSync.db.rpc('redeem_referral',{p_code:code});
+    const d=r&&r.data;
+    if((r&&r.error)||!d||d.ok===false){
+      const msg=(d&&d.error)||(r&&r.error&&r.error.message)||'Could not redeem this code.';
+      h.textContent=(msg==='already redeemed')?'You have already redeemed a referral code.':String(msg);
+      h.className='hint2 bad';
+    } else {
+      try{ localStorage.setItem('alpexa.referralRedeemed',JSON.stringify({code,ts:Date.now()})); }catch(e){}
+      h.textContent='Code applied · 100 ALPXS earned'; h.className='hint2 ok';
+      document.getElementById('sgCode').value='';
+      loadPortfolio(); mmSession(); stLoad(); sgLoad(); walSession().then(s=>loadWalletKvs(s));
+    }
+  }catch(e){ h.textContent='Network error — try again.'; h.className='hint2 bad'; }
+  sg.busy=false;
+};
+function sgSignOut(all){
+  // 앱 doSignOut(:253-257)과 동일 — signOut은 기다리지 않는다(먹통이어도 사용자를 가두지 않기).
+  try{ if(AlpexaSync.db&&AlpexaSync.db.auth) AlpexaSync.db.auth.signOut(all?{scope:'global'}:undefined)
+    .catch(()=>{}); }catch(e){}
+  try{ ['alpexa.me','alpexa.userName','alpexa.userEmail'].forEach(k=>localStorage.removeItem(k)); }catch(e){}
+  try{ location.replace('/login.html?switch=1'); }catch(e){ location.href='/login.html?switch=1'; }
+}
+document.getElementById('sgOut').onclick=()=>sgSignOut(false);
+document.getElementById('sgOutAll').onclick=()=>sgSignOut(true);
+
+mmSession(); stLoad(); sgLoad();
 </script>
 </body>
 </html>
