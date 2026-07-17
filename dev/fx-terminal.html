@@ -1,0 +1,355 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alpexa · FX Terminal (Legend)</title>
+<link rel="stylesheet" href="../legend-ui.css">
+<style>
+/* ══ FX 레전드 터미널 — M1 셸(기초공사). 크립토/스포츠 대시보드 위젯 엔진 재사용.
+   기존 FX 코드(webtrade/trading) 0터치 · legend-ui.css 읽기 전용 링크. 돈 코드 0. ══ */
+*{box-sizing:border-box; margin:0}
+*{scrollbar-width:none; -ms-overflow-style:none}
+*::-webkit-scrollbar{display:none}
+body{color:var(--lgd-ink,#F5F6F7); overflow:hidden; font-family:var(--lgd-font,system-ui,-apple-system,Segoe UI,sans-serif)}
+button:active:not(:disabled),.htab:active,.hic:active,.avatar:active{ transform:scale(.97); filter:brightness(1.15) }
+
+/* ── 헤더 ── */
+.hdr{display:flex; align-items:center; gap:8px; height:48px; padding:0 12px; background:var(--lgd-surface);
+  border-bottom:1px solid var(--lgd-hair); position:relative; z-index:60}
+.mark{width:26px; height:26px; border-radius:7px; background:var(--lgd-up); color:#04250B; font-weight:900;
+  display:flex; align-items:center; justify-content:center; font-size:15px}
+.htab{display:flex; align-items:center; gap:8px; background:var(--lgd-pill); border-radius:var(--lgd-r-btn,8px);
+  height:32px; padding:0 14px 0 12px; font-size:13px; font-weight:600; transition:background .12s}
+.htab:hover{background:var(--lgd-pill-hi)}
+.htab.swtab{background:none; color:var(--lgd-dim); cursor:pointer}
+.htab.swtab:hover{background:var(--lgd-pill); color:var(--lgd-ink)}
+.addtab{width:32px; height:32px; border-radius:var(--lgd-r-btn,8px); display:flex; align-items:center;
+  justify-content:center; color:var(--lgd-dim); cursor:pointer; font-size:17px}
+.addtab:hover{background:var(--lgd-pill); color:var(--lgd-ink)}
+.hsp{flex:1}
+.hmid{display:flex; align-items:center; gap:7px; font-size:11px; color:var(--lgd-dim); font-weight:600}
+.hmid .dot{width:7px; height:7px; border-radius:50%; background:var(--lgd-dim)}
+.hmid .dot.ok{background:var(--lgd-up)}
+.hbtn{background:var(--lgd-pill); border:none; color:var(--lgd-ink); font-size:12px; font-weight:700;
+  border-radius:var(--lgd-r-btn,8px); height:32px; padding:0 12px; cursor:pointer; font-family:inherit}
+.hbtn:hover{background:var(--lgd-pill-hi)}
+.hic{width:34px; height:34px; border-radius:var(--lgd-r-btn,8px); display:flex; align-items:center;
+  justify-content:center; color:var(--lgd-ink); cursor:pointer}
+.hic:hover{background:var(--lgd-pill)}
+.avatar{width:28px; height:28px; border-radius:999px; background:#3A3E42; display:flex; align-items:center;
+  justify-content:center; color:#101214; cursor:pointer; font-size:12.5px; font-weight:800; position:relative}
+.avatar.signin{background:var(--lgd-up); color:#04250B; animation:avpulse 2s ease-in-out infinite}
+@keyframes avpulse{0%,100%{box-shadow:0 0 0 0 rgba(0,200,5,.45)}50%{box-shadow:0 0 0 7px rgba(0,200,5,0)}}
+#addMenu, #tabMenu{display:none; position:absolute; top:38px; z-index:70; min-width:190px;
+  background:var(--lgd-surface2); border:1px solid var(--lgd-hair); border-radius:var(--lgd-r-pop,10px);
+  box-shadow:0 8px 24px rgba(0,0,0,.5); padding:6px; font-size:13px}
+.tabrow, .addrow{display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:6px; cursor:pointer}
+.tabrow:hover, .addrow:hover{background:var(--lgd-pill)}
+.tabrow.dis{cursor:default; color:var(--lgd-dim)}
+.addrow .sub, .tabrow .sub{margin-left:auto; color:var(--lgd-dim); font-size:11px}
+
+/* ── 스테이지 · 점 배경 ── */
+.stage{position:relative; height:calc(100vh - 49px); overflow:hidden; background:var(--lgd-bg)}
+.dots{position:absolute; inset:0; pointer-events:none;
+  background-image:radial-gradient(circle, rgba(255,255,255,.05) 1.2px, transparent 1.6px);
+  background-size:26px 26px}
+
+/* ── 위젯 ── */
+.widget{position:absolute; display:flex; flex-direction:column; background:var(--lgd-surface);
+  border:1px solid var(--lgd-hair); border-radius:var(--lgd-r-widget,12px); overflow:hidden; z-index:2}
+.widget.drag{box-shadow:0 12px 32px rgba(0,0,0,.5); opacity:.97}
+.wtb{display:flex; align-items:center; gap:9px; height:var(--lgd-titlebar-h,34px); padding:0 10px;
+  cursor:grab; flex:none; border-bottom:1px solid var(--lgd-hair); user-select:none}
+.widget.drag .wtb{cursor:grabbing}
+.wtb .linksq{width:9px; height:9px; border-radius:3px; flex:none}
+.wtb h3{margin:0; font-size:var(--lgd-fs-widget-title,13px); font-weight:700}
+.wtb .wsub{font-size:var(--lgd-fs-label,11px); color:var(--lgd-dim)}
+.wtb .wsp{flex:1}
+.wtb .wic{width:24px; height:24px; display:flex; align-items:center; justify-content:center;
+  color:var(--lgd-dim); cursor:pointer; border-radius:6px; font-size:15px}
+.wtb .wic:hover{background:var(--lgd-surface2); color:var(--lgd-ink)}
+.wbody{flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column}
+.rz{position:absolute; z-index:3}
+.rz.r{right:-3px; top:12px; bottom:20px; width:8px; cursor:ew-resize}
+.rz.b{bottom:-3px; left:12px; right:20px; height:8px; cursor:ns-resize}
+.rz.c{right:-3px; bottom:-3px; width:16px; height:16px; cursor:nwse-resize}
+.rz.r:hover,.rz.b:hover,.rz.c:hover{background:rgba(255,255,255,.06)}
+.algn{position:absolute; z-index:45; background:var(--lgd-up); pointer-events:none}
+
+/* ── 기초공사 프레임(빈 위젯) ── */
+.found{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+  color:var(--lgd-dim); text-align:center; padding:18px}
+.found .big{font-size:15px; font-weight:800; color:var(--lgd-ink); opacity:.6}
+.found .tag{background:var(--lgd-pill); border-radius:999px; padding:4px 12px; font-size:10.5px;
+  font-weight:700; letter-spacing:.4px; color:var(--lgd-dim)}
+
+/* ── 언어 (설정 위젯) ── */
+.stg{flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column}
+.stg .sect2{padding:10px 14px 5px; font-size:10.5px; font-weight:800; letter-spacing:.6px;
+  color:var(--lgd-dim); text-transform:uppercase}
+.stg .rowbtns{display:flex; gap:8px; padding:2px 14px 6px}
+.stg .rowbtns button{flex:1; background:var(--lgd-pill); border:1px solid transparent; color:var(--lgd-ink);
+  font-size:11.5px; font-weight:700; border-radius:7px; height:30px; cursor:pointer; font-family:inherit}
+.stg .rowbtns button.on{background:rgba(0,200,5,.10); border-color:var(--lgd-up)}
+.stg .langs{display:flex; gap:6px; padding:2px 14px 10px; flex-wrap:wrap}
+.stg .langs button{background:var(--lgd-pill); border:1px solid transparent; color:var(--lgd-ink);
+  font-size:11.5px; font-weight:700; border-radius:7px; padding:6px 11px; cursor:pointer; font-family:inherit}
+.stg .langs button.on{background:rgba(0,200,5,.10); border-color:var(--lgd-up); color:var(--lgd-up)}
+.stg .kv2{display:flex; padding:6px 14px; font-size:11.5px}
+.stg .kv2 .l{color:var(--lgd-dim)} .stg .kv2 .v{margin-left:auto; font-weight:600}
+
+/* ── 라이트 테마 (legend-ui.css 무변경, 토큰 오버라이드) ── */
+body.light{ --lgd-bg:#F4F5F7; --lgd-surface:#FFFFFF; --lgd-surface2:#F0F2F5;
+  --lgd-pill:#EEF0F3; --lgd-pill-hi:#E4E7EB; --lgd-hair:rgba(15,23,40,.10);
+  --lgd-ink:#0E1726; --lgd-dim:#6B7480; }
+body.light .hdr{background:#fff; border-bottom:1px solid var(--lgd-hair)}
+body.light .dots{background-image:radial-gradient(circle, rgba(15,23,40,.16) 1.2px, transparent 1.6px)}
+body.light .widget.drag{box-shadow:0 12px 32px rgba(15,23,40,.22)}
+body.light .avatar{background:#D7DBE2; color:#4a5364}
+body.light #tabMenu, body.light #addMenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
+</style>
+</head>
+<body class="lgd">
+
+<div class="hdr">
+  <div class="mark" title="Alpexa FX">A</div>
+  <div class="htab swtab" id="goSports" title="Switch to the Sports dashboard">
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor"><rect x="0.5" y="0.5" width="6" height="14" rx="1.6"/><rect x="8.5" y="0.5" width="6" height="6" rx="1.6"/><rect x="8.5" y="8.5" width="6" height="6" rx="1.6"/></svg>
+    Alpexa Sports
+  </div>
+  <div class="htab swtab" id="goCrypto" title="Switch to the Crypto dashboard">
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor"><rect x="0.5" y="0.5" width="6" height="14" rx="1.6"/><rect x="8.5" y="0.5" width="6" height="6" rx="1.6"/><rect x="8.5" y="8.5" width="6" height="6" rx="1.6"/></svg>
+    Alpexa Crypto
+  </div>
+  <div class="htab" id="fxTab" title="Alpexa FX" style="cursor:default">
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor"><rect x="0.5" y="0.5" width="6" height="14" rx="1.6"/><rect x="8.5" y="0.5" width="6" height="6" rx="1.6"/><rect x="8.5" y="8.5" width="6" height="6" rx="1.6"/></svg>
+    Alpexa FX
+  </div>
+  <div style="position:relative">
+    <div class="addtab" id="btnTabs" title="Add server tab">+</div>
+    <div id="tabMenu"></div>
+  </div>
+  <div class="hsp"></div>
+  <div class="hmid"><span data-i18n="FX terminal · DEV">FX terminal · DEV</span><span class="dot" id="feedDot"></span></div>
+  <div class="hsp"></div>
+  <div style="position:relative">
+    <button class="hbtn" id="btnAdd" data-i18n="Add widget">Add widget</button>
+    <div id="addMenu"></div>
+  </div>
+  <button class="hbtn" id="btnReset" title="Reset layout" data-i18n="Reset layout">Reset layout</button>
+  <div class="hic" id="btnTheme" title="Light / Dark" role="button" style="cursor:pointer">
+    <svg id="thMoon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+    <svg id="thSun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+  </div>
+  <div class="hic" id="btnFull" title="Full screen" role="button" style="cursor:pointer">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+  </div>
+  <div class="avatar signin" title="Sign in">→</div>
+</div>
+
+<div class="stage" id="stage"><div class="dots"></div></div>
+
+<script>
+/* ════ 멀티랭귀지 (크립토/스포츠와 alpexa.dash.lang 공유) — M1은 셸 문구만 ════ */
+const LANG={ cur:(localStorage.getItem('alpexa.dash.lang')||'en') };
+const LANGS=[['en','EN'],['zh','中文'],['ja','日本語'],['ko','한국어'],['fr','Français']];
+const I18N={
+ zh:{ 'Chart':'图表','Market Watch':'市场报价','Order':'下单','Positions':'持仓','Account':'账户','Navigator':'导航器','Toolbox':'工具箱','Pending orders':'挂单','Money moves':'资金操作','Depth':'深度','Settings':'设置','Add widget':'添加组件','Reset layout':'重置布局','Display':'显示','Language':'语言','Dark':'深色','Light':'浅色','FX terminal · DEV':'FX 终端 · DEV','Foundation':'基础施工','Coming in build':'施工中' },
+ ja:{ 'Chart':'チャート','Market Watch':'気配値','Order':'注文','Positions':'ポジション','Account':'口座','Navigator':'ナビゲーター','Toolbox':'ツールボックス','Pending orders':'待機注文','Money moves':'入出金','Depth':'板','Settings':'設定','Add widget':'ウィジェット追加','Reset layout':'レイアウト初期化','Display':'表示','Language':'言語','Dark':'ダーク','Light':'ライト','FX terminal · DEV':'FXターミナル · DEV','Foundation':'基礎工事','Coming in build':'構築中' },
+ ko:{ 'Chart':'차트','Market Watch':'시세','Order':'주문','Positions':'포지션','Account':'계좌','Navigator':'내비게이터','Toolbox':'툴박스','Pending orders':'지정가 주문','Money moves':'자금 이동','Depth':'호가','Settings':'설정','Add widget':'위젯 추가','Reset layout':'레이아웃 초기화','Display':'디스플레이','Language':'언어','Dark':'다크','Light':'라이트','FX terminal · DEV':'FX 터미널 · DEV','Foundation':'기초공사','Coming in build':'구축 중' },
+ fr:{ 'Chart':'Graphique','Market Watch':'Cotes','Order':'Ordre','Positions':'Positions','Account':'Compte','Navigator':'Navigateur','Toolbox':'Boîte à outils','Pending orders':'Ordres en attente','Money moves':'Mouvements','Depth':'Carnet','Settings':'Paramètres','Add widget':'Ajouter un widget','Reset layout':'Réinitialiser','Display':'Affichage','Language':'Langue','Dark':'Sombre','Light':'Clair','FX terminal · DEV':'Terminal FX · DEV','Foundation':'Fondations','Coming in build':'En construction' }
+};
+function t(str){ const d=I18N[LANG.cur]; return (d&&d[str])||str; }
+function applyLang(){ document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent=t(el.getAttribute('data-i18n')); });
+  document.querySelectorAll('#sgLangs [data-lang]').forEach(b=>b.classList.toggle('on',b.dataset.lang===LANG.cur)); }
+function setLang(code){ LANG.cur=code; try{ localStorage.setItem('alpexa.dash.lang',code); }catch(e){} applyLang(); }
+
+/* ════ 위젯 엔진 (크립토/스포츠 대시보드 검증 엔진 이식) ════ */
+const stage=document.getElementById('stage');
+const GAP=8, GRID=38, FINE=8, SNAP=6;
+const LKEY='alpexa.fxdash.layout.v1';
+/* 4열 레이아웃 (Navigator | Chart+MarketWatch | Positions | Order+Account) — 1900×856 기준 */
+const DEFAULT_LAYOUT={
+  navigator:{x:8,y:8,w:230,h:840},
+  chart:{x:246,y:8,w:820,h:520},   marketwatch:{x:246,y:536,w:820,h:312},
+  positions:{x:1074,y:8,w:470,h:520}, account:{x:1074,y:536,w:470,h:312},
+  order:{x:1552,y:8,w:340,h:400},   toolbox:{x:1552,y:408,w:340,h:440},
+  pending:{x:900,y:120,w:360,h:280,hidden:true}, depth:{x:940,y:160,w:320,h:300,hidden:true},
+  money:{x:980,y:200,w:340,h:320,hidden:true},   settings:{x:760,y:120,w:380,h:520,hidden:true},
+  __ref:{w:1900,h:856} };
+const MIN_SIZE={ navigator:{w:180,h:260}, chart:{w:420,h:300}, marketwatch:{w:340,h:220},
+  positions:{w:360,h:260}, account:{w:300,h:220}, order:{w:300,h:300}, toolbox:{w:300,h:240},
+  pending:{w:280,h:200}, depth:{w:260,h:220}, money:{w:300,h:220}, settings:{w:320,h:320} };
+const WIDGET_TITLES={ navigator:'Navigator', chart:'Chart', marketwatch:'Market Watch', positions:'Positions',
+  account:'Account', order:'Order', toolbox:'Toolbox', pending:'Pending orders', depth:'Depth',
+  money:'Money moves', settings:'Settings' };
+const deepLayout=o=>JSON.parse(JSON.stringify(o));
+function loadLayout(){ try{ const raw=localStorage.getItem(LKEY); if(!raw) return deepLayout(DEFAULT_LAYOUT);
+  const p=JSON.parse(raw); Object.keys(DEFAULT_LAYOUT).forEach(k=>{ if(!p[k]) p[k]=deepLayout(DEFAULT_LAYOUT[k]); }); return p;
+}catch(e){ return deepLayout(DEFAULT_LAYOUT); } }
+let layout=loadLayout();
+Object.keys(layout).forEach(id=>{ const m=MIN_SIZE[id]; if(!m) return;
+  if(layout[id].w<m.w) layout[id].w=m.w; if(layout[id].h<m.h) layout[id].h=m.h; });
+function saveLayout(){ try{ localStorage.setItem(LKEY, JSON.stringify(layout)); }catch(e){} }
+document.getElementById('btnReset').onclick=()=>{ try{ localStorage.removeItem(LKEY); }catch(e){}
+  layout=deepLayout(DEFAULT_LAYOUT); Object.keys(layout).forEach(k=>{ if(k!=='__ref') applyGeo(k); });
+  renderAddMenu(); refitLayout(); };
+
+const HDR_H=49;
+function refitLayout(){
+  const vw=window.innerWidth, vh=window.innerHeight-HDR_H;
+  if(vw<500||vh<300) return;
+  const ref=layout.__ref||{w:1900,h:856};
+  if(Math.abs(ref.w-vw)<2&&Math.abs(ref.h-vh)<2){ layout.__ref={w:vw,h:vh}; return; }
+  const sx=(vw-2*GAP)/(ref.w-2*GAP), sy=(vh-2*GAP)/(ref.h-2*GAP);
+  const mapX=v=>GAP+(v-GAP)*sx, mapY=v=>GAP+(v-GAP)*sy;
+  Object.keys(layout).forEach(id=>{ if(id==='__ref') return; const g=layout[id];
+    const r=mapX(g.x+g.w), b=mapY(g.y+g.h);
+    g.x=mapX(g.x); g.y=mapY(g.y); g.w=r-g.x; g.h=b-g.y;
+    if(g.w<120)g.w=120; if(g.h<120)g.h=120; applyGeo(id); });
+  layout.__ref={w:vw,h:vh}; saveLayout();
+}
+let _refitT=null;
+window.addEventListener('resize', ()=>{ clearTimeout(_refitT); _refitT=setTimeout(refitLayout,150); });
+
+function applyGeo(id){ const el=document.getElementById('w-'+id); if(!el) return; const g=layout[id];
+  el.style.display=g.hidden?'none':'flex';
+  el.style.left=g.x+'px'; el.style.top=g.y+'px'; el.style.width=g.w+'px'; el.style.height=g.h+'px'; }
+function setHidden(id, hidden){ layout[id].hidden=hidden; applyGeo(id); saveLayout(); renderAddMenu(); }
+function renderAddMenu(){ const m=document.getElementById('addMenu'); if(!m) return;
+  m.innerHTML=Object.keys(WIDGET_TITLES).map(id=>{ const off=!!layout[id].hidden;
+    return '<div class="addrow" data-id="'+id+'"'+(off?'':' style="color:var(--lgd-dim)"')+'>'+
+      '<span style="width:14px; text-align:center">'+(off?'+':'✓')+'</span>'+
+      '<span data-i18n="'+WIDGET_TITLES[id]+'">'+t(WIDGET_TITLES[id])+'</span></div>'; }).join(''); }
+
+/* z-order */
+const zOrder=[];
+function bringToFront(id){ const i=zOrder.indexOf(id); if(i>=0) zOrder.splice(i,1); zOrder.push(id);
+  zOrder.forEach((wid,k)=>{ const el=document.getElementById('w-'+wid); if(el) el.style.zIndex=2+k; }); }
+
+/* 자석 스냅 가이드 */
+let guides=[];
+function clearGuides(){ guides.forEach(g=>g.remove()); guides=[]; }
+function addGuide(x,y,w,h){ const d=document.createElement('div'); d.className='algn';
+  d.style.left=x+'px'; d.style.top=y+'px'; d.style.width=w+'px'; d.style.height=h+'px'; stage.appendChild(d); guides.push(d); }
+function othersOf(id){ return Object.keys(layout).filter(k=>k!=='__ref'&&k!==id&&!layout[k].hidden).map(k=>layout[k]); }
+function snapAxis(v, cands){ let best=v, bd=SNAP+1;
+  cands.forEach(c=>{ const d=Math.abs(v-c); if(d<bd){ bd=d; best=c; } }); return {v:best, snapped:bd<=SNAP}; }
+
+function makeWidget(id, title, linkColor, bodyHTML){
+  const el=document.createElement('div'); el.className='widget'; el.id='w-'+id;
+  zOrder.push(id);
+  el.addEventListener('pointerdown', ()=>bringToFront(id), true);
+  el.innerHTML='<div class="wtb"><span class="linksq" style="background:'+linkColor+'"></span>'+
+    '<h3 data-i18n="'+title+'">'+t(title)+'</h3><span class="wsp"></span>'+
+    '<span class="wic" title="Close widget">⋮</span></div>'+
+    '<div class="wbody">'+bodyHTML+'</div>'+
+    '<div class="rz r"></div><div class="rz b"></div><div class="rz c"></div>';
+  stage.appendChild(el); applyGeo(id);
+  el.querySelector('.wic').addEventListener('click', ()=>setHidden(id,true));
+  /* 드래그 (타이틀바) */
+  const tb=el.querySelector('.wtb');
+  tb.addEventListener('pointerdown', e=>{
+    if(e.target.closest('.wic')) return;
+    e.preventDefault(); bringToFront(id); tb.setPointerCapture(e.pointerId);
+    const g=layout[id]; const sx=e.clientX-g.x, sy=e.clientY-(g.y);
+    el.classList.add('drag');
+    const move=ev=>{
+      let nx=ev.clientX-sx, ny=ev.clientY-sy;
+      const others=othersOf(id);
+      const xc=[GAP], yc=[GAP];
+      others.forEach(o=>{ xc.push(o.x, o.x+o.w, o.x+o.w+GAP, o.x-GAP-g.w); yc.push(o.y, o.y+o.h, o.y+o.h+GAP, o.y-GAP-g.h); });
+      const rx=snapAxis(nx,xc), ry=snapAxis(ny,yc);
+      clearGuides();
+      if(rx.snapped){ nx=rx.v; addGuide(nx,0,1,window.innerHeight); } else nx=Math.round(nx/FINE)*FINE;
+      if(ry.snapped){ ny=ry.v; addGuide(0,ny+HDR_H,window.innerWidth,1); } else ny=Math.round(ny/FINE)*FINE;
+      nx=Math.max(0,nx); ny=Math.max(0,ny);
+      g.x=nx; g.y=ny; el.style.left=nx+'px'; el.style.top=ny+'px';
+    };
+    const up=ev=>{ tb.releasePointerCapture(e.pointerId); tb.removeEventListener('pointermove',move);
+      tb.removeEventListener('pointerup',up); el.classList.remove('drag'); clearGuides(); saveLayout(); };
+    tb.addEventListener('pointermove',move); tb.addEventListener('pointerup',up);
+  });
+  /* 리사이즈 (우/하/코너) */
+  function rz(sel, dir){ const h=el.querySelector(sel);
+    h.addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopPropagation(); bringToFront(id);
+      h.setPointerCapture(e.pointerId); const g=layout[id]; const sx=e.clientX, sy=e.clientY, sw=g.w, sh=g.h;
+      const m=MIN_SIZE[id]||{w:180,h:140};
+      const move=ev=>{ if(dir.includes('e')) g.w=Math.max(m.w, sw+(ev.clientX-sx));
+        if(dir.includes('s')) g.h=Math.max(m.h, sh+(ev.clientY-sy));
+        el.style.width=g.w+'px'; el.style.height=g.h+'px'; };
+      const up=ev=>{ h.releasePointerCapture(e.pointerId); h.removeEventListener('pointermove',move);
+        h.removeEventListener('pointerup',up); saveLayout(); };
+      h.addEventListener('pointermove',move); h.addEventListener('pointerup',up); }); }
+  rz('.rz.r','e'); rz('.rz.b','s'); rz('.rz.c','es');
+  return el;
+}
+
+/* ── 기초공사 프레임 헬퍼 ── */
+function frame(){ return '<div class="found"><span class="big" data-i18n="Foundation">Foundation</span>'+
+  '<span class="tag" data-i18n="Coming in build">Coming in build</span></div>'; }
+
+/* ── 위젯 생성 (M1: 전부 기초 프레임, 설정만 언어/테마 실동작) ── */
+makeWidget('navigator','Navigator','var(--lgd-link1,#4C8DFF)', frame());
+makeWidget('chart','Chart','var(--lgd-up)', frame());
+makeWidget('marketwatch','Market Watch','var(--lgd-link2,#00C805)', frame());
+makeWidget('positions','Positions','var(--lgd-link3,#B37FEB)', frame());
+makeWidget('account','Account','var(--lgd-link1,#4C8DFF)', frame());
+makeWidget('order','Order','var(--lgd-up)', frame());
+makeWidget('toolbox','Toolbox','var(--lgd-dim)', frame());
+makeWidget('pending','Pending orders','var(--lgd-down,#EB5D2A)', frame());
+makeWidget('depth','Depth','var(--lgd-dim)', frame());
+makeWidget('money','Money moves','var(--lgd-link3,#B37FEB)', frame());
+makeWidget('settings','Settings','var(--lgd-link2,#00C805)',
+  '<div class="stg">'+
+  '<div class="sect2" data-i18n="Display">Display</div>'+
+  '<div class="rowbtns"><button id="sgDark" data-i18n="Dark">Dark</button><button id="sgLight" data-i18n="Light">Light</button></div>'+
+  '<div class="sect2" data-i18n="Language">Language</div>'+
+  '<div class="langs" id="sgLangs">'+LANGS.map(l=>'<button data-lang="'+l[0]+'">'+l[1]+'</button>').join('')+'</div>'+
+  '<div class="sect2">Build</div>'+
+  '<div class="kv2"><span class="l">Milestone</span><span class="v">M1 · Shell foundation</span></div>'+
+  '<div class="kv2"><span class="l">Money code</span><span class="v">0 (read-only shell)</span></div>'+
+  '</div>');
+
+renderAddMenu();
+refitLayout();
+Object.keys(layout).forEach(k=>{ if(k!=='__ref') applyGeo(k); });
+
+/* ── 헤더 동작 ── */
+document.getElementById('btnAdd').onclick=e=>{ e.stopPropagation();
+  const m=document.getElementById('addMenu'); m.style.display=m.style.display==='block'?'none':'block'; };
+document.getElementById('addMenu').addEventListener('click', e=>{ const r=e.target.closest('.addrow'); if(!r) return;
+  setHidden(r.dataset.id, !layout[r.dataset.id].hidden);
+  document.getElementById('addMenu').style.display='none'; });
+document.getElementById('btnTabs').onclick=e=>{ e.stopPropagation();
+  const m=document.getElementById('tabMenu');
+  if(m.style.display==='block'){ m.style.display='none'; return; }
+  m.innerHTML='<div class="tabrow dis">Alpexa FX<span class="sub">this terminal</span></div>'+
+    '<div class="tabrow dis">Alpexa Sports<span class="sub">tab</span></div>'+
+    '<div class="tabrow dis">Alpexa Crypto<span class="sub">tab</span></div>';
+  m.style.display='block'; };
+document.addEventListener('click', ()=>{ document.getElementById('addMenu').style.display='none';
+  document.getElementById('tabMenu').style.display='none'; });
+document.getElementById('goSports').onclick=()=>{ location.href='/sports-dashboard.html'; };
+document.getElementById('goCrypto').onclick=()=>{ location.href='/dev/crypto-dashboard.html'; };
+
+/* 풀스크린 (버튼만) */
+document.getElementById('btnFull').onclick=()=>{ try{ if(!document.fullscreenElement)
+  document.documentElement.requestFullscreen().catch(()=>{}); else document.exitFullscreen(); }catch(e){} };
+
+/* 테마 (FX 전용 키, 기본 다크) */
+const FX_TKEY='alpexa.fxdash.theme';
+function applyThemeFX(){ const light=localStorage.getItem(FX_TKEY)==='light';
+  document.body.classList.toggle('light', light);
+  const mo=document.getElementById('thMoon'), su=document.getElementById('thSun');
+  if(mo) mo.style.display=light?'none':''; if(su) su.style.display=light?'':'none';
+  const dk=document.getElementById('sgDark'), lt=document.getElementById('sgLight');
+  if(dk) dk.classList.toggle('on',!light); if(lt) lt.classList.toggle('on',light); }
+document.getElementById('btnTheme').onclick=()=>{ localStorage.setItem(FX_TKEY,
+  localStorage.getItem(FX_TKEY)==='light'?'dark':'light'); applyThemeFX(); };
+document.getElementById('sgDark').onclick=()=>{ localStorage.setItem(FX_TKEY,'dark'); applyThemeFX(); };
+document.getElementById('sgLight').onclick=()=>{ localStorage.setItem(FX_TKEY,'light'); applyThemeFX(); };
+document.getElementById('sgLangs').addEventListener('click',e=>{ const b=e.target.closest('[data-lang]'); if(!b) return; setLang(b.dataset.lang); });
+
+applyThemeFX(); applyLang();
+</script>
+</body>
+</html>
