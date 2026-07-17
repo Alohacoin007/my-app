@@ -331,6 +331,31 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .tk .done .t1{font-size:14px; font-weight:800}
 .tk .done .t2{font-size:11.5px; color:var(--lgd-dim)}
 
+/* ══ W6 Swap ══ */
+.sw{flex:1; min-height:0; display:flex; flex-direction:column; overflow:auto; padding:6px 0}
+.sw .card{margin:6px 14px; background:var(--lgd-surface2); border:1px solid var(--lgd-hair);
+  border-radius:10px; padding:10px 12px}
+.sw .lbl2{font-size:10.5px; font-weight:700; letter-spacing:.5px; color:var(--lgd-dim); text-transform:uppercase}
+.sw .row2{display:flex; align-items:center; gap:8px; margin-top:7px}
+.sw select{background:var(--lgd-pill); border:none; color:var(--lgd-ink); border-radius:7px;
+  padding:7px 9px; font-size:12.5px; font-weight:700; font-family:inherit; outline:none}
+.sw input{flex:1; min-width:0; background:none; border:none; outline:none; color:var(--lgd-ink);
+  font-size:16px; font-weight:700; text-align:right; font-family:inherit; font-variant-numeric:tabular-nums}
+.sw .sub2{font-size:10.5px; color:var(--lgd-dim); margin-top:5px; display:flex}
+.sw .sub2 .mx{margin-left:auto; color:var(--lgd-ink); font-weight:700; cursor:pointer}
+.sw .arrow{display:flex; justify-content:center; margin:-2px 0; color:var(--lgd-dim); font-size:14px}
+.sw .meta{padding:4px 16px; font-size:11px; color:var(--lgd-dim); display:flex}
+.sw .meta .v{margin-left:auto; color:var(--lgd-ink); font-weight:600}
+.sw .warn{margin:4px 16px; font-size:11.5px; color:#FF9500; display:none}
+.sw .gobtn{margin:8px 14px 12px; background:var(--lgd-up); color:#04250B; border:none; border-radius:8px;
+  height:36px; font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit}
+.sw .gobtn:disabled{background:var(--lgd-pill); color:var(--lgd-dim); cursor:not-allowed}
+.sw .done2{display:none; flex-direction:column; align-items:center; gap:6px; padding:14px; text-align:center}
+.sw .done2 .ic{width:36px; height:36px; border-radius:50%; background:var(--lgd-up); color:#04250B;
+  display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:900}
+.sw .done2 .t1{font-size:13px; font-weight:800}
+.sw .done2 .t2{font-size:11px; color:var(--lgd-dim)}
+
 /* ══ 라이트 테마 — legend-ui.css 무변경, 이 파일 안에서 --lgd-* 토큰만 오버라이드.
    업/다운/링크 색은 의미색이라 유지. 크립토 앱의 라이트 기본과 조화(화이트 서피스). ══ */
 body.light{
@@ -657,7 +682,23 @@ makeWidget('trade','Trade','','var(--lgd-link2)',
   '<div class="tkbtns" style="width:100%"><button class="cancel" id="tkDoneX">Done</button></div></div>'+
   '</div></div>');
 makeWidget('money','Money moves','','var(--lgd-link3)', frame('Send · Transfer · Fund · Withdraw','2FA/OTP 관문 시트'));
-makeWidget('swap','Swap','','var(--lgd-link2)', frame('Swap','swap_crypto RPC'));
+makeWidget('swap','Swap','','var(--lgd-link2)',
+  '<div class="sw tnum">'+
+  '<div class="card"><div class="lbl2">From</div><div class="row2">'+
+  '<select id="swFrom"></select><input id="swAmt" inputmode="decimal" placeholder="0.00" value="100"/></div>'+
+  '<div class="sub2"><span>USD notional</span><span class="mx" id="swMax">Max</span></div></div>'+
+  '<div class="arrow">↓</div>'+
+  '<div class="card"><div class="lbl2">To</div><div class="row2">'+
+  '<select id="swTo"></select><span style="flex:1"></span>'+
+  '<span id="swRecv" style="font-size:16px;font-weight:700">—</span></div>'+
+  '<div class="sub2"><span id="swRate"></span></div></div>'+
+  '<div class="meta"><span>Est fee included (<span id="swFeeP">0.00</span>%)</span><span class="v" id="swFeeV">$0.00</span></div>'+
+  '<div class="meta"><span>Available</span><span class="v" id="swAvail">···</span></div>'+
+  '<div class="warn" id="swWarn"></div>'+
+  '<button class="gobtn" id="swGo">Swap</button>'+
+  '<div class="done2" id="swDone"><span class="ic">✓</span><span class="t1" id="swDoneT"></span>'+
+  '<span class="t2" id="swDoneS"></span></div>'+
+  '</div>');
 makeWidget('orders','Open orders','','var(--lgd-link3)', frame('Pending (manual)','표시·취소 전용 — 체결기 없음(정직 표기)'));
 
 renderAddMenu();
@@ -1401,6 +1442,81 @@ document.getElementById('tkGo').onclick=async()=>{
   }
 };
 trW52(); trRender();
+
+/* ════════════════════ W6 Swap — swap_crypto RPC 단일 경로 (M2) ════════════════════
+   계약 = 앱 :14201 락스텝: p_ref 'sw-<ts>-<rand6>' 멱등 · p_usd = FROM의 USD 노셔널 ·
+   p_markup = __alpexaCryptoMarks[from] 0~50 클램프. 서버가 양쪽 가격 120s 신선도·보유 재검증. */
+const sw={ busy:false, sess:null, have:{} };
+const SW_ASSETS=['USDT','BTC','ETH','SOL','AVAX','DOGE','XRP','LINK','BNB','ADA','PEPE','SHIB'];
+function swPrice(s){ if(s==='USDT') return 1; const q=mk.q[s]; return q&&(q.last!=null)?q.last:(pf.mid[s]||null); }
+function swInit(){
+  const f=document.getElementById('swFrom'), t=document.getElementById('swTo');
+  f.innerHTML=SW_ASSETS.map(s=>'<option'+(s==='USDT'?' selected':'')+'>'+s+'</option>').join('');
+  t.innerHTML=SW_ASSETS.map(s=>'<option'+(s==='BTC'?' selected':'')+'>'+s+'</option>').join('');
+}
+async function swSession(){
+  sw.sess=await walSession(); sw.have={};
+  if(sw.sess){ try{
+    const r=await AlpexaSync.db.from('crypto_holdings').select('asset,qty').eq('acct_no',sw.sess.acct);
+    (r.data||[]).forEach(x=>{ sw.have[x.asset]=+x.qty||0; });
+  }catch(e){} }
+  swCalc();
+}
+function swVals(){
+  const from=document.getElementById('swFrom').value, to=document.getElementById('swTo').value;
+  const usd=parseFloat(document.getElementById('swAmt').value)||0;
+  const mkP=Math.max(0,Math.min(50,(window.__alpexaCryptoMarks&&+window.__alpexaCryptoMarks[from])||0));
+  const fee=usd*(mkP/100), net=usd-fee;
+  const fp=swPrice(from), tp=swPrice(to);
+  return {from,to,usd,mkP,fee,net,fp,tp, toQty:tp?net/tp:0,
+    haveUsd:fp?(sw.have[from]||0)*fp:0};
+}
+function swCalc(){
+  const v=swVals();
+  document.getElementById('swRecv').textContent=v.tp&&v.usd?('≈ '+v.toQty.toLocaleString('en-US',{maximumFractionDigits:8})+' '+v.to):'—';
+  document.getElementById('swRate').textContent=(v.fp&&v.tp)?('1 '+v.from+' ≈ '+(v.fp/v.tp).toLocaleString('en-US',{maximumFractionDigits:8})+' '+v.to):'';
+  document.getElementById('swFeeP').textContent=v.mkP.toFixed(2);
+  document.getElementById('swFeeV').textContent=fmtUsdSm(v.fee);
+  document.getElementById('swAvail').textContent=!sw.sess?'···':
+    ((sw.have[v.from]||0).toLocaleString('en-US',{maximumFractionDigits:8})+' '+v.from+' ('+fmtUsdSm(v.haveUsd)+')');
+  const warn=document.getElementById('swWarn'); let w='';
+  if(!sw.sess) w='Sign in to swap — orders execute on the server.';
+  else if(v.from===v.to) w='Pick two different assets.';
+  else if(!v.fp||!v.tp) w='No live price — not swappable here.';
+  else if(v.usd>v.haveUsd+1e-9) w='Not enough '+v.from+' for this swap.';
+  warn.textContent=w; warn.style.display=w?'block':'none';
+  document.getElementById('swGo').disabled=!!w||!v.usd||sw.busy;
+}
+document.getElementById('swFrom').addEventListener('change',swCalc);
+document.getElementById('swTo').addEventListener('change',swCalc);
+document.getElementById('swAmt').addEventListener('input',swCalc);
+document.getElementById('swMax').onclick=()=>{ const v=swVals();
+  if(sw.sess&&v.fp) document.getElementById('swAmt').value=(+v.haveUsd.toFixed(2)); swCalc(); };
+document.getElementById('swGo').onclick=async()=>{
+  if(sw.busy) return;
+  const v=swVals(); if(!v.usd||!sw.sess) return;
+  sw.busy=true; swCalc();
+  let res;
+  try{ const r=await AlpexaSync.db.rpc('swap_crypto',{
+      p_ref:'sw-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),
+      p_acct:sw.sess.acct, p_from:v.from, p_to:v.to, p_usd:+v.usd.toFixed(2), p_markup:v.mkP });
+    res=r&&r.data; }catch(e){ res=null; }
+  sw.busy=false;
+  if(res&&res.ok===true){
+    const dn=document.getElementById('swDone'); dn.style.display='flex';
+    document.getElementById('swDoneT').textContent='Swapped '+fmtUsdSm(v.usd)+' '+v.from+' → '+v.to;
+    document.getElementById('swDoneS').textContent=(+res.toQty||v.toQty).toLocaleString('en-US',{maximumFractionDigits:8})+' '+v.to+
+      (+res.fee?' · fee '+fmtUsdSm(+res.fee):'')+' · server-verified';
+    setTimeout(()=>{ dn.style.display='none'; },6000);
+    swSession(); loadPortfolio(); loadWallet(); loadActivity();
+  } else {
+    const warn=document.getElementById('swWarn');
+    warn.textContent=(res&&res.error)||'Swap failed — try again.'; warn.style.display='block';
+    swCalc();
+  }
+};
+swInit(); swSession();
+setInterval(()=>{ if(!document.hidden&&!layout.swap.hidden) swCalc(); },2500);
 </script>
 </body>
 </html>
