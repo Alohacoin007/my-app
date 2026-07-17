@@ -3393,7 +3393,7 @@ function App(){
   // height). One window fills the whole workspace so the wave amplitude runs full-height like MT5.
   // DEFAULT LOGIN LAYOUT (2026-07-13, MT5-style): boot the full 2×2 — one M1 candle chart per GRID
   // symbol, tiled edge-to-edge by floatGeo. (The earlier single-maximized boot was retired on request.)
-  const initCharts=React.useRef(GRID.map((sym,i)=>({ id:i+1, symbol:sym, tf:'M1', type:'candle', inds:(cfg.indicators||[]).slice() }))).current;   // indicators are PER-CHART
+  const initCharts=React.useRef(GRID.map((sym,i)=>({ id:i+1, symbol:sym, tf:'M30', type:'candle', inds:(cfg.indicators||[]).slice() }))).current;   // indicators are PER-CHART
   const [charts,setCharts]=React.useState(initCharts);   // dynamic chart windows [{id,symbol,tf,type}]
   const [activeId,setActiveId]=React.useState(initCharts[0]?initCharts[0].id:null);
   const geos=React.useRef({});   // id → last {x,y,w,h} so a re-mounted window restores where you left it
@@ -3426,7 +3426,7 @@ function App(){
   const actRef=React.useRef(null); actRef.current = activeChart ? activeChart.id : null;
   // ── chart window life-cycle ──
   const addChart=React.useCallback((symbol)=>{ const id=++idRef.current;
-    setCharts(cs=>cs.concat([{ id, symbol:symbol||WATCH[0], tf:'M1', type:'candle' }])); setActiveId(id);
+    setCharts(cs=>cs.concat([{ id, symbol:symbol||WATCH[0], tf:'M30', type:'candle' }])); setActiveId(id);
     if(IS_MOBILE) setRevealed(s=> new Set(s).add(id)); }, []);   // a freshly-opened chart is revealed
   const closeChart=React.useCallback((id)=>{ setCharts(cs=>cs.filter(c=>c.id!==id));   // unmount → ChartCell cleanup unsubscribes + chart.remove (no leak)
     delete geos.current[id]; setActiveId(a=> a===id ? null : a); }, []);

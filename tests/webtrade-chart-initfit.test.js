@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// REGRESSION (webtrade) — the default M1 chart must show its candles on load. A floating window can
+// REGRESSION (webtrade) — the default M30 chart must show its candles on load. A floating window can
 // be 0-wide for a few frames after refresh, so the first setData landed off-view and the chart
 // looked EMPTY until you switched timeframe ("5분짜리 클릭해야 뜨는데"). A ResizeObserver fits the
 // chart the moment the box gets a real width; once fitted, later resizes keep the zoom.
@@ -10,7 +10,7 @@ const src = fs.readFileSync(path.join(__dirname, '..', 'webtrade.html'), 'utf8')
 let fail = 0;
 const bad = (m) => { console.error('🔴 ' + m); fail++; };
 
-// default boot layout is owned by webtrade-chart-boot.test.js (2026-07-13: full 2×2 GRID at M1).
+// default boot layout is owned by webtrade-chart-boot.test.js (2026-07-13: full 2×2 GRID at M30).
 // Here we only pin the geometry rule: a lone chart goes full-stage, multi-chart tiles via floatGeo.
 if (!/initial=\{charts\.length===1\?\{fx:0,fy:0,fw:1,fh:1\}:floatGeo\(i\)\}/.test(src)) bad('a lone chart must open full-stage (fw:1,fh:1); multi-chart tiles via floatGeo');
 
@@ -29,4 +29,4 @@ if (!/doFit\(\); requestAnimationFrame\(doFit\); setTimeout\(doFit,120\)/.test(s
 if (!/boxRO&&boxRO\.disconnect\(\)/.test(src)) bad('the ResizeObserver must be disconnected on cleanup');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} chart-init-fit problem(s).`); process.exit(1); }
-console.log('🟢 PASS: default M1 chart snaps to the MT5 slim view (barSpacing 5 + rightOffset 15, scroll-to-realtime) the moment its (initially 0-wide) window gets a real size — candles show on load, no need to switch timeframe.');
+console.log('🟢 PASS: default M30 chart snaps to the MT5 slim view (barSpacing 5 + rightOffset 15, scroll-to-realtime) the moment its (initially 0-wide) window gets a real size — candles show on load, no need to switch timeframe.');
