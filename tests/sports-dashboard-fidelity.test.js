@@ -205,7 +205,11 @@ if (/live_games/.test(src)) {
   const noCmt = src
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/(^|[^:'"])\/\/[^\n]*/gm, '$1');
+    .replace(/(^|[^:'"])\/\/[^\n]*/gm, '$1')
+    // 2026-07-17 멀티랭귀지: I18N 사전 + LANGS 라벨은 번역의 승인된 저장소 → 제외.
+    // (사전 '밖'의 하드코드 한글은 여전히 잡음 — 검사 의도 유지)
+    .replace(/const I18N=\{[\s\S]*?\n\};/, '')
+    .replace(/const LANGS=\[[\s\S]*?\]\];/, '');
   const kor = noCmt.match(/[가-힣][^\n'"<]{0,30}/g) || [];
   if (kor.length) bad('[영어전용] 사용자 노출 한글 ' + kor.length + '곳 — 예: ' + kor.slice(0, 3).join(' · '));
 }

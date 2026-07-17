@@ -504,12 +504,12 @@ body.light .avatar{background:#D7DBE2; color:#4a5364}
   <div class="hmid"><span>Games today</span><span class="dot" id="feedDot"></span></div>
   <div class="hsp"></div>
   <div style="position:relative">
-    <button class="hbtn" id="btnAdd">Add widget</button>
+    <button class="hbtn" id="btnAdd" data-i18n="Add widget">Add widget</button>
     <div id="addMenu" style="display:none; position:absolute; right:0; top:38px; z-index:50; min-width:180px;
       background:var(--lgd-surface2); border:1px solid var(--lgd-hair); border-radius:var(--lgd-r-pop);
       box-shadow:0 8px 24px rgba(0,0,0,.5); padding:6px; font-size:var(--lgd-fs-body)"></div>
   </div>
-  <button class="hbtn" id="btnReset" title="Reset layout">Reset layout</button>
+  <button class="hbtn" id="btnReset" title="Reset layout" data-i18n="Reset layout">Reset layout</button>
   <div class="hic" id="btnTheme" title="Light / Dark" role="button" aria-label="Toggle theme" style="cursor:pointer">
     <svg id="thMoon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
     <svg id="thSun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
@@ -730,12 +730,26 @@ function bringToFront(id){
   const i=zOrder.indexOf(id); if(i>=0) zOrder.splice(i,1); zOrder.push(id);
   zOrder.forEach((wid,k)=>{ const el=document.getElementById('w-'+wid); if(el) el.style.zIndex=2+k; });
 }
+/* ════ 멀티랭귀지 (2026-07-17 사장님 지시) — UI 뼈대. 크립토 대시보드와 동일 키(alpexa.dash.lang) 공유. ════ */
+const LANG={ cur:(localStorage.getItem('alpexa.dash.lang')||'en') };
+const LANGS=[['en','EN'],['zh','中文'],['ja','日本語'],['ko','한국어'],['fr','Français']];
+const I18N={
+ zh:{ 'Account':'账户','Leagues':'联赛','Schedule':'赛程','Odds board':'赔率板','Live':'直播','My bets':'我的投注','Wallet':'钱包','Bet slip':'投注单','Add widget':'添加组件','Reset layout':'重置布局','Odds format':'赔率格式','Language':'语言','Sign out':'退出登录','Log in':'登录' },
+ ja:{ 'Account':'アカウント','Leagues':'リーグ','Schedule':'スケジュール','Odds board':'オッズボード','Live':'ライブ','My bets':'マイベット','Wallet':'ウォレット','Bet slip':'ベットスリップ','Add widget':'ウィジェット追加','Reset layout':'レイアウト初期化','Odds format':'オッズ形式','Language':'言語','Sign out':'ログアウト','Log in':'ログイン' },
+ ko:{ 'Account':'계정','Leagues':'리그','Schedule':'일정','Odds board':'배당판','Live':'라이브','My bets':'내 베팅','Wallet':'지갑','Bet slip':'베팅 슬립','Add widget':'위젯 추가','Reset layout':'레이아웃 초기화','Odds format':'배당 형식','Language':'언어','Sign out':'로그아웃','Log in':'로그인' },
+ fr:{ 'Account':'Compte','Leagues':'Ligues','Schedule':'Calendrier','Odds board':'Cotes','Live':'En direct','My bets':'Mes paris','Wallet':'Portefeuille','Bet slip':'Coupon','Add widget':'Ajouter un widget','Reset layout':'Réinitialiser','Odds format':'Format des cotes','Language':'Langue','Sign out':'Déconnexion','Log in':'Connexion' }
+};
+function t(str){ const d=I18N[LANG.cur]; return (d&&d[str])||str; }
+function applyLang(){ document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent=t(el.getAttribute('data-i18n')); }); }
+function setLang(code){ LANG.cur=code; try{ localStorage.setItem('alpexa.dash.lang',code); }catch(e){} applyLang();
+  try{ renderAvMenu(); }catch(e){} }
+
 function makeWidget(id, title, sub, linkColor, bodyHTML){
   const el=document.createElement('div'); el.className='widget'; el.id='w-'+id;
   zOrder.push(id);
   el.addEventListener('pointerdown', ()=>bringToFront(id), true);   // 캡처: 드래그·본문 클릭 모두
   el.innerHTML='<div class="wtb"><span class="linksq" style="background:'+linkColor+'"></span>'+
-    '<h3>'+title+'</h3>'+(sub?'<span class="wsub">'+sub+'</span>':'')+
+    '<h3 data-i18n="'+title+'">'+t(title)+'</h3>'+(sub?'<span class="wsub">'+sub+'</span>':'')+
     '<span class="wsp"></span><span class="wic" title="Close widget">⋮</span></div>'+
     '<div class="wbody">'+bodyHTML+'</div>';
   stage.appendChild(el); applyGeo(id);
@@ -1867,14 +1881,15 @@ function doSignOut(){
 }
 function renderAvMenu(){
   const tag=meId(), m=moneyStore.authed?tag:null;   // 태그+세션 둘 다 있어야 로그인 (유령 세션 게이트)
-  avMenu.innerHTML='<div class="mh">ACCOUNT</div>'+(m
+  avMenu.innerHTML='<div class="mh">'+t('Account')+'</div>'+(m
     ? '<div class="mo" style="cursor:default"><span class="ck">●</span><b>'+esc(m.name||'Account')+'</b><span class="sub">'+esc(m.custId||'')+'</span></div>'+
-      '<div class="mo" data-act="signout"><span class="ck"></span><b>Sign out</b></div>'
-    : '<div class="mo" data-act="login"><span class="ck"></span><b>Log in</b><span class="sub">'+
+      '<div class="mo" data-act="signout"><span class="ck"></span><b>'+t('Sign out')+'</b></div>'
+    : '<div class="mo" data-act="login"><span class="ck"></span><b>'+t('Log in')+'</b><span class="sub">'+
       ((tag&&moneyStore.sessAbsent)?'session expired':'real account')+'</span></div>')+
-  '<div class="mh">ODDS FORMAT</div>'+ODDS_OPTS.map(o=>
+  '<div class="mh">'+t('Odds format')+'</div>'+ODDS_OPTS.map(o=>
     '<div class="mo" data-odds="'+o.v+'"><span class="ck">'+(settings.oddsFormat===o.v?'✓':'')+'</span>'+
-    '<b>'+o.lbl+'</b><span class="sub">'+o.sub+'</span></div>').join('');
+    '<b>'+o.lbl+'</b><span class="sub">'+o.sub+'</span></div>').join('')+
+  '<div class="mh">'+t('Language')+'</div>'+LANGS.map(function(l){return '<div class="mo" data-lang="'+l[0]+'"><span class="ck">'+(LANG.cur===l[0]?'✓':'')+'</span><b>'+l[1]+'</b></div>';}).join('');
 }
 document.getElementById('btnAv').onclick=(e)=>{ e.stopPropagation();
   renderAvMenu(); avMenu.style.display=avMenu.style.display==='block'?'none':'block'; };
@@ -1882,7 +1897,8 @@ avMenu.addEventListener('click', e=>{ const o=e.target.closest('.mo'); if(!o) re
   e.stopPropagation();
   if(o.dataset.act==='login'){ goLogin(); return; }
   if(o.dataset.act==='signout'){ doSignOut(); return; }
-  if(o.dataset.odds){ setOddsFormat(o.dataset.odds); renderAvMenu(); } });
+  if(o.dataset.odds){ setOddsFormat(o.dataset.odds); renderAvMenu(); return; }
+  if(o.dataset.lang){ setLang(o.dataset.lang); return; } });
 // 아바타 로그인 상태 점 (초록 = 세션 있음)
 moneyStore.sub(ms=>{ const d=document.getElementById('avDot'); if(d) d.style.display=ms.authed?'block':'none'; });
 document.addEventListener('click', ()=>{ avMenu.style.display='none'; });
@@ -1974,7 +1990,7 @@ document.querySelectorAll('.widget .wic[title="Close widget"]').forEach(ic=>{
 /* ════════════════════ 부팅 ════════════════════ */
 gamesStore.sub(games=>{ renderLeagues(games); renderBoard(games); renderSchedule(games); renderLive(games); });
 refitLayout();   // 첫 페인트부터 현재 뷰포트를 수학적으로 채움 (저장 배치는 비율 보존)
-gamesStore.start();
+applyLang(); gamesStore.start();
 moneyStore.start();
 </script>
 </body>
