@@ -737,8 +737,29 @@ makeWidget('money','Money moves','','var(--lgd-link3)',
   '<button class="gobtn" id="xfGo">Transfer</button>'+
   '<div class="done3" id="xfDone"><span class="ic">✓</span><span class="t1" id="xfDoneT"></span><span class="t2" id="xfDoneS"></span></div>'+
   '</div>'+
-  '<div class="pane" data-pane="fund"><div class="soon2">Deposit (card / wire) — next build step.</div></div>'+
-  '<div class="pane" data-pane="withdraw"><div class="soon2">External withdraw with 2FA tiers — next build step.</div></div>'+
+  '<div class="pane" data-pane="fund">'+
+  '<div class="fld"><div class="l">Method</div><select id="fdMethod">'+
+  '<option value="card">Card — instant (Transak)</option><option value="wire">Wire — reviewed by our team</option></select></div>'+
+  '<div class="fld"><div class="l">Amount (USD)</div><input id="fdAmt" inputmode="decimal" placeholder="0.00" value="100"/></div>'+
+  '<div class="warn2" id="fdWarn"></div>'+
+  '<button class="gobtn" id="fdGo">Deposit</button>'+
+  '<div class="done3" id="fdDone"><span class="ic">✓</span><span class="t1" id="fdDoneT"></span><span class="t2" id="fdDoneS"></span></div>'+
+  '</div>'+
+  '<div class="pane" data-pane="withdraw">'+
+  '<div class="fld"><div class="l">Asset</div><select id="wdAsset">'+
+  '<option>USDT</option><option>BTC</option><option>ETH</option></select></div>'+
+  '<div class="fld"><div class="l">Destination address</div><input id="wdAddr" placeholder="0x… / bc1…"/>'+
+  '<div class="hint" id="wdNet"></div></div>'+
+  '<div class="fld"><div class="l">Amount (USD)</div><input id="wdAmt" inputmode="decimal" placeholder="0.00"/></div>'+
+  '<div class="meta2"><span>Withdrawable</span><span class="v" id="wdAvail">···</span><span class="mx" id="wdMax">Max</span></div>'+
+  '<div class="hint" id="wdTier"></div>'+
+  '<div class="warn2" id="wdWarn"></div>'+
+  '<div class="fld" id="wdOtpBox" style="display:none"><div class="l">Email verification code</div>'+
+  '<input id="wdOtp" inputmode="numeric" maxlength="6" placeholder="6-digit code"/>'+
+  '<div class="hint" id="wdOtpH"></div></div>'+
+  '<button class="gobtn" id="wdGo">Withdraw</button>'+
+  '<div class="done3" id="wdDone"><span class="ic">✓</span><span class="t1" id="wdDoneT"></span><span class="t2" id="wdDoneS"></span></div>'+
+  '</div>'+
   '</div>');
 makeWidget('swap','Swap','','var(--lgd-link2)',
   '<div class="sw tnum">'+
@@ -1588,7 +1609,7 @@ async function mmSession(){
     const r=await AlpexaSync.db.from('crypto_holdings').select('asset,qty').eq('acct_no',mm.sess.acct);
     (r.data||[]).forEach(x=>{ mm.have[x.asset]=+x.qty||0; });
   }catch(e){} }
-  mmCalc();
+  mmCalc(); fdCalc(); wdCalc();
 }
 async function mmResolve(){
   const raw=(document.getElementById('mmTo').value||'').trim();
@@ -1716,11 +1737,150 @@ document.getElementById('xfGo').onclick=async()=>{
     xfCalc();
   }
 };
+/* ── Fund (입금, M3) — 카드 = transak-widget Edge(시크릿 서버 전용, URL만 수신) ·
+   와이어 = pushRequest 'deposit' (백오피스 승인 후 서버가 크레딧 — 클라 셀프크레딧 없음) ── */
+const fd={ busy:false, err:'' };   // err = 제출 에러(sticky) — 재계산이 지우면 안 됨
+function fdCalc(){
+  const usd=parseFloat(document.getElementById('fdAmt').value)||0;
+  const warn=document.getElementById('fdWarn'); let w='';
+  if(!mm.sess) w='Sign in to deposit.';
+  w=w||fd.err;
+  warn.textContent=w; warn.style.display=w?'block':'none';
+  document.getElementById('fdGo').disabled=!!w||!usd||fd.busy;
+  document.getElementById('fdGo').textContent=
+    document.getElementById('fdMethod').value==='card'?'Continue to card checkout':'Submit wire deposit';
+}
+document.getElementById('fdMethod').addEventListener('change',()=>{ fd.err=''; fdCalc(); });
+document.getElementById('fdAmt').addEventListener('input',()=>{ fd.err=''; fdCalc(); });
+document.getElementById('fdGo').onclick=async()=>{
+  if(fd.busy) return;
+  const usd=parseFloat(document.getElementById('fdAmt').value)||0;
+  if(!usd||!mm.sess) return;
+  fd.busy=true; fd.err=''; fdCalc();
+  const method=document.getElementById('fdMethod').value;
+  if(method==='card'){
+    try{
+      const r=await AlpexaSync.db.functions.invoke('transak-widget',{body:{
+        amount:usd, email:(mm.sess.me&&mm.sess.me.email)||'', partnerCustomerId:mm.sess.acct }});
+      const url=r&&r.data&&r.data.widgetUrl;
+      if(url){ window.open(url,'_blank','noopener'); }
+      else fd.err='Card checkout unavailable — try wire.';
+    }catch(e){ fd.err='Card checkout unavailable — try wire.'; }
+  } else {
+    try{
+      const res=await AlpexaSync.pushRequest({ id:'cr-'+Date.now()+'-'+Math.random().toString(36).slice(2,6),
+        type:'deposit', server:'crypto', amount:usd, net:usd, fee:0,
+        from:'Wire transfer', to:'Crypto wallet', status:'pending' });
+      if(res&&!res.error){
+        const dn=document.getElementById('fdDone'); dn.style.display='flex';
+        document.getElementById('fdDoneT').textContent='Wire deposit submitted — '+fmtUsdSm(usd);
+        document.getElementById('fdDoneS').textContent='Credited after our team reviews it. Nothing to do now.';
+        setTimeout(()=>{ dn.style.display='none'; },7000);
+        loadActivity(); walSession().then(s=>loadWalletKvs(s));
+      } else fd.err='Submit failed — try again.';
+    }catch(e){ fd.err='Submit failed — try again.'; }
+  }
+  fd.busy=false; fdCalc();
+};
+/* ── Withdraw (외부 출금, M3) — 앱 :13661 계약: reqId 'cr-<ts>-<rand4>' · pushRequest
+   type 'withdraw' (승인 전 차감 없음). 티어(서버 트리거가 최종 강제, 클라는 사전 안내+OTP UX):
+   ≥$1,000 = 이메일 OTP(withdraw-otp Edge → verify_withdraw_otp RPC, 15분 unlock) ·
+   ≥$5,000 = 활성 허용목록(24h) 필요. 서버 거절 메시지는 그대로 표시. ── */
+const wd={ busy:false, avail:null, otpSent:false, unlocked:false, err:'' };
+const WD_NET={ USDT:'ERC-20 · Ethereum', BTC:'Bitcoin Network', ETH:'ERC-20 · Ethereum' };
+async function wdLoad(){
+  wd.avail=null; wdCalc();
+  if(!mm.sess) return;
+  const asset=document.getElementById('wdAsset').value;
+  try{
+    if(asset==='USDT'){ const r=await AlpexaSync.db.rpc('withdrawable_for',{p_acct:mm.sess.acct});
+      if(r&&r.data!=null) wd.avail=+r.data; }
+    else { const px=swPrice(asset); wd.avail=px?(mm.have[asset]||0)*px:null; }
+  }catch(e){}
+  wdCalc();
+}
+function wdCalc(){
+  const asset=document.getElementById('wdAsset').value;
+  const addr=(document.getElementById('wdAddr').value||'').trim();
+  const usd=parseFloat(document.getElementById('wdAmt').value)||0;
+  document.getElementById('wdNet').textContent=addr?('Network: '+WD_NET[asset]+' — only send '+asset+' on this network'):'';
+  document.getElementById('wdAvail').textContent=wd.avail==null?'···':fmtUsdSm(wd.avail);
+  const tier=document.getElementById('wdTier');
+  tier.textContent=usd>=5000?'⚠ $5,000+ needs the address on your ACTIVE allowlist (added 24h+ ago).':
+    (usd>=1000?'✉ $1,000+ needs a one-time email code — we\'ll send it at submit.':'');
+  const warn=document.getElementById('wdWarn'); let w='';
+  if(!mm.sess) w='Sign in to withdraw.';
+  else if(addr&&addr.length<8) w='That address looks too short.';
+  else if(wd.avail!=null&&usd>wd.avail+1e-9) w='Amount exceeds withdrawable balance.';
+  w=w||wd.err;   // 제출 에러는 sticky — 재계산이 지우지 않는다
+  warn.textContent=w; warn.style.display=w?'block':'none';
+  document.getElementById('wdGo').disabled=!!w||!usd||!addr||wd.busy;
+  document.getElementById('wdGo').textContent=
+    (usd>=1000&&!wd.unlocked)?(wd.otpSent?'Verify code & withdraw':'Send code & continue'):'Withdraw';
+}
+['wdAsset','wdAddr','wdAmt','wdOtp'].forEach(id=>{
+  document.getElementById(id).addEventListener('input',()=>{ wd.err=''; wdCalc(); }); });
+document.getElementById('wdAsset').addEventListener('change',wdLoad);
+document.getElementById('wdMax').onclick=()=>{ if(wd.avail!=null)
+  document.getElementById('wdAmt').value=(+wd.avail.toFixed(2)); wdCalc(); };
+document.getElementById('wdGo').onclick=async()=>{
+  if(wd.busy) return;
+  const asset=document.getElementById('wdAsset').value;
+  const addr=(document.getElementById('wdAddr').value||'').trim();
+  const usd=parseFloat(document.getElementById('wdAmt').value)||0;
+  if(!usd||!addr||!mm.sess) return;
+  wd.busy=true; wd.err=''; wdCalc();
+  try{
+    if(usd>=1000&&!wd.unlocked){
+      if(!wd.otpSent){
+        // 1단계: 등록 이메일로 6자리 코드 발송 (Edge가 JWT에서 이메일 유도 — 클라 이메일 불신)
+        const r=await AlpexaSync.db.functions.invoke('withdraw-otp',{body:{}});
+        const d=r&&r.data;
+        if(d&&d.ok){ wd.otpSent=true;
+          document.getElementById('wdOtpBox').style.display='';
+          document.getElementById('wdOtpH').textContent='Code sent to '+(d.sentTo||'your email')+' · valid 10 min';
+        } else wd.err=(d&&d.error)||'Could not send the code — try again.';
+        wd.busy=false; wdCalc(); return;
+      }
+      // 2단계: 코드 검증 → 15분 unlock (attempts 5회 제한은 서버)
+      const code=(document.getElementById('wdOtp').value||'').trim();
+      if(!/^\d{6}$/.test(code)){ wd.err='Enter the 6-digit code.';
+        wd.busy=false; wdCalc(); return; }
+      const v=await AlpexaSync.db.rpc('verify_withdraw_otp',{p_code:code});
+      const vd=v&&v.data;
+      if(!(vd&&vd.ok)){ wd.err=(vd&&vd.error)||'Code check failed.';
+        wd.busy=false; wdCalc(); return; }
+      wd.unlocked=true;
+      document.getElementById('wdOtpH').textContent='✓ verified — unlocked for '+(vd.unlocked_minutes||15)+' min';
+    }
+    // 제출 — 승인 전 차감 없음. 서버 트리거(2FA/허용목록/상한)가 최종 관문: 거절 메시지 그대로 표시.
+    const res=await AlpexaSync.pushRequest({ id:'cr-'+Date.now()+'-'+Math.random().toString(36).slice(2,6),
+      type:'withdraw', server:'crypto', amount:usd, net:usd, fee:0,
+      asset:asset, network:WD_NET[asset].split(' ')[0], address:addr, status:'pending' });
+    if(res&&!res.error){
+      const dn=document.getElementById('wdDone'); dn.style.display='flex';
+      document.getElementById('wdDoneT').textContent='Withdrawal submitted — '+fmtUsdSm(usd)+' '+asset;
+      document.getElementById('wdDoneS').textContent='Reviewed by our team · nothing deducted until approval';
+      setTimeout(()=>{ dn.style.display='none'; },8000);
+      document.getElementById('wdAmt').value=''; wd.otpSent=false; wd.unlocked=false;
+      document.getElementById('wdOtpBox').style.display='none'; document.getElementById('wdOtp').value='';
+      loadActivity(); walSession().then(s=>loadWalletKvs(s));
+    } else {
+      const msg=(res&&res.error&&(res.error.message||res.error))||'Submit failed.';
+      wd.err=/allowlist|whitel/i.test(String(msg))
+        ? 'This address isn\'t on your active allowlist yet (needed for $5,000+). Add it in the app: Account → Security → Whitelisted destinations, then wait 24 hours. Nothing was deducted.'
+        : String(msg);
+    }
+  }catch(e){ wd.err='Network error — nothing was submitted.'; }
+  wd.busy=false; wdCalc();
+};
 document.querySelector('#w-money .mtabs').addEventListener('click',e=>{
   const t=e.target.closest('span[data-p]'); if(!t) return;
   document.querySelectorAll('#w-money .mtabs span').forEach(x=>x.classList.toggle('on',x===t));
   document.querySelectorAll('#w-money .pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===t.dataset.p));
   if(t.dataset.p==='transfer') xfLoad();
+  if(t.dataset.p==='withdraw') wdLoad();
+  if(t.dataset.p==='fund') fdCalc();
 });
 mmSession();
 </script>
