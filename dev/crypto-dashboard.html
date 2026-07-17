@@ -724,7 +724,19 @@ makeWidget('money','Money moves','','var(--lgd-link3)',
   '<button class="gobtn" id="mmGo">Send</button>'+
   '<div class="done3" id="mmDone"><span class="ic">✓</span><span class="t1" id="mmDoneT"></span><span class="t2" id="mmDoneS"></span></div>'+
   '</div>'+
-  '<div class="pane" data-pane="transfer"><div class="soon2">Transfer between Alpexa wallets — next build step.</div></div>'+
+  '<div class="pane" data-pane="transfer">'+
+  '<div class="fld"><div class="l">From</div><select id="xfFrom">'+
+  '<option value="crypto" selected>Alpexa Crypto</option><option value="fx">Alpexa FX</option>'+
+  '<option value="sports">Alpexa Sports</option></select></div>'+
+  '<div class="fld"><div class="l">To</div><select id="xfTo">'+
+  '<option value="crypto">Alpexa Crypto</option><option value="fx" selected>Alpexa FX</option>'+
+  '<option value="sports">Alpexa Sports</option></select></div>'+
+  '<div class="fld"><div class="l">Amount (USD)</div><input id="xfAmt" inputmode="decimal" placeholder="0.00"/></div>'+
+  '<div class="meta2"><span>Transferable</span><span class="v" id="xfAvail">···</span><span class="mx" id="xfMax">Max</span></div>'+
+  '<div class="warn2" id="xfWarn"></div>'+
+  '<button class="gobtn" id="xfGo">Transfer</button>'+
+  '<div class="done3" id="xfDone"><span class="ic">✓</span><span class="t1" id="xfDoneT"></span><span class="t2" id="xfDoneS"></span></div>'+
+  '</div>'+
   '<div class="pane" data-pane="fund"><div class="soon2">Deposit (card / wire) — next build step.</div></div>'+
   '<div class="pane" data-pane="withdraw"><div class="soon2">External withdraw with 2FA tiers — next build step.</div></div>'+
   '</div>');
@@ -1646,10 +1658,69 @@ document.getElementById('mmGo').onclick=async()=>{
     mmCalc();
   }
 };
+/* ── Transfer (서버간 이체) — app_transfer RPC 단일 경로 (앱 :13435 락스텝:
+   'xfer-<ts>-<rand5>' 멱등, p_from/p_to = 내 계좌만(alpexa.me.accts, 서버가 양쪽 소유권
+   재검증), 이체 가능액 = withdrawable_for(보너스 제외 캡, crypto=USDT) ── */
+const xf={ busy:false, avail:null };
+function xfAccts(){ try{ const a=(JSON.parse(localStorage.getItem('alpexa.me')||'{}').accts)||{};
+  return {crypto:a.crypto||'', fx:a.fx||'', sports:a.sports||''}; }catch(e){ return {crypto:'',fx:'',sports:''}; } }
+async function xfLoad(){
+  xf.avail=null; xfCalc();
+  if(!mm.sess) return;
+  const from=document.getElementById('xfFrom').value, acct=xfAccts()[from];
+  if(!acct) return;
+  try{ const r=await AlpexaSync.db.rpc('withdrawable_for',{p_acct:acct});
+    if(r&&r.data!=null) xf.avail=+r.data; }catch(e){}
+  xfCalc();
+}
+function xfCalc(){
+  const from=document.getElementById('xfFrom').value, to=document.getElementById('xfTo').value;
+  const usd=parseFloat(document.getElementById('xfAmt').value)||0;
+  document.getElementById('xfAvail').textContent=xf.avail==null?'···':fmtUsdSm(xf.avail);
+  const warn=document.getElementById('xfWarn'); let w='';
+  const ac=xfAccts();
+  if(!mm.sess) w='Sign in to transfer.';
+  else if(from===to) w='Pick two different wallets.';
+  else if(!ac[from]||!ac[to]) w='No '+(!ac[from]?from:to)+' account on this login.';
+  else if(xf.avail!=null&&usd>xf.avail+1e-9) w='Amount exceeds transferable balance (bonus excluded).';
+  warn.textContent=w; warn.style.display=w?'block':'none';
+  document.getElementById('xfGo').disabled=!!w||!usd||xf.busy;
+}
+document.getElementById('xfFrom').addEventListener('change',xfLoad);
+document.getElementById('xfTo').addEventListener('change',xfCalc);
+document.getElementById('xfAmt').addEventListener('input',xfCalc);
+document.getElementById('xfMax').onclick=()=>{ if(xf.avail!=null)
+  document.getElementById('xfAmt').value=(+xf.avail.toFixed(2)); xfCalc(); };
+document.getElementById('xfGo').onclick=async()=>{
+  if(xf.busy) return;
+  const from=document.getElementById('xfFrom').value, to=document.getElementById('xfTo').value;
+  const usd=parseFloat(document.getElementById('xfAmt').value)||0;
+  const ac=xfAccts(); if(!usd||!mm.sess||!ac[from]||!ac[to]) return;
+  xf.busy=true; xfCalc();
+  let res;
+  try{ const r=await AlpexaSync.db.rpc('app_transfer',{
+      p_ref:'xfer-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),
+      p_from:ac[from], p_to:ac[to], p_amount:+usd.toFixed(2) });
+    res=r&&r.data; }catch(e){ res=null; }
+  xf.busy=false;
+  if(res&&(res.ok===true||res.duplicate===true)){
+    const dn=document.getElementById('xfDone'); dn.style.display='flex';
+    document.getElementById('xfDoneT').textContent='Transferred '+fmtUsdSm(usd);
+    document.getElementById('xfDoneS').textContent=from.toUpperCase()+' → '+to.toUpperCase()+' · server-verified';
+    setTimeout(()=>{ dn.style.display='none'; },6000);
+    document.getElementById('xfAmt').value='';
+    xfLoad(); mmSession(); loadPortfolio(); loadWallet(); loadActivity(); loadWalletKvs&&walSession().then(s=>loadWalletKvs(s));
+  } else {
+    const warn=document.getElementById('xfWarn');
+    warn.textContent=(res&&res.error)||'Transfer failed — try again.'; warn.style.display='block';
+    xfCalc();
+  }
+};
 document.querySelector('#w-money .mtabs').addEventListener('click',e=>{
   const t=e.target.closest('span[data-p]'); if(!t) return;
   document.querySelectorAll('#w-money .mtabs span').forEach(x=>x.classList.toggle('on',x===t));
   document.querySelectorAll('#w-money .pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===t.dataset.p));
+  if(t.dataset.p==='transfer') xfLoad();
 });
 mmSession();
 </script>
