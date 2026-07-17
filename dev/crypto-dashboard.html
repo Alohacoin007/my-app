@@ -177,6 +177,38 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .mk .mpop .prow .ck{margin-left:auto; color:var(--lgd-dim)}
 .mk .mpop .prow.in .ps,.mk .mpop .prow.in .pn{opacity:.45}
 
+/* ══ W4 Chart — 레전드 캔들 차트 (사용자 스크린샷 2026-07-16) ══ */
+.ch{flex:1; min-height:0; display:flex; flex-direction:column}
+.ch .chd{display:flex; align-items:center; gap:9px; padding:8px 12px 6px; flex:none; flex-wrap:wrap}
+.ch .csym{display:flex; align-items:center; gap:7px; background:var(--lgd-pill); border-radius:8px;
+  padding:6px 11px; font-size:13px; font-weight:700}
+.ch .csym .cbadge{width:13px; height:13px; border-radius:50%; border:1.4px solid var(--lgd-dim);
+  display:inline-flex; align-items:center; justify-content:center; font-size:8px; color:var(--lgd-dim)}
+.ch .cchg{font-size:12px; font-weight:700}
+.ch .cchg.up{color:var(--lgd-up)} .ch .cchg.down{color:var(--lgd-down)}
+.ch .csp{flex:1}
+.ch .cbtn{background:var(--lgd-pill); border:none; color:var(--lgd-ink); border-radius:7px; height:26px;
+  padding:0 13px; font-size:11.5px; font-weight:700; cursor:pointer; font-family:inherit; opacity:.55}
+.ch .cbtn[title]{cursor:help}
+.ch .ohlc{display:flex; gap:10px; padding:0 12px 6px; font-size:11px; font-weight:600; flex:none; flex-wrap:wrap}
+.ch .ohlc b{color:var(--lgd-dim); font-weight:700; margin-right:3px}
+.ch .ohlc .v.up{color:var(--lgd-up)} .ch .ohlc .v.down{color:var(--lgd-down)} .ch .ohlc .v.dim{color:var(--lgd-dim)}
+.ch .cwrap{position:relative; flex:1; min-height:80px}
+.ch canvas{position:absolute; inset:0; width:100%; height:100%; cursor:crosshair}
+.ch .ctag{position:absolute; right:0; transform:translateY(-50%); font-size:10.5px; font-weight:700;
+  padding:2px 7px; border-radius:4px; color:#04250B; pointer-events:none; font-variant-numeric:tabular-nums}
+.ch .cempty{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  color:var(--lgd-dim); font-size:12px}
+.ch .cbar{display:flex; align-items:center; gap:2px; padding:5px 10px 7px; flex:none; border-top:1px solid var(--lgd-hair)}
+.ch .cbar button{background:none; border:none; color:var(--lgd-dim); font-size:10.5px; font-weight:700;
+  padding:5px 8px; border-radius:6px; cursor:pointer; font-family:inherit}
+.ch .cbar button:hover{color:var(--lgd-ink)}
+.ch .cbar button.on{background:var(--lgd-pill); color:var(--lgd-ink)}
+.ch .cbar .isel{margin-left:auto; display:flex; align-items:center; gap:5px; color:var(--lgd-dim);
+  font-size:10.5px; font-weight:700}
+.ch .cbar select{background:var(--lgd-pill); border:none; color:var(--lgd-ink); border-radius:6px;
+  padding:4px 6px; font-size:10.5px; font-weight:700; font-family:inherit; outline:none}
+
 /* ══ 라이트 테마 — legend-ui.css 무변경, 이 파일 안에서 --lgd-* 토큰만 오버라이드.
    업/다운/링크 색은 의미색이라 유지. 크립토 앱의 라이트 기본과 조화(화이트 서피스). ══ */
 body.light{
@@ -440,7 +472,21 @@ makeWidget('markets','Markets','','var(--lgd-link4)',
   '<div class="grp">Popular crypto</div><div class="plist" id="mkPlist"></div>'+
   '</div></div>');
 makeWidget('activity','Activity','','var(--lgd-link2)', frame('Recent activity','거래·이체·입출금 원장 — 필터/그룹핑'));
-makeWidget('chart','Chart','','var(--lgd-link4)', frame('BTC · Chart','klines 실봉 + 레인지 7종 + 스크럽'));
+makeWidget('chart','Chart','','var(--lgd-link4)',
+  '<div class="ch tnum">'+
+  '<div class="chd"><span class="csym"><span id="chSym">BTC</span><span class="cbadge">₿</span></span>'+
+  '<span class="cchg" id="chChg"></span><span class="csp"></span>'+
+  '<button class="cbtn" title="Trade 위젯에서 연결 예정 (M2)">Buy</button>'+
+  '<button class="cbtn" title="Trade 위젯에서 연결 예정 (M2)">Sell</button></div>'+
+  '<div class="ohlc" id="chOhlc"></div>'+
+  '<div class="cwrap" id="chWrap"><canvas id="chCv"></canvas>'+
+  '<span class="ctag" id="chTag" style="display:none"></span>'+
+  '<div class="cempty" id="chEmpty" style="display:none"></div></div>'+
+  '<div class="cbar"><span id="chRanges">'+['1D','1W','1M','3M','YTD','1Y','ALL'].map(r=>
+    '<button data-r="'+r+'"'+(r==='1M'?' class="on"':'')+'>'+r+'</button>').join('')+'</span>'+
+  '<span class="isel">Interval: <select id="chIv"><option value="">auto</option>'+
+  ['1m','5m','15m','1h','4h','1d'].map(v=>'<option value="'+v+'">'+v+'</option>').join('')+'</select></span>'+
+  '</div></div>');
 makeWidget('portfolio','Portfolio','','var(--lgd-link1)', frame('Holdings','Crypto · Securities · Staked 섹션'));
 makeWidget('trade','Trade','','var(--lgd-link2)', frame('Buy / Sell','crypto_trade RPC — 신선도 120s 락스텝'));
 makeWidget('money','Money moves','','var(--lgd-link3)', frame('Send · Transfer · Fund · Withdraw','2FA/OTP 관문 시트'));
@@ -753,6 +799,130 @@ document.getElementById('mkQ').addEventListener('input',mkRenderPlist);
 document.getElementById('mkQx').onclick=()=>{ document.getElementById('mkQ').value=''; mkRenderPlist(); };
 document.addEventListener('click',()=>mkPop.classList.remove('open'));
 mkSeedAlpxs(); mkRender(); mkConnect(); mkPoll();
+
+/* ════════════════════ W4 Chart — 레전드 캔들 (Binance 미러 klines 실봉, 합성 금지) ════════════════════
+   캔들+심지 · 볼륨 히스토그램 · OHLCV 헤더(호버 캔들) · 우측 가격축 + 라스트 프라이스 태그 ·
+   크로스헤어 · 레인지 7종 + Interval 셀렉터. 심볼 = Markets 행 클릭(cb-sel) 연동. */
+const CH_RANGE={ '1D':['5m',288], '1W':['1h',168], '1M':['4h',186], '3M':['1d',90],
+  'YTD':['1d',200], '1Y':['1d',365], 'ALL':['1w',300] };
+const ch={ sym:'BTC', range:'1M', iv:'', candles:[], hover:null, _seq:0 };
+const chFmt=v=>{ const d=(v>0&&v<1)?Math.min(8,Math.max(2,4-Math.floor(Math.log10(v)))):2;
+  return v.toLocaleString('en-US',{minimumFractionDigits:d>2?d:2,maximumFractionDigits:d>4?d:(v<10?4:2)}); };
+const chVol=v=>v>=1e9?(v/1e9).toFixed(2)+'B':v>=1e6?(v/1e6).toFixed(2)+'M':v>=1e3?(v/1e3).toFixed(2)+'K':v.toFixed(0);
+async function chLoad(){
+  const seq=++ch._seq;
+  const b=MK_BSYM[ch.sym];
+  const empty=document.getElementById('chEmpty');
+  if(!b){ ch.candles=[]; empty.textContent='No chart feed for '+ch.sym; empty.style.display='flex'; chDraw(); return; }
+  const [rIv,rN]=CH_RANGE[ch.range]||CH_RANGE['1M'];
+  const iv=ch.iv||rIv, n=ch.iv?300:rN;
+  try{
+    const r=await fetch('https://data-api.binance.vision/api/v3/klines?symbol='+b.toUpperCase()+'USDT&interval='+iv+'&limit='+n);
+    if(!r.ok) throw 0;
+    const rows=await r.json();
+    if(seq!==ch._seq) return;   // 늦게 온 응답이 최신 선택을 덮지 않게
+    ch.candles=rows.map(k=>({t:+k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:+k[5]}));
+    empty.style.display=ch.candles.length?'none':'flex';
+    if(!ch.candles.length) empty.textContent='Chart unavailable';
+  }catch(e){ if(seq!==ch._seq) return;
+    ch.candles=[]; empty.textContent='Chart unavailable'; empty.style.display='flex'; }
+  ch.hover=null; chDraw();
+}
+function chDraw(){
+  const cv=document.getElementById('chCv'), wrap=document.getElementById('chWrap');
+  if(!cv||!wrap) return;
+  const dpr=window.devicePixelRatio||1, W=wrap.clientWidth, H=wrap.clientHeight;
+  cv.width=W*dpr; cv.height=H*dpr;
+  const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+  const cs=ch.candles; const tag=document.getElementById('chTag');
+  if(!cs.length){ tag.style.display='none'; chOhlcRender(null); chHdr(); return; }
+  const AX=62, BX=18, plotW=W-AX, volH=Math.max(24,H*0.16), priceH=H-BX-volH-4;
+  const up=cssVar('--lgd-up'), dn=cssVar('--lgd-down'), dim=cssVar('--lgd-dim'), hair='rgba(128,128,128,.14)';
+  let lo=Infinity, hi=-Infinity, vmax=0;
+  cs.forEach(k=>{ if(k.l<lo)lo=k.l; if(k.h>hi)hi=k.h; if(k.v>vmax)vmax=k.v; });
+  const pad=(hi-lo)*0.06||hi*0.01; lo-=pad; hi+=pad;
+  const xAt=i=>(i+0.5)*plotW/cs.length, yAt=v=>(1-(v-lo)/(hi-lo))*priceH+2;
+  const bw=Math.max(1,Math.min(9,plotW/cs.length*0.62));
+  // Y 그리드 + 우측 가격 라벨
+  g.font='9.5px Inter,system-ui'; g.textAlign='left'; g.textBaseline='middle';
+  const steps=Math.max(3,Math.min(7,Math.floor(priceH/44)));
+  for(let i=0;i<=steps;i++){ const v=lo+(hi-lo)*i/steps, y=yAt(v);
+    g.strokeStyle=hair; g.beginPath(); g.moveTo(0,y); g.lineTo(plotW,y); g.stroke();
+    g.fillStyle=dim; g.fillText(chFmt(v), plotW+6, y); }
+  // X 날짜 라벨 (4~6개)
+  const nx=Math.max(3,Math.min(6,Math.floor(plotW/150)));
+  g.textAlign='center'; g.textBaseline='top';
+  for(let i=0;i<=nx;i++){ const idx=Math.min(cs.length-1,Math.round(i*(cs.length-1)/nx));
+    const d=new Date(cs[idx].t);
+    const lbl=(ch.range==='1D'||ch.iv==='1m'||ch.iv==='5m')
+      ? d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:false})
+      : d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    g.fillStyle=dim; g.fillText(lbl, Math.max(18,Math.min(plotW-18,xAt(idx))), H-BX+5); }
+  // 볼륨 히스토그램
+  cs.forEach((k,i)=>{ const x=xAt(i), h=vmax?k.v/vmax*(volH-4):0;
+    g.fillStyle=(k.c>=k.o?up:dn); g.globalAlpha=0.45;
+    g.fillRect(x-bw/2, priceH+4+(volH-4-h), bw, h); g.globalAlpha=1; });
+  // 캔들 (몸통+심지)
+  cs.forEach((k,i)=>{ const x=xAt(i), col=k.c>=k.o?up:dn;
+    g.strokeStyle=col; g.lineWidth=1;
+    g.beginPath(); g.moveTo(x,yAt(k.h)); g.lineTo(x,yAt(k.l)); g.stroke();
+    const y1=yAt(Math.max(k.o,k.c)), y2=yAt(Math.min(k.o,k.c));
+    g.fillStyle=col; g.fillRect(x-bw/2, y1, bw, Math.max(1,y2-y1)); });
+  // 크로스헤어
+  if(ch.hover!=null){ const k=cs[ch.hover], x=xAt(ch.hover), y=yAt(k.c);
+    g.strokeStyle=dim; g.setLineDash([3,4]); g.lineWidth=1;
+    g.beginPath(); g.moveTo(x,0); g.lineTo(x,priceH+volH); g.stroke();
+    g.beginPath(); g.moveTo(0,y); g.lineTo(plotW,y); g.stroke(); g.setLineDash([]); }
+  // 라스트 프라이스 태그 (DOM 오버레이)
+  const last=cs[cs.length-1];
+  tag.style.display=''; tag.textContent=chFmt(last.c);
+  tag.style.top=Math.max(8,Math.min(priceH-4,yAt(last.c)))+'px';
+  tag.style.background=(last.c>=last.o?up:dn);
+  // 볼륨 라벨
+  g.textAlign='left'; g.fillStyle=dim; g.font='9.5px Inter,system-ui';
+  g.fillText('Volume '+chVol(last.v), 6, priceH+10);
+  chOhlcRender(ch.hover!=null?cs[ch.hover]:last); chHdr();
+}
+function chOhlcRender(k){
+  const el=document.getElementById('chOhlc'); if(!el) return;
+  if(!k){ el.innerHTML=''; return; }
+  const cls=k.c>=k.o?'up':'down';
+  el.innerHTML=['O','H','L','C'].map((n,i)=>{ const v=[k.o,k.h,k.l,k.c][i];
+    return '<span><b>'+n+'</b><span class="v '+cls+'">'+chFmt(v)+'</span></span>'; }).join('')+
+    '<span><b>V</b><span class="v dim">'+chVol(k.v)+'</span></span>';
+}
+function chHdr(){
+  document.getElementById('chSym').textContent=ch.sym;
+  const q=mk.q[ch.sym], el=document.getElementById('chChg');
+  if(q&&q.chg!=null&&q.last!=null){ const up=q.chg>=0, d=q.last*(q.chg/100)/(1+q.chg/100);
+    el.className='cchg '+(up?'up':'down');
+    el.textContent=(up?'▲':'▼')+' $'+chFmt(Math.abs(d))+' ('+Math.abs(q.chg).toFixed(2)+'%)';
+  } else el.textContent='';
+}
+/* 크로스헤어 호버 → OHLCV 연동 */
+(function(){
+  const cv=document.getElementById('chCv'), wrap=document.getElementById('chWrap');
+  cv.addEventListener('pointermove',e=>{ if(!ch.candles.length) return;
+    const r=cv.getBoundingClientRect(), plotW=r.width-62;
+    const i=Math.round((e.clientX-r.left)/plotW*ch.candles.length-0.5);
+    ch.hover=Math.max(0,Math.min(ch.candles.length-1,i)); chDraw(); });
+  cv.addEventListener('pointerleave',()=>{ ch.hover=null; chDraw(); });
+  try{ new ResizeObserver(()=>chDraw()).observe(wrap); }catch(e){}
+})();
+document.getElementById('chRanges').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  document.querySelector('#chRanges button.on').classList.remove('on'); b.classList.add('on');
+  ch.range=b.dataset.r; chLoad();
+});
+document.getElementById('chIv').addEventListener('change',e=>{ ch.iv=e.target.value; chLoad(); });
+document.addEventListener('cb-sel',e=>{ if(e.detail&&e.detail!==ch.sym){ ch.sym=e.detail; chLoad(); } });
+/* 라이브 틱 → 마지막 캔들 종가 갱신 (같은 심볼일 때, 2초 스로틀) */
+setInterval(()=>{ if(document.hidden||!ch.candles.length) return;
+  const q=mk.q[ch.sym]; if(!q||q.last==null) return;
+  const last=ch.candles[ch.candles.length-1];
+  if(q.last!==last.c){ last.c=q.last; if(q.last>last.h)last.h=q.last; if(q.last<last.l)last.l=q.last; chDraw(); }
+},2000);
+chLoad();
 </script>
 </body>
 </html>
