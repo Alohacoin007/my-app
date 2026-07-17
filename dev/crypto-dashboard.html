@@ -382,6 +382,26 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .mm .done3 .t1{font-size:12.5px; font-weight:800}
 .mm .done3 .t2{font-size:10.5px; color:var(--lgd-dim)}
 .mm .soon2{padding:22px 10px; text-align:center; color:var(--lgd-dim); font-size:11.5px}
+.mm .rcqr{display:flex; justify-content:center; padding:2px 0}
+.mm .rcqr img{border-radius:8px; background:#fff; padding:6px; display:none}
+.mm .rcaddr{background:var(--lgd-pill); border-radius:7px; padding:8px 10px; font-size:11.5px;
+  font-weight:600; word-break:break-all; user-select:all}
+
+/* ══ W8 Open orders ══ */
+.od{flex:1; min-height:0; display:flex; flex-direction:column; overflow:auto}
+.od .odh{padding:9px 14px 5px; font-size:10.5px; font-weight:800; letter-spacing:.6px;
+  color:var(--lgd-dim); text-transform:uppercase}
+.od .orow{display:flex; align-items:center; gap:8px; padding:7px 14px; border-bottom:1px solid var(--lgd-hair)}
+.od .orow .nm{font-size:12.5px; font-weight:800}
+.od .typechip{font-size:9px; font-weight:700; letter-spacing:.8px; text-transform:uppercase;
+  background:rgba(0,200,5,.10); border:1px solid rgba(0,200,5,.35); color:var(--lgd-up);
+  border-radius:999px; padding:1px 7px; margin-left:6px}
+.od .orow .sub{font-size:10.5px; color:var(--lgd-dim); margin-top:2px}
+.od .orow .man{margin-left:auto; font-size:9.5px; font-weight:700; letter-spacing:.6px;
+  text-transform:uppercase; color:var(--lgd-dim)}
+.od .orow .cx{background:var(--lgd-pill); border:none; color:var(--lgd-ink); font-size:10.5px;
+  font-weight:700; border-radius:6px; padding:4px 10px; cursor:pointer; font-family:inherit}
+.od .empty2{padding:14px; font-size:11px; color:var(--lgd-dim); line-height:1.5}
 
 /* ══ W7 Staking ══ */
 .stk{flex:1; min-height:0; display:flex; flex-direction:column; overflow:auto}
@@ -778,7 +798,8 @@ makeWidget('trade','Trade','','var(--lgd-link2)',
   '</div></div>');
 makeWidget('money','Money moves','','var(--lgd-link3)',
   '<div class="mm tnum">'+
-  '<div class="mtabs"><span class="on" data-p="send">Send</span><span data-p="transfer">Transfer</span>'+
+  '<div class="mtabs"><span class="on" data-p="send">Send</span><span data-p="receive">Receive</span>'+
+  '<span data-p="transfer">Transfer</span>'+
   '<span data-p="fund">Fund</span><span data-p="withdraw">Withdraw</span></div>'+
   '<div class="pane on" data-pane="send">'+
   '<div class="fld"><div class="l">To — account no. or email</div>'+
@@ -791,6 +812,16 @@ makeWidget('money','Money moves','','var(--lgd-link3)',
   '<div class="warn2" id="mmWarn"></div>'+
   '<button class="gobtn" id="mmGo">Send</button>'+
   '<div class="done3" id="mmDone"><span class="ic">✓</span><span class="t1" id="mmDoneT"></span><span class="t2" id="mmDoneS"></span></div>'+
+  '</div>'+
+  '<div class="pane" data-pane="receive">'+
+  '<div class="fld"><div class="l">Method</div><select id="rcMode">'+
+  '<option value="internal" selected>Internal — any asset (Alpexa account)</option>'+
+  '<option value="external">External — USDT on-chain only</option></select></div>'+
+  '<div class="rcqr"><img id="rcQr" alt="QR code" width="132" height="132"/></div>'+
+  '<div class="fld"><div class="l" id="rcAddrL">Your account number</div>'+
+  '<div class="rcaddr" id="rcAddr">···</div><div class="hint" id="rcNet"></div></div>'+
+  '<button class="gobtn" id="rcCopy">Copy</button>'+
+  '<div class="hint" id="rcNote"></div>'+
   '</div>'+
   '<div class="pane" data-pane="transfer">'+
   '<div class="fld"><div class="l">From</div><select id="xfFrom">'+
@@ -846,7 +877,8 @@ makeWidget('swap','Swap','','var(--lgd-link2)',
   '<div class="done2" id="swDone"><span class="ic">✓</span><span class="t1" id="swDoneT"></span>'+
   '<span class="t2" id="swDoneS"></span></div>'+
   '</div>');
-makeWidget('orders','Open orders','','var(--lgd-link3)', frame('Pending (manual)','표시·취소 전용 — 체결기 없음(정직 표기)'));
+makeWidget('orders','Open orders','','var(--lgd-link3)',
+  '<div class="od tnum"><div class="odh" id="odCount"></div><div id="odList"></div></div>');
 
 renderAddMenu();
 refitLayout();
@@ -1808,7 +1840,7 @@ async function mmSession(){
     const r=await AlpexaSync.db.from('crypto_holdings').select('asset,qty').eq('acct_no',mm.sess.acct);
     (r.data||[]).forEach(x=>{ mm.have[x.asset]=+x.qty||0; });
   }catch(e){} }
-  mmCalc(); fdCalc(); wdCalc();
+  mmCalc(); fdCalc(); wdCalc(); rcRender();
 }
 async function mmResolve(){
   const raw=(document.getElementById('mmTo').value||'').trim();
@@ -2073,6 +2105,67 @@ document.getElementById('wdGo').onclick=async()=>{
   }catch(e){ wd.err='Network error — nothing was submitted.'; }
   wd.busy=false; wdCalc();
 };
+/* ── Receive — 표시 전용 (앱 Receive 계약 그대로): 내부 = 내 CR- 계좌(모든 자산 수취,
+   서버 북 이체) · 외부 = USDT ERC-20 회사 고정주소만 — 타 자산 온체인 입금은 미제공
+   (공유주소 오입금 방지, 앱 #C1~C3). 시뮬 입금 경로는 이식 제외(기획 5절).
+   QR = qrserver 실스캔 이미지(앱 QrPattern과 동일 소스). ── */
+const RC_EXT={ address:'0x6B1c8941698Affc56757eF9Be1723Ec43F720966', network:'ERC-20 · Ethereum' };
+function rcRender(){
+  const internal=document.getElementById('rcMode').value==='internal';
+  const qr=document.getElementById('rcQr');
+  const addr=internal?((mm.sess&&mm.sess.acct)||''):RC_EXT.address;
+  document.getElementById('rcAddrL').textContent=internal?'Your account number':'USDT deposit address';
+  document.getElementById('rcAddr').textContent=addr||'···';
+  document.getElementById('rcNet').textContent=internal?(addr?'Alpexa · Internal':''):('Network: '+RC_EXT.network);
+  document.getElementById('rcNote').textContent=internal
+    ?(addr?'Receives any asset — the sender uses Send with this account number.':'Sign in to see your receive details.')
+    :'Only send USDT on Ethereum (ERC-20). For other assets, use Internal.';
+  document.getElementById('rcCopy').disabled=!addr;
+  if(addr){ qr.src='https://api.qrserver.com/v1/create-qr-code/?size=264x264&qzone=2&data='+encodeURIComponent(addr);
+    qr.style.display='block'; } else qr.style.display='none';
+}
+document.getElementById('rcMode').addEventListener('change',rcRender);
+document.getElementById('rcCopy').onclick=()=>{
+  const a=document.getElementById('rcAddr').textContent;
+  if(!a||a==='···') return;
+  try{ if(navigator.clipboard&&navigator.clipboard.writeText)
+    navigator.clipboard.writeText(a).catch(()=>{}); }catch(e){}
+  const b=document.getElementById('rcCopy'); b.textContent='Copied ✓';
+  setTimeout(()=>{ b.textContent='Copy'; },1800);
+};
+
+/* ════════════════════ W8 Open orders — 앱 localStorage 'alpexa.pendingOrders' 공유 ════════════════════
+   표시·취소 전용 — 체결 엔진 없음(정직 표기 'Pending (manual)'). 돈 이동 0:
+   지정가/스탑 주문은 의사표시일 뿐 자금은 체결 시까지 미이동(앱 :14025와 동일). */
+function odRead(){ try{ const v=JSON.parse(localStorage.getItem('alpexa.pendingOrders')||'[]');
+  return Array.isArray(v)?v:[]; }catch(e){ return []; } }
+function odRender(){
+  const list=document.getElementById('odList'); if(!list) return;
+  const os=odRead();
+  document.getElementById('odCount').textContent=os.length?(os.length+' pending · manual fill'):'';
+  if(!os.length){ list.innerHTML='<div class="empty2">No open orders. Limit / Stop orders placed in the '+
+    'app show up here — there is no matching engine yet, so fills are manual.</div>'; return; }
+  list.innerHTML=os.map(o=>{
+    const side=String(o.side||'buy');
+    return '<div class="orow"><div style="min-width:0"><div class="nm">'+
+      side.charAt(0).toUpperCase()+side.slice(1)+' '+(o.sym||'?')+
+      '<span class="typechip">'+(o.type||'Limit')+'</span></div>'+
+      '<div class="sub">'+((o.type==='Stop')?'≥':'≤')+' $'+(+o.trigger||0).toFixed(2)+
+      ' · $'+(+o.usd||0).toFixed(2)+'</div></div>'+
+      '<span class="man">Pending (manual)</span>'+
+      '<button class="cx" data-cx="'+o.id+'">Cancel</button></div>';
+  }).join('');
+}
+document.getElementById('odList').addEventListener('click',e=>{
+  const b=e.target.closest('[data-cx]'); if(!b) return;
+  const os=odRead().filter(o=>String(o.id)!==String(b.dataset.cx));
+  try{ localStorage.setItem('alpexa.pendingOrders',JSON.stringify(os)); }catch(e2){}
+  odRender();
+});
+window.addEventListener('storage',e=>{ if(e.key==='alpexa.pendingOrders') odRender(); });
+setInterval(()=>{ if(!document.hidden) odRender(); },10000);
+odRender();
+
 document.querySelector('#w-money .mtabs').addEventListener('click',e=>{
   const t=e.target.closest('span[data-p]'); if(!t) return;
   document.querySelectorAll('#w-money .mtabs span').forEach(x=>x.classList.toggle('on',x===t));
@@ -2080,6 +2173,7 @@ document.querySelector('#w-money .mtabs').addEventListener('click',e=>{
   if(t.dataset.p==='transfer') xfLoad();
   if(t.dataset.p==='withdraw') wdLoad();
   if(t.dataset.p==='fund') fdCalc();
+  if(t.dataset.p==='receive') rcRender();
 });
 mmSession(); stLoad();
 </script>
