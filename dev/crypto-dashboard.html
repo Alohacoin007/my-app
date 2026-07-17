@@ -152,6 +152,7 @@ body.light .avatar .pdot{border-color:#fff}
 .mk .mhead .sortable{cursor:pointer; user-select:none}
 .mk .mhead .sortable:hover{color:var(--lgd-ink)}
 .mk .mlist{flex:1; overflow:auto}
+.widget.dropok{outline:2px solid var(--lgd-up); outline-offset:-2px}   /* 차트 드롭 타깃 표시 */
 .mk .mrow{display:grid; grid-template-columns:26px 1.2fr 1fr 1fr 1fr; gap:6px; align-items:center;
   padding:9px 14px; font-size:12.5px; cursor:pointer; border-bottom:1px solid transparent}
 .mk .mrow:hover{background:var(--lgd-surface2)}
@@ -1211,7 +1212,7 @@ function mkRender(){
     return (av-bv)*mk.dir; });
   el.innerHTML=rows.map((r,i)=>{
     const up=(r.chg||0)>=0, f=r._f?(' '+r._f):'';
-    return '<div class="mrow'+f+'" data-sym="'+r.s+'">'+
+    return '<div class="mrow'+f+'" data-sym="'+r.s+'" draggable="true">'+
       '<span class="idx">'+(i+1)+'</span>'+
       '<span class="sym">'+r.s+(r.s==='ALPXS'?'<span class="cbadge">A</span>':'<span class="cbadge">₿</span>')+'</span>'+
       '<span class="chg '+(r.chg==null?'':(up?'up':'down'))+'">'+
@@ -1306,6 +1307,23 @@ document.getElementById('mkQ').addEventListener('input',mkRenderPlist);
 document.getElementById('mkQx').onclick=()=>{ document.getElementById('mkQ').value=''; mkRenderPlist(); };
 document.addEventListener('click',()=>mkPop.classList.remove('open'));
 mkSeedAlpxs(); mkRender(); mkConnect(); mkPoll();
+/* 시세 → 차트 드래그&드롭 (2026-07-17 사장님 지시, MT5 방식) */
+document.getElementById('mkList').addEventListener('dragstart',e=>{
+  const r=e.target.closest('.mrow'); if(!r) return;
+  e.dataTransfer.setData('text/plain','sym:'+r.dataset.sym);
+  e.dataTransfer.effectAllowed='copy';
+});
+(function(){
+  const chW=document.getElementById('w-chart'); if(!chW) return;
+  chW.addEventListener('dragover',e=>{ e.preventDefault(); e.dataTransfer.dropEffect='copy';
+    chW.classList.add('dropok'); });
+  chW.addEventListener('dragleave',()=>chW.classList.remove('dropok'));
+  chW.addEventListener('drop',e=>{ e.preventDefault(); chW.classList.remove('dropok');
+    const d=e.dataTransfer.getData('text/plain')||'';
+    if(d.startsWith('sym:')){ const sym=d.slice(4);
+      window.__cbSel=sym; document.dispatchEvent(new CustomEvent('cb-sel',{detail:sym})); }
+  });
+})();
 
 /* ════════════════════ W4 Chart — 레전드 캔들 (Binance 미러 klines 실봉, 합성 금지) ════════════════════
    캔들+심지 · 볼륨 히스토그램 · OHLCV 헤더(호버 캔들) · 우측 가격축 + 라스트 프라이스 태그 ·
