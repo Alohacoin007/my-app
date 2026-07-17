@@ -49,7 +49,10 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
   justify-content:center; color:var(--lgd-ink); cursor:pointer}
 .hic:hover{background:var(--lgd-pill)}
 .avatar{width:28px; height:28px; border-radius:999px; background:#3A3E42; display:flex;
-  align-items:center; justify-content:center; color:#101214; cursor:pointer}
+  align-items:center; justify-content:center; color:#101214; cursor:pointer;
+  font-size:12.5px; font-weight:800}
+.avatar.signin{background:var(--lgd-up); color:#04250B; animation:avpulse 2s ease-in-out infinite}
+@keyframes avpulse{0%,100%{box-shadow:0 0 0 0 rgba(0,200,5,.45)}50%{box-shadow:0 0 0 7px rgba(0,200,5,0)}}
 .tabrow{display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:6px; cursor:pointer}
 .tabrow:hover{background:var(--lgd-pill)}
 .tabrow.dis{cursor:default; color:var(--lgd-dim)}
@@ -2299,7 +2302,24 @@ function sgSignOut(all){
 document.getElementById('sgOut').onclick=()=>sgSignOut(false);
 document.getElementById('sgOutAll').onclick=()=>sgSignOut(true);
 
-mmSession(); stLoad(); sgLoad();
+/* ── 헤더 아바타(동그라미) = 로그인 관문 (2026-07-17 사장님 지시 "동그라미 안에") ──
+   로그아웃: 초록 → 클릭 = 닫힌 토큰(alpexa.dest2='crypto-dashboard') 심고 login.html로 —
+   로그인 끝나면 login.html fxDest가 이 대시보드로 자동 복귀(스포츠 대시보드와 동일 패턴,
+   같은 탭이라 세션도 함께 옴 = "새 탭 함정" 해소). 로그인됨: 이름 이니셜, 클릭 = Settings. */
+async function hdrAuth(){
+  const av=document.querySelector('.avatar'); if(!av) return;
+  const s=await walSession();
+  if(s){
+    av.textContent=((s.me&&s.me.name)||'?').charAt(0).toUpperCase();
+    av.title=((s.me&&s.me.name)||'')+' · signed in'; av.classList.remove('signin');
+    av.onclick=()=>{ setHidden('settings',false); bringToFront('settings'); };
+  } else {
+    av.textContent='→'; av.title='Sign in'; av.classList.add('signin');
+    av.onclick=()=>{ try{ sessionStorage.setItem('alpexa.dest2','crypto-dashboard'); }catch(e){}
+      location.href='/login.html'; };
+  }
+}
+mmSession(); stLoad(); sgLoad(); hdrAuth();
 </script>
 </body>
 </html>
