@@ -6,6 +6,8 @@
 <meta name="robots" content="noindex,nofollow"/>
 <title>ALPEXA Crypto — Dashboard (DEV)</title>
 <link rel="stylesheet" href="../legend-ui.css"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../alpexa-sync.js?v=16"></script>
 <!-- ══════════════════════════════════════════════════════════════════════════
   크립토 레전드 대시보드 — DEV 격리 빌드 (2026-07-16)
   · 기존 파일 0터치: 이 파일은 dev/ 안에서만 자란다. legend-ui.css는 링크만.
@@ -95,6 +97,24 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .wempty .big{font-size:15px; font-weight:700; color:var(--lgd-ink); opacity:.55}
 .wempty .tag{background:var(--lgd-pill); border-radius:999px; padding:4px 11px; font-size:10.5px;
   font-weight:700; letter-spacing:.4px; color:var(--lgd-dim)}
+
+/* ══ W1 My wallet — RH 크립토 차트 문법 (앱 Chart 973-1058 번역) ══ */
+.wal{flex:1; min-height:0; display:flex; flex-direction:column; padding:14px 16px 10px}
+.wal .lbl{font-size:var(--lgd-fs-label); color:var(--lgd-dim); font-weight:600}
+.wal .amt{font-size:26px; font-weight:700; letter-spacing:-.3px; margin-top:2px}
+.wal .amt .cents{font-size:17px; color:var(--lgd-dim)}
+.wal .chg{font-size:var(--lgd-fs-caption); font-weight:600; margin-top:3px; min-height:15px}
+.wal .chg.up{color:var(--lgd-up)} .wal .chg.down{color:var(--lgd-down)}
+.wal .chg .dim{color:var(--lgd-dim); font-weight:500}
+.wal .chartwrap{position:relative; flex:1; min-height:90px; margin:8px -6px 2px}
+.wal svg.rhchart{width:100%; height:100%; display:block; touch-action:none; cursor:crosshair}
+.wal .ranges{display:flex; gap:2px; flex:none; margin-top:4px}
+.wal .ranges button{flex:1; background:none; border:none; color:var(--lgd-dim); font-size:10.5px;
+  font-weight:700; padding:6px 0; border-radius:6px; cursor:pointer; font-family:inherit; letter-spacing:.3px}
+.wal .ranges button:hover{color:var(--lgd-ink)}
+.wal .ranges button.on{background:var(--lgd-pill); color:var(--lgd-ink)}
+.wal .pvtag{position:absolute; left:50%; top:8px; transform:translateX(-50%); background:var(--lgd-pill);
+  color:var(--lgd-dim); border-radius:999px; padding:3px 10px; font-size:9.5px; font-weight:700; letter-spacing:.6px}
 
 /* ══ 라이트 테마 — legend-ui.css 무변경, 이 파일 안에서 --lgd-* 토큰만 오버라이드.
    업/다운/링크 색은 의미색이라 유지. 크립토 앱의 라이트 기본과 조화(화이트 서피스). ══ */
@@ -318,7 +338,14 @@ function makeWidget(id, title, sub, linkColor, bodyHTML){
    W6 swap · W7 staking · W8 orders · W9 activity · W10 money */
 const frame=(big,note)=>'<div class="wempty"><span class="big">'+big+'</span><span>'+note+'</span>'+
   '<span class="tag">CONNECTS NEXT</span></div>';
-makeWidget('balance','Account','Crypto','var(--lgd-link1)', frame('My wallet','잔고·변동·포트폴리오 차트 — holdings×prices 서버 표시'));
+makeWidget('balance','Account','Crypto','var(--lgd-link1)',
+  '<div class="wal tnum"><div class="lbl">My wallet</div>'+
+  '<div class="amt" id="walAmt">···</div>'+
+  '<div class="chg" id="walChg"></div>'+
+  '<div class="chartwrap" id="walWrap"><svg class="rhchart" id="walSvg" preserveAspectRatio="none"></svg>'+
+  '<span class="pvtag" id="walPv" style="display:none">PREVIEW · SIGN IN FOR LIVE DATA</span></div>'+
+  '<div class="ranges" id="walRanges">'+['1D','1W','1M','3M','YTD','1Y','ALL'].map((r,i)=>
+    '<button data-r="'+r+'"'+(i===0?' class="on"':'')+'>'+r+'</button>').join('')+'</div></div>');
 makeWidget('staking','Staking','','var(--lgd-link3)', frame('Staked','스테이크 현황 + Stake/Unstake — stake_crypto RPC'));
 makeWidget('markets','Markets','30 assets','var(--lgd-link4)', frame('Watchlist','실시간 시세 — Binance WS + Realtime'));
 makeWidget('activity','Activity','','var(--lgd-link2)', frame('Recent activity','거래·이체·입출금 원장 — 필터/그룹핑'));
@@ -361,8 +388,107 @@ function applyThemeCB(){ const light=localStorage.getItem(TKEY)==='light';
   document.getElementById('thMoon').style.display=light?'none':'';
   document.getElementById('thSun').style.display=light?'':'none'; }
 document.getElementById('btnTheme').onclick=()=>{
-  localStorage.setItem(TKEY, localStorage.getItem(TKEY)==='light'?'dark':'light'); applyThemeCB(); };
+  localStorage.setItem(TKEY, localStorage.getItem(TKEY)==='light'?'dark':'light'); applyThemeCB();
+  renderWal(); };
 applyThemeCB();
+
+/* ════════════════════ W1 My wallet — RH 크립토 차트 (앱 Chart:973-1058 문법 번역) ════════════════════
+   라인 + 에어리어 그라디언트 + 베이스라인 점선 + 끝점 펄스 + 스크럽(수직 점선·값 연동) + 레인지 탭.
+   돈 규율: 세션 있으면 get_portfolio_history(p_acct,p_range) 실데이터(앱:1654 계약),
+   없으면 잔고 '···' + PREVIEW 라벨의 표본 파형 — 가짜 달러 숫자는 절대 표시하지 않는다. */
+const WAL_RANGES={'1D':'Today','1W':'Past week','1M':'Past month','3M':'Past 3 months','YTD':'Year to date','1Y':'Past year','ALL':'All time'};
+const wal={ range:'1D', pts:[], real:false, scrub:null };
+function seedRnd(seed){ let s=seed>>>0; return ()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
+function sampleSeries(range){
+  const N={'1D':96,'1W':84,'1M':90,'3M':90,'YTD':100,'1Y':104,'ALL':120}[range]||96;
+  const rnd=seedRnd(range.split('').reduce((a,c)=>a*31+c.charCodeAt(0),7));
+  let v=100; const out=[]; for(let i=0;i<N;i++){ v*=1+(rnd()-0.482)*0.016; out.push(v); } return out;
+}
+const fmtUsdBig=(v)=>{ const s=Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const i=s.lastIndexOf('.'); return (v<0?'-':'')+'$'+s.slice(0,i)+'<span class="cents">.'+s.slice(i+1)+'</span>'; };
+function cssVar(n){ return getComputedStyle(document.body).getPropertyValue(n).trim()||'#00C805'; }
+function renderWal(){
+  const svg=document.getElementById('walSvg'), wrap=document.getElementById('walWrap');
+  if(!svg||!wrap||wal.pts.length<2) return;
+  const W=Math.max(60,wrap.clientWidth), H=Math.max(60,wrap.clientHeight);
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  const pts=wal.pts, base=pts[0], last=pts[pts.length-1];
+  const up=last>=base, col=up?cssVar('--lgd-up'):cssVar('--lgd-down');
+  // Y 스케일 — min==max 붕괴/미세변동 증폭 방지: 스팬 하한 ±1% (앱 chartYScale:963-971 규칙)
+  let lo=Math.min(...pts), hi=Math.max(...pts);
+  const mid=(lo+hi)/2, span=Math.max(hi-lo, Math.abs(mid)*0.02, 1e-9);
+  lo=mid-span/2; hi=mid+span/2;
+  const padY=12, xAt=i=>i/(pts.length-1)*W, yAt=v=>padY+(1-(v-lo)/(hi-lo))*(H-2*padY);
+  let line=''; pts.forEach((v,i)=>{ line+=(i?'L':'M')+xAt(i).toFixed(1)+' '+yAt(v).toFixed(1)+' '; });
+  const area=line+'L'+W+' '+H+' L0 '+H+' Z';
+  const sc=wal.scrub, si=sc==null?pts.length-1:sc;
+  const ex=xAt(si), ey=yAt(pts[si]);
+  svg.innerHTML=
+    '<defs><linearGradient id="walG" x1="0" y1="0" x2="0" y2="1">'+
+    '<stop offset="0" stop-color="'+col+'" stop-opacity="0.22"/>'+
+    '<stop offset="1" stop-color="'+col+'" stop-opacity="0"/></linearGradient></defs>'+
+    '<path d="'+area+'" fill="url(#walG)"/>'+
+    '<line x1="0" x2="'+W+'" y1="'+yAt(base).toFixed(1)+'" y2="'+yAt(base).toFixed(1)+'" stroke="'+cssVar('--lgd-dim')+'" stroke-opacity="0.5" stroke-width="1" stroke-dasharray="3 4"/>'+
+    '<path d="'+line+'" fill="none" stroke="'+col+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+
+    (sc==null
+      ? '<circle cx="'+ex+'" cy="'+ey+'" r="7" fill="'+col+'" opacity="0.25"><animate attributeName="r" values="4;13" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.35;0" dur="2s" repeatCount="indefinite"/></circle>'+
+        '<circle cx="'+ex+'" cy="'+ey+'" r="3.4" fill="'+col+'"/>'
+      : '<line x1="'+ex+'" x2="'+ex+'" y1="0" y2="'+H+'" stroke="'+cssVar('--lgd-dim')+'" stroke-width="1" stroke-dasharray="3 4"/>'+
+        '<circle cx="'+ex+'" cy="'+ey+'" r="4" fill="'+col+'"/>'+
+        '<circle cx="'+ex+'" cy="'+ey+'" r="8" fill="'+col+'" opacity="0.18"/>');
+  // 헤더 숫자·변동 — 실데이터만 달러 표기, 프리뷰는 '···' 유지
+  const amtEl=document.getElementById('walAmt'), chgEl=document.getElementById('walChg');
+  const cur=pts[si], d=cur-base, p=base?d/base*100:0;
+  if(wal.real){
+    amtEl.innerHTML=fmtUsdBig(cur);
+    chgEl.className='chg '+(d>=0?'up':'down');
+    chgEl.innerHTML=(d>=0?'▲':'▼')+' $'+Math.abs(d).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+
+      ' ('+(d>=0?'+':'−')+Math.abs(p).toFixed(2)+'%) <span class="dim">'+WAL_RANGES[wal.range]+'</span>';
+  } else {
+    amtEl.textContent='···';
+    chgEl.className='chg '+(d>=0?'up':'down');
+    chgEl.innerHTML=(d>=0?'▲':'▼')+' '+(d>=0?'+':'−')+Math.abs(p).toFixed(2)+'% <span class="dim">'+WAL_RANGES[wal.range]+' · preview</span>';
+  }
+}
+async function loadWallet(){
+  // 실데이터 경로: 세션 실존 + alpexa.me 태그 둘 다 (유령세션 클래스 가드, 결함-로그 2026-07-15)
+  wal.real=false;
+  try{
+    if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.auth){
+      const s=await AlpexaSync.db.auth.getSession();
+      const me=JSON.parse(localStorage.getItem('alpexa.me')||'null');
+      const acct=me&&me.accts&&me.accts.crypto;
+      if(s&&s.data&&s.data.session&&acct){
+        const r=await AlpexaSync.db.rpc('get_portfolio_history',{p_acct:acct,p_range:wal.range});
+        if(r&&r.data&&r.data.ok&&Array.isArray(r.data.points)&&r.data.points.length>1){
+          wal.pts=r.data.points.map(pt=>+pt.v||0); wal.real=true;
+        }
+      }
+    }
+  }catch(e){}
+  if(!wal.real) wal.pts=sampleSeries(wal.range);
+  document.getElementById('walPv').style.display=wal.real?'none':'';
+  wal.scrub=null; renderWal();
+}
+/* 스크럽 — 포인터 x → 인덱스, 떼면 라이브 끝점 복귀 (앱:987-994 계약) */
+(function(){
+  const svg=document.getElementById('walSvg'); if(!svg) return;
+  const idxOf=e=>{ const r=svg.getBoundingClientRect();
+    const ratio=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width));
+    return Math.round(ratio*(wal.pts.length-1)); };
+  svg.addEventListener('pointerdown',e=>{ svg.setPointerCapture(e.pointerId); wal.scrub=idxOf(e); renderWal(); });
+  svg.addEventListener('pointermove',e=>{ if(e.buttons!==1&&e.pointerType==='mouse'&&wal.scrub==null) return;
+    if(e.buttons===1||e.pointerType!=='mouse'){ wal.scrub=idxOf(e); renderWal(); } });
+  const end=()=>{ if(wal.scrub!=null){ wal.scrub=null; renderWal(); } };
+  svg.addEventListener('pointerup',end); svg.addEventListener('pointerleave',end);
+})();
+document.getElementById('walRanges').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  document.querySelector('#walRanges button.on').classList.remove('on'); b.classList.add('on');
+  wal.range=b.dataset.r; loadWallet();
+});
+try{ new ResizeObserver(()=>renderWal()).observe(document.getElementById('walWrap')); }catch(e){}
+loadWallet();
 </script>
 </body>
 </html>
