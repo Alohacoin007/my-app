@@ -34,6 +34,9 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .htab{display:flex; align-items:center; gap:8px; background:var(--lgd-pill); border-radius:var(--lgd-r-btn);
   height:32px; padding:0 14px 0 12px; font-size:var(--lgd-fs-tab); font-weight:600; cursor:pointer; transition:background .12s}
 .htab:hover{background:var(--lgd-pill-hi)}
+/* 앱 전환 칩 (2026-07-17 사장님 지시) — 비활성 탭 톤, 클릭=같은 탭 이동(세션 유지) */
+.swtab{background:none; color:var(--lgd-dim); cursor:pointer}
+.swtab:hover{background:var(--lgd-pill); color:var(--lgd-ink)}
 .addtab{width:32px; height:32px; border-radius:var(--lgd-r-btn); display:flex; align-items:center;
   justify-content:center; color:var(--lgd-dim); font-size:19px; cursor:pointer}
 .addtab:hover{background:var(--lgd-pill); color:var(--lgd-ink)}
@@ -50,7 +53,12 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .hic:hover{background:var(--lgd-pill)}
 .avatar{width:28px; height:28px; border-radius:999px; background:#3A3E42; display:flex;
   align-items:center; justify-content:center; color:#101214; cursor:pointer;
-  font-size:12.5px; font-weight:800}
+  font-size:12.5px; font-weight:800; position:relative}
+.avatar.me{background:#26292C; color:#C9CDD1}   /* 로그인 = 사람 아이콘 + 초록 상태점 (사장님 시안) */
+.avatar .pdot{position:absolute; right:-1px; bottom:-1px; width:9px; height:9px; border-radius:50%;
+  background:var(--lgd-up); border:2px solid var(--lgd-surface)}
+body.light .avatar.me{background:#D7DBE2; color:#4a5364}
+body.light .avatar .pdot{border-color:#fff}
 .avatar.signin{background:var(--lgd-up); color:#04250B; animation:avpulse 2s ease-in-out infinite}
 @keyframes avpulse{0%,100%{box-shadow:0 0 0 0 rgba(0,200,5,.45)}50%{box-shadow:0 0 0 7px rgba(0,200,5,0)}}
 .tabrow{display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:6px; cursor:pointer}
@@ -519,6 +527,10 @@ body.light #tabMenu, body.light #addMenu{box-shadow:0 8px 24px rgba(15,23,40,.18
     <svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor"><rect x="0.5" y="0.5" width="6" height="14" rx="1.6"/><rect x="8.5" y="0.5" width="6" height="6" rx="1.6"/><rect x="8.5" y="8.5" width="6" height="6" rx="1.6"/></svg>
     Alpexa Crypto
   </div>
+  <div class="htab swtab" id="goSports" title="Switch to the Sports dashboard">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a15 15 0 0 1 0 18M3.5 9h17M3.5 15h17"/></svg>
+    Alpexa Sports
+  </div>
   <div style="position:relative">
     <div class="addtab" id="btnTabs" title="Add server tab">+</div>
     <div id="tabMenu" style="display:none; position:absolute; left:0; top:38px; z-index:50; min-width:230px;
@@ -976,6 +988,7 @@ const goFull=()=>{ if(document.fullscreenElement) document.exitFullscreen();
   else document.documentElement.requestFullscreen().catch(()=>{}); };
 document.getElementById('btnFull').onclick=goFull;
 document.getElementById('cbTab').onclick=goFull;
+document.getElementById('goSports').onclick=()=>{ location.href='/sports-dashboard.html'; };   // 같은 탭 = 세션 유지
 /* B-7 수리: 피드 상태등 = 실제 마지막 틱 나이 (하드코드 초록 금지 — 가짜 신호였음).
    15초 내 틱 = 초록, 그 외 = 꺼짐(회색). WS 죽어도 폴백 폴링이 틱을 찍으면 초록 유지. */
 setInterval(()=>{ const el=document.getElementById('feedDot'); if(!el) return;
@@ -2408,10 +2421,14 @@ async function hdrAuth(){
   const av=document.querySelector('.avatar'); if(!av) return;
   const s=await walSession();
   if(s){
-    av.textContent=((s.me&&s.me.name)||'?').charAt(0).toUpperCase();
-    av.title=((s.me&&s.me.name)||'')+' · signed in'; av.classList.remove('signin');
+    av.innerHTML='<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">'+
+      '<circle cx="12" cy="8.2" r="4.2"/><path d="M4 20.6c0-4 3.6-6.6 8-6.6s8 2.6 8 6.6v.4H4z"/></svg>'+
+      '<span class="pdot"></span>';
+    av.title=((s.me&&s.me.name)||'')+' · signed in';
+    av.classList.remove('signin'); av.classList.add('me');
     av.onclick=()=>{ setHidden('settings',false); bringToFront('settings'); };
   } else {
+    av.classList.remove('me');
     av.textContent='→'; av.title='Sign in'; av.classList.add('signin');
     av.onclick=()=>{ try{ sessionStorage.setItem('alpexa.dest2','crypto-dashboard'); }catch(e){}
       location.href='/login.html'; };
