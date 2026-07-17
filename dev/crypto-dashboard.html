@@ -1672,12 +1672,24 @@ document.getElementById('tkX').onclick=document.getElementById('tkCancel').oncli
 document.getElementById('tkDoneX').onclick=()=>{ tr.tkOpen=false; tkEl.classList.remove('open'); };
 document.getElementById('tkIn').addEventListener('change',e=>{ tr.mode=e.target.value==='usd'?'usd':'coin'; tr.maxAll=false; tkCalc(); });
 document.getElementById('tkQty').addEventListener('input',()=>{ tr.maxAll=false; tkCalc(); });
-document.getElementById('tkUp').onclick=()=>{ const i=document.getElementById('tkQty');
+/* 볼륨 스테퍼 — 꾹 누르면 가속 반복 (사장님 지시 2026-07-17, MT5 볼륨 스테퍼 방식):
+   탭 1회 = 1스텝 · 350ms 홀드 후 반복 시작 · 반복이 쌓일수록 120→60→30ms로 가속. */
+function holdRepeat(el,fn){
+  let t=null,n=0;
+  const stop=()=>{ clearTimeout(t); t=null; n=0; };
+  el.addEventListener('pointerdown',e=>{
+    if(e.button) return; e.preventDefault(); stop(); fn(); n=0;
+    t=setTimeout(function rep(){ n++; fn();
+      t=setTimeout(rep, n>40?30:(n>14?60:120)); },350);
+  });
+  ['pointerup','pointerleave','pointercancel'].forEach(ev=>el.addEventListener(ev,stop));
+  el.addEventListener('click',e=>e.preventDefault());   // pointerdown이 이미 처리 — 이중 스텝 방지
+}
+function tkStep(dir){ const i=document.getElementById('tkQty');
   const step=tr.mode==='usd'?10:(trPrice(tr.side)?10/trPrice(tr.side):0.001);
-  i.value=(+((parseFloat(i.value)||0)+step).toFixed(8)); tr.maxAll=false; tkCalc(); };
-document.getElementById('tkDn').onclick=()=>{ const i=document.getElementById('tkQty');
-  const step=tr.mode==='usd'?10:(trPrice(tr.side)?10/trPrice(tr.side):0.001);
-  i.value=Math.max(0,+((parseFloat(i.value)||0)-step).toFixed(8)); tr.maxAll=false; tkCalc(); };
+  i.value=Math.max(0,+((parseFloat(i.value)||0)+dir*step).toFixed(8)); tr.maxAll=false; tkCalc(); }
+holdRepeat(document.getElementById('tkUp'),()=>tkStep(1));
+holdRepeat(document.getElementById('tkDn'),()=>tkStep(-1));
 document.getElementById('tkBp').onclick=()=>{ if(tr.side!=='sell'||!tr.sess) return;
   document.getElementById('tkIn').value='coin'; tr.mode='coin';
   document.getElementById('tkQty').value=tr.have; tr.maxAll=true; tkCalc(); };
