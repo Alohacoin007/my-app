@@ -482,7 +482,7 @@ body.light .avatar{background:#D7DBE2; color:#4a5364}
 
 <div class="hdr">
   <div class="mark" title="Alpexa Sports">A</div>
-  <div class="htab" id="sbTab" style="cursor:pointer" title="Fullscreen — ESC to exit">
+  <div class="htab" id="sbTab" style="cursor:default" title="Alpexa Sports">
     <svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor"><rect x="0.5" y="0.5" width="6" height="14" rx="1.6"/><rect x="8.5" y="0.5" width="6" height="6" rx="1.6"/><rect x="8.5" y="8.5" width="6" height="6" rx="1.6"/></svg>
     Alpexa Sports
   </div>
@@ -1949,11 +1949,10 @@ function applyThemeSB(){ const light=localStorage.getItem(SB_THKEY)==='light';
 document.getElementById('btnTheme').addEventListener('click', ()=>{
   localStorage.setItem(SB_THKEY, localStorage.getItem(SB_THKEY)==='light'?'dark':'light'); applyThemeSB(); });
 applyThemeSB();
-// Alpexa Sports 탭 = 대시보드 자체 풀스크린 토글 (서버 탭 공통 규칙: 클릭=풀스크린, ESC=인터넷 창)
+// sbTab 풀스크린 제거 (2026-07-17 사장님 지시) — 풀스크린은 오른쪽 버튼만.
+// 탭 본연의 의미는 유지: FX 오버레이가 떠 있으면 Sports 탭 클릭 = 스포츠로 복귀.
 document.getElementById('sbTab').addEventListener('click', ()=>{
-  closeFx();   // FX 오버레이가 떠 있으면 정리하고 스포츠로
-  if(document.fullscreenElement===document.documentElement){ try{ document.exitFullscreen(); }catch(e){} return; }
-  try{ if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(()=>{}); }catch(e){}
+  if(fxOv && fxOv.classList.contains('open')) closeFx();
 });
 document.getElementById('btnTabs').onclick=(e)=>{ e.stopPropagation();
   tabMenu.innerHTML=
