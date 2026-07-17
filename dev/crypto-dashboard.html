@@ -301,6 +301,12 @@ body.light .avatar .pdot{border-color:#fff}
 .tr .hdl{font-size:11px; color:var(--lgd-dim); padding:0 0 14px}
 /* 티켓 오버레이 */
 .tk{position:absolute; inset:0; z-index:9; background:var(--lgd-surface); display:none; flex-direction:column; overflow:auto}
+/* 팝업 모드 (2026-07-17 사장님 지시, 레전드 주문창) — 포트폴리오 클릭 시 떠 있는 창.
+   같은 티켓 DOM·같은 돈 경로, 표시만 플로팅. */
+.tk.float{position:fixed; inset:auto; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:330px; max-height:86vh; z-index:80; border:1px solid var(--lgd-hair);
+  border-radius:12px; box-shadow:0 18px 52px rgba(0,0,0,.55)}
+body.light .tk.float{box-shadow:0 18px 52px rgba(15,23,40,.28)}
 .tk.open{display:flex}
 .tk .tkh{display:flex; align-items:center; padding:11px 14px 7px}
 .tk .tkh .t{font-size:14px; font-weight:800}
@@ -1479,9 +1485,11 @@ async function loadPortfolio(){
 }
 document.getElementById('pfBody').addEventListener('click',e=>{
   const r=e.target.closest('.prow2'); if(!r) return;
-  const s=r.dataset.sym;   // B-5 수리: ALPXS도 통과 — 차트는 정직한 빈 상태, 티켓은 서버가로 매매(환매 경로)
+  const s=r.dataset.sym;   // B-5: ALPXS도 통과 — 차트는 정직한 빈 상태, 티켓은 서버가로 매매(환매 경로)
   if(MK_BSYM[s]||s==='ALPXS'){ window.__cbSel=s;
-    document.dispatchEvent(new CustomEvent('cb-sel',{detail:s})); }   // 보유 클릭 → 차트·티켓 연동
+    document.dispatchEvent(new CustomEvent('cb-sel',{detail:s}));   // 차트·티켓 심볼 동기
+    tkFloat(true); tkOpen('buy');   // 레전드식 팝업 주문창 (2026-07-17) — Sell+Max = 전량 청산
+  }
 });
 setInterval(()=>{ if(!document.hidden&&pf.authed) pfRender(); },2000);   // 라이브 평가액
 setInterval(()=>{ if(!document.hidden&&pf.authed) loadPortfolio(); },30000);   // 보유 재적재
@@ -1621,6 +1629,13 @@ document.addEventListener('cb-sel',e=>{ if(e.detail){ tr.sym=e.detail; tr.maxAll
 setInterval(()=>{ if(!document.hidden) trRender(); },2000);
 /* ── 티켓 ── */
 const tkEl=document.getElementById('tk');
+/* 팝업 모드 — 트레이드 위젯이 숨겨져 있어도 뜨도록 body로 이동했다가 닫으면 원위치.
+   같은 DOM = 같은 핸들러 = 같은 돈 경로 (crypto_trade RPC·halt·이중탭 가드 전부 그대로). */
+const tkHome=tkEl.parentNode;
+function tkFloat(on){
+  if(on){ if(tkEl.parentNode!==document.body) document.body.appendChild(tkEl); tkEl.classList.add('float'); }
+  else { tkEl.classList.remove('float'); if(tkEl.parentNode!==tkHome) tkHome.appendChild(tkEl); }
+}
 function tkSyncSym(){ document.getElementById('tkSym').textContent=tr.sym;
   document.getElementById('tkInCoin').textContent=tr.sym;
   document.getElementById('tkGo').textContent=(tr.side==='buy'?'Buy ':'Sell ')+tr.sym; }
@@ -1683,8 +1698,8 @@ document.getElementById('trSell').onclick=()=>tkOpen('sell');
 document.getElementById('tkBuyT').onclick=()=>{ tr.side='buy'; tkSide(); };
 document.getElementById('tkSellT').onclick=()=>{ tr.side='sell'; tkSide(); };
 document.getElementById('tkX').onclick=document.getElementById('tkCancel').onclick=
-  ()=>{ tr.tkOpen=false; tkEl.classList.remove('open'); };
-document.getElementById('tkDoneX').onclick=()=>{ tr.tkOpen=false; tkEl.classList.remove('open'); };
+  ()=>{ tr.tkOpen=false; tkEl.classList.remove('open'); tkFloat(false); };
+document.getElementById('tkDoneX').onclick=()=>{ tr.tkOpen=false; tkEl.classList.remove('open'); tkFloat(false); };
 document.getElementById('tkIn').addEventListener('change',e=>{ tr.mode=e.target.value==='usd'?'usd':'coin'; tr.maxAll=false; tkCalc(); });
 document.getElementById('tkQty').addEventListener('input',()=>{ tr.maxAll=false; tkCalc(); });
 /* 볼륨 스테퍼 — 꾹 누르면 가속 반복 (사장님 지시 2026-07-17, MT5 볼륨 스테퍼 방식):
