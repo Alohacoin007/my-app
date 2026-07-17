@@ -4,31 +4,338 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=1280"/>
 <meta name="robots" content="noindex,nofollow"/>
-<title>ALPEXA Crypto — Dashboard (WIP)</title>
+<title>ALPEXA Crypto — Dashboard (DEV)</title>
+<link rel="stylesheet" href="../legend-ui.css"/>
 <!-- ══════════════════════════════════════════════════════════════════════════
-  크립토 레전드 대시보드 — 개발 전용 격리 공간 (2026-07-16)
-  · 이 파일은 dev/ 안에서만 자라며, 기존 파일은 어떤 것도 수정하지 않는다.
+  크립토 레전드 대시보드 — DEV 격리 빌드 (2026-07-16)
+  · 기존 파일 0터치: 이 파일은 dev/ 안에서만 자란다. legend-ui.css는 링크만.
   · 어디서도 링크되지 않음 + noindex — 고객 유입 경로 없음.
-  · 완성 후 사용자 승인 시 정식 위치(/crypto-dashboard.html)로 한 번에 이동("실행").
-  · 근거 문서: 크립토-대시보드-기획.md · 크립토-앱-문법-스펙.md · 크립토-대시보드-데이터-스펙.md
+  · 완성 + 승인 후 정식 위치로 한 번에 이동("실행").
+  · 이 단계(바탕화면): 위젯 무브먼트 엔진 — 픽셀 드래그 · 자석 스냅(±6px) + 초록
+    정렬 가이드 · 8px 미세 격자 · 4방향 리사이즈 · z-순서 · 레이아웃 저장/리셋 ·
+    뷰포트 리핏(선형 사상) · 풀스크린. sports-dashboard.html 검증 엔진의 이식본.
+  · 데이터/돈 코드 0 — 위젯 본문은 다음 단계에서 연결 (기획서 M1~M5).
 ═══════════════════════════════════════════════════════════════════════════ -->
 <style>
-html,body{height:100%;margin:0;background:#0B0D0E;color:#F5F6F7;font-family:Inter,-apple-system,sans-serif}
-.wrap{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
-.mark{width:44px;height:44px;border-radius:10px;background:#16181A;border:1px solid rgba(255,255,255,.10);
-  display:flex;align-items:center;justify-content:center;font-weight:900;font-size:24px}
-h1{margin:0;font-size:18px;font-weight:700}
-p{margin:0;font-size:12.5px;color:#8B9096}
-.pill{background:#16181A;border:1px solid rgba(255,255,255,.10);border-radius:999px;padding:7px 15px;
-  font-size:12px;font-weight:700;color:#8B9096}
+html,body{height:100%; margin:0; background:var(--lgd-bg,#0B0D0E)}
+body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
+.tnum{font-variant-numeric:tabular-nums}
+/* 스크롤바 전면 숨김 (스포츠 대시보드와 동일 결정) */
+*{scrollbar-width:none; -ms-overflow-style:none}
+*::-webkit-scrollbar{width:0; height:0; display:none}
+
+/* ══ 헤더 (레전드 §2: h48 · 블랙 바 · 탭 필 · 중앙 상태 필 · 우측 액션) ══ */
+.hdr{display:flex; align-items:center; gap:8px; height:var(--lgd-header-h); padding:0 14px;
+  background:#000; border-bottom:1px solid var(--lgd-hair)}
+.mark{width:26px; height:26px; display:flex; align-items:center; justify-content:center;
+  color:#fff; font-family:'Arial Black',Arial,sans-serif; font-weight:900; font-size:19px; letter-spacing:-1px}
+.htab{display:flex; align-items:center; gap:8px; background:var(--lgd-pill); border-radius:var(--lgd-r-btn);
+  height:32px; padding:0 14px 0 12px; font-size:var(--lgd-fs-tab); font-weight:600; cursor:pointer; transition:background .12s}
+.htab:hover{background:var(--lgd-pill-hi)}
+.addtab{width:32px; height:32px; border-radius:var(--lgd-r-btn); display:flex; align-items:center;
+  justify-content:center; color:var(--lgd-dim); font-size:19px; cursor:pointer}
+.addtab:hover{background:var(--lgd-pill); color:var(--lgd-ink)}
+.hsp{flex:1}
+.hmid{display:flex; align-items:center; gap:8px; background:var(--lgd-pill); border-radius:999px;
+  height:32px; padding:0 14px; font-size:var(--lgd-fs-body); font-weight:600}
+.hmid .dot{width:6px; height:6px; border-radius:999px; background:#C8C8C2}
+.hmid .dot.ok{background:var(--lgd-up)}
+.hbtn{background:var(--lgd-pill); border:none; color:var(--lgd-ink); border-radius:var(--lgd-r-btn); height:32px;
+  padding:0 14px; font-size:var(--lgd-fs-body); font-weight:600; cursor:pointer; transition:background .12s}
+.hbtn:hover{background:var(--lgd-pill-hi)}
+.hic{width:34px; height:34px; border-radius:var(--lgd-r-btn); display:flex; align-items:center;
+  justify-content:center; color:var(--lgd-ink); cursor:pointer}
+.hic:hover{background:var(--lgd-pill)}
+.avatar{width:28px; height:28px; border-radius:999px; background:#3A3E42; display:flex;
+  align-items:center; justify-content:center; color:#101214; cursor:pointer}
+.tabrow{display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:6px; cursor:pointer}
+.tabrow:hover{background:var(--lgd-pill)}
+.tabrow.dis{cursor:default; color:var(--lgd-dim)}
+.tabrow.dis:hover{background:transparent}
+.tabrow .sub{margin-left:auto; color:var(--lgd-dim); font-size:var(--lgd-fs-caption)}
+
+/* ══ 캔버스 + 점 그리드 (드래그/리사이즈 중에만) ══ */
+.stage{position:relative; height:calc(100vh - 49px); overflow:auto; background:var(--lgd-bg)}
+.dots{position:absolute; inset:0; opacity:0; transition:opacity .18s; pointer-events:none; z-index:1;
+  background-image:radial-gradient(circle, rgba(255,255,255,.15) 1.2px, transparent 1.6px);
+  background-size:38px 38px; background-position:19px 19px}
+.stage.dragging .dots{opacity:1}
+.algn{position:absolute; background:var(--lgd-up); z-index:45; pointer-events:none}
+.algn.v{width:1px; top:0; bottom:0}
+.algn.h{height:1px; left:0; right:0}
+@media (prefers-reduced-motion: reduce){ .dots{transition:none} }
+
+/* ══ 위젯 크롬 (레전드 §3: 타이틀바 36 · 링크 사각형 · ⋮ · 4방향 리사이즈) ══ */
+.widget{position:absolute; display:flex; flex-direction:column; background:var(--lgd-surface);
+  border:1px solid var(--lgd-hair); border-radius:var(--lgd-r-widget); overflow:hidden; z-index:2}
+.widget.drag{box-shadow:0 12px 32px rgba(0,0,0,.6); opacity:.92; z-index:9}
+.wtb{display:flex; align-items:center; gap:9px; height:var(--lgd-titlebar-h); padding:0 10px;
+  border-bottom:1px solid var(--lgd-hair); flex:none; cursor:grab; user-select:none}
+.widget.drag .wtb{cursor:grabbing}
+.linksq{width:12px; height:12px; border-radius:3px; flex:none; cursor:pointer}
+.wtb h3{margin:0; font-size:var(--lgd-fs-widget-title); font-weight:700}
+.wtb .wsub{font-size:var(--lgd-fs-label); color:var(--lgd-dim)}
+.wtb .wsp{flex:1}
+.wtb .wic{width:24px; height:24px; display:flex; align-items:center; justify-content:center;
+  color:var(--lgd-dim); cursor:pointer; border-radius:5px}
+.wtb .wic:hover{background:var(--lgd-surface2); color:var(--lgd-ink)}
+.wbody{flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column}
+.rz{position:absolute; z-index:6}
+.rz.br{right:0; bottom:0; width:18px; height:18px; cursor:nwse-resize}
+.rz.br::after{content:""; position:absolute; right:5px; bottom:5px; width:7px; height:7px;
+  border-right:2px solid var(--lgd-dim); border-bottom:2px solid var(--lgd-dim);
+  border-bottom-right-radius:2px; opacity:0; transition:opacity .12s}
+.widget:hover .rz.br::after{opacity:1}
+.rz.r{right:-3px; top:12px; bottom:20px; width:8px; cursor:ew-resize}
+.rz.l{left:-3px; top:12px; bottom:20px; width:8px; cursor:ew-resize}
+.rz.b{bottom:-3px; left:12px; right:20px; height:8px; cursor:ns-resize}
+.rz.r:hover,.rz.l:hover,.rz.b:hover{background:rgba(255,255,255,.06); border-radius:4px}
+.wempty{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+  color:var(--lgd-dim); font-size:var(--lgd-fs-label); text-align:center; padding:16px}
+.wempty .big{font-size:15px; font-weight:700; color:var(--lgd-ink); opacity:.55}
+.wempty .tag{background:var(--lgd-pill); border-radius:999px; padding:4px 11px; font-size:10.5px;
+  font-weight:700; letter-spacing:.4px; color:var(--lgd-dim)}
 </style>
 </head>
-<body>
-<div class="wrap">
-  <div class="mark">A</div>
-  <h1>Alpexa Crypto — Legend Dashboard</h1>
-  <p>Workspace secured · build starts on approval</p>
-  <span class="pill">DEV · not linked anywhere</span>
+<body class="lgd">
+
+<div class="hdr">
+  <div class="mark" title="Alpexa Crypto">A</div>
+  <div class="htab" id="cbTab" title="Fullscreen — ESC to exit">
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor"><rect x="0.5" y="0.5" width="6" height="14" rx="1.6"/><rect x="8.5" y="0.5" width="6" height="6" rx="1.6"/><rect x="8.5" y="8.5" width="6" height="6" rx="1.6"/></svg>
+    Alpexa Crypto
+  </div>
+  <div style="position:relative">
+    <div class="addtab" id="btnTabs" title="Add server tab">+</div>
+    <div id="tabMenu" style="display:none; position:absolute; left:0; top:38px; z-index:50; min-width:230px;
+      background:var(--lgd-surface2); border:1px solid var(--lgd-hair); border-radius:var(--lgd-r-pop);
+      box-shadow:0 8px 24px rgba(0,0,0,.5); padding:6px; font-size:var(--lgd-fs-body)"></div>
+  </div>
+  <div class="hsp"></div>
+  <div class="hmid"><span>Crypto dashboard · DEV</span><span class="dot" id="feedDot"></span></div>
+  <div class="hsp"></div>
+  <div style="position:relative">
+    <button class="hbtn" id="btnAdd">Add widget</button>
+    <div id="addMenu" style="display:none; position:absolute; right:0; top:38px; z-index:50; min-width:180px;
+      background:var(--lgd-surface2); border:1px solid var(--lgd-hair); border-radius:var(--lgd-r-pop);
+      box-shadow:0 8px 24px rgba(0,0,0,.5); padding:6px; font-size:var(--lgd-fs-body)"></div>
+  </div>
+  <button class="hbtn" id="btnReset" title="Reset layout">Reset layout</button>
+  <div class="hic" id="btnFull" title="Full screen" role="button" aria-label="Toggle full screen" style="cursor:pointer">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+  </div>
+  <div class="avatar" title="Account">●</div>
 </div>
+
+<div class="stage" id="stage"><div class="dots"></div></div>
+
+<script>
+'use strict';
+/* ════════════════════ 레이아웃 엔진 — sports-dashboard.html 검증 이식본 ════════════════════
+   픽셀 드래그 + 자석 스냅(±6px, 이웃 변/8px 갭/가터) + 초록 정렬 가이드 + 8px 미세 격자 +
+   4방향 리사이즈 + z-순서 + 저장/리셋 + 뷰포트 선형 리핏. */
+const GRID=38, FINE=8, SNAP=6, GAP=8, LKEY='alpexa.cbdash.layout.v1';
+const stage=document.getElementById('stage');
+const guides={ els:[], clear(){ this.els.forEach(e=>e.remove()); this.els=[]; },
+  v(x){ const e=document.createElement('div'); e.className='algn v'; e.style.left=x+'px';
+    stage.appendChild(e); this.els.push(e); },
+  h(y){ const e=document.createElement('div'); e.className='algn h'; e.style.top=y+'px';
+    stage.appendChild(e); this.els.push(e); } };
+function snapAxis(cands, v){ let best=null;
+  for(const c of cands){ const d=Math.abs(c.at-v); if(d<=SNAP&&(!best||d<best.d)) best={...c,d}; }
+  return best; }
+function othersOf(id){ return Object.keys(layout).filter(k=>k!=='__ref'&&k!==id&&!layout[k].hidden).map(k=>layout[k]); }
+function dragCands(id, w, h){
+  const xs=[{at:GAP, guide:GAP}], ys=[{at:GAP, guide:GAP}];
+  othersOf(id).forEach(o=>{
+    xs.push({at:o.x, guide:o.x});
+    xs.push({at:o.x+o.w-w, guide:o.x+o.w});
+    xs.push({at:o.x+o.w+GAP, guide:o.x+o.w+GAP/2});
+    xs.push({at:o.x-w-GAP, guide:o.x-GAP/2});
+    ys.push({at:o.y, guide:o.y});
+    ys.push({at:o.y+o.h-h, guide:o.y+o.h});
+    ys.push({at:o.y+o.h+GAP, guide:o.y+o.h+GAP/2});
+    ys.push({at:o.y-h-GAP, guide:o.y-GAP/2});
+  });
+  return {xs,ys};
+}
+/* 기본 배치 v1 — 1900×856 기준, GAP 8 수학 정합:
+   열 8|340|520|660|340 (경계 348/356·876/884·1544/1552·1892) — 340+520+660+340=1860 + 갭5×8=1900 ✓
+   행 504+8+328 (=840+16=856 ✓) · A열은 452+8+380 (=840) ✓
+   위젯 10종 중 8종 기본 표시, swap/orders는 Add widget으로 (기획 §2). */
+const DEFAULT_LAYOUT={
+  balance:{x:8,y:8,w:340,h:452},   staking:{x:8,y:468,w:340,h:380},
+  markets:{x:356,y:8,w:520,h:504}, activity:{x:356,y:520,w:520,h:328},
+  chart:{x:884,y:8,w:660,h:504},   portfolio:{x:884,y:520,w:660,h:328},
+  trade:{x:1552,y:8,w:340,h:504},  money:{x:1552,y:520,w:340,h:328},
+  swap:{x:1208,y:8,w:336,h:420,hidden:true}, orders:{x:1208,y:436,w:336,h:412,hidden:true},
+  __ref:{w:1900,h:856} };
+const deepLayout=(o)=>JSON.parse(JSON.stringify(o));
+const MIN_SIZE={ balance:{w:300,h:220}, staking:{w:300,h:240}, markets:{w:400,h:260}, activity:{w:400,h:220},
+  chart:{w:480,h:280}, portfolio:{w:440,h:220}, trade:{w:300,h:320}, money:{w:300,h:200},
+  swap:{w:300,h:300}, orders:{w:300,h:220} };
+function loadLayout(){ try{ const raw=localStorage.getItem(LKEY); if(!raw) return deepLayout(DEFAULT_LAYOUT);
+  const p=JSON.parse(raw);
+  Object.keys(DEFAULT_LAYOUT).forEach(k=>{ if(!p[k]) p[k]=deepLayout(DEFAULT_LAYOUT[k]); });
+  return p;
+}catch(e){ return deepLayout(DEFAULT_LAYOUT); } }
+let layout=loadLayout();
+Object.keys(layout).forEach(id=>{ const m=MIN_SIZE[id]; if(!m) return;
+  if(layout[id].w<m.w) layout[id].w=m.w; if(layout[id].h<m.h) layout[id].h=m.h; });
+function saveLayout(){ try{ localStorage.setItem(LKEY, JSON.stringify(layout)); }catch(e){} }
+document.getElementById('btnReset').onclick=()=>{ try{ localStorage.removeItem(LKEY); }catch(e){}
+  layout=deepLayout(DEFAULT_LAYOUT); Object.keys(layout).forEach(k=>{ if(k!=='__ref') applyGeo(k); });
+  renderAddMenu(); refitLayout(); };
+
+/* 뷰포트 선형 리핏 — 저장 배치를 기준 뷰포트 → 현재 뷰포트로 재사상 (끝변 매핑, float 유지) */
+const HDR_H=48;
+function refitLayout(){
+  const vw=window.innerWidth, vh=window.innerHeight-HDR_H;
+  if(vw<500||vh<300) return;
+  const ref=layout.__ref||{w:1900,h:856};
+  if(Math.abs(ref.w-vw)<2&&Math.abs(ref.h-vh)<2){ layout.__ref={w:vw,h:vh}; return; }
+  const sx=(vw-2*GAP)/(ref.w-2*GAP), sy=(vh-2*GAP)/(ref.h-2*GAP);
+  const mapX=v=>GAP+(v-GAP)*sx, mapY=v=>GAP+(v-GAP)*sy;
+  Object.keys(layout).forEach(id=>{ if(id==='__ref') return; const g=layout[id];
+    const r=mapX(g.x+g.w), b=mapY(g.y+g.h);
+    g.x=mapX(g.x); g.y=mapY(g.y); g.w=r-g.x; g.h=b-g.y;
+    if(g.w<120)g.w=120; if(g.h<120)g.h=120;
+    applyGeo(id); });
+  layout.__ref={w:vw,h:vh}; saveLayout();
+}
+let _refitT=null;
+window.addEventListener('resize', ()=>{ clearTimeout(_refitT); _refitT=setTimeout(refitLayout,150); });
+document.addEventListener('fullscreenchange', ()=>{ clearTimeout(_refitT); _refitT=setTimeout(refitLayout,120); });
+
+function applyGeo(id){ const el=document.getElementById('w-'+id); if(!el) return; const g=layout[id];
+  el.style.display=g.hidden?'none':'flex';
+  el.style.left=g.x+'px'; el.style.top=g.y+'px'; el.style.width=g.w+'px'; el.style.height=g.h+'px'; }
+const WIDGET_TITLES={ balance:'Account', portfolio:'Portfolio', markets:'Markets', chart:'Chart',
+  trade:'Trade', swap:'Swap', staking:'Staking', orders:'Open orders', activity:'Activity', money:'Money moves' };
+function setHidden(id, hidden){ layout[id].hidden=hidden; applyGeo(id); saveLayout(); renderAddMenu(); }
+function renderAddMenu(){ const m=document.getElementById('addMenu'); if(!m) return;
+  m.innerHTML=Object.keys(WIDGET_TITLES).map(id=>{
+    const off=!!layout[id].hidden;
+    return '<div class="addrow" data-id="'+id+'" style="display:flex; align-items:center; gap:8px; padding:8px 10px;'+
+      ' border-radius:6px; cursor:pointer'+(off?'':'; color:var(--lgd-dim)')+'">'+
+      '<span style="width:14px; text-align:center">'+(off?'+':'✓')+'</span>'+WIDGET_TITLES[id]+'</div>';
+  }).join('');
+}
+
+/* 클릭한 위젯 = 맨 앞 — z 2..N 재정규화 (가이드 z45 아래 유지) */
+const zOrder=[];
+function bringToFront(id){
+  const i=zOrder.indexOf(id); if(i>=0) zOrder.splice(i,1); zOrder.push(id);
+  zOrder.forEach((wid,k)=>{ const el=document.getElementById('w-'+wid); if(el) el.style.zIndex=2+k; });
+}
+function makeWidget(id, title, sub, linkColor, bodyHTML){
+  const el=document.createElement('div'); el.className='widget'; el.id='w-'+id;
+  zOrder.push(id);
+  el.addEventListener('pointerdown', ()=>bringToFront(id), true);
+  el.innerHTML='<div class="wtb"><span class="linksq" style="background:'+linkColor+'"></span>'+
+    '<h3>'+title+'</h3>'+(sub?'<span class="wsub">'+sub+'</span>':'')+
+    '<span class="wsp"></span><span class="wic" title="Close widget">⋮</span></div>'+
+    '<div class="wbody">'+bodyHTML+'</div>';
+  stage.appendChild(el); applyGeo(id);
+  el.querySelector('.wic').addEventListener('click', ()=>setHidden(id,true));
+  // 드래그 (타이틀바) — 자석 스냅 + 초록 가이드, 미스냅 축은 8px 미세 격자
+  const tb=el.querySelector('.wtb');
+  tb.addEventListener('pointerdown', e=>{
+    if(e.target.closest('.wic,.linksq')) return;
+    e.preventDefault(); tb.setPointerCapture(e.pointerId);
+    const g=layout[id], offX=e.clientX-g.x, offY=e.clientY-g.y;
+    stage.classList.add('dragging'); el.classList.add('drag');
+    const cands=dragCands(id, g.w, g.h);
+    const move=ev=>{
+      let x=Math.max(0,ev.clientX-offX), y=Math.max(0,ev.clientY-offY);
+      guides.clear();
+      const sx=snapAxis(cands.xs,x), sy=snapAxis(cands.ys,y);
+      if(sx){ x=sx.at; guides.v(sx.guide); }
+      if(sy){ y=sy.at; guides.h(sy.guide); }
+      g.x=x; g.y=y; applyGeo(id); };
+    const up=()=>{ tb.removeEventListener('pointermove',move); tb.removeEventListener('pointerup',up);
+      stage.classList.remove('dragging'); el.classList.remove('drag'); guides.clear();
+      const sx=snapAxis(cands.xs,g.x), sy=snapAxis(cands.ys,g.y);
+      if(!sx) g.x=Math.round(g.x/FINE)*FINE;
+      if(!sy) g.y=Math.round(g.y/FINE)*FINE;
+      applyGeo(id); saveLayout(); };
+    tb.addEventListener('pointermove',move); tb.addEventListener('pointerup',up);
+  });
+  // 리사이즈 4방향 — 이웃 변/갭 스냅, 미스냅 치수는 8px 격자
+  const MINW=(MIN_SIZE[id]||{}).w||220, MINH=(MIN_SIZE[id]||{}).h||170;
+  ['br','r','l','b'].forEach(dir=>{
+    const rz=document.createElement('div'); rz.className='rz '+dir; el.appendChild(rz);
+    rz.addEventListener('pointerdown', e=>{
+      e.preventDefault(); e.stopPropagation(); rz.setPointerCapture(e.pointerId);
+      const g=layout[id], x0=e.clientX, y0=e.clientY, w0=g.w, h0=g.h, l0=g.x;
+      stage.classList.add('dragging'); el.classList.add('drag');
+      const eXs=[], eYs=[];
+      othersOf(id).forEach(o=>{ eXs.push({at:o.x-GAP, guide:o.x-GAP/2},{at:o.x, guide:o.x},{at:o.x+o.w, guide:o.x+o.w});
+        eYs.push({at:o.y-GAP, guide:o.y-GAP/2},{at:o.y, guide:o.y},{at:o.y+o.h, guide:o.y+o.h}); });
+      const move=ev=>{ const dx=ev.clientX-x0, dy=ev.clientY-y0;
+        guides.clear();
+        if(dir==='br'||dir==='r'){ let r=l0+Math.max(MINW,w0+dx);
+          const sn=snapAxis(eXs,r); if(sn){ r=sn.at; guides.v(sn.guide); } g.w=Math.max(MINW,r-g.x); }
+        if(dir==='br'||dir==='b'){ let btm=g.y+Math.max(MINH,h0+dy);
+          const sn=snapAxis(eYs,btm); if(sn){ btm=sn.at; guides.h(sn.guide); } g.h=Math.max(MINH,btm-g.y); }
+        if(dir==='l'){ let x=l0+Math.min(dx,w0-MINW);
+          const sn=snapAxis(eXs,x); if(sn){ x=sn.at; guides.v(sn.guide); }
+          const w=Math.max(MINW,l0+w0-x); g.x=l0+w0-w; g.w=w; }
+        applyGeo(id); };
+      const up=()=>{ rz.removeEventListener('pointermove',move); rz.removeEventListener('pointerup',up);
+        stage.classList.remove('dragging'); el.classList.remove('drag'); guides.clear();
+        const right=g.x+g.w, btm=g.y+g.h;
+        if(!snapAxis(eXs,right)) g.w=Math.max(MINW,Math.round(g.w/FINE)*FINE);
+        if(!snapAxis(eYs,btm)) g.h=Math.max(MINH,Math.round(g.h/FINE)*FINE);
+        if(dir==='l'){ if(!snapAxis(eXs,g.x)) g.x=right-g.w; }
+        applyGeo(id); saveLayout(); };
+      rz.addEventListener('pointermove',move); rz.addEventListener('pointerup',up);
+    });
+  });
+  return el;
+}
+
+/* ════════════════════ 위젯 프레임 10종 (본문은 다음 단계에서 연결) ════════════════════
+   기획서 §2 매핑: W1 balance · W2 portfolio · W3 markets · W4 chart · W5 trade ·
+   W6 swap · W7 staking · W8 orders · W9 activity · W10 money */
+const frame=(big,note)=>'<div class="wempty"><span class="big">'+big+'</span><span>'+note+'</span>'+
+  '<span class="tag">CONNECTS NEXT</span></div>';
+makeWidget('balance','Account','Crypto','var(--lgd-link1)', frame('My wallet','잔고·변동·포트폴리오 차트 — holdings×prices 서버 표시'));
+makeWidget('staking','Staking','','var(--lgd-link3)', frame('Staked','스테이크 현황 + Stake/Unstake — stake_crypto RPC'));
+makeWidget('markets','Markets','30 assets','var(--lgd-link4)', frame('Watchlist','실시간 시세 — Binance WS + Realtime'));
+makeWidget('activity','Activity','','var(--lgd-link2)', frame('Recent activity','거래·이체·입출금 원장 — 필터/그룹핑'));
+makeWidget('chart','Chart','','var(--lgd-link4)', frame('BTC · Chart','klines 실봉 + 레인지 7종 + 스크럽'));
+makeWidget('portfolio','Portfolio','','var(--lgd-link1)', frame('Holdings','Crypto · Securities · Staked 섹션'));
+makeWidget('trade','Trade','','var(--lgd-link2)', frame('Buy / Sell','crypto_trade RPC — 신선도 120s 락스텝'));
+makeWidget('money','Money moves','','var(--lgd-link3)', frame('Send · Transfer · Fund · Withdraw','2FA/OTP 관문 시트'));
+makeWidget('swap','Swap','','var(--lgd-link2)', frame('Swap','swap_crypto RPC'));
+makeWidget('orders','Open orders','','var(--lgd-link3)', frame('Pending (manual)','표시·취소 전용 — 체결기 없음(정직 표기)'));
+
+renderAddMenu();
+refitLayout();
+Object.keys(layout).forEach(k=>{ if(k!=='__ref') applyGeo(k); });
+
+/* ── 헤더 동작 ── */
+document.getElementById('btnAdd').onclick=(e)=>{ e.stopPropagation();
+  const m=document.getElementById('addMenu'); m.style.display=m.style.display==='none'?'block':'none'; };
+document.getElementById('addMenu').addEventListener('click', e=>{
+  const r=e.target.closest('.addrow'); if(!r) return;
+  setHidden(r.dataset.id, !layout[r.dataset.id].hidden); });
+document.getElementById('btnTabs').onclick=(e)=>{ e.stopPropagation();
+  const m=document.getElementById('tabMenu');
+  if(m.style.display==='none'){
+    m.innerHTML='<div class="tabrow dis">Alpexa Crypto<span class="sub">this dashboard</span></div>'+
+      '<div class="tabrow dis">Alpexa FX<span class="sub">soon</span></div>'+
+      '<div class="tabrow dis">Alpexa Sports<span class="sub">soon</span></div>';
+    m.style.display='block';
+  } else m.style.display='none'; };
+document.addEventListener('click', ()=>{ document.getElementById('addMenu').style.display='none';
+  document.getElementById('tabMenu').style.display='none'; });
+const goFull=()=>{ if(document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen().catch(()=>{}); };
+document.getElementById('btnFull').onclick=goFull;
+document.getElementById('cbTab').onclick=goFull;
+document.getElementById('feedDot').classList.add('ok');
+</script>
 </body>
 </html>
