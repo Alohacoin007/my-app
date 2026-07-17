@@ -127,6 +127,56 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .wal .kv.lnk:hover{background:var(--lgd-surface2)}
 .wal .kv .go{color:var(--lgd-dim); font-size:11px; margin-left:7px}
 
+/* ══ W3 Markets — 레전드 워치리스트 문법 (사용자 스크린샷 2026-07-16) ══ */
+.mk{flex:1; min-height:0; display:flex; flex-direction:column; position:relative}
+.mk .mhead{display:grid; grid-template-columns:26px 1.2fr 1fr 1fr 1fr; gap:6px; padding:8px 14px 6px;
+  font-size:10.5px; font-weight:700; letter-spacing:.4px; color:var(--lgd-dim); border-bottom:1px solid var(--lgd-hair)}
+.mk .mhead span{text-align:right}
+.mk .mhead .sym{text-align:left}
+.mk .mhead .sortable{cursor:pointer; user-select:none}
+.mk .mhead .sortable:hover{color:var(--lgd-ink)}
+.mk .mlist{flex:1; overflow:auto}
+.mk .mrow{display:grid; grid-template-columns:26px 1.2fr 1fr 1fr 1fr; gap:6px; align-items:center;
+  padding:9px 14px; font-size:12.5px; cursor:pointer; border-bottom:1px solid transparent}
+.mk .mrow:hover{background:var(--lgd-surface2)}
+.mk .mrow .idx{color:var(--lgd-dim); font-size:11px}
+.mk .mrow .sym{display:flex; align-items:center; gap:6px; font-weight:700}
+.mk .mrow .sym .cbadge{width:13px; height:13px; border-radius:50%; border:1.4px solid var(--lgd-dim);
+  display:inline-flex; align-items:center; justify-content:center; font-size:8px; color:var(--lgd-dim); flex:none}
+.mk .mrow .chg{text-align:right; font-weight:600}
+.mk .mrow .chg.up{color:var(--lgd-up)} .mk .mrow .chg.down{color:var(--lgd-down)}
+.mk .mrow .px{text-align:right; font-weight:600}
+@keyframes mkflashU{0%{background:var(--lgd-up-soft,rgba(0,200,5,.16))}100%{background:transparent}}
+@keyframes mkflashD{0%{background:rgba(235,93,42,.14)}100%{background:transparent}}
+.mk .mrow.fu{animation:mkflashU .7s ease-out}
+.mk .mrow.fd{animation:mkflashD .7s ease-out}
+.mk .madd{display:flex; align-items:center; gap:8px; padding:10px 14px; color:var(--lgd-dim);
+  font-size:12.5px; font-weight:600; cursor:pointer; flex:none}
+.mk .madd:hover{color:var(--lgd-ink)}
+/* + Add 팝오버 — 검색 + 카테고리 칩 + 체크 리스트 */
+.mk .mpop{position:absolute; left:10px; right:10px; bottom:44px; z-index:8; background:var(--lgd-surface2);
+  border:1px solid var(--lgd-hair); border-radius:var(--lgd-r-pop); box-shadow:0 12px 32px rgba(0,0,0,.5);
+  padding:10px; display:none; flex-direction:column; gap:8px; max-height:62%}
+.mk .mpop.open{display:flex}
+.mk .mpop .srch{display:flex; align-items:center; gap:7px; background:var(--lgd-pill); border-radius:8px; padding:7px 10px}
+.mk .mpop .srch input{flex:1; background:none; border:none; outline:none; color:var(--lgd-ink);
+  font-size:12.5px; font-family:inherit}
+.mk .mpop .srch .x{cursor:pointer; color:var(--lgd-dim)}
+.mk .mpop .chips{display:flex; gap:6px; flex-wrap:wrap}
+.mk .mpop .chip{background:var(--lgd-pill); border-radius:999px; padding:5px 12px; font-size:11px;
+  font-weight:700; cursor:pointer; color:var(--lgd-ink)}
+.mk .mpop .chip.on{background:var(--lgd-ink); color:var(--lgd-bg)}
+.mk .mpop .chip.dis{color:var(--lgd-dim); cursor:default}
+.mk .mpop .grp{font-size:10.5px; font-weight:700; letter-spacing:.4px; color:var(--lgd-dim); padding:4px 2px 2px}
+.mk .mpop .plist{overflow:auto; min-height:0}
+.mk .mpop .prow{display:flex; align-items:center; gap:9px; padding:7px 6px; border-radius:6px;
+  cursor:pointer; font-size:12.5px}
+.mk .mpop .prow:hover{background:var(--lgd-pill)}
+.mk .mpop .prow .ps{font-weight:700; width:52px}
+.mk .mpop .prow .pn{color:var(--lgd-dim)}
+.mk .mpop .prow .ck{margin-left:auto; color:var(--lgd-dim)}
+.mk .mpop .prow.in .ps,.mk .mpop .prow.in .pn{opacity:.45}
+
 /* ══ 라이트 테마 — legend-ui.css 무변경, 이 파일 안에서 --lgd-* 토큰만 오버라이드.
    업/다운/링크 색은 의미색이라 유지. 크립토 앱의 라이트 기본과 조화(화이트 서피스). ══ */
 body.light{
@@ -375,7 +425,21 @@ makeWidget('balance','Account','Crypto','var(--lgd-link1)',
   '<div class="kv lnk" id="kvGoSp"><span class="k">Alpexa Sports</span><span class="v" id="kvSp">···</span><span class="go">›</span></div>'+
   '</div></div>');
 makeWidget('staking','Staking','','var(--lgd-link3)', frame('Staked','스테이크 현황 + Stake/Unstake — stake_crypto RPC'));
-makeWidget('markets','Markets','30 assets','var(--lgd-link4)', frame('Watchlist','실시간 시세 — Binance WS + Realtime'));
+makeWidget('markets','Markets','','var(--lgd-link4)',
+  '<div class="mk tnum">'+
+  '<div class="mhead"><span></span><span class="sym">SYMBOL</span>'+
+  '<span class="sortable" id="mkSortChg">CHANGE % <span id="mkArr">▼</span></span>'+
+  '<span>BID</span><span>ASK</span></div>'+
+  '<div class="mlist" id="mkList"></div>'+
+  '<div class="madd" id="mkAdd">+ Add</div>'+
+  '<div class="mpop" id="mkPop">'+
+  '<div class="srch"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>'+
+  '<input id="mkQ" placeholder="Search crypto"/><span class="x" id="mkQx">✕</span></div>'+
+  '<div class="chips"><span class="chip on" data-c="all">All</span><span class="chip dis" title="Soon">Equities</span>'+
+  '<span class="chip dis" title="Soon">Futures</span><span class="chip" data-c="crypto">Crypto</span>'+
+  '<span class="chip dis" title="Soon">Indexes</span></div>'+
+  '<div class="grp">Popular crypto</div><div class="plist" id="mkPlist"></div>'+
+  '</div></div>');
 makeWidget('activity','Activity','','var(--lgd-link2)', frame('Recent activity','거래·이체·입출금 원장 — 필터/그룹핑'));
 makeWidget('chart','Chart','','var(--lgd-link4)', frame('BTC · Chart','klines 실봉 + 레인지 7종 + 스크럽'));
 makeWidget('portfolio','Portfolio','','var(--lgd-link1)', frame('Holdings','Crypto · Securities · Staked 섹션'));
@@ -569,6 +633,123 @@ document.getElementById('walRanges').addEventListener('click',e=>{
 });
 try{ new ResizeObserver(()=>renderWal()).observe(document.getElementById('walWrap')); }catch(e){}
 loadWallet();
+
+/* ════════════════════ W3 Markets — 레전드 워치리스트 (실시장 데이터, 공개) ════════════════════
+   1차: Binance 공개 미러 WS @ticker (last·24h%·실 bid/ask — CLAUDE.md 미러 규칙, geo-fence 대응)
+   폴백: 서버 prices 테이블 8초 폴링 (mid ± spr_pts bps 반절) — WS 불가 환경에서도 실가격.
+   카탈로그·심볼맵 = 앱 사본 (crypto-live.html:344-379 · :521-524 계약). */
+const MK_CATALOG=[
+  ['BTC','Bitcoin','L1'],['ETH','Ethereum','L1'],['SOL','Solana','L1'],['BNB','BNB','L1'],
+  ['XRP','XRP','L1'],['ADA','Cardano','L1'],['AVAX','Avalanche','L1'],['DOT','Polkadot','L1'],
+  ['NEAR','NEAR','L1'],['APT','Aptos','L1'],['TRX','TRON','L1'],['ATOM','Cosmos','L1'],
+  ['LINK','Chainlink','DeFi'],['AAVE','Aave','DeFi'],['UNI','Uniswap','DeFi'],
+  ['DOGE','Dogecoin','Memes'],['SHIB','Shiba Inu','Memes'],['PEPE','Pepe','Memes'],
+  ['BONK','Bonk','Memes'],['WIF','dogwifhat','Memes'],
+  ['WLD','Worldcoin','AI'],['RNDR','Render','AI'],['FET','Fetch.ai','AI'],['TAO','Bittensor','AI'],
+  ['ALPXS','Alpexa Token','RWA']];
+const MK_BSYM={BTC:'btc',ETH:'eth',SOL:'sol',BNB:'bnb',XRP:'xrp',ADA:'ada',AVAX:'avax',DOT:'dot',
+  NEAR:'near',APT:'apt',TRX:'trx',ATOM:'atom',LINK:'link',AAVE:'aave',UNI:'uni',DOGE:'doge',
+  SHIB:'shib',PEPE:'pepe',BONK:'bonk',WIF:'wif',WLD:'wld',RNDR:'render',FET:'fet',TAO:'tao'};
+const MK_KEY='alpexa.cbdash.watch.v1';
+const MK_NAMES={}; MK_CATALOG.forEach(([s,n])=>MK_NAMES[s]=n);
+function alpxsPrice(){ const months=(Date.now()-Date.UTC(2024,0,1))/(30.44*86400e3);
+  return 1.00*Math.pow(1.02,months); }   // 앱 :775 공식 사본
+const mk={ list:(()=>{ try{ const s=JSON.parse(localStorage.getItem(MK_KEY)||'null');
+    if(Array.isArray(s)&&s.length) return s; }catch(e){}
+    return ['BTC','ETH','SOL','AVAX','DOGE','XRP','PEPE','LINK','BNB']; })(),
+  q:{}, dir:-1, ws:null, wsLive:false, _t:0 };
+function mkSave(){ try{ localStorage.setItem(MK_KEY,JSON.stringify(mk.list)); }catch(e){} }
+function mkFmtPx(v){ if(v==null||!isFinite(v)) return '—';
+  const d=(v>0&&v<1)?Math.min(10,Math.max(2,2-Math.floor(Math.log10(v)))):2;   // 미세가 확장 (앱 fmtUsd:899)
+  return '$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:d}); }
+function mkRender(){
+  const el=document.getElementById('mkList'); if(!el) return;
+  const rows=mk.list.map(s=>({s,...(mk.q[s]||{})}));
+  rows.sort((a,b)=>{ const av=a.chg==null?-1e9*mk.dir:a.chg, bv=b.chg==null?-1e9*mk.dir:b.chg;
+    return (av-bv)*mk.dir; });
+  el.innerHTML=rows.map((r,i)=>{
+    const up=(r.chg||0)>=0, f=r._f?(' '+r._f):'';
+    return '<div class="mrow'+f+'" data-sym="'+r.s+'">'+
+      '<span class="idx">'+(i+1)+'</span>'+
+      '<span class="sym">'+r.s+(r.s==='ALPXS'?'<span class="cbadge">A</span>':'<span class="cbadge">₿</span>')+'</span>'+
+      '<span class="chg '+(r.chg==null?'':(up?'up':'down'))+'">'+
+        (r.chg==null?'—':(up?'▲ ':'▼ ')+Math.abs(r.chg).toFixed(2)+'%')+'</span>'+
+      '<span class="px">'+mkFmtPx(r.bid)+'</span>'+
+      '<span class="px">'+mkFmtPx(r.ask)+'</span></div>';
+  }).join('');
+  rows.forEach(r=>{ if(mk.q[r.s]) mk.q[r.s]._f=''; });
+}
+function mkTouch(s,last,chg,bid,ask){
+  const prev=mk.q[s]&&mk.q[s].last;
+  mk.q[s]={last,chg,bid,ask,_f:(prev!=null&&last!==prev)?(last>prev?'fu':'fd'):''};
+  const now=Date.now(); if(now-mk._t>150){ mk._t=now; mkRender(); }
+}
+function mkSeedAlpxs(){ if(mk.list.includes('ALPXS')){ const p=alpxsPrice();
+  mk.q.ALPXS={last:p,chg:2.0,bid:p,ask:p,_f:''}; } }
+/* WS — 미러 도메인, 워치리스트 심볼만 @ticker (c=last · P=24h% · b/a=실 bid/ask) */
+function mkConnect(){
+  try{ if(mk.ws){ mk.ws.onclose=null; mk.ws.close(); mk.ws=null; } }catch(e){}
+  const streams=mk.list.filter(s=>MK_BSYM[s]).map(s=>MK_BSYM[s]+'usdt@ticker').join('/');
+  if(!streams) return;
+  try{
+    const ws=new WebSocket('wss://data-stream.binance.vision/stream?streams='+streams);
+    mk.ws=ws;
+    ws.onmessage=ev=>{ try{ const d=JSON.parse(ev.data).data; if(!d||d.e!=='24hrTicker') return;
+      const base=d.s.replace(/USDT$/,''); const sym=Object.keys(MK_BSYM).find(k=>MK_BSYM[k].toUpperCase()===base)||base;
+      mk.wsLive=true;
+      mkTouch(sym,+d.c,+d.P,+d.b,+d.a);
+    }catch(e){} };
+    ws.onclose=()=>{ mk.wsLive=false; setTimeout(mkConnect,3000); };
+    ws.onerror=()=>{ mk.wsLive=false; };
+  }catch(e){ mk.wsLive=false; }
+}
+/* 폴백 — 서버 prices (mid ± bps 반절). WS가 살아있는 심볼은 건너뜀. */
+async function mkPoll(){
+  try{
+    if(!(window.AlpexaSync&&AlpexaSync.db)) return;
+    const r=await AlpexaSync.db.from('prices').select('symbol,mid,spr_pts');
+    (r.data||[]).forEach(row=>{
+      const s=row.symbol; if(!mk.list.includes(s)) return;
+      if(mk.wsLive&&mk.q[s]&&mk.q[s].last!=null) return;
+      const mid=+row.mid||0; if(!mid) return;
+      const half=mid*((+row.spr_pts||0)/1e4)/2;
+      mkTouch(s,mid,(mk.q[s]&&mk.q[s].chg)!=null?mk.q[s].chg:null,mid-half,mid+half);
+    });
+    mkRender();
+  }catch(e){}
+}
+setInterval(()=>{ if(!document.hidden) mkPoll(); },8000);
+/* 정렬 토글 + 행 선택(차트 연동 예정) */
+document.getElementById('mkSortChg').onclick=()=>{ mk.dir=-mk.dir;
+  document.getElementById('mkArr').textContent=mk.dir<0?'▼':'▲'; mkRender(); };
+document.getElementById('mkList').addEventListener('click',e=>{
+  const r=e.target.closest('.mrow'); if(!r) return;
+  window.__cbSel=r.dataset.sym;   // W4 Chart가 이 선택을 읽는다 (다음 단계)
+  document.dispatchEvent(new CustomEvent('cb-sel',{detail:r.dataset.sym}));
+});
+/* + Add 팝오버 */
+const mkPop=document.getElementById('mkPop');
+function mkRenderPlist(){
+  const q=(document.getElementById('mkQ').value||'').toLowerCase();
+  document.getElementById('mkPlist').innerHTML=MK_CATALOG
+    .filter(([s,n])=>!q||s.toLowerCase().includes(q)||n.toLowerCase().includes(q))
+    .map(([s,n])=>{ const inL=mk.list.includes(s);
+      return '<div class="prow'+(inL?' in':'')+'" data-sym="'+s+'"><span class="ps">'+s+'</span>'+
+        '<span class="pn">'+n+'</span><span class="ck">'+(inL?'✓':'')+'</span></div>'; }).join('');
+}
+document.getElementById('mkAdd').onclick=e=>{ e.stopPropagation();
+  mkPop.classList.toggle('open'); if(mkPop.classList.contains('open')){ mkRenderPlist();
+    document.getElementById('mkQ').focus(); } };
+mkPop.addEventListener('click',e=>{ e.stopPropagation();
+  const row=e.target.closest('.prow'); if(!row) return;
+  const s=row.dataset.sym, i=mk.list.indexOf(s);
+  if(i>=0){ mk.list.splice(i,1); delete mk.q[s]; } else { mk.list.push(s); }
+  mkSave(); mkSeedAlpxs(); mkRenderPlist(); mkRender(); mkConnect(); mkPoll();
+});
+document.getElementById('mkQ').addEventListener('input',mkRenderPlist);
+document.getElementById('mkQx').onclick=()=>{ document.getElementById('mkQ').value=''; mkRenderPlist(); };
+document.addEventListener('click',()=>mkPop.classList.remove('open'));
+mkSeedAlpxs(); mkRender(); mkConnect(); mkPoll();
 </script>
 </body>
 </html>
