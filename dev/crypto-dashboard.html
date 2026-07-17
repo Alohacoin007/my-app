@@ -356,6 +356,33 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .sw .done2 .t1{font-size:13px; font-weight:800}
 .sw .done2 .t2{font-size:11px; color:var(--lgd-dim)}
 
+/* ══ W10 Money moves ══ */
+.mm{flex:1; min-height:0; display:flex; flex-direction:column; overflow:auto}
+.mm .mtabs{display:flex; gap:14px; padding:8px 14px 0; border-bottom:1px solid var(--lgd-hair); flex:none}
+.mm .mtabs span{font-size:12px; font-weight:700; padding:6px 1px; color:var(--lgd-dim); cursor:pointer}
+.mm .mtabs span.on{color:var(--lgd-ink); border-bottom:2px solid var(--lgd-ink)}
+.mm .pane{padding:10px 14px; display:none; flex-direction:column; gap:8px}
+.mm .pane.on{display:flex}
+.mm .fld .l{font-size:10.5px; font-weight:700; letter-spacing:.5px; color:var(--lgd-dim); text-transform:uppercase; margin-bottom:4px}
+.mm .fld input,.mm .fld select{width:100%; box-sizing:border-box; background:var(--lgd-pill); border:none;
+  color:var(--lgd-ink); border-radius:7px; padding:8px 10px; font-size:12.5px; font-weight:600;
+  font-family:inherit; outline:none; font-variant-numeric:tabular-nums}
+.mm .hint{font-size:10.5px; color:var(--lgd-dim); margin-top:3px; min-height:13px}
+.mm .hint.ok{color:var(--lgd-up)} .mm .hint.bad{color:var(--lgd-down)}
+.mm .meta2{display:flex; font-size:11px; color:var(--lgd-dim)}
+.mm .meta2 .v{margin-left:auto; color:var(--lgd-ink); font-weight:600}
+.mm .meta2 .mx{margin-left:8px; color:var(--lgd-ink); font-weight:700; cursor:pointer}
+.mm .warn2{font-size:11.5px; color:#FF9500; display:none}
+.mm .gobtn{background:var(--lgd-up); color:#04250B; border:none; border-radius:8px; height:34px;
+  font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit}
+.mm .gobtn:disabled{background:var(--lgd-pill); color:var(--lgd-dim); cursor:not-allowed}
+.mm .done3{display:none; flex-direction:column; align-items:center; gap:6px; padding:10px; text-align:center}
+.mm .done3 .ic{width:34px; height:34px; border-radius:50%; background:var(--lgd-up); color:#04250B;
+  display:flex; align-items:center; justify-content:center; font-size:17px; font-weight:900}
+.mm .done3 .t1{font-size:12.5px; font-weight:800}
+.mm .done3 .t2{font-size:10.5px; color:var(--lgd-dim)}
+.mm .soon2{padding:22px 10px; text-align:center; color:var(--lgd-dim); font-size:11.5px}
+
 /* ══ 라이트 테마 — legend-ui.css 무변경, 이 파일 안에서 --lgd-* 토큰만 오버라이드.
    업/다운/링크 색은 의미색이라 유지. 크립토 앱의 라이트 기본과 조화(화이트 서피스). ══ */
 body.light{
@@ -681,7 +708,26 @@ makeWidget('trade','Trade','','var(--lgd-link2)',
   '<span class="t1" id="tkDoneT"></span><span class="t2" id="tkDoneS"></span>'+
   '<div class="tkbtns" style="width:100%"><button class="cancel" id="tkDoneX">Done</button></div></div>'+
   '</div></div>');
-makeWidget('money','Money moves','','var(--lgd-link3)', frame('Send · Transfer · Fund · Withdraw','2FA/OTP 관문 시트'));
+makeWidget('money','Money moves','','var(--lgd-link3)',
+  '<div class="mm tnum">'+
+  '<div class="mtabs"><span class="on" data-p="send">Send</span><span data-p="transfer">Transfer</span>'+
+  '<span data-p="fund">Fund</span><span data-p="withdraw">Withdraw</span></div>'+
+  '<div class="pane on" data-pane="send">'+
+  '<div class="fld"><div class="l">To — account no. or email</div>'+
+  '<input id="mmTo" placeholder="CR-123456 or name@email.com"/><div class="hint" id="mmToH"></div></div>'+
+  '<div class="fld"><div class="l">Asset</div><select id="mmAsset">'+
+  ['USDT','ALPXS','BTC','ETH'].map(s=>'<option>'+s+'</option>').join('')+'</select></div>'+
+  '<div class="fld"><div class="l">Amount</div><input id="mmQty" inputmode="decimal" placeholder="0.00"/>'+
+  '<div class="hint" id="mmUsd"></div></div>'+
+  '<div class="meta2"><span>Available</span><span class="v" id="mmAvail">···</span><span class="mx" id="mmMax">Max</span></div>'+
+  '<div class="warn2" id="mmWarn"></div>'+
+  '<button class="gobtn" id="mmGo">Send</button>'+
+  '<div class="done3" id="mmDone"><span class="ic">✓</span><span class="t1" id="mmDoneT"></span><span class="t2" id="mmDoneS"></span></div>'+
+  '</div>'+
+  '<div class="pane" data-pane="transfer"><div class="soon2">Transfer between Alpexa wallets — next build step.</div></div>'+
+  '<div class="pane" data-pane="fund"><div class="soon2">Deposit (card / wire) — next build step.</div></div>'+
+  '<div class="pane" data-pane="withdraw"><div class="soon2">External withdraw with 2FA tiers — next build step.</div></div>'+
+  '</div>');
 makeWidget('swap','Swap','','var(--lgd-link2)',
   '<div class="sw tnum">'+
   '<div class="card"><div class="lbl2">From</div><div class="row2">'+
@@ -1517,6 +1563,95 @@ document.getElementById('swGo').onclick=async()=>{
 };
 swInit(); swSession();
 setInterval(()=>{ if(!document.hidden&&!layout.swap.hidden) swCalc(); },2500);
+
+/* ════════════════════ W10 Money moves — Send (내부 P2P, M3) ════════════════════
+   돈 경로 = AlpexaSync.cryptoSendInternal 공용 래퍼 (앱과 동일 코드, csend- 멱등 ref,
+   crypto_send_internal RPC — 발신자는 서버가 auth.uid에서 유도 = FROM 조작 불가).
+   이메일 수취인은 acct_for_email로 해석. 성공 후 sendPayment는 알림 전용(돈 아님, 앱 :13641). */
+const mm={ busy:false, sess:null, have:{}, toAcct:'', resolving:0 };
+function mmMyAcct(){ return mm.sess?mm.sess.acct:''; }
+async function mmSession(){
+  mm.sess=await walSession(); mm.have={};
+  if(mm.sess){ try{
+    const r=await AlpexaSync.db.from('crypto_holdings').select('asset,qty').eq('acct_no',mm.sess.acct);
+    (r.data||[]).forEach(x=>{ mm.have[x.asset]=+x.qty||0; });
+  }catch(e){} }
+  mmCalc();
+}
+async function mmResolve(){
+  const raw=(document.getElementById('mmTo').value||'').trim();
+  const h=document.getElementById('mmToH');
+  mm.toAcct='';
+  if(!raw){ h.textContent=''; h.className='hint'; mmCalc(); return; }
+  if(raw.includes('@')){
+    const seq=++mm.resolving;
+    h.textContent='Looking up…'; h.className='hint';
+    try{
+      const r=await AlpexaSync.db.rpc('acct_for_email',{p_email:raw});
+      if(seq!==mm.resolving) return;
+      if(r&&r.data){ mm.toAcct=String(r.data).toUpperCase(); h.textContent='→ '+mm.toAcct; h.className='hint ok'; }
+      else { h.textContent='No Alpexa account for that email.'; h.className='hint bad'; }
+    }catch(e){ if(seq===mm.resolving){ h.textContent='Lookup failed.'; h.className='hint bad'; } }
+  } else {
+    mm.toAcct=raw.toUpperCase();
+    h.textContent=/^CR-/i.test(raw)?'':'Crypto accounts start with CR-';
+    h.className='hint'+(/^CR-/i.test(raw)?' ok':'');
+    if(/^CR-/i.test(raw)) h.textContent='✓ account number';
+  }
+  mmCalc();
+}
+let _mmT=null;
+document.getElementById('mmTo').addEventListener('input',()=>{ clearTimeout(_mmT); _mmT=setTimeout(mmResolve,350); });
+function mmVals(){
+  const asset=document.getElementById('mmAsset').value;
+  const qty=parseFloat(document.getElementById('mmQty').value)||0;
+  const px=swPrice(asset)||(asset==='ALPXS'?alpxsPrice():null);
+  return {asset,qty,px,have:mm.have[asset]||0};
+}
+function mmCalc(){
+  const v=mmVals();
+  document.getElementById('mmUsd').textContent=(v.px&&v.qty)?('≈ '+fmtUsdSm(v.qty*v.px)):'';
+  document.getElementById('mmAvail').textContent=!mm.sess?'···':
+    (v.have.toLocaleString('en-US',{maximumFractionDigits:8})+' '+v.asset);
+  const warn=document.getElementById('mmWarn'); let w='';
+  if(!mm.sess) w='Sign in to send — transfers execute on the server.';
+  else if(mm.toAcct&&mm.toAcct===mm.sess.acct) w='You can\'t send to your own account.';
+  else if(v.qty>v.have+1e-9) w='Not enough '+v.asset+'.';
+  warn.textContent=w; warn.style.display=w?'block':'none';
+  document.getElementById('mmGo').disabled=!!w||!v.qty||!mm.toAcct||mm.busy;
+}
+document.getElementById('mmAsset').addEventListener('change',mmCalc);
+document.getElementById('mmQty').addEventListener('input',mmCalc);
+document.getElementById('mmMax').onclick=()=>{ const v=mmVals();
+  if(mm.sess) document.getElementById('mmQty').value=v.have; mmCalc(); };
+document.getElementById('mmGo').onclick=async()=>{
+  if(mm.busy) return;
+  const v=mmVals(); if(!v.qty||!mm.toAcct||!mm.sess) return;
+  mm.busy=true; mmCalc();
+  let res;
+  try{ res=await AlpexaSync.cryptoSendInternal({to:mm.toAcct, asset:v.asset, qty:v.qty}); }
+  catch(e){ res={ok:false,error:'network error'}; }
+  mm.busy=false;
+  if(res&&(res.ok===true||res.duplicate===true)){
+    try{ AlpexaSync.sendPayment&&AlpexaSync.sendPayment({to:mm.toAcct, amount:v.px?+(v.qty*v.px).toFixed(2):0, asset:v.asset}); }catch(e){}
+    const dn=document.getElementById('mmDone'); dn.style.display='flex';
+    document.getElementById('mmDoneT').textContent='Sent '+v.qty.toLocaleString('en-US',{maximumFractionDigits:8})+' '+v.asset;
+    document.getElementById('mmDoneS').textContent='to '+mm.toAcct+' · server-verified';
+    setTimeout(()=>{ dn.style.display='none'; },6000);
+    document.getElementById('mmQty').value='';
+    mmSession(); loadPortfolio(); loadWallet(); loadActivity();
+  } else {
+    const warn=document.getElementById('mmWarn');
+    warn.textContent=(res&&res.error)||'Send failed — try again.'; warn.style.display='block';
+    mmCalc();
+  }
+};
+document.querySelector('#w-money .mtabs').addEventListener('click',e=>{
+  const t=e.target.closest('span[data-p]'); if(!t) return;
+  document.querySelectorAll('#w-money .mtabs span').forEach(x=>x.classList.toggle('on',x===t));
+  document.querySelectorAll('#w-money .pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===t.dataset.p));
+});
+mmSession();
 </script>
 </body>
 </html>
