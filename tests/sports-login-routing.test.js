@@ -50,8 +50,9 @@ eq('Mobile + Sports (no token) = 폰 앱',          makeFxDest(PHONE)(2), 'sport
 eq('PC + FX = webtrade 터미널',   makeFxDest(PC)(3), 'webtrade.html');
 eq('Mobile + FX = trading 앱',    makeFxDest(PHONE)(3), 'trading.html');
 
-// 5) Crypto (server 1): unchanged single client.
-eq('Crypto = crypto-live 단일', makeFxDest(PC)(1), 'crypto-live.html');
+// 5) Crypto (server 1) — 2026-07-17 계약 변경(사장님 지시): 크립토도 기기 라우팅.
+eq('Crypto PC = 크립토 대시보드', makeFxDest(PC)(1), 'dev/crypto-dashboard.html');
+eq('Crypto 폰 = crypto-live 앱', makeFxDest(PHONE)(1), 'crypto-live.html');
 
 // 6) Explicit return tokens still win (dashboard round-trip + a way back to the app).
 eq('token sports-dashboard → 대시보드 (모바일이라도 명시복귀)', makeFxDest(PHONE, 'sports-dashboard')(2), 'sports-dashboard.html');
