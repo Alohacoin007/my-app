@@ -283,9 +283,10 @@ body.light .avatar .pdot{border-color:#fff}
 .tr .tba b{color:var(--lgd-ink); font-weight:600}
 .tr .tbtns{display:flex; gap:8px; padding:10px 14px}
 .tr .tbtns button{flex:1; background:var(--lgd-pill); border:none; border-radius:8px; height:32px;
-  font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit; color:var(--lgd-dim)}
+  font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit; color:var(--lgd-ink)}
 .tr .tbtns button:hover{background:var(--lgd-pill-hi)}
-.tr .tbtns .buy{color:var(--lgd-up)}
+.tr .tbtns .buy{background:var(--lgd-up); color:#04250B}   /* 활성 룩 (2026-07-17 사장님 지시) */
+.tr .tbtns .buy:hover{filter:brightness(1.08)}
 .tr .ttabs{display:flex; gap:16px; padding:4px 14px 0; border-bottom:1px solid var(--lgd-hair)}
 .tr .ttabs span{font-size:12px; font-weight:700; padding:7px 1px; color:var(--lgd-dim)}
 .tr .ttabs span.on{color:var(--lgd-ink); border-bottom:2px solid var(--lgd-ink)}
@@ -792,7 +793,8 @@ makeWidget('markets','Markets','','var(--lgd-link4)',
   '<div class="mpop" id="mkPop">'+
   '<div class="srch"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>'+
   '<input id="mkQ" placeholder="Search crypto"/><span class="x" id="mkQx">✕</span></div>'+
-  '<div class="chips"><span class="chip on" data-c="all">All</span><span class="chip dis" title="Soon">Equities</span>'+
+  '<div class="chips"><span class="chip on" data-c="all">All</span>'+
+  '<span class="chip" data-c="eq">Equities</span>'+   // 활성화 (2026-07-17) — ALPXS 배치
   '<span class="chip dis" title="Soon">Futures</span><span class="chip" data-c="crypto">Crypto</span>'+
   '<span class="chip dis" title="Soon">Indexes</span></div>'+
   '<div class="grp">Popular crypto</div><div class="plist" id="mkPlist"></div>'+
@@ -1268,7 +1270,9 @@ document.getElementById('mkList').addEventListener('click',e=>{
 const mkPop=document.getElementById('mkPop');
 function mkRenderPlist(){
   const q=(document.getElementById('mkQ').value||'').toLowerCase();
+  const cat=mk.pcat||'all';   // 카테고리 필터 (2026-07-17): eq=증권(ALPXS·RWA) · crypto=코인
   document.getElementById('mkPlist').innerHTML=MK_CATALOG
+    .filter(([s,n,c])=>cat==='all'||(cat==='eq'?c==='RWA':c!=='RWA'))
     .filter(([s,n])=>!q||s.toLowerCase().includes(q)||n.toLowerCase().includes(q))
     .map(([s,n])=>{ const inL=mk.list.includes(s);
       return '<div class="prow'+(inL?' in':'')+'" data-sym="'+s+'"><span class="ps">'+s+'</span>'+
@@ -1279,6 +1283,12 @@ mkPop.addEventListener('click',e=>{ e.stopPropagation();
   const s=row.dataset.sym, i=mk.list.indexOf(s);
   if(i>=0){ mk.list.splice(i,1); delete mk.q[s]; } else { mk.list.push(s); }
   mkSave(); mkSeedAlpxs(); mkRenderPlist(); mkRender(); mkConnect(); mkPoll();
+});
+mkPop.addEventListener('click',e=>{   // 카테고리 칩 (팝오버 내부 — stopPropagation은 위 리스너가 처리)
+  const c=e.target.closest('.chip[data-c]'); if(!c) return;
+  mk.pcat=c.dataset.c;
+  mkPop.querySelectorAll('.chip[data-c]').forEach(x=>x.classList.toggle('on',x===c));
+  mkRenderPlist();
 });
 document.getElementById('mkQ').addEventListener('input',mkRenderPlist);
 document.getElementById('mkQx').onclick=()=>{ document.getElementById('mkQ').value=''; mkRenderPlist(); };
@@ -1700,6 +1710,8 @@ document.getElementById('tkSellT').onclick=()=>{ tr.side='sell'; tkSide(); };
 document.getElementById('tkX').onclick=document.getElementById('tkCancel').onclick=
   ()=>{ tr.tkOpen=false; tkEl.classList.remove('open'); tkFloat(false); };
 document.getElementById('tkDoneX').onclick=()=>{ tr.tkOpen=false; tkEl.classList.remove('open'); tkFloat(false); };
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&tkEl.classList.contains('open')){
+  tr.tkOpen=false; tkEl.classList.remove('open'); tkFloat(false); } });   // ESC = 팝업 닫기 보강
 document.getElementById('tkIn').addEventListener('change',e=>{ tr.mode=e.target.value==='usd'?'usd':'coin'; tr.maxAll=false; tkCalc(); });
 document.getElementById('tkQty').addEventListener('input',()=>{ tr.maxAll=false; tkCalc(); });
 /* 볼륨 스테퍼 — 꾹 누르면 가속 반복 (사장님 지시 2026-07-17, MT5 볼륨 스테퍼 방식):
