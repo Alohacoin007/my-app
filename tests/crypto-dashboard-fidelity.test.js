@@ -104,7 +104,9 @@ BANS.forEach(([name, re]) => ok('BAN ' + name + ' 없음', !re.test(html)));
    여기 허용목록에 근거와 함께 추가하거나 서버로 옮겨라. */
 (function storageAllowlist() {
   const calls = html.match(/localStorage\.setItem\([^)]*\)/g) || [];
-  const ALLOWED = /localStorage\.setItem\(\s*(LKEY|TKEY|MK_KEY|localStorage|'alpexa\.pendingOrders'|'alpexa\.referralRedeemed')/;
+  // ACCEPTED 'alpexa.cbdash.watch.alpxs1' (2026-07-17): ALPXS 기본 워치리스트 1회 병합 플래그 —
+  // UI 설정 캐시(돈 아님), 사용자가 ALPXS를 뺀 뒤 다시 안 넣기 위한 존중 플래그.
+  const ALLOWED = /localStorage\.setItem\(\s*(LKEY|TKEY|MK_KEY|localStorage|'alpexa\.pendingOrders'|'alpexa\.referralRedeemed'|'alpexa\.cbdash\.watch\.alpxs1')/;
   const bad = calls.filter(c => !ALLOWED.test(c));
   ok('BAN localStorage 비허용 키 쓰기 없음 (' + calls.length + '건 검사)', bad.length === 0,
     bad.join(' | '));
