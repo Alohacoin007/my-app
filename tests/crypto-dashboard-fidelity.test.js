@@ -47,6 +47,14 @@ const PINS = [
   ['ALPXS 하드락 안내(만기 전 언스테이크 불가)', /cannot be unstaked before maturity/],
   ['조기 언스테이크 몰수 경고(원금만 반환)',    /principal only/],
   ['출금 승인 전 차감 없음 문구',              /nothing deducted until approval/i],
+  // ── 2026-07-17 누락감사 A급 수리 핀 (지우면 부분복제 클래스 재발) ──
+  ['A-1 킬스위치 적재(controls.trading_halt)', /from\('controls'\)\.select\('val'\)\.eq\('key','trading_halt'\)/],
+  ['A-1 halt가 돈 제출을 막음(HALT_MSG 게이트)', /if\(window\.__alpexaHalt\)\{[^}]*HALT_MSG/],
+  ['A-2 마크업 적재(pricing_marks → __alpexaCryptoMarks)', /from\('pricing_marks'\)\.select\('symbol,markup_pts'\)/],
+  ['A-3 신원 대조(assertIdentity 호출)',       /AlpexaSync\.assertIdentity/],
+  ['A-4 Transak 계약(walletAddress+partnerOrderId)', /walletAddress:RC_EXT\.address[\s\S]{0,200}partnerOrderId/],
+  ['B-2 와이어 매칭 참조(ALPX-<custId>)',       /'ALPX-'\+String\(c\)\.toUpperCase\(\)/],
+  ['B-1 온체인 출금 USDT 한정(WD_NET)',         /const WD_NET=\{ USDT:'ERC-20 · Ethereum' \};/],
 ];
 PINS.forEach(([name, re]) => ok('PIN ' + name, re.test(html)));
 
@@ -76,6 +84,7 @@ const BANS = [
   ['crypto_trades 직접 쓰기(RPC만 기록)', /from\('crypto_trades'\)\s*\.\s*(insert|update|upsert|delete)/],
   ['service_role 노출',         /service_role/],
   ['잔고 델타 추측 업로드(syncSportsBal류)', /__sbLastPushed|syncSportsBal/],
+  ['피드 상태등 하드코드(가짜 초록)',        /feedDot'\)\.classList\.add\('ok'\)/],
 ];
 BANS.forEach(([name, re]) => ok('BAN ' + name + ' 없음', !re.test(html)));
 

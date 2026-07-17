@@ -385,6 +385,13 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .mm .done3 .t1{font-size:12.5px; font-weight:800}
 .mm .done3 .t2{font-size:10.5px; color:var(--lgd-dim)}
 .mm .soon2{padding:22px 10px; text-align:center; color:var(--lgd-dim); font-size:11.5px}
+.mm .wirebox{background:var(--lgd-pill); border-radius:8px; padding:8px 10px; font-size:10.5px}
+.mm .wirebox .wr{display:flex; gap:8px; padding:2px 0}
+.mm .wirebox .wr .l2{color:var(--lgd-dim); width:64px; flex:none}
+.mm .wirebox .wr .v2{font-weight:600; word-break:break-all}
+.mm .wirebox .ref{color:var(--lgd-down); font-weight:800; letter-spacing:.4px}
+.mm .wirebox .cpy{margin-top:4px; background:var(--lgd-pill-hi); border:none; color:var(--lgd-ink);
+  font-size:10px; font-weight:700; border-radius:6px; padding:4px 10px; cursor:pointer; font-family:inherit}
 .mm .rcqr{display:flex; justify-content:center; padding:2px 0}
 .mm .rcqr img{border-radius:8px; background:#fff; padding:6px; display:none}
 .mm .rcaddr{background:var(--lgd-pill); border-radius:7px; padding:8px 10px; font-size:11.5px;
@@ -875,6 +882,7 @@ makeWidget('money','Money moves','','var(--lgd-link3)',
   '<div class="pane" data-pane="fund">'+
   '<div class="fld"><div class="l">Method</div><select id="fdMethod">'+
   '<option value="card">Card — instant (Transak)</option><option value="wire">Wire — reviewed by our team</option></select></div>'+
+  '<div class="wirebox" id="fdWire" style="display:none"></div>'+
   '<div class="fld"><div class="l">Amount (USD)</div><input id="fdAmt" inputmode="decimal" placeholder="0.00" value="100"/></div>'+
   '<div class="warn2" id="fdWarn"></div>'+
   '<button class="gobtn" id="fdGo">Deposit</button>'+
@@ -882,7 +890,8 @@ makeWidget('money','Money moves','','var(--lgd-link3)',
   '</div>'+
   '<div class="pane" data-pane="withdraw">'+
   '<div class="fld"><div class="l">Asset</div><select id="wdAsset">'+
-  '<option>USDT</option><option>BTC</option><option>ETH</option></select></div>'+
+  '<option>USDT</option></select><div class="hint">On-chain withdrawals are USDT-only '+
+  '(same as the app). Sell other assets to USDT first.</div></div>'+
   '<div class="fld"><div class="l">Destination address</div><input id="wdAddr" placeholder="0x… / bc1…"/>'+
   '<div class="hint" id="wdNet"></div></div>'+
   '<div class="fld"><div class="l">Amount (USD)</div><input id="wdAmt" inputmode="decimal" placeholder="0.00"/></div>'+
@@ -965,7 +974,10 @@ const goFull=()=>{ if(document.fullscreenElement) document.exitFullscreen();
   else document.documentElement.requestFullscreen().catch(()=>{}); };
 document.getElementById('btnFull').onclick=goFull;
 document.getElementById('cbTab').onclick=goFull;
-document.getElementById('feedDot').classList.add('ok');
+/* B-7 수리: 피드 상태등 = 실제 마지막 틱 나이 (하드코드 초록 금지 — 가짜 신호였음).
+   15초 내 틱 = 초록, 그 외 = 꺼짐(회색). WS 죽어도 폴백 폴링이 틱을 찍으면 초록 유지. */
+setInterval(()=>{ const el=document.getElementById('feedDot'); if(!el) return;
+  el.classList.toggle('ok', !!mk.lastTick&&(Date.now()-mk.lastTick)<15000); },3000);
 /* ── 테마 토글 (라이트/다크) — 취향 저장, 기본 다크(레전드) ── */
 const TKEY='alpexa.cbdash.theme';
 function applyThemeCB(){ const light=localStorage.getItem(TKEY)==='light';
@@ -1178,6 +1190,7 @@ function mkTouch(s,last,chg,bid,ask,extra){
   const prev=mk.q[s]&&mk.q[s].last;
   mk.q[s]=Object.assign({},mk.q[s]||{},extra||{},
     {last,chg,bid,ask,_f:(prev!=null&&last!==prev)?(last>prev?'fu':'fd'):''});
+  mk.lastTick=Date.now();   // B-7: 피드 상태등의 진짜 근거
   const now=Date.now(); if(now-mk._t>150){ mk._t=now; mkRender(); }
 }
 function mkSeedAlpxs(){ if(mk.list.includes('ALPXS')){ const p=alpxsPrice();
@@ -1449,8 +1462,9 @@ async function loadPortfolio(){
 }
 document.getElementById('pfBody').addEventListener('click',e=>{
   const r=e.target.closest('.prow2'); if(!r) return;
-  const s=r.dataset.sym; if(MK_BSYM[s]){ window.__cbSel=s;
-    document.dispatchEvent(new CustomEvent('cb-sel',{detail:s})); }   // 보유 클릭 → 차트 연동
+  const s=r.dataset.sym;   // B-5 수리: ALPXS도 통과 — 차트는 정직한 빈 상태, 티켓은 서버가로 매매(환매 경로)
+  if(MK_BSYM[s]||s==='ALPXS'){ window.__cbSel=s;
+    document.dispatchEvent(new CustomEvent('cb-sel',{detail:s})); }   // 보유 클릭 → 차트·티켓 연동
 });
 setInterval(()=>{ if(!document.hidden&&pf.authed) pfRender(); },2000);   // 라이브 평가액
 setInterval(()=>{ if(!document.hidden&&pf.authed) loadPortfolio(); },30000);   // 보유 재적재
@@ -1658,6 +1672,7 @@ document.getElementById('tkBp').onclick=()=>{ if(tr.side!=='sell'||!tr.sess) ret
 /* 제출 — 이중탭 가드 + crypto_trade RPC (유일 경로) */
 document.getElementById('tkGo').onclick=async()=>{
   if(tr.busy) return;
+  if(window.__alpexaHalt){ tkHalt(); return; }   // A-1 킬스위치
   const {usd,coin,mkP}=tkVals(); if(!usd||!tr.sess) return;
   tr.busy=true; tkCalc();
   const args={ p_ref:'cb-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),
@@ -1734,6 +1749,7 @@ document.getElementById('swMax').onclick=()=>{ const v=swVals();
   if(sw.sess&&v.fp) document.getElementById('swAmt').value=(+v.haveUsd.toFixed(2)); swCalc(); };
 document.getElementById('swGo').onclick=async()=>{
   if(sw.busy) return;
+  if(window.__alpexaHalt){ swHaltWarn(); return; }   // A-1 킬스위치
   const v=swVals(); if(!v.usd||!sw.sess) return;
   sw.busy=true; swCalc();
   let res;
@@ -1812,6 +1828,7 @@ document.getElementById('stList').addEventListener('click',async e=>{
   if(no){ st.confirm=null; stRender(); return; }
   if(un&&!un.disabled){ st.confirm=(st.confirm===un.dataset.un)?null:un.dataset.un; stRender(); return; }
   if(yes&&!st.busy){
+    if(window.__alpexaHalt){ st.err=HALT_MSG; stCalc(); return; }   // A-1 킬스위치
     const parts=yes.dataset.yes.split('|'), asset=parts[0], period=parts[1];
     st.busy=true; st.err=''; stCalc();
     try{
@@ -1867,6 +1884,7 @@ document.getElementById('stPers').addEventListener('click',e=>{
   st.err=''; stCalc(); });
 document.getElementById('stGo').onclick=async()=>{
   if(st.busy) return;
+  if(window.__alpexaHalt){ st.err=HALT_MSG; stCalc(); return; }   // A-1 킬스위치
   const asset=document.getElementById('stAsset').value;
   const usd=parseFloat(document.getElementById('stAmt').value)||0;
   const per=stPer();
@@ -1951,6 +1969,7 @@ document.getElementById('mmMax').onclick=()=>{ const v=mmVals();
   if(mm.sess) document.getElementById('mmQty').value=v.have; mmCalc(); };
 document.getElementById('mmGo').onclick=async()=>{
   if(mm.busy) return;
+  if(window.__alpexaHalt){ const w=document.getElementById('mmWarn'); w.textContent=HALT_MSG; w.style.display='block'; return; }   // A-1
   const v=mmVals(); if(!v.qty||!mm.toAcct||!mm.sess) return;
   mm.busy=true; mmCalc();
   let res;
@@ -2006,6 +2025,7 @@ document.getElementById('xfMax').onclick=()=>{ if(xf.avail!=null)
   document.getElementById('xfAmt').value=(+xf.avail.toFixed(2)); xfCalc(); };
 document.getElementById('xfGo').onclick=async()=>{
   if(xf.busy) return;
+  if(window.__alpexaHalt){ const w=document.getElementById('xfWarn'); w.textContent=HALT_MSG; w.style.display='block'; return; }   // A-1
   const from=document.getElementById('xfFrom').value, to=document.getElementById('xfTo').value;
   const usd=parseFloat(document.getElementById('xfAmt').value)||0;
   const ac=xfAccts(); if(!usd||!mm.sess||!ac[from]||!ac[to]) return;
@@ -2032,37 +2052,73 @@ document.getElementById('xfGo').onclick=async()=>{
 /* ── Fund (입금, M3) — 카드 = transak-widget Edge(시크릿 서버 전용, URL만 수신) ·
    와이어 = pushRequest 'deposit' (백오피스 승인 후 서버가 크레딧 — 클라 셀프크레딧 없음) ── */
 const fd={ busy:false, err:'' };   // err = 제출 에러(sticky) — 재계산이 지우면 안 됨
+/* B-2 수리: 와이어 은행좌표 + 고객별 매칭 참조 (앱 WIRE_INFO :5106-5116 사본) —
+   참조 없이는 백오피스가 들어온 송금을 이 계정과 대사할 수 없다. */
+const FD_WIRE={ bank:'Nevada State Bank', name:'REDROCKFX LLC', account:'984869966',
+  routing:'122400779', swift:'ZFNBUS55', address:'9415 W Flamingo Rd, Las Vegas, NV 89147' };
+function fdRef(){ const c=(mm.sess&&mm.sess.me&&mm.sess.me.custId)||'';
+  return c?('ALPX-'+String(c).toUpperCase()):'ALPX-PENDING'; }
+function fdWireRender(){
+  const el=document.getElementById('fdWire'); if(!el) return;
+  const wr=(l,v,cls)=>'<div class="wr"><span class="l2">'+l+'</span><span class="v2 '+(cls||'')+'">'+v+'</span></div>';
+  el.innerHTML=wr('Reference',fdRef(),'ref')+wr('Bank',FD_WIRE.bank)+wr('Name',FD_WIRE.name)+
+    wr('Account',FD_WIRE.account)+wr('Routing',FD_WIRE.routing)+wr('SWIFT',FD_WIRE.swift)+
+    wr('Address',FD_WIRE.address)+
+    '<div class="wr" style="color:var(--lgd-dim)">Put the reference on the wire — it links the money to your account.</div>'+
+    '<button class="cpy" id="fdRefCp">Copy reference</button>';
+  const b=document.getElementById('fdRefCp');
+  b.onclick=()=>{ try{ if(navigator.clipboard&&navigator.clipboard.writeText)
+      navigator.clipboard.writeText(fdRef()).catch(()=>{}); }catch(e){}
+    b.textContent='Copied'; setTimeout(()=>{ b.textContent='Copy reference'; },1400); };
+}
 function fdCalc(){
   const usd=parseFloat(document.getElementById('fdAmt').value)||0;
+  const wire=document.getElementById('fdMethod').value==='wire';
+  const wb=document.getElementById('fdWire');
+  if(wb){ wb.style.display=wire?'':'none'; if(wire) fdWireRender(); }
   const warn=document.getElementById('fdWarn'); let w='';
   if(!mm.sess) w='Sign in to deposit.';
   w=w||fd.err;
   warn.textContent=w; warn.style.display=w?'block':'none';
   document.getElementById('fdGo').disabled=!!w||!usd||fd.busy;
-  document.getElementById('fdGo').textContent=
-    document.getElementById('fdMethod').value==='card'?'Continue to card checkout':'Submit wire deposit';
+  document.getElementById('fdGo').textContent=wire?'Submit wire deposit':'Continue to card checkout';
 }
 document.getElementById('fdMethod').addEventListener('change',()=>{ fd.err=''; fdCalc(); });
 document.getElementById('fdAmt').addEventListener('input',()=>{ fd.err=''; fdCalc(); });
 document.getElementById('fdGo').onclick=async()=>{
   if(fd.busy) return;
+  if(window.__alpexaHalt){ fd.err=HALT_MSG; fdCalc(); return; }   // A-1 킬스위치
   const usd=parseFloat(document.getElementById('fdAmt').value)||0;
   if(!usd||!mm.sess) return;
   fd.busy=true; fd.err=''; fdCalc();
   const method=document.getElementById('fdMethod').value;
   if(method==='card'){
+    // A-4 수리: 앱 payWithTransak(:5205-5221) 계약 전량 — walletAddress(플랫폼 수취주소)·
+    // 코인/네트워크/통화·partnerOrderId·custId·referrerDomain + 성공 시 pending deposit 기록
+    // (백오피스가 이 주문을 기다리게) 후 위젯 오픈.
     try{
+      const oid='tx-'+Date.now()+'-'+Math.random().toString(36).slice(2,6);
       const r=await AlpexaSync.db.functions.invoke('transak-widget',{body:{
-        amount:usd, email:(mm.sess.me&&mm.sess.me.email)||'', partnerCustomerId:mm.sess.acct }});
+        amount:usd, walletAddress:RC_EXT.address, cryptoCurrencyCode:'USDT',
+        network:'ethereum', fiatCurrency:'USD', partnerOrderId:oid,
+        partnerCustomerId:(mm.sess.me&&mm.sess.me.custId)||'',
+        email:(mm.sess.me&&mm.sess.me.email)||'',
+        referrerDomain:(location&&location.hostname)||'alpexa-sports.com' }});
       const url=r&&r.data&&r.data.widgetUrl;
-      if(url){ window.open(url,'_blank','noopener'); }
+      if(url){
+        try{ AlpexaSync.pushRequest({ id:oid, type:'deposit', server:'crypto', amount:usd,
+          asset:'USDT', network:'Transak card', from:'Transak '+oid, to:'Crypto wallet',
+          status:'pending' }); }catch(e2){}
+        window.open(url,'_blank','noopener');
+        loadActivity();
+      }
       else fd.err='Card checkout unavailable — try wire.';
     }catch(e){ fd.err='Card checkout unavailable — try wire.'; }
   } else {
     try{
       const res=await AlpexaSync.pushRequest({ id:'cr-'+Date.now()+'-'+Math.random().toString(36).slice(2,6),
         type:'deposit', server:'crypto', amount:usd, net:usd, fee:0,
-        from:'Wire transfer', to:'Crypto wallet', status:'pending' });
+        from:'Wire '+fdRef(), to:'Crypto wallet', status:'pending' });   // B-2: 매칭 참조 포함
       if(res&&!res.error){
         const dn=document.getElementById('fdDone'); dn.style.display='flex';
         document.getElementById('fdDoneT').textContent='Wire deposit submitted — '+fmtUsdSm(usd);
@@ -2079,15 +2135,13 @@ document.getElementById('fdGo').onclick=async()=>{
    ≥$1,000 = 이메일 OTP(withdraw-otp Edge → verify_withdraw_otp RPC, 15분 unlock) ·
    ≥$5,000 = 활성 허용목록(24h) 필요. 서버 거절 메시지는 그대로 표시. ── */
 const wd={ busy:false, avail:null, otpSent:false, unlocked:false, err:'' };
-const WD_NET={ USDT:'ERC-20 · Ethereum', BTC:'Bitcoin Network', ETH:'ERC-20 · Ethereum' };
+const WD_NET={ USDT:'ERC-20 · Ethereum' };   // B-1 수리: 온체인 출금 = USDT만 (앱과 동일, 새 돈 경로 금지)
 async function wdLoad(){
   wd.avail=null; wdCalc();
   if(!mm.sess) return;
-  const asset=document.getElementById('wdAsset').value;
   try{
-    if(asset==='USDT'){ const r=await AlpexaSync.db.rpc('withdrawable_for',{p_acct:mm.sess.acct});
-      if(r&&r.data!=null) wd.avail=+r.data; }
-    else { const px=swPrice(asset); wd.avail=px?(mm.have[asset]||0)*px:null; }
+    const r=await AlpexaSync.db.rpc('withdrawable_for',{p_acct:mm.sess.acct});
+    if(r&&r.data!=null) wd.avail=+r.data;
   }catch(e){}
   wdCalc();
 }
@@ -2117,6 +2171,7 @@ document.getElementById('wdMax').onclick=()=>{ if(wd.avail!=null)
   document.getElementById('wdAmt').value=(+wd.avail.toFixed(2)); wdCalc(); };
 document.getElementById('wdGo').onclick=async()=>{
   if(wd.busy) return;
+  if(window.__alpexaHalt){ wd.err=HALT_MSG; wdCalc(); return; }   // A-1 킬스위치
   const asset=document.getElementById('wdAsset').value;
   const addr=(document.getElementById('wdAddr').value||'').trim();
   const usd=parseFloat(document.getElementById('wdAmt').value)||0;
@@ -2319,6 +2374,29 @@ async function hdrAuth(){
       location.href='/login.html'; };
   }
 }
+/* ════ 백오피스 락스텝 (A-1·A-2 수리, 앱 crypto-live.html:14636-14648 사본) ════
+   · 마크업: pricing_marks → window.__alpexaCryptoMarks (0~50 클램프) — 이게 없으면
+     거래·스왑 수수료가 0%로 나가 하우스 스프레드를 못 받는다.
+   · 킬스위치: controls.trading_halt → window.__alpexaHalt — 서버 RPC엔 halt 게이트가
+     없어 클라 체크가 유일 관문. 모든 돈 제출 버튼이 이 플래그를 본다. */
+window.__alpexaCryptoMarks=window.__alpexaCryptoMarks||{};
+window.__alpexaHalt=false;
+const HALT_MSG='Trading is temporarily paused. Please try again shortly.';
+function tkHalt(){ const w=document.getElementById('tkWarn'); if(w){ w.textContent=HALT_MSG; w.style.display='block'; } }
+function swHaltWarn(){ const w=document.getElementById('swWarn'); if(w){ w.textContent=HALT_MSG; w.style.display='block'; } }
+function pullMarksHalt(){
+  if(!(window.AlpexaSync&&AlpexaSync.db)) return;
+  AlpexaSync.db.from('pricing_marks').select('symbol,markup_pts').then(r=>{
+    if(r&&r.data){ const m={}; r.data.forEach(p=>{ m[p.symbol]=Math.max(0,Math.min(50,+p.markup_pts||0)); });
+      window.__alpexaCryptoMarks=m; } },()=>{});
+  AlpexaSync.db.from('controls').select('val').eq('key','trading_halt').limit(1).then(r=>{
+    window.__alpexaHalt=!!(r&&r.data&&r.data[0]&&r.data[0].val==='1'); },()=>{});
+}
+setTimeout(pullMarksHalt,1300); setInterval(()=>{ if(!document.hidden) pullMarksHalt(); },5000);
+
+/* A-3 수리: 세션↔표시 신원 대조 (불일치 시 재로그인 강제 — alpexa-sync.js:288 공용) */
+try{ AlpexaSync.assertIdentity&&AlpexaSync.assertIdentity(); }catch(e){}
+
 mmSession(); stLoad(); sgLoad(); hdrAuth();
 </script>
 </body>
