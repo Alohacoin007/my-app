@@ -24,6 +24,10 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden}
 .tnum{font-variant-numeric:tabular-nums}
 /* 스크롤바 전면 숨김 (스포츠 대시보드와 동일 결정) */
 *{scrollbar-width:none; -ms-overflow-style:none}
+/* 즉시 눌림 피드백 (2026-07-17 사장님 "빛의 속도") — 클릭 순간 시각 반응, transition 없음 */
+button:active:not(:disabled),.htab:active,.hic:active,.chip:active,.mrow:active,.prow2:active,
+.arow:active,.ubtn:active,.mx:active,.madd:active,.addtab:active,.avatar:active{
+  transform:scale(.97); filter:brightness(1.15)}
 *::-webkit-scrollbar{width:0; height:0; display:none}
 
 /* ══ 헤더 (레전드 §2: h48 · 블랙 바 · 탭 필 · 중앙 상태 필 · 우측 액션) ══ */
@@ -505,6 +509,7 @@ body.light .tk.float{box-shadow:0 18px 52px rgba(15,23,40,.28)}
 .stk .gobtn{background:var(--lgd-up); color:#04250B; border:none; border-radius:8px; height:34px;
   font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit}
 .stk .gobtn:disabled{background:var(--lgd-pill); color:var(--lgd-dim); cursor:not-allowed}
+.armw{background:#FF9500 !important; color:#231301 !important}   /* 무장 상태 = 확인 대기 강조 */
 .stk .done3{display:none; flex-direction:column; align-items:center; gap:6px; padding:10px; text-align:center}
 .stk .done3 .ic{width:34px; height:34px; border-radius:50%; background:var(--lgd-up); color:#04250B;
   display:flex; align-items:center; justify-content:center; font-size:17px; font-weight:900}
@@ -1748,13 +1753,15 @@ document.getElementById('tkGo').onclick=async()=>{
   if(window.__alpexaHalt){ tkHalt(); return; }   // A-1 킬스위치
   const {usd,coin,mkP}=tkVals(); if(!usd||!tr.sess) return;
   tr.busy=true; tkCalc();
+  const _tkOrig=document.getElementById('tkGo').textContent;
+  document.getElementById('tkGo').textContent='Working…';
   const args={ p_ref:'cb-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),
     p_acct:tr.sess.acct, p_symbol:tr.sym, p_usd:+usd.toFixed(2), p_side:tr.side, p_markup:mkP };
   if(tr.side==='sell'&&tr.maxAll) args.p_all=true;   // 전량 청산 = 서버가 정확 수량 계산 (가격갭 거절 회피)
   let res;
   try{ const r=await AlpexaSync.db.rpc('crypto_trade',args); res=r&&r.data; }
   catch(e){ res=null; }
-  tr.busy=false;
+  tr.busy=false; document.getElementById('tkGo').textContent=_tkOrig;
   if(res&&res.ok===true){
     document.getElementById('tkForm').style.display='none';
     const dn=document.getElementById('tkDone'); dn.style.display='flex';
@@ -1826,13 +1833,13 @@ document.getElementById('swGo').onclick=async()=>{
   if(window.__alpexaHalt){ swHaltWarn(); return; }   // A-1 킬스위치
   if(!armed('sw',document.getElementById('swGo'),'Tap again to confirm swap')) return;   // B-3
   const v=swVals(); if(!v.usd||!sw.sess) return;
-  sw.busy=true; swCalc();
+  sw.busy=true; swCalc(); document.getElementById('swGo').textContent='Working…';
   let res;
   try{ const r=await AlpexaSync.db.rpc('swap_crypto',{
       p_ref:'sw-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),
       p_acct:sw.sess.acct, p_from:v.from, p_to:v.to, p_usd:+v.usd.toFixed(2), p_markup:v.mkP });
     res=r&&r.data; }catch(e){ res=null; }
-  sw.busy=false;
+  sw.busy=false; document.getElementById('swGo').textContent='Swap';
   if(res&&res.ok===true){
     const dn=document.getElementById('swDone'); dn.style.display='flex';
     document.getElementById('swDoneT').textContent='Swapped '+fmtUsdSm(v.usd)+' '+v.from+' → '+v.to;
@@ -1956,7 +1963,8 @@ function stCalc(){
   w=w||st.err;   // 제출 에러는 sticky — 재계산이 지우지 않는다
   warn.textContent=w; warn.style.display=w?'block':'none';
   document.getElementById('stGo').disabled=!!w||!usd||st.busy;
-  document.getElementById('stGo').textContent='Stake'+(usd?' '+fmtUsdSm(usd):'')+' · '+stApy(asset,perX).toFixed(0)+'% APY';
+  document.getElementById('stGo').textContent=st.busy?'Working…':
+    ('Stake'+(usd?' '+fmtUsdSm(usd):'')+' · '+stApy(asset,perX).toFixed(0)+'% APY');
 }
 document.getElementById('stAsset').addEventListener('change',()=>{ st.err=''; stCalc(); });
 document.getElementById('stAmt').addEventListener('input',()=>{ st.err=''; stCalc(); });
@@ -2059,11 +2067,11 @@ document.getElementById('mmGo').onclick=async()=>{
   if(window.__alpexaHalt){ const w=document.getElementById('mmWarn'); w.textContent=HALT_MSG; w.style.display='block'; return; }   // A-1
   if(!armed('mm',document.getElementById('mmGo'),'Tap again to confirm send')) return;   // B-3
   const v=mmVals(); if(!v.qty||!mm.toAcct||!mm.sess) return;
-  mm.busy=true; mmCalc();
+  mm.busy=true; mmCalc(); document.getElementById('mmGo').textContent='Working…';
   let res;
   try{ res=await AlpexaSync.cryptoSendInternal({to:mm.toAcct, asset:v.asset, qty:v.qty}); }
   catch(e){ res={ok:false,error:'network error'}; }
-  mm.busy=false;
+  mm.busy=false; document.getElementById('mmGo').textContent='Send';
   if(res&&(res.ok===true||res.duplicate===true)){
     try{ AlpexaSync.sendPayment&&AlpexaSync.sendPayment({to:mm.toAcct, amount:v.px?+(v.qty*v.px).toFixed(2):0, asset:v.asset}); }catch(e){}
     const dn=document.getElementById('mmDone'); dn.style.display='flex';
@@ -2119,13 +2127,13 @@ document.getElementById('xfGo').onclick=async()=>{
   const from=document.getElementById('xfFrom').value, to=document.getElementById('xfTo').value;
   const usd=parseFloat(document.getElementById('xfAmt').value)||0;
   const ac=xfAccts(); if(!usd||!mm.sess||!ac[from]||!ac[to]) return;
-  xf.busy=true; xfCalc();
+  xf.busy=true; xfCalc(); document.getElementById('xfGo').textContent='Working…';
   let res;
   try{ const r=await AlpexaSync.db.rpc('app_transfer',{
       p_ref:'xfer-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),
       p_from:ac[from], p_to:ac[to], p_amount:+usd.toFixed(2) });
     res=r&&r.data; }catch(e){ res=null; }
-  xf.busy=false;
+  xf.busy=false; document.getElementById('xfGo').textContent='Transfer';
   if(res&&(res.ok===true||res.duplicate===true)){
     const dn=document.getElementById('xfDone'); dn.style.display='flex';
     document.getElementById('xfDoneT').textContent='Transferred '+fmtUsdSm(usd);
@@ -2173,7 +2181,7 @@ function fdCalc(){
   w=w||fd.err;
   warn.textContent=w; warn.style.display=w?'block':'none';
   document.getElementById('fdGo').disabled=!!w||!usd||fd.busy;
-  document.getElementById('fdGo').textContent=wire?'Submit wire deposit':'Continue to card checkout';
+  document.getElementById('fdGo').textContent=fd.busy?'Working…':(wire?'Submit wire deposit':'Continue to card checkout');
 }
 document.getElementById('fdMethod').addEventListener('change',()=>{ fd.err=''; fdCalc(); });
 document.getElementById('fdAmt').addEventListener('input',()=>{ fd.err=''; fdCalc(); });
@@ -2253,8 +2261,8 @@ function wdCalc(){
   w=w||wd.err;   // 제출 에러는 sticky — 재계산이 지우지 않는다
   warn.textContent=w; warn.style.display=w?'block':'none';
   document.getElementById('wdGo').disabled=!!w||!usd||!addr||wd.busy;
-  document.getElementById('wdGo').textContent=
-    (usd>=1000&&!wd.unlocked)?(wd.otpSent?'Verify code & withdraw':'Send code & continue'):'Withdraw';
+  document.getElementById('wdGo').textContent=wd.busy?'Working…':
+    ((usd>=1000&&!wd.unlocked)?(wd.otpSent?'Verify code & withdraw':'Send code & continue'):'Withdraw');
 }
 ['wdAsset','wdAddr','wdAmt','wdOtp'].forEach(id=>{
   document.getElementById(id).addEventListener('input',()=>{ wd.err=''; wdCalc(); }); });
@@ -2484,10 +2492,10 @@ function tkHalt(){ const w=document.getElementById('tkWarn'); if(w){ w.textConte
 const ARM={};
 function armed(key,btn,label){
   const t=ARM[key];
-  if(t&&Date.now()-t.ts<6000){ ARM[key]=null; btn.textContent=t.orig; return true; }
+  if(t&&Date.now()-t.ts<6000){ ARM[key]=null; btn.textContent=t.orig; btn.classList.remove('armw'); return true; }
   ARM[key]={ts:Date.now(),orig:btn.textContent};
-  btn.textContent=label;
-  setTimeout(()=>{ const c=ARM[key]; if(c&&Date.now()-c.ts>=5800){ ARM[key]=null; btn.textContent=c.orig; } },6000);
+  btn.textContent=label; btn.classList.add('armw');
+  setTimeout(()=>{ const c=ARM[key]; if(c&&Date.now()-c.ts>=5800){ ARM[key]=null; btn.textContent=c.orig; btn.classList.remove('armw'); } },6000);
   return false;
 }
 /* B-4: 앱 :13348과 동일하게 모든 성공 액션을 activity에 미러 — 백오피스·앱 이력에 보이게 */
