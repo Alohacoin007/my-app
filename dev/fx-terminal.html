@@ -202,7 +202,39 @@ body.light .cgmenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
 .postbl td{text-align:right; padding:5px 10px; border-bottom:1px solid rgba(128,128,128,.08); font-variant-numeric:tabular-nums}
 .postbl .buy{color:var(--lgd-up); text-transform:capitalize} .postbl .sell{color:var(--lgd-down,#EB5D2A); text-transform:capitalize}
 .postbl .pl-pos{color:var(--lgd-up)} .postbl .pl-neg{color:var(--lgd-down,#EB5D2A)}
-.tbxempty{flex:1; display:flex; align-items:center; justify-content:center; color:var(--lgd-dim); font-size:12px; padding:24px}
+.tbxempty{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:var(--lgd-dim); font-size:12px; padding:24px; text-align:center}
+.tbxempty .ic{font-size:28px; opacity:.7}
+.postbl .up{color:var(--lgd-up)} .postbl .down{color:var(--lgd-down,#EB5D2A)}
+/* History 기간 필터 바 */
+.histbar{display:flex; align-items:center; gap:5px; padding:5px 10px; border-bottom:1px solid var(--lgd-hair); flex:none; flex-wrap:wrap}
+.histbar .hbtn{background:var(--lgd-pill); border:1px solid transparent; color:var(--lgd-dim); font:700 10px/1 inherit;
+  padding:4px 8px; border-radius:2px; cursor:pointer}
+.histbar .hbtn:hover{color:var(--lgd-ink)} .histbar .hbtn.on{color:var(--lgd-up); border-color:var(--lgd-up)}
+.histbar .hbcount{margin-left:auto; color:var(--lgd-dim); font-size:10.5px}
+/* Alerts 추가 폼 */
+.aladd{display:flex; align-items:center; gap:6px; padding:8px 10px; border-bottom:1px solid var(--lgd-hair); flex:none; flex-wrap:wrap}
+.aladd .k{color:var(--lgd-dim); font-size:11px; font-weight:700}
+.aladd select, .aladd input{background:var(--lgd-surface2); border:1px solid var(--lgd-hair); color:var(--lgd-ink);
+  font:600 11px inherit; padding:4px 6px; border-radius:2px; outline:none}
+.aladd input{width:96px}
+.aladd .albtn{background:var(--lgd-up); border:none; color:#fff; font:800 11px inherit; padding:5px 12px; border-radius:2px; cursor:pointer}
+.aldel{background:none; border:none; color:var(--lgd-dim); cursor:pointer; font-size:11px; font-weight:700; padding:2px 6px; border-radius:2px}
+.aldel:hover{background:var(--lgd-down,#EB5D2A); color:#fff}
+/* Journal 로그 */
+.jrnl{width:100%; border-collapse:collapse; font-size:11px}
+.jrnl td{padding:4px 10px; border-bottom:1px solid rgba(128,128,128,.08); vertical-align:top}
+.jrnl td.t{color:var(--lgd-dim); white-space:nowrap; font-variant-numeric:tabular-nums; width:150px}
+.jrnl td.ok{color:var(--lgd-ink)} .jrnl td.err{color:var(--lgd-down,#EB5D2A)}
+/* Company 정보 패널 */
+.cinfo{padding:12px 14px; overflow:auto}
+.cinfo-hd{font-size:13px; font-weight:800; color:var(--lgd-ink); margin-bottom:10px}
+.cinfo-tbl{border-collapse:collapse; font-size:11.5px}
+.cinfo-tbl td{padding:5px 10px; border-bottom:1px solid rgba(128,128,128,.08); vertical-align:top}
+.cinfo-tbl td.ck{color:var(--lgd-dim); white-space:nowrap; padding-right:20px} .cinfo-tbl td.cv{color:var(--lgd-ink)}
+.cinfo-note{margin-top:10px; color:var(--lgd-dim); font-size:10.5px; max-width:520px; line-height:1.5}
+/* Mailbox */
+.mbx-row{cursor:pointer} .mbx-row:hover td{background:rgba(128,128,128,.06)}
+.mbx-detail td{white-space:pre-wrap; color:var(--lgd-dim); font-size:11px; line-height:1.55; padding:8px 12px; background:var(--lgd-surface2)}
 
 /* ── 상태바 (MT5 최하단) ── */
 .statusbar{display:flex; align-items:center; gap:12px; height:22px; padding:0 10px; background:var(--lgd-surface);
@@ -656,13 +688,56 @@ function navBodyHTML(){ return '<div class="nvtree" id="nvTree">'+NAV_GROUPS.map
 /* ── Toolbox (MT5 하단 패널) — 탭 12종 + Trade(계좌 바 + 포지션 테이블) ──
    계좌·포지션 값은 사장님이 준 MT5 데모 스샷 그대로(DEMO·preview 표기). 실계좌 연동은 M3(서버 전용). */
 const TBX_TABS=['Trade','Exposure','History','News','Mailbox','Calendar','Company','Alerts','Articles','Code Base','Experts','Journal'];
+let curTbxTab='Trade';
 let DEMO_POS=[
   {sym:'eurusd.fx', ticket:'3172308', time:'2026.07.09 20:17:40', type:'buy', vol:'0.01', price:'1.14318', sl:'', tp:'', cur:'1.14360', comm:'0.00', swap:'0.00', pl:'0.42'},
   {sym:'usdchf.fx', ticket:'3194818', time:'2026.07.13 09:34:06', type:'buy', vol:'0.07', price:'0.80808', sl:'', tp:'', cur:'0.80720', comm:'0.00', swap:'-0.21', pl:'-7.63'} ];
-/* 원클릭 청산 (DEMO) — 데모 행 제거 + 총 P/L 재계산. 실청산은 fx_close RPC(M5, 서버 전용) */
-function closePosDemo(ticket){ DEMO_POS=DEMO_POS.filter(p=>p.ticket!==ticket); renderToolbox('Trade');
+/* 청산된 거래 로그(History) — 데모 시드 + 청산 시 추가. 실이력은 M3 서버(settlements) */
+let DEMO_HIST=[
+  {sym:'eurusd.fx', ticket:'3170112', ctime:'2026.07.08 14:22:10', type:'sell', vol:'0.02', open:'1.14210', close:'1.14090', profit:'2.40', ms:Date.parse('2026-07-08T14:22:10')},
+  {sym:'gbpjpy.fx', ticket:'3169044', ctime:'2026.07.07 09:05:33', type:'buy',  vol:'0.05', open:'217.400', close:'217.050', profit:'-8.05', ms:Date.parse('2026-07-07T09:05:33')} ];
+/* 타임스탬프 (MT5: 2026.07.09 20:17:40) */
+function fxStamp(t){ const d=t?new Date(t):new Date(), p=n=>(n<10?'0':'')+n;
+  return d.getFullYear()+'.'+p(d.getMonth()+1)+'.'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds()); }
+/* Journal — 시스템 통신 로그(터미널 시작·청산·알림 등, 최신 먼저). 메모리 300개 캡 */
+const JOURNAL={ entries:[{ts:fxStamp(),msg:'Alpexa FX Terminal started — Alpexa-Demo 3172308',ok:true}],
+  log(msg,ok){ this.entries.unshift({ts:fxStamp(),msg,ok:ok!==false}); if(this.entries.length>300) this.entries.length=300;
+    if(curTbxTab==='Journal') renderToolbox('Journal'); } };
+/* Price alerts — UI 데이터라 localStorage OK(#5: 설정 OK, 돈 금지). 히트=1회 발화(무장해제)+Journal 기록 */
+const AL_KEY='alpexa.fxdash.alerts';
+const alertsStore={ list:(()=>{ try{ return JSON.parse(localStorage.getItem(AL_KEY)||'[]'); }catch(_){ return []; } })(),
+  save(){ try{ localStorage.setItem(AL_KEY, JSON.stringify(this.list)); }catch(_){} },
+  add(sym,cond,px){ this.list.push({id:Date.now()+'-'+Math.floor(Math.random()*1e4),sym,cond,px:+px,armed:true,hitAt:null}); this.save(); },
+  remove(id){ this.list=this.list.filter(a=>a.id!==id); this.save(); },
+  check(){ let hit=false; this.list.forEach(a=>{ if(!a.armed) return; const r=mwStore.rows[a.sym]; if(!r||!(r.mid>0)) return;
+    if(a.cond==='>=' ? r.mid>=a.px : r.mid<=a.px){ a.armed=false; a.hitAt=Date.now(); hit=true;
+      JOURNAL.log('Alert — '+a.sym+' '+a.cond+' '+a.px+' hit @ '+mwFmt(a.sym,r.mid), true); } });
+    if(hit){ this.save(); if(curTbxTab==='Alerts') renderToolbox('Alerts'); } } };
+/* 노셔널/마진 수학 (MT5 익스포저) — DEMO. 실값은 M3 서버. contract 100k, leverage 1:100 */
+const FX_CONTRACT=100000, FX_LEV=100, FX_EQUITY=99992.79;
+const symPair=s=>s.replace(/\.fx$/i,'').toUpperCase();
+function baseUsdRate(sym,price){ const p=symPair(sym); if(p.slice(0,3)==='USD') return 1; if(p.slice(3,6)==='USD') return +price||1;
+  const r=mwStore.rows[p.slice(0,3)+'USD']; return r&&r.mid>0?r.mid:(+price||1); }   // 근사(교차쌍)
+const fxNum=n=>(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+/* 원클릭 청산 (DEMO) — 행 제거 + History/Journal 기록 + 총 P/L 재계산. 실청산은 fx_close RPC(M5, 서버 전용) */
+function closePosDemo(ticket){ const p=DEMO_POS.find(x=>x.ticket===ticket); if(!p) return;
+  DEMO_POS=DEMO_POS.filter(x=>x.ticket!==ticket);
+  DEMO_HIST.unshift({sym:p.sym,ticket:p.ticket,ctime:fxStamp(),type:p.type,vol:p.vol,open:p.price,close:p.cur,profit:(+p.pl).toFixed(2),ms:Date.now()});
+  JOURNAL.log('Closed #'+ticket+' '+p.sym+' '+p.type+' '+p.vol+' @ '+p.cur+'  P/L '+(+p.pl).toFixed(2), +p.pl>=0);
+  renderToolbox(curTbxTab==='Trade'?'Trade':curTbxTab);
   toast('Position '+ticket+' closed (demo) — live close via fx_close in M5'); }
-function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!body) return;
+
+/* Alerts 폼 제출/삭제, History 기간 필터 (툴박스 클릭 위임에서 호출) */
+let histPeriod='all';
+function tbxAddAlert(){ const s=document.getElementById('alSym'), c=document.getElementById('alCond'), px=document.getElementById('alPx');
+  if(!s||!c||!px) return; const v=+px.value; if(!(v>0)){ toast('Enter a price'); return; }
+  alertsStore.add(s.value, c.value, v); JOURNAL.log('Alert set — '+s.value+' '+c.value+' '+v, true); renderToolbox('Alerts'); }
+
+function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!body) return; curTbxTab=tab;
+  const emptyIC={News:['📰','News feed — connects in M6'], Mailbox:['✉️','No messages (Mailbox empty)'],
+    Calendar:['📅','Economic calendar — connects in M6'], Articles:['📄','No articles'],
+    'Code Base':['💾','Code Base is empty'], Experts:['🤖','No Expert Advisors attached']};
+
   if(tab==='Trade'){
     const total=DEMO_POS.reduce((s,p)=>s+(+p.pl),0);
     const rows=DEMO_POS.length ? DEMO_POS.map(p=>'<tr><td>'+p.sym+'</td><td>'+p.ticket+'</td><td>'+p.time+'</td>'+
@@ -679,7 +754,90 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
       '<span>Balance:<b>100 000.00 USD</b></span><span>Equity:<b>99 992.79</b></span>'+
       '<span>Margin:<b>256.64</b></span><span>Free Margin:<b>99 736.15</b></span><span>Margin Level:<b>38 962.28%</b></span>'+
       '<span class="tbxtotal '+(total>=0?'pl-pos':'pl-neg')+'">'+total.toFixed(2)+'</span></div></div>';
-  } else { body.innerHTML='<div class="tbxempty">'+tab+' — foundation (Coming in build)</div>'; } }
+
+  } else if(tab==='Exposure'){
+    /* 심볼별 long/short 집계 — 헤지북도 표시(Net=long−short, Notional/Margin=GROSS 양다리) */
+    const agg={}; DEMO_POS.forEach(p=>{ const s=p.sym, lots=+p.vol||0, a=agg[s]||(agg[s]={long:0,short:0,px:+p.price});
+      if(p.type==='sell') a.short+=lots; else a.long+=lots; });
+    const syms=Object.keys(agg).filter(s=>(agg[s].long+agg[s].short)>1e-9);
+    let totN=0, totM=0;
+    const rows=syms.map(s=>{ const a=agg[s], gross=a.long+a.short, net=a.long-a.short;
+      const notl=gross*FX_CONTRACT*baseUsdRate(s,a.px), marg=notl/FX_LEV; totN+=notl; totM+=marg;
+      const flat=Math.abs(net)<1e-9, cls=flat?'':(net>0?'up':'down');
+      return '<tr><td>'+s+'</td><td class="'+cls+'">'+net.toFixed(2)+'</td>'+
+        '<td class="'+cls+'">'+(flat?'Flat (hedged)':(net>0?'Long':'Short'))+'</td>'+
+        '<td>'+fxNum(notl)+'</td><td>'+fxNum(marg)+'</td><td>'+(FX_EQUITY>0?(marg/FX_EQUITY*100).toFixed(2)+' %':'—')+'</td></tr>'; }).join('');
+    const foot=syms.length?'<div class="tbxacct"><span>Notional:<b>'+fxNum(totN)+' USD</b></span>'+
+      '<span>Margin:<b>'+fxNum(totM)+'</b></span><span>Equity:<b>'+fxNum(FX_EQUITY)+'</b></span>'+
+      '<span>Margin used:<b>'+(FX_EQUITY>0?(totM/FX_EQUITY*100).toFixed(2)+' %':'—')+'</b></span></div>':'';
+    body.innerHTML='<div class="tbxscroll"><table class="postbl"><thead><tr>'+
+      ['Symbol','Net Volume','Direction','Notional (USD)','Margin (USD)','% of Equity'].map(h=>'<th>'+h+'</th>').join('')+
+      '</tr></thead><tbody>'+(syms.length?rows:'<tr><td colspan="6" style="text-align:center;color:var(--lgd-dim);padding:16px">No open exposure</td></tr>')+
+      '</tbody></table>'+foot+'</div>';
+
+  } else if(tab==='History'){
+    const now=Date.now(), sod=(()=>{ const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); })();
+    const shown=DEMO_HIST.filter(h=>{ const ms=+h.ms||0;
+      if(histPeriod==='today') return ms>=sod; if(histPeriod==='week') return ms>=now-7*864e5; if(histPeriod==='month') return ms>=now-30*864e5; return true; });
+    const totP=shown.reduce((s,h)=>s+(+h.profit),0);
+    const bar='<div class="histbar">'+[['all','All'],['today','Today'],['week','Last Week'],['month','Last Month']]
+      .map(([k,l])=>'<button class="hbtn'+(histPeriod===k?' on':'')+'" data-hp="'+k+'">'+l+'</button>').join('')+
+      '<span class="hbcount">'+shown.length+' deals</span></div>';
+    const rows=shown.length?shown.map(h=>'<tr><td>'+h.sym+'</td><td>'+h.ticket+'</td><td>'+h.ctime+'</td>'+
+      '<td class="'+(h.type==='sell'?'down':'up')+'">'+h.type+'</td><td>'+(+h.vol).toFixed(2)+'</td><td>'+h.open+'</td><td>'+h.close+'</td>'+
+      '<td class="'+(+h.profit>=0?'pl-pos':'pl-neg')+'">'+(+h.profit).toFixed(2)+'</td></tr>').join('')
+      : '<tr><td colspan="8" style="text-align:center;color:var(--lgd-dim);padding:16px">No history in the selected period</td></tr>';
+    const foot=shown.length?'<div class="tbxacct"><span>Deals:<b>'+shown.length+'</b></span>'+
+      '<span class="tbxtotal '+(totP>=0?'pl-pos':'pl-neg')+'">'+totP.toFixed(2)+'</span></div>':'';
+    body.innerHTML=bar+'<div class="tbxscroll"><table class="postbl"><thead><tr>'+
+      ['Symbol','Ticket','Time','Type','Volume','Price','Price','Profit'].map(h=>'<th>'+h+'</th>').join('')+
+      '</tr></thead><tbody>'+rows+'</tbody></table>'+foot+'</div>';
+
+  } else if(tab==='Alerts'){
+    const opts=MW_WATCH.map(s=>'<option value="'+s+'">'+s+'</option>').join('');
+    const form='<div class="aladd"><span class="k">🔔 New alert:</span>'+
+      '<select id="alSym">'+opts+'</select>'+
+      '<select id="alCond"><option value="&gt;=">Bid/Mid ≥</option><option value="&lt;=">Bid/Mid ≤</option></select>'+
+      '<input id="alPx" placeholder="price" inputmode="decimal">'+
+      '<button class="albtn" id="alAdd">Add Alert</button></div>';
+    const list=alertsStore.list;
+    const body2=list.length?'<div class="tbxscroll"><table class="postbl"><thead><tr>'+
+        ['Symbol','Condition','Status',''].map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+
+        list.map(a=>'<tr><td>'+a.sym+'</td><td>'+(a.cond==='>='?'≥':'≤')+' '+a.px+'</td>'+
+          '<td class="'+(a.armed?'':'up')+'">'+(a.armed?'⏳ Armed':'✅ Hit '+new Date(a.hitAt).toLocaleTimeString())+'</td>'+
+          '<td class="pox"><button class="aldel" data-del="'+a.id+'" title="Delete alert">✕</button></td></tr>').join('')+
+        '</tbody></table></div>'
+      : '<div class="tbxempty"><div class="ic">🔔</div>No alerts — add one above (fires once, logs to Journal)</div>';
+    body.innerHTML=form+body2;
+
+  } else if(tab==='Journal'){
+    const rows=JOURNAL.entries.length?JOURNAL.entries.map(r=>'<tr><td class="t">'+r.ts+'</td><td class="'+(r.ok?'ok':'err')+'">'+r.msg+'</td></tr>').join('')
+      : '<tr><td class="t">—</td><td>No journal entries yet</td></tr>';
+    body.innerHTML='<div class="tbxscroll"><table class="jrnl"><tbody>'+rows+'</tbody></table></div>';
+
+  } else if(tab==='Company'){
+    const info=[['Legal name','Alpexa Suisse S.A.'],['Registration (Cédula)','3-101-835471'],
+      ['Municipal licence','LIC. MUN. 4439-S'],['Resolution','2026-MSJ-PT-0874'],
+      ['Issuing authority','Municipalidad de San José · Departamento de Patentes'],
+      ['Activity','Procesamiento de datos y servicios electrónicos'],
+      ['Registered address','Boulevard Dent — Adriatico Building, Piso 3, San Pedro, San José, 11501']];
+    body.innerHTML='<div class="tbxscroll"><div class="cinfo"><div class="cinfo-hd">🏛️ Company &amp; Licensing</div>'+
+      '<table class="cinfo-tbl"><tbody>'+info.map(kv=>'<tr><td class="ck">'+kv[0]+'</td><td class="cv">'+kv[1]+'</td></tr>').join('')+'</tbody></table>'+
+      '<div class="cinfo-note">Municipal business licence (patente) issued by the Municipalidad de San José, Costa Rica.</div></div></div>';
+
+  } else if(tab==='Mailbox'){
+    const mail={subject:'🎉 Account opened — welcome to ALPEXA FX',
+      detail:'Dear trader,\n\nYour demo trading account is open and ready:\n'+
+        '  · Login (account):  3172308\n  · Server:           Alpexa-Demo\n'+
+        '  · Account type:     Standard · USD · leverage up to 1:100\n\n'+
+        'Live account data connects in a later build (server-only). Good trading!\nALPEXA Dealing Desk'};
+    body.innerHTML='<div class="tbxscroll"><table class="postbl"><thead><tr>'+
+      ['Time','Subject','Amount (USD)'].map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+
+      '<tr class="mbx-row" data-mail="1"><td>—</td><td>'+mail.subject+'</td><td>—</td></tr>'+
+      '<tr class="mbx-detail" id="mbxDetail" style="display:none"><td colspan="3">'+mail.detail+'</td></tr>'+
+      '</tbody></table></div>';
+
+  } else { const e=emptyIC[tab]||['🗂️',tab]; body.innerHTML='<div class="tbxempty"><div class="ic">'+e[0]+'</div>'+e[1]+'</div>'; } }
 
 /* ── 위젯 생성 (M1: 전부 기초 프레임, 설정만 언어/테마 실동작) ── */
 makeWidget('navigator','Navigator','var(--lgd-link1,#4C8DFF)', navBodyHTML());
@@ -852,8 +1010,15 @@ mwSimulate(); mwRender();
     tabs.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('on',x===b)); renderToolbox(b.dataset.tab); });
   /* X = 툴박스 닫기(완전 숨김, 차트 확대). Ctrl+T로 재오픈 */
   if(closeBtn) closeBtn.addEventListener('click', ()=>{ setHiddenDock(true); toast('Toolbox closed — Ctrl+T to reopen'); });
-  /* 원클릭 청산 (포지션 행 우측 X) — 위임 */
-  content.addEventListener('click', e=>{ const x=e.target.closest('.poclose'); if(!x) return; closePosDemo(x.dataset.close); });
+  /* 툴박스 본문 위임: 원클릭 청산 · Alerts 추가/삭제 · History 기간 · Mailbox 펼치기 */
+  content.addEventListener('click', e=>{
+    const x=e.target.closest('.poclose'); if(x){ closePosDemo(x.dataset.close); return; }
+    const add=e.target.closest('#alAdd'); if(add){ tbxAddAlert(); return; }
+    const del=e.target.closest('.aldel'); if(del){ alertsStore.remove(del.dataset.del); JOURNAL.log('Alert removed', true); renderToolbox('Alerts'); return; }
+    const hp=e.target.closest('[data-hp]'); if(hp){ histPeriod=hp.dataset.hp; renderToolbox('History'); return; }
+    const mail=e.target.closest('[data-mail]'); if(mail){ const d=document.getElementById('mbxDetail'); if(d) d.style.display=d.style.display==='none'?'table-row':'none'; return; }
+  });
+  content.addEventListener('keydown', e=>{ if(e.key==='Enter' && e.target.id==='alPx'){ e.preventDefault(); tbxAddAlert(); } });
   /* 상단 테두리 드래그로 높이 조절 */
   if(rz) rz.addEventListener('pointerdown', e=>{ e.preventDefault(); rz.setPointerCapture(e.pointerId);
     const sy=e.clientY, sh=dockH;
@@ -870,7 +1035,7 @@ function updateStatus(){ const el=document.getElementById('sbClock'); if(!el) re
   const d=new Date(), p=n=>(n<10?'0':'')+n;
   el.textContent=d.getFullYear()+'.'+p(d.getMonth()+1)+'.'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds()); }
 updateStatus();
-setInterval(()=>{ if(!mwStore.live) mwSimulate(); mwRender(); updateStatus(); }, 1000);
+setInterval(()=>{ if(!mwStore.live) mwSimulate(); mwRender(); alertsStore.check(); updateStatus(); }, 1000);
 
 /* ── 헤더 동작 ── */
 document.getElementById('btnAdd').onclick=e=>{ e.stopPropagation();
