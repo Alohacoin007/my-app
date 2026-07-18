@@ -103,12 +103,6 @@ body.light .cgmenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
 
 /* ── Market Watch (시세) — MT5 Symbol·Bid·Ask·Spread ── */
 .mwwrap{flex:1; min-height:0; display:flex; flex-direction:column}
-.mwtabs{display:flex; align-items:center; gap:5px; padding:6px 8px; flex:none; border-bottom:1px solid var(--lgd-hair)}
-.mwtabs button{background:var(--lgd-pill); border:1px solid transparent; color:var(--lgd-dim);
-  font:700 10.5px/1 inherit; border-radius:6px; padding:5px 8px; cursor:pointer}
-.mwtabs button:hover{background:var(--lgd-pill-hi)}
-.mwtabs button.on{background:rgba(0,200,5,.12); border-color:var(--lgd-up); color:var(--lgd-up)}
-.mwtabs .mwsp{flex:1}
 .mwfeed{font-size:8.5px; font-weight:800; letter-spacing:.6px; padding:3px 7px; border-radius:999px;
   background:rgba(240,180,40,.15); color:#E0A020}
 .mwfeed.live{background:rgba(0,200,5,.15); color:var(--lgd-up)}
@@ -417,8 +411,6 @@ function mwRender(){ const host=document.getElementById('mwBody'); if(!host) ret
       '<div class="mwspr">'+spr+'</div></div>'; }).join('');
   const fl=document.getElementById('mwFeed'); if(fl){ fl.textContent=mwStore.live?'LIVE':'SIM'; fl.classList.toggle('live',mwStore.live); } }
 function mwBodyHTML(){ return '<div class="mwwrap">'+
-  '<div class="mwtabs" id="mwTabs">'+['All','Forex','Stocks','Crypto'].map(c=>'<button data-cat="'+c+'"'+(c==='All'?' class="on"':'')+'>'+c+'</button>').join('')+
-  '<span class="mwsp"></span><span class="mwfeed" id="mwFeed" title="Dev simulator — live feed next">SIM</span></div>'+
   '<div class="mwhd mwgrid"><div>Symbol</div><div>Bid</div><div>Ask</div><div>Spread</div></div>'+
   '<div class="mwlist" id="mwBody"></div></div>'; }
 
@@ -473,10 +465,28 @@ renderChartGrid();
     cgN=+b.dataset.n; try{ localStorage.setItem(CG_KEY, cgN); }catch(_){} renderChartGrid(); menu.style.display='none'; });
 })();
 
-/* Market Watch — 초기 렌더 + 클래스 탭 + 틱 루프(dev 시뮬레이터, 실피드 붙으면 mwStore.apply가 LIVE로) */
+/* Market Watch — 우클릭 컨텍스트 메뉴(클래스 필터, MT5식) + 타이틀바 피드 상태(SIM/LIVE) + 틱 루프 */
+(function mwControls(){
+  const mwEl=document.getElementById('w-marketwatch'); if(!mwEl) return;
+  const mwtb=mwEl.querySelector('.wtb');
+  const feed=document.createElement('span'); feed.className='mwfeed'; feed.id='mwFeed';
+  feed.title='Dev simulator — live feed next'; feed.textContent='SIM';
+  mwtb.insertBefore(feed, mwtb.querySelector('.wic'));
+  const ctx=document.createElement('div'); ctx.id='mwCtx'; ctx.className='cgmenu';
+  ctx.innerHTML='<div class="cgmhd" data-i18n="View">View</div>'+
+    ['All','Forex','Stocks','Crypto'].map(c=>'<button data-cat="'+c+'"><span>'+c+'</span><span class="ck">✓</span></button>').join('');
+  document.body.appendChild(ctx);
+  mwEl.addEventListener('contextmenu', e=>{ e.preventDefault();
+    document.getElementById('addMenu').style.display='none'; document.getElementById('tabMenu').style.display='none';
+    const cg=document.getElementById('cgMenu'); if(cg) cg.style.display='none';
+    ctx.style.left=Math.min(e.clientX, window.innerWidth-170)+'px';
+    ctx.style.top=Math.min(e.clientY, window.innerHeight-190)+'px';
+    ctx.querySelectorAll('[data-cat]').forEach(b=>b.classList.toggle('on',b.dataset.cat===mwFilter));
+    ctx.style.display='block'; });
+  ctx.addEventListener('click', e=>{ const b=e.target.closest('[data-cat]'); if(!b) return;
+    mwFilter=b.dataset.cat; mwRender(); ctx.style.display='none'; });
+})();
 mwSimulate(); mwRender();
-document.getElementById('mwTabs').addEventListener('click', e=>{ const b=e.target.closest('[data-cat]'); if(!b) return;
-  mwFilter=b.dataset.cat; document.querySelectorAll('#mwTabs [data-cat]').forEach(x=>x.classList.toggle('on',x===b)); mwRender(); });
 setInterval(()=>{ if(!mwStore.live) mwSimulate(); mwRender(); }, 1000);
 
 /* ── 헤더 동작 ── */
@@ -494,7 +504,8 @@ document.getElementById('btnTabs').onclick=e=>{ e.stopPropagation();
   m.style.display='block'; };
 document.addEventListener('click', ()=>{ document.getElementById('addMenu').style.display='none';
   document.getElementById('tabMenu').style.display='none';
-  const cm=document.getElementById('cgMenu'); if(cm) cm.style.display='none'; });
+  const cm=document.getElementById('cgMenu'); if(cm) cm.style.display='none';
+  const mc=document.getElementById('mwCtx'); if(mc) mc.style.display='none'; });
 document.getElementById('goSports').onclick=()=>{ location.href='/sports-dashboard.html'; };
 document.getElementById('goCrypto').onclick=()=>{ location.href='/dev/crypto-dashboard.html'; };
 
