@@ -560,9 +560,11 @@ function makeWidget(id, title, linkColor, bodyHTML){
         if(dir.includes('w')){ let nw=Math.max(m.w, ow-dx); nw=Math.min(nw, ox+ow); g.x=ox+ow-nw; g.w=nw; }
         if(dir.includes('n')){ let nh=Math.max(m.h, oh-dy); nh=Math.min(nh, oy+oh); g.y=oy+oh-nh; g.h=nh; }
         el.style.left=g.x+'px'; el.style.top=g.y+'px'; el.style.width=g.w+'px'; el.style.height=g.h+'px';
-        if(/^chart\d+$/.test(id)) renderChart(id); };   // 리사이즈 중 봉 실시간 재계산(늘어남 방지)
+        if(/^chart\d+$/.test(id)) renderChart(id);       // 리사이즈 중 봉 실시간 재계산(늘어남 방지)
+        else if((id==='marketwatch'||id==='navigator')&&dir.includes('e')) tileCharts(lastTileMode, false); };  // 시세창 늘리는 중 차트 실시간 정렬(저장 X)
       const up=ev=>{ h.releasePointerCapture(e.pointerId); h.removeEventListener('pointermove',move);
-        h.removeEventListener('pointerup',up); saveLayout(); };
+        h.removeEventListener('pointerup',up); saveLayout();
+        if(id==='marketwatch'||id==='navigator') tileCharts(lastTileMode); };  // 시세창 리사이즈 종료 → 남은 공간에 차트 재정렬
       h.addEventListener('pointermove',move); h.addEventListener('pointerup',up); }); }
   rz('.rz.t','n'); rz('.rz.b','s'); rz('.rz.l','w'); rz('.rz.r','e');
   rz('.rz.tl','nw'); rz('.rz.tr','ne'); rz('.rz.bl','sw'); rz('.rz.c','se');
@@ -576,6 +578,7 @@ function frame(){ return '<div class="found"><span class="big" data-i18n="Founda
 /* ── 멀티차트 그리드 (Chart 위젯 = MT5 4분할→N분할, 최대 10칸) ──
    M1: 골격 실동작(분할 선택·심볼·TF·타일 배치). 실봉 렌더는 M2 — 각 칸 회색 스켈레톤+M2 태그(정직 표기). */
 const CHART_UNIVERSE=['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCHF','USDCAD','XAUUSD','NZDUSD','EURJPY','GBPJPY'];
+let lastTileMode='grid';   // 마지막 정렬 방식 — 시세창 리사이즈 시 이 방식으로 남은 공간에 재정렬
 const CG_KEY='alpexa.fxdash.chartgrid', CG_PRESETS=[1,2,4,6,9,10];
 let cgN=Math.max(1,Math.min(10,+(localStorage.getItem(CG_KEY)||4)));
 /* 타임프레임 (MT5 툴바) — 차트 창 TF 라벨 구동. 실봉 M2, 지금은 라벨만. */
@@ -641,8 +644,13 @@ function mkChart(id, sym, i){ makeWidget(id, sym, 'var(--lgd-up)', chartBody());
   applyGeo(id); renderChart(id); }
 function destroyCharts(){ chartIds().forEach(id=>{ const el=document.getElementById('w-'+id); if(el) el.remove();
   delete layout[id]; const zi=zOrder.indexOf(id); if(zi>=0) zOrder.splice(zi,1); }); }
-/* 차트 영역 = 좌측 도크 오른쪽 전체(남은 공간 꽉 차게, 세로도 끝까지) */
-function chartRegion(){ const ref=layout.__ref||{w:1900,h:856}; return { x:276, y:8, w:ref.w-8-276, h:ref.h-16 }; }
+/* 차트 영역 = 좌측 도크(Market Watch/Navigator)의 오른쪽 끝 다음부터 스테이지 끝까지.
+   시세창을 늘리면 x가 그만큼 밀려 차트가 남은 공간으로 정리됨(시세를 절대 덮지 않음). */
+function chartLeftEdge(){ let maxR=0;
+  ['marketwatch','navigator'].forEach(id=>{ const g=layout[id]; if(g&&!g.hidden&&g.x<=24) maxR=Math.max(maxR, g.x+g.w); });
+  return maxR>0?Math.round(maxR+8):8; }
+function chartRegion(){ const ref=layout.__ref||{w:1900,h:856}, x=chartLeftEdge();
+  return { x, y:8, w:ref.w-8-x, h:ref.h-16 }; }
 const CH_TITLE_H=20;   // 최소화 시 타이틀바 높이
 function toggleMax(id){ const g=layout[id]; if(!g) return;
   if(g.__min){ toggleMin(id); }                         // 최소 상태면 먼저 복원
@@ -654,7 +662,7 @@ function toggleMin(id){ const g=layout[id], el=document.getElementById('w-'+id);
   else { if(g.__max){ Object.assign(g, g.__max); g.__max=null; } g.__min=g.h; g.h=CH_TITLE_H; el.classList.add('mini'); }
   applyGeo(id); saveLayout(); renderChart(id); }
 /* ── MT5 Window > Tile — 열려있는 차트들을 현재 남은 공간(chartRegion, 툴박스 높이 반영)에 꽉 채워 재배치 ── */
-function tileCharts(mode){ const ids=chartIds().filter(id=>!layout[id].hidden), n=ids.length; if(!n) return;
+function tileCharts(mode, save){ lastTileMode=mode||'grid'; const ids=chartIds().filter(id=>!layout[id].hidden), n=ids.length; if(!n) return;
   const R=chartRegion(), gap=2;
   ids.forEach(id=>{ const g=layout[id]; g.__max=null; g.__min=null; const el=document.getElementById('w-'+id); if(el) el.classList.remove('mini'); });
   if(mode==='cascade'){ const off=28; ids.forEach((id,i)=>{ const g=layout[id];
@@ -666,7 +674,7 @@ function tileCharts(mode){ const ids=chartIds().filter(id=>!layout[id].hidden), 
     const cw=(R.w-gap*(cols-1))/cols, ch=(R.h-gap*(rows-1))/rows;
     ids.forEach((id,i)=>{ const r=Math.floor(i/cols), c=i%cols, g=layout[id];
       g.x=Math.round(R.x+c*(cw+gap)); g.y=Math.round(R.y+r*(ch+gap)); g.w=Math.round(cw); g.h=Math.round(ch); applyGeo(id); }); }
-  saveLayout(); renderAllCharts(false); }
+  if(save!==false) saveLayout(); renderAllCharts(false); }   // 리사이즈 중 라이브 정렬은 save=false (localStorage 스팸 방지)
 function buildCharts(){ destroyCharts();
   const R=chartRegion(), gap=2, cols=Math.ceil(Math.sqrt(cgN)), rows=Math.ceil(cgN/cols);
   const cw=(R.w-gap*(cols-1))/cols, ch=(R.h-gap*(rows-1))/rows;
