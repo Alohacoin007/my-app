@@ -11,12 +11,14 @@
 /* 미니멀 · 직사각형 — 레전드 라운드 토큰을 샤프하게 오버라이드 */
 body{color:var(--lgd-ink,#F5F6F7); overflow:hidden; font-family:var(--lgd-font,system-ui,-apple-system,Segoe UI,sans-serif);
   --lgd-r-widget:2px; --lgd-r-btn:2px; --lgd-r-pop:2px; display:flex; flex-direction:column; height:100vh}
+/* 컨셉 초록 → MT5 블루 (.lgd 특이도 이겨야 함). 차트 색 별도, --lgd-down 빨강 유지 */
+body.lgd{ --lgd-up:#2E90FA; --lgd-link2:#2E90FA }
 button:active:not(:disabled),.htab:active,.hic:active,.avatar:active{ transform:scale(.97); filter:brightness(1.15) }
 
 /* ── 헤더 (컴팩트 38px) ── */
 .hdr{display:flex; align-items:center; gap:6px; height:38px; padding:0 8px; background:var(--lgd-surface);
   border-bottom:1px solid var(--lgd-hair); position:relative; z-index:60}
-.mark{width:24px; height:24px; border-radius:2px; background:var(--lgd-up); color:#04250B; font-weight:900;
+.mark{width:24px; height:24px; border-radius:2px; background:var(--lgd-up); color:#ffffff; font-weight:900;
   display:flex; align-items:center; justify-content:center; font-size:14px}
 /* 헤더 = 아이콘 전용(글자 제거), 라벨은 hover 툴팁으로 */
 .htab{display:flex; align-items:center; justify-content:center; width:30px; height:26px; flex:none;
@@ -24,13 +26,11 @@ button:active:not(:disabled),.htab:active,.hic:active,.avatar:active{ transform:
   transition:background .12s, color .12s}
 .htab.swtab{background:none; color:var(--lgd-dim); cursor:pointer}
 .htab.swtab:hover{background:var(--lgd-pill); color:var(--lgd-ink)}
-[data-tip]{position:relative}
-[data-tip]:hover::after{content:attr(data-tip); position:absolute; top:calc(100% + 6px); left:50%;
-  transform:translateX(-50%); background:var(--lgd-surface2); color:var(--lgd-ink); font-size:11px; font-weight:600;
+/* 마우스오버 툴팁 = body 레벨(오버플로에 안 잘림). JS가 위치 지정 */
+#gtip{position:fixed; display:none; background:var(--lgd-surface2); color:var(--lgd-ink); font-size:11px; font-weight:600;
   white-space:nowrap; padding:5px 8px; border-radius:2px; border:1px solid var(--lgd-hair);
-  box-shadow:0 6px 18px rgba(0,0,0,.45); z-index:100; pointer-events:none}
-.tip-r[data-tip]:hover::after{left:auto; right:0; transform:none}
-body.light [data-tip]:hover::after{box-shadow:0 6px 18px rgba(15,23,40,.18)}
+  box-shadow:0 6px 18px rgba(0,0,0,.45); z-index:300; pointer-events:none}
+body.light #gtip{box-shadow:0 6px 18px rgba(15,23,40,.18)}
 .addtab{width:28px; height:26px; border-radius:var(--lgd-r-btn,2px); display:flex; align-items:center;
   justify-content:center; color:var(--lgd-dim); cursor:pointer; font-size:16px}
 .addtab:hover{background:var(--lgd-pill); color:var(--lgd-ink)}
@@ -59,11 +59,11 @@ body.light [data-tip]:hover::after{box-shadow:0 6px 18px rgba(15,23,40,.18)}
 .tfbtn{height:24px; min-width:26px; padding:0 6px; border-radius:2px; font-size:10.5px; font-weight:700;
   color:var(--lgd-dim); background:none; border:none; cursor:pointer; font-family:inherit; flex:none}
 .tfbtn:hover{background:var(--lgd-pill); color:var(--lgd-ink)}
-.tfbtn.on{background:rgba(0,200,5,.14); color:var(--lgd-up)}
+.tfbtn.on{background:rgba(46,144,250,.14); color:var(--lgd-up)}
 .avatar{width:26px; height:26px; border-radius:999px; background:#3A3E42; display:flex; align-items:center;
   justify-content:center; color:#101214; cursor:pointer; font-size:12px; font-weight:800; position:relative}
-.avatar.signin{background:var(--lgd-up); color:#04250B; animation:avpulse 2s ease-in-out infinite}
-@keyframes avpulse{0%,100%{box-shadow:0 0 0 0 rgba(0,200,5,.45)}50%{box-shadow:0 0 0 6px rgba(0,200,5,0)}}
+.avatar.signin{background:var(--lgd-up); color:#ffffff; animation:avpulse 2s ease-in-out infinite}
+@keyframes avpulse{0%,100%{box-shadow:0 0 0 0 rgba(46,144,250,.45)}50%{box-shadow:0 0 0 6px rgba(46,144,250,0)}}
 #addMenu, #tabMenu{display:none; position:absolute; top:32px; z-index:70; min-width:190px;
   background:var(--lgd-surface2); border:1px solid var(--lgd-hair); border-radius:var(--lgd-r-pop,2px);
   box-shadow:0 8px 24px rgba(0,0,0,.5); padding:6px; font-size:13px}
@@ -129,7 +129,7 @@ body.light .cgmenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
 .mwwrap{flex:1; min-height:0; display:flex; flex-direction:column}
 .mwfeed{font-size:8.5px; font-weight:800; letter-spacing:.6px; padding:3px 7px; border-radius:2px;
   background:rgba(240,180,40,.15); color:#E0A020}
-.mwfeed.live{background:rgba(0,200,5,.15); color:var(--lgd-up)}
+.mwfeed.live{background:rgba(46,144,250,.15); color:var(--lgd-up)}
 .mwgrid{display:grid; grid-template-columns:1.15fr 1fr 1fr .72fr; gap:4px}
 .mwhd{padding:6px 10px; flex:none; font-size:9.5px; font-weight:800; letter-spacing:.4px;
   color:var(--lgd-dim); text-transform:uppercase; border-bottom:1px solid var(--lgd-hair)}
@@ -149,38 +149,38 @@ body.light .cgmenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
   font-weight:800; border-radius:2px; padding:2px 6px; letter-spacing:.5px}
 
 /* ── Toolbox = 하단 도크(#dock) — 상단 리사이즈 핸들 · 내용 · 바닥 탭. 접기 가능 ── */
-#dock{flex:none; display:flex; flex-direction:column; background:var(--lgd-surface);
+/* MT5: 좌측 세로 헤드(× + "Toolbox" 세로) + 우측 본체(리사이즈/내용/탭) */
+#dock{flex:none; display:flex; flex-direction:row; background:var(--lgd-surface);
   border-top:1px solid var(--lgd-hair); position:relative; z-index:55}
+.dockside{width:20px; flex:none; display:flex; flex-direction:column; align-items:center;
+  border-right:1px solid var(--lgd-hair); padding-top:3px; gap:4px}
+.dockclose{width:16px; height:16px; display:flex; align-items:center; justify-content:center; color:var(--lgd-dim);
+  cursor:pointer; border-radius:2px; flex:none; font-size:11px}
+.dockclose:hover{background:var(--lgd-down,#EB5D2A); color:#fff}
+.dockvlabel{writing-mode:vertical-rl; transform:rotate(180deg); font-size:9px; font-weight:800;
+  letter-spacing:.5px; text-transform:uppercase; color:var(--lgd-dim); margin-top:5px}
+.dockmain{flex:1; min-width:0; display:flex; flex-direction:column}
 .dockrz{height:6px; margin-top:-3px; cursor:row-resize; flex:none; z-index:2}
 .dockrz:hover{background:var(--lgd-hair)}
 .dockcontent{overflow:hidden; display:flex; flex-direction:column; min-height:0}  /* 높이는 JS가 지정 */
-#dock.collapsed .dockcontent{display:none}
-#dock.collapsed .dockrz{display:none}
 .docktabs{display:flex; align-items:center; gap:1px; height:26px; flex:none; padding:0 8px;
   border-top:1px solid var(--lgd-hair); overflow-x:auto}
-.dockname{color:var(--lgd-dim); font-size:9px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; margin-right:8px; flex:none}
 .dtabs{display:flex; align-items:center; gap:1px; flex:none}
 .docktabs button{background:none; border:none; color:var(--lgd-dim); font:700 11px/1 inherit; padding:6px 9px;
   border-radius:2px; cursor:pointer; white-space:nowrap; flex:none}
 .docktabs button:hover{color:var(--lgd-ink)}
 .docktabs button.on{color:var(--lgd-up); box-shadow:inset 0 -2px 0 var(--lgd-up)}
-.docktabs .sbtabs{color:var(--lgd-dim); font-size:10.5px; flex:none}
-.docktabs .sbtabs span{margin-left:10px}
-.dockclose{width:20px; height:20px; display:flex; align-items:center; justify-content:center; color:var(--lgd-dim);
-  cursor:pointer; border-radius:2px; flex:none; margin-right:4px; font-size:12px}
-.dockclose:hover{background:var(--lgd-down,#EB5D2A); color:#fff}
 /* 포지션 원클릭 청산 X (행 우측) */
 .poclose{display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:2px;
   color:var(--lgd-dim); cursor:pointer; font-size:11px; font-weight:700}
 .poclose:hover{background:var(--lgd-down,#EB5D2A); color:#fff}
-.postbl td.pox{text-align:center; padding:2px 6px}
+.postbl td.pox, .postbl th:last-child{text-align:center; padding:2px 6px; width:32px}
 /* Trade 탭: 포지션 스크롤(위) + 계좌 sticky 푸터(아래, 포지션 수 무관 항상 표시) */
 .tbxscroll{flex:1; min-height:0; overflow:auto}
 .tbxacct{display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:5px 10px; flex:none;
   font-size:11.5px; border-top:1px solid var(--lgd-hair); background:var(--lgd-surface2)}
 .tbxacct span{color:var(--lgd-dim)} .tbxacct b{color:var(--lgd-ink); font-weight:700; font-variant-numeric:tabular-nums; margin-left:4px}
-.tbxdemo{background:rgba(240,180,40,.15); color:#E0A020; font-size:8.5px; font-weight:800; letter-spacing:.6px; padding:3px 7px; border-radius:2px}
-.tbxtotal{margin-left:auto; font-weight:800; font-variant-numeric:tabular-nums; font-size:12px}
+.tbxtotal{margin-left:auto; margin-right:32px; font-weight:800; font-variant-numeric:tabular-nums; font-size:12px}  /* Profit 열 아래 정렬(청산 X열폭 32px만큼 왼쪽) */
 .postbl{width:100%; border-collapse:collapse; font-size:11.5px}
 .postbl th{position:sticky; top:0; background:var(--lgd-surface); text-align:right; font-weight:700; color:var(--lgd-dim);
   padding:5px 10px; font-size:9.5px; text-transform:uppercase; letter-spacing:.3px; border-bottom:1px solid var(--lgd-hair)}
@@ -228,11 +228,11 @@ body.light #toast{box-shadow:0 8px 24px rgba(15,23,40,.18)}
 .stg .rowbtns{display:flex; gap:8px; padding:2px 14px 6px}
 .stg .rowbtns button{flex:1; background:var(--lgd-pill); border:1px solid transparent; color:var(--lgd-ink);
   font-size:11.5px; font-weight:700; border-radius:2px; height:30px; cursor:pointer; font-family:inherit}
-.stg .rowbtns button.on{background:rgba(0,200,5,.10); border-color:var(--lgd-up)}
+.stg .rowbtns button.on{background:rgba(46,144,250,.10); border-color:var(--lgd-up)}
 .stg .langs{display:flex; gap:6px; padding:2px 14px 10px; flex-wrap:wrap}
 .stg .langs button{background:var(--lgd-pill); border:1px solid transparent; color:var(--lgd-ink);
   font-size:11.5px; font-weight:700; border-radius:2px; padding:6px 11px; cursor:pointer; font-family:inherit}
-.stg .langs button.on{background:rgba(0,200,5,.10); border-color:var(--lgd-up); color:var(--lgd-up)}
+.stg .langs button.on{background:rgba(46,144,250,.10); border-color:var(--lgd-up); color:var(--lgd-up)}
 .stg .kv2{display:flex; padding:6px 14px; font-size:11.5px}
 .stg .kv2 .l{color:var(--lgd-dim)} .stg .kv2 .v{margin-left:auto; font-weight:600}
 
@@ -256,9 +256,6 @@ body.light #tabMenu, body.light #addMenu{box-shadow:0 8px 24px rgba(15,23,40,.18
   </div>
   <div class="htab swtab" id="goCrypto" data-tip="Alpexa Crypto">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>
-  </div>
-  <div class="htab" id="fxTab" data-tip="Alpexa FX">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13l-3.5-3.5"/><path d="M20 16H7l3.5 3.5"/></svg>
   </div>
   <div style="position:relative">
     <div class="addtab" id="btnTabs" data-tip="Server tabs">+</div>
@@ -296,12 +293,14 @@ body.light #tabMenu, body.light #addMenu{box-shadow:0 8px 24px rgba(15,23,40,.18
 <div class="stage" id="stage"><div class="dots"></div></div>
 
 <div id="dock">
-  <div class="dockrz" id="dockRz" title="Drag to resize"></div>
-  <div class="dockcontent" id="tbxBody"></div>
-  <div class="docktabs">
+  <div class="dockside">
     <div class="dockclose" id="dockClose" title="Close toolbox (Ctrl+T to reopen)">✕</div>
-    <span class="dockname">Toolbox</span>
-    <div class="dtabs" id="tbxTabs"></div>
+    <div class="dockvlabel">Toolbox</div>
+  </div>
+  <div class="dockmain">
+    <div class="dockrz" id="dockRz" title="Drag to resize"></div>
+    <div class="dockcontent" id="tbxBody"></div>
+    <div class="docktabs"><div class="dtabs" id="tbxTabs"></div></div>
   </div>
 </div>
 
@@ -591,7 +590,7 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
       ['Symbol','Ticket','Time','Type','Volume','Price','S / L','T / P','Price','Commission','Swap','Profit',''].map(h=>'<th>'+h+'</th>').join('')+
       '</tr></thead><tbody>'+rows+'</tbody></table>'+
       /* 계좌 바 = 마지막 포지션 바로 뒤에 따라붙음(아래는 빈 공간), 총 P/L 우측 (MT5) */
-      '<div class="tbxacct"><span class="tbxdemo">DEMO</span>'+
+      '<div class="tbxacct">'+
       '<span>Balance:<b>100 000.00 USD</b></span><span>Equity:<b>99 992.79</b></span>'+
       '<span>Margin:<b>256.64</b></span><span>Free Margin:<b>99 736.15</b></span><span>Margin Level:<b>38 962.28%</b></span>'+
       '<span class="tbxtotal '+(total>=0?'pl-pos':'pl-neg')+'">'+total.toFixed(2)+'</span></div></div>';
@@ -843,6 +842,19 @@ document.addEventListener('keydown', e=>{
   else if(k==='+'||k==='='){ toast('Zoom in — coming in build'); }
   else if(k==='-'||k==='_'){ toast('Zoom out — coming in build'); }
 });
+
+/* ── 마우스오버 툴팁 (모든 [data-tip] — 툴바 아이콘 포함, 오버플로에 안 잘림) ── */
+(function tips(){
+  let tip;
+  document.addEventListener('mouseover', e=>{ const el=e.target.closest('[data-tip]'); if(!el) return;
+    const t=el.getAttribute('data-tip'); if(!t) return;
+    if(!tip){ tip=document.createElement('div'); tip.id='gtip'; document.body.appendChild(tip); }
+    tip.textContent=t; tip.style.display='block';
+    const r=el.getBoundingClientRect(), tw=tip.offsetWidth;
+    let left=r.left+r.width/2-tw/2; left=Math.max(6, Math.min(left, window.innerWidth-tw-6));
+    tip.style.left=left+'px'; tip.style.top=(r.bottom+6)+'px'; });
+  document.addEventListener('mouseout', e=>{ if(tip && e.target.closest && e.target.closest('[data-tip]')) tip.style.display='none'; });
+})();
 </script>
 </body>
 </html>
