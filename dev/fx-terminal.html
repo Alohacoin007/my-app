@@ -658,6 +658,46 @@ function objMove(o,which,d){ if(which==='p1') o.p1={t:d.t,price:d.price}; else i
     o.p1={t:o.p1.t+mt,price:o.p1.price+mp}; o.p2={t:o.p2.t+mt,price:o.p2.price+mp}; } }
 function delSelObj(){ if(!selObj) return false; const c=cfg(selObj.id); if(c.obj&&c.obj[selObj.idx]!=null){ c.obj.splice(selObj.idx,1); saveCfg(); const id=selObj.id; selObj=null; renderChart(id); return true; } selObj=null; return false; }
 function clearObjects(id){ const c=cfg(id); if(!c.obj||!c.obj.length) return; c.obj=[]; if(selObj&&selObj.id===id) selObj=null; saveCfg(); renderChart(id); }
+/* ── 차트 우클릭 컨텍스트 메뉴 (MT5) — Indicators List(제거/추가) · Objects(삭제) · Grid/Volumes · Zoom · Refresh · Properties.
+   차트타입/TF는 MT5 우클릭 메뉴에 없음(툴바·TF 스트립 전용)이라 넣지 않음. ── */
+const IND_LABEL={ma:'Moving Average (20)', boll:'Bollinger Bands (20,2)', rsi:'RSI (14)', vol:'Volume'};
+let _chCtx=null;
+function chartCtxEl(){ if(_chCtx) return _chCtx; const m=_chCtx=document.createElement('div'); m.id='chCtx'; m.className='cgmenu'; document.body.appendChild(m);
+  m.addEventListener('click', e=>{ e.stopPropagation(); const b=e.target.closest('button'); if(!b) return; const id=m.dataset.cid; if(!id||!layout[id]) return; const c=cfg(id);
+    if(b.dataset.indDel){ if(b.dataset.indDel==='vol') c.vol=false; else c.ind[b.dataset.indDel]=false; saveCfg(); renderChart(id); showChartCtx(id); }
+    else if(b.dataset.indAdd){ if(b.dataset.indAdd==='vol') c.vol=true; else c.ind[b.dataset.indAdd]=true; saveCfg(); renderChart(id); showChartCtx(id); }
+    else if(b.dataset.obj==='delsel'){ delSelObj(); m.style.display='none'; }
+    else if(b.dataset.obj==='delall'){ clearObjects(id); m.style.display='none'; }
+    else if(b.dataset.act==='grid'){ c.grid=!c.grid; saveCfg(); renderChart(id); showChartCtx(id); }
+    else if(b.dataset.act==='vol'){ c.vol=(c.vol===false); saveCfg(); renderChart(id); showChartCtx(id); }
+    else if(b.dataset.act==='zoomin'){ c.zoom=Math.min(4,+(c.zoom*1.25).toFixed(3)); saveCfg(); renderChart(id); }
+    else if(b.dataset.act==='zoomout'){ c.zoom=Math.max(0.18,+(c.zoom*0.8).toFixed(3)); saveCfg(); renderChart(id); }
+    else if(b.dataset.act==='refresh'){ delete chartSeries[layout[id].sym+'|'+c.tf]; renderChart(id); m.style.display='none'; }
+    else if(b.dataset.act==='props'){ toast('Chart Properties (F8) — coming in build'); m.style.display='none'; } });
+  return m; }
+function showChartCtx(id, e){ const m=chartCtxEl(), c=cfg(id), ind=c.ind; m.dataset.cid=id;
+  const attached=['ma','boll','rsi'].filter(k=>ind[k]).concat(c.vol!==false?['vol']:[]);
+  const addable=['ma','boll','rsi'].filter(k=>!ind[k]).concat(c.vol===false?['vol']:[]);
+  let h='<div class="cgmhd">Indicators List</div>';
+  h+= attached.length? attached.map(k=>'<button data-ind-del="'+k+'"><span>'+IND_LABEL[k]+'</span><span class="key" style="color:var(--lgd-down);opacity:1">✕ Remove</span></button>').join('')
+    : '<div class="mrow" style="color:var(--lgd-dim);padding:6px 10px">(none attached)</div>';
+  if(addable.length) h+='<div class="cgsep"></div><div class="cgmhd">Add</div>'+addable.map(k=>'<button data-ind-add="'+k+'"><span>+ '+IND_LABEL[k]+'</span></button>').join('');
+  h+='<div class="cgsep"></div><div class="cgmhd">Objects</div>';
+  if(selObj&&selObj.id===id) h+='<button data-obj="delsel"><span>Delete Selected</span><span class="key">Del</span></button>';
+  h+='<button data-obj="delall"><span>Delete All Objects</span></button>'+
+    '<div class="cgsep"></div>'+
+    '<button data-act="grid"'+(c.grid?' class="on"':'')+'><span>Grid</span><span class="ck">✓</span></button>'+
+    '<button data-act="vol"'+(c.vol!==false?' class="on"':'')+'><span>Volumes</span><span class="ck">✓</span></button>'+
+    '<div class="cgsep"></div>'+
+    '<button data-act="zoomin"><span>Zoom In</span><span class="key">+</span></button>'+
+    '<button data-act="zoomout"><span>Zoom Out</span><span class="key">−</span></button>'+
+    '<button data-act="refresh"><span>Refresh</span></button>'+
+    '<div class="cgsep"></div><button data-act="props"><span>Properties…</span><span class="key">F8</span></button>';
+  m.innerHTML=h;
+  document.getElementById('addMenu').style.display='none'; document.getElementById('tabMenu').style.display='none';
+  const md=document.getElementById('menuDrop'); if(md) md.style.display='none'; const mc=document.getElementById('mwCtx'); if(mc) mc.style.display='none';
+  if(e){ m.style.left=Math.min(e.clientX, window.innerWidth-210)+'px'; m.style.top=Math.min(e.clientY, window.innerHeight-420)+'px'; }
+  m.style.display='block'; }
 const syncToolActive=syncChartUI;   // 하위호환
 /* 활성 차트에만 적용하는 조작 */
 function setChartType(t){ const c=activeCfg(); if(!c) return; c.type=t; saveCfg(); renderChart(activeChart); syncChartUI(); }
@@ -832,7 +872,8 @@ function mkChart(id, sym, i){ makeWidget(id, sym, 'var(--lgd-up)', chartBody());
       let best=-1,bd=8; c.obj.forEach((o,i)=>{ const dd=objDist(chartScale[id],o,d.x,d.y); if(dd<bd){ bd=dd; best=i; } });
       selObj=best>=0?{id,idx:best}:null; renderChart(id); });   // 더블클릭 = 근처 오브젝트 선택(핸들 표시)
     plot.addEventListener('wheel', ev=>{ ev.preventDefault(); setActiveChart(id); const c=cfg(id);
-      c.zoom=Math.max(0.18,Math.min(4,+(c.zoom*(ev.deltaY<0?1.15:0.87)).toFixed(3))); saveCfg(); renderChart(id); }, {passive:false}); }
+      c.zoom=Math.max(0.18,Math.min(4,+(c.zoom*(ev.deltaY<0?1.15:0.87)).toFixed(3))); saveCfg(); renderChart(id); }, {passive:false});
+    plot.addEventListener('contextmenu', ev=>{ ev.preventDefault(); setActiveChart(id); showChartCtx(id, ev); }); }   // 우클릭 메뉴
   applyGeo(id); renderChart(id); }
 function destroyCharts(){ chartIds().forEach(id=>{ const el=document.getElementById('w-'+id); if(el) el.remove();
   delete layout[id]; const zi=zOrder.indexOf(id); if(zi>=0) zOrder.splice(zi,1); }); }
@@ -1436,7 +1477,8 @@ document.addEventListener('click', ()=>{ document.getElementById('addMenu').styl
   document.getElementById('tabMenu').style.display='none';
   const cm=document.getElementById('cgMenu'); if(cm) cm.style.display='none';
   const mc=document.getElementById('mwCtx'); if(mc) mc.style.display='none';
-  const md=document.getElementById('menuDrop'); if(md) md.style.display='none'; });
+  const md=document.getElementById('menuDrop'); if(md) md.style.display='none';
+  const cc=document.getElementById('chCtx'); if(cc) cc.style.display='none'; });
 document.getElementById('goSports').onclick=()=>{ location.href='/sports-dashboard.html'; };
 document.getElementById('goCrypto').onclick=()=>{ location.href='/dev/crypto-dashboard.html'; };
 
@@ -1476,8 +1518,10 @@ document.addEventListener('keydown', e=>{
   else if(k==='F9'){ e.preventDefault(); toast('New Order (F9) — coming in build'); }
   else if(k==='F8'){ e.preventDefault(); toast('Chart Properties (F8) — coming in build'); }
   else if(k==='F11'){ e.preventDefault(); if(!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{}); else document.exitFullscreen(); }
-  else if(k==='Escape'){ if(drawDrag){ const id=drawDrag.id; drawDrag=null; renderChart(id); } else if(drawTool){ setDrawTool(null); }
-    else if(selObj){ const id=selObj.id; selObj=null; renderChart(id); } }   // 그리기/툴/선택 취소
+  else if(k==='Escape'){ const cc=document.getElementById('chCtx'); const md=document.getElementById('menuDrop');   // 팝업 먼저 닫기
+    if((cc&&cc.style.display==='block')||(md&&md.style.display==='block')){ if(cc) cc.style.display='none'; if(md) md.style.display='none'; }
+    else if(drawDrag){ const id=drawDrag.id; drawDrag=null; renderChart(id); } else if(drawTool){ setDrawTool(null); }
+    else if(selObj){ const id=selObj.id; selObj=null; renderChart(id); } }   // 팝업/그리기/툴/선택 취소
   else if(k==='Delete'||k==='Backspace'){ if(selObj){ delSelObj(); toast('Object deleted'); }   // 선택된 것만 삭제
     else if(activeChart){ clearObjects(activeChart); toast('All objects deleted'); } }
   else if(k==='+'||k==='='){ zoomCharts(1); }
