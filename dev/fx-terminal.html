@@ -192,6 +192,31 @@ body.light .cgmenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
 .statusbar .ssp{flex:1}
 .statusbar b{color:var(--lgd-ink); font-weight:600; font-variant-numeric:tabular-nums}
 
+/* ── Navigator 트리 (Accounts/Indicators/EA/Scripts) ── */
+.nvtree{flex:1; min-height:0; overflow:auto; padding:4px 0; font-size:12px}
+.nvhead{display:flex; align-items:center; gap:6px; padding:4px 8px; cursor:pointer; font-weight:700; user-select:none}
+.nvhead:hover{background:var(--lgd-surface2)}
+.nvcar{width:9px; font-size:8px; color:var(--lgd-dim)}
+.nvic{display:flex; align-items:center; color:var(--lgd-dim); flex:none}
+.nvgrp.closed .nvkids{display:none}
+.nvgrp.closed .nvcar{transform:rotate(-90deg)}
+.nvleaf{display:flex; align-items:center; gap:6px; padding:3px 8px 3px 26px; color:var(--lgd-dim); cursor:default}
+.nvleaf:hover{background:var(--lgd-surface2); color:var(--lgd-ink)}
+/* ── Market Watch 하위탭(Symbols/Details/Trading/Ticks) ── */
+.mwsub{display:flex; align-items:center; gap:1px; flex:none; padding:0 6px; border-top:1px solid var(--lgd-hair); overflow-x:auto}
+.mwsub button{background:none; border:none; color:var(--lgd-dim); font:700 10px/1 inherit; padding:5px 8px; border-radius:2px; cursor:pointer; white-space:nowrap; flex:none}
+.mwsub button:hover{color:var(--lgd-ink)}
+.mwsub button.on{color:var(--lgd-up); box-shadow:inset 0 -2px 0 var(--lgd-up)}
+/* 컨텍스트 메뉴 구분선 + 단축키 라벨 */
+.cgmenu .cgsep{height:1px; background:var(--lgd-hair); margin:5px 4px}
+.cgmenu button .key{margin-left:auto; font-size:10px; color:var(--lgd-dim); opacity:.7}
+/* ── 토스트 (핫키 피드백) ── */
+#toast{position:fixed; left:50%; bottom:64px; transform:translateX(-50%); background:var(--lgd-surface2); color:var(--lgd-ink);
+  border:1px solid var(--lgd-hair); border-radius:2px; padding:8px 14px; font-size:12px; font-weight:600;
+  box-shadow:0 8px 24px rgba(0,0,0,.5); z-index:200; opacity:0; transition:opacity .15s; pointer-events:none}
+#toast.on{opacity:1}
+body.light #toast{box-shadow:0 8px 24px rgba(15,23,40,.18)}
+
 /* ── 언어 (설정 위젯) ── */
 .stg{flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column}
 .stg .sect2{padding:10px 14px 5px; font-size:10.5px; font-weight:800; letter-spacing:.6px;
@@ -452,7 +477,7 @@ const CHART_UNIVERSE=['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCHF','USDCAD','XAU
 const CG_KEY='alpexa.fxdash.chartgrid', CG_PRESETS=[1,2,4,6,9,10];
 let cgN=Math.max(1,Math.min(10,+(localStorage.getItem(CG_KEY)||4)));
 /* 타임프레임 (MT5 툴바) — 차트 창 TF 라벨 구동. 실봉 M2, 지금은 라벨만. */
-const TF_KEY='alpexa.fxdash.tf', TFS=['M1','M5','M15','M30','H1','H4','D1','W1','MN'];
+const TF_KEY='alpexa.fxdash.tf', TFS=['M1','M2','M3','M4','M5','M6','M10','M12','M15','M20','M30','H1','H2','H3','H4','H6','H8','H12','D1','W1','MN'];
 let curTF=TFS.includes(localStorage.getItem(TF_KEY))?localStorage.getItem(TF_KEY):'M30';
 function cgSkeleton(seed){ let s=''; const N=16, bx=100/N;
   for(let i=0;i<N;i++){ const a=Math.sin((i+seed*3)*0.7), b=Math.sin((i+seed*3)*1.3);
@@ -519,44 +544,60 @@ const mwStore={ rows:{}, live:false,
     this.set(s,mid,spr); }); this.live=true; } };
 function mwSimulate(){ MW_WATCH.forEach(s=>{ const prev=mwStore.rows[s], base=prev?prev.mid:(MW_BASE[s]||1);
   const mid=Math.max(base*0.5, base+base*(Math.random()-0.5)*0.0006); mwStore.set(s, mid, mwSeedSpr(s)); }); }
-let mwFilter='All';
+let mwFilter='All', mwView='Symbols';
 function mwRender(){ const host=document.getElementById('mwBody'); if(!host) return;
+  const fl=document.getElementById('mwFeed'); if(fl){ fl.textContent=mwStore.live?'LIVE':'SIM'; fl.classList.toggle('live',mwStore.live); }
+  if(mwView!=='Symbols'){ if(!host.querySelector('.tbxempty')) host.innerHTML='<div class="tbxempty">'+mwView+' — coming in build</div>'; return; }
   const list=mwFilter==='All'?MW_WATCH:MW_WATCH.filter(s=>mwCat(s)===mwFilter);
   host.innerHTML=list.map(s=>{ const r=mwStore.rows[s]||{};
     const bc=r.bDir>0?'up':r.bDir<0?'down':'', ac=r.aDir>0?'up':r.aDir<0?'down':'';
     const spr=(r.bid!=null)?mwSprText(s, r.ask-r.bid):'—';
     return '<div class="mwrow mwgrid" data-sym="'+s+'"><div class="mwsym">'+s+'</div>'+
       '<div class="mwpx '+bc+'">'+mwFmt(s,r.bid)+'</div><div class="mwpx '+ac+'">'+mwFmt(s,r.ask)+'</div>'+
-      '<div class="mwspr">'+spr+'</div></div>'; }).join('');
-  const fl=document.getElementById('mwFeed'); if(fl){ fl.textContent=mwStore.live?'LIVE':'SIM'; fl.classList.toggle('live',mwStore.live); } }
+      '<div class="mwspr">'+spr+'</div></div>'; }).join(''); }
 function mwBodyHTML(){ return '<div class="mwwrap">'+
   '<div class="mwhd mwgrid"><div>Symbol</div><div>Bid</div><div>Ask</div><div>Spread</div></div>'+
-  '<div class="mwlist" id="mwBody"></div></div>'; }
+  '<div class="mwlist" id="mwBody"></div>'+
+  '<div class="mwsub" id="mwSub">'+['Symbols','Details','Trading','Ticks'].map((t,i)=>
+    '<button data-sub="'+t+'"'+(i===0?' class="on"':'')+'>'+t+'</button>').join('')+'</div></div>'; }
+
+/* ── Navigator 트리 (MT5: Accounts / Indicators / Expert Advisors / Scripts) ── */
+const NAV_GROUPS=[
+  {n:'Accounts', k:['3172308 — Alpexa-Demo (Hedge)']},
+  {n:'Indicators', k:['Trend','Oscillators','Volumes','Bill Williams','Custom']},
+  {n:'Expert Advisors', k:['Moving Average','MACD Sample','Awesome Oscillator']},
+  {n:'Scripts', k:['PeriodConverter']} ];
+const navFolder='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7h6l2 2h10v10H3z"/></svg>';
+function navBodyHTML(){ return '<div class="nvtree" id="nvTree">'+NAV_GROUPS.map(g=>
+  '<div class="nvgrp"><div class="nvhead"><span class="nvcar">▼</span><span class="nvic">'+navFolder+'</span><span>'+g.n+'</span></div>'+
+  '<div class="nvkids">'+g.k.map(k=>'<div class="nvleaf"><span class="nvic" style="font-size:8px">•</span>'+k+'</div>').join('')+
+  '</div></div>').join('')+'</div>'; }
 
 /* ── Toolbox (MT5 하단 패널) — 탭 12종 + Trade(계좌 바 + 포지션 테이블) ──
    계좌·포지션 값은 사장님이 준 MT5 데모 스샷 그대로(DEMO·preview 표기). 실계좌 연동은 M3(서버 전용). */
 const TBX_TABS=['Trade','Exposure','History','News','Mailbox','Calendar','Company','Alerts','Articles','Code Base','Experts','Journal'];
 const DEMO_POS=[
-  {sym:'eurusd.fx', ticket:'3172308', time:'2026.07.09 20:17:40', type:'buy', vol:'0.01', price:'1.14318', sl:'', tp:'', cur:'1.14360', pl:'0.42'},
-  {sym:'usdchf.fx', ticket:'3194818', time:'2026.07.13 09:34:06', type:'buy', vol:'0.07', price:'0.80808', sl:'', tp:'', cur:'0.80720', pl:'-7.63'} ];
+  {sym:'eurusd.fx', ticket:'3172308', time:'2026.07.09 20:17:40', type:'buy', vol:'0.01', price:'1.14318', sl:'', tp:'', cur:'1.14360', comm:'0.00', swap:'0.00', pl:'0.42'},
+  {sym:'usdchf.fx', ticket:'3194818', time:'2026.07.13 09:34:06', type:'buy', vol:'0.07', price:'0.80808', sl:'', tp:'', cur:'0.80720', comm:'0.00', swap:'-0.21', pl:'-7.63'} ];
 function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!body) return;
   if(tab==='Trade'){
     const total=DEMO_POS.reduce((s,p)=>s+(+p.pl),0);
     body.innerHTML='<div class="tbxscroll"><table class="postbl"><thead><tr>'+
-      ['Symbol','Ticket','Time','Type','Volume','Price','S / L','T / P','Price','Profit'].map(h=>'<th>'+h+'</th>').join('')+
+      ['Symbol','Ticket','Time','Type','Volume','Price','S / L','T / P','Price','Commission','Swap','Profit'].map(h=>'<th>'+h+'</th>').join('')+
       '</tr></thead><tbody>'+DEMO_POS.map(p=>'<tr><td>'+p.sym+'</td><td>'+p.ticket+'</td><td>'+p.time+'</td>'+
         '<td class="'+p.type+'">'+p.type+'</td><td>'+p.vol+'</td><td>'+p.price+'</td><td>'+(p.sl||'—')+'</td>'+
-        '<td>'+(p.tp||'—')+'</td><td>'+p.cur+'</td><td class="'+(+p.pl>=0?'pl-pos':'pl-neg')+'">'+p.pl+'</td></tr>').join('')+
-      '</tbody></table></div>'+
-      /* 계좌 sticky 푸터 — 포지션 목록 바로 아래 고정, 총 P/L 우측 (MT5) */
+        '<td>'+(p.tp||'—')+'</td><td>'+p.cur+'</td><td>'+p.comm+'</td><td>'+p.swap+'</td>'+
+        '<td class="'+(+p.pl>=0?'pl-pos':'pl-neg')+'">'+p.pl+'</td></tr>').join('')+
+      '</tbody></table>'+
+      /* 계좌 바 = 마지막 포지션 바로 뒤에 따라붙음(아래는 빈 공간), 총 P/L 우측 (MT5) */
       '<div class="tbxacct"><span class="tbxdemo">DEMO</span>'+
       '<span>Balance:<b>100 000.00 USD</b></span><span>Equity:<b>99 992.79</b></span>'+
       '<span>Margin:<b>256.64</b></span><span>Free Margin:<b>99 736.15</b></span><span>Margin Level:<b>38 962.28%</b></span>'+
-      '<span class="tbxtotal '+(total>=0?'pl-pos':'pl-neg')+'">'+total.toFixed(2)+'</span></div>';
+      '<span class="tbxtotal '+(total>=0?'pl-pos':'pl-neg')+'">'+total.toFixed(2)+'</span></div></div>';
   } else { body.innerHTML='<div class="tbxempty">'+tab+' — foundation (Coming in build)</div>'; } }
 
 /* ── 위젯 생성 (M1: 전부 기초 프레임, 설정만 언어/테마 실동작) ── */
-makeWidget('navigator','Navigator','var(--lgd-link1,#4C8DFF)', frame());
+makeWidget('navigator','Navigator','var(--lgd-link1,#4C8DFF)', navBodyHTML());
 makeWidget('marketwatch','Market Watch','var(--lgd-link2,#00C805)', mwBodyHTML());
 makeWidget('positions','Positions','var(--lgd-link3,#B37FEB)', frame());
 makeWidget('account','Account','var(--lgd-link1,#4C8DFF)', frame());
@@ -670,27 +711,40 @@ function toolSvg(inner, fill){ return '<svg width="14" height="14" viewBox="0 0 
       drop.style.display=drop.style.display==='block'?'none':'block'; }); }
 })();
 
-/* Market Watch — 우클릭 컨텍스트 메뉴(클래스 필터, MT5식) + 타이틀바 피드 상태(SIM/LIVE) + 틱 루프 */
+/* Market Watch — 하위탭(Symbols/Details/Trading/Ticks) + MT5 표준 우클릭 메뉴 + 피드 상태 */
 (function mwControls(){
   const mwEl=document.getElementById('w-marketwatch'); if(!mwEl) return;
   const mwtb=mwEl.querySelector('.wtb');
   const feed=document.createElement('span'); feed.className='mwfeed'; feed.id='mwFeed';
   feed.title='Dev simulator — live feed next'; feed.textContent='SIM';
   mwtb.insertBefore(feed, mwtb.querySelector('.wic'));
+  /* 하위탭 */
+  const sub=document.getElementById('mwSub');
+  if(sub) sub.addEventListener('click', e=>{ const b=e.target.closest('[data-sub]'); if(!b) return;
+    mwView=b.dataset.sub; sub.querySelectorAll('[data-sub]').forEach(x=>x.classList.toggle('on',x===b)); mwRender(); });
+  /* MT5 표준 우클릭 컨텍스트 메뉴 (골격 항목 = 토스트, 클래스 필터 = 실동작) */
+  const mtItem=(l,k)=>'<button data-mt="'+l+'"><span>'+l+'</span>'+(k?'<span class="key">'+k+'</span>':'')+'</button>';
   const ctx=document.createElement('div'); ctx.id='mwCtx'; ctx.className='cgmenu';
-  ctx.innerHTML='<div class="cgmhd" data-i18n="View">View</div>'+
+  ctx.innerHTML=mtItem('New Order','F9')+mtItem('Chart Window','')+mtItem('Tick Chart','')+mtItem('Depth of Market','Alt+B')+mtItem('Specification','')+
+    '<div class="cgsep"></div>'+mtItem('Hide','Delete')+mtItem('Symbols','Ctrl+U')+mtItem('Popup Prices','F10')+
+    '<div class="cgsep"></div><div class="cgmhd">Show</div>'+
     ['All','Forex','Stocks','Crypto'].map(c=>'<button data-cat="'+c+'"><span>'+c+'</span><span class="ck">✓</span></button>').join('');
   document.body.appendChild(ctx);
   mwEl.addEventListener('contextmenu', e=>{ e.preventDefault();
     document.getElementById('addMenu').style.display='none'; document.getElementById('tabMenu').style.display='none';
     const cg=document.getElementById('cgMenu'); if(cg) cg.style.display='none';
-    ctx.style.left=Math.min(e.clientX, window.innerWidth-170)+'px';
-    ctx.style.top=Math.min(e.clientY, window.innerHeight-190)+'px';
+    ctx.style.left=Math.min(e.clientX, window.innerWidth-180)+'px';
+    ctx.style.top=Math.min(e.clientY, window.innerHeight-320)+'px';
     ctx.querySelectorAll('[data-cat]').forEach(b=>b.classList.toggle('on',b.dataset.cat===mwFilter));
     ctx.style.display='block'; });
-  ctx.addEventListener('click', e=>{ const b=e.target.closest('[data-cat]'); if(!b) return;
-    mwFilter=b.dataset.cat; mwRender(); ctx.style.display='none'; });
+  ctx.addEventListener('click', e=>{ const cat=e.target.closest('[data-cat]'), mt=e.target.closest('[data-mt]');
+    if(cat){ mwFilter=cat.dataset.cat; mwRender(); }
+    else if(mt){ toast(mt.dataset.mt+' — coming in build'); }
+    ctx.style.display='none'; });
 })();
+/* Navigator — 그룹 접기/펼치기 */
+(function navControls(){ const tree=document.getElementById('nvTree'); if(!tree) return;
+  tree.addEventListener('click', e=>{ const h=e.target.closest('.nvhead'); if(!h) return; h.parentNode.classList.toggle('closed'); }); })();
 mwSimulate(); mwRender();
 
 /* Toolbox 도크 — 탭(바닥) · Trade 렌더 · 상단 리사이즈 · 접기(Ctrl+T) */
@@ -771,6 +825,26 @@ document.getElementById('sgLight').onclick=()=>{ localStorage.setItem(FX_TKEY,'l
 document.getElementById('sgLangs').addEventListener('click',e=>{ const b=e.target.closest('[data-lang]'); if(!b) return; setLang(b.dataset.lang); });
 
 applyThemeFX(); applyLang();
+
+/* ── 토스트 + MT5 핫키 ── */
+let _toastT=null;
+function toast(msg){ let el=document.getElementById('toast');
+  if(!el){ el=document.createElement('div'); el.id='toast'; document.body.appendChild(el); }
+  el.textContent=msg; el.classList.add('on'); clearTimeout(_toastT); _toastT=setTimeout(()=>el.classList.remove('on'),1500); }
+document.addEventListener('keydown', e=>{
+  const tag=(e.target&&e.target.tagName)||''; if(tag==='INPUT'||tag==='TEXTAREA') return;
+  const cmd=e.ctrlKey||e.metaKey, k=e.key;
+  if(cmd&&/^m$/i.test(k)){ e.preventDefault(); const h=!layout.marketwatch.hidden; setHidden('marketwatch',h); toast(h?'Market Watch — hidden':'Market Watch'); }
+  else if(cmd&&/^n$/i.test(k)){ e.preventDefault(); const h=!layout.navigator.hidden; setHidden('navigator',h); toast(h?'Navigator — hidden':'Navigator'); }
+  else if(cmd&&/^d$/i.test(k)){ e.preventDefault(); toast('Data Window — coming in build'); }
+  else if(cmd&&/^g$/i.test(k)){ e.preventDefault(); toast('Grid — coming in build'); }
+  else if(cmd&&/^b$/i.test(k)){ e.preventDefault(); toast('Objects List — coming in build'); }
+  else if(k==='F9'){ e.preventDefault(); toast('New Order (F9) — coming in build'); }
+  else if(k==='F8'){ e.preventDefault(); toast('Chart Properties (F8) — coming in build'); }
+  else if(k==='F11'){ e.preventDefault(); if(!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{}); else document.exitFullscreen(); }
+  else if(k==='+'||k==='='){ toast('Zoom in — coming in build'); }
+  else if(k==='-'||k==='_'){ toast('Zoom out — coming in build'); }
+});
 </script>
 </body>
 </html>
