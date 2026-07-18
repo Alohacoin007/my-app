@@ -442,7 +442,7 @@ function refitLayout(){
     const r=mapX(g.x+g.w), b=mapY(g.y+g.h);
     g.x=mapX(g.x); g.y=mapY(g.y); g.w=r-g.x; g.h=b-g.y;
     if(g.w<120)g.w=120; if(g.h<120)g.h=120; applyGeo(id); });
-  layout.__ref={w:vw,h:vh}; saveLayout();
+  layout.__ref={w:vw,h:vh}; saveLayout(); renderAllCharts(false);   // 리사이즈 후 봉 재계산
 }
 let _refitT=null;
 window.addEventListener('resize', ()=>{ clearTimeout(_refitT); _refitT=setTimeout(refitLayout,150); });
@@ -559,7 +559,8 @@ function makeWidget(id, title, linkColor, bodyHTML){
         if(dir.includes('s')) g.h=Math.max(m.h, oh+dy);
         if(dir.includes('w')){ let nw=Math.max(m.w, ow-dx); nw=Math.min(nw, ox+ow); g.x=ox+ow-nw; g.w=nw; }
         if(dir.includes('n')){ let nh=Math.max(m.h, oh-dy); nh=Math.min(nh, oy+oh); g.y=oy+oh-nh; g.h=nh; }
-        el.style.left=g.x+'px'; el.style.top=g.y+'px'; el.style.width=g.w+'px'; el.style.height=g.h+'px'; };
+        el.style.left=g.x+'px'; el.style.top=g.y+'px'; el.style.width=g.w+'px'; el.style.height=g.h+'px';
+        if(/^chart\d+$/.test(id)) renderChart(id); };   // 리사이즈 중 봉 실시간 재계산(늘어남 방지)
       const up=ev=>{ h.releasePointerCapture(e.pointerId); h.removeEventListener('pointermove',move);
         h.removeEventListener('pointerup',up); saveLayout(); };
       h.addEventListener('pointermove',move); h.addEventListener('pointerup',up); }); }
@@ -580,20 +581,55 @@ let cgN=Math.max(1,Math.min(10,+(localStorage.getItem(CG_KEY)||4)));
 /* 타임프레임 (MT5 툴바) — 차트 창 TF 라벨 구동. 실봉 M2, 지금은 라벨만. */
 const TF_KEY='alpexa.fxdash.tf', TFS=['M1','M5','M15','M30','H1','H4','D1','W1','MN'];
 let curTF=TFS.includes(localStorage.getItem(TF_KEY))?localStorage.getItem(TF_KEY):'M30';
-function cgSkeleton(seed){ let s=''; const N=16, bx=100/N;
-  for(let i=0;i<N;i++){ const a=Math.sin((i+seed*3)*0.7), b=Math.sin((i+seed*3)*1.3);
-    const mid=30-a*9, hi=mid-3-Math.abs(b)*4, lo=mid+3+Math.abs(b)*4, x=(i+0.5)*bx;
-    s+='<line x1="'+x.toFixed(1)+'" y1="'+hi.toFixed(1)+'" x2="'+x.toFixed(1)+'" y2="'+lo.toFixed(1)+'" stroke="currentColor" stroke-width="0.5"/>'+
-       '<rect x="'+(x-1.5).toFixed(1)+'" y="'+(mid-2).toFixed(1)+'" width="3" height="4" fill="currentColor"/>'; }
-  return '<svg viewBox="0 0 100 60" preserveAspectRatio="none" style="color:var(--lgd-dim); opacity:.4">'+
-    '<line x1="0" y1="20" x2="100" y2="20" stroke="currentColor" stroke-width="0.3" opacity=".4"/>'+
-    '<line x1="0" y1="40" x2="100" y2="40" stroke="currentColor" stroke-width="0.3" opacity=".4"/>'+s+'</svg>'; }
-/* 각 차트 = 최상위 위젯(chart1..N). 표준 위젯 엔진으로 스테이지 어디든 드래그/스냅/리사이즈.
-   ⊞ 개수 선택 = 우상 영역에 타일 재배치(buildCharts). 그 뒤 각 창 자유 이동(위치는 layout에 저장). */
-function chartSkeletonBody(i){ return '<div class="cgwplot">'+cgSkeleton(i)+
-  '<span class="cgtf">'+curTF+'</span><span class="cgtag">M2</span></div>'; }
+/* ── 실 캔들 차트 엔진 — dev SIM 피드(mwStore mid)로 라이브 봉 생성/갱신. 심볼별·TF별.
+   실피드(prices) 붙으면 tickSeries의 mid 소스만 교체 = 같은 엔진이 실봉 렌더. ── */
+const TF_MS={M1:60e3,M5:300e3,M15:900e3,M30:1800e3,H1:3600e3,H4:14400e3,D1:864e5,W1:6048e5,MN:2592e6};
+const CHART_BASE={XAUUSD:2400};
+const CH_UP='#26A69A', CH_DN='#EF5350';           // MT5식 강세(녹)·약세(적) 봉
+const chartSeries={};                              // sym -> {tf, c:[{t,o,h,l,c}]}
+const chBase=sym=>MW_BASE[sym]||CHART_BASE[sym]||(mwStore.rows[sym]&&mwStore.rows[sym].mid)||1;
+function seedSeries(sym){ const base=chBase(sym), vol=base*(mwCat(sym)==='Crypto'?0.004:0.0009);
+  const n=150, step=TF_MS[curTF]||1800e3, now=Date.now(); let px=base*(1+(Math.random()-0.5)*0.006), arr=[];
+  for(let i=n;i>=1;i--){ const o=px, c=Math.max(base*0.3, o+(Math.random()-0.5)*vol*2);
+    const hi=Math.max(o,c)+Math.random()*vol*0.8, lo=Math.min(o,c)-Math.random()*vol*0.8;
+    arr.push({t:now-i*step,o,h:hi,l:lo,c}); px=c; }
+  /* 마지막 봉 종가를 현재가(base=SIM mid ≈ base)에 앵커 → 라이브 전환 시 거대 봉 방지(평행 이동, OHLC 관계 보존) */
+  const shift=base-arr[arr.length-1].c; if(shift) arr.forEach(k=>{ k.o+=shift; k.h+=shift; k.l+=shift; k.c+=shift; });
+  return arr; }
+function series(sym){ let s=chartSeries[sym]; if(!s||s.tf!==curTF) s=chartSeries[sym]={tf:curTF,c:seedSeries(sym)}; return s; }
+function tickSeries(sym){ const s=series(sym), r=mwStore.rows[sym], mid=r&&r.mid; if(!(mid>0)) return s;
+  const step=TF_MS[curTF]||1800e3, now=Date.now(), last=s.c[s.c.length-1];
+  if(now-last.t>=step){ s.c.push({t:last.t+step,o:last.c,h:Math.max(last.c,mid),l:Math.min(last.c,mid),c:mid}); if(s.c.length>500) s.c.shift(); }
+  else { last.c=mid; if(mid>last.h) last.h=mid; if(mid<last.l) last.l=mid; } return s; }
+/* 각 차트 = 최상위 위젯(chart1..N). 표준 위젯 엔진으로 스테이지 어디든 드래그/스냅/리사이즈. */
+function chartBody(){ return '<div class="cgwplot"><svg class="cgsvg"></svg><span class="cgtf">'+curTF+'</span></div>'; }
+function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) return;
+  const box=el.querySelector('.cgwplot'), svg=box&&box.querySelector('svg'); if(!svg) return;
+  const sym=(layout[id]&&layout[id].sym)||'', W=box.clientWidth, H=box.clientHeight;
+  if(W<40||H<28){ svg.innerHTML=''; return; }
+  const s=series(sym), dg=mwDigits(sym);
+  const RA=Math.round(Math.min(60, Math.max(36, W*0.12))), padT=6, padB=6, plotW=W-RA, plotH=H-padT-padB;
+  const slot=Math.max(3, Math.min(13, plotW/50)); let nVis=Math.min(s.c.length, Math.max(10, Math.floor(plotW/slot)));
+  const vis=s.c.slice(-nVis); let mn=Infinity,mx=-Infinity; vis.forEach(k=>{ if(k.l<mn)mn=k.l; if(k.h>mx)mx=k.h; });
+  if(!(mx>mn)) mx=mn+1; const pd=(mx-mn)*0.08; mn-=pd; mx+=pd; const rng=mx-mn||1;
+  const yOf=p=>padT+(mx-p)/rng*plotH, cw=plotW/nVis, bw=Math.max(1,cw*0.62);
+  let out='';
+  for(let i=0;i<=4;i++){ const p=mn+rng*i/4, y=yOf(p);
+    out+='<line x1="0" y1="'+y.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="var(--lgd-hair)" stroke-width="1" opacity=".5"/>'+
+      '<text x="'+(W-4)+'" y="'+(y-2).toFixed(1)+'" text-anchor="end" fill="var(--lgd-dim)" font-size="9" font-family="inherit">'+p.toFixed(dg)+'</text>'; }
+  vis.forEach((k,i)=>{ const x=i*cw+cw/2, up=k.c>=k.o, col=up?CH_UP:CH_DN;
+    const bt=Math.min(yOf(k.o),yOf(k.c)), bb=Math.max(yOf(k.o),yOf(k.c));
+    out+='<line x1="'+x.toFixed(1)+'" y1="'+yOf(k.h).toFixed(1)+'" x2="'+x.toFixed(1)+'" y2="'+yOf(k.l).toFixed(1)+'" stroke="'+col+'" stroke-width="1"/>'+
+      '<rect x="'+(x-bw/2).toFixed(1)+'" y="'+bt.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(1,bb-bt).toFixed(1)+'" fill="'+col+'"/>'; });
+  const lk=vis[vis.length-1], lc=lk.c, ly=yOf(lc), lcol=lc>=lk.o?CH_UP:CH_DN;
+  out+='<line x1="0" y1="'+ly.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+ly.toFixed(1)+'" stroke="'+lcol+'" stroke-width="1" stroke-dasharray="3 3" opacity=".9"/>'+
+    '<rect x="'+plotW.toFixed(1)+'" y="'+(ly-8).toFixed(1)+'" width="'+RA+'" height="16" fill="'+lcol+'"/>'+
+    '<text x="'+(W-4)+'" y="'+(ly+3.5).toFixed(1)+'" text-anchor="end" fill="#fff" font-size="9.5" font-weight="700" font-family="inherit">'+lc.toFixed(dg)+'</text>';
+  svg.setAttribute('viewBox','0 0 '+W+' '+H); svg.innerHTML=out; }
+function renderAllCharts(doTick){ chartIds().forEach(id=>{ const g=layout[id]; if(!g||g.hidden||g.__min) return;
+  if(doTick&&g.sym) tickSeries(g.sym); renderChart(id); }); }
 function chartIds(){ return Object.keys(layout).filter(k=>/^chart\d+$/.test(k)); }
-function mkChart(id, sym, i){ makeWidget(id, sym, 'var(--lgd-up)', chartSkeletonBody(i));
+function mkChart(id, sym, i){ makeWidget(id, sym, 'var(--lgd-up)', chartBody());
   /* MT5 창 컨트롤 — 헤더 우측: 최소화(–) · 최대화(□) · 닫기(×) */
   const el=document.getElementById('w-'+id), wtb=el.querySelector('.wtb'), cls=wtb.querySelector('.wic');
   cls.textContent='×'; cls.title='Close'; cls.classList.add('wcls');
@@ -602,7 +638,7 @@ function mkChart(id, sym, i){ makeWidget(id, sym, 'var(--lgd-up)', chartSkeleton
   wtb.insertBefore(mn, cls); wtb.insertBefore(mx, cls);
   mn.addEventListener('click', ev=>{ ev.stopPropagation(); toggleMin(id); });
   mx.addEventListener('click', ev=>{ ev.stopPropagation(); toggleMax(id); });
-  applyGeo(id); }
+  applyGeo(id); renderChart(id); }
 function destroyCharts(){ chartIds().forEach(id=>{ const el=document.getElementById('w-'+id); if(el) el.remove();
   delete layout[id]; const zi=zOrder.indexOf(id); if(zi>=0) zOrder.splice(zi,1); }); }
 /* 차트 영역 = 좌측 도크 오른쪽 전체(남은 공간 꽉 차게, 세로도 끝까지) */
@@ -612,11 +648,11 @@ function toggleMax(id){ const g=layout[id]; if(!g) return;
   if(g.__min){ toggleMin(id); }                         // 최소 상태면 먼저 복원
   if(g.__max){ Object.assign(g, g.__max); g.__max=null; }
   else { g.__max={x:g.x,y:g.y,w:g.w,h:g.h}; const R=chartRegion(); g.x=R.x; g.y=R.y; g.w=R.w; g.h=R.h; }
-  applyGeo(id); bringToFront(id); saveLayout(); }
+  applyGeo(id); bringToFront(id); saveLayout(); renderChart(id); }
 function toggleMin(id){ const g=layout[id], el=document.getElementById('w-'+id); if(!g||!el) return;
   if(g.__min){ g.h=g.__min; g.__min=null; el.classList.remove('mini'); }
   else { if(g.__max){ Object.assign(g, g.__max); g.__max=null; } g.__min=g.h; g.h=CH_TITLE_H; el.classList.add('mini'); }
-  applyGeo(id); saveLayout(); }
+  applyGeo(id); saveLayout(); renderChart(id); }
 /* ── MT5 Window > Tile — 열려있는 차트들을 현재 남은 공간(chartRegion, 툴박스 높이 반영)에 꽉 채워 재배치 ── */
 function tileCharts(mode){ const ids=chartIds().filter(id=>!layout[id].hidden), n=ids.length; if(!n) return;
   const R=chartRegion(), gap=2;
@@ -630,7 +666,7 @@ function tileCharts(mode){ const ids=chartIds().filter(id=>!layout[id].hidden), 
     const cw=(R.w-gap*(cols-1))/cols, ch=(R.h-gap*(rows-1))/rows;
     ids.forEach((id,i)=>{ const r=Math.floor(i/cols), c=i%cols, g=layout[id];
       g.x=Math.round(R.x+c*(cw+gap)); g.y=Math.round(R.y+r*(ch+gap)); g.w=Math.round(cw); g.h=Math.round(ch); applyGeo(id); }); }
-  saveLayout(); }
+  saveLayout(); renderAllCharts(false); }
 function buildCharts(){ destroyCharts();
   const R=chartRegion(), gap=2, cols=Math.ceil(Math.sqrt(cgN)), rows=Math.ceil(cgN/cols);
   const cw=(R.w-gap*(cols-1))/cols, ch=(R.h-gap*(rows-1))/rows;
@@ -1043,7 +1079,8 @@ function toolSvg(inner, fill){ return '<svg width="16" height="16" viewBox="0 0 
     strip.addEventListener('click', e=>{ const b=e.target.closest('[data-tf]'); if(!b) return;
       curTF=b.dataset.tf; try{ localStorage.setItem(TF_KEY, curTF); }catch(_){}
       strip.querySelectorAll('[data-tf]').forEach(x=>x.classList.toggle('on',x.dataset.tf===curTF));
-      document.querySelectorAll('.cgtf').forEach(el=>el.textContent=curTF); }); }
+      document.querySelectorAll('.cgtf').forEach(el=>el.textContent=curTF);
+      renderAllCharts(false); }); }   // TF 바뀌면 series()가 재시드 → 봉 다시 그림
   const tile=document.getElementById('btnTile');
   if(tile) tile.addEventListener('click', e=>{ e.stopPropagation(); openChartMenu(tile); });   // 타일 = 차트 개수 메뉴(중복 ⊞ 통합)
   /* 드로잉/지표/줌 도구 = 골격(툴팁만, 실봉 M2 이후 연결) — 클릭 시 활성 표시만 */
@@ -1150,7 +1187,9 @@ function updateStatus(){ const el=document.getElementById('sbClock'); if(!el) re
 updateStatus();
 setInterval(()=>{ if(!mwStore.live) mwSimulate(); mwRender(); alertsStore.check();
   if(curTbxTab==='Exposure') renderToolbox('Exposure');   // 통화 노출 실시간 마크(MT5)
+  renderAllCharts(true);                                   // 라이브 봉 갱신(현재 봉 close/high/low)
   updateStatus(); }, 1000);
+renderAllCharts(false);   // 초기 1회 (봉 즉시 표시)
 
 /* ── 헤더 동작 ── */
 document.getElementById('btnAdd').onclick=e=>{ e.stopPropagation();
