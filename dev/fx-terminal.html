@@ -603,7 +603,10 @@ const CH_UP='#26A69A', CH_DN='#EF5350', CH_LINE='#2E90FA';   // 강세(녹)·약
 const chartSeries={};                              // sym -> {tf, c:[{t,o,h,l,c}]}
 /* ── 차트 조작 상태 — 차트별 독립(각 창이 자기 타입·TF·줌·그리드·지표). 툴바/☰/TF는 활성 차트에만 적용 ── */
 let crossOn=false;                                 // 크로스헤어 모드(커서 모드라 전역 — 그리기는 창별 스케일)
-let drawTool=null, drawPend=null;                  // 활성 드로잉 툴(hline/vline/trend/fib/text) · 2클릭 대기점
+let drawTool=null;                                 // 활성 드로잉 툴(hline/vline/trend/fib/text)
+let drawDrag=null;                                 // 드래그로 그리는 중 {id,k,p1,p2}
+let selObj=null;                                   // 선택된 오브젝트 {id,idx} (더블클릭으로 선택 → 핸들 수정)
+let handleDrag=null;                               // 핸들 드래그 중 {id,idx,which}
 const CH_DRAW='#E8B84B';                            // 드로잉 오브젝트 색(노랑)
 let toggleDock=null;                               // 툴박스 도크 토글(toolboxDock가 주입 — ☰ View>Toolbox)
 let activeChart=null;                              // 현재 활성(포커스) 차트 id
@@ -612,8 +615,8 @@ const IND_MA_P=20, IND_BB_P=20, IND_BB_K=2, IND_RSI_P=14;
 const CH_MA='#F5A623', CH_BB='#8E9BB3', CH_RSI='#B37FEB';
 /* 차트별 설정 (id -> {type,grid,zoom,tf,ind}). 새 차트는 기본값. localStorage 저장 */
 const chartCfg=(()=>{ try{ return JSON.parse(localStorage.getItem('alpexa.fxdash.chartcfg')||'{}'); }catch(_){ return {}; } })();
-function cfg(id){ let c=chartCfg[id]; if(!c){ c=chartCfg[id]={type:'candles',grid:true,zoom:1,tf:curTF,ind:{},vol:true}; }
-  if(!c.ind) c.ind={}; if(!c.tf) c.tf=curTF; if(c.vol===undefined) c.vol=true; return c; }
+function cfg(id){ let c=chartCfg[id]; if(!c){ c=chartCfg[id]={type:'candles',grid:true,zoom:1,tf:curTF,ind:{},vol:true,scroll:0}; }
+  if(!c.ind) c.ind={}; if(!c.tf) c.tf=curTF; if(c.vol===undefined) c.vol=true; if(c.scroll===undefined) c.scroll=0; return c; }
 const chVolFmt=v=>{ v=+v||0; return v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(1)+'K':String(Math.round(v)); };
 function saveCfg(){ try{ localStorage.setItem('alpexa.fxdash.chartcfg', JSON.stringify(chartCfg)); }catch(_){} }
 function activeCfg(){ return activeChart?cfg(activeChart):null; }
@@ -629,24 +632,32 @@ function syncChartUI(){ const c=activeCfg();
     else if(DRAW_TIP[n]) on=drawTool===DRAW_TIP[n];
     if(on!==null) t.classList.toggle('on',!!on); });
   if(c) document.querySelectorAll('#tfStrip [data-tf]').forEach(x=>x.classList.toggle('on',x.dataset.tf===c.tf)); }
-/* 드로잉 툴 — 오브젝트 좌표는 데이터 공간(시간 t·가격)에 저장 → 줌/리사이즈에도 고정. 창별(cfg.obj) */
-function setDrawTool(tool){ drawTool=tool; if(tool) crossOn=false; drawPend=null;
+/* ── 드로잉 툴 — 좌표는 데이터 공간(시간 t·가격) 저장(줌/리사이즈 고정). 창별(cfg.obj).
+   2점 오브젝트(추세선·피보)는 클릭-드래그-놓기, 그린 후 더블클릭으로 선택 → 핸들 드래그로 수정. ── */
+function setDrawTool(tool){ drawTool=tool; if(tool){ crossOn=false; selObj=null; } drawDrag=null; handleDrag=null;
   document.querySelectorAll('.cgwplot').forEach(p=>p.classList.toggle('crossmode', crossOn||!!tool));
   if(!crossOn&&!tool) document.querySelectorAll('.cgcross').forEach(c=>c.innerHTML=''); syncChartUI(); }
-function placeDrawing(id,e){ const sc=chartScale[id]; if(!sc||!drawTool) return;
-  const box=document.querySelector('#w-'+id+' .cgwplot'), r=box.getBoundingClientRect();
-  const x=e.clientX-r.left, y=e.clientY-r.top;
-  if(x>sc.plotW||y<sc.padT||y>sc.padT+sc.plotH) return;   // 가격창 밖(축·오실레이터)은 무시
-  const price=sc.mx-(y-sc.padT)/sc.plotH*(sc.mx-sc.mn), t=sc.t0+Math.round((x-sc.cw/2)/sc.cw)*sc.step;
-  const c=cfg(id); if(!c.obj) c.obj=[];
-  if(drawTool==='hline'){ c.obj.push({k:'hline',price}); finishDraw(id); }
-  else if(drawTool==='vline'){ c.obj.push({k:'vline',t}); finishDraw(id); }
-  else if(drawTool==='text'){ const s=prompt('Text label:'); if(s) c.obj.push({k:'text',t,price,s}); finishDraw(id); }
-  else if(drawTool==='trend'||drawTool==='fib'){
-    if(drawPend&&drawPend.id===id){ c.obj.push({k:drawPend.k,p1:drawPend.p1,p2:{t,price}}); drawPend=null; finishDraw(id); }
-    else { drawPend={id,k:drawTool,p1:{t,price}}; } } }
-function finishDraw(id){ saveCfg(); renderChart(id); setDrawTool(null); }   // 하나 그리면 커서로 복귀(MT5)
-function clearObjects(id){ const c=cfg(id); if(!c.obj||!c.obj.length) return; c.obj=[]; saveCfg(); renderChart(id); }
+/* 픽셀 ↔ 데이터 좌표 (chartScale 기준) */
+function dataAt(id,e){ const sc=chartScale[id]; if(!sc) return null; const box=document.querySelector('#w-'+id+' .cgwplot'); if(!box) return null;
+  const r=box.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+  return { x, y, price:sc.mx-(y-sc.padT)/sc.plotH*(sc.mx-sc.mn), t:sc.t0+Math.round((x-sc.cw/2)/sc.cw)*sc.step, inPrice:(x<=sc.plotW&&y>=sc.padT&&y<=sc.padT+sc.plotH) }; }
+const objXOf=(sc,t)=>((t-sc.t0)/sc.step)*sc.cw+sc.cw/2, objYOf=(sc,p)=>sc.padT+(sc.mx-p)/(sc.mx-sc.mn)*sc.plotH;
+function segDist(px,py,x1,y1,x2,y2){ const dx=x2-x1,dy=y2-y1,L2=dx*dx+dy*dy; let t=L2?((px-x1)*dx+(py-y1)*dy)/L2:0; t=Math.max(0,Math.min(1,t)); return Math.hypot(px-(x1+t*dx),py-(y1+t*dy)); }
+function objDist(sc,o,x,y){ if(o.k==='hline') return Math.abs(y-objYOf(sc,o.price));
+  if(o.k==='vline') return Math.abs(x-objXOf(sc,o.t));
+  if(o.k==='trend'||o.k==='fib') return segDist(x,y,objXOf(sc,o.p1.t),objYOf(sc,o.p1.price),objXOf(sc,o.p2.t),objYOf(sc,o.p2.price));
+  if(o.k==='text') return Math.hypot(x-objXOf(sc,o.t),y-objYOf(sc,o.price)); return 1e9; }
+function handleAt(sc,o,x,y){ const H=9;
+  if(o.k==='trend'||o.k==='fib'){ if(Math.hypot(x-objXOf(sc,o.p1.t),y-objYOf(sc,o.p1.price))<H) return 'p1';
+    if(Math.hypot(x-objXOf(sc,o.p2.t),y-objYOf(sc,o.p2.price))<H) return 'p2'; return 'move'; }
+  return o.k; }   // hline/vline/text = 통째 이동
+function objMove(o,which,d){ if(which==='p1') o.p1={t:d.t,price:d.price}; else if(which==='p2') o.p2={t:d.t,price:d.price};
+  else if(o.k==='hline') o.price=d.price; else if(o.k==='vline') o.t=d.t;
+  else if(o.k==='text') { o.t=d.t; o.price=d.price; }
+  else if(which==='move'&&(o.k==='trend'||o.k==='fib')){ const mt=d.t-((o.p1.t+o.p2.t)/2), mp=d.price-((o.p1.price+o.p2.price)/2);
+    o.p1={t:o.p1.t+mt,price:o.p1.price+mp}; o.p2={t:o.p2.t+mt,price:o.p2.price+mp}; } }
+function delSelObj(){ if(!selObj) return false; const c=cfg(selObj.id); if(c.obj&&c.obj[selObj.idx]!=null){ c.obj.splice(selObj.idx,1); saveCfg(); const id=selObj.id; selObj=null; renderChart(id); return true; } selObj=null; return false; }
+function clearObjects(id){ const c=cfg(id); if(!c.obj||!c.obj.length) return; c.obj=[]; if(selObj&&selObj.id===id) selObj=null; saveCfg(); renderChart(id); }
 const syncToolActive=syncChartUI;   // 하위호환
 /* 활성 차트에만 적용하는 조작 */
 function setChartType(t){ const c=activeCfg(); if(!c) return; c.type=t; saveCfg(); renderChart(activeChart); syncChartUI(); }
@@ -765,21 +776,22 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
     const pts=[]; vis.forEach((k,i)=>{ const v=rsi[absBase+i]; if(v!=null) pts.push((i*cw+cw/2).toFixed(1)+','+yR(v).toFixed(1)); });
     if(pts.length) out+='<polyline points="'+pts.join(' ')+'" fill="none" stroke="'+CH_RSI+'" stroke-width="1.2"/>';
     out+='<text x="4" y="'+(top+10).toFixed(1)+'" fill="'+CH_RSI+'" font-size="8.5" font-weight="700">RSI('+IND_RSI_P+')</text>'; }
-  /* ── 드로잉 오브젝트(창별, 데이터 좌표) ── */
-  if((c.obj&&c.obj.length)||(drawPend&&drawPend.id===id)){
-    const xOf=t=>((t-vis[0].t)/(TF_MS[c.tf]||1800e3))*cw+cw/2, clampX=x=>Math.max(0,Math.min(plotW,x)), esc=s=>String(s).replace(/[<&>]/g,' ');
-    (c.obj||[]).forEach(o=>{
-      if(o.k==='hline'){ const y=yOf(o.price); out+='<line x1="0" y1="'+y.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="1"/><text x="3" y="'+(y-3).toFixed(1)+'" fill="'+CH_DRAW+'" font-size="8.5">'+o.price.toFixed(dg)+'</text>'; }
-      else if(o.k==='vline'){ const x=clampX(xOf(o.t)); out+='<line x1="'+x.toFixed(1)+'" y1="'+padT+'" x2="'+x.toFixed(1)+'" y2="'+(padT+priceH).toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="1"/>'; }
-      else if(o.k==='trend'){ out+='<line x1="'+clampX(xOf(o.p1.t)).toFixed(1)+'" y1="'+yOf(o.p1.price).toFixed(1)+'" x2="'+clampX(xOf(o.p2.t)).toFixed(1)+'" y2="'+yOf(o.p2.price).toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="1.4"/>'; }
+  /* ── 드로잉 오브젝트(창별, 데이터 좌표) + 그리는 중 미리보기 + 선택 핸들 ── */
+  { const xOf=t=>((t-vis[0].t)/(TF_MS[c.tf]||1800e3))*cw+cw/2, clampX=x=>Math.max(0,Math.min(plotW,x)), esc=s=>String(s).replace(/[<&>]/g,' ');
+    const drawOne=(o,sel)=>{ const sw=sel?1.8:1;
+      if(o.k==='hline'){ const y=yOf(o.price); out+='<line x1="0" y1="'+y.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="'+sw+'"/><text x="3" y="'+(y-3).toFixed(1)+'" fill="'+CH_DRAW+'" font-size="8.5">'+o.price.toFixed(dg)+'</text>'; }
+      else if(o.k==='vline'){ const x=clampX(xOf(o.t)); out+='<line x1="'+x.toFixed(1)+'" y1="'+padT+'" x2="'+x.toFixed(1)+'" y2="'+(padT+priceH).toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="'+sw+'"/>'; }
+      else if(o.k==='trend'){ out+='<line x1="'+clampX(xOf(o.p1.t)).toFixed(1)+'" y1="'+yOf(o.p1.price).toFixed(1)+'" x2="'+clampX(xOf(o.p2.t)).toFixed(1)+'" y2="'+yOf(o.p2.price).toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="'+(sw+0.4)+'"/>'; }
       else if(o.k==='fib'){ const x1=clampX(xOf(o.p1.t)),x2=clampX(xOf(o.p2.t)),lo=Math.min(x1,x2),hi2=Math.max(x1,x2);
-        out+='<line x1="'+x1.toFixed(1)+'" y1="'+yOf(o.p1.price).toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+yOf(o.p2.price).toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="1" opacity=".5"/>';
+        out+='<line x1="'+x1.toFixed(1)+'" y1="'+yOf(o.p1.price).toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+yOf(o.p2.price).toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="'+sw+'" opacity=".5"/>';
         [0,0.236,0.382,0.5,0.618,0.786,1].forEach(f=>{ const p=o.p1.price+(o.p2.price-o.p1.price)*f, y=yOf(p);
           out+='<line x1="'+lo.toFixed(1)+'" y1="'+y.toFixed(1)+'" x2="'+hi2.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="0.8" stroke-dasharray="3 2" opacity=".85"/><text x="'+(hi2+2).toFixed(1)+'" y="'+(y+3).toFixed(1)+'" fill="'+CH_DRAW+'" font-size="7.5">'+(f*100).toFixed(1)+'</text>'; }); }
       else if(o.k==='text'){ out+='<text x="'+clampX(xOf(o.t)).toFixed(1)+'" y="'+yOf(o.price).toFixed(1)+'" fill="'+CH_DRAW+'" font-size="10" font-weight="600">'+esc(o.s)+'</text>'; }
-    });
-    if(drawPend&&drawPend.id===id){ const x=clampX(xOf(drawPend.p1.t)),y=yOf(drawPend.p1.price);
-      out+='<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="3" fill="'+CH_DRAW+'"/>'; }   // 2클릭 대기점 표시
+      if(sel){ const pts=(o.k==='trend'||o.k==='fib')?[[xOf(o.p1.t),yOf(o.p1.price)],[xOf(o.p2.t),yOf(o.p2.price)]]
+          :o.k==='hline'?[[plotW/2,yOf(o.price)]]:o.k==='vline'?[[clampX(xOf(o.t)),padT+priceH/2]]:[[clampX(xOf(o.t)),yOf(o.price)]];
+        pts.forEach(p=>{ out+='<rect x="'+(p[0]-3).toFixed(1)+'" y="'+(p[1]-3).toFixed(1)+'" width="6" height="6" fill="#fff" stroke="'+CH_DRAW+'" stroke-width="1"/>'; }); } };
+    (c.obj||[]).forEach((o,i)=>drawOne(o, selObj&&selObj.id===id&&selObj.idx===i));
+    if(drawDrag&&drawDrag.id===id) drawOne(drawDrag, false);   // 그리는 중 미리보기
   }
   const lbl=box.querySelector('.cgtf'); if(lbl&&lbl.textContent!==c.tf) lbl.textContent=c.tf;   // 창별 TF 라벨
   svg.setAttribute('viewBox','0 0 '+W+' '+H); svg.innerHTML=out; }
@@ -795,12 +807,32 @@ function mkChart(id, sym, i){ makeWidget(id, sym, 'var(--lgd-up)', chartBody());
   wtb.insertBefore(mn, cls); wtb.insertBefore(mx, cls);
   mn.addEventListener('click', ev=>{ ev.stopPropagation(); toggleMin(id); });
   mx.addEventListener('click', ev=>{ ev.stopPropagation(); toggleMax(id); });
-  /* 크로스헤어 + 드로잉 — 크로스헤어 모드=마우스 따라 십자선, 드로잉 툴 활성 시 클릭으로 오브젝트 배치 */
+  /* 크로스헤어 + 드로잉(클릭-드래그) + 편집(더블클릭 선택 → 핸들 드래그) + 마우스휠 줌 */
   const plot=el.querySelector('.cgwplot');
   if(plot){ plot.classList.toggle('crossmode',crossOn||!!drawTool);
-    plot.addEventListener('mousemove', ev=>{ if(crossOn) drawCross(id, ev); });
+    plot.addEventListener('pointerdown', ev=>{ if(ev.button!==0) return; const d=dataAt(id,ev); if(!d||!d.inPrice) return; const c=cfg(id);
+      if(drawTool==='trend'||drawTool==='fib'){ drawDrag={id,k:drawTool,p1:{t:d.t,price:d.price},p2:{t:d.t,price:d.price}}; plot.setPointerCapture(ev.pointerId); ev.preventDefault(); return; }
+      if(drawTool==='hline'){ (c.obj=c.obj||[]).push({k:'hline',price:d.price}); saveCfg(); setDrawTool(null); renderChart(id); return; }
+      if(drawTool==='vline'){ (c.obj=c.obj||[]).push({k:'vline',t:d.t}); saveCfg(); setDrawTool(null); renderChart(id); return; }
+      if(drawTool==='text'){ const s=prompt('Text label:'); if(s){ (c.obj=c.obj||[]).push({k:'text',t:d.t,price:d.price,s}); saveCfg(); } setDrawTool(null); renderChart(id); return; }
+      if(selObj&&selObj.id===id&&c.obj&&c.obj[selObj.idx]){ const w=handleAt(chartScale[id],c.obj[selObj.idx],d.x,d.y);
+        if(w){ handleDrag={id,idx:selObj.idx,which:w}; plot.setPointerCapture(ev.pointerId); ev.preventDefault(); return; } }
+      if(selObj){ selObj=null; renderChart(id); } });   // 빈 곳 클릭 = 선택 해제
+    plot.addEventListener('pointermove', ev=>{ if(crossOn) drawCross(id, ev);
+      if(drawDrag&&drawDrag.id===id){ const d=dataAt(id,ev); if(d){ drawDrag.p2={t:d.t,price:d.price}; renderChart(id); } return; }
+      if(handleDrag&&handleDrag.id===id){ const d=dataAt(id,ev), o=cfg(id).obj[handleDrag.idx]; if(d&&o){ objMove(o,handleDrag.which,d); renderChart(id); } } });
+    plot.addEventListener('pointerup', ev=>{
+      if(drawDrag&&drawDrag.id===id){ const dd=drawDrag; drawDrag=null;
+        if(dd.p1.t===dd.p2.t&&dd.p1.price===dd.p2.price){ renderChart(id); return; }   // 안 끌면 취소(툴 유지)
+        const c=cfg(id); (c.obj=c.obj||[]).push({k:dd.k,p1:dd.p1,p2:dd.p2}); saveCfg(); setDrawTool(null); selObj={id,idx:c.obj.length-1}; renderChart(id); return; }
+      if(handleDrag&&handleDrag.id===id){ handleDrag=null; saveCfg(); } });
     plot.addEventListener('mouseleave', ()=>{ const cx=plot.querySelector('.cgcross'); if(cx) cx.innerHTML=''; });
-    plot.addEventListener('click', ev=>{ if(drawTool) placeDrawing(id, ev); }); }
+    plot.addEventListener('dblclick', ev=>{ const d=dataAt(id,ev), c=cfg(id); setActiveChart(id);
+      if(!c.obj||!c.obj.length){ if(selObj){ selObj=null; renderChart(id); } return; }
+      let best=-1,bd=8; c.obj.forEach((o,i)=>{ const dd=objDist(chartScale[id],o,d.x,d.y); if(dd<bd){ bd=dd; best=i; } });
+      selObj=best>=0?{id,idx:best}:null; renderChart(id); });   // 더블클릭 = 근처 오브젝트 선택(핸들 표시)
+    plot.addEventListener('wheel', ev=>{ ev.preventDefault(); setActiveChart(id); const c=cfg(id);
+      c.zoom=Math.max(0.18,Math.min(4,+(c.zoom*(ev.deltaY<0?1.15:0.87)).toFixed(3))); saveCfg(); renderChart(id); }, {passive:false}); }
   applyGeo(id); renderChart(id); }
 function destroyCharts(){ chartIds().forEach(id=>{ const el=document.getElementById('w-'+id); if(el) el.remove();
   delete layout[id]; const zi=zOrder.indexOf(id); if(zi>=0) zOrder.splice(zi,1); }); }
@@ -1444,8 +1476,10 @@ document.addEventListener('keydown', e=>{
   else if(k==='F9'){ e.preventDefault(); toast('New Order (F9) — coming in build'); }
   else if(k==='F8'){ e.preventDefault(); toast('Chart Properties (F8) — coming in build'); }
   else if(k==='F11'){ e.preventDefault(); if(!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{}); else document.exitFullscreen(); }
-  else if(k==='Escape'){ if(drawTool||drawPend){ setDrawTool(null); } }   // 드로잉 취소
-  else if(k==='Delete'||k==='Backspace'){ if(activeChart){ clearObjects(activeChart); toast('Objects deleted'); } }
+  else if(k==='Escape'){ if(drawDrag){ const id=drawDrag.id; drawDrag=null; renderChart(id); } else if(drawTool){ setDrawTool(null); }
+    else if(selObj){ const id=selObj.id; selObj=null; renderChart(id); } }   // 그리기/툴/선택 취소
+  else if(k==='Delete'||k==='Backspace'){ if(selObj){ delSelObj(); toast('Object deleted'); }   // 선택된 것만 삭제
+    else if(activeChart){ clearObjects(activeChart); toast('All objects deleted'); } }
   else if(k==='+'||k==='='){ zoomCharts(1); }
   else if(k==='-'||k==='_'){ zoomCharts(-1); }
 });
