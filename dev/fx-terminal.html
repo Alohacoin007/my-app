@@ -49,6 +49,11 @@ body.light #gtip{box-shadow:0 6px 18px rgba(15,23,40,.18)}
   border:1px solid var(--lgd-hair); border-radius:2px; box-shadow:0 8px 24px rgba(0,0,0,.5); padding:6px}
 #menuDrop .mrow{display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:2px; font-size:12.5px; color:var(--lgd-dim)}
 #menuDrop .mrow .sub{margin-left:auto; font-size:10px; opacity:.7}
+#menuDrop .cgmhd{font-size:10px; font-weight:800; letter-spacing:.5px; color:var(--lgd-dim); text-transform:uppercase; padding:4px 10px 6px}
+#menuDrop .cgsep{height:1px; background:var(--lgd-hair); margin:5px 4px}
+#menuDrop .mtile{display:block; width:100%; text-align:left; background:none; border:none; color:var(--lgd-ink);
+  font:600 12.5px/1 inherit; padding:8px 10px; border-radius:2px; cursor:pointer}
+#menuDrop .mtile:hover{background:var(--lgd-pill)}
 .htoolbar{display:flex; align-items:center; gap:2px; flex:1; min-width:0; overflow-x:auto; overflow-y:visible; padding:0 4px}
 .hdivider{width:1px; height:18px; background:var(--lgd-hair); margin:0 5px; flex:none}
 .htool{width:26px; height:26px; border-radius:2px; display:flex; align-items:center; justify-content:center;
@@ -492,7 +497,7 @@ function chartIds(){ return Object.keys(layout).filter(k=>/^chart\d+$/.test(k));
 function mkChart(id, sym, i){ makeWidget(id, sym, 'var(--lgd-up)', chartSkeletonBody(i));
   /* MT5 창 컨트롤 — 헤더 우측: 최소화(–) · 최대화(□) · 닫기(×) */
   const el=document.getElementById('w-'+id), wtb=el.querySelector('.wtb'), cls=wtb.querySelector('.wic');
-  cls.textContent='×'; cls.title='Close';
+  cls.textContent='×'; cls.title='Close'; cls.classList.add('wcls');
   const mn=document.createElement('span'); mn.className='wic wmin'; mn.title='Minimize'; mn.textContent='–';
   const mx=document.createElement('span'); mx.className='wic wmax'; mx.title='Maximize'; mx.textContent='□';
   wtb.insertBefore(mn, cls); wtb.insertBefore(mx, cls);
@@ -513,6 +518,20 @@ function toggleMin(id){ const g=layout[id], el=document.getElementById('w-'+id);
   if(g.__min){ g.h=g.__min; g.__min=null; el.classList.remove('mini'); }
   else { if(g.__max){ Object.assign(g, g.__max); g.__max=null; } g.__min=g.h; g.h=CH_TITLE_H; el.classList.add('mini'); }
   applyGeo(id); saveLayout(); }
+/* ── MT5 Window > Tile — 열려있는 차트들을 현재 남은 공간(chartRegion, 툴박스 높이 반영)에 꽉 채워 재배치 ── */
+function tileCharts(mode){ const ids=chartIds().filter(id=>!layout[id].hidden), n=ids.length; if(!n) return;
+  const R=chartRegion(), gap=8;
+  ids.forEach(id=>{ const g=layout[id]; g.__max=null; g.__min=null; const el=document.getElementById('w-'+id); if(el) el.classList.remove('mini'); });
+  if(mode==='cascade'){ const off=28; ids.forEach((id,i)=>{ const g=layout[id];
+      g.x=Math.round(R.x+i*off); g.y=Math.round(R.y+i*off); g.w=Math.round(R.w*0.72); g.h=Math.round(R.h*0.72); applyGeo(id); bringToFront(id); }); }
+  else { let cols,rows;
+    if(mode==='vertical'){ cols=n; rows=1; }           // 세로 분할 = 좌우로 나란히
+    else if(mode==='horizontal'){ cols=1; rows=n; }    // 가로 분할 = 위아래로 쌓기
+    else { cols=Math.ceil(Math.sqrt(n)); rows=Math.ceil(n/cols); }   // 격자(기본)
+    const cw=(R.w-gap*(cols-1))/cols, ch=(R.h-gap*(rows-1))/rows;
+    ids.forEach((id,i)=>{ const r=Math.floor(i/cols), c=i%cols, g=layout[id];
+      g.x=Math.round(R.x+c*(cw+gap)); g.y=Math.round(R.y+r*(ch+gap)); g.w=Math.round(cw); g.h=Math.round(ch); applyGeo(id); }); }
+  saveLayout(); }
 function buildCharts(){ destroyCharts();
   const R=chartRegion(), gap=8, cols=Math.ceil(Math.sqrt(cgN)), rows=Math.ceil(cgN/cols);
   const cw=(R.w-gap*(cols-1))/cols, ch=(R.h-gap*(rows-1))/rows;
@@ -722,14 +741,22 @@ function toolSvg(inner, fill){ return '<svg width="14" height="14" viewBox="0 0 
   /* 드로잉/지표/줌 도구 = 골격(툴팁만, 실봉 M2 이후 연결) — 클릭 시 활성 표시만 */
   document.querySelectorAll('#htoolbar .htool:not(#btnTile)').forEach(t=>t.addEventListener('click', ()=>{
     document.querySelectorAll('#htoolbar .htool').forEach(x=>x.classList.remove('on')); t.classList.add('on'); }));
-  /* 메뉴바(File/View/Insert/Charts/Tools/Window/Help) — 골격 드롭다운 */
+  /* 메뉴바 ☰ — Window > Tile 실동작(남은 공간 꽉 채우기) + 나머지 메뉴 골격 */
   const btn=document.getElementById('btnMenu'), drop=document.getElementById('menuDrop');
-  if(btn&&drop){ drop.innerHTML=['File','View','Insert','Charts','Tools','Window','Help']
-      .map(m=>'<div class="mrow">'+m+'<span class="sub">Soon</span></div>').join('');
+  if(btn&&drop){ drop.innerHTML=
+      '<div class="cgmhd">Window</div>'+
+      '<button class="mtile" data-tile="grid">Tile Windows</button>'+
+      '<button class="mtile" data-tile="vertical">Tile Vertically</button>'+
+      '<button class="mtile" data-tile="horizontal">Tile Horizontally</button>'+
+      '<button class="mtile" data-tile="cascade">Cascade</button>'+
+      '<div class="cgsep"></div>'+
+      ['File','View','Insert','Charts','Tools','Help'].map(m=>'<div class="mrow">'+m+'<span class="sub">Soon</span></div>').join('');
     btn.addEventListener('click', e=>{ e.stopPropagation();
       document.getElementById('addMenu').style.display='none'; document.getElementById('tabMenu').style.display='none';
       const cm=document.getElementById('cgMenu'); if(cm) cm.style.display='none';
-      drop.style.display=drop.style.display==='block'?'none':'block'; }); }
+      drop.style.display=drop.style.display==='block'?'none':'block'; });
+    drop.addEventListener('click', e=>{ const t=e.target.closest('[data-tile]'); if(!t) return;
+      tileCharts(t.dataset.tile); drop.style.display='none'; }); }
 })();
 
 /* Market Watch — 하위탭(Symbols/Details/Trading/Ticks) + MT5 표준 우클릭 메뉴 + 피드 상태 */
