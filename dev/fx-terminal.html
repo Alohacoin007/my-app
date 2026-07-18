@@ -604,6 +604,8 @@ const CH_UP='#26A69A', CH_DN='#EF5350', CH_LINE='#2E90FA';   // 강세(녹)·약
 const chartSeries={};                              // sym -> {tf, c:[{t,o,h,l,c}]}
 /* ── 차트 조작 상태 — 차트별 독립(각 창이 자기 타입·TF·줌·그리드·지표). 툴바/☰/TF는 활성 차트에만 적용 ── */
 let crossOn=false;                                 // 크로스헤어 모드(커서 모드라 전역 — 그리기는 창별 스케일)
+let drawTool=null, drawPend=null;                  // 활성 드로잉 툴(hline/vline/trend/fib/text) · 2클릭 대기점
+const CH_DRAW='#E8B84B';                            // 드로잉 오브젝트 색(노랑)
 let toggleDock=null;                               // 툴박스 도크 토글(toolboxDock가 주입 — ☰ View>Toolbox)
 let activeChart=null;                              // 현재 활성(포커스) 차트 id
 const chartScale={};                               // id -> 마지막 렌더 스케일(크로스헤어 좌표변환용)
@@ -618,12 +620,33 @@ function activeCfg(){ return activeChart?cfg(activeChart):null; }
 function setActiveChart(id){ if(!/^chart\d+$/.test(id)||!layout[id]) return; activeChart=id;
   chartIds().forEach(cid=>{ const el=document.getElementById('w-'+cid); if(el) el.classList.toggle('chart-active',cid===id); });
   syncChartUI(); }
+const DRAW_TIP={'Horizontal line':'hline','Vertical line':'vline','Trend line':'trend','Fibonacci':'fib','Text':'text'};
 function syncChartUI(){ const c=activeCfg();
   document.querySelectorAll('#htoolbar .htool').forEach(t=>{ const n=t.dataset.tip; let on=null;
     if(n==='Candlesticks') on=c&&c.type==='candles'; else if(n==='Bar chart (OHLC)') on=c&&c.type==='bars';
-    else if(n==='Line chart') on=c&&c.type==='line'; else if(n==='Crosshair') on=crossOn; else if(n==='Cursor') on=!crossOn;
+    else if(n==='Line chart') on=c&&c.type==='line'; else if(n==='Crosshair') on=crossOn;
+    else if(n==='Cursor') on=!crossOn&&!drawTool;
+    else if(DRAW_TIP[n]) on=drawTool===DRAW_TIP[n];
     if(on!==null) t.classList.toggle('on',!!on); });
   if(c) document.querySelectorAll('#tfStrip [data-tf]').forEach(x=>x.classList.toggle('on',x.dataset.tf===c.tf)); }
+/* 드로잉 툴 — 오브젝트 좌표는 데이터 공간(시간 t·가격)에 저장 → 줌/리사이즈에도 고정. 창별(cfg.obj) */
+function setDrawTool(tool){ drawTool=tool; if(tool) crossOn=false; drawPend=null;
+  document.querySelectorAll('.cgwplot').forEach(p=>p.classList.toggle('crossmode', crossOn||!!tool));
+  if(!crossOn&&!tool) document.querySelectorAll('.cgcross').forEach(c=>c.innerHTML=''); syncChartUI(); }
+function placeDrawing(id,e){ const sc=chartScale[id]; if(!sc||!drawTool) return;
+  const box=document.querySelector('#w-'+id+' .cgwplot'), r=box.getBoundingClientRect();
+  const x=e.clientX-r.left, y=e.clientY-r.top;
+  if(x>sc.plotW||y<sc.padT||y>sc.padT+sc.plotH) return;   // 가격창 밖(축·오실레이터)은 무시
+  const price=sc.mx-(y-sc.padT)/sc.plotH*(sc.mx-sc.mn), t=sc.t0+Math.round((x-sc.cw/2)/sc.cw)*sc.step;
+  const c=cfg(id); if(!c.obj) c.obj=[];
+  if(drawTool==='hline'){ c.obj.push({k:'hline',price}); finishDraw(id); }
+  else if(drawTool==='vline'){ c.obj.push({k:'vline',t}); finishDraw(id); }
+  else if(drawTool==='text'){ const s=prompt('Text label:'); if(s) c.obj.push({k:'text',t,price,s}); finishDraw(id); }
+  else if(drawTool==='trend'||drawTool==='fib'){
+    if(drawPend&&drawPend.id===id){ c.obj.push({k:drawPend.k,p1:drawPend.p1,p2:{t,price}}); drawPend=null; finishDraw(id); }
+    else { drawPend={id,k:drawTool,p1:{t,price}}; } } }
+function finishDraw(id){ saveCfg(); renderChart(id); setDrawTool(null); }   // 하나 그리면 커서로 복귀(MT5)
+function clearObjects(id){ const c=cfg(id); if(!c.obj||!c.obj.length) return; c.obj=[]; saveCfg(); renderChart(id); }
 const syncToolActive=syncChartUI;   // 하위호환
 /* 활성 차트에만 적용하는 조작 */
 function setChartType(t){ const c=activeCfg(); if(!c) return; c.type=t; saveCfg(); renderChart(activeChart); syncChartUI(); }
@@ -646,8 +669,9 @@ function rsiSeries(cl,p){ const out=new Array(cl.length).fill(null); if(cl.lengt
   out[p]=100-100/(1+(l===0?100:g/l));
   for(let i=p+1;i<cl.length;i++){ const c=cl[i]-cl[i-1]; g=(g*(p-1)+Math.max(0,c))/p; l=(l*(p-1)+Math.max(0,-c))/p;
     out[i]=100-100/(1+(l===0?100:g/l)); } return out; }
-function setCrossMode(on){ crossOn=on; document.querySelectorAll('.cgwplot').forEach(p=>p.classList.toggle('crossmode',crossOn));
-  if(!crossOn) document.querySelectorAll('.cgcross').forEach(c=>c.innerHTML=''); syncToolActive(); }
+function setCrossMode(on){ crossOn=on; if(on) drawTool=null;   // 크로스헤어 켜면 드로잉 해제
+  document.querySelectorAll('.cgwplot').forEach(p=>p.classList.toggle('crossmode',crossOn||!!drawTool));
+  if(!crossOn&&!drawTool) document.querySelectorAll('.cgcross').forEach(c=>c.innerHTML=''); syncToolActive(); }
 function drawCross(id,e){ const el=document.getElementById('w-'+id); if(!el) return;
   const box=el.querySelector('.cgwplot'), cx=box&&box.querySelector('.cgcross'), sc=chartScale[id]; if(!cx||!sc) return;
   const r=box.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
@@ -689,7 +713,7 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
     if(m+IND_BB_K*sd>mx) mx=m+IND_BB_K*sd; if(m-IND_BB_K*sd<mn) mn=m-IND_BB_K*sd; }); }   // 밴드가 스케일 안에 들어오게
   if(!(mx>mn)) mx=mn+1; const pd=(mx-mn)*0.08; mn-=pd; mx+=pd; const rng=mx-mn||1;
   const yOf=p=>padT+(mx-p)/rng*priceH, cw=plotW/nVis, bw=Math.max(1,cw*0.62);
-  chartScale[id]={mn,mx,padT,plotH:priceH,plotW,W,H,RA,sym};   // 크로스헤어 좌표변환(가격창 기준)
+  chartScale[id]={mn,mx,padT,plotH:priceH,plotW,W,H,RA,sym,cw,t0:vis[0].t,step:TF_MS[c.tf]||1800e3};   // 크로스헤어·드로잉 좌표변환
   let out='';
   for(let i=0;i<=4;i++){ const p=mn+rng*i/4, y=yOf(p);
     if(c.grid) out+='<line x1="0" y1="'+y.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="var(--lgd-hair)" stroke-width="1" opacity=".5"/>';
@@ -724,6 +748,22 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
     const pts=[]; vis.forEach((k,i)=>{ const v=rsi[absBase+i]; if(v!=null) pts.push((i*cw+cw/2).toFixed(1)+','+yR(v).toFixed(1)); });
     if(pts.length) out+='<polyline points="'+pts.join(' ')+'" fill="none" stroke="'+CH_RSI+'" stroke-width="1.2"/>';
     out+='<text x="4" y="'+(top+10).toFixed(1)+'" fill="'+CH_RSI+'" font-size="8.5" font-weight="700">RSI('+IND_RSI_P+')</text>'; }
+  /* ── 드로잉 오브젝트(창별, 데이터 좌표) ── */
+  if((c.obj&&c.obj.length)||(drawPend&&drawPend.id===id)){
+    const xOf=t=>((t-vis[0].t)/(TF_MS[c.tf]||1800e3))*cw+cw/2, clampX=x=>Math.max(0,Math.min(plotW,x)), esc=s=>String(s).replace(/[<&>]/g,' ');
+    (c.obj||[]).forEach(o=>{
+      if(o.k==='hline'){ const y=yOf(o.price); out+='<line x1="0" y1="'+y.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="1"/><text x="3" y="'+(y-3).toFixed(1)+'" fill="'+CH_DRAW+'" font-size="8.5">'+o.price.toFixed(dg)+'</text>'; }
+      else if(o.k==='vline'){ const x=clampX(xOf(o.t)); out+='<line x1="'+x.toFixed(1)+'" y1="'+padT+'" x2="'+x.toFixed(1)+'" y2="'+(padT+priceH).toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="1"/>'; }
+      else if(o.k==='trend'){ out+='<line x1="'+clampX(xOf(o.p1.t)).toFixed(1)+'" y1="'+yOf(o.p1.price).toFixed(1)+'" x2="'+clampX(xOf(o.p2.t)).toFixed(1)+'" y2="'+yOf(o.p2.price).toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="1.4"/>'; }
+      else if(o.k==='fib'){ const x1=clampX(xOf(o.p1.t)),x2=clampX(xOf(o.p2.t)),lo=Math.min(x1,x2),hi2=Math.max(x1,x2);
+        out+='<line x1="'+x1.toFixed(1)+'" y1="'+yOf(o.p1.price).toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+yOf(o.p2.price).toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="1" opacity=".5"/>';
+        [0,0.236,0.382,0.5,0.618,0.786,1].forEach(f=>{ const p=o.p1.price+(o.p2.price-o.p1.price)*f, y=yOf(p);
+          out+='<line x1="'+lo.toFixed(1)+'" y1="'+y.toFixed(1)+'" x2="'+hi2.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="0.8" stroke-dasharray="3 2" opacity=".85"/><text x="'+(hi2+2).toFixed(1)+'" y="'+(y+3).toFixed(1)+'" fill="'+CH_DRAW+'" font-size="7.5">'+(f*100).toFixed(1)+'</text>'; }); }
+      else if(o.k==='text'){ out+='<text x="'+clampX(xOf(o.t)).toFixed(1)+'" y="'+yOf(o.price).toFixed(1)+'" fill="'+CH_DRAW+'" font-size="10" font-weight="600">'+esc(o.s)+'</text>'; }
+    });
+    if(drawPend&&drawPend.id===id){ const x=clampX(xOf(drawPend.p1.t)),y=yOf(drawPend.p1.price);
+      out+='<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="3" fill="'+CH_DRAW+'"/>'; }   // 2클릭 대기점 표시
+  }
   const lbl=box.querySelector('.cgtf'); if(lbl&&lbl.textContent!==c.tf) lbl.textContent=c.tf;   // 창별 TF 라벨
   svg.setAttribute('viewBox','0 0 '+W+' '+H); svg.innerHTML=out; }
 function renderAllCharts(doTick){ chartIds().forEach(id=>{ const g=layout[id]; if(!g||g.hidden||g.__min) return;
@@ -738,11 +778,12 @@ function mkChart(id, sym, i){ makeWidget(id, sym, 'var(--lgd-up)', chartBody());
   wtb.insertBefore(mn, cls); wtb.insertBefore(mx, cls);
   mn.addEventListener('click', ev=>{ ev.stopPropagation(); toggleMin(id); });
   mx.addEventListener('click', ev=>{ ev.stopPropagation(); toggleMax(id); });
-  /* 크로스헤어 — 크로스헤어 모드일 때 마우스 따라 십자선+가격 라벨 */
+  /* 크로스헤어 + 드로잉 — 크로스헤어 모드=마우스 따라 십자선, 드로잉 툴 활성 시 클릭으로 오브젝트 배치 */
   const plot=el.querySelector('.cgwplot');
-  if(plot){ plot.classList.toggle('crossmode',crossOn);
+  if(plot){ plot.classList.toggle('crossmode',crossOn||!!drawTool);
     plot.addEventListener('mousemove', ev=>{ if(crossOn) drawCross(id, ev); });
-    plot.addEventListener('mouseleave', ()=>{ const cx=plot.querySelector('.cgcross'); if(cx) cx.innerHTML=''; }); }
+    plot.addEventListener('mouseleave', ()=>{ const cx=plot.querySelector('.cgcross'); if(cx) cx.innerHTML=''; });
+    plot.addEventListener('click', ev=>{ if(drawTool) placeDrawing(id, ev); }); }
   applyGeo(id); renderChart(id); }
 function destroyCharts(){ chartIds().forEach(id=>{ const el=document.getElementById('w-'+id); if(el) el.remove();
   delete layout[id]; const zi=zOrder.indexOf(id); if(zi>=0) zOrder.splice(zi,1); }); }
@@ -1195,9 +1236,11 @@ function toolSvg(inner, fill){ return '<svg width="16" height="16" viewBox="0 0 
   const btn=document.getElementById('btnMenu'), drop=document.getElementById('menuDrop');
   function openMenu(){ document.getElementById('addMenu').style.display='none'; document.getElementById('tabMenu').style.display='none';
     const cm=document.getElementById('cgMenu'); if(cm) cm.style.display='none'; drawMenu(); if(drop) drop.style.display='block'; }
-  const TOOL_ACT={ 'Cursor':()=>setCrossMode(false), 'Crosshair':()=>setCrossMode(true),
+  const TOOL_ACT={ 'Cursor':()=>{ setDrawTool(null); setCrossMode(false); }, 'Crosshair':()=>setCrossMode(true),
     'Line chart':()=>setChartType('line'), 'Bar chart (OHLC)':()=>setChartType('bars'), 'Candlesticks':()=>setChartType('candles'),
     'Zoom in':()=>zoomCharts(1), 'Zoom out':()=>zoomCharts(-1),
+    'Horizontal line':()=>setDrawTool('hline'), 'Vertical line':()=>setDrawTool('vline'), 'Trend line':()=>setDrawTool('trend'),
+    'Fibonacci':()=>setDrawTool('fib'), 'Text':()=>setDrawTool('text'),
     'Indicators':(ev)=>{ if(ev) ev.stopPropagation(); openMenu(); }, 'Add indicator':(ev)=>{ if(ev) ev.stopPropagation(); openMenu(); } };
   document.querySelectorAll('#htoolbar .htool:not(#btnTile)').forEach(t=>t.addEventListener('click', (ev)=>{
     const act=TOOL_ACT[t.dataset.tip]; if(act){ act(ev); } else { toast(t.dataset.tip+' — coming in build'); } syncChartUI(); }));
@@ -1209,6 +1252,7 @@ function toolSvg(inner, fill){ return '<svg width="16" height="16" viewBox="0 0 
       '<div class="cgmhd">Charts'+hd+'</div>'+
       mact('type:candles','Candlesticks','',c&&c.type==='candles')+mact('type:bars','Bar Chart (OHLC)','',c&&c.type==='bars')+mact('type:line','Line Chart','',c&&c.type==='line')+
       '<div class="cgsep"></div>'+mact('grid','Grid','',c&&c.grid)+mact('zoomin','Zoom In','+')+mact('zoomout','Zoom Out','−')+
+      mact('objclear','Delete All Objects','Del')+
       '<div class="cgsep"></div><div class="cgmhd">Insert — Indicators</div>'+
       mact('ind:ma','Moving Average (20)','',!!ind.ma)+mact('ind:boll','Bollinger Bands (20,2)','',!!ind.boll)+mact('ind:rsi','RSI (14)','',!!ind.rsi)+
       '<div class="cgsep"></div><div class="cgmhd">Window</div>'+
@@ -1229,6 +1273,7 @@ function toolSvg(inner, fill){ return '<svg width="16" height="16" viewBox="0 0 
       else if(a==='grid'){ toggleGrid(); drawMenu(); }
       else if(a==='zoomin'){ zoomCharts(1); }
       else if(a==='zoomout'){ zoomCharts(-1); }
+      else if(a==='objclear'){ if(activeChart) clearObjects(activeChart); drawMenu(); }
       else if(a==='view:marketwatch'){ setHidden('marketwatch', !layout.marketwatch.hidden); drawMenu(); }
       else if(a==='view:navigator'){ setHidden('navigator', !layout.navigator.hidden); drawMenu(); }
       else if(a==='view:toolbox'){ if(toggleDock) toggleDock(); drop.style.display='none'; }
@@ -1376,13 +1421,15 @@ document.addEventListener('keydown', e=>{
   if(cmd&&/^m$/i.test(k)){ e.preventDefault(); const h=!layout.marketwatch.hidden; setHidden('marketwatch',h); toast(h?'Market Watch — hidden':'Market Watch'); }
   else if(cmd&&/^n$/i.test(k)){ e.preventDefault(); const h=!layout.navigator.hidden; setHidden('navigator',h); toast(h?'Navigator — hidden':'Navigator'); }
   else if(cmd&&/^d$/i.test(k)){ e.preventDefault(); toast('Data Window — coming in build'); }
-  else if(cmd&&/^g$/i.test(k)){ e.preventDefault(); toast('Grid — coming in build'); }
+  else if(cmd&&/^g$/i.test(k)){ e.preventDefault(); toggleGrid(); }   // 활성 차트 그리드
   else if(cmd&&/^b$/i.test(k)){ e.preventDefault(); toast('Objects List — coming in build'); }
   else if(k==='F9'){ e.preventDefault(); toast('New Order (F9) — coming in build'); }
   else if(k==='F8'){ e.preventDefault(); toast('Chart Properties (F8) — coming in build'); }
   else if(k==='F11'){ e.preventDefault(); if(!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{}); else document.exitFullscreen(); }
-  else if(k==='+'||k==='='){ toast('Zoom in — coming in build'); }
-  else if(k==='-'||k==='_'){ toast('Zoom out — coming in build'); }
+  else if(k==='Escape'){ if(drawTool||drawPend){ setDrawTool(null); } }   // 드로잉 취소
+  else if(k==='Delete'||k==='Backspace'){ if(activeChart){ clearObjects(activeChart); toast('Objects deleted'); } }
+  else if(k==='+'||k==='='){ zoomCharts(1); }
+  else if(k==='-'||k==='_'){ zoomCharts(-1); }
 });
 
 /* ── 마우스오버 툴팁 (모든 [data-tip] — 툴바 아이콘 포함, 오버플로에 안 잘림) ── */
