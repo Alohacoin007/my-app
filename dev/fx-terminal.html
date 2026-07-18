@@ -100,6 +100,13 @@ body.light #gtip{box-shadow:0 6px 18px rgba(15,23,40,.18)}
 .wtb .wic:hover{background:var(--lgd-surface2); color:var(--lgd-ink)}
 .wtb .wmin, .wtb .wmax{font-size:13px}
 .widget.mini .wbody, .widget.mini .rz{display:none}   /* 최소화: 타이틀바만 */
+/* 도킹 탭 그룹 — 위젯 하단 [탭][탭] (MT5 도크 탭) */
+.grptabs{display:flex; align-items:center; gap:1px; flex:none; height:24px; padding:0 6px;
+  border-top:1px solid var(--lgd-hair); overflow-x:auto}
+.grptabs button{background:none; border:none; color:var(--lgd-dim); font:700 10.5px/1 inherit; padding:5px 9px;
+  border-radius:2px; cursor:pointer; white-space:nowrap; flex:none}
+.grptabs button:hover{color:var(--lgd-ink)}
+.grptabs button.on{color:var(--lgd-up); box-shadow:inset 0 -2px 0 var(--lgd-up)}
 .wbody{flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column}
 .rz{position:absolute; z-index:6}
 .rz.r{right:-3px; top:14px; bottom:16px; width:8px; cursor:ew-resize}
@@ -410,7 +417,41 @@ let guides=[];
 function clearGuides(){ guides.forEach(g=>g.remove()); guides=[]; }
 function addGuide(x,y,w,h){ const d=document.createElement('div'); d.className='algn';
   d.style.left=x+'px'; d.style.top=y+'px'; d.style.width=w+'px'; d.style.height=h+'px'; stage.appendChild(d); guides.push(d); }
-function othersOf(id){ return Object.keys(layout).filter(k=>k!=='__ref'&&k!==id&&!layout[k].hidden).map(k=>layout[k]); }
+function othersOf(id){ return Object.keys(layout).filter(k=>{ if(k==='__ref'||k===id||layout[k].hidden) return false;
+  const g=groupOf(k); if(g&&g.active!==k) return false;  // 도킹 탭 그룹의 비활성 멤버 제외
+  return true; }).map(k=>layout[k]); }
+
+/* ── MT5 도킹 탭 그룹 — 패널 위젯을 겹쳐 놓으면 하단 [탭][탭]으로 묶음(차트 제외) ── */
+let groups=[];
+function groupOf(id){ return groups.find(g=>g.ids.includes(id)); }
+function overlapRatio(a,b){ const ix=Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x)),
+  iy=Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y)), inter=ix*iy, amin=Math.min(a.w*a.h,b.w*b.h);
+  return amin>0?inter/amin:0; }
+function grpTitle(id){ return WIDGET_TITLES[id] || (/^chart\d+$/.test(id)?(layout[id].sym||'Chart'):id); }
+function ensureGrpTabs(el, g){ let bar=el.querySelector(':scope > .grptabs');
+  if(!bar){ bar=document.createElement('div'); bar.className='grptabs'; el.appendChild(bar); }
+  bar.innerHTML=g.ids.map(mid=>'<button data-gid="'+mid+'"'+(mid===g.active?' class="on"':'')+'>'+grpTitle(mid)+'</button>').join('');
+  bar.onclick=e=>{ const b=e.target.closest('[data-gid]'); if(!b) return; g.active=b.dataset.gid; renderGroup(g); }; }
+function removeGrpTabs(el){ const b=el&&el.querySelector(':scope > .grptabs'); if(b) b.remove(); }
+function renderGroup(g){ g.ids.forEach(id=>{ const el=document.getElementById('w-'+id); if(!el) return;
+    Object.assign(layout[id], {x:g.geo.x, y:g.geo.y, w:g.geo.w, h:g.geo.h});
+    const active=(id===g.active); removeGrpTabs(el); el.style.display=active?'flex':'none';
+    if(active){ applyGeo(id); ensureGrpTabs(el, g); bringToFront(id); } }); }
+function dockTogether(target, dropId){ let g=groupOf(target);
+  if(!g){ g={ids:[target], active:target, geo:{x:layout[target].x,y:layout[target].y,w:layout[target].w,h:layout[target].h}}; groups.push(g); }
+  if(!g.ids.includes(dropId)) g.ids.push(dropId);
+  g.active=dropId; renderGroup(g); saveLayout(); }
+function maybeDock(id){ if(groupOf(id)||/^chart\d+$/.test(id)) return; const g=layout[id];
+  let best=null, bestR=0.5;
+  Object.keys(layout).forEach(oid=>{ if(oid==='__ref'||oid===id||layout[oid].hidden||/^chart\d+$/.test(oid)) return;
+    const og=groupOf(oid); if(og&&og.active!==oid) return;
+    const r=overlapRatio(g, layout[oid]); if(r>bestR){ bestR=r; best=oid; } });
+  if(best) dockTogether(best, id); }
+function undock(id){ const g=groupOf(id); if(!g) return;
+  g.ids=g.ids.filter(x=>x!==id); const el=document.getElementById('w-'+id); if(el){ removeGrpTabs(el); el.style.display='flex'; }
+  if(g.ids.length<=1){ groups=groups.filter(x=>x!==g); const last=g.ids[0];
+    if(last){ const le=document.getElementById('w-'+last); if(le){ removeGrpTabs(le); le.style.display='flex'; } applyGeo(last); } }
+  else { if(g.active===id) g.active=g.ids[0]; renderGroup(g); } }
 function snapAxis(v, cands){ let best=v, bd=SNAP+1;
   cands.forEach(c=>{ const d=Math.abs(v-c); if(d<bd){ bd=d; best=c; } }); return {v:best, snapped:bd<=SNAP}; }
 
@@ -430,7 +471,8 @@ function makeWidget(id, title, linkColor, bodyHTML){
   const tb=el.querySelector('.wtb');
   tb.addEventListener('pointerdown', e=>{
     if(e.target.closest('.wic')) return;
-    e.preventDefault(); bringToFront(id); tb.setPointerCapture(e.pointerId);
+    e.preventDefault(); undock(id);   // 그룹 멤버면 드래그 시작 시 분리(떼기)
+    bringToFront(id); tb.setPointerCapture(e.pointerId);
     const g=layout[id]; const sx=e.clientX-g.x, sy=e.clientY-(g.y);
     el.classList.add('drag');
     const move=ev=>{
@@ -446,7 +488,9 @@ function makeWidget(id, title, linkColor, bodyHTML){
       g.x=nx; g.y=ny; el.style.left=nx+'px'; el.style.top=ny+'px';
     };
     const up=ev=>{ tb.releasePointerCapture(e.pointerId); tb.removeEventListener('pointermove',move);
-      tb.removeEventListener('pointerup',up); el.classList.remove('drag'); clearGuides(); saveLayout(); };
+      tb.removeEventListener('pointerup',up); el.classList.remove('drag'); clearGuides();
+      maybeDock(id);   // 놓을 때 다른 패널과 겹치면 도킹 탭 그룹으로 묶기
+      saveLayout(); };
     tb.addEventListener('pointermove',move); tb.addEventListener('pointerup',up);
   });
   /* 리사이즈 (전 모서리·코너) — n/s/e/w 방향. 위/왼쪽은 x·y도 함께 이동하며 h·w 반전, 0 밖 클램프 */
