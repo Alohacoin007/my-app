@@ -144,7 +144,7 @@ body.light .cgmenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
 .mwfeed{font-size:8.5px; font-weight:800; letter-spacing:.6px; padding:3px 7px; border-radius:2px;
   background:rgba(240,180,40,.15); color:#E0A020}
 .mwfeed.live{background:rgba(46,144,250,.15); color:var(--lgd-up)}
-.mwgrid{display:grid; grid-template-columns:1.15fr 1fr 1fr .72fr; gap:4px}
+.mwgrid{display:grid; gap:4px}  /* grid-template-columns는 활성 컬럼대로 인라인 지정(우클릭 토글) */
 .mwhd{padding:6px 10px; flex:none; font-size:9.5px; font-weight:800; letter-spacing:.4px;
   color:var(--lgd-dim); text-transform:uppercase; border-bottom:1px solid var(--lgd-hair)}
 .mwhd div:not(:first-child), .mwrow .mwpx, .mwrow .mwspr{text-align:right}
@@ -680,18 +680,49 @@ const mwStore={ rows:{}, live:false,
 function mwSimulate(){ MW_WATCH.forEach(s=>{ const prev=mwStore.rows[s], base=prev?prev.mid:(MW_BASE[s]||1);
   const mid=Math.max(base*0.5, base+base*(Math.random()-0.5)*0.0006); mwStore.set(s, mid, mwSeedSpr(s)); }); }
 let mwFilter='All', mwView='Symbols';
+/* ── MT5 Market Watch 컬럼 (우클릭으로 넣다 뺐다) — Symbol/Bid/Ask는 고정, 나머지 토글 ── */
+const MW_COLDEF=[
+  {k:'symbol', lbl:'Symbol', fr:'1.4fr', always:1},
+  {k:'bid', lbl:'Bid', fr:'1fr', always:1},
+  {k:'ask', lbl:'Ask', fr:'1fr', always:1},
+  {k:'high', lbl:'High', fr:'1fr'},
+  {k:'low', lbl:'Low', fr:'1fr'},
+  {k:'spread', lbl:'Spread', fr:'.72fr'},
+  {k:'time', lbl:'Time', fr:'.9fr'},
+  {k:'change', lbl:'Daily Change', fr:'1.05fr'} ];
+const MW_CKEY='alpexa.fxdash.mwcols';
+let mwCols=(()=>{ const d={high:false,low:false,spread:true,time:false,change:true};
+  try{ return Object.assign(d, JSON.parse(localStorage.getItem(MW_CKEY)||'{}')); }catch(_){ return d; } })();
+function mwSaveCols(){ try{ localStorage.setItem(MW_CKEY, JSON.stringify(mwCols)); }catch(_){} }
+const mwActiveCols=()=>MW_COLDEF.filter(c=>c.always||mwCols[c.k]);
+const mwTemplate=()=>mwActiveCols().map(c=>c.fr).join(' ');
+/* Daily Change 기준 = 시드된 일일 오픈(세션 오픈 아님, ±0.6% 범위로 초기값 즉시 non-zero) */
+const MW_DAYOPEN={}; MW_WATCH.forEach(s=>{ const b=MW_BASE[s]||1; MW_DAYOPEN[s]=b*(1+(Math.random()-0.5)*0.012); });
+function mwDailyPct(s,r){ const o=MW_DAYOPEN[s]; return (o>0&&r&&r.mid!=null)?((r.mid-o)/o*100):null; }
+function mwCell(s,r,k,tnow){ switch(k){
+  case 'symbol': return '<div class="mwsym">'+s+'</div>';
+  case 'bid':{ const c=r.bDir>0?'up':r.bDir<0?'down':''; return '<div class="mwpx '+c+'">'+mwFmt(s,r.bid)+'</div>'; }
+  case 'ask':{ const c=r.aDir>0?'up':r.aDir<0?'down':''; return '<div class="mwpx '+c+'">'+mwFmt(s,r.ask)+'</div>'; }
+  case 'high': return '<div class="mwpx">'+mwFmt(s,r.hi)+'</div>';
+  case 'low': return '<div class="mwpx">'+mwFmt(s,r.lo)+'</div>';
+  case 'spread':{ const spr=(r.bid!=null)?mwSprText(s,r.ask-r.bid):'—'; return '<div class="mwspr">'+spr+'</div>'; }
+  case 'time': return '<div class="mwspr">'+(r.bid!=null?tnow:'—')+'</div>';
+  case 'change':{ const ch=mwDailyPct(s,r), c=ch>0?'up':ch<0?'down':'';
+    return '<div class="mwpx '+c+'">'+(ch==null?'—':(ch>=0?'+':'')+ch.toFixed(2)+'%')+'</div>'; }
+} return '<div></div>'; }
 function mwRender(){ const host=document.getElementById('mwBody'); if(!host) return;
   const fl=document.getElementById('mwFeed'); if(fl){ fl.textContent=mwStore.live?'LIVE':'SIM'; fl.classList.toggle('live',mwStore.live); }
-  if(mwView!=='Symbols'){ if(!host.querySelector('.tbxempty')) host.innerHTML='<div class="tbxempty">'+mwView+' — coming in build</div>'; return; }
+  const head=document.getElementById('mwHead');
+  if(mwView!=='Symbols'){ if(!host.querySelector('.tbxempty')) host.innerHTML='<div class="tbxempty">'+mwView+' — coming in build</div>'; if(head) head.innerHTML=''; return; }
+  const cols=mwActiveCols(), tmpl=mwTemplate();
+  if(head) head.innerHTML='<div class="mwhd mwgrid" style="grid-template-columns:'+tmpl+'">'+cols.map(c=>'<div>'+c.lbl+'</div>').join('')+'</div>';
   const list=mwFilter==='All'?MW_WATCH:MW_WATCH.filter(s=>mwCat(s)===mwFilter);
+  const d=new Date(),p=n=>(n<10?'0':'')+n, tnow=p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
   host.innerHTML=list.map(s=>{ const r=mwStore.rows[s]||{};
-    const bc=r.bDir>0?'up':r.bDir<0?'down':'', ac=r.aDir>0?'up':r.aDir<0?'down':'';
-    const spr=(r.bid!=null)?mwSprText(s, r.ask-r.bid):'—';
-    return '<div class="mwrow mwgrid" data-sym="'+s+'"><div class="mwsym">'+s+'</div>'+
-      '<div class="mwpx '+bc+'">'+mwFmt(s,r.bid)+'</div><div class="mwpx '+ac+'">'+mwFmt(s,r.ask)+'</div>'+
-      '<div class="mwspr">'+spr+'</div></div>'; }).join(''); }
+    return '<div class="mwrow mwgrid" data-sym="'+s+'" style="grid-template-columns:'+tmpl+'">'+
+      cols.map(c=>mwCell(s,r,c.k,tnow)).join('')+'</div>'; }).join(''); }
 function mwBodyHTML(){ return '<div class="mwwrap">'+
-  '<div class="mwhd mwgrid"><div>Symbol</div><div>Bid</div><div>Ask</div><div>Spread</div></div>'+
+  '<div id="mwHead"></div>'+   /* 헤더는 mwRender가 활성 컬럼대로 재생성(우클릭 토글 반영) */
   '<div class="mwlist" id="mwBody"></div>'+
   '<div class="mwsub" id="mwSub">'+['Symbols','Details','Trading','Ticks'].map((t,i)=>
     '<button data-sub="'+t+'"'+(i===0?' class="on"':'')+'>'+t+'</button>').join('')+'</div></div>'; }
@@ -1049,6 +1080,8 @@ function toolSvg(inner, fill){ return '<svg width="16" height="16" viewBox="0 0 
   const ctx=document.createElement('div'); ctx.id='mwCtx'; ctx.className='cgmenu';
   ctx.innerHTML=mtItem('New Order','F9')+mtItem('Chart Window','')+mtItem('Tick Chart','')+mtItem('Depth of Market','Alt+B')+mtItem('Specification','')+
     '<div class="cgsep"></div>'+mtItem('Hide','Delete')+mtItem('Symbols','Ctrl+U')+mtItem('Popup Prices','F10')+
+    '<div class="cgsep"></div><div class="cgmhd">Columns</div>'+   /* 컬럼 넣다 뺐다 (Symbol/Bid/Ask 고정) */
+    MW_COLDEF.filter(c=>!c.always).map(c=>'<button data-col="'+c.k+'"><span>'+c.lbl+'</span><span class="ck">✓</span></button>').join('')+
     '<div class="cgsep"></div><div class="cgmhd">Show</div>'+
     ['All','Forex','Stocks','Crypto'].map(c=>'<button data-cat="'+c+'"><span>'+c+'</span><span class="ck">✓</span></button>').join('');
   document.body.appendChild(ctx);
@@ -1056,10 +1089,15 @@ function toolSvg(inner, fill){ return '<svg width="16" height="16" viewBox="0 0 
     document.getElementById('addMenu').style.display='none'; document.getElementById('tabMenu').style.display='none';
     const cg=document.getElementById('cgMenu'); if(cg) cg.style.display='none';
     ctx.style.left=Math.min(e.clientX, window.innerWidth-180)+'px';
-    ctx.style.top=Math.min(e.clientY, window.innerHeight-320)+'px';
+    ctx.style.top=Math.min(e.clientY, window.innerHeight-360)+'px';
     ctx.querySelectorAll('[data-cat]').forEach(b=>b.classList.toggle('on',b.dataset.cat===mwFilter));
+    ctx.querySelectorAll('[data-col]').forEach(b=>b.classList.toggle('on',!!mwCols[b.dataset.col]));
     ctx.style.display='block'; });
-  ctx.addEventListener('click', e=>{ const cat=e.target.closest('[data-cat]'), mt=e.target.closest('[data-mt]');
+  ctx.addEventListener('click', e=>{
+    e.stopPropagation();   // 문서 클릭 핸들러가 메뉴를 닫지 않게 — 컬럼은 여러 개 연속 토글
+    const col=e.target.closest('[data-col]');
+    if(col){ mwCols[col.dataset.col]=!mwCols[col.dataset.col]; col.classList.toggle('on',mwCols[col.dataset.col]); mwSaveCols(); mwRender(); return; }  // 메뉴 유지(여러 개 토글)
+    const cat=e.target.closest('[data-cat]'), mt=e.target.closest('[data-mt]');
     if(cat){ mwFilter=cat.dataset.cat; mwRender(); }
     else if(mt){ toast(mt.dataset.mt+' — coming in build'); }
     ctx.style.display='none'; });
