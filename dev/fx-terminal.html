@@ -169,6 +169,14 @@ body.light .cgmenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
 .widget.chart-active .wtb{background:var(--lgd-surface2)}
 .widget.chart-active .wtb h3{color:var(--lgd-ink)}
 .cgtf{position:absolute; top:5px; left:8px; font-size:9.5px; font-weight:800; color:var(--lgd-dim); letter-spacing:.4px}
+/* 차트 지표 범례(원클릭 삭제) — 좌상단, TF 라벨 아래. 칩별 ✕ 한 번에 그 지표 제거 */
+.chleg{position:absolute; top:19px; left:8px; z-index:2; display:flex; flex-wrap:wrap; gap:4px; pointer-events:none; max-width:70%}
+.chchip{pointer-events:auto; display:inline-flex; align-items:center; gap:5px; font-size:9.5px; font-weight:700;
+  line-height:1; padding:2px 4px 2px 6px; border-radius:3px; background:var(--lgd-pill); color:var(--lgd-dim);
+  border:1px solid var(--lgd-hair); user-select:none}
+.chchip .chsw{width:7px; height:7px; border-radius:1px; flex:none}
+.chchip .chx{cursor:pointer; font-size:11px; font-weight:800; color:var(--lgd-dim); opacity:.55; padding:0 1px; border-radius:2px}
+.chchip .chx:hover{opacity:1; color:var(--lgd-down,#EB5D2A); background:var(--lgd-surface2)}
 .cgtag{position:absolute; top:5px; right:8px; background:var(--lgd-pill); color:var(--lgd-dim); font-size:9px;
   font-weight:800; border-radius:2px; padding:2px 6px; letter-spacing:.5px}
 
@@ -750,7 +758,7 @@ function tickSeries(sym,tf){ const s=series(sym,tf), r=mwStore.rows[sym], mid=r&
   if(now-last.t>=step){ s.c.push({t:last.t+step,o:last.c,h:Math.max(last.c,mid),l:Math.min(last.c,mid),c:mid,v:Math.round(80+Math.random()*160)}); if(s.c.length>700) s.c.shift(); }
   else { last.c=mid; if(mid>last.h) last.h=mid; if(mid<last.l) last.l=mid; last.v=(last.v||0)+Math.round(1+Math.random()*3); } return s; }
 /* 각 차트 = 최상위 위젯(chart1..N). 표준 위젯 엔진으로 스테이지 어디든 드래그/스냅/리사이즈. */
-function chartBody(){ return '<div class="cgwplot"><svg class="cgsvg"></svg><svg class="cgcross"></svg><span class="cgtf">'+curTF+'</span></div>'; }
+function chartBody(){ return '<div class="cgwplot"><svg class="cgsvg"></svg><svg class="cgcross"></svg><span class="cgtf">'+curTF+'</span><div class="chleg"></div></div>'; }
 function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) return;
   const box=el.querySelector('.cgwplot'), svg=box&&box.querySelector('.cgsvg'); if(!svg) return;
   const sym=(layout[id]&&layout[id].sym)||'', W=box.clientWidth, H=box.clientHeight;
@@ -800,7 +808,6 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
     '<text x="'+(W-4)+'" y="'+(ly+3.5).toFixed(1)+'" text-anchor="end" fill="#fff" font-size="9.5" font-weight="700" font-family="inherit">'+lc.toFixed(dg)+'</text>';
   /* ── OHLCV 리드아웃(상단, TF 라벨 우측) — 마지막 봉, 라이브 ── */
   let info='O '+lk.o.toFixed(dg)+'  H '+lk.h.toFixed(dg)+'  L '+lk.l.toFixed(dg)+'  C '+lk.c.toFixed(dg)+'  V '+chVolFmt(lk.v);
-  if(ind.ma) info+='  ·  MA'+IND_MA_P; if(ind.boll) info+='  ·  BB';
   out+='<text x="44" y="'+(padT+8)+'" fill="var(--lgd-ink)" font-size="8.5" font-family="inherit">'+info+'</text>';
   /* ── Volume 히스토그램(최하단 서브창) ── */
   if(showVol){ let maxV=1; vis.forEach(k=>{ if((k.v||0)>maxV) maxV=k.v||0; }); const vbase=volTop+volH;
@@ -834,6 +841,15 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
     if(drawDrag&&drawDrag.id===id) drawOne(drawDrag, false);   // 그리는 중 미리보기
   }
   const lbl=box.querySelector('.cgtf'); if(lbl&&lbl.textContent!==c.tf) lbl.textContent=c.tf;   // 창별 TF 라벨
+  /* ── 지표 범례(원클릭 삭제) — 켜진 지표별 칩 + ✕. 클릭 한 번에 그 지표만 제거 ── */
+  const leg=box.querySelector('.chleg');
+  if(leg){ const chip=(k,txt,col)=>'<span class="chchip" data-leg="'+k+'">'+(col?'<span class="chsw" style="background:'+col+'"></span>':'')+txt+'<span class="chx" data-legx="'+k+'" title="Remove">✕</span></span>';
+    let lg='';
+    if(ind.ma) lg+=chip('ma','MA'+IND_MA_P, CH_MA);
+    if(ind.boll) lg+=chip('boll','BB('+IND_BB_P+','+IND_BB_K+')', CH_BB);
+    if(ind.rsi) lg+=chip('rsi','RSI('+IND_RSI_P+')', CH_RSI);
+    if(showVol) lg+=chip('vol','Vol', CH_UP);
+    if(leg.innerHTML!==lg) leg.innerHTML=lg; }
   svg.setAttribute('viewBox','0 0 '+W+' '+H); svg.innerHTML=out; }
 function renderAllCharts(doTick){ chartIds().forEach(id=>{ const g=layout[id]; if(!g||g.hidden||g.__min) return;
   if(doTick&&g.sym) tickSeries(g.sym, cfg(id).tf); renderChart(id); }); }
@@ -850,7 +866,11 @@ function mkChart(id, sym, i){ makeWidget(id, sym, 'var(--lgd-up)', chartBody());
   /* 크로스헤어 + 드로잉(클릭-드래그) + 편집(더블클릭 선택 → 핸들 드래그) + 마우스휠 줌 */
   const plot=el.querySelector('.cgwplot');
   if(plot){ plot.classList.toggle('crossmode',crossOn||!!drawTool);
-    plot.addEventListener('pointerdown', ev=>{ if(ev.button!==0) return; const d=dataAt(id,ev); if(!d||!d.inPrice) return; const c=cfg(id);
+    /* 지표 범례 원클릭 삭제 — 칩의 ✕ 한 번에 그 지표만 이 차트에서 제거 */
+    const leg=plot.querySelector('.chleg');
+    if(leg) leg.addEventListener('click', ev=>{ const x=ev.target.closest('.chx'); if(!x) return; ev.stopPropagation(); ev.preventDefault();
+      const k=x.dataset.legx, c=cfg(id); if(k==='vol') c.vol=false; else c.ind[k]=false; saveCfg(); renderChart(id); });
+    plot.addEventListener('pointerdown', ev=>{ if(ev.button!==0||ev.target.closest('.chleg')) return; const d=dataAt(id,ev); if(!d||!d.inPrice) return; const c=cfg(id);
       if(drawTool==='trend'||drawTool==='fib'){ drawDrag={id,k:drawTool,p1:{t:d.t,price:d.price},p2:{t:d.t,price:d.price}}; plot.setPointerCapture(ev.pointerId); ev.preventDefault(); return; }
       if(drawTool==='hline'){ (c.obj=c.obj||[]).push({k:'hline',price:d.price}); saveCfg(); setDrawTool(null); renderChart(id); return; }
       if(drawTool==='vline'){ (c.obj=c.obj||[]).push({k:'vline',t:d.t}); saveCfg(); setDrawTool(null); renderChart(id); return; }
