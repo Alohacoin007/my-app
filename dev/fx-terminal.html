@@ -93,8 +93,8 @@ body.light [data-tip]:hover::after{box-shadow:0 6px 18px rgba(15,23,40,.18)}
 .found .tag{background:var(--lgd-pill); border-radius:2px; padding:4px 12px; font-size:10.5px;
   font-weight:700; letter-spacing:.4px; color:var(--lgd-dim)}
 
-/* ── 멀티차트 그리드 (Chart 위젯 — MT5 N분할, 최대 10칸) ── */
-.cggrid{flex:1; min-height:0; display:grid; gap:6px; padding:6px; overflow:auto}
+/* ── 멀티차트 (Chart 위젯 = MT5 MDI — 각 차트가 독립 창으로 이동/리사이즈) ── */
+.cgcanvas{flex:1; min-height:0; position:relative; overflow:hidden}
 .cgmenu{display:none; position:fixed; z-index:80; min-width:150px; background:var(--lgd-surface2);
   border:1px solid var(--lgd-hair); border-radius:var(--lgd-r-pop,10px); box-shadow:0 8px 24px rgba(0,0,0,.5); padding:6px}
 .cgmenu .cgmhd{font-size:10px; font-weight:800; letter-spacing:.5px; color:var(--lgd-dim);
@@ -123,15 +123,20 @@ body.light .cgmenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
 .mwpx{font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; font-weight:600; color:var(--lgd-dim)}
 .mwpx.up{color:var(--lgd-up)} .mwpx.down{color:var(--lgd-down,#EB5D2A)}
 .mwspr{font-variant-numeric:tabular-nums; color:var(--lgd-dim); font-size:11px; opacity:.85}
-.cgcell{background:var(--lgd-bg); border:1px solid var(--lgd-hair); border-radius:2px; display:flex;
-  flex-direction:column; overflow:hidden; min-height:84px}
-.cghd{display:flex; align-items:center; justify-content:space-between; padding:5px 8px; flex:none;
-  font-size:11px; border-bottom:1px solid var(--lgd-hair)}
-.cghd b{font-weight:800} .cghd span{color:var(--lgd-dim); font-size:10px}
-.cgplot{flex:1; min-height:0; position:relative; display:flex}
-.cgplot svg{width:100%; height:100%; display:block}
-.cgtag{position:absolute; top:6px; right:6px; background:var(--lgd-pill); color:var(--lgd-dim);
-  font-size:9px; font-weight:800; border-radius:2px; padding:2px 7px; letter-spacing:.5px}
+.cgwin{position:absolute; display:flex; flex-direction:column; background:var(--lgd-bg);
+  border:1px solid var(--lgd-hair); border-radius:2px; overflow:hidden; min-width:120px; min-height:80px}
+.cgwin.drag{box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.cgwtb{display:flex; align-items:center; gap:6px; height:20px; padding:0 8px; flex:none; cursor:grab;
+  border-bottom:1px solid var(--lgd-hair); user-select:none; font-size:10.5px}
+.cgwin.drag .cgwtb{cursor:grabbing}
+.cgwtb b{font-weight:800} .cgwtb .tf{color:var(--lgd-dim); font-size:9.5px} .cgwtb .sp{flex:1}
+.cgwplot{flex:1; min-height:0; position:relative; display:flex}
+.cgwplot svg{width:100%; height:100%; display:block}
+.cgwrz{position:absolute; right:-1px; bottom:-1px; width:14px; height:14px; cursor:nwse-resize; z-index:3}
+.cgwrz-r{position:absolute; right:-2px; top:16px; bottom:14px; width:7px; cursor:ew-resize; z-index:3}
+.cgwrz-b{position:absolute; bottom:-2px; left:12px; right:14px; height:7px; cursor:ns-resize; z-index:3}
+.cgtag{background:var(--lgd-pill); color:var(--lgd-dim); font-size:9px; font-weight:800;
+  border-radius:2px; padding:2px 6px; letter-spacing:.5px; flex:none}
 
 /* ── 언어 (설정 위젯) ── */
 .stg{flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column}
@@ -364,13 +369,46 @@ function cgSkeleton(seed){ let s=''; const N=16, bx=100/N;
   return '<svg viewBox="0 0 100 60" preserveAspectRatio="none" style="color:var(--lgd-dim); opacity:.4">'+
     '<line x1="0" y1="20" x2="100" y2="20" stroke="currentColor" stroke-width="0.3" opacity=".4"/>'+
     '<line x1="0" y1="40" x2="100" y2="40" stroke="currentColor" stroke-width="0.3" opacity=".4"/>'+s+'</svg>'; }
-function cgCell(sym,i){ return '<div class="cgcell"><div class="cghd"><b>'+sym+'</b><span>M30</span></div>'+
-  '<div class="cgplot">'+cgSkeleton(i)+'<span class="cgtag">M2</span></div></div>'; }
-function renderChartGrid(){ const host=document.getElementById('cgGrid'); if(!host) return;
-  host.style.gridTemplateColumns='repeat('+Math.ceil(Math.sqrt(cgN))+',1fr)';
-  host.innerHTML=CHART_UNIVERSE.slice(0,cgN).map(cgCell).join('');
+function chartBodyHTML(){ return '<div class="cgcanvas" id="cgCanvas"></div>'; }
+/* 각 차트 = 독립 창(cgWins). ⊞ 분할 = 타일 정렬(초기 배치), 그 뒤 각 창 자유 드래그/리사이즈 */
+let cgWins=[], cgZ=10;
+function cgTile(){ const cv=document.getElementById('cgCanvas'); if(!cv) return;
+  const W=cv.clientWidth||800, H=cv.clientHeight||500, gap=6;
+  const cols=Math.ceil(Math.sqrt(cgN)), rows=Math.ceil(cgN/cols);
+  const cw=(W-gap*(cols+1))/cols, ch=(H-gap*(rows+1))/rows;
+  cgWins=CHART_UNIVERSE.slice(0,cgN).map((sym,i)=>{ const r=Math.floor(i/cols), c=i%cols;
+    return { sym, x:Math.round(gap+c*(cw+gap)), y:Math.round(gap+r*(ch+gap)), w:Math.round(cw), h:Math.round(ch) }; });
+  renderCgWins();
   document.querySelectorAll('#cgMenu [data-n]').forEach(b=>b.classList.toggle('on',+b.dataset.n===cgN)); }
-function chartBodyHTML(){ return '<div class="cggrid" id="cgGrid"></div>'; }
+function renderCgWins(){ const cv=document.getElementById('cgCanvas'); if(!cv) return; cv.innerHTML='';
+  cgWins.forEach((win,i)=>{ const el=document.createElement('div'); el.className='cgwin'; el.dataset.sym=win.sym;
+    el.style.left=win.x+'px'; el.style.top=win.y+'px'; el.style.width=win.w+'px'; el.style.height=win.h+'px';
+    el.style.zIndex=1+i;
+    el.innerHTML='<div class="cgwtb"><b>'+win.sym+'</b><span class="tf">M30</span><span class="sp"></span>'+
+      '<span class="cgtag">M2</span></div><div class="cgwplot">'+cgSkeleton(i)+'</div>'+
+      '<div class="cgwrz-r"></div><div class="cgwrz-b"></div><div class="cgwrz"></div>';
+    cv.appendChild(el); cgMakeMovable(el, win, cv); }); }
+function cgMakeMovable(el, win, cv){
+  el.addEventListener('pointerdown', ()=>{ el.style.zIndex=++cgZ; }, true);
+  const tb=el.querySelector('.cgwtb');
+  tb.addEventListener('pointerdown', e=>{ e.preventDefault(); tb.setPointerCapture(e.pointerId);
+    el.classList.add('drag'); const sx=e.clientX-win.x, sy=e.clientY-win.y;
+    const move=ev=>{ win.x=Math.max(0,Math.min(ev.clientX-sx, cv.clientWidth-win.w));
+      win.y=Math.max(0,Math.min(ev.clientY-sy, cv.clientHeight-win.h));
+      el.style.left=win.x+'px'; el.style.top=win.y+'px'; };
+    const up=()=>{ tb.releasePointerCapture(e.pointerId); tb.removeEventListener('pointermove',move);
+      tb.removeEventListener('pointerup',up); el.classList.remove('drag'); };
+    tb.addEventListener('pointermove',move); tb.addEventListener('pointerup',up); });
+  function rz(sel,dir){ const h=el.querySelector(sel); if(!h) return;
+    h.addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopPropagation(); h.setPointerCapture(e.pointerId);
+      const sx=e.clientX, sy=e.clientY, sw=win.w, sh=win.h;
+      const move=ev=>{ if(dir.includes('e')) win.w=Math.max(120, Math.min(sw+(ev.clientX-sx), cv.clientWidth-win.x));
+        if(dir.includes('s')) win.h=Math.max(80, Math.min(sh+(ev.clientY-sy), cv.clientHeight-win.y));
+        el.style.width=win.w+'px'; el.style.height=win.h+'px'; };
+      const up=()=>{ h.releasePointerCapture(e.pointerId); h.removeEventListener('pointermove',move); h.removeEventListener('pointerup',up); };
+      h.addEventListener('pointermove',move); h.addEventListener('pointerup',up); }); }
+  rz('.cgwrz-r','e'); rz('.cgwrz-b','s'); rz('.cgwrz','es');
+}
 
 /* ── Market Watch (시세) — 현행 MT5(webtrade.html) 원본 리스트·계산 이식 ──
    심볼 유니버스·bid/ask·스프레드 계산은 webtrade.html:848~931의 무변경 미러(fx_close.sql 락스텝).
@@ -448,7 +486,7 @@ refitLayout();
 Object.keys(layout).forEach(k=>{ if(k!=='__ref') applyGeo(k); });
 
 /* 멀티차트 초기 렌더 + 분할 선택(차트 타이틀바 ⊞ 드롭다운 — 인라인 바 대신 MT5식 툴바 컨트롤) */
-renderChartGrid();
+cgTile();
 (function chartLayoutControl(){
   const cEl=document.getElementById('w-chart'); if(!cEl) return;
   const cwtb=cEl.querySelector('.wtb');
@@ -469,7 +507,7 @@ renderChartGrid();
     menu.querySelectorAll('[data-n]').forEach(b=>b.classList.toggle('on',+b.dataset.n===cgN));
     menu.style.display='block'; });
   menu.addEventListener('click', e=>{ const b=e.target.closest('[data-n]'); if(!b) return;
-    cgN=+b.dataset.n; try{ localStorage.setItem(CG_KEY, cgN); }catch(_){} renderChartGrid(); menu.style.display='none'; });
+    cgN=+b.dataset.n; try{ localStorage.setItem(CG_KEY, cgN); }catch(_){} cgTile(); menu.style.display='none'; });
 })();
 
 /* Market Watch — 우클릭 컨텍스트 메뉴(클래스 필터, MT5식) + 타이틀바 피드 상태(SIM/LIVE) + 틱 루프 */
