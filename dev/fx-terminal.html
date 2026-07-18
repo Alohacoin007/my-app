@@ -520,7 +520,7 @@ function toggleMin(id){ const g=layout[id], el=document.getElementById('w-'+id);
   applyGeo(id); saveLayout(); }
 /* ── MT5 Window > Tile — 열려있는 차트들을 현재 남은 공간(chartRegion, 툴박스 높이 반영)에 꽉 채워 재배치 ── */
 function tileCharts(mode){ const ids=chartIds().filter(id=>!layout[id].hidden), n=ids.length; if(!n) return;
-  const R=chartRegion(), gap=8;
+  const R=chartRegion(), gap=2;
   ids.forEach(id=>{ const g=layout[id]; g.__max=null; g.__min=null; const el=document.getElementById('w-'+id); if(el) el.classList.remove('mini'); });
   if(mode==='cascade'){ const off=28; ids.forEach((id,i)=>{ const g=layout[id];
       g.x=Math.round(R.x+i*off); g.y=Math.round(R.y+i*off); g.w=Math.round(R.w*0.72); g.h=Math.round(R.h*0.72); applyGeo(id); bringToFront(id); }); }
@@ -533,7 +533,7 @@ function tileCharts(mode){ const ids=chartIds().filter(id=>!layout[id].hidden), 
       g.x=Math.round(R.x+c*(cw+gap)); g.y=Math.round(R.y+r*(ch+gap)); g.w=Math.round(cw); g.h=Math.round(ch); applyGeo(id); }); }
   saveLayout(); }
 function buildCharts(){ destroyCharts();
-  const R=chartRegion(), gap=8, cols=Math.ceil(Math.sqrt(cgN)), rows=Math.ceil(cgN/cols);
+  const R=chartRegion(), gap=2, cols=Math.ceil(Math.sqrt(cgN)), rows=Math.ceil(cgN/cols);
   const cw=(R.w-gap*(cols-1))/cols, ch=(R.h-gap*(rows-1))/rows;
   for(let i=0;i<cgN;i++){ const r=Math.floor(i/cols), c=i%cols, id='chart'+(i+1), sym=CHART_UNIVERSE[i]||('CHART'+(i+1));
     layout[id]={ x:Math.round(R.x+c*(cw+gap)), y:Math.round(R.y+r*(ch+gap)), w:Math.round(cw), h:Math.round(ch), sym };
