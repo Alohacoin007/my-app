@@ -650,7 +650,7 @@ function clearObjects(id){ const c=cfg(id); if(!c.obj||!c.obj.length) return; c.
 const syncToolActive=syncChartUI;   // 하위호환
 /* 활성 차트에만 적용하는 조작 */
 function setChartType(t){ const c=activeCfg(); if(!c) return; c.type=t; saveCfg(); renderChart(activeChart); syncChartUI(); }
-function zoomCharts(dir){ const c=activeCfg(); if(!c) return; c.zoom=Math.max(0.5,Math.min(3,+(c.zoom*(dir>0?1.25:0.8)).toFixed(3))); saveCfg(); renderChart(activeChart); }
+function zoomCharts(dir){ const c=activeCfg(); if(!c) return; c.zoom=Math.max(0.18,Math.min(4,+(c.zoom*(dir>0?1.25:0.8)).toFixed(3))); saveCfg(); renderChart(activeChart); }
 function toggleGrid(){ const c=activeCfg(); if(!c) return; c.grid=!c.grid; saveCfg(); renderChart(activeChart); }
 function toggleInd(k){ const c=activeCfg(); if(!c) return; c.ind[k]=!c.ind[k]; saveCfg(); renderChart(activeChart); }
 function toggleVol(){ const c=activeCfg(); if(!c) return; c.vol=!c.vol; saveCfg(); renderChart(activeChart); }
@@ -685,7 +685,7 @@ function drawCross(id,e){ const el=document.getElementById('w-'+id); if(!el) ret
     '<text x="'+(sc.W-4)+'" y="'+(y+3.5).toFixed(1)+'" text-anchor="end" fill="#fff" font-size="9.5" font-weight="700" font-family="inherit">'+price.toFixed(dg)+'</text>'; }
 const chBase=sym=>MW_BASE[sym]||CHART_BASE[sym]||(mwStore.rows[sym]&&mwStore.rows[sym].mid)||1;
 function seedSeries(sym,tf){ const base=chBase(sym), vol=base*(mwCat(sym)==='Crypto'?0.004:0.0009);
-  const n=150, step=TF_MS[tf]||1800e3, now=Date.now(); let px=base*(1+(Math.random()-0.5)*0.006), arr=[];
+  const n=420, step=TF_MS[tf]||1800e3, now=Date.now(); let px=base*(1+(Math.random()-0.5)*0.006), arr=[];   // 시드 늘림 → 줌아웃 시 볼 히스토리 확보
   for(let i=n;i>=1;i--){ const o=px, c=Math.max(base*0.3, o+(Math.random()-0.5)*vol*2);
     const hi=Math.max(o,c)+Math.random()*vol*0.8, lo=Math.min(o,c)-Math.random()*vol*0.8;
     const v=Math.round(150+Math.random()*700+Math.abs(c-o)/vol*300);   // 틱 볼륨(변동 클수록 큼)
@@ -696,7 +696,7 @@ function seedSeries(sym,tf){ const base=chBase(sym), vol=base*(mwCat(sym)==='Cry
 function series(sym,tf){ const k=sym+'|'+tf; let s=chartSeries[k]; if(!s) s=chartSeries[k]={tf,c:seedSeries(sym,tf)}; return s; }
 function tickSeries(sym,tf){ const s=series(sym,tf), r=mwStore.rows[sym], mid=r&&r.mid; if(!(mid>0)) return s;
   const step=TF_MS[tf]||1800e3, now=Date.now(), last=s.c[s.c.length-1];
-  if(now-last.t>=step){ s.c.push({t:last.t+step,o:last.c,h:Math.max(last.c,mid),l:Math.min(last.c,mid),c:mid,v:Math.round(80+Math.random()*160)}); if(s.c.length>500) s.c.shift(); }
+  if(now-last.t>=step){ s.c.push({t:last.t+step,o:last.c,h:Math.max(last.c,mid),l:Math.min(last.c,mid),c:mid,v:Math.round(80+Math.random()*160)}); if(s.c.length>700) s.c.shift(); }
   else { last.c=mid; if(mid>last.h) last.h=mid; if(mid<last.l) last.l=mid; last.v=(last.v||0)+Math.round(1+Math.random()*3); } return s; }
 /* 각 차트 = 최상위 위젯(chart1..N). 표준 위젯 엔진으로 스테이지 어디든 드래그/스냅/리사이즈. */
 function chartBody(){ return '<div class="cgwplot"><svg class="cgsvg"></svg><svg class="cgcross"></svg><span class="cgtf">'+curTF+'</span></div>'; }
