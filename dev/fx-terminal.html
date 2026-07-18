@@ -93,6 +93,8 @@ body.light #gtip{box-shadow:0 6px 18px rgba(15,23,40,.18)}
 .wtb .wic{width:16px; height:16px; display:flex; align-items:center; justify-content:center;
   color:var(--lgd-dim); cursor:pointer; border-radius:2px; font-size:12px}
 .wtb .wic:hover{background:var(--lgd-surface2); color:var(--lgd-ink)}
+.wtb .wmin, .wtb .wmax{font-size:13px}
+.widget.mini .wbody, .widget.mini .rz{display:none}   /* 최소화: 타이틀바만 */
 .wbody{flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column}
 .rz{position:absolute; z-index:6}
 .rz.r{right:-3px; top:14px; bottom:16px; width:8px; cursor:ew-resize}
@@ -487,10 +489,30 @@ function cgSkeleton(seed){ let s=''; const N=16, bx=100/N;
 function chartSkeletonBody(i){ return '<div class="cgwplot">'+cgSkeleton(i)+
   '<span class="cgtf">'+curTF+'</span><span class="cgtag">M2</span></div>'; }
 function chartIds(){ return Object.keys(layout).filter(k=>/^chart\d+$/.test(k)); }
-function mkChart(id, sym, i){ makeWidget(id, sym, 'var(--lgd-up)', chartSkeletonBody(i)); applyGeo(id); }
+function mkChart(id, sym, i){ makeWidget(id, sym, 'var(--lgd-up)', chartSkeletonBody(i));
+  /* MT5 창 컨트롤 — 헤더 우측: 최소화(–) · 최대화(□) · 닫기(×) */
+  const el=document.getElementById('w-'+id), wtb=el.querySelector('.wtb'), cls=wtb.querySelector('.wic');
+  cls.textContent='×'; cls.title='Close';
+  const mn=document.createElement('span'); mn.className='wic wmin'; mn.title='Minimize'; mn.textContent='–';
+  const mx=document.createElement('span'); mx.className='wic wmax'; mx.title='Maximize'; mx.textContent='□';
+  wtb.insertBefore(mn, cls); wtb.insertBefore(mx, cls);
+  mn.addEventListener('click', ev=>{ ev.stopPropagation(); toggleMin(id); });
+  mx.addEventListener('click', ev=>{ ev.stopPropagation(); toggleMax(id); });
+  applyGeo(id); }
 function destroyCharts(){ chartIds().forEach(id=>{ const el=document.getElementById('w-'+id); if(el) el.remove();
   delete layout[id]; const zi=zOrder.indexOf(id); if(zi>=0) zOrder.splice(zi,1); }); }
-function chartRegion(){ const ref=layout.__ref||{w:1900,h:856}; return { x:276, y:8, w:ref.w-8-276, h:600-8 }; }
+/* 차트 영역 = 좌측 도크 오른쪽 전체(남은 공간 꽉 차게, 세로도 끝까지) */
+function chartRegion(){ const ref=layout.__ref||{w:1900,h:856}; return { x:276, y:8, w:ref.w-8-276, h:ref.h-16 }; }
+const CH_TITLE_H=20;   // 최소화 시 타이틀바 높이
+function toggleMax(id){ const g=layout[id]; if(!g) return;
+  if(g.__min){ toggleMin(id); }                         // 최소 상태면 먼저 복원
+  if(g.__max){ Object.assign(g, g.__max); g.__max=null; }
+  else { g.__max={x:g.x,y:g.y,w:g.w,h:g.h}; const R=chartRegion(); g.x=R.x; g.y=R.y; g.w=R.w; g.h=R.h; }
+  applyGeo(id); bringToFront(id); saveLayout(); }
+function toggleMin(id){ const g=layout[id], el=document.getElementById('w-'+id); if(!g||!el) return;
+  if(g.__min){ g.h=g.__min; g.__min=null; el.classList.remove('mini'); }
+  else { if(g.__max){ Object.assign(g, g.__max); g.__max=null; } g.__min=g.h; g.h=CH_TITLE_H; el.classList.add('mini'); }
+  applyGeo(id); saveLayout(); }
 function buildCharts(){ destroyCharts();
   const R=chartRegion(), gap=8, cols=Math.ceil(Math.sqrt(cgN)), rows=Math.ceil(cgN/cols);
   const cw=(R.w-gap*(cols-1))/cols, ch=(R.h-gap*(rows-1))/rows;
