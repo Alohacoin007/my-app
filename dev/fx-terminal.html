@@ -10,7 +10,7 @@
 *::-webkit-scrollbar{display:none}
 /* 미니멀 · 직사각형 — 레전드 라운드 토큰을 샤프하게 오버라이드 */
 body{color:var(--lgd-ink,#F5F6F7); overflow:hidden; font-family:var(--lgd-font,system-ui,-apple-system,Segoe UI,sans-serif);
-  --lgd-r-widget:2px; --lgd-r-btn:2px; --lgd-r-pop:2px}
+  --lgd-r-widget:2px; --lgd-r-btn:2px; --lgd-r-pop:2px; display:flex; flex-direction:column; height:100vh}
 button:active:not(:disabled),.htab:active,.hic:active,.avatar:active{ transform:scale(.97); filter:brightness(1.15) }
 
 /* ── 헤더 (컴팩트 38px) ── */
@@ -73,7 +73,7 @@ body.light [data-tip]:hover::after{box-shadow:0 6px 18px rgba(15,23,40,.18)}
 .addrow .sub, .tabrow .sub{margin-left:auto; color:var(--lgd-dim); font-size:11px}
 
 /* ── 스테이지 · 점 배경 ── */
-.stage{position:relative; height:calc(100vh - 39px - 22px); overflow:hidden; background:var(--lgd-bg)}
+.stage{position:relative; flex:1 1 auto; min-height:0; overflow:hidden; background:var(--lgd-bg)}
 .dots{position:absolute; inset:0; pointer-events:none;
   background-image:radial-gradient(circle, rgba(255,255,255,.05) 1.2px, transparent 1.6px);
   background-size:26px 26px}
@@ -148,19 +148,35 @@ body.light .cgmenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
 .cgtag{position:absolute; top:5px; right:8px; background:var(--lgd-pill); color:var(--lgd-dim); font-size:9px;
   font-weight:800; border-radius:2px; padding:2px 6px; letter-spacing:.5px}
 
-/* ── Toolbox (MT5 하단 패널 — 탭 + 계좌 바 + 포지션 테이블) ── */
-.tbx{flex:1; min-height:0; display:flex; flex-direction:column}
-.tbxtabs{display:flex; align-items:center; gap:1px; flex:none; padding:2px 6px 0; border-bottom:1px solid var(--lgd-hair); overflow-x:auto}
-.tbxtabs button{background:none; border:none; color:var(--lgd-dim); font:700 11px/1 inherit; padding:6px 9px;
-  border-radius:2px 2px 0 0; cursor:pointer; white-space:nowrap; flex:none}
-.tbxtabs button:hover{color:var(--lgd-ink)}
-.tbxtabs button.on{color:var(--lgd-up); box-shadow:inset 0 -2px 0 var(--lgd-up)}
-.tbxbody{flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column}
-.tbxacct{display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:6px 10px; flex:none;
-  font-size:11.5px; border-bottom:1px solid var(--lgd-hair)}
+/* ── Toolbox = 하단 도크(#dock) — 상단 리사이즈 핸들 · 내용 · 바닥 탭. 접기 가능 ── */
+#dock{flex:none; display:flex; flex-direction:column; background:var(--lgd-surface);
+  border-top:1px solid var(--lgd-hair); position:relative; z-index:55}
+.dockrz{height:6px; margin-top:-3px; cursor:row-resize; flex:none; z-index:2}
+.dockrz:hover{background:var(--lgd-hair)}
+.dockcontent{overflow:hidden; display:flex; flex-direction:column; min-height:0}  /* 높이는 JS가 지정 */
+#dock.collapsed .dockcontent{display:none}
+#dock.collapsed .dockrz{display:none}
+.docktabs{display:flex; align-items:center; gap:1px; height:26px; flex:none; padding:0 8px;
+  border-top:1px solid var(--lgd-hair); overflow-x:auto}
+.dockname{color:var(--lgd-dim); font-size:9px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; margin-right:8px; flex:none}
+.dtabs{display:flex; align-items:center; gap:1px; flex:none}
+.docktabs button{background:none; border:none; color:var(--lgd-dim); font:700 11px/1 inherit; padding:6px 9px;
+  border-radius:2px; cursor:pointer; white-space:nowrap; flex:none}
+.docktabs button:hover{color:var(--lgd-ink)}
+.docktabs button.on{color:var(--lgd-up); box-shadow:inset 0 -2px 0 var(--lgd-up)}
+.docktabs .sbtabs{color:var(--lgd-dim); font-size:10.5px; flex:none}
+.docktabs .sbtabs span{margin-left:10px}
+.dockcollapse{width:22px; height:22px; display:flex; align-items:center; justify-content:center; color:var(--lgd-dim);
+  cursor:pointer; border-radius:2px; flex:none; margin-left:6px; font-size:12px}
+.dockcollapse:hover{background:var(--lgd-pill); color:var(--lgd-ink)}
+#dock.collapsed .dockcollapse{transform:rotate(180deg)}
+/* Trade 탭: 포지션 스크롤(위) + 계좌 sticky 푸터(아래, 포지션 수 무관 항상 표시) */
+.tbxscroll{flex:1; min-height:0; overflow:auto}
+.tbxacct{display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:5px 10px; flex:none;
+  font-size:11.5px; border-top:1px solid var(--lgd-hair); background:var(--lgd-surface2)}
 .tbxacct span{color:var(--lgd-dim)} .tbxacct b{color:var(--lgd-ink); font-weight:700; font-variant-numeric:tabular-nums; margin-left:4px}
-.tbxdemo{margin-left:auto; background:rgba(240,180,40,.15); color:#E0A020; font-size:8.5px; font-weight:800;
-  letter-spacing:.6px; padding:3px 7px; border-radius:2px}
+.tbxdemo{background:rgba(240,180,40,.15); color:#E0A020; font-size:8.5px; font-weight:800; letter-spacing:.6px; padding:3px 7px; border-radius:2px}
+.tbxtotal{margin-left:auto; font-weight:800; font-variant-numeric:tabular-nums; font-size:12px}
 .postbl{width:100%; border-collapse:collapse; font-size:11.5px}
 .postbl th{position:sticky; top:0; background:var(--lgd-surface); text-align:right; font-weight:700; color:var(--lgd-dim);
   padding:5px 10px; font-size:9.5px; text-transform:uppercase; letter-spacing:.3px; border-bottom:1px solid var(--lgd-hair)}
@@ -172,10 +188,9 @@ body.light .cgmenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
 
 /* ── 상태바 (MT5 최하단) ── */
 .statusbar{display:flex; align-items:center; gap:12px; height:22px; padding:0 10px; background:var(--lgd-surface);
-  border-top:1px solid var(--lgd-hair); font-size:10.5px; color:var(--lgd-dim); position:relative; z-index:60; white-space:nowrap; overflow:hidden}
+  border-top:1px solid var(--lgd-hair); font-size:10.5px; color:var(--lgd-dim); position:relative; z-index:60; white-space:nowrap; overflow:hidden; flex:none}
 .statusbar .ssp{flex:1}
 .statusbar b{color:var(--lgd-ink); font-weight:600; font-variant-numeric:tabular-nums}
-.statusbar .sbtabs span{margin-left:10px}
 
 /* ── 언어 (설정 위젯) ── */
 .stg{flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column}
@@ -254,6 +269,18 @@ body.light #tabMenu, body.light #addMenu{box-shadow:0 8px 24px rgba(15,23,40,.18
 
 <div class="stage" id="stage"><div class="dots"></div></div>
 
+<div id="dock">
+  <div class="dockrz" id="dockRz" title="Drag to resize"></div>
+  <div class="dockcontent" id="tbxBody"></div>
+  <div class="docktabs">
+    <span class="dockname">Toolbox</span>
+    <div class="dtabs" id="tbxTabs"></div>
+    <span class="ssp"></span>
+    <span class="sbtabs"><span>Market</span><span>Signals</span><span>VPS</span><span>Tester</span></span>
+    <div class="dockcollapse" id="dockToggle" title="Show / hide toolbox (Ctrl+T)">▾</div>
+  </div>
+</div>
+
 <div class="statusbar" id="statusbar">
   <span>For Help, press F1</span>
   <span class="ssp"></span>
@@ -262,7 +289,6 @@ body.light #tabMenu, body.light #addMenu{box-shadow:0 8px 24px rgba(15,23,40,.18
   <span class="ssp"></span>
   <span id="sbClock">—</span>
   <span>Default</span>
-  <span class="sbtabs"><span>Market</span><span>Signals</span><span>VPS</span><span>Tester</span></span>
 </div>
 
 <script>
@@ -295,13 +321,14 @@ const DEFAULT_LAYOUT={
   depth:{x:940,y:220,w:320,h:300,hidden:true},     money:{x:980,y:200,w:340,h:320,hidden:true},
   settings:{x:760,y:120,w:380,h:520,hidden:true},
   __ref:{w:1900,h:856} };
+/* Toolbox는 위젯이 아니라 하단 도크(#dock) — 자유 위젯 목록에서 제외 */
 const MIN_SIZE={ navigator:{w:180,h:260}, marketwatch:{w:220,h:200},
-  positions:{w:360,h:260}, account:{w:300,h:220}, order:{w:300,h:300}, toolbox:{w:300,h:240},
+  positions:{w:360,h:260}, account:{w:300,h:220}, order:{w:300,h:300},
   pending:{w:280,h:200}, depth:{w:260,h:220}, money:{w:300,h:220}, settings:{w:320,h:320} };
 /* 차트 창 최소 크기(동적 chart1..N — MIN_SIZE 맵엔 없음, makeWidget 폴백 사용) */
 const CHART_MIN={w:200,h:140};
 const WIDGET_TITLES={ navigator:'Navigator', marketwatch:'Market Watch', positions:'Positions',
-  account:'Account', order:'Order', toolbox:'Toolbox', pending:'Pending orders', depth:'Depth',
+  account:'Account', order:'Order', pending:'Pending orders', depth:'Depth',
   money:'Money moves', settings:'Settings' };
 const deepLayout=o=>JSON.parse(JSON.stringify(o));
 function loadLayout(){ try{ const raw=localStorage.getItem(LKEY); if(!raw) return deepLayout(DEFAULT_LAYOUT);
@@ -319,7 +346,7 @@ document.getElementById('btnReset').onclick=()=>{ try{ localStorage.removeItem(L
 
 const HDR_H=39, STATUS_H=22;
 function refitLayout(){
-  const vw=window.innerWidth, vh=window.innerHeight-HDR_H-STATUS_H;
+  const vw=stage.clientWidth, vh=stage.clientHeight;   // 실제 스테이지(도크 높이/접힘 반영)
   if(vw<500||vh<300) return;
   const ref=layout.__ref||{w:1900,h:856};
   if(Math.abs(ref.w-vw)<2&&Math.abs(ref.h-vh)<2){ layout.__ref={w:vw,h:vh}; return; }
@@ -512,19 +539,20 @@ const TBX_TABS=['Trade','Exposure','History','News','Mailbox','Calendar','Compan
 const DEMO_POS=[
   {sym:'eurusd.fx', ticket:'3172308', time:'2026.07.09 20:17:40', type:'buy', vol:'0.01', price:'1.14318', sl:'', tp:'', cur:'1.14360', pl:'0.42'},
   {sym:'usdchf.fx', ticket:'3194818', time:'2026.07.13 09:34:06', type:'buy', vol:'0.07', price:'0.80808', sl:'', tp:'', cur:'0.80720', pl:'-7.63'} ];
-function toolboxBodyHTML(){ return '<div class="tbx"><div class="tbxtabs" id="tbxTabs">'+
-  TBX_TABS.map((t,i)=>'<button data-tab="'+t+'"'+(i===0?' class="on"':'')+'>'+t+'</button>').join('')+
-  '</div><div class="tbxbody" id="tbxBody"></div></div>'; }
 function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!body) return;
   if(tab==='Trade'){
-    body.innerHTML='<div class="tbxacct"><span>Balance:<b>100 000.00 USD</b></span><span>Equity:<b>99 992.79</b></span>'+
+    const total=DEMO_POS.reduce((s,p)=>s+(+p.pl),0);
+    body.innerHTML='<div class="tbxscroll"><table class="postbl"><thead><tr>'+
+      ['Symbol','Ticket','Time','Type','Volume','Price','S / L','T / P','Price','Profit'].map(h=>'<th>'+h+'</th>').join('')+
+      '</tr></thead><tbody>'+DEMO_POS.map(p=>'<tr><td>'+p.sym+'</td><td>'+p.ticket+'</td><td>'+p.time+'</td>'+
+        '<td class="'+p.type+'">'+p.type+'</td><td>'+p.vol+'</td><td>'+p.price+'</td><td>'+(p.sl||'—')+'</td>'+
+        '<td>'+(p.tp||'—')+'</td><td>'+p.cur+'</td><td class="'+(+p.pl>=0?'pl-pos':'pl-neg')+'">'+p.pl+'</td></tr>').join('')+
+      '</tbody></table></div>'+
+      /* 계좌 sticky 푸터 — 포지션 목록 바로 아래 고정, 총 P/L 우측 (MT5) */
+      '<div class="tbxacct"><span class="tbxdemo">DEMO</span>'+
+      '<span>Balance:<b>100 000.00 USD</b></span><span>Equity:<b>99 992.79</b></span>'+
       '<span>Margin:<b>256.64</b></span><span>Free Margin:<b>99 736.15</b></span><span>Margin Level:<b>38 962.28%</b></span>'+
-      '<span class="tbxdemo">DEMO · preview</span></div>'+
-      '<table class="postbl"><thead><tr>'+['Symbol','Ticket','Time','Type','Volume','Price','S / L','T / P','Price','Profit']
-        .map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+
-      DEMO_POS.map(p=>'<tr><td>'+p.sym+'</td><td>'+p.ticket+'</td><td>'+p.time+'</td><td class="'+p.type+'">'+p.type+'</td>'+
-        '<td>'+p.vol+'</td><td>'+p.price+'</td><td>'+(p.sl||'—')+'</td><td>'+(p.tp||'—')+'</td><td>'+p.cur+'</td>'+
-        '<td class="'+(+p.pl>=0?'pl-pos':'pl-neg')+'">'+p.pl+'</td></tr>').join('')+'</tbody></table>';
+      '<span class="tbxtotal '+(total>=0?'pl-pos':'pl-neg')+'">'+total.toFixed(2)+'</span></div>';
   } else { body.innerHTML='<div class="tbxempty">'+tab+' — foundation (Coming in build)</div>'; } }
 
 /* ── 위젯 생성 (M1: 전부 기초 프레임, 설정만 언어/테마 실동작) ── */
@@ -533,7 +561,6 @@ makeWidget('marketwatch','Market Watch','var(--lgd-link2,#00C805)', mwBodyHTML()
 makeWidget('positions','Positions','var(--lgd-link3,#B37FEB)', frame());
 makeWidget('account','Account','var(--lgd-link1,#4C8DFF)', frame());
 makeWidget('order','Order','var(--lgd-up)', frame());
-makeWidget('toolbox','Toolbox','var(--lgd-dim)', toolboxBodyHTML());
 makeWidget('pending','Pending orders','var(--lgd-down,#EB5D2A)', frame());
 makeWidget('depth','Depth','var(--lgd-dim)', frame());
 makeWidget('money','Money moves','var(--lgd-link3,#B37FEB)', frame());
@@ -666,11 +693,33 @@ function toolSvg(inner, fill){ return '<svg width="14" height="14" viewBox="0 0 
 })();
 mwSimulate(); mwRender();
 
-/* Toolbox — Trade 탭 기본 렌더 + 탭 전환 */
-(function toolboxControls(){ const tabs=document.getElementById('tbxTabs'); if(!tabs) return;
+/* Toolbox 도크 — 탭(바닥) · Trade 렌더 · 상단 리사이즈 · 접기(Ctrl+T) */
+(function toolboxDock(){
+  const tabs=document.getElementById('tbxTabs'), dock=document.getElementById('dock'),
+        content=document.getElementById('tbxBody'), rz=document.getElementById('dockRz'), toggle=document.getElementById('dockToggle');
+  if(!tabs||!dock||!content) return;
+  const DOCK_H='alpexa.fxdash.dockH', DOCK_C='alpexa.fxdash.dockCollapsed';
+  let dockH=Math.max(90, Math.min(+localStorage.getItem(DOCK_H)||190, 700));
+  let collapsed=localStorage.getItem(DOCK_C)==='1';
+  function applyDock(){ content.style.height=dockH+'px'; dock.classList.toggle('collapsed', collapsed);
+    if(toggle) toggle.textContent='▾'; refitLayout(); }
+  tabs.innerHTML=TBX_TABS.map((t,i)=>'<button data-tab="'+t+'"'+(i===0?' class="on"':'')+'>'+t+'</button>').join('');
   renderToolbox('Trade');
   tabs.addEventListener('click', e=>{ const b=e.target.closest('[data-tab]'); if(!b) return;
-    tabs.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('on',x===b)); renderToolbox(b.dataset.tab); }); })();
+    if(collapsed){ collapsed=false; try{localStorage.setItem(DOCK_C,'0');}catch(_){} applyDock(); }  // 접힌 상태서 탭 클릭 → 펼침
+    tabs.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('on',x===b)); renderToolbox(b.dataset.tab); });
+  if(toggle) toggle.addEventListener('click', ()=>{ collapsed=!collapsed; try{localStorage.setItem(DOCK_C,collapsed?'1':'0');}catch(_){} applyDock(); });
+  /* 상단 테두리 드래그로 높이 조절 */
+  if(rz) rz.addEventListener('pointerdown', e=>{ if(collapsed) return; e.preventDefault(); rz.setPointerCapture(e.pointerId);
+    const sy=e.clientY, sh=dockH;
+    const move=ev=>{ dockH=Math.max(90, Math.min(sh+(sy-ev.clientY), window.innerHeight*0.75)); content.style.height=dockH+'px'; refitLayout(); };
+    const up=()=>{ rz.releasePointerCapture(e.pointerId); rz.removeEventListener('pointermove',move); rz.removeEventListener('pointerup',up);
+      try{localStorage.setItem(DOCK_H, Math.round(dockH));}catch(_){} };
+    rz.addEventListener('pointermove',move); rz.addEventListener('pointerup',up); });
+  document.addEventListener('keydown', e=>{ if((e.ctrlKey||e.metaKey)&&(e.key==='t'||e.key==='T')){ e.preventDefault();
+    collapsed=!collapsed; try{localStorage.setItem(DOCK_C,collapsed?'1':'0');}catch(_){} applyDock(); } });
+  applyDock();
+})();
 
 /* 상태바 — 시각 + EURUSD O/H/L/C/V(SIM mwStore 기반) */
 function updateStatus(){ const r=mwStore.rows['EURUSD']; if(!r) return;
