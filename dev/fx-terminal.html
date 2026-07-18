@@ -235,6 +235,18 @@ body.light .cgmenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
 /* Mailbox */
 .mbx-row{cursor:pointer} .mbx-row:hover td{background:rgba(128,128,128,.06)}
 .mbx-detail td{white-space:pre-wrap; color:var(--lgd-dim); font-size:11px; line-height:1.55; padding:8px 12px; background:var(--lgd-surface2)}
+/* Exposure — 통화별 순노출 표 + Long Positions 파이 (MT5) */
+.expwrap{display:flex; align-items:flex-start; gap:18px; padding:0 0 8px}
+.exptbl{flex:1; min-width:0}
+.exptbl td:first-child, .exptbl th:first-child{text-align:left}
+.expdot{display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:7px; vertical-align:middle}
+.expgcell{width:34%; padding-top:7px !important; padding-bottom:7px !important}
+.expbar{display:block; height:9px; border-radius:2px; min-width:2px; opacity:.85}
+.exppiewrap{flex:none; width:190px; padding:8px 10px 4px; text-align:center}
+.exphd{font-size:11px; font-weight:800; color:var(--lgd-ink); margin-bottom:8px}
+.exppie{width:112px; height:112px; border-radius:50%; margin:0 auto 10px; box-shadow:0 0 0 1px var(--lgd-hair) inset}
+.explegend{display:flex; flex-direction:column; gap:3px; align-items:flex-start; font-size:11px}
+.explg{color:var(--lgd-dim); white-space:nowrap} .explg b{color:var(--lgd-ink); font-variant-numeric:tabular-nums; font-weight:700; margin-left:2px}
 
 /* ── 상태바 (MT5 최하단) ── */
 .statusbar{display:flex; align-items:center; gap:12px; height:22px; padding:0 10px; background:var(--lgd-surface);
@@ -722,6 +734,18 @@ const symPair=s=>s.replace(/\.fx$/i,'').toUpperCase();
 function baseUsdRate(sym,price){ const p=symPair(sym); if(p.slice(0,3)==='USD') return 1; if(p.slice(3,6)==='USD') return +price||1;
   const r=mwStore.rows[p.slice(0,3)+'USD']; return r&&r.mid>0?r.mid:(+price||1); }   // 근사(교차쌍)
 const fxNum=n=>(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+/* ── MT5 Exposure = 통화(자산)별 순노출 ──
+   각 포지션을 두 통화로 분해(base 매수/매도, quote 반대) → 통화별 순합 → USD 환산.
+   Rate=통화당 USD가(USD=1, EURUSD 등 직접가, USDCHF/USDJPY 등은 역수). USD=Volume×Rate. 합계 ~0(밸런스북). */
+const CCY_COLORS={USD:'#2E90FA', EUR:'#22C55E', GBP:'#A855F7', JPY:'#EF4444', CHF:'#EAB308', AUD:'#14B8A6', CAD:'#F97316', NZD:'#EC4899'};
+function ccyUsdRate(ccy){ if(ccy==='USD') return 1; const r=mwStore.rows;
+  const d=r[ccy+'USD']; if(d&&d.mid>0) return d.mid;          // EURUSD/GBPUSD/AUDUSD/NZDUSD → 직접
+  const i=r['USD'+ccy]; if(i&&i.mid>0) return 1/i.mid;        // USDJPY/USDCHF/USDCAD → 역수
+  return null; }
+function ccyVolFmt(v){ const a=Math.abs(v);
+  if(a>=1e6) return parseFloat((v/1e6).toFixed(6))+'M';
+  if(a>=1e3) return parseFloat((v/1e3).toFixed(5))+'K';
+  return (Math.round(v*100)/100).toString(); }
 /* 원클릭 청산 (DEMO) — 행 제거 + History/Journal 기록 + 총 P/L 재계산. 실청산은 fx_close RPC(M5, 서버 전용) */
 function closePosDemo(ticket){ const p=DEMO_POS.find(x=>x.ticket===ticket); if(!p) return;
   DEMO_POS=DEMO_POS.filter(x=>x.ticket!==ticket);
@@ -759,24 +783,38 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
       '<span class="tbxtotal '+(total>=0?'pl-pos':'pl-neg')+'">'+total.toFixed(2)+'</span></div></div>';
 
   } else if(tab==='Exposure'){
-    /* 심볼별 long/short 집계 — 헤지북도 표시(Net=long−short, Notional/Margin=GROSS 양다리) */
-    const agg={}; DEMO_POS.forEach(p=>{ const s=p.sym, lots=+p.vol||0, a=agg[s]||(agg[s]={long:0,short:0,px:+p.price});
-      if(p.type==='sell') a.short+=lots; else a.long+=lots; });
-    const syms=Object.keys(agg).filter(s=>(agg[s].long+agg[s].short)>1e-9);
-    let totN=0, totM=0;
-    const rows=syms.map(s=>{ const a=agg[s], gross=a.long+a.short, net=a.long-a.short;
-      const notl=gross*FX_CONTRACT*baseUsdRate(s,a.px), marg=notl/FX_LEV; totN+=notl; totM+=marg;
-      const flat=Math.abs(net)<1e-9, cls=flat?'':(net>0?'up':'down');
-      return '<tr><td>'+s+'</td><td class="'+cls+'">'+net.toFixed(2)+'</td>'+
-        '<td class="'+cls+'">'+(flat?'Flat (hedged)':(net>0?'Long':'Short'))+'</td>'+
-        '<td>'+fxNum(notl)+'</td><td>'+fxNum(marg)+'</td><td>'+(FX_EQUITY>0?(marg/FX_EQUITY*100).toFixed(2)+' %':'—')+'</td></tr>'; }).join('');
-    const foot=syms.length?'<div class="tbxacct"><span>Notional:<b>'+fxNum(totN)+' USD</b></span>'+
-      '<span>Margin:<b>'+fxNum(totM)+'</b></span><span>Equity:<b>'+fxNum(FX_EQUITY)+'</b></span>'+
-      '<span>Margin used:<b>'+(FX_EQUITY>0?(totM/FX_EQUITY*100).toFixed(2)+' %':'—')+'</b></span></div>':'';
-    body.innerHTML='<div class="tbxscroll"><table class="postbl"><thead><tr>'+
-      ['Symbol','Net Volume','Direction','Notional (USD)','Margin (USD)','% of Equity'].map(h=>'<th>'+h+'</th>').join('')+
-      '</tr></thead><tbody>'+(syms.length?rows:'<tr><td colspan="6" style="text-align:center;color:var(--lgd-dim);padding:16px">No open exposure</td></tr>')+
-      '</tbody></table>'+foot+'</div>';
+    /* MT5 Exposure — 통화별 순노출 표(Asset/Volume/Rate/USD/Graph) + Long/Short Positions 파이 */
+    const ccy={};
+    DEMO_POS.forEach(p=>{ const pair=symPair(p.sym), base=pair.slice(0,3), quote=pair.slice(3,6);
+      const units=(+p.vol||0)*FX_CONTRACT, dir=p.type==='sell'?-1:1;
+      const px=(mwStore.rows[pair]&&mwStore.rows[pair].mid)||+p.cur||+p.price||1;
+      ccy[base]=(ccy[base]||0)+dir*units;          // base: 매수=+, 매도=−
+      ccy[quote]=(ccy[quote]||0)-dir*units*px; });  // quote: 반대, 현재가로 평가
+    const list=Object.keys(ccy).map(c=>{ const rate=ccyUsdRate(c), vol=ccy[c];
+      return { c, vol, rate, usd:(rate!=null?vol*rate:0) }; })
+      .filter(x=>Math.abs(x.vol)>1e-6).sort((a,b)=>Math.abs(b.usd)-Math.abs(a.usd));
+    const maxUsd=Math.max(1,...list.map(x=>Math.abs(x.usd)));
+    const rows=list.length?list.map(x=>{ const col=CCY_COLORS[x.c]||'#8891A5', w=Math.round(Math.abs(x.usd)/maxUsd*100);
+      return '<tr><td><span class="expdot" style="background:'+col+'"></span>'+x.c+'</td>'+
+        '<td>'+ccyVolFmt(x.vol)+'</td><td>'+(x.rate!=null?x.rate.toFixed(5):'—')+'</td>'+
+        '<td class="'+(x.usd>=0?'pl-pos':'pl-neg')+'">'+fxNum(x.usd)+'</td>'+
+        '<td class="expgcell"><span class="expbar" style="width:'+w+'%;background:'+col+'"></span></td></tr>'; }).join('')
+      : '<tr><td colspan="5" style="text-align:center;color:var(--lgd-dim);padding:16px">No open exposure</td></tr>';
+    /* Long Positions 파이 — USD>0 노출 비중 (conic-gradient) */
+    const longs=list.filter(x=>x.usd>0), longTot=longs.reduce((s,x)=>s+x.usd,0)||1;
+    let acc=0; const stops=longs.map(x=>{ const a=acc, b=acc+x.usd/longTot*100; acc=b;
+      return (CCY_COLORS[x.c]||'#8891A5')+' '+a.toFixed(2)+'% '+b.toFixed(2)+'%'; }).join(', ');
+    const legend=longs.map(x=>'<div class="explg"><span class="expdot" style="background:'+(CCY_COLORS[x.c]||'#8891A5')+'"></span>'+
+      x.c+' <b>'+(x.usd/longTot*100).toFixed(1)+'%</b></div>').join('');
+    const pie=longs.length?'<div class="exppiewrap"><div class="exphd">Long Positions</div>'+
+      '<div class="exppie" style="background:conic-gradient('+stops+')"></div>'+
+      '<div class="explegend">'+legend+'</div></div>'
+      : '<div class="exppiewrap"><div class="exphd">Long Positions</div><div class="tbxempty" style="padding:12px">—</div></div>';
+    const acctbar='<div class="tbxacct"><span>Balance:<b>100 000.00 USD</b></span><span>Equity:<b>99 992.79</b></span>'+
+      '<span>Margin:<b>256.64</b></span><span>Free Margin:<b>99 736.15</b></span><span>Margin Level:<b>38 962.28%</b></span></div>';
+    body.innerHTML='<div class="tbxscroll"><div class="expwrap"><table class="postbl exptbl"><thead><tr>'+
+      ['Asset','Volume','Rate','USD','Graph'].map(h=>'<th>'+h+'</th>').join('')+
+      '</tr></thead><tbody>'+rows+'</tbody></table>'+pie+'</div>'+acctbar+'</div>';
 
   } else if(tab==='History'){
     const now=Date.now(), sod=(()=>{ const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); })();
@@ -1038,7 +1076,9 @@ function updateStatus(){ const el=document.getElementById('sbClock'); if(!el) re
   const d=new Date(), p=n=>(n<10?'0':'')+n;
   el.textContent=d.getFullYear()+'.'+p(d.getMonth()+1)+'.'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds()); }
 updateStatus();
-setInterval(()=>{ if(!mwStore.live) mwSimulate(); mwRender(); alertsStore.check(); updateStatus(); }, 1000);
+setInterval(()=>{ if(!mwStore.live) mwSimulate(); mwRender(); alertsStore.check();
+  if(curTbxTab==='Exposure') renderToolbox('Exposure');   // 통화 노출 실시간 마크(MT5)
+  updateStatus(); }, 1000);
 
 /* ── 헤더 동작 ── */
 document.getElementById('btnAdd').onclick=e=>{ e.stopPropagation();
