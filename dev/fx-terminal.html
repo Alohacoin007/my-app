@@ -112,7 +112,7 @@ body.light .cgmenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
 .mwfeed{font-size:8.5px; font-weight:800; letter-spacing:.6px; padding:3px 7px; border-radius:2px;
   background:rgba(240,180,40,.15); color:#E0A020}
 .mwfeed.live{background:rgba(0,200,5,.15); color:var(--lgd-up)}
-.mwgrid{display:grid; grid-template-columns:1.05fr 1fr 1fr .82fr; gap:4px}
+.mwgrid{display:grid; grid-template-columns:1.15fr 1fr 1fr .72fr; gap:4px}
 .mwhd{padding:6px 10px; flex:none; font-size:9.5px; font-weight:800; letter-spacing:.4px;
   color:var(--lgd-dim); text-transform:uppercase; border-bottom:1px solid var(--lgd-hair)}
 .mwhd div:not(:first-child), .mwrow .mwpx, .mwrow .mwspr{text-align:right}
@@ -120,14 +120,9 @@ body.light .cgmenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
 .mwrow{padding:6px 10px; font-size:12px; border-bottom:1px solid rgba(128,128,128,.10); cursor:default}
 .mwrow:hover{background:var(--lgd-surface2)}
 .mwsym{font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-/* 종류별 색 구분 — 좌측 액센트 스트라이프(inset, 레이아웃 시프트 0) + 심볼 틴트 */
-.mw-forex{box-shadow:inset 3px 0 0 -1px #4C8DFF}   .mw-forex  .mwsym{color:#5C97FF}
-.mw-crypto{box-shadow:inset 3px 0 0 -1px #B37FEB}  .mw-crypto .mwsym{color:#BD8CF0}
-.mw-stocks{box-shadow:inset 3px 0 0 -1px #E0A020}  .mw-stocks .mwsym{color:#E6AE3A}
 .mwpx{font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; font-weight:600; color:var(--lgd-dim)}
 .mwpx.up{color:var(--lgd-up)} .mwpx.down{color:var(--lgd-down,#EB5D2A)}
-.mwchg{font-variant-numeric:tabular-nums; color:var(--lgd-dim); font-size:11px; font-weight:600}
-.mwchg.up{color:var(--lgd-up)} .mwchg.down{color:var(--lgd-down,#EB5D2A)}
+.mwspr{font-variant-numeric:tabular-nums; color:var(--lgd-dim); font-size:11px; opacity:.85}
 .cgwin{position:absolute; display:flex; flex-direction:column; background:var(--lgd-bg);
   border:1px solid var(--lgd-hair); border-radius:2px; overflow:hidden; min-width:120px; min-height:80px}
 .cgwin.drag{box-shadow:0 8px 24px rgba(0,0,0,.5)}
@@ -440,8 +435,7 @@ const MW_BASE={ EURUSD:1.143,GBPUSD:1.3417,USDJPY:162.36,AUDUSD:0.694,USDCAD:1.4
   META:562.1, BTCUSD:64250,ETHUSD:3420,SOLUSD:148.5,XRPUSD:0.612,DOGEUSD:0.145 };
 const mwStore={ rows:{}, live:false,
   set(sym,mid,spr){ const half=mwHalf(sym,mid,spr), prev=this.rows[sym], bid=mid-half, ask=mid+half;
-    const open=prev?prev.open:mid;   // 세션 오픈(첫 tick) 기준 Daily Change% — MT5 Daily Change 컬럼
-    this.rows[sym]={ mid,bid,ask,spr, open, chg:(mid-open)/open*100,
+    this.rows[sym]={ mid,bid,ask,spr,
       bDir: prev?(bid>prev.bid?1:bid<prev.bid?-1:(prev.bDir||0)):0,
       aDir: prev?(ask>prev.ask?1:ask<prev.ask?-1:(prev.aDir||0)):0 }; },
   /* 실피드 진입점 — prices 행 [{symbol,mid,spr_pts}]. 붙는 순간 live=true (SIM→LIVE) */
@@ -456,14 +450,13 @@ function mwRender(){ const host=document.getElementById('mwBody'); if(!host) ret
   const list=mwFilter==='All'?MW_WATCH:MW_WATCH.filter(s=>mwCat(s)===mwFilter);
   host.innerHTML=list.map(s=>{ const r=mwStore.rows[s]||{};
     const bc=r.bDir>0?'up':r.bDir<0?'down':'', ac=r.aDir>0?'up':r.aDir<0?'down':'';
-    const chg=(r.chg==null)?null:r.chg, cc=chg>0?'up':chg<0?'down':'';
-    const chgTxt=(chg==null)?'—':(chg>=0?'+':'')+chg.toFixed(2)+'%';
-    return '<div class="mwrow mwgrid mw-'+mwCat(s).toLowerCase()+'" data-sym="'+s+'"><div class="mwsym">'+s+'</div>'+
+    const spr=(r.bid!=null)?mwSprText(s, r.ask-r.bid):'—';
+    return '<div class="mwrow mwgrid" data-sym="'+s+'"><div class="mwsym">'+s+'</div>'+
       '<div class="mwpx '+bc+'">'+mwFmt(s,r.bid)+'</div><div class="mwpx '+ac+'">'+mwFmt(s,r.ask)+'</div>'+
-      '<div class="mwchg '+cc+'">'+chgTxt+'</div></div>'; }).join('');
+      '<div class="mwspr">'+spr+'</div></div>'; }).join('');
   const fl=document.getElementById('mwFeed'); if(fl){ fl.textContent=mwStore.live?'LIVE':'SIM'; fl.classList.toggle('live',mwStore.live); } }
 function mwBodyHTML(){ return '<div class="mwwrap">'+
-  '<div class="mwhd mwgrid"><div>Symbol</div><div>Bid</div><div>Ask</div><div>Chg%</div></div>'+
+  '<div class="mwhd mwgrid"><div>Symbol</div><div>Bid</div><div>Ask</div><div>Spread</div></div>'+
   '<div class="mwlist" id="mwBody"></div></div>'; }
 
 /* ── 위젯 생성 (M1: 전부 기초 프레임, 설정만 언어/테마 실동작) ── */
