@@ -196,13 +196,7 @@ body.light #tabMenu, body.light #addMenu{box-shadow:0 8px 24px rgba(15,23,40,.18
     <div id="menuDrop"></div>
   </div>
   <div class="htoolbar" id="htoolbar">
-    <div class="htool on" data-tip="Cursor"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l6 15 2.2-5.6L19 10z"/></svg></div>
-    <div class="htool" data-tip="Crosshair"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1.6"/><path d="M12 3v5M12 16v5M3 12h5M16 12h5"/></svg></div>
-    <div class="htool" data-tip="Trend line"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 19L19 5"/><circle cx="5" cy="19" r="1.8"/><circle cx="19" cy="5" r="1.8"/></svg></div>
-    <div class="htool" data-tip="Indicators"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15l4-6 4 4 5-8 5 6"/></svg></div>
-    <div class="htool" data-tip="Zoom in"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M10.5 7.5v6M7.5 10.5h6"/></svg></div>
-    <div class="htool" data-tip="Zoom out"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M7.5 10.5h6"/></svg></div>
-    <div class="htool" id="btnTile" data-tip="Tile charts"><svg width="14" height="14" viewBox="0 0 15 15" fill="currentColor"><rect x="0.5" y="0.5" width="6" height="6" rx="1"/><rect x="8.5" y="0.5" width="6" height="6" rx="1"/><rect x="0.5" y="8.5" width="6" height="6" rx="1"/><rect x="8.5" y="8.5" width="6" height="6" rx="1"/></svg></div>
+    <div id="toolIcons" style="display:flex; align-items:center; gap:2px"></div>
     <div class="hdivider"></div>
     <div class="tfstrip" id="tfStrip"></div>
   </div>
@@ -518,8 +512,44 @@ Object.keys(layout).forEach(k=>{ if(k!=='__ref') applyGeo(k); });
     cgN=+b.dataset.n; try{ localStorage.setItem(CG_KEY, cgN); }catch(_){} buildCharts(); menu.style.display='none'; });
 })();
 
-/* ── MT5 툴바 — 타임프레임(실동작: 차트 TF 라벨) · 타일(재배치) · 메뉴(골격) ── */
+/* ── MT5 툴바 아이콘 세트 (스샷 그룹 순서대로 — 커서/드로잉/차트타입/지표/거래/뷰) ──
+   실동작: Tile(재배치)·TF(라벨). 나머지는 골격(툴팁, 실봉 M2·주문 M4 이후 연결). fill:1 = 채움 아이콘. */
+const TOOLS=[
+  {t:'Cursor', on:1, fill:1, i:'<path d="M5 3l6 15 2.2-5.6L19 10z"/>'},
+  {t:'Crosshair', i:'<circle cx="12" cy="12" r="1.6"/><path d="M12 3v5M12 16v5M3 12h5M16 12h5"/>'},
+  {div:1},
+  {t:'Vertical line', i:'<path d="M12 3v18"/>'},
+  {t:'Horizontal line', i:'<path d="M3 12h18"/>'},
+  {t:'Trend line', i:'<path d="M5 19L19 5"/><circle cx="5" cy="19" r="1.6"/><circle cx="19" cy="5" r="1.6"/>'},
+  {t:'Fibonacci', i:'<path d="M4 6h16M4 10h16M4 14h16M4 18h16M4 18L20 6"/>'},
+  {t:'Text', i:'<path d="M6 5h12M12 5v14"/>'},
+  {t:'Shapes', i:'<rect x="3" y="4" width="8" height="8" rx="1"/><path d="M17 20l-4-7h8z"/>'},
+  {div:1},
+  {t:'Line chart', i:'<path d="M3 16l5-6 4 3 8-9"/>'},
+  {t:'Bar chart (OHLC)', i:'<path d="M7 5v14M7 8H4M7 14h3M17 4v16M17 10h-3M17 15h3"/>'},
+  {t:'Candlesticks', i:'<path d="M7 4v4M7 15v5M17 3v3M17 14v5"/><rect x="5" y="8" width="4" height="7"/><rect x="15" y="6" width="4" height="8"/>'},
+  {div:1},
+  {t:'Indicators', i:'<path d="M3 15l4-6 4 4 5-8 5 6"/>'},
+  {t:'Add indicator', i:'<circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/>'},
+  {div:1},
+  {t:'New Order (F9)', i:'<rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M12 8v8M8 12h8"/>'},
+  {t:'Algo Trading', i:'<rect x="5" y="8" width="14" height="10" rx="1.5"/><path d="M12 4v4M9 13h.01M15 13h.01"/>'},
+  {t:'One-click trading', i:'<path d="M12 3v18M15 7H10a2.5 2.5 0 0 0 0 5h4a2.5 2.5 0 0 1 0 5H8"/>'},
+  {div:1},
+  {t:'Zoom in', i:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M10.5 7.5v6M7.5 10.5h6"/>'},
+  {t:'Zoom out', i:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M7.5 10.5h6"/>'},
+  {t:'Tile charts', id:'btnTile', fill:1, i:'<rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/>'},
+  {t:'Auto scroll', i:'<path d="M3 12h13M12 8l4 4-4 4M21 5v14"/>'},
+  {t:'Chart shift', i:'<path d="M21 12H8M12 8l-4 4 4 4M3 5v14"/>'},
+  {t:'Screenshot', i:'<rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13.5" r="3"/><path d="M8 7l2-3h4l2 3"/>'},
+];
+function toolSvg(inner, fill){ return '<svg width="14" height="14" viewBox="0 0 24 24" '+
+  (fill?'fill="currentColor"':'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"')+'>'+inner+'</svg>'; }
+/* ── MT5 툴바 — Tile/TF 실동작, 나머지 골격 ── */
 (function mt5Toolbar(){
+  const icons=document.getElementById('toolIcons');
+  if(icons) icons.innerHTML=TOOLS.map(t=> t.div ? '<div class="hdivider"></div>'
+    : '<div class="htool'+(t.on?' on':'')+'"'+(t.id?' id="'+t.id+'"':'')+' data-tip="'+t.t+'">'+toolSvg(t.i,t.fill)+'</div>').join('');
   const strip=document.getElementById('tfStrip');
   if(strip){ strip.innerHTML=TFS.map(tf=>'<button class="tfbtn'+(tf===curTF?' on':'')+'" data-tf="'+tf+'">'+tf+'</button>').join('');
     strip.addEventListener('click', e=>{ const b=e.target.closest('[data-tf]'); if(!b) return;
