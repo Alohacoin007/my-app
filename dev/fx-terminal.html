@@ -41,6 +41,25 @@ body.light [data-tip]:hover::after{box-shadow:0 6px 18px rgba(15,23,40,.18)}
 .hic{width:30px; height:30px; border-radius:var(--lgd-r-btn,2px); display:flex; align-items:center;
   justify-content:center; color:var(--lgd-ink); cursor:pointer}
 .hic:hover{background:var(--lgd-pill)}
+/* ── MT5 툴바 (헤더 한 줄, 좁으면 가운데만 가로 스크롤) ── */
+.hmenu{height:26px; padding:0 8px; border-radius:2px; display:flex; align-items:center; color:var(--lgd-dim);
+  cursor:pointer; font-size:15px; flex:none}
+.hmenu:hover{background:var(--lgd-pill); color:var(--lgd-ink)}
+#menuDrop{display:none; position:absolute; top:32px; left:0; z-index:70; min-width:160px; background:var(--lgd-surface2);
+  border:1px solid var(--lgd-hair); border-radius:2px; box-shadow:0 8px 24px rgba(0,0,0,.5); padding:6px}
+#menuDrop .mrow{display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:2px; font-size:12.5px; color:var(--lgd-dim)}
+#menuDrop .mrow .sub{margin-left:auto; font-size:10px; opacity:.7}
+.htoolbar{display:flex; align-items:center; gap:2px; flex:1; min-width:0; overflow-x:auto; overflow-y:visible; padding:0 4px}
+.hdivider{width:1px; height:18px; background:var(--lgd-hair); margin:0 5px; flex:none}
+.htool{width:26px; height:26px; border-radius:2px; display:flex; align-items:center; justify-content:center;
+  color:var(--lgd-dim); cursor:pointer; flex:none}
+.htool:hover{background:var(--lgd-pill); color:var(--lgd-ink)}
+.htool.on{background:var(--lgd-pill); color:var(--lgd-ink)}
+.tfstrip{display:flex; align-items:center; gap:1px; flex:none}
+.tfbtn{height:24px; min-width:26px; padding:0 6px; border-radius:2px; font-size:10.5px; font-weight:700;
+  color:var(--lgd-dim); background:none; border:none; cursor:pointer; font-family:inherit; flex:none}
+.tfbtn:hover{background:var(--lgd-pill); color:var(--lgd-ink)}
+.tfbtn.on{background:rgba(0,200,5,.14); color:var(--lgd-up)}
 .avatar{width:26px; height:26px; border-radius:999px; background:#3A3E42; display:flex; align-items:center;
   justify-content:center; color:#101214; cursor:pointer; font-size:12px; font-weight:800; position:relative}
 .avatar.signin{background:var(--lgd-up); color:#04250B; animation:avpulse 2s ease-in-out infinite}
@@ -172,9 +191,22 @@ body.light #tabMenu, body.light #addMenu{box-shadow:0 8px 24px rgba(15,23,40,.18
     <div class="addtab" id="btnTabs" data-tip="Server tabs">+</div>
     <div id="tabMenu"></div>
   </div>
-  <div class="hsp"></div>
-  <div class="hmid" data-tip="FX terminal · DEV"><span class="dot" id="feedDot"></span></div>
-  <div class="hsp"></div>
+  <div style="position:relative">
+    <div class="hmenu" id="btnMenu" data-tip="Menu">☰</div>
+    <div id="menuDrop"></div>
+  </div>
+  <div class="htoolbar" id="htoolbar">
+    <div class="htool on" data-tip="Cursor"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l6 15 2.2-5.6L19 10z"/></svg></div>
+    <div class="htool" data-tip="Crosshair"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1.6"/><path d="M12 3v5M12 16v5M3 12h5M16 12h5"/></svg></div>
+    <div class="htool" data-tip="Trend line"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 19L19 5"/><circle cx="5" cy="19" r="1.8"/><circle cx="19" cy="5" r="1.8"/></svg></div>
+    <div class="htool" data-tip="Indicators"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15l4-6 4 4 5-8 5 6"/></svg></div>
+    <div class="htool" data-tip="Zoom in"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M10.5 7.5v6M7.5 10.5h6"/></svg></div>
+    <div class="htool" data-tip="Zoom out"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M7.5 10.5h6"/></svg></div>
+    <div class="htool" id="btnTile" data-tip="Tile charts"><svg width="14" height="14" viewBox="0 0 15 15" fill="currentColor"><rect x="0.5" y="0.5" width="6" height="6" rx="1"/><rect x="8.5" y="0.5" width="6" height="6" rx="1"/><rect x="0.5" y="8.5" width="6" height="6" rx="1"/><rect x="8.5" y="8.5" width="6" height="6" rx="1"/></svg></div>
+    <div class="hdivider"></div>
+    <div class="tfstrip" id="tfStrip"></div>
+  </div>
+  <span class="dot" id="feedDot" style="display:none"></span>
   <div class="hic" id="cgLayoutBtn" role="button" data-tip="Charts" style="cursor:pointer">
     <svg width="14" height="14" viewBox="0 0 15 15" fill="currentColor"><rect x="0.5" y="0.5" width="6" height="6" rx="1.2"/><rect x="8.5" y="0.5" width="6" height="6" rx="1.2"/><rect x="0.5" y="8.5" width="6" height="6" rx="1.2"/><rect x="8.5" y="8.5" width="6" height="6" rx="1.2"/></svg>
   </div>
@@ -358,6 +390,9 @@ function frame(){ return '<div class="found"><span class="big" data-i18n="Founda
 const CHART_UNIVERSE=['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCHF','USDCAD','XAUUSD','NZDUSD','EURJPY','GBPJPY'];
 const CG_KEY='alpexa.fxdash.chartgrid', CG_PRESETS=[1,2,4,6,9,10];
 let cgN=Math.max(1,Math.min(10,+(localStorage.getItem(CG_KEY)||4)));
+/* 타임프레임 (MT5 툴바) — 차트 창 TF 라벨 구동. 실봉 M2, 지금은 라벨만. */
+const TF_KEY='alpexa.fxdash.tf', TFS=['M1','M5','M15','M30','H1','H4','D1','W1','MN'];
+let curTF=TFS.includes(localStorage.getItem(TF_KEY))?localStorage.getItem(TF_KEY):'M30';
 function cgSkeleton(seed){ let s=''; const N=16, bx=100/N;
   for(let i=0;i<N;i++){ const a=Math.sin((i+seed*3)*0.7), b=Math.sin((i+seed*3)*1.3);
     const mid=30-a*9, hi=mid-3-Math.abs(b)*4, lo=mid+3+Math.abs(b)*4, x=(i+0.5)*bx;
@@ -369,7 +404,7 @@ function cgSkeleton(seed){ let s=''; const N=16, bx=100/N;
 /* 각 차트 = 최상위 위젯(chart1..N). 표준 위젯 엔진으로 스테이지 어디든 드래그/스냅/리사이즈.
    ⊞ 개수 선택 = 우상 영역에 타일 재배치(buildCharts). 그 뒤 각 창 자유 이동(위치는 layout에 저장). */
 function chartSkeletonBody(i){ return '<div class="cgwplot">'+cgSkeleton(i)+
-  '<span class="cgtf">M30</span><span class="cgtag">M2</span></div>'; }
+  '<span class="cgtf">'+curTF+'</span><span class="cgtag">M2</span></div>'; }
 function chartIds(){ return Object.keys(layout).filter(k=>/^chart\d+$/.test(k)); }
 function mkChart(id, sym, i){ makeWidget(id, sym, 'var(--lgd-up)', chartSkeletonBody(i)); applyGeo(id); }
 function destroyCharts(){ chartIds().forEach(id=>{ const el=document.getElementById('w-'+id); if(el) el.remove();
@@ -483,6 +518,29 @@ Object.keys(layout).forEach(k=>{ if(k!=='__ref') applyGeo(k); });
     cgN=+b.dataset.n; try{ localStorage.setItem(CG_KEY, cgN); }catch(_){} buildCharts(); menu.style.display='none'; });
 })();
 
+/* ── MT5 툴바 — 타임프레임(실동작: 차트 TF 라벨) · 타일(재배치) · 메뉴(골격) ── */
+(function mt5Toolbar(){
+  const strip=document.getElementById('tfStrip');
+  if(strip){ strip.innerHTML=TFS.map(tf=>'<button class="tfbtn'+(tf===curTF?' on':'')+'" data-tf="'+tf+'">'+tf+'</button>').join('');
+    strip.addEventListener('click', e=>{ const b=e.target.closest('[data-tf]'); if(!b) return;
+      curTF=b.dataset.tf; try{ localStorage.setItem(TF_KEY, curTF); }catch(_){}
+      strip.querySelectorAll('[data-tf]').forEach(x=>x.classList.toggle('on',x.dataset.tf===curTF));
+      document.querySelectorAll('.cgtf').forEach(el=>el.textContent=curTF); }); }
+  const tile=document.getElementById('btnTile');
+  if(tile) tile.addEventListener('click', ()=>buildCharts());   // MT5 Tile Windows
+  /* 드로잉/지표/줌 도구 = 골격(툴팁만, 실봉 M2 이후 연결) — 클릭 시 활성 표시만 */
+  document.querySelectorAll('#htoolbar .htool:not(#btnTile)').forEach(t=>t.addEventListener('click', ()=>{
+    document.querySelectorAll('#htoolbar .htool').forEach(x=>x.classList.remove('on')); t.classList.add('on'); }));
+  /* 메뉴바(File/View/Insert/Charts/Tools/Window/Help) — 골격 드롭다운 */
+  const btn=document.getElementById('btnMenu'), drop=document.getElementById('menuDrop');
+  if(btn&&drop){ drop.innerHTML=['File','View','Insert','Charts','Tools','Window','Help']
+      .map(m=>'<div class="mrow">'+m+'<span class="sub">Soon</span></div>').join('');
+    btn.addEventListener('click', e=>{ e.stopPropagation();
+      document.getElementById('addMenu').style.display='none'; document.getElementById('tabMenu').style.display='none';
+      const cm=document.getElementById('cgMenu'); if(cm) cm.style.display='none';
+      drop.style.display=drop.style.display==='block'?'none':'block'; }); }
+})();
+
 /* Market Watch — 우클릭 컨텍스트 메뉴(클래스 필터, MT5식) + 타이틀바 피드 상태(SIM/LIVE) + 틱 루프 */
 (function mwControls(){
   const mwEl=document.getElementById('w-marketwatch'); if(!mwEl) return;
@@ -523,7 +581,8 @@ document.getElementById('btnTabs').onclick=e=>{ e.stopPropagation();
 document.addEventListener('click', ()=>{ document.getElementById('addMenu').style.display='none';
   document.getElementById('tabMenu').style.display='none';
   const cm=document.getElementById('cgMenu'); if(cm) cm.style.display='none';
-  const mc=document.getElementById('mwCtx'); if(mc) mc.style.display='none'; });
+  const mc=document.getElementById('mwCtx'); if(mc) mc.style.display='none';
+  const md=document.getElementById('menuDrop'); if(md) md.style.display='none'; });
 document.getElementById('goSports').onclick=()=>{ location.href='/sports-dashboard.html'; };
 document.getElementById('goCrypto').onclick=()=>{ location.href='/dev/crypto-dashboard.html'; };
 
