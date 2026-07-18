@@ -166,10 +166,14 @@ body.light .cgmenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
 .docktabs button.on{color:var(--lgd-up); box-shadow:inset 0 -2px 0 var(--lgd-up)}
 .docktabs .sbtabs{color:var(--lgd-dim); font-size:10.5px; flex:none}
 .docktabs .sbtabs span{margin-left:10px}
-.dockcollapse{width:22px; height:22px; display:flex; align-items:center; justify-content:center; color:var(--lgd-dim);
-  cursor:pointer; border-radius:2px; flex:none; margin-left:6px; font-size:12px}
-.dockcollapse:hover{background:var(--lgd-pill); color:var(--lgd-ink)}
-#dock.collapsed .dockcollapse{transform:rotate(180deg)}
+.dockclose{width:20px; height:20px; display:flex; align-items:center; justify-content:center; color:var(--lgd-dim);
+  cursor:pointer; border-radius:2px; flex:none; margin-right:4px; font-size:12px}
+.dockclose:hover{background:var(--lgd-down,#EB5D2A); color:#fff}
+/* 포지션 원클릭 청산 X (행 우측) */
+.poclose{display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:2px;
+  color:var(--lgd-dim); cursor:pointer; font-size:11px; font-weight:700}
+.poclose:hover{background:var(--lgd-down,#EB5D2A); color:#fff}
+.postbl td.pox{text-align:center; padding:2px 6px}
 /* Trade 탭: 포지션 스크롤(위) + 계좌 sticky 푸터(아래, 포지션 수 무관 항상 표시) */
 .tbxscroll{flex:1; min-height:0; overflow:auto}
 .tbxacct{display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:5px 10px; flex:none;
@@ -270,9 +274,6 @@ body.light #tabMenu, body.light #addMenu{box-shadow:0 8px 24px rgba(15,23,40,.18
     <div class="tfstrip" id="tfStrip"></div>
   </div>
   <span class="dot" id="feedDot" style="display:none"></span>
-  <div class="hic" id="cgLayoutBtn" role="button" data-tip="Charts" style="cursor:pointer">
-    <svg width="14" height="14" viewBox="0 0 15 15" fill="currentColor"><rect x="0.5" y="0.5" width="6" height="6" rx="1.2"/><rect x="8.5" y="0.5" width="6" height="6" rx="1.2"/><rect x="0.5" y="8.5" width="6" height="6" rx="1.2"/><rect x="8.5" y="8.5" width="6" height="6" rx="1.2"/></svg>
-  </div>
   <div style="position:relative">
     <div class="hic" id="btnAdd" role="button" data-tip="Add widget" style="cursor:pointer">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M12 8v8M8 12h8"/></svg>
@@ -298,19 +299,14 @@ body.light #tabMenu, body.light #addMenu{box-shadow:0 8px 24px rgba(15,23,40,.18
   <div class="dockrz" id="dockRz" title="Drag to resize"></div>
   <div class="dockcontent" id="tbxBody"></div>
   <div class="docktabs">
+    <div class="dockclose" id="dockClose" title="Close toolbox (Ctrl+T to reopen)">✕</div>
     <span class="dockname">Toolbox</span>
     <div class="dtabs" id="tbxTabs"></div>
-    <span class="ssp"></span>
-    <span class="sbtabs"><span>Market</span><span>Signals</span><span>VPS</span><span>Tester</span></span>
-    <div class="dockcollapse" id="dockToggle" title="Show / hide toolbox (Ctrl+T)">▾</div>
   </div>
 </div>
 
 <div class="statusbar" id="statusbar">
   <span>For Help, press F1</span>
-  <span class="ssp"></span>
-  <span id="sbSym">EURUSD</span>
-  <span class="ohlc">O <b id="sbO">—</b> H <b id="sbH">—</b> L <b id="sbL">—</b> C <b id="sbC">—</b> V <b id="sbV">—</b></span>
   <span class="ssp"></span>
   <span id="sbClock">—</span>
   <span>Default</span>
@@ -477,7 +473,7 @@ const CHART_UNIVERSE=['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCHF','USDCAD','XAU
 const CG_KEY='alpexa.fxdash.chartgrid', CG_PRESETS=[1,2,4,6,9,10];
 let cgN=Math.max(1,Math.min(10,+(localStorage.getItem(CG_KEY)||4)));
 /* 타임프레임 (MT5 툴바) — 차트 창 TF 라벨 구동. 실봉 M2, 지금은 라벨만. */
-const TF_KEY='alpexa.fxdash.tf', TFS=['M1','M2','M3','M4','M5','M6','M10','M12','M15','M20','M30','H1','H2','H3','H4','H6','H8','H12','D1','W1','MN'];
+const TF_KEY='alpexa.fxdash.tf', TFS=['M1','M5','M15','M30','H1','H4','D1','W1','MN'];
 let curTF=TFS.includes(localStorage.getItem(TF_KEY))?localStorage.getItem(TF_KEY):'M30';
 function cgSkeleton(seed){ let s=''; const N=16, bx=100/N;
   for(let i=0;i<N;i++){ const a=Math.sin((i+seed*3)*0.7), b=Math.sin((i+seed*3)*1.3);
@@ -576,19 +572,24 @@ function navBodyHTML(){ return '<div class="nvtree" id="nvTree">'+NAV_GROUPS.map
 /* ── Toolbox (MT5 하단 패널) — 탭 12종 + Trade(계좌 바 + 포지션 테이블) ──
    계좌·포지션 값은 사장님이 준 MT5 데모 스샷 그대로(DEMO·preview 표기). 실계좌 연동은 M3(서버 전용). */
 const TBX_TABS=['Trade','Exposure','History','News','Mailbox','Calendar','Company','Alerts','Articles','Code Base','Experts','Journal'];
-const DEMO_POS=[
+let DEMO_POS=[
   {sym:'eurusd.fx', ticket:'3172308', time:'2026.07.09 20:17:40', type:'buy', vol:'0.01', price:'1.14318', sl:'', tp:'', cur:'1.14360', comm:'0.00', swap:'0.00', pl:'0.42'},
   {sym:'usdchf.fx', ticket:'3194818', time:'2026.07.13 09:34:06', type:'buy', vol:'0.07', price:'0.80808', sl:'', tp:'', cur:'0.80720', comm:'0.00', swap:'-0.21', pl:'-7.63'} ];
+/* 원클릭 청산 (DEMO) — 데모 행 제거 + 총 P/L 재계산. 실청산은 fx_close RPC(M5, 서버 전용) */
+function closePosDemo(ticket){ DEMO_POS=DEMO_POS.filter(p=>p.ticket!==ticket); renderToolbox('Trade');
+  toast('Position '+ticket+' closed (demo) — live close via fx_close in M5'); }
 function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!body) return;
   if(tab==='Trade'){
     const total=DEMO_POS.reduce((s,p)=>s+(+p.pl),0);
-    body.innerHTML='<div class="tbxscroll"><table class="postbl"><thead><tr>'+
-      ['Symbol','Ticket','Time','Type','Volume','Price','S / L','T / P','Price','Commission','Swap','Profit'].map(h=>'<th>'+h+'</th>').join('')+
-      '</tr></thead><tbody>'+DEMO_POS.map(p=>'<tr><td>'+p.sym+'</td><td>'+p.ticket+'</td><td>'+p.time+'</td>'+
+    const rows=DEMO_POS.length ? DEMO_POS.map(p=>'<tr><td>'+p.sym+'</td><td>'+p.ticket+'</td><td>'+p.time+'</td>'+
         '<td class="'+p.type+'">'+p.type+'</td><td>'+p.vol+'</td><td>'+p.price+'</td><td>'+(p.sl||'—')+'</td>'+
         '<td>'+(p.tp||'—')+'</td><td>'+p.cur+'</td><td>'+p.comm+'</td><td>'+p.swap+'</td>'+
-        '<td class="'+(+p.pl>=0?'pl-pos':'pl-neg')+'">'+p.pl+'</td></tr>').join('')+
-      '</tbody></table>'+
+        '<td class="'+(+p.pl>=0?'pl-pos':'pl-neg')+'">'+p.pl+'</td>'+
+        '<td class="pox"><span class="poclose" data-close="'+p.ticket+'" title="Close position (one-click)">✕</span></td></tr>').join('')
+      : '<tr><td colspan="13" style="text-align:center;color:var(--lgd-dim);padding:16px">No open positions</td></tr>';
+    body.innerHTML='<div class="tbxscroll"><table class="postbl"><thead><tr>'+
+      ['Symbol','Ticket','Time','Type','Volume','Price','S / L','T / P','Price','Commission','Swap','Profit',''].map(h=>'<th>'+h+'</th>').join('')+
+      '</tr></thead><tbody>'+rows+'</tbody></table>'+
       /* 계좌 바 = 마지막 포지션 바로 뒤에 따라붙음(아래는 빈 공간), 총 P/L 우측 (MT5) */
       '<div class="tbxacct"><span class="tbxdemo">DEMO</span>'+
       '<span>Balance:<b>100 000.00 USD</b></span><span>Equity:<b>99 992.79</b></span>'+
@@ -625,19 +626,18 @@ refitLayout();
 Object.keys(layout).forEach(k=>{ if(k!=='__ref') applyGeo(k); });
 
 /* 헤더 ⊞ 차트 개수 메뉴 (차트 컨테이너 폐지 — 이제 chart1..N 최상위 창) */
+/* 차트 개수 메뉴 — 툴바 타일 아이콘(btnTile)에서 오픈(헤더 중복 ⊞ 제거) */
+function openChartMenu(anchor){ const menu=document.getElementById('cgMenu'); if(!menu||!anchor) return;
+  if(menu.style.display==='block'){ menu.style.display='none'; return; }
+  document.getElementById('addMenu').style.display='none'; document.getElementById('tabMenu').style.display='none';
+  const r=anchor.getBoundingClientRect(); menu.style.left=Math.min(r.left, window.innerWidth-170)+'px'; menu.style.top=(r.bottom+5)+'px';
+  menu.querySelectorAll('[data-n]').forEach(b=>b.classList.toggle('on',+b.dataset.n===cgN));
+  menu.style.display='block'; }
 (function chartLayoutControl(){
-  const btn=document.getElementById('cgLayoutBtn'); if(!btn) return;
   const menu=document.createElement('div'); menu.id='cgMenu'; menu.className='cgmenu';
   menu.innerHTML='<div class="cgmhd" data-i18n="Charts">Charts</div>'+
     CG_PRESETS.map(n=>'<button data-n="'+n+'"><span>'+n+' '+(n>1?'charts':'chart')+'</span><span class="ck">✓</span></button>').join('');
   document.body.appendChild(menu);
-  btn.addEventListener('click', e=>{ e.stopPropagation();
-    const open=menu.style.display==='block';
-    document.getElementById('addMenu').style.display='none'; document.getElementById('tabMenu').style.display='none';
-    if(open){ menu.style.display='none'; return; }
-    const r=btn.getBoundingClientRect(); menu.style.left=Math.min(r.left, window.innerWidth-170)+'px'; menu.style.top=(r.bottom+5)+'px';
-    menu.querySelectorAll('[data-n]').forEach(b=>b.classList.toggle('on',+b.dataset.n===cgN));
-    menu.style.display='block'; });
   menu.addEventListener('click', e=>{ const b=e.target.closest('[data-n]'); if(!b) return;
     cgN=+b.dataset.n; try{ localStorage.setItem(CG_KEY, cgN); }catch(_){} buildCharts(); menu.style.display='none'; });
 })();
@@ -697,7 +697,7 @@ function toolSvg(inner, fill){ return '<svg width="14" height="14" viewBox="0 0 
       strip.querySelectorAll('[data-tf]').forEach(x=>x.classList.toggle('on',x.dataset.tf===curTF));
       document.querySelectorAll('.cgtf').forEach(el=>el.textContent=curTF); }); }
   const tile=document.getElementById('btnTile');
-  if(tile) tile.addEventListener('click', ()=>buildCharts());   // MT5 Tile Windows
+  if(tile) tile.addEventListener('click', e=>{ e.stopPropagation(); openChartMenu(tile); });   // 타일 = 차트 개수 메뉴(중복 ⊞ 통합)
   /* 드로잉/지표/줌 도구 = 골격(툴팁만, 실봉 M2 이후 연결) — 클릭 시 활성 표시만 */
   document.querySelectorAll('#htoolbar .htool:not(#btnTile)').forEach(t=>t.addEventListener('click', ()=>{
     document.querySelectorAll('#htoolbar .htool').forEach(x=>x.classList.remove('on')); t.classList.add('on'); }));
@@ -747,41 +747,39 @@ function toolSvg(inner, fill){ return '<svg width="14" height="14" viewBox="0 0 
   tree.addEventListener('click', e=>{ const h=e.target.closest('.nvhead'); if(!h) return; h.parentNode.classList.toggle('closed'); }); })();
 mwSimulate(); mwRender();
 
-/* Toolbox 도크 — 탭(바닥) · Trade 렌더 · 상단 리사이즈 · 접기(Ctrl+T) */
+/* Toolbox 도크 — 탭(바닥) · Trade 렌더 · 상단 리사이즈 · X 닫기(왼쪽 헤드, Ctrl+T 재오픈) · 원클릭 청산 */
 (function toolboxDock(){
   const tabs=document.getElementById('tbxTabs'), dock=document.getElementById('dock'),
-        content=document.getElementById('tbxBody'), rz=document.getElementById('dockRz'), toggle=document.getElementById('dockToggle');
+        content=document.getElementById('tbxBody'), rz=document.getElementById('dockRz'), closeBtn=document.getElementById('dockClose');
   if(!tabs||!dock||!content) return;
-  const DOCK_H='alpexa.fxdash.dockH', DOCK_C='alpexa.fxdash.dockCollapsed';
+  const DOCK_H='alpexa.fxdash.dockH', DOCK_C='alpexa.fxdash.dockHidden';
   let dockH=Math.max(90, Math.min(+localStorage.getItem(DOCK_H)||190, 700));
-  let collapsed=localStorage.getItem(DOCK_C)==='1';
-  function applyDock(){ content.style.height=dockH+'px'; dock.classList.toggle('collapsed', collapsed);
-    if(toggle) toggle.textContent='▾'; refitLayout(); }
+  let hidden=localStorage.getItem(DOCK_C)==='1';
+  function applyDock(){ content.style.height=dockH+'px'; dock.style.display=hidden?'none':'flex'; refitLayout(); }
+  function setHiddenDock(v){ hidden=v; try{localStorage.setItem(DOCK_C,v?'1':'0');}catch(_){} applyDock(); }
   tabs.innerHTML=TBX_TABS.map((t,i)=>'<button data-tab="'+t+'"'+(i===0?' class="on"':'')+'>'+t+'</button>').join('');
   renderToolbox('Trade');
   tabs.addEventListener('click', e=>{ const b=e.target.closest('[data-tab]'); if(!b) return;
-    if(collapsed){ collapsed=false; try{localStorage.setItem(DOCK_C,'0');}catch(_){} applyDock(); }  // 접힌 상태서 탭 클릭 → 펼침
     tabs.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('on',x===b)); renderToolbox(b.dataset.tab); });
-  if(toggle) toggle.addEventListener('click', ()=>{ collapsed=!collapsed; try{localStorage.setItem(DOCK_C,collapsed?'1':'0');}catch(_){} applyDock(); });
+  /* X = 툴박스 닫기(완전 숨김, 차트 확대). Ctrl+T로 재오픈 */
+  if(closeBtn) closeBtn.addEventListener('click', ()=>{ setHiddenDock(true); toast('Toolbox closed — Ctrl+T to reopen'); });
+  /* 원클릭 청산 (포지션 행 우측 X) — 위임 */
+  content.addEventListener('click', e=>{ const x=e.target.closest('.poclose'); if(!x) return; closePosDemo(x.dataset.close); });
   /* 상단 테두리 드래그로 높이 조절 */
-  if(rz) rz.addEventListener('pointerdown', e=>{ if(collapsed) return; e.preventDefault(); rz.setPointerCapture(e.pointerId);
+  if(rz) rz.addEventListener('pointerdown', e=>{ e.preventDefault(); rz.setPointerCapture(e.pointerId);
     const sy=e.clientY, sh=dockH;
     const move=ev=>{ dockH=Math.max(90, Math.min(sh+(sy-ev.clientY), window.innerHeight*0.75)); content.style.height=dockH+'px'; refitLayout(); };
     const up=()=>{ rz.releasePointerCapture(e.pointerId); rz.removeEventListener('pointermove',move); rz.removeEventListener('pointerup',up);
       try{localStorage.setItem(DOCK_H, Math.round(dockH));}catch(_){} };
     rz.addEventListener('pointermove',move); rz.addEventListener('pointerup',up); });
-  document.addEventListener('keydown', e=>{ if((e.ctrlKey||e.metaKey)&&(e.key==='t'||e.key==='T')){ e.preventDefault();
-    collapsed=!collapsed; try{localStorage.setItem(DOCK_C,collapsed?'1':'0');}catch(_){} applyDock(); } });
+  document.addEventListener('keydown', e=>{ if((e.ctrlKey||e.metaKey)&&(e.key==='t'||e.key==='T')){ e.preventDefault(); setHiddenDock(!hidden); } });
   applyDock();
 })();
 
-/* 상태바 — 시각 + EURUSD O/H/L/C/V(SIM mwStore 기반) */
-function updateStatus(){ const r=mwStore.rows['EURUSD']; if(!r) return;
+/* 상태바 — 시각 */
+function updateStatus(){ const el=document.getElementById('sbClock'); if(!el) return;
   const d=new Date(), p=n=>(n<10?'0':'')+n;
-  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
-  set('sbClock', d.getFullYear()+'.'+p(d.getMonth()+1)+'.'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds()));
-  set('sbC', mwFmt('EURUSD', r.mid)); set('sbO', mwFmt('EURUSD', r.open));
-  set('sbH', mwFmt('EURUSD', r.hi)); set('sbL', mwFmt('EURUSD', r.lo)); set('sbV', String(25)); }
+  el.textContent=d.getFullYear()+'.'+p(d.getMonth()+1)+'.'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds()); }
 updateStatus();
 setInterval(()=>{ if(!mwStore.live) mwSimulate(); mwRender(); updateStatus(); }, 1000);
 
