@@ -154,8 +154,12 @@ body.light .cgmenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
   color:var(--lgd-dim); text-transform:uppercase; border-bottom:1px solid var(--lgd-hair)}
 .mwhd div:not(:first-child), .mwrow .mwpx, .mwrow .mwspr{text-align:right}
 .mwlist{flex:1; min-height:0; overflow:auto}
-.mwrow{padding:6px 10px; font-size:12px; border-bottom:1px solid rgba(128,128,128,.10); cursor:default}
+.mwrow{padding:6px 10px; font-size:12px; border-bottom:1px solid rgba(128,128,128,.10); cursor:grab}
 .mwrow:hover{background:var(--lgd-surface2)}
+.mwrow:active{cursor:grabbing}
+/* 심볼 드래그 중 차트 위 드롭 하이라이트(MT5) */
+body.symdrag .widget[id^="w-chart"]{outline:1px dashed var(--lgd-hair); outline-offset:-2px}
+.widget.dropok{outline:2px solid var(--lgd-up)!important; outline-offset:-2px}
 .mwsym{font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .mwpx{font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; font-weight:600; color:var(--lgd-dim)}
 .mwpx.up{color:var(--lgd-up)} .mwpx.down{color:var(--lgd-down,#EB5D2A)}
@@ -631,6 +635,14 @@ function activeCfg(){ return activeChart?cfg(activeChart):null; }
 function setActiveChart(id){ if(!/^chart\d+$/.test(id)||!layout[id]) return; activeChart=id;
   chartIds().forEach(cid=>{ const el=document.getElementById('w-'+cid); if(el) el.classList.toggle('chart-active',cid===id); });
   syncChartUI(); }
+/* 시세창 심볼 드롭 → 그 차트만 심볼 교체(MT5). 알 수 없는 심볼은 무시. */
+function setChartSymbol(id, sym){ if(!/^chart\d+$/.test(id)||!layout[id]) return false;
+  sym=String(sym||'').trim().toUpperCase(); if(!sym||!MW_WATCH.includes(sym)) return false;
+  if(layout[id].sym===sym){ setActiveChart(id); return true; }
+  layout[id].sym=sym; saveLayout();
+  const el=document.getElementById('w-'+id); if(el){ const h=el.querySelector('.wtb h3'); if(h){ h.textContent=sym; h.setAttribute('data-i18n',sym); } }
+  const g=groupOf(id); if(g){ const ael=document.getElementById('w-'+g.active); if(ael) ensureGrpTabs(ael,g); }   // 그룹 탭 라벨 갱신
+  setActiveChart(id); renderChart(id); toast(sym+' — chart'); return true; }
 const DRAW_TIP={'Horizontal line':'hline','Vertical line':'vline','Trend line':'trend','Fibonacci':'fib','Text':'text'};
 function syncChartUI(){ const c=activeCfg();
   document.querySelectorAll('#htoolbar .htool').forEach(t=>{ const n=t.dataset.tip; let on=null;
@@ -894,6 +906,10 @@ function mkChart(id, sym, i){ makeWidget(id, sym, 'var(--lgd-up)', chartBody());
     plot.addEventListener('wheel', ev=>{ ev.preventDefault(); setActiveChart(id); const c=cfg(id);
       c.zoom=Math.max(0.18,Math.min(4,+(c.zoom*(ev.deltaY<0?1.15:0.87)).toFixed(3))); saveCfg(); renderChart(id); }, {passive:false});
     plot.addEventListener('contextmenu', ev=>{ ev.preventDefault(); setActiveChart(id); showChartCtx(id, ev); }); }   // 우클릭 메뉴
+  /* 시세창 심볼 드롭 대상 — 차트 어디든(헤더 포함) 드롭 허용 → 심볼 교체 */
+  el.addEventListener('dragover', ev=>{ if(!document.body.classList.contains('symdrag')) return; ev.preventDefault(); ev.dataTransfer.dropEffect='copy'; el.classList.add('dropok'); });
+  el.addEventListener('dragleave', ev=>{ if(!el.contains(ev.relatedTarget)) el.classList.remove('dropok'); });
+  el.addEventListener('drop', ev=>{ el.classList.remove('dropok'); const sym=(ev.dataTransfer&&(ev.dataTransfer.getData('text/mt5-symbol')||ev.dataTransfer.getData('text/plain')))||''; if(!sym) return; ev.preventDefault(); setChartSymbol(id, sym); });
   applyGeo(id); renderChart(id); }
 function destroyCharts(){ chartIds().forEach(id=>{ const el=document.getElementById('w-'+id); if(el) el.remove();
   delete layout[id]; const zi=zOrder.indexOf(id); if(zi>=0) zOrder.splice(zi,1); }); }
@@ -1017,7 +1033,7 @@ function mwRender(){ const host=document.getElementById('mwBody'); if(!host) ret
   const list=mwFilter==='All'?MW_WATCH:MW_WATCH.filter(s=>mwCat(s)===mwFilter);
   const d=new Date(),p=n=>(n<10?'0':'')+n, tnow=p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
   host.innerHTML=list.map(s=>{ const r=mwStore.rows[s]||{};
-    return '<div class="mwrow mwgrid" data-sym="'+s+'" style="grid-template-columns:'+tmpl+'">'+
+    return '<div class="mwrow mwgrid" draggable="true" data-sym="'+s+'" style="grid-template-columns:'+tmpl+'">'+
       cols.map(c=>mwCell(s,r,c.k,tnow)).join('')+'</div>'; }).join(''); }
 function mwBodyHTML(){ return '<div class="mwwrap">'+
   '<div id="mwHead"></div>'+   /* 헤더는 mwRender가 활성 컬럼대로 재생성(우클릭 토글 반영) */
@@ -1400,6 +1416,12 @@ function toolSvg(inner, fill){ return '<svg width="16" height="16" viewBox="0 0 
   const sub=document.getElementById('mwSub');
   if(sub) sub.addEventListener('click', e=>{ const b=e.target.closest('[data-sub]'); if(!b) return;
     mwView=b.dataset.sub; sub.querySelectorAll('[data-sub]').forEach(x=>x.classList.toggle('on',x===b)); mwRender(); });
+  /* MT5: 심볼 행을 끌어 차트에 드롭 → 그 차트가 심볼로 바뀜. 심볼 이름을 dataTransfer에 실음. */
+  const body=document.getElementById('mwBody');
+  if(body) body.addEventListener('dragstart', e=>{ const row=e.target.closest('.mwrow'); if(!row) return;
+    const sym=row.dataset.sym||''; document.body.classList.add('symdrag');
+    try{ e.dataTransfer.setData('text/mt5-symbol', sym); e.dataTransfer.setData('text/plain', sym); e.dataTransfer.effectAllowed='copy'; }catch(_){} });
+  if(body) body.addEventListener('dragend', ()=>document.body.classList.remove('symdrag'));
   /* MT5 표준 우클릭 컨텍스트 메뉴 (골격 항목 = 토스트, 클래스 필터 = 실동작) */
   const mtItem=(l,k)=>'<button data-mt="'+l+'"><span>'+l+'</span>'+(k?'<span class="key">'+k+'</span>':'')+'</button>';
   const ctx=document.createElement('div'); ctx.id='mwCtx'; ctx.className='cgmenu';
