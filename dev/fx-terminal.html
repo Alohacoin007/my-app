@@ -612,8 +612,9 @@ const IND_MA_P=20, IND_BB_P=20, IND_BB_K=2, IND_RSI_P=14;
 const CH_MA='#F5A623', CH_BB='#8E9BB3', CH_RSI='#B37FEB';
 /* 차트별 설정 (id -> {type,grid,zoom,tf,ind}). 새 차트는 기본값. localStorage 저장 */
 const chartCfg=(()=>{ try{ return JSON.parse(localStorage.getItem('alpexa.fxdash.chartcfg')||'{}'); }catch(_){ return {}; } })();
-function cfg(id){ let c=chartCfg[id]; if(!c){ c=chartCfg[id]={type:'candles',grid:true,zoom:1,tf:curTF,ind:{}}; }
-  if(!c.ind) c.ind={}; if(!c.tf) c.tf=curTF; return c; }
+function cfg(id){ let c=chartCfg[id]; if(!c){ c=chartCfg[id]={type:'candles',grid:true,zoom:1,tf:curTF,ind:{},vol:true}; }
+  if(!c.ind) c.ind={}; if(!c.tf) c.tf=curTF; if(c.vol===undefined) c.vol=true; return c; }
+const chVolFmt=v=>{ v=+v||0; return v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(1)+'K':String(Math.round(v)); };
 function saveCfg(){ try{ localStorage.setItem('alpexa.fxdash.chartcfg', JSON.stringify(chartCfg)); }catch(_){} }
 function activeCfg(){ return activeChart?cfg(activeChart):null; }
 function setActiveChart(id){ if(!/^chart\d+$/.test(id)||!layout[id]) return; activeChart=id;
@@ -652,6 +653,7 @@ function setChartType(t){ const c=activeCfg(); if(!c) return; c.type=t; saveCfg(
 function zoomCharts(dir){ const c=activeCfg(); if(!c) return; c.zoom=Math.max(0.5,Math.min(3,+(c.zoom*(dir>0?1.25:0.8)).toFixed(3))); saveCfg(); renderChart(activeChart); }
 function toggleGrid(){ const c=activeCfg(); if(!c) return; c.grid=!c.grid; saveCfg(); renderChart(activeChart); }
 function toggleInd(k){ const c=activeCfg(); if(!c) return; c.ind[k]=!c.ind[k]; saveCfg(); renderChart(activeChart); }
+function toggleVol(){ const c=activeCfg(); if(!c) return; c.vol=!c.vol; saveCfg(); renderChart(activeChart); }
 function setChartTF(tf){ const c=activeCfg(); if(!c) return; c.tf=tf; saveCfg();
   const lbl=document.querySelector('#w-'+activeChart+' .cgtf'); if(lbl) lbl.textContent=tf; renderChart(activeChart); syncChartUI(); }
 function smaAt(cl,p,i){ if(i<p-1) return null; let s=0; for(let j=i-p+1;j<=i;j++) s+=cl[j]; return s/p; }
@@ -686,15 +688,16 @@ function seedSeries(sym,tf){ const base=chBase(sym), vol=base*(mwCat(sym)==='Cry
   const n=150, step=TF_MS[tf]||1800e3, now=Date.now(); let px=base*(1+(Math.random()-0.5)*0.006), arr=[];
   for(let i=n;i>=1;i--){ const o=px, c=Math.max(base*0.3, o+(Math.random()-0.5)*vol*2);
     const hi=Math.max(o,c)+Math.random()*vol*0.8, lo=Math.min(o,c)-Math.random()*vol*0.8;
-    arr.push({t:now-i*step,o,h:hi,l:lo,c}); px=c; }
+    const v=Math.round(150+Math.random()*700+Math.abs(c-o)/vol*300);   // 틱 볼륨(변동 클수록 큼)
+    arr.push({t:now-i*step,o,h:hi,l:lo,c,v}); px=c; }
   /* 마지막 봉 종가를 현재가(base=SIM mid ≈ base)에 앵커 → 라이브 전환 시 거대 봉 방지(평행 이동, OHLC 관계 보존) */
   const shift=base-arr[arr.length-1].c; if(shift) arr.forEach(k=>{ k.o+=shift; k.h+=shift; k.l+=shift; k.c+=shift; });
   return arr; }
 function series(sym,tf){ const k=sym+'|'+tf; let s=chartSeries[k]; if(!s) s=chartSeries[k]={tf,c:seedSeries(sym,tf)}; return s; }
 function tickSeries(sym,tf){ const s=series(sym,tf), r=mwStore.rows[sym], mid=r&&r.mid; if(!(mid>0)) return s;
   const step=TF_MS[tf]||1800e3, now=Date.now(), last=s.c[s.c.length-1];
-  if(now-last.t>=step){ s.c.push({t:last.t+step,o:last.c,h:Math.max(last.c,mid),l:Math.min(last.c,mid),c:mid}); if(s.c.length>500) s.c.shift(); }
-  else { last.c=mid; if(mid>last.h) last.h=mid; if(mid<last.l) last.l=mid; } return s; }
+  if(now-last.t>=step){ s.c.push({t:last.t+step,o:last.c,h:Math.max(last.c,mid),l:Math.min(last.c,mid),c:mid,v:Math.round(80+Math.random()*160)}); if(s.c.length>500) s.c.shift(); }
+  else { last.c=mid; if(mid>last.h) last.h=mid; if(mid<last.l) last.l=mid; last.v=(last.v||0)+Math.round(1+Math.random()*3); } return s; }
 /* 각 차트 = 최상위 위젯(chart1..N). 표준 위젯 엔진으로 스테이지 어디든 드래그/스냅/리사이즈. */
 function chartBody(){ return '<div class="cgwplot"><svg class="cgsvg"></svg><svg class="cgcross"></svg><span class="cgtf">'+curTF+'</span></div>'; }
 function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) return;
@@ -703,8 +706,14 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
   if(W<40||H<28){ svg.innerHTML=''; return; }
   const c=cfg(id), ind=c.ind, dg=mwDigits(sym), s=series(sym, c.tf);   // ← 차트별 설정
   const RA=Math.round(Math.min(60, Math.max(36, W*0.12))), padT=6, padB=6, plotW=W-RA, plotH=H-padT-padB;
-  /* RSI 서브창이 켜지면 가격창 높이를 줄이고 하단에 오실레이터 창 배치 */
-  const oscH=ind.rsi?Math.max(40,Math.min(130,plotH*0.28)):0, gapPane=ind.rsi?10:0, priceH=plotH-oscH-gapPane;
+  /* 하단 서브창 스택: 가격창 → (RSI) → (Volume). 켜진 만큼 가격창 높이 축소 */
+  const showVol=c.vol!==false && H>110;
+  const volH=showVol?Math.max(22,Math.min(64,plotH*0.16)):0;
+  const oscH=ind.rsi?Math.max(38,Math.min(120,plotH*0.24)):0;
+  const priceH=plotH-oscH-volH-(oscH?8:0)-(volH?8:0);
+  let paneY=padT+priceH, rsiTop=0, volTop=0;
+  if(oscH){ paneY+=8; rsiTop=paneY; paneY+=oscH; }
+  if(volH){ paneY+=8; volTop=paneY; paneY+=volH; }
   const slot=Math.max(3, Math.min(13, plotW/50))*c.zoom; let nVis=Math.min(s.c.length, Math.max(6, Math.floor(plotW/slot)));
   const vis=s.c.slice(-nVis), closes=s.c.map(k=>k.c), absBase=s.c.length-vis.length;
   let mn=Infinity,mx=-Infinity; vis.forEach(k=>{ if(k.l<mn)mn=k.l; if(k.h>mx)mx=k.h; });
@@ -738,9 +747,18 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
   out+='<line x1="0" y1="'+ly.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+ly.toFixed(1)+'" stroke="'+lcol+'" stroke-width="1" stroke-dasharray="3 3" opacity=".9"/>'+
     '<rect x="'+plotW.toFixed(1)+'" y="'+(ly-8).toFixed(1)+'" width="'+RA+'" height="16" fill="'+lcol+'"/>'+
     '<text x="'+(W-4)+'" y="'+(ly+3.5).toFixed(1)+'" text-anchor="end" fill="#fff" font-size="9.5" font-weight="700" font-family="inherit">'+lc.toFixed(dg)+'</text>';
-  if(ind.ma) out+='<text x="4" y="'+(padT+10)+'" fill="'+CH_MA+'" font-size="8.5" font-weight="700">MA'+IND_MA_P+'</text>';
-  /* ── RSI 서브창(하단) ── */
-  if(ind.rsi){ const rsi=rsiSeries(closes,IND_RSI_P), top=padT+priceH+gapPane, yR=v=>top+(100-v)/100*oscH;
+  /* ── OHLCV 리드아웃(상단, TF 라벨 우측) — 마지막 봉, 라이브 ── */
+  let info='O '+lk.o.toFixed(dg)+'  H '+lk.h.toFixed(dg)+'  L '+lk.l.toFixed(dg)+'  C '+lk.c.toFixed(dg)+'  V '+chVolFmt(lk.v);
+  if(ind.ma) info+='  ·  MA'+IND_MA_P; if(ind.boll) info+='  ·  BB';
+  out+='<text x="44" y="'+(padT+8)+'" fill="var(--lgd-ink)" font-size="8.5" font-family="inherit">'+info+'</text>';
+  /* ── Volume 히스토그램(최하단 서브창) ── */
+  if(showVol){ let maxV=1; vis.forEach(k=>{ if((k.v||0)>maxV) maxV=k.v||0; }); const vbase=volTop+volH;
+    out+='<line x1="0" y1="'+volTop.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+volTop.toFixed(1)+'" stroke="var(--lgd-hair)" stroke-width="1" opacity=".5"/>';
+    vis.forEach((k,i)=>{ const x=i*cw+cw/2, up=k.c>=k.o, h=Math.max(1,(k.v||0)/maxV*(volH-3));
+      out+='<rect x="'+(x-bw/2).toFixed(1)+'" y="'+(vbase-h).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" fill="'+(up?CH_UP:CH_DN)+'" opacity=".5"/>'; });
+    out+='<text x="4" y="'+(volTop+9).toFixed(1)+'" fill="var(--lgd-dim)" font-size="8" font-weight="700">Vol '+chVolFmt(lk.v)+'</text>'; }
+  /* ── RSI 서브창 ── */
+  if(ind.rsi){ const rsi=rsiSeries(closes,IND_RSI_P), top=rsiTop, yR=v=>top+(100-v)/100*oscH;
     out+='<line x1="0" y1="'+top.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+top.toFixed(1)+'" stroke="var(--lgd-hair)" stroke-width="1" opacity=".6"/>';
     [30,50,70].forEach(lv=>{ out+='<line x1="0" y1="'+yR(lv).toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+yR(lv).toFixed(1)+'" stroke="var(--lgd-hair)" stroke-width="1" stroke-dasharray="2 3" opacity="'+(lv===50?'.3':'.5')+'"/>'; });
     ['70','30'].forEach(t2=>{ out+='<text x="'+(W-4)+'" y="'+(yR(+t2)-2).toFixed(1)+'" text-anchor="end" fill="var(--lgd-dim)" font-size="8">'+t2+'</text>'; });
@@ -1253,7 +1271,7 @@ function toolSvg(inner, fill){ return '<svg width="16" height="16" viewBox="0 0 
       '<div class="cgsep"></div>'+mact('grid','Grid','',c&&c.grid)+mact('zoomin','Zoom In','+')+mact('zoomout','Zoom Out','−')+
       mact('objclear','Delete All Objects','Del')+
       '<div class="cgsep"></div><div class="cgmhd">Insert — Indicators</div>'+
-      mact('ind:ma','Moving Average (20)','',!!ind.ma)+mact('ind:boll','Bollinger Bands (20,2)','',!!ind.boll)+mact('ind:rsi','RSI (14)','',!!ind.rsi)+
+      mact('vol','Volume','',c&&c.vol!==false)+mact('ind:ma','Moving Average (20)','',!!ind.ma)+mact('ind:boll','Bollinger Bands (20,2)','',!!ind.boll)+mact('ind:rsi','RSI (14)','',!!ind.rsi)+
       '<div class="cgsep"></div><div class="cgmhd">Window</div>'+
       '<button class="mtile" data-tile="grid">Tile Windows</button><button class="mtile" data-tile="vertical">Tile Vertically</button>'+
       '<button class="mtile" data-tile="horizontal">Tile Horizontally</button><button class="mtile" data-tile="cascade">Cascade</button>'+
@@ -1268,6 +1286,7 @@ function toolSvg(inner, fill){ return '<svg width="16" height="16" viewBox="0 0 
       if(tl){ tileCharts(tl.dataset.tile); drop.style.display='none'; return; }
       if(!ac) return; const a=ac.dataset.act;
       if(a.startsWith('type:')){ setChartType(a.slice(5)); drawMenu(); }         // 활성 차트 · 메뉴 유지(체크 갱신)
+      else if(a==='vol'){ toggleVol(); drawMenu(); }
       else if(a.startsWith('ind:')){ toggleInd(a.slice(4)); drawMenu(); }
       else if(a==='grid'){ toggleGrid(); drawMenu(); }
       else if(a==='zoomin'){ zoomCharts(1); }
