@@ -195,7 +195,8 @@ body.light .cgmenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
   font-size:11.5px; border-top:1px solid var(--lgd-hair); background:var(--lgd-surface2)}
 .tbxacct span{color:var(--lgd-dim)} .tbxacct b{color:var(--lgd-ink); font-weight:700; font-variant-numeric:tabular-nums; margin-left:4px}
 .tbxtotal{margin-left:auto; margin-right:32px; font-weight:800; font-variant-numeric:tabular-nums; font-size:12px}  /* Profit 열 아래 정렬(청산 X열폭 32px만큼 왼쪽) */
-.postbl{width:100%; border-collapse:collapse; font-size:11.5px}
+.postbl{width:100%; border-collapse:collapse; font-size:11.5px; table-layout:fixed}
+.postbl th, .postbl td{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .postbl th{position:sticky; top:0; background:var(--lgd-surface); text-align:right; font-weight:700; color:var(--lgd-dim);
   padding:5px 10px; font-size:9.5px; text-transform:uppercase; letter-spacing:.3px; border-bottom:1px solid var(--lgd-hair)}
 .postbl th:first-child, .postbl td:first-child{text-align:left}
@@ -690,17 +691,31 @@ function mwBodyHTML(){ return '<div class="mwwrap">'+
   '<div class="mwsub" id="mwSub">'+['Symbols','Details','Trading','Ticks'].map((t,i)=>
     '<button data-sub="'+t+'"'+(i===0?' class="on"':'')+'>'+t+'</button>').join('')+'</div></div>'; }
 
-/* ── Navigator 트리 (MT5: Accounts / Indicators / Expert Advisors / Scripts) ── */
-const NAV_GROUPS=[
-  {n:'Accounts', k:['3172308 — Alpexa-Demo (Hedge)']},
-  {n:'Indicators', k:['Trend','Oscillators','Volumes','Bill Williams','Custom']},
-  {n:'Expert Advisors', k:['Moving Average','MACD Sample','Awesome Oscillator']},
-  {n:'Scripts', k:['PeriodConverter']} ];
+/* ── Navigator 트리 (MT5 그대로: Accounts / Indicators(하위폴더+실인디케이터) / Expert Advisors / Scripts) ──
+   인디케이터 목록 = 실제 MT5 Navigator(사장님 스샷 기준). 클릭 시 폴더 접힘/펼침, 리프는 인디케이터 글리프. */
+const NAV_TREE=[
+  {n:'Accounts', ch:['3172308 — Alpexa-Demo (Hedge)']},
+  {n:'Indicators', ch:[
+    {n:'Trend', ch:['Adaptive Moving Average','Average Directional Movement Index','Average Directional Movement Index Wilder','Bollinger Bands','Double Exponential Moving Average','Envelopes','Fractal Adaptive Moving Average','Ichimoku Kinko Hyo','Moving Average','Parabolic SAR','Standard Deviation','Triple Exponential Moving Average','Variable Index Dynamic Average']},
+    {n:'Oscillators', ch:['Average True Range','Bears Power','Bulls Power','Chaikin Oscillator','Commodity Channel Index','DeMarker','Force Index','MACD','Momentum','Moving Average of Oscillator','Relative Strength Index','Relative Vigor Index','Stochastic Oscillator','Triple Exponential Average','Williams’ Percent Range']},
+    {n:'Volumes', ch:['Accumulation/Distribution','Money Flow Index','On Balance Volume','Volumes']},
+    {n:'Bill Williams', ch:['Accelerator Oscillator','Alligator','Awesome Oscillator','Fractals','Gator Oscillator','Market Facilitation Index']},
+    {n:'Examples', ch:['Accelerator','AD','ADX','ADXW','Alligator','AMA','ASI','ATR','Awesome_Oscillator','BB','Bears','Bulls','BW-ZoneTrade','CCI','CHO','CHV','ColorBars','ColorCandlesDaily','ColorLine','Custom Moving Average','DEMA','DeMarker','DPO','Envelopes','Force_Index','Fractals','FrAMA','Gator','Gator_2','Heiken_Ashi','Ichimoku','MACD','MarketFacilitationIndex','MFI','MI','Momentum','OBV','OsMA','ParabolicSAR','Price_Channel','PVT','ROC','RSI','RVI','StdDev','Stochastic','TEMA','TRIX','Ultimate_Oscillator','VIDYA','Volumes','VROC','WPR','W_AD','ZigZag','ZigzagColor']},
+    {n:'Free Indicators', ch:['Camarilla Channel','DeMark Channel','Donchian Channel','Fibonacci Channel','Keltner Channel','MarketProfile Canvas','MarketProfile','MurreyMath Channel','NRTR Channel','Parabolic Channel','Pivot Channel','Woodie Channel']} ]},
+  {n:'Expert Advisors', ch:[
+    {n:'Advisors', ch:['ExpertMACD','ExpertMAMA','ExpertMAPSAR']},
+    {n:'Examples', ch:['MACD Sample','Moving Average','Awesome Oscillator']},
+    {n:'Free Robots', ch:[]} ]},
+  {n:'Scripts', ch:['PeriodConverter']} ];
 const navFolder='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7h6l2 2h10v10H3z"/></svg>';
-function navBodyHTML(){ return '<div class="nvtree" id="nvTree">'+NAV_GROUPS.map(g=>
-  '<div class="nvgrp closed"><div class="nvhead"><span class="nvcar">▼</span><span class="nvic">'+navFolder+'</span><span>'+g.n+'</span></div>'+
-  '<div class="nvkids">'+g.k.map(k=>'<div class="nvleaf"><span class="nvic" style="font-size:8px">•</span>'+k+'</div>').join('')+
-  '</div></div>').join('')+'</div>'; }
+const navInd='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2E90FA" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15l4-6 4 5 4-9 6 8"/></svg>';
+function navNode(node, depth){ const pad=depth*13+8;
+  if(typeof node==='string')
+    return '<div class="nvleaf" style="padding-left:'+(pad+13)+'px"><span class="nvic ind">'+navInd+'</span>'+node+'</div>';
+  return '<div class="nvgrp closed"><div class="nvhead" style="padding-left:'+pad+'px"><span class="nvcar">▼</span>'+
+    '<span class="nvic">'+navFolder+'</span><span>'+node.n+'</span></div>'+
+    '<div class="nvkids">'+(node.ch||[]).map(c=>navNode(c, depth+1)).join('')+'</div></div>'; }
+function navBodyHTML(){ return '<div class="nvtree" id="nvTree">'+NAV_TREE.map(n=>navNode(n,0)).join('')+'</div>'; }
 
 /* ── Toolbox (MT5 하단 패널) — 탭 12종 + Trade(계좌 바 + 포지션 테이블) ──
    계좌·포지션 값은 사장님이 준 MT5 데모 스샷 그대로(DEMO·preview 표기). 실계좌 연동은 M3(서버 전용). */
@@ -748,6 +763,15 @@ function ccyVolFmt(v){ const a=Math.abs(v);
   if(a>=1e6) return parseFloat((v/1e6).toFixed(6))+'M';
   if(a>=1e3) return parseFloat((v/1e3).toFixed(5))+'K';
   return (Math.round(v*100)/100).toString(); }
+/* ── MT5식 고정 컬럼 폭 (table-layout:fixed + colgroup) — 탭 전환해도 칸이 안 흔들리게.
+   각 배열은 % 합 100. 브라우저 자동배분("지 맘대로") 제거. ── */
+const colg=ws=>'<colgroup>'+ws.map(w=>'<col style="width:'+w+'%">').join('')+'</colgroup>';
+const TBX_COLW={
+  trade:  [10,7,17,5,7,8,6,6,8,9,6,8,3],   // Symbol Ticket Time Type Vol Price S/L T/P Price Comm Swap Profit X
+  history:[14,12,22,8,10,11,11,12],        // Symbol Ticket Time Type Vol Price Price Profit
+  exposure:[12,16,14,16,42],               // Asset Volume Rate USD Graph
+  alerts: [26,26,44,4],                    // Symbol Condition Status X
+  mailbox:[16,68,16] };                    // Time Subject Amount
 /* 원클릭 청산 (DEMO) — 행 제거 + History/Journal 기록 + 총 P/L 재계산. 실청산은 fx_close RPC(M5, 서버 전용) */
 function closePosDemo(ticket){ const p=DEMO_POS.find(x=>x.ticket===ticket); if(!p) return;
   DEMO_POS=DEMO_POS.filter(x=>x.ticket!==ticket);
@@ -775,7 +799,7 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
         '<td class="'+(+p.pl>=0?'pl-pos':'pl-neg')+'">'+p.pl+'</td>'+
         '<td class="pox"><span class="poclose" data-close="'+p.ticket+'" title="Close position (one-click)">✕</span></td></tr>').join('')
       : '<tr><td colspan="13" style="text-align:center;color:var(--lgd-dim);padding:16px">No open positions</td></tr>';
-    body.innerHTML='<div class="tbxscroll"><table class="postbl"><thead><tr>'+
+    body.innerHTML='<div class="tbxscroll"><table class="postbl">'+colg(TBX_COLW.trade)+'<thead><tr>'+
       ['Symbol','Ticket','Time','Type','Volume','Price','S / L','T / P','Price','Commission','Swap','Profit',''].map(h=>'<th>'+h+'</th>').join('')+
       '</tr></thead><tbody>'+rows+'</tbody></table>'+
       /* 계좌 바 = 마지막 포지션 바로 뒤에 따라붙음(아래는 빈 공간), 총 P/L 우측 (MT5) */
@@ -814,7 +838,7 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
       : '<div class="exppiewrap"><div class="exphd">Long Positions</div><div class="tbxempty" style="padding:12px">—</div></div>';
     const acctbar='<div class="tbxacct"><span>Balance:<b>100 000.00 USD</b></span><span>Equity:<b>99 992.79</b></span>'+
       '<span>Margin:<b>256.64</b></span><span>Free Margin:<b>99 736.15</b></span><span>Margin Level:<b>38 962.28%</b></span></div>';
-    body.innerHTML='<div class="tbxscroll"><div class="expwrap"><table class="postbl exptbl"><thead><tr>'+
+    body.innerHTML='<div class="tbxscroll"><div class="expwrap"><table class="postbl exptbl">'+colg(TBX_COLW.exposure)+'<thead><tr>'+
       ['Asset','Volume','Rate','USD','Graph'].map(h=>'<th>'+h+'</th>').join('')+
       '</tr></thead><tbody>'+rows+'</tbody></table>'+pie+'</div>'+acctbar+'</div>';
 
@@ -832,7 +856,7 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
       : '<tr><td colspan="8" style="text-align:center;color:var(--lgd-dim);padding:16px">No history in the selected period</td></tr>';
     const foot=shown.length?'<div class="tbxacct"><span>Deals:<b>'+shown.length+'</b></span>'+
       '<span class="tbxtotal '+(totP>=0?'pl-pos':'pl-neg')+'">'+totP.toFixed(2)+'</span></div>':'';
-    body.innerHTML=bar+'<div class="tbxscroll"><table class="postbl"><thead><tr>'+
+    body.innerHTML=bar+'<div class="tbxscroll"><table class="postbl">'+colg(TBX_COLW.history)+'<thead><tr>'+
       ['Symbol','Ticket','Time','Type','Volume','Price','Price','Profit'].map(h=>'<th>'+h+'</th>').join('')+
       '</tr></thead><tbody>'+rows+'</tbody></table>'+foot+'</div>';
 
@@ -844,7 +868,7 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
       '<input id="alPx" placeholder="price" inputmode="decimal">'+
       '<button class="albtn" id="alAdd">Add Alert</button></div>';
     const list=alertsStore.list;
-    const body2=list.length?'<div class="tbxscroll"><table class="postbl"><thead><tr>'+
+    const body2=list.length?'<div class="tbxscroll"><table class="postbl">'+colg(TBX_COLW.alerts)+'<thead><tr>'+
         ['Symbol','Condition','Status',''].map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+
         list.map(a=>'<tr><td>'+a.sym+'</td><td>'+(a.cond==='>='?'≥':'≤')+' '+a.px+'</td>'+
           '<td class="'+(a.armed?'':'up')+'">'+(a.armed?'⏳ Armed':'✅ Hit '+new Date(a.hitAt).toLocaleTimeString())+'</td>'+
@@ -874,7 +898,7 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
         '  · Login (account):  3172308\n  · Server:           Alpexa-Demo\n'+
         '  · Account type:     Standard · USD · leverage up to 1:100\n\n'+
         'Live account data connects in a later build (server-only). Good trading!\nALPEXA Dealing Desk'};
-    body.innerHTML='<div class="tbxscroll"><table class="postbl"><thead><tr>'+
+    body.innerHTML='<div class="tbxscroll"><table class="postbl">'+colg(TBX_COLW.mailbox)+'<thead><tr>'+
       ['Time','Subject','Amount (USD)'].map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+
       '<tr class="mbx-row" data-mail="1"><td>—</td><td>'+mail.subject+'</td><td>—</td></tr>'+
       '<tr class="mbx-detail" id="mbxDetail" style="display:none"><td colspan="3">'+mail.detail+'</td></tr>'+
