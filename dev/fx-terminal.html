@@ -203,6 +203,11 @@ body.light .cgmenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
 .postbl td{text-align:right; padding:5px 10px; border-bottom:1px solid rgba(128,128,128,.08); font-variant-numeric:tabular-nums}
 .postbl .buy{color:var(--lgd-up); text-transform:capitalize} .postbl .sell{color:var(--lgd-down,#EB5D2A); text-transform:capitalize}
 .postbl .pl-pos{color:var(--lgd-up)} .postbl .pl-neg{color:var(--lgd-down,#EB5D2A)}
+/* 계좌/합계 tfoot — colspan으로 Profit 열에 자동 정렬(하드코딩 margin 제거) */
+.postbl tfoot .acctrow td{background:var(--lgd-surface2); border-top:1px solid var(--lgd-hair); padding:6px 10px; overflow:visible}
+.acctline{display:flex; align-items:center; gap:14px; flex-wrap:wrap; font-size:11.5px}
+.acctline span{color:var(--lgd-dim)} .acctline b{color:var(--lgd-ink); font-weight:700; margin-left:4px; font-variant-numeric:tabular-nums}
+.postbl tfoot td.tbxtotal{text-align:right; font-weight:800; font-size:12px; font-variant-numeric:tabular-nums}
 .tbxempty{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:var(--lgd-dim); font-size:12px; padding:24px; text-align:center}
 .tbxempty .ic{font-size:28px; opacity:.7}
 .postbl .up{color:var(--lgd-up)} .postbl .down{color:var(--lgd-down,#EB5D2A)}
@@ -801,12 +806,14 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
       : '<tr><td colspan="13" style="text-align:center;color:var(--lgd-dim);padding:16px">No open positions</td></tr>';
     body.innerHTML='<div class="tbxscroll"><table class="postbl">'+colg(TBX_COLW.trade)+'<thead><tr>'+
       ['Symbol','Ticket','Time','Type','Volume','Price','S / L','T / P','Price','Commission','Swap','Profit',''].map(h=>'<th>'+h+'</th>').join('')+
-      '</tr></thead><tbody>'+rows+'</tbody></table>'+
-      /* 계좌 바 = 마지막 포지션 바로 뒤에 따라붙음(아래는 빈 공간), 총 P/L 우측 (MT5) */
-      '<div class="tbxacct">'+
+      '</tr></thead><tbody>'+rows+'</tbody>'+
+      /* 계좌 바 = tfoot(마지막 행 바로 밑) · 총 P/L은 colspan으로 Profit 열에 정확히 정렬(margin 하드코딩 X) */
+      '<tfoot><tr class="acctrow">'+
+      '<td colspan="11"><div class="acctline">'+
       '<span>Balance:<b>100 000.00 USD</b></span><span>Equity:<b>99 992.79</b></span>'+
-      '<span>Margin:<b>256.64</b></span><span>Free Margin:<b>99 736.15</b></span><span>Margin Level:<b>38 962.28%</b></span>'+
-      '<span class="tbxtotal '+(total>=0?'pl-pos':'pl-neg')+'">'+total.toFixed(2)+'</span></div></div>';
+      '<span>Margin:<b>256.64</b></span><span>Free Margin:<b>99 736.15</b></span><span>Margin Level:<b>38 962.28%</b></span></div></td>'+
+      '<td class="tbxtotal '+(total>=0?'pl-pos':'pl-neg')+'">'+total.toFixed(2)+'</td><td></td>'+
+      '</tr></tfoot></table></div>';
 
   } else if(tab==='Exposure'){
     /* MT5 Exposure — 통화별 순노출 표(Asset/Volume/Rate/USD/Graph) + Long/Short Positions 파이 */
@@ -854,11 +861,12 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
       '<td class="'+(h.type==='sell'?'down':'up')+'">'+h.type+'</td><td>'+(+h.vol).toFixed(2)+'</td><td>'+h.open+'</td><td>'+h.close+'</td>'+
       '<td class="'+(+h.profit>=0?'pl-pos':'pl-neg')+'">'+(+h.profit).toFixed(2)+'</td></tr>').join('')
       : '<tr><td colspan="8" style="text-align:center;color:var(--lgd-dim);padding:16px">No history in the selected period</td></tr>';
-    const foot=shown.length?'<div class="tbxacct"><span>Deals:<b>'+shown.length+'</b></span>'+
-      '<span class="tbxtotal '+(totP>=0?'pl-pos':'pl-neg')+'">'+totP.toFixed(2)+'</span></div>':'';
+    /* 합계 = tfoot(colspan 7 + Profit열) — Profit 값 아래 정확 정렬 */
+    const foot=shown.length?'<tfoot><tr class="acctrow"><td colspan="7"><div class="acctline"><span>Deals:<b>'+shown.length+'</b></span></div></td>'+
+      '<td class="tbxtotal '+(totP>=0?'pl-pos':'pl-neg')+'">'+totP.toFixed(2)+'</td></tr></tfoot>':'';
     body.innerHTML=bar+'<div class="tbxscroll"><table class="postbl">'+colg(TBX_COLW.history)+'<thead><tr>'+
       ['Symbol','Ticket','Time','Type','Volume','Price','Price','Profit'].map(h=>'<th>'+h+'</th>').join('')+
-      '</tr></thead><tbody>'+rows+'</tbody></table>'+foot+'</div>';
+      '</tr></thead><tbody>'+rows+'</tbody>'+foot+'</table></div>';
 
   } else if(tab==='Alerts'){
     const opts=MW_WATCH.map(s=>'<option value="'+s+'">'+s+'</option>').join('');
