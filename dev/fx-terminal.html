@@ -69,11 +69,17 @@ button:active:not(:disabled),.htab:active,.hic:active,.avatar:active{ transform:
   color:var(--lgd-dim); cursor:pointer; border-radius:6px; font-size:15px}
 .wtb .wic:hover{background:var(--lgd-surface2); color:var(--lgd-ink)}
 .wbody{flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column}
-.rz{position:absolute; z-index:3}
-.rz.r{right:-3px; top:12px; bottom:20px; width:8px; cursor:ew-resize}
-.rz.b{bottom:-3px; left:12px; right:20px; height:8px; cursor:ns-resize}
+.rz{position:absolute; z-index:6}
+.rz.r{right:-3px; top:14px; bottom:16px; width:8px; cursor:ew-resize}
+.rz.l{left:-3px; top:14px; bottom:16px; width:8px; cursor:ew-resize}
+.rz.b{bottom:-3px; left:14px; right:16px; height:8px; cursor:ns-resize}
+.rz.t{top:-3px; left:14px; right:16px; height:8px; cursor:ns-resize}
 .rz.c{right:-3px; bottom:-3px; width:16px; height:16px; cursor:nwse-resize}
-.rz.r:hover,.rz.b:hover,.rz.c:hover{background:rgba(255,255,255,.06)}
+.rz.tl{left:-3px; top:-3px; width:14px; height:14px; cursor:nwse-resize}
+.rz.tr{right:-3px; top:-3px; width:14px; height:14px; cursor:nesw-resize}
+.rz.bl{left:-3px; bottom:-3px; width:14px; height:14px; cursor:nesw-resize}
+.rz:hover{background:rgba(255,255,255,.06)}
+body.light .rz:hover{background:rgba(15,23,40,.06)}
 .algn{position:absolute; z-index:45; background:var(--lgd-up); pointer-events:none}
 
 /* ── 기초공사 프레임(빈 위젯) ── */
@@ -84,14 +90,18 @@ button:active:not(:disabled),.htab:active,.hic:active,.avatar:active{ transform:
   font-weight:700; letter-spacing:.4px; color:var(--lgd-dim)}
 
 /* ── 멀티차트 그리드 (Chart 위젯 — MT5 N분할, 최대 10칸) ── */
-.cgwrap{flex:1; min-height:0; display:flex; flex-direction:column}
-.cgbar{display:flex; align-items:center; gap:6px; padding:6px 10px; flex:none; border-bottom:1px solid var(--lgd-hair)}
-.cgbar .cglbl{font-size:11px; color:var(--lgd-dim); font-weight:700; margin-right:4px}
-.cgbar button{background:var(--lgd-pill); border:1px solid transparent; color:var(--lgd-ink);
-  font:700 11px/1 inherit; border-radius:6px; height:24px; min-width:26px; padding:0 7px; cursor:pointer}
-.cgbar button:hover{background:var(--lgd-pill-hi)}
-.cgbar button.on{background:rgba(0,200,5,.12); border-color:var(--lgd-up); color:var(--lgd-up)}
 .cggrid{flex:1; min-height:0; display:grid; gap:6px; padding:6px; overflow:auto}
+.cgmenu{display:none; position:fixed; z-index:80; min-width:150px; background:var(--lgd-surface2);
+  border:1px solid var(--lgd-hair); border-radius:var(--lgd-r-pop,10px); box-shadow:0 8px 24px rgba(0,0,0,.5); padding:6px}
+.cgmenu .cgmhd{font-size:10px; font-weight:800; letter-spacing:.5px; color:var(--lgd-dim);
+  text-transform:uppercase; padding:4px 10px 6px}
+.cgmenu button{display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:none;
+  border:none; color:var(--lgd-ink); font:600 12px/1 inherit; padding:8px 10px; border-radius:6px; cursor:pointer}
+.cgmenu button:hover{background:var(--lgd-pill)}
+.cgmenu button.on{color:var(--lgd-up)}
+.cgmenu button .ck{margin-left:auto; color:var(--lgd-up); opacity:0}
+.cgmenu button.on .ck{opacity:1}
+body.light .cgmenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
 .cgcell{background:var(--lgd-bg); border:1px solid var(--lgd-hair); border-radius:8px; display:flex;
   flex-direction:column; overflow:hidden; min-height:84px}
 .cghd{display:flex; align-items:center; justify-content:space-between; padding:5px 8px; flex:none;
@@ -268,7 +278,8 @@ function makeWidget(id, title, linkColor, bodyHTML){
     '<h3 data-i18n="'+title+'">'+t(title)+'</h3><span class="wsp"></span>'+
     '<span class="wic" title="Close widget">⋮</span></div>'+
     '<div class="wbody">'+bodyHTML+'</div>'+
-    '<div class="rz r"></div><div class="rz b"></div><div class="rz c"></div>';
+    '<div class="rz t"></div><div class="rz b"></div><div class="rz l"></div><div class="rz r"></div>'+
+    '<div class="rz tl"></div><div class="rz tr"></div><div class="rz bl"></div><div class="rz c"></div>';
   stage.appendChild(el); applyGeo(id);
   el.querySelector('.wic').addEventListener('click', ()=>setHidden(id,true));
   /* 드래그 (타이틀바) */
@@ -294,18 +305,23 @@ function makeWidget(id, title, linkColor, bodyHTML){
       tb.removeEventListener('pointerup',up); el.classList.remove('drag'); clearGuides(); saveLayout(); };
     tb.addEventListener('pointermove',move); tb.addEventListener('pointerup',up);
   });
-  /* 리사이즈 (우/하/코너) */
+  /* 리사이즈 (전 모서리·코너) — n/s/e/w 방향. 위/왼쪽은 x·y도 함께 이동하며 h·w 반전, 0 밖 클램프 */
   function rz(sel, dir){ const h=el.querySelector(sel);
     h.addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopPropagation(); bringToFront(id);
-      h.setPointerCapture(e.pointerId); const g=layout[id]; const sx=e.clientX, sy=e.clientY, sw=g.w, sh=g.h;
+      h.setPointerCapture(e.pointerId); const g=layout[id];
+      const sx=e.clientX, sy=e.clientY, ox=g.x, oy=g.y, ow=g.w, oh=g.h;
       const m=MIN_SIZE[id]||{w:180,h:140};
-      const move=ev=>{ if(dir.includes('e')) g.w=Math.max(m.w, sw+(ev.clientX-sx));
-        if(dir.includes('s')) g.h=Math.max(m.h, sh+(ev.clientY-sy));
-        el.style.width=g.w+'px'; el.style.height=g.h+'px'; };
+      const move=ev=>{ const dx=ev.clientX-sx, dy=ev.clientY-sy;
+        if(dir.includes('e')) g.w=Math.max(m.w, ow+dx);
+        if(dir.includes('s')) g.h=Math.max(m.h, oh+dy);
+        if(dir.includes('w')){ let nw=Math.max(m.w, ow-dx); nw=Math.min(nw, ox+ow); g.x=ox+ow-nw; g.w=nw; }
+        if(dir.includes('n')){ let nh=Math.max(m.h, oh-dy); nh=Math.min(nh, oy+oh); g.y=oy+oh-nh; g.h=nh; }
+        el.style.left=g.x+'px'; el.style.top=g.y+'px'; el.style.width=g.w+'px'; el.style.height=g.h+'px'; };
       const up=ev=>{ h.releasePointerCapture(e.pointerId); h.removeEventListener('pointermove',move);
         h.removeEventListener('pointerup',up); saveLayout(); };
       h.addEventListener('pointermove',move); h.addEventListener('pointerup',up); }); }
-  rz('.rz.r','e'); rz('.rz.b','s'); rz('.rz.c','es');
+  rz('.rz.t','n'); rz('.rz.b','s'); rz('.rz.l','w'); rz('.rz.r','e');
+  rz('.rz.tl','nw'); rz('.rz.tr','ne'); rz('.rz.bl','sw'); rz('.rz.c','se');
   return el;
 }
 
@@ -331,11 +347,8 @@ function cgCell(sym,i){ return '<div class="cgcell"><div class="cghd"><b>'+sym+'
 function renderChartGrid(){ const host=document.getElementById('cgGrid'); if(!host) return;
   host.style.gridTemplateColumns='repeat('+Math.ceil(Math.sqrt(cgN))+',1fr)';
   host.innerHTML=CHART_UNIVERSE.slice(0,cgN).map(cgCell).join('');
-  document.querySelectorAll('#cgBar [data-n]').forEach(b=>b.classList.toggle('on',+b.dataset.n===cgN)); }
-function chartBodyHTML(){ return '<div class="cgwrap"><div class="cgbar" id="cgBar">'+
-  '<span class="cglbl" data-i18n="Charts">Charts</span>'+
-  CG_PRESETS.map(n=>'<button data-n="'+n+'" title="'+n+' chart'+(n>1?'s':'')+'">'+n+'</button>').join('')+
-  '</div><div class="cggrid" id="cgGrid"></div></div>'; }
+  document.querySelectorAll('#cgMenu [data-n]').forEach(b=>b.classList.toggle('on',+b.dataset.n===cgN)); }
+function chartBodyHTML(){ return '<div class="cggrid" id="cgGrid"></div>'; }
 
 /* ── 위젯 생성 (M1: 전부 기초 프레임, 설정만 언어/테마 실동작) ── */
 makeWidget('navigator','Navigator','var(--lgd-link1,#4C8DFF)', frame());
@@ -363,10 +376,30 @@ renderAddMenu();
 refitLayout();
 Object.keys(layout).forEach(k=>{ if(k!=='__ref') applyGeo(k); });
 
-/* 멀티차트 초기 렌더 + 분할 선택 */
+/* 멀티차트 초기 렌더 + 분할 선택(차트 타이틀바 ⊞ 드롭다운 — 인라인 바 대신 MT5식 툴바 컨트롤) */
 renderChartGrid();
-document.getElementById('cgBar').addEventListener('click', e=>{ const b=e.target.closest('[data-n]'); if(!b) return;
-  cgN=+b.dataset.n; try{ localStorage.setItem(CG_KEY, cgN); }catch(_){} renderChartGrid(); });
+(function chartLayoutControl(){
+  const cEl=document.getElementById('w-chart'); if(!cEl) return;
+  const cwtb=cEl.querySelector('.wtb');
+  const layBtn=document.createElement('span');
+  layBtn.className='wic'; layBtn.id='cgLayoutBtn'; layBtn.title='Chart layout';
+  layBtn.innerHTML='<svg width="14" height="14" viewBox="0 0 15 15" fill="currentColor"><rect x="0.5" y="0.5" width="6" height="6" rx="1.2"/><rect x="8.5" y="0.5" width="6" height="6" rx="1.2"/><rect x="0.5" y="8.5" width="6" height="6" rx="1.2"/><rect x="8.5" y="8.5" width="6" height="6" rx="1.2"/></svg>';
+  cwtb.insertBefore(layBtn, cwtb.querySelector('.wic'));
+  const menu=document.createElement('div'); menu.id='cgMenu'; menu.className='cgmenu';
+  menu.innerHTML='<div class="cgmhd" data-i18n="Charts">Charts</div>'+
+    CG_PRESETS.map(n=>'<button data-n="'+n+'"><span>'+n+' '+(n>1?'charts':'chart')+'</span><span class="ck">✓</span></button>').join('');
+  document.body.appendChild(menu);
+  layBtn.addEventListener('click', e=>{ e.stopPropagation();
+    const open=menu.style.display==='block';
+    document.getElementById('addMenu').style.display='none'; document.getElementById('tabMenu').style.display='none';
+    if(open){ menu.style.display='none'; return; }
+    const r=layBtn.getBoundingClientRect();
+    menu.style.left=Math.min(r.left, window.innerWidth-170)+'px'; menu.style.top=(r.bottom+5)+'px';
+    menu.querySelectorAll('[data-n]').forEach(b=>b.classList.toggle('on',+b.dataset.n===cgN));
+    menu.style.display='block'; });
+  menu.addEventListener('click', e=>{ const b=e.target.closest('[data-n]'); if(!b) return;
+    cgN=+b.dataset.n; try{ localStorage.setItem(CG_KEY, cgN); }catch(_){} renderChartGrid(); menu.style.display='none'; });
+})();
 
 /* ── 헤더 동작 ── */
 document.getElementById('btnAdd').onclick=e=>{ e.stopPropagation();
@@ -382,7 +415,8 @@ document.getElementById('btnTabs').onclick=e=>{ e.stopPropagation();
     '<div class="tabrow dis">Alpexa Crypto<span class="sub">tab</span></div>';
   m.style.display='block'; };
 document.addEventListener('click', ()=>{ document.getElementById('addMenu').style.display='none';
-  document.getElementById('tabMenu').style.display='none'; });
+  document.getElementById('tabMenu').style.display='none';
+  const cm=document.getElementById('cgMenu'); if(cm) cm.style.display='none'; });
 document.getElementById('goSports').onclick=()=>{ location.href='/sports-dashboard.html'; };
 document.getElementById('goCrypto').onclick=()=>{ location.href='/dev/crypto-dashboard.html'; };
 
