@@ -95,7 +95,10 @@
 - **파이프라인 (전부 라이브 검증됨):** 크립토=클라 Binance WS 직결(ms) + 크론 3초 폴백 · FX=`fx-stream` WS 펌프(~1초, job `fx-stream-1m`) + `fx-prices` 3초 폴백 · 주식=`stock-stream` WS 펌프(2~8초, job `stock-stream-1m`) + `stock-prices` 1분 폴백(+ALPXS) · 클라 수신=Supabase Realtime 푸시(`prices` publication) + 1초 폴링 폴백. 크론 진단/튜닝/롤백 = `supabase/sql/feed_speed_tune.sql`.
 - **WS 펌프 Edge 공통 규칙:** 대시보드에서 JWT verify **OFF**(함수 내 `CRON_SECRET` 검사가 관문) · spr_pts 단위는 기존 작성자와 동일하게(FX 정수핍·크립토 bps·주식 0) — 단위 새로 발명 금지(결함-로그 2026-07-13).
 - **아침 감시 2층 (2026-07-13):** ① Claude 루틴 `trig_01VUfQyWNpydMtCKnghmXNE5` — 매일 15:00 UTC(베가스 8시) 이 세션에서 feed-check+오늘 경기·오즈 점검 후 **능동 보고**. ② GitHub Action `daily-sports-check.yml`(main) — 매일 ~16-17 UTC **침묵 게이트**(빨강 시만 이메일, 7/7부터 전회 초록). 서로 백업 — 하나 지운다고 감시가 사라지지 않게 둘 다 유지.
-- **일일 자가검진 2회 (2026-07-19, 사장님 지시 "알림은 사후 — 매일 자체 확인"):** 아침 루틴(15:00 UTC) + 저녁 루틴 `trig_01SjQexqmcFzqDcKhyZwns8c`(03:00 UTC = 베가스 8PM) 둘 다 **`node tests/daily-selfcheck.js` 한 방**으로: ① 스케줄·오즈(오늘/내일 경기·실배당/잠금·가짜라인) ② 주문·결제·미청산 = `sports-audit` C1~C9 verdict·미청산 건수·최대노출·홀드 ③ 시세 라이브니스(서버 prices 크립토 신선도 실측). 🟢=3줄 요약 보고, 🔴=즉시 원인 추적→수정→결함-로그. 전부 읽기 전용(돈/쓰기 0). 이메일 알람과 상호 백업. 추가로 `feed-liveness` Action(main) 최근 런도 확인.
+- **상시 자가검진 (2026-07-19, 사장님 지시 "모든 문제는 저녁 보고 전에 잡아라"):** 검진 = **`node tests/daily-selfcheck.js` 한 방**(① 스케줄·오즈: 경기·실배당/잠금·가짜라인 ② 주문·결제·미청산: `sports-audit` C1~C9·미청산·최대노출·홀드 ③ 시세 라이브니스. 전부 읽기 전용, 돈/쓰기 0).
+  - **시간당 무음 감시** `trig_01U7JZ9NTu8UJgYdjbkntxQd`(매시 :25) — 🟢면 "이상무" 한 줄, 🔴면 그 시간에 즉시 발견·처리. **발견의 층**.
+  - **아침 루틴**(15:00 UTC) + **저녁 결산** `trig_01SjQexqmcFzqDcKhyZwns8c`(03:00 UTC=베가스 8PM) — 그날 발견·처리·대기 항목 **결산 보고**. 저녁 보고에서 처음 발견되는 문제가 있으면 그건 감시 실패로 간주.
+  - ⚠️ **돈 사고 방지 이원 규칙 (사장님 경고 2026-07-19 "실수하면 돈 사고"):** 🔴이 [돈 관련](정산·잔고·지급·원장·미청산)이면 루틴은 **진단·증거·수정안 준비까지만** — 돈 코드 수정/커밋/배포/정산 실행(돈 이동 유발 호출)은 **사장님 승인 후에만**(#1 원칙). [비돈](표시·피드 클라·렌더)은 verify+스모크 초록 조건으로 자율 수정 가능. 이메일 알람·`feed-liveness` Action(main)과 상호 백업.
 
 ## 📌 보류 백로그 (조건 충족 시 사용자에게 먼저 리마인드할 것)
 - **[감시 중 2026-07-16] ⛳ 여자골프(LPGA)**: The Odds API에 현재 여자 대회 키 없음(프로브 실측 — golf 키 4개 전부 남자 메이저). sports-odds가 일 1회 종목 카탈로그를 `sports_odds.__sports_list`에 적재하고 feed-check가 **신규 골프/LPGA 키 등장 시 📣 알림** → 뜨면 사용자에게 확장 제안(작업 반나절: 키 추가+대회명 매처+ESPN golf/lpga+정산 스코어보드). 세션에서 Odds API 직접 호출은 네트워크 정책상 불가 — 카탈로그 행 경유가 유일 경로.
