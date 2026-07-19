@@ -320,7 +320,7 @@ body.symdrag .widget[id^="w-chart"]{outline:1px dashed var(--lgd-hair); outline-
 .postbl th{position:sticky; top:0; background:var(--lgd-surface); text-align:right; font-weight:700; color:var(--lgd-dim);
   padding:5px 10px; font-size:9.5px; text-transform:uppercase; letter-spacing:.3px; border-bottom:1px solid var(--lgd-hair)}
 .postbl th:first-child, .postbl td:first-child{text-align:left}
-.postbl td{text-align:right; padding:5px 10px; border-bottom:1px solid rgba(128,128,128,.08); font-variant-numeric:tabular-nums}
+.postbl td{text-align:right; padding:5px 10px; border-bottom:1px solid rgba(128,128,128,.08); font-variant-numeric:tabular-nums; color:var(--lgd-ink)}   /* 라이트에서 흰 글자 방지 — 항상 테마 ink */
 .postbl .buy{color:var(--lgd-up); text-transform:capitalize} .postbl .sell{color:var(--lgd-down,#EB5D2A); text-transform:capitalize}
 .postbl .pend{color:#E0A020; text-transform:capitalize}   /* 대기 주문 = MT5 주황 */
 .postbl .pendhd td{background:var(--lgd-surface2); color:var(--lgd-dim); font-weight:800; font-size:10px; letter-spacing:.4px; padding:4px 10px; text-align:left}
@@ -437,6 +437,8 @@ body.light .dots{background-image:radial-gradient(circle, rgba(15,23,40,.16) 1.2
 body.light .widget.drag{box-shadow:0 12px 32px rgba(15,23,40,.22)}
 body.light .avatar{background:#D7DBE2; color:#4a5364}
 body.light #tabMenu, body.light #addMenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
+body.light .ocvol, body.light .ocspr, body.light .octrade{background:rgba(255,255,255,.88)}
+body.light .ocvb{color:var(--lgd-ink)}
 </style>
 </head>
 <body class="lgd">
@@ -996,7 +998,7 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
         '<text x="4" y="'+(y-3).toFixed(1)+'" fill="'+col+'" font-size="8.5" font-weight="700">'+lab+'</text>'; };
     const acct=window.fxAcct;   // renderChart는 fxAcct 선언 전(초기 렌더)에도 돎 — window 경유로 TDZ 회피
     ((acct&&acct.authed)?acct.rows():DEMO_POS).forEach(p=>{ if(p.sym!==dsym&&p.sym!==sym) return;
-      const col=p.type==='buy'?CH_UP:CH_DN;
+      const col=p.type==='buy'?'#00C805':'#F23645';   // BUY 초록 · SELL 빨강 (2026-07-19 사장님, 캔들색과 구분)
       tl(p.price, p.type+' '+p.vol+' #'+p.ticket, col, false);
       tl(p.sl, 'sl '+p.sl, '#EB5D2A', true);
       tl(p.tp, 'tp '+p.tp, '#26A69A', true); });

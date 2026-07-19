@@ -53,8 +53,10 @@ async function probeCrypto(browser) {
     await page.waitForTimeout(WINDOW_S * 1000);
     const t1 = await snap();
     let moved = 0; for (let i = 0; i < Math.min(t0.length, t1.length); i++) if (t0[i] !== t1[i]) moved++;
+    /* mk는 top-level const(전역 lexical) — window.mk는 항상 undefined라 3연속 오탐(2026-07-19 실측).
+       typeof 가드로 교정: 진짜 신선도를 읽고, 페이지 구조가 바뀌어 mk가 사라진 경우만 missing. */
     const tickAge = await page.evaluate(() =>
-      (window.mk && mk.lastTick) ? Math.round((Date.now() - mk.lastTick) / 1000) : null);
+      (typeof mk !== 'undefined' && mk.lastTick) ? Math.round((Date.now() - mk.lastTick) / 1000) : null);
     // 크립토는 24/7 — 관찰창 동안 최소 2행은 움직여야 하고 마지막 실틱이 15s 이내여야 한다
     report('crypto: rows moving (' + moved + '/' + Math.min(t0.length, t1.length) + ' in ' + WINDOW_S + 's)', moved >= 2,
       moved < 2 ? 'FROZEN — t0=' + JSON.stringify(t0.slice(0, 3)) : '');
