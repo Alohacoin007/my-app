@@ -267,6 +267,12 @@ Deno.serve(async (req) => {
   if (!posRes.ok) return json({ ok: false, error: "positions read " + posRes.status }, 500);
   const positions = await posRes.json();
 
+  // 업계 표준 규칙 2종 (2026-07-19 사장님 승인 — SP-100058 연기경기 무한대기 사고):
+  //  A. 조기 패배 확정 — 한 leg라도 확정 패배면 나머지를 기다리지 않고 즉시 LOST (죽은 팔레이는 안 기다린다).
+  //  B. 연기 void — 예정 킥오프 +48h에도 최종 결과가 없으면 그 leg는 무효(배당 1.0)로 제외.
+  //     단, "안 열렸음"이 6일 결과 조회창 안에서 증명될 때만(창 밖이면 계속 보류 — 돈은 추측 금지).
+  const VOID_AFTER_MS = 48 * 3600e3;
+  const PROVABLE_MS = 6 * 86400000;   // fetchLeagueResults의 캐치업 창과 반드시 동일
   const settled: any[] = [];
   for (const p of positions) {
     try {
@@ -274,23 +280,37 @@ Deno.serve(async (req) => {
       const legs = Array.isArray(meta.legs) ? meta.legs : [];
       if (!legs.length) continue;
       const stake = +meta.stake || +p.stake || 0;
-      let allDone = true, anyLost = false, decMul = 1;
+      let anyLost = false, pending = 0, decMul = 1;
       const legResults: any[] = [];
       for (const l of legs) {
-        let g: string | null;
+        let g: string | null = null;
+        const push = (r: string) => legResults.push({ pk: (l.sel || l.pk || ""), gm: (l.gm || l.game || ""), am: (+l.am || 0), gid: (l.gid || ""), lg: (l.lg || ""), r });
         if (/outright/i.test(String(l.market || ""))) {
           // ⛳ OUTRIGHT: graded only against a FINAL tournament's confirmed champion.
-          // No winner yet (still playing / playoff / no data) → bet stays open.
-          const w = golfWin[l.gid]; if (!w) { allDone = false; break; }
+          // No winner yet (still playing / playoff / no data) → leg pending.
+          const w = golfWin[l.gid];
+          if (!w) { pending++; push("pending"); continue; }
           g = playerMatch(l.sel || l.pk || "", w) ? "won" : "lost"; // cut/WD/runner-up = not the winner = lost
         } else {
-          const r = results[l.gid]; if (!r) { allDone = false; break; }
-          g = gradeLeg(l, r); if (g === null) { allDone = false; break; }
+          const r = results[l.gid];
+          if (!r) {
+            // 규칙 B: 결과 부재 — 킥오프 +48h 경과 && 6일 증명창 안 → 연기 확정 = void.
+            const kt = Date.parse(l.kt || "");
+            const age = isNaN(kt) ? NaN : Date.now() - kt;
+            if (!isNaN(age) && age > VOID_AFTER_MS && age < PROVABLE_MS) { g = "void"; }
+            else { pending++; push("pending"); continue; }
+          } else {
+            g = gradeLeg(l, r);
+            if (g === null) { pending++; push("pending"); continue; }
+          }
         }
-        if (g === "lost") anyLost = true; else if (g === "won") decMul *= decOf(l);
-        legResults.push({ pk: (l.sel || l.pk || ""), gm: (l.gm || l.game || ""), am: (+l.am || 0), gid: (l.gid || ""), lg: (l.lg || ""), r: g });
+        if (g === "lost") anyLost = true;
+        else if (g === "won") decMul *= decOf(l);
+        // "void"/"push"는 곱셈 제외(배당 1.0 취급) — 패배 아님
+        push(g);
       }
-      if (!allDone) continue; // not all games final yet
+      // 규칙 A: 확정 패배가 있으면 pending 무시하고 즉시 LOST. 아니면 pending 있는 동안 보류.
+      if (!anyLost && pending > 0) continue;
 
       // 3) CLAIM atomically: delete the open row. Only the actor that actually
       // removes it proceeds — prevents double credit (app uses the same claim).
