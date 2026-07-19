@@ -301,9 +301,13 @@ body.symdrag .widget[id^="w-chart"]{outline:1px dashed var(--lgd-hair); outline-
 .cinfo-tbl td{padding:5px 10px; border-bottom:1px solid rgba(128,128,128,.08); vertical-align:top}
 .cinfo-tbl td.ck{color:var(--lgd-dim); white-space:nowrap; padding-right:20px} .cinfo-tbl td.cv{color:var(--lgd-ink)}
 .cinfo-note{margin-top:10px; color:var(--lgd-dim); font-size:10.5px; max-width:520px; line-height:1.5}
-/* Mailbox */
+/* Mailbox — MT5 브로커 메시지함(Time·Subject·본문). 좌측 정렬, 읽지 않음 볼드. */
+.mbxtbl th, .mbxtbl td{text-align:left!important}
+.mbxtbl td.t{color:var(--lgd-dim); font-variant-numeric:tabular-nums; white-space:nowrap}
+.mbxtbl .mbxsub{overflow:hidden; text-overflow:ellipsis}
+.mbxtbl .mbx-row.unread .mbxsub{font-weight:800; color:var(--lgd-ink)}
 .mbx-row{cursor:pointer} .mbx-row:hover td{background:rgba(128,128,128,.06)}
-.mbx-detail td{white-space:pre-wrap; color:var(--lgd-dim); font-size:11px; line-height:1.55; padding:8px 12px; background:var(--lgd-surface2)}
+.mbx-detail td.mbxbody{white-space:normal; color:var(--lgd-dim); font-size:11px; line-height:1.6; padding:8px 12px 10px; background:var(--lgd-surface2)}
 /* Exposure — 통화별 순노출 표 + Long Positions 파이 (MT5) */
 .expwrap{display:flex; align-items:flex-start; gap:18px; padding:0 0 8px}
 .exptbl{flex:1; min-width:0}
@@ -1226,7 +1230,17 @@ const TBX_COLW={
   history:[14,12,22,8,10,11,11,12],        // Symbol Ticket Time Type Vol Price Price Profit
   exposure:[12,16,14,16,42],               // Asset Volume Rate USD Graph
   alerts: [26,26,44,4],                    // Symbol Condition Status X
-  mailbox:[16,68,16] };                    // Time Subject Amount
+  mailbox:[20,80] };                       // Time Subject (MT5 우편함 = 메시지, 금액 컬럼 없음)
+/* MT5 Mailbox = 브로커 메시지함(Time·Subject·본문). 금액/거래 아님. 데모 개설 안내 메시지. */
+const MAILBOX=[
+  {t:'2026.07.18 08:00', unread:true, subject:'🎉 Account opened — welcome to ALPEXA FX',
+    detail:'Dear trader,\n\nYour demo trading account is open and ready:\n'+
+      '  · Login (account):  3172308\n  · Server:           Alpexa-Demo\n'+
+      '  · Account type:     Standard · USD · leverage up to 1:100\n\n'+
+      'Live account data connects in a later build (server-only). Good trading!\nALPEXA Dealing Desk'},
+  {t:'2026.07.18 08:00', subject:'Trading conditions & risk disclosure',
+    detail:'Leveraged FX/CFD trading carries a high level of risk and may not be suitable for all investors. '+
+      'This terminal is a demo environment — all funds and positions are simulated. No real money is at risk.\n\nALPEXA Dealing Desk'}];
 /* 원클릭 청산 (DEMO) — 행 제거 + History/Journal 기록 + 총 P/L 재계산. 실청산은 fx_close RPC(M5, 서버 전용) */
 function closePosDemo(ticket){ const p=DEMO_POS.find(x=>x.ticket===ticket); if(!p) return;
   DEMO_POS=DEMO_POS.filter(x=>x.ticket!==ticket);
@@ -1351,16 +1365,13 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
       '<div class="cinfo-note">Municipal business licence (patente) issued by the Municipalidad de San José, Costa Rica.</div></div></div>';
 
   } else if(tab==='Mailbox'){
-    const mail={subject:'🎉 Account opened — welcome to ALPEXA FX',
-      detail:'Dear trader,\n\nYour demo trading account is open and ready:\n'+
-        '  · Login (account):  3172308\n  · Server:           Alpexa-Demo\n'+
-        '  · Account type:     Standard · USD · leverage up to 1:100\n\n'+
-        'Live account data connects in a later build (server-only). Good trading!\nALPEXA Dealing Desk'};
-    body.innerHTML='<div class="tbxscroll"><table class="postbl">'+colg(TBX_COLW.mailbox)+'<thead><tr>'+
-      ['Time','Subject','Amount (USD)'].map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+
-      '<tr class="mbx-row" data-mail="1"><td>—</td><td>'+mail.subject+'</td><td>—</td></tr>'+
-      '<tr class="mbx-detail" id="mbxDetail" style="display:none"><td colspan="3">'+mail.detail+'</td></tr>'+
-      '</tbody></table></div>';
+    const rows=MAILBOX.map((m,i)=>
+      '<tr class="mbx-row'+(m.unread?' unread':'')+'" data-mail="'+i+'"><td class="t">'+m.t+'</td>'+
+        '<td class="mbxsub">'+m.subject+'</td></tr>'+
+      '<tr class="mbx-detail" id="mbxDetail'+i+'" style="display:none"><td></td>'+
+        '<td class="mbxbody">'+m.detail.replace(/\n/g,'<br>')+'</td></tr>').join('');
+    body.innerHTML='<div class="tbxscroll"><table class="postbl mbxtbl">'+colg(TBX_COLW.mailbox)+'<thead><tr>'+
+      ['Time','Subject'].map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
 
   } else { const e=emptyIC[tab]||['🗂️',tab]; body.innerHTML='<div class="tbxempty"><div class="ic">'+e[0]+'</div>'+e[1]+'</div>'; } }
 
@@ -1590,7 +1601,8 @@ mwSimulate(); mwRender();
     const add=e.target.closest('#alAdd'); if(add){ tbxAddAlert(); return; }
     const del=e.target.closest('.aldel'); if(del){ alertsStore.remove(del.dataset.del); JOURNAL.log('Alert removed', true); renderToolbox('Alerts'); return; }
     const hp=e.target.closest('[data-hp]'); if(hp){ histPeriod=hp.dataset.hp; renderToolbox('History'); return; }
-    const mail=e.target.closest('[data-mail]'); if(mail){ const d=document.getElementById('mbxDetail'); if(d) d.style.display=d.style.display==='none'?'table-row':'none'; return; }
+    const mail=e.target.closest('[data-mail]'); if(mail){ const d=document.getElementById('mbxDetail'+mail.dataset.mail);
+      if(d) d.style.display=d.style.display==='none'?'table-row':'none'; mail.classList.remove('unread'); return; }
   });
   content.addEventListener('keydown', e=>{ if(e.key==='Enter' && e.target.id==='alPx'){ e.preventDefault(); tbxAddAlert(); } });
   /* 상단 테두리 드래그로 높이 조절 */
