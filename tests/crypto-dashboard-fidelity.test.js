@@ -53,6 +53,8 @@ const PINS = [
   ['하네스 치유③ 차트 캔들 재적재', /heal:chLoad/],
   ['하네스 정직표시 ⚠ FEED STALE 배지', /FEED STALE/],
   ['폴백 게이트 = 신선도(sticky wsLive 금지)', /wsFresh=mk\.lastTick&&/],
+  ['지갑 재평가 루프 — 시세 틱에 잔고 재마크(스냅샷 고정 금지)', /function kvLivePrice\(s\)[\s\S]{0,600}?wal\.hold\.forEach/],
+  ['재평가는 수량=서버·가격=라이브(표시 전용)', /wal\.hold=h\.data\|\|\[\]; wal\.stakedUsd=staked/],
   ['Open orders 정직 표기 = Pending (manual)', /Pending \(manual\)/],
   ['미구현 기능 정직 표기 = Soon 칩',          /title="Soon"/],
   ['ALPXS 하드락 안내(만기 전 언스테이크 불가)', /cannot be unstaked before maturity/],

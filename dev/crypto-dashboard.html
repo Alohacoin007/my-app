@@ -1160,6 +1160,7 @@ async function loadWalletKvs(sess){
     setKv('kvStaked',fmtUsdSm(staked)); setKv('kvTotal',fmtUsdSm(cash+cryptoV+staked));
     setKv('kvPStk','▲ '+fmtUsdSm(rewards),'up');
     wal.total=cash+cryptoV+staked; renderWal();   // 헤드라인 총액 = KV Total과 동일 소스(로그인 시 실총액 표시)
+    wal.hold=h.data||[]; wal.stakedUsd=staked;    // 재평가(re-mark) 루프용 스태시 — 수량은 서버 진실, 가격만 라이브로 다시 마크
   }catch(e){}
   try{ // P&L — 서버 이력 RPC 앞뒤차 (1D=Today, YTD)
     for(const [rng,id] of [['1D','kvPToday'],['YTD','kvPYtd']]){
@@ -1182,6 +1183,20 @@ async function loadWalletKvs(sess){
       if(a.server==='sports') setKv('kvSp',fmtUsdSm(+a.balance||0)); });
   }catch(e){}
 }
+/* ── 지갑 재평가(re-mark) 루프 — "시세는 움직이는데 잔고는 그대로" 클래스 봉쇄 (2026-07-19 사장님 보고).
+   MT5 규율 "평가액=실시간 피드로 마크"의 지갑판: 수량(wal.hold)·스테이크는 서버 로드분 그대로,
+   가격만 라이브(mk.q 우선 → 서버 mid 폴백, Portfolio의 pfPrice와 동일 서열)로 3s마다 재계산.
+   표시 전용 — 돈/RPC/원장 안 건드림. 수량 변경은 기존 이벤트 경로가 loadWalletKvs를 다시 부른다. */
+function kvLivePrice(s){ if(s==='USDT'||s==='USDC'||s==='DAI') return 1;
+  const q=mk.q[s]; if(q&&q.last!=null) return q.last;
+  return pf.mid[s]||(s==='ALPXS'?alpxsPrice():0); }
+setInterval(()=>{ if(document.hidden||!wal.authed||!wal.hold) return;
+  let cash=0, cryptoV=0;
+  wal.hold.forEach(r=>{ const q=+r.qty||0; if(r.asset==='USDT') cash=q; else cryptoV+=q*(kvLivePrice(r.asset)||0); });
+  const total=cash+cryptoV+(wal.stakedUsd||0);
+  if(wal.total==null||Math.abs(total-wal.total)>=0.005){ wal.total=total;
+    setKv('kvCash',fmtUsdSm(cash)); setKv('kvCrypto',fmtUsdSm(cryptoV)); setKv('kvTotal',fmtUsdSm(total)); renderWal(); }
+},3000);
 document.getElementById('kvGoFx').onclick=()=>window.open('../trading.html','_blank','noopener');
 document.getElementById('kvGoSp').onclick=()=>window.open('../sports-live.html','_blank','noopener');
 async function loadWallet(){

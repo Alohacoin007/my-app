@@ -83,6 +83,17 @@ const STUB = `(sessOn)=>{
     kv: document.getElementById('kvTotal').textContent.trim() }));
   ok('authed + EMPTY history → headline equals KV Total (' + tot.amt + ')', tot.amt === tot.kv, JSON.stringify(tot));
 
+  // ── ④ 시세가 움직이면 잔고도 재평가되어야 한다 (2026-07-19 사장님 보고: "시세는 움직이는데 발란스 그대로")
+  //      = MT5 규율 "평가액은 실시간 피드로 마크"의 지갑판. 라이브가를 10% 올리고 재평가 대기 → 총액 상승 확인.
+  const totBefore = await page.evaluate(() => wal.total);
+  await page.evaluate(() => { mk.q.BTC = { last: 70400, chg: 10, bid: 70390, ask: 70410 }; });   // 64000 → 70400 (+10%)
+  await page.waitForTimeout(3800);   // 재평가 루프(3s) 1회+
+  const remark = await page.evaluate(() => ({
+    total: wal.total, kv: document.getElementById('kvTotal').textContent.trim(),
+    amt: document.getElementById('walAmt').textContent.trim() }));
+  ok('price tick re-marks balance (total ' + totBefore + ' → ' + remark.total + ', headline follows)',
+     remark.total > totBefore * 1.05 && remark.amt === remark.kv, JSON.stringify(remark));
+
   // ── ② KV-only 갱신 경로도 헤드라인을 전환시킨다 (loadWallet 재실행 없이) ──
   const b = await page.evaluate(`(async()=>{ wal.authed=false;
     const s=await walSession(); await loadWalletKvs(s); await new Promise(r=>setTimeout(r,150));
