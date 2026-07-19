@@ -160,10 +160,38 @@ body.light .cgmenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
 /* 심볼 드래그 중 차트 위 드롭 하이라이트(MT5) */
 body.symdrag .widget[id^="w-chart"]{outline:1px dashed var(--lgd-hair); outline-offset:-2px}
 .widget.dropok{outline:2px solid var(--lgd-up)!important; outline-offset:-2px}
+.mwrow.sel{background:var(--lgd-surface2); box-shadow:inset 2px 0 0 var(--lgd-up)}
 .mwsym{font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .mwpx{font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; font-weight:600; color:var(--lgd-dim)}
 .mwpx.up{color:var(--lgd-up)} .mwpx.down{color:var(--lgd-down,#EB5D2A)}
 .mwspr{font-variant-numeric:tabular-nums; color:var(--lgd-dim); font-size:11px; opacity:.85}
+/* ── Market Watch 하위탭: Trading(원클릭·DEMO) ── */
+.mwtradewrap,.mwtickwrap{flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden}
+.mwtradebar{flex:none; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:5px 10px;
+  font-size:9px; font-weight:800; letter-spacing:.5px; color:#E0A020; background:rgba(240,180,40,.10); border-bottom:1px solid var(--lgd-hair)}
+.mwvol{display:inline-flex; align-items:center; gap:6px; color:var(--lgd-ink)}
+.mwvol button{width:16px; height:16px; line-height:1; border:1px solid var(--lgd-hair); background:var(--lgd-pill); color:var(--lgd-ink); border-radius:3px; cursor:pointer; font-weight:800}
+.mwvol b{min-width:34px; text-align:center; font-variant-numeric:tabular-nums}
+.mwtlist{flex:1; min-height:0; overflow:auto}
+.mwtrow{display:grid; grid-template-columns:1.1fr 1.5fr .6fr 1.5fr; gap:5px; align-items:center; padding:5px 10px; border-bottom:1px solid rgba(128,128,128,.10)}
+.mwtsym{font-weight:700}
+.mwtsell,.mwtbuy{display:flex; flex-direction:column; align-items:center; gap:1px; padding:4px 2px; border-radius:4px; cursor:pointer;
+  border:1px solid var(--lgd-hair); background:var(--lgd-pill); font-family:inherit}
+.mwtsell span,.mwtbuy span{font-size:8px; font-weight:800; letter-spacing:.6px; opacity:.7}
+.mwtsell b,.mwtbuy b{font-size:12px; font-weight:700; font-variant-numeric:tabular-nums}
+.mwtsell{color:var(--lgd-down,#EB5D2A)} .mwtsell:hover{background:rgba(235,93,42,.14)}
+.mwtbuy{color:var(--lgd-up)} .mwtbuy:hover{background:rgba(46,144,250,.14)}
+.mwtsell b.up,.mwtbuy b.up{color:var(--lgd-up)} .mwtsell b.dn,.mwtbuy b.dn{color:var(--lgd-down,#EB5D2A)}
+.mwtspr{text-align:center; font-size:10px; color:var(--lgd-dim); font-variant-numeric:tabular-nums}
+/* ── Market Watch 하위탭: Ticks(실시간 Bid/Ask 라인) ── */
+.mwtickbar{flex:none; display:flex; align-items:center; gap:10px; padding:5px 10px; border-bottom:1px solid var(--lgd-hair); font-size:11px}
+.mwticksel{background:var(--lgd-pill); color:var(--lgd-ink); border:1px solid var(--lgd-hair); border-radius:3px; padding:2px 4px; font-family:inherit; font-weight:700}
+.mwtickrd{display:flex; align-items:center; gap:5px; color:var(--lgd-dim); font-variant-numeric:tabular-nums}
+.mwtickrd b{color:var(--lgd-ink)} .mwtickrd .mwspr{margin-left:2px}
+.mwtickrd .dot{width:7px; height:7px; border-radius:50%; display:inline-block}
+.mwtickrd .dot.bid{background:var(--lgd-up)} .mwtickrd .dot.ask{background:var(--lgd-down,#EB5D2A)}
+.mwtickplot{flex:1; min-height:0; position:relative; padding:6px 8px}
+.mwticksvg{width:100%; height:100%; display:block}
 /* 차트 창 본문(스켈레톤 + TF/M2 오버레이) — 껍데기는 표준 .widget/.wtb/.rz 재사용 */
 .cgwplot{flex:1; min-height:0; position:relative; display:flex}
 .cgwplot svg{width:100%; height:100%; display:block; position:absolute; inset:0}
@@ -980,12 +1008,13 @@ const mwHalf=(s,mid,spr)=>mwCat(s)==='Forex'?Math.max(0.1,(+spr||0))*mwPip(s)/2
 const MW_BASE={ EURUSD:1.143,GBPUSD:1.3417,USDJPY:162.36,AUDUSD:0.694,USDCAD:1.417,USDCHF:0.8068,NZDUSD:0.5758,
   GBPJPY:217.8,AUDJPY:112.7,EURJPY:185.6, AAPL:229.5,MSFT:465.2,NVDA:128.4,TSLA:248.6,AMZN:198.3,GOOGL:178.9,
   META:562.1, BTCUSD:64250,ETHUSD:3420,SOLUSD:148.5,XRPUSD:0.612,DOGEUSD:0.145 };
-const mwStore={ rows:{}, live:false,
+const mwStore={ rows:{}, ticks:{}, live:false,
   set(sym,mid,spr){ const half=mwHalf(sym,mid,spr), prev=this.rows[sym], bid=mid-half, ask=mid+half;
     const open=prev?prev.open:mid, hi=prev?Math.max(prev.hi,mid):mid, lo=prev?Math.min(prev.lo,mid):mid;
     this.rows[sym]={ mid,bid,ask,spr,open,hi,lo,   // open/hi/lo → 상태바 O/H/L/C
       bDir: prev?(bid>prev.bid?1:bid<prev.bid?-1:(prev.bDir||0)):0,
-      aDir: prev?(ask>prev.ask?1:ask<prev.ask?-1:(prev.aDir||0)):0 }; },
+      aDir: prev?(ask>prev.ask?1:ask<prev.ask?-1:(prev.aDir||0)):0 };
+    const tb=this.ticks[sym]||(this.ticks[sym]=[]); tb.push({t:Date.now(),bid,ask}); if(tb.length>240) tb.shift(); },   // Ticks 탭 버퍼
   /* 실피드 진입점 — prices 행 [{symbol,mid,spr_pts}]. 붙는 순간 live=true (SIM→LIVE) */
   apply(list){ if(!Array.isArray(list)) return; list.forEach(p=>{ const s=p&&p.symbol; if(!s) return;
     const mid=+p.mid; if(!(mid>0)) return; const prev=this.rows[s];
@@ -993,7 +1022,7 @@ const mwStore={ rows:{}, live:false,
     this.set(s,mid,spr); }); this.live=true; } };
 function mwSimulate(){ MW_WATCH.forEach(s=>{ const prev=mwStore.rows[s], base=prev?prev.mid:(MW_BASE[s]||1);
   const mid=Math.max(base*0.5, base+base*(Math.random()-0.5)*0.0006); mwStore.set(s, mid, mwSeedSpr(s)); }); }
-let mwFilter='All', mwView='Symbols';
+let mwFilter='All', mwView='Symbols', mwSel='EURUSD', mwVol=0.10;   // mwSel=Ticks/선택행, mwVol=Trading 원클릭 볼륨(표시용, 체결 없음)
 /* ── MT5 Market Watch 컬럼 (우클릭으로 넣다 뺐다) — Symbol/Bid/Ask는 고정, 나머지 토글 ── */
 const MW_COLDEF=[
   {k:'symbol', lbl:'Symbol', fr:'1.4fr', always:1},
@@ -1027,14 +1056,50 @@ function mwCell(s,r,k,tnow){ switch(k){
 function mwRender(){ const host=document.getElementById('mwBody'); if(!host) return;
   const fl=document.getElementById('mwFeed'); if(fl){ fl.textContent=mwStore.live?'LIVE':'SIM'; fl.classList.toggle('live',mwStore.live); }
   const head=document.getElementById('mwHead');
-  if(mwView!=='Symbols'){ if(!host.querySelector('.tbxempty')) host.innerHTML='<div class="tbxempty">'+mwView+' — coming in build</div>'; if(head) head.innerHTML=''; return; }
-  const cols=mwActiveCols(), tmpl=mwTemplate();
-  if(head) head.innerHTML='<div class="mwhd mwgrid" style="grid-template-columns:'+tmpl+'">'+cols.map(c=>'<div>'+c.lbl+'</div>').join('')+'</div>';
   const list=mwFilter==='All'?MW_WATCH:MW_WATCH.filter(s=>mwCat(s)===mwFilter);
   const d=new Date(),p=n=>(n<10?'0':'')+n, tnow=p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
-  host.innerHTML=list.map(s=>{ const r=mwStore.rows[s]||{};
-    return '<div class="mwrow mwgrid" draggable="true" data-sym="'+s+'" style="grid-template-columns:'+tmpl+'">'+
+  if(mwView==='Details'){ mwRenderGrid(host, head, MW_COLDEF, list, tnow, true); return; }   // Details = 전 컬럼 표
+  if(mwView==='Trading'){ if(head) head.innerHTML=''; mwRenderTrading(host, list); return; }   // 원클릭 트레이딩(DEMO)
+  if(mwView==='Ticks'){ if(head) head.innerHTML=''; mwRenderTicks(host); return; }               // 실시간 틱 차트
+  mwRenderGrid(host, head, mwActiveCols(), list, tnow, false);   // Symbols(우클릭 토글 컬럼)
+}
+/* 표 렌더(Symbols/Details 공용) — cols 목록·선택행 하이라이트·드래그 가능 */
+function mwRenderGrid(host, head, cols, list, tnow, isDetails){
+  const tmpl=cols.map(c=>c.fr).join(' ');
+  if(head) head.innerHTML='<div class="mwhd mwgrid" style="grid-template-columns:'+tmpl+'">'+cols.map(c=>'<div>'+c.lbl+'</div>').join('')+'</div>';
+  host.className='mwlist'; host.innerHTML=list.map(s=>{ const r=mwStore.rows[s]||{};
+    return '<div class="mwrow mwgrid'+(s===mwSel?' sel':'')+'" draggable="true" data-sym="'+s+'" style="grid-template-columns:'+tmpl+'">'+
       cols.map(c=>mwCell(s,r,c.k,tnow)).join('')+'</div>'; }).join(''); }
+/* MT5 Trading 탭 = 원클릭 매매 패널. 체결은 없음(DEMO) — 클릭 시 New Order 토스트. */
+function mwRenderTrading(host, list){ host.className='mwtradewrap';
+  const bar='<div class="mwtradebar">DEMO · One-Click Trading'+
+    '<span class="mwvol"><button data-vol="-1">−</button><b>'+mwVol.toFixed(2)+'</b><button data-vol="1">+</button></span></div>';
+  const rows=list.map(s=>{ const r=mwStore.rows[s]||{}; if(r.bid==null) return '';
+    const spr=mwSprText(s,r.ask-r.bid), sc=r.bDir<0?'dn':r.bDir>0?'up':'', ac=r.aDir<0?'dn':r.aDir>0?'up':'';
+    return '<div class="mwtrow" data-sym="'+s+'"><div class="mwtsym">'+s+'</div>'+
+      '<button class="mwtsell" data-trade="sell" data-sym="'+s+'"><span>SELL</span><b class="'+sc+'">'+mwFmt(s,r.bid)+'</b></button>'+
+      '<div class="mwtspr">'+spr+'</div>'+
+      '<button class="mwtbuy" data-trade="buy" data-sym="'+s+'"><span>BUY</span><b class="'+ac+'">'+mwFmt(s,r.ask)+'</b></button></div>'; }).join('');
+  host.innerHTML=bar+'<div class="mwtlist">'+rows+'</div>'; }
+/* Ticks 탭 = 선택 심볼의 실시간 Bid/Ask 틱 라인(버퍼 부족 시 M1 봉으로 시딩). */
+function mwTickBuf(sym){ const tb=mwStore.ticks[sym]||[]; if(tb.length>=8) return tb;
+  const s=series(sym,'M1'), r=mwStore.rows[sym], half=r?(r.ask-r.bid)/2:0;
+  return s.c.slice(-120).map(k=>({t:k.t,bid:k.c-half,ask:k.c+half})); }
+function mwRenderTicks(host){ host.className='mwtickwrap'; const sym=mwSel, r=mwStore.rows[sym]||{}, dg=mwDigits(sym);
+  const opts=list=>MW_WATCH.map(s=>'<option value="'+s+'"'+(s===sym?' selected':'')+'>'+s+'</option>').join('');
+  const buf=mwTickBuf(sym).slice(-140);
+  let svg='';
+  if(buf.length>=2){ const W=100,H=100; let mn=Infinity,mx=-Infinity;
+    buf.forEach(t=>{ if(t.bid<mn)mn=t.bid; if(t.ask>mx)mx=t.ask; }); if(!(mx>mn)) mx=mn+1; const rng=mx-mn;
+    const xOf=i=>(i/(buf.length-1))*W, yOf=v=>(mx-v)/rng*H;
+    const line=(key,col)=>'<polyline vector-effect="non-scaling-stroke" points="'+buf.map((t,i)=>xOf(i).toFixed(2)+','+yOf(t[key]).toFixed(2)).join(' ')+'" fill="none" stroke="'+col+'" stroke-width="1.2"/>';
+    svg='<svg class="mwticksvg" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">'+line('ask',CH_DN)+line('bid',CH_LINE)+'</svg>';
+  } else svg='<div class="tbxempty">collecting ticks…</div>';
+  const spr=r.bid!=null?mwSprText(sym,r.ask-r.bid):'—';
+  host.innerHTML='<div class="mwtickbar"><select class="mwticksel">'+opts()+'</select>'+
+    '<span class="mwtickrd"><i class="dot bid"></i>Bid <b>'+mwFmt(sym,r.bid)+'</b>'+
+    '<i class="dot ask"></i>Ask <b>'+mwFmt(sym,r.ask)+'</b><span class="mwspr">spr '+spr+'</span></span></div>'+
+    '<div class="mwtickplot">'+svg+'</div>'; }
 function mwBodyHTML(){ return '<div class="mwwrap">'+
   '<div id="mwHead"></div>'+   /* 헤더는 mwRender가 활성 컬럼대로 재생성(우클릭 토글 반영) */
   '<div class="mwlist" id="mwBody"></div>'+
@@ -1422,6 +1487,14 @@ function toolSvg(inner, fill){ return '<svg width="16" height="16" viewBox="0 0 
     const sym=row.dataset.sym||''; document.body.classList.add('symdrag');
     try{ e.dataTransfer.setData('text/mt5-symbol', sym); e.dataTransfer.setData('text/plain', sym); e.dataTransfer.effectAllowed='copy'; }catch(_){} });
   if(body) body.addEventListener('dragend', ()=>document.body.classList.remove('symdrag'));
+  /* 하위탭 상호작용: 행 선택(Ticks 따라감) · Trading 볼륨/원클릭(DEMO 토스트) · Ticks 심볼 선택 */
+  if(body){ body.addEventListener('click', e=>{
+      const vol=e.target.closest('[data-vol]');
+      if(vol){ mwVol=Math.max(0.01, +(mwVol+(+vol.dataset.vol)*0.01).toFixed(2)); mwRender(); return; }
+      const tr=e.target.closest('[data-trade]');
+      if(tr){ toast(tr.dataset.trade.toUpperCase()+' '+tr.dataset.sym+' '+mwVol.toFixed(2)+' — New Order (DEMO, coming in build)'); return; }
+      const row=e.target.closest('.mwrow'); if(row&&row.dataset.sym){ mwSel=row.dataset.sym; mwRender(); } });
+    body.addEventListener('change', e=>{ const sel=e.target.closest('.mwticksel'); if(sel){ mwSel=sel.value; mwRender(); } }); }
   /* MT5 표준 우클릭 컨텍스트 메뉴 (골격 항목 = 토스트, 클래스 필터 = 실동작) */
   const mtItem=(l,k)=>'<button data-mt="'+l+'"><span>'+l+'</span>'+(k?'<span class="key">'+k+'</span>':'')+'</button>';
   const ctx=document.createElement('div'); ctx.id='mwCtx'; ctx.className='cgmenu';
