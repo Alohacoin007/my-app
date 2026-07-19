@@ -165,6 +165,19 @@ body.symdrag .widget[id^="w-chart"]{outline:1px dashed var(--lgd-hair); outline-
 .mwpx{font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; font-weight:600; color:var(--lgd-dim)}
 .mwpx.up{color:var(--lgd-up)} .mwpx.down{color:var(--lgd-down,#EB5D2A)}
 .mwspr{font-variant-numeric:tabular-nums; color:var(--lgd-dim); font-size:11px; opacity:.85}
+/* ── Market Watch 하위탭: Details(선택 심볼 상세, MT5) ── */
+.mwdetwrap{flex:1; min-height:0; display:flex; flex-direction:column; overflow:auto}
+.mwdetbar{flex:none; padding:5px 8px; border-bottom:1px solid var(--lgd-hair)}
+.mwdetsel{width:100%}
+.mwdetname{flex:none; padding:6px 10px; font-size:11px; font-weight:700; color:var(--lgd-ink); border-bottom:1px solid var(--lgd-hair)}
+.mwdetrows{flex:none}
+.mwdrow{display:grid; grid-template-columns:16px 1fr auto; align-items:center; gap:8px; padding:6px 12px; font-size:12px}
+.mwdrow:nth-child(even){background:var(--lgd-surface2)}
+.mwdlbl{color:var(--lgd-dim)}
+.mwdval{font-variant-numeric:tabular-nums; font-weight:700; text-align:right; color:var(--lgd-ink)}
+.mwdval.up{color:var(--lgd-up)} .mwdval.dn{color:var(--lgd-down,#EB5D2A)}
+.mwdar{font-size:11px; font-weight:800; text-align:center; line-height:1}
+.mwdar.up{color:#26A69A} .mwdar.dn{color:#EF5350} .mwdar.fl{color:var(--lgd-dim)}
 /* ── Market Watch 하위탭: Trading(원클릭·DEMO) ── */
 .mwtradewrap,.mwtickwrap{flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden}
 .mwtradebar{flex:none; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:5px 10px;
@@ -994,6 +1007,16 @@ const MW_SYMBOLS={ Forex:['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCAD','USDCHF',
 const MW_CAT={}; Object.keys(MW_SYMBOLS).forEach(c=>MW_SYMBOLS[c].forEach(s=>MW_CAT[s]=c));
 const MW_WATCH=[...MW_SYMBOLS.Forex,...MW_SYMBOLS.Stocks,...MW_SYMBOLS.Crypto];
 const mwCat=s=>MW_CAT[s]||(/USD$/.test(s)?'Crypto':(s.length===6?'Forex':'Stocks'));
+/* Details 탭 심볼 풀네임(MT5식) — "USDJPY.FX, US Dollar vs Japanese Yen" */
+const CCY_NAME={USD:'US Dollar',EUR:'Euro',JPY:'Japanese Yen',GBP:'British Pound',AUD:'Australian Dollar',CAD:'Canadian Dollar',CHF:'Swiss Franc',NZD:'New Zealand Dollar'};
+const STOCK_NAME={AAPL:'Apple Inc',MSFT:'Microsoft Corp',NVDA:'NVIDIA Corp',TSLA:'Tesla Inc',AMZN:'Amazon.com Inc',GOOGL:'Alphabet Inc',META:'Meta Platforms Inc'};
+const CRYPTO_NAME={BTC:'Bitcoin',ETH:'Ethereum',SOL:'Solana',XRP:'XRP',DOGE:'Dogecoin'};
+const mwSuffix=s=>({Forex:'.FX',Crypto:'.XC',Stocks:'.EQ'}[mwCat(s)]||'');
+function mwFullName(s){ const cat=mwCat(s);
+  if(cat==='Forex') return (CCY_NAME[s.slice(0,3)]||s.slice(0,3))+' vs '+(CCY_NAME[s.slice(3)]||s.slice(3));
+  if(cat==='Stocks') return STOCK_NAME[s]||s;
+  if(cat==='Crypto') return (CRYPTO_NAME[s.replace(/USD$/,'')]||s.replace(/USD$/,''))+' vs US Dollar';
+  return s; }
 const mwPip=s=>(mwCat(s)==='Stocks'||mwCat(s)==='Crypto')?0.01:((s.slice(3)==='JPY'||s.slice(0,3)==='JPY')?0.01:0.0001);
 const mwDigits=s=>mwCat(s)==='Stocks'?2:mwCat(s)==='Crypto'?({SOLUSD:3,XRPUSD:4,DOGEUSD:5}[s]||2):(s.includes('JPY')?3:5);
 const mwFmt=(s,v)=>v==null?'—':(+v).toFixed(mwDigits(s));
@@ -1011,7 +1034,9 @@ const MW_BASE={ EURUSD:1.143,GBPUSD:1.3417,USDJPY:162.36,AUDUSD:0.694,USDCAD:1.4
 const mwStore={ rows:{}, ticks:{}, live:false,
   set(sym,mid,spr){ const half=mwHalf(sym,mid,spr), prev=this.rows[sym], bid=mid-half, ask=mid+half;
     const open=prev?prev.open:mid, hi=prev?Math.max(prev.hi,mid):mid, lo=prev?Math.min(prev.lo,mid):mid;
-    this.rows[sym]={ mid,bid,ask,spr,open,hi,lo,   // open/hi/lo → 상태바 O/H/L/C
+    const bidHi=prev?Math.max(prev.bidHi,bid):bid, bidLo=prev?Math.min(prev.bidLo,bid):bid,   // Details 탭: bid/ask 세션 고저 개별 추적
+      askHi=prev?Math.max(prev.askHi,ask):ask, askLo=prev?Math.min(prev.askLo,ask):ask, close=prev?prev.close:mid;   // close=전 세션 종가(세션 중 고정)
+    this.rows[sym]={ mid,bid,ask,spr,open,hi,lo,bidHi,bidLo,askHi,askLo,close,   // open/hi/lo → 상태바 O/H/L/C
       bDir: prev?(bid>prev.bid?1:bid<prev.bid?-1:(prev.bDir||0)):0,
       aDir: prev?(ask>prev.ask?1:ask<prev.ask?-1:(prev.aDir||0)):0 };
     const tb=this.ticks[sym]||(this.ticks[sym]=[]); tb.push({t:Date.now(),bid,ask}); if(tb.length>240) tb.shift(); },   // Ticks 탭 버퍼
@@ -1058,18 +1083,33 @@ function mwRender(){ const host=document.getElementById('mwBody'); if(!host) ret
   const head=document.getElementById('mwHead');
   const list=mwFilter==='All'?MW_WATCH:MW_WATCH.filter(s=>mwCat(s)===mwFilter);
   const d=new Date(),p=n=>(n<10?'0':'')+n, tnow=p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
-  if(mwView==='Details'){ mwRenderGrid(host, head, MW_COLDEF, list, tnow, true); return; }   // Details = 전 컬럼 표
+  if(mwView==='Details'){ if(head) head.innerHTML=''; mwRenderDetails(host); return; }   // Details = 선택 심볼 상세(MT5)
   if(mwView==='Trading'){ if(head) head.innerHTML=''; mwRenderTrading(host, list); return; }   // 원클릭 트레이딩(DEMO)
   if(mwView==='Ticks'){ if(head) head.innerHTML=''; mwRenderTicks(host); return; }               // 실시간 틱 차트
-  mwRenderGrid(host, head, mwActiveCols(), list, tnow, false);   // Symbols(우클릭 토글 컬럼)
+  mwRenderGrid(host, head, mwActiveCols(), list, tnow);   // Symbols(우클릭 토글 컬럼)
 }
-/* 표 렌더(Symbols/Details 공용) — cols 목록·선택행 하이라이트·드래그 가능 */
-function mwRenderGrid(host, head, cols, list, tnow, isDetails){
+/* 표 렌더(Symbols) — cols 목록·선택행 하이라이트·드래그 가능 */
+function mwRenderGrid(host, head, cols, list, tnow){
   const tmpl=cols.map(c=>c.fr).join(' ');
   if(head) head.innerHTML='<div class="mwhd mwgrid" style="grid-template-columns:'+tmpl+'">'+cols.map(c=>'<div>'+c.lbl+'</div>').join('')+'</div>';
   host.className='mwlist'; host.innerHTML=list.map(s=>{ const r=mwStore.rows[s]||{};
     return '<div class="mwrow mwgrid'+(s===mwSel?' sel':'')+'" draggable="true" data-sym="'+s+'" style="grid-template-columns:'+tmpl+'">'+
       cols.map(c=>mwCell(s,r,c.k,tnow)).join('')+'</div>'; }).join(''); }
+/* MT5 Details 탭 = 선택 심볼 상세 카드(Bid/Bid High/Bid Low/Ask/Ask High/Ask Low/Open/Close + 방향 화살표). */
+function mwRenderDetails(host){ host.className='mwdetwrap'; const sym=mwSel, r=mwStore.rows[sym]||{};
+  const opts=MW_WATCH.map(s=>'<option value="'+s+'"'+(s===sym?' selected':'')+'>'+s+'</option>').join('');
+  const arrow=d=>d>0?'<span class="mwdar up">↗</span>':d<0?'<span class="mwdar dn">↘</span>':'<span class="mwdar fl">•</span>';
+  const val=(v,cls)=>'<span class="mwdval '+(cls||'')+'">'+(v==null?'—':mwFmt(sym,v))+'</span>';
+  const row=(ar,lbl,v,cls)=>'<div class="mwdrow">'+ar+'<span class="mwdlbl">'+lbl+'</span>'+val(v,cls)+'</div>';
+  const rows=
+    row(arrow(r.bDir),'Bid',r.bid,r.bDir<0?'dn':'up')+
+    row(arrow(1),'Bid High',r.bidHi,'up')+row(arrow(-1),'Bid Low',r.bidLo,'dn')+
+    row(arrow(r.aDir),'Ask',r.ask,r.aDir<0?'dn':'up')+
+    row(arrow(1),'Ask High',r.askHi,'up')+row(arrow(-1),'Ask Low',r.askLo,'dn')+
+    row(arrow(0),'Open Price',r.open,'')+row(arrow(0),'Close Price',r.close,'');
+  host.innerHTML='<div class="mwdetbar"><select class="mwticksel mwdetsel">'+opts+'</select></div>'+
+    '<div class="mwdetname">'+sym+mwSuffix(sym)+', '+mwFullName(sym)+'</div>'+
+    '<div class="mwdetrows">'+rows+'</div>'; }
 /* MT5 Trading 탭 = 원클릭 매매 패널. 체결은 없음(DEMO) — 클릭 시 New Order 토스트. */
 function mwRenderTrading(host, list){ host.className='mwtradewrap';
   const bar='<div class="mwtradebar">DEMO · One-Click Trading'+
