@@ -56,7 +56,7 @@ const ROWS = [
   let page = await browser.newPage({ viewport: { width: 1900, height: 904 } });
   await page.goto(`http://localhost:${PORT}/dev/fx-terminal.html`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(700);
-  ok('no feed → SIM mode, no LIVE badge', !(await page.$('#mwLive')) || (await page.$eval('#mwLive', el => el.style.display === 'none')));
+  ok('no feed → honest SIM badge shown', (await page.$eval('#mwLive', el => el.textContent)) === 'SIM');
   ok('SIM rows render (22 symbols)', (await page.$$eval('#w-marketwatch .mwrow', r => r.length)) === 22);
 
   // ── ① 실피드 주입 → 실가격 + 매핑 ──

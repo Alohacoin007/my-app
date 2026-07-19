@@ -98,15 +98,15 @@ function installStub(mode) {
     return { authed: fxAcct.authed, cells, spans,
       bid: mwStore.rows.EURUSD.bid,
       liveTag: !!document.querySelector('#tbxBody .acctlive'),
-      closes: document.querySelectorAll('#tbxBody .poclose[data-close]').length,
-      noclose: document.querySelectorAll('#tbxBody .ponoclose').length,
-      pendhd: !!document.querySelector('#tbxBody .pendhd'),
+      firstRowNoClose: !!document.querySelector('#tbxBody tbody tr:first-child .ponoclose'),
+      practiceHd: [...document.querySelectorAll('#tbxBody .pendhd td')].map(x=>x.textContent).join('|'),
       total: (document.querySelector('#tbxBody .tbxtotal') || {}).textContent };
   });
   ok('login → real position row (EURUSD buy 0.10 @1.10000, ticket FXP-77001)',
      live.authed === true && live.cells[0] === 'EURUSD' && live.cells[1] === 'FXP-77001' &&
      live.cells[3] === 'buy' && live.cells[4] === '0.10' && live.cells[5] === '1.10000', JSON.stringify(live.cells));
-  ok('LIVE tag shown + demo pending orders hidden', live.liveTag === true && live.pendhd === false);
+  ok('LIVE tag + demo positions only under explicit Practice header (no bare pending)',
+     live.liveTag === true && !/Pending Orders/.test(live.practiceHd) && /Practice \(DEMO\)/.test(live.practiceHd));
   const expPl = 1 * (live.bid - 1.10) * 0.10 * 100000;                       // dir*(bid-open)*lots*contract
   ok('floating P/L = server formula (dir*(bid-open)*lots*100000 = ' + expPl.toFixed(2) + ')',
      Math.abs(+live.cells[11] - expPl) < 0.01 && Math.abs(+live.total - expPl) < 0.01, live.cells[11] + ' / ' + live.total);
@@ -115,8 +115,8 @@ function installStub(mode) {
   const expEq = 50000 + expPl;
   ok('Equity = Balance + Floating (' + expEq.toFixed(2) + ')',
      eqTxt.replace(/\s/g, '').includes(expEq.toLocaleString('en-US', { minimumFractionDigits: 2 }).replace(/,/g, '')), eqTxt);
-  // ── ④ 실포지션엔 ✕ 없음 ──
-  ok('real rows: no close ✕ (read-only until M5)', live.closes === 0 && live.noclose === 1);
+  // ── ④ 실포지션(첫 행)엔 ✕ 없음 — 연습 섹션의 ✕는 허용(데모 청산) ──
+  ok('real row: no close ✕ (read-only until M5)', live.firstRowNoClose === true);
 
   // ── ⑤ 시세 이동 → 1s 루프가 Trade 재마킹 ──
   await page.evaluate(() => { mwStore.apply([{ symbol: 'EURUSD', mid: 1.30000, spr_pts: 1.0 }]); });

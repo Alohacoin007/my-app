@@ -168,6 +168,7 @@ body.symdrag .widget[id^="w-chart"]{outline:1px dashed var(--lgd-hair); outline-
 /* M2 실시세 배지 — LIVE(초록)=신선 · STALE(주황 점멸)=실피드 끊김(동결) · 배지 없음=SIM */
 .mwlive{font-size:8.5px; font-weight:800; letter-spacing:.6px; padding:2px 7px; border-radius:2px; margin-right:6px}
 .mwlive.live{background:rgba(0,200,5,.15); color:var(--lgd-green,#00C805)}
+.mwlive.sim{background:rgba(128,136,150,.18); color:var(--lgd-dim)}
 .mwlive.stale{background:rgba(240,180,40,.15); color:#E0A020; animation:mwstale 1.6s ease-in-out infinite}
 @keyframes mwstale{0%,100%{opacity:1}50%{opacity:.4}}
 .mwsym{font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
@@ -222,7 +223,7 @@ body.symdrag .widget[id^="w-chart"]{outline:1px dashed var(--lgd-hair); outline-
 /* 활성(포커스) 차트 — 헤더만 아주 은은하게(네온 파랑 제거, 티 안나게) */
 .widget.chart-active .wtb{background:var(--lgd-surface2)}
 .widget.chart-active .wtb h3{color:var(--lgd-ink)}
-.cgtf{position:absolute; top:5px; left:8px; font-size:9.5px; font-weight:800; color:var(--lgd-dim); letter-spacing:.4px}
+.cgtf{position:absolute; bottom:24px; left:8px; font-size:9.5px; font-weight:800; color:var(--lgd-dim); letter-spacing:.4px}   /* 좌하단(시간축 위) — 상단 DEMO 칩과 겹침 방지 */
 /* 차트 지표 범례(원클릭 삭제) — 좌상단, TF 라벨 아래. 칩별 ✕ 한 번에 그 지표 제거 */
 .chleg{position:absolute; top:36px; left:8px; z-index:2; display:flex; flex-wrap:wrap; gap:4px; pointer-events:none; max-width:70%}
 .chchip{pointer-events:auto; display:inline-flex; align-items:center; gap:5px; font-size:9.5px; font-weight:700;
@@ -233,6 +234,8 @@ body.symdrag .widget[id^="w-chart"]{outline:1px dashed var(--lgd-hair); outline-
 .chchip .chx:hover{opacity:1; color:var(--lgd-down,#EB5D2A); background:var(--lgd-surface2)}
 /* (차트 왼쪽 라인스터디 사이드바 CSS 제거 — 2026-07-19, 기능은 상단 툴바) */
 /* 차트 원클릭 매매 바 — 상단, 가격 크고 뚜렷. SELL 빨강 / BUY 초록(레전드) */
+.ocdemo{display:flex; align-items:center; padding:0 6px; border-radius:4px; font-size:8.5px; font-weight:800; letter-spacing:.5px;
+  color:#E0A020; border:1px solid rgba(224,160,32,.55); background:rgba(224,160,32,.10)}
 .ocbar{position:absolute; top:3px; left:6px; z-index:4; display:flex; align-items:stretch; gap:4px; font-size:10px; max-width:calc(100% - 62px)}
 .ocvol{display:flex; align-items:center; gap:1px; background:rgba(18,24,34,.72); border:1px solid var(--lgd-hair); border-radius:4px; padding:0 2px}
 .ocvb{width:15px; height:100%; min-height:22px; border:none; background:transparent; color:var(--lgd-ink); font-weight:800; font-size:13px; cursor:pointer; line-height:1}
@@ -930,6 +933,7 @@ function loadRealSeries(sym,tf){ const k=sym+'|'+tf; if(realSeriesState[k]) retu
 /* (차트창 왼쪽 라인스터디 사이드바는 2026-07-19 사장님 지시로 제거 — 같은 기능 전부 상단 툴바에 있음) */
 /* 차트 원클릭 매매 바(MT5/레전드) — 볼륨 · SELL(bid) · 스프레드 · BUY(ask) · 티켓(▾) · OHLCV. 가격 크게. */
 function ocbarHTML(){ return '<div class="ocbar">'+
+  '<span class="ocdemo" title="Orders here are simulated practice fills — no real funds (live execution: M4)">DEMO</span>'+
   '<span class="ocvol"><button class="ocvb" data-oc="dec">−</button><b class="ocvv">0.10</b><button class="ocvb" data-oc="inc">+</button></span>'+
   '<button class="octrade ocsell" data-oc="sell"><span class="ocl">SELL</span><b class="ocbid">—</b></button>'+
   '<span class="ocspr" title="Spread">—</span>'+
@@ -942,7 +946,7 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
   const sym=(layout[id]&&layout[id].sym)||'', W=box.clientWidth, H=box.clientHeight;
   if(W<40||H<70){ svg.innerHTML=''; return; }   // padT=34 반영: 너무 낮은 창은 그리지 않음(음수 플롯 방지)
   const c=cfg(id), ind=c.ind, dg=mwDigits(sym), s=series(sym, c.tf);   // ← 차트별 설정
-  const RA=Math.round(Math.min(60, Math.max(36, W*0.12))), padT=34, padB=6, plotW=W-RA, plotH=H-padT-padB;   // padT=34: 상단 원클릭 매매바(ocbar) 아래부터 그림 — 바가 캔들을 덮지 않게
+  const RA=Math.round(Math.min(60, Math.max(36, W*0.12))), padT=34, padB=20, plotW=W-RA, plotH=H-padT-padB;   // padT=34: ocbar 아래부터 · padB=20: 하단 시간축 라벨 스트립(MT5)
   /* 하단 서브창 스택: 가격창 → (RSI) → (Volume). 켜진 만큼 가격창 높이 축소 */
   const showVol=c.vol!==false && H>110;
   const volH=showVol?Math.max(22,Math.min(64,plotH*0.16)):0;
@@ -973,6 +977,18 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
   for(let i=0;i<=4;i++){ const p=mn+rng*i/4, y=yOf(p);
     if(c.grid) out+='<line x1="0" y1="'+y.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="var(--lgd-hair)" stroke-width="1" opacity=".5"/>';
     out+='<text x="'+(W-4)+'" y="'+(y-2).toFixed(1)+'" text-anchor="end" fill="var(--lgd-dim)" font-size="9" font-family="inherit">'+p.toFixed(dg)+'</text>'; }
+  /* ── 시간축(MT5) — 하단 라벨 스트립 + (그리드 시) 세로선. ~90px마다 하나, 날짜 경계는 날짜로 ── */
+  { const stepMs=TF_MS[c.tf]||1800e3, every=Math.max(1, Math.round(90/cw));
+    const p2=n=>(n<10?'0':'')+n, isDay=stepMs>=864e5;
+    const tLab=(ms,prevMs)=>{ const d=new Date(ms);
+      if(isDay) return (stepMs>=2592e6?d.getFullYear()+'.':'')+p2(d.getMonth()+1)+'.'+p2(d.getDate());
+      const dayChanged=prevMs==null||new Date(prevMs).getDate()!==d.getDate();
+      return dayChanged?(p2(d.getMonth()+1)+'.'+p2(d.getDate())):(p2(d.getHours())+':'+p2(d.getMinutes())); };
+    let prevMs=null; const axY=(padT+plotH+13).toFixed(1);
+    for(let i=0;i<vis.length;i+=every){ const x=i*cw+cw/2; if(x>plotW-8) break;
+      if(c.grid) out+='<line x1="'+x.toFixed(1)+'" y1="'+padT+'" x2="'+x.toFixed(1)+'" y2="'+(padT+plotH).toFixed(1)+'" stroke="var(--lgd-hair)" stroke-width="1" opacity=".3"/>';
+      out+='<text x="'+x.toFixed(1)+'" y="'+axY+'" text-anchor="middle" fill="var(--lgd-dim)" font-size="8.5" font-family="inherit">'+tLab(vis[i].t, prevMs)+'</text>';
+      prevMs=vis[i].t; } }
   if(c.type==='line'){
     out+='<polyline points="'+vis.map((k,i)=>((i*cw+cw/2).toFixed(1)+','+yOf(k.c).toFixed(1))).join(' ')+'" fill="none" stroke="'+CH_LINE+'" stroke-width="1.4"/>';
   } else vis.forEach((k,i)=>{ const x=i*cw+cw/2, up=k.c>=k.o, col=up?CH_UP:CH_DN;
@@ -1235,8 +1251,12 @@ const mwStore={ rows:{}, ticks:{}, live:false,
     const mid=+p.mid; if(!(mid>0)) return; const prev=this.rows[s];
     const spr=(p.spr_pts!=null&&p.spr_pts!=='')?+p.spr_pts:(prev&&prev.spr!=null?prev.spr:mwSeedSpr(s));
     this.set(s,mid,spr); }); this.live=true; } };
-function mwSimulate(){ MW_WATCH.forEach(s=>{ const prev=mwStore.rows[s], base=prev?prev.mid:(MW_BASE[s]||1);
-  const mid=Math.max(base*0.5, base+base*(Math.random()-0.5)*0.0006); mwStore.set(s, mid, mwSeedSpr(s)); }); }
+function fxWeekendClosed(){ const d=new Date(), day=d.getUTCDay(), h=d.getUTCHours();
+  return day===6 || (day===0&&h<21) || (day===5&&h>=21); }   // 금 21UTC ~ 일 21UTC = FX 휴장
+function mwSimulate(){ const closed=fxWeekendClosed();
+  MW_WATCH.forEach(s=>{ const prev=mwStore.rows[s], base=prev?prev.mid:(MW_BASE[s]||1);
+    if(closed && mwCat(s)!=='Crypto'){ if(!prev) mwStore.set(s, base, mwSeedSpr(s)); return; }   // 휴장 = 동결(가짜 움직임 금지, webtrade 동일)
+    const mid=Math.max(base*0.5, base+base*(Math.random()-0.5)*0.0006); mwStore.set(s, mid, mwSeedSpr(s)); }); }
 let mwFilter='All', mwView='Symbols', mwSel='EURUSD', mwVol=0.10;   // mwSel=Ticks/선택행, mwVol=Trading 원클릭 볼륨(표시용, 체결 없음)
 /* ── MT5 Market Watch 컬럼 (우클릭으로 넣다 뺐다) — Symbol/Bid/Ask는 고정, 나머지 토글 ── */
 const MW_COLDEF=[
@@ -1653,6 +1673,14 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
         (p.noClose?'<td class="pox"><span class="ponoclose" title="Live close via fx_close (M5)">—</span></td>'
                   :'<td class="pox"><span class="poclose" data-close="'+p.ticket+'" title="Close position (one-click)">✕</span></td>')+'</tr>').join('')
       : '<tr><td colspan="13" style="text-align:center;color:var(--lgd-dim);padding:16px">No open positions</td></tr>';
+    /* LIVE에서도 데모(연습) 체결은 별도 섹션으로 보인다 — "주문이 사라졌다" 착각 방지(갭감사 1순위) */
+    if(LIVE) demoMarkAll();
+    const demoSec=(LIVE&&DEMO_POS.length)?'<tr class="pendhd"><td colspan="13">Practice (DEMO) — simulated, not your account ('+DEMO_POS.length+')</td></tr>'+
+      DEMO_POS.map(p=>'<tr><td>'+p.sym+'</td><td>'+p.ticket+'</td><td>'+p.time+'</td>'+
+        '<td class="'+p.type+'">'+p.type+'</td><td>'+p.vol+'</td><td>'+p.price+'</td><td>'+(p.sl||'—')+'</td>'+
+        '<td>'+(p.tp||'—')+'</td><td>'+p.cur+'</td><td>'+p.comm+'</td><td>'+p.swap+'</td>'+
+        '<td class="'+(+p.pl>=0?'pl-pos':'pl-neg')+'">'+p.pl+'</td>'+
+        '<td class="pox"><span class="poclose" data-close="'+p.ticket+'" title="Close practice position">✕</span></td></tr>').join(''):'';
     /* 대기 주문(Pending) — MT5는 포지션 아래 별도 섹션. 현재가는 라이브, 취소 ✕. (LIVE엔 데모 대기주문 미표시) */
     const pmk=s=>{ const p=symPair(s), rr=mwStore.rows[p]; return rr&&rr.mid!=null?mwFmt(p,rr.mid):'—'; };
     const pend=(!LIVE&&DEMO_PEND.length) ? '<tr class="pendhd"><td colspan="13">Pending Orders ('+DEMO_PEND.length+')</td></tr>'+
@@ -1662,7 +1690,7 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
         '<td class="pox"><span class="poclose" data-cancel="'+p.ticket+'" title="Cancel pending order">✕</span></td></tr>').join('') : '';
     body.innerHTML='<div class="tbxscroll"><table class="postbl">'+colg(TBX_COLW.trade)+'<thead><tr>'+
       ['Symbol','Ticket','Time','Type','Volume','Price','S / L','T / P','Price','Commission','Swap','Profit',''].map(h=>'<th>'+h+'</th>').join('')+
-      '</tr></thead><tbody>'+rows+pend+'</tbody>'+
+      '</tr></thead><tbody>'+rows+demoSec+pend+'</tbody>'+
       /* 계좌 바 = tfoot(마지막 행 바로 밑) · 총 P/L은 colspan으로 Profit 열에 정확히 정렬(margin 하드코딩 X) */
       '<tfoot><tr class="acctrow">'+
       '<td colspan="11"><div class="acctline">'+acctSpans(LIVE)+'</div></td>'+
@@ -1704,8 +1732,12 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
       '</tr></thead><tbody>'+rows+'</tbody></table>'+pie+'</div>'+acctbar+'</div>';
 
   } else if(tab==='History'){
+    /* LIVE = 서버 settlements(fx_close) 실기록 — 데모 기록을 실계좌인 척 보여주지 않는다(갭감사 1순위) */
+    const HLIVE=fxAcct.authed;
+    if(HLIVE&&!fxAcct.histLoaded) fxAcct.loadHist();   // 비동기 — 로드되면 자동 재렌더
+    const SRC=HLIVE?fxAcct.hist:DEMO_HIST;
     const now=Date.now(), sod=(()=>{ const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); })();
-    const shown=DEMO_HIST.filter(h=>{ const ms=+h.ms||0;
+    const shown=SRC.filter(h=>{ const ms=+h.ms||0;
       if(histPeriod==='today') return ms>=sod; if(histPeriod==='week') return ms>=now-7*864e5; if(histPeriod==='month') return ms>=now-30*864e5; return true; });
     const totP=shown.reduce((s,h)=>s+(+h.profit),0);
     const bar='<div class="histbar">'+[['all','All'],['today','Today'],['week','Last Week'],['month','Last Month']]
@@ -1714,7 +1746,7 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
     const rows=shown.length?shown.map(h=>'<tr><td>'+h.sym+'</td><td>'+h.ticket+'</td><td>'+h.ctime+'</td>'+
       '<td class="'+(h.type==='sell'?'down':'up')+'">'+h.type+'</td><td>'+(+h.vol).toFixed(2)+'</td><td>'+h.open+'</td><td>'+h.close+'</td>'+
       '<td class="'+(+h.profit>=0?'pl-pos':'pl-neg')+'">'+(+h.profit).toFixed(2)+'</td></tr>').join('')
-      : '<tr><td colspan="8" style="text-align:center;color:var(--lgd-dim);padding:16px">No history in the selected period</td></tr>';
+      : '<tr><td colspan="8" style="text-align:center;color:var(--lgd-dim);padding:16px">'+(HLIVE&&!fxAcct.histLoaded?'Loading account history…':'No history in the selected period')+'</td></tr>';
     /* 합계 = tfoot(colspan 7 + Profit열) — Profit 값 아래 정확 정렬 */
     const foot=shown.length?'<tfoot><tr class="acctrow"><td colspan="7"><div class="acctline"><span>Deals:<b>'+shown.length+'</b></span></div></td>'+
       '<td class="tbxtotal '+(totP>=0?'pl-pos':'pl-neg')+'">'+totP.toFixed(2)+'</td></tr></tfoot>':'';
@@ -2015,10 +2047,10 @@ const fxFeed={ lastRealAt:0, wsAt:{}, realSyms:new Set(), ws:null, rt:null, _t:n
   badge(){ let el=document.getElementById('mwLive');
     if(!el){ const host=document.querySelector('#w-marketwatch .wtb'), sp=host&&host.querySelector('.wsp'); if(!sp) return;
       el=document.createElement('span'); el.id='mwLive'; sp.parentNode.insertBefore(el, sp.nextSibling); }
-    const st=this.state();
-    if(st==='sim'){ el.style.display='none'; return; }
-    el.style.display=''; el.textContent=st==='live'?'LIVE':'STALE'; el.className='mwlive '+st; },
+    const st=this.state();   // SIM도 정직 표기(갭감사) — 시뮬 시세를 무표기로 두지 않는다
+    el.style.display=''; el.textContent=st==='live'?'LIVE':st==='stale'?'STALE':'SIM'; el.className='mwlive '+st; },
   start(){ if(this._t) return; this.poll(); this._t=setInterval(()=>{ if(!document.hidden) this.poll(); },3000);
+    this.badge();   // SIM 상태도 즉시 정직 표기(지연 없이)
     this.startRT(); this.startWS();
     /* 워치독(feedHz 미러): 배지 재평가 + 조용히 죽은 WS(30s 무프레임) 소켓 재활용.
        실피드가 끊겨도 SIM으로 되돌아가 가짜로 흔들지 않는다 — 마지막 실가격 동결 + STALE 정직 표시. */
@@ -2071,6 +2103,20 @@ const fxAcct={ authed:false, acct:null, pos:[], _t:null, ch1:null, ch2:null,
   stats(){ const floating=this.pos.reduce((s,p)=>s+this.pnl(p),0), bal=+((this.acct&&this.acct.balance))||0;
     const margin=this.pos.reduce((s,p)=>s+this.margin(p),0), equity=bal+floating;
     return { bal, floating, equity, margin, free:equity-margin, level:margin>0?equity/margin*100:0 }; },
+  hist:[], histLoaded:false, _histBusy:false,
+  async loadHist(){ if(this._histBusy) return; this._histBusy=true; try{
+    const a=await this.session(); if(!a){ this._histBusy=false; return; }
+    const r=await AlpexaSync.db.from('settlements').select('local_id,symbol,stake,pnl,detail,created_at')
+      .eq('server','fx').eq('acct_no',a).eq('kind','fx_close').order('created_at',{ascending:false}).range(0,99);
+    if(r&&r.data){ this.hist=r.data.map(x=>{ const dt=String(x.detail||''),
+        sm=dt.match(/(BUY|SELL)/i), pm=dt.match(/@\s*([\d.]+)(?:\s*->\s*([\d.]+))?/);
+      return { sym:String(x.symbol||'').toLowerCase()+mwSuffix(String(x.symbol||'')).toLowerCase(),
+        ticket:String(x.local_id||''), ctime:String(x.created_at||'').slice(0,19).replace('T',' ').replace(/-/g,'.'),
+        type:sm?sm[1].toLowerCase():'—', vol:+x.stake||0, open:pm?pm[1]:'—', close:(pm&&pm[2]!=null)?pm[2]:'—',
+        profit:(+x.pnl||0).toFixed(2), ms:Date.parse(x.created_at)||0 }; });
+      this.histLoaded=true;
+      if(curTbxTab==='History') renderToolbox('History'); }
+  }catch(e){} this._histBusy=false; },
   paint(){ if(curTbxTab==='Trade'||curTbxTab==='Exposure') renderToolbox(curTbxTab); },
   start(){ if(this._t) return;
     this.load(); [1500,4000].forEach(ms=>setTimeout(()=>{ if(!this.authed) this.load(); },ms));   // 세션 하이드레이션 레이스 자가치유
@@ -2080,6 +2126,17 @@ const fxAcct={ authed:false, acct:null, pos:[], _t:null, ch1:null, ch2:null,
       this.ch2=AlpexaSync.db.channel('fxterm-pos').on('postgres_changes',{event:'*',schema:'public',table:'positions'},()=>this.load()).subscribe();
     } }catch(e){} } };
 fxAcct.start(); window.fxAcct=fxAcct;   // 차트 주문라인 등 이른 코드가 window 경유로 안전 참조
+/* Sign in 아바타 — 미로그인: login.html(FX)로, 복귀토큰 fx-terminal. 로그인: 계좌번호 표시(장식 해제) */
+(function avatarWire(){ const av=document.querySelector('.avatar'); if(!av) return;
+  av.style.cursor='pointer';
+  av.addEventListener('click', ()=>{
+    if(fxAcct.authed){ toast('Signed in — FX account '+((fxAcct.acct&&fxAcct.acct.acct_no)||'')); return; }
+    try{ sessionStorage.setItem('alpexa.dest2','fx-terminal'); }catch(e){}
+    location.href='../login.html'; });
+  const sync=()=>{ av.classList.toggle('signin', !fxAcct.authed);
+    av.title=fxAcct.authed?('FX '+((fxAcct.acct&&fxAcct.acct.acct_no)||'')):'Sign in';
+    if(fxAcct.authed) av.textContent='A'; };
+  setInterval(sync, 2000); sync(); })();
 mwSimulate(); mwRender();
 
 /* Toolbox 도크 — 탭(바닥) · Trade 렌더 · 상단 리사이즈 · X 닫기(왼쪽 헤드, Ctrl+T 재오픈) · 원클릭 청산 */
