@@ -1137,6 +1137,9 @@ const pnlKv=(id,d)=>setKv(id,(d>=0?'▲ ':'▼ ')+fmtUsdSm(Math.abs(d)), d>=0?'u
    RH는 빈 계좌를 $0.00으로 그리지만 우리는 "모름(미로그인)"과 "0원"을 구분한다). */
 async function loadWalletKvs(sess){
   if(!sess) return;
+  /* 세션이 실존하면 헤드라인도 즉시 로그인 상태로 — 초기 loadWallet()이 세션 하이드레이션 전에
+     돌아 authed=false로 굳고, 이후엔 KV 갱신 경로만 도는 레이스 차단(로그인했는데 Sign in CTA 잔류). */
+  if(!wal.authed){ wal.authed=true; try{ document.getElementById('walPv').style.display='none'; }catch(e){} renderWal(); }
   const db=AlpexaSync.db, acct=sess.acct;
   try{
     const [h,p,st]=await Promise.all([
@@ -1213,6 +1216,9 @@ document.getElementById('walRanges').addEventListener('click',e=>{
 });
 try{ new ResizeObserver(()=>renderWal()).observe(document.getElementById('walWrap')); }catch(e){}
 loadWallet();
+/* 자가치유 재시도 — 첫 loadWallet이 세션/CDN 하이드레이션보다 먼저 돌면 authed=false로 남는다.
+   로그인 유저가 "Sign in"을 보는 일이 없도록 잠깐 뒤 재판정(미로그인이면 그대로 CTA 유지). */
+[1500,4000].forEach(ms=>setTimeout(()=>{ if(!wal.authed) loadWallet(); },ms));
 
 /* ════════════════════ W3 Markets — 레전드 워치리스트 (실시장 데이터, 공개) ════════════════════
    1차: Binance 공개 미러 WS @ticker (last·24h%·실 bid/ask — CLAUDE.md 미러 규칙, geo-fence 대응)
