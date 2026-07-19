@@ -95,6 +95,7 @@
 - **파이프라인 (전부 라이브 검증됨):** 크립토=클라 Binance WS 직결(ms) + 크론 3초 폴백 · FX=`fx-stream` WS 펌프(~1초, job `fx-stream-1m`) + `fx-prices` 3초 폴백 · 주식=`stock-stream` WS 펌프(2~8초, job `stock-stream-1m`) + `stock-prices` 1분 폴백(+ALPXS) · 클라 수신=Supabase Realtime 푸시(`prices` publication) + 1초 폴링 폴백. 크론 진단/튜닝/롤백 = `supabase/sql/feed_speed_tune.sql`.
 - **WS 펌프 Edge 공통 규칙:** 대시보드에서 JWT verify **OFF**(함수 내 `CRON_SECRET` 검사가 관문) · spr_pts 단위는 기존 작성자와 동일하게(FX 정수핍·크립토 bps·주식 0) — 단위 새로 발명 금지(결함-로그 2026-07-13).
 - **아침 감시 2층 (2026-07-13):** ① Claude 루틴 `trig_01VUfQyWNpydMtCKnghmXNE5` — 매일 15:00 UTC(베가스 8시) 이 세션에서 feed-check+오늘 경기·오즈 점검 후 **능동 보고**. ② GitHub Action `daily-sports-check.yml`(main) — 매일 ~16-17 UTC **침묵 게이트**(빨강 시만 이메일, 7/7부터 전회 초록). 서로 백업 — 하나 지운다고 감시가 사라지지 않게 둘 다 유지.
+- **아침 루틴 추가 항목 (2026-07-19, SP-100058 사고 후):** ①에서 **돈-상태 감사 결과도 확인·보고** — `sports-audit` Edge를 토큰으로 1회 호출(읽기+기록, 돈 무접촉)해 `verdict·open_bets`를 채팅에 보고. 🔴이면 미정산 나이·원인 즉시 추적. 이메일 경로가 죽어도 이 보고가 백업(알람의 알람). 토큰은 cron.job의 sports-daily-audit 잡과 동일. 추가로 `feed-liveness` Action(main) 최근 런 상태도 확인.
 
 ## 📌 보류 백로그 (조건 충족 시 사용자에게 먼저 리마인드할 것)
 - **[감시 중 2026-07-16] ⛳ 여자골프(LPGA)**: The Odds API에 현재 여자 대회 키 없음(프로브 실측 — golf 키 4개 전부 남자 메이저). sports-odds가 일 1회 종목 카탈로그를 `sports_odds.__sports_list`에 적재하고 feed-check가 **신규 골프/LPGA 키 등장 시 📣 알림** → 뜨면 사용자에게 확장 제안(작업 반나절: 키 추가+대회명 매처+ESPN golf/lpga+정산 스코어보드). 세션에서 Odds API 직접 호출은 네트워크 정책상 불가 — 카탈로그 행 경유가 유일 경로.
