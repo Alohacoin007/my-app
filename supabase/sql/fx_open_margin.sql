@@ -12,7 +12,7 @@
 --             FX quote=USD   → size*lot*price          (EURUSD, XAUUSD, XAGUSD)
 --             FX base=USD    → size*lot                (USDJPY)
 --             FX cross       → size*lot*ccyToUsd(base) (EURGBP)
---   lev cap:  FX=100, INDEX=20, STOCK=5, CRYPTO=5, else 1 (conservative)
+--   lev cap:  FX=500 (2026-07-19 사장님 승인, 舊100), INDEX=20, STOCK=5, CRYPTO=5, else 1
 --
 -- ⚠️ TEST PLAN (run on a real session BEFORE trusting it):
 --   1) balance $2000, open EURUSD 1.0 lot @~1.10 → OK (margin ~$1100, free ~$900).
@@ -53,9 +53,10 @@ begin
 end;$$;
 
 -- House leverage cap per class (the client's DEFAULT_LEVERAGE = the max allowed).
+-- 2026-07-19 사장님 승인: FX 100→500 (마진 게이트·5-arg 클램프·fx_stopout 전부 이 함수 경유 = 락스텝 자동)
 create or replace function public.fx_lev_cap(p_cls text)
 returns numeric language sql immutable as $$
-  select case p_cls when 'FX' then 100 when 'INDEX' then 20
+  select case p_cls when 'FX' then 500 when 'INDEX' then 20
                     when 'STOCK' then 5 when 'CRYPTO' then 5 else 1 end::numeric;
 $$;
 
