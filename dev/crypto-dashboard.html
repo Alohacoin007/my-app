@@ -119,6 +119,10 @@ body.light .avatar .pdot{border-color:#fff}
 .wal .lbl{font-size:var(--lgd-fs-label); color:var(--lgd-dim); font-weight:600}
 .wal .amt{font-size:26px; font-weight:700; letter-spacing:-.3px; margin-top:2px}
 .wal .amt .cents{font-size:17px; color:var(--lgd-dim)}
+/* 미로그인 지갑 CTA — 헐벗은 '···'가 고장처럼 보이던 문제 해소 */
+.wal .amt .walsignin{font:700 15px/1.2 inherit; color:#04250B; background:var(--lgd-up); border:none;
+  border-radius:8px; padding:8px 14px; cursor:pointer; letter-spacing:.2px}
+.wal .amt .walsignin:hover{filter:brightness(1.08)}
 .wal .chg{font-size:var(--lgd-fs-caption); font-weight:600; margin-top:3px; min-height:15px}
 .wal .chg.up{color:var(--lgd-up)} .wal .chg.down{color:var(--lgd-down)}
 .wal .chg .dim{color:var(--lgd-dim); font-weight:500}
@@ -1100,11 +1104,16 @@ function renderWal(){
     chgEl.innerHTML=(d>=0?'▲':'▼')+' $'+Math.abs(d).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+
       ' ('+(d>=0?'+':'−')+Math.abs(p).toFixed(2)+'%) <span class="dim">'+WAL_RANGES[wal.range]+'</span>';
   } else {
-    amtEl.textContent='···';
-    chgEl.className='chg '+(d>=0?'up':'down');
-    chgEl.innerHTML=(d>=0?'▲':'▼')+' '+(d>=0?'+':'−')+Math.abs(p).toFixed(2)+'% <span class="dim">'+WAL_RANGES[wal.range]+' · preview</span>';
+    /* 미로그인 = 가짜 달러 금지(규칙 #5). 단, 헐벗은 '···'는 "고장난 것"처럼 보인다 →
+       명시적 "Sign in to view balance" CTA로 대체(탭하면 로그인, 돌아오면 실잔고). */
+    amtEl.innerHTML='<button type="button" class="walsignin" data-signin="1">Sign in to view balance</button>';
+    chgEl.className='chg dim';
+    chgEl.innerHTML='<span class="dim">Preview — live figures after sign-in</span>';
   }
 }
+/* 로그인 이동 — 돌아올 목적지 토큰 심고 login.html (아바타·지갑 CTA 공용) */
+function goCryptoLogin(){ try{ sessionStorage.setItem('alpexa.dest2','crypto-dashboard'); }catch(e){} location.href='/login.html'; }
+document.addEventListener('click', e=>{ if(e.target.closest('[data-signin]')) goCryptoLogin(); });   // 지갑 CTA → 로그인
 /* 세션 게이트 — 세션 실존 + alpexa.me 태그 둘 다 (유령세션 클래스 가드, 결함-로그 2026-07-15) */
 async function walSession(){
   try{

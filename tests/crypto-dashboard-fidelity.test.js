@@ -42,6 +42,8 @@ const PINS = [
   ['리워드 = redeem_referral RPC(서버 1회 강제)', /rpc\('redeem_referral',\{p_code/],
   ['세션 가드 = alpexa.me 태그 AND getSession 실존', /auth\.getSession\(\)/],
   ['비로그인 잔고 표시 = ··· (가짜 $ 금지)',   /'···'/],
+  ['비로그인 지갑 헤드라인 = 명시적 Sign-in CTA(헐벗은 ···가 고장처럼 보이던 문제)', /amtEl\.innerHTML=[^\n]*walsignin[^\n]*data-signin/],
+  ['Sign-in CTA → 목적지 토큰 후 login.html', /alpexa\.dest2','crypto-dashboard'[\s\S]{0,80}?login\.html/],
   ['Open orders 정직 표기 = Pending (manual)', /Pending \(manual\)/],
   ['미구현 기능 정직 표기 = Soon 칩',          /title="Soon"/],
   ['ALPXS 하드락 안내(만기 전 언스테이크 불가)', /cannot be unstaked before maturity/],
