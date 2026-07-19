@@ -1234,6 +1234,17 @@ function legState(l){ // Open 위계: Live > Awaiting result > Upcoming (앱:211
   if(kt&&Date.parse(kt)<Date.now()) return 'await';
   return 'up';
 }
+/* 오픈벳 정렬 = 앱 계약 미러(sports-live:2178-2187 — 전에 앱에서 고친 규칙 그대로, 2026-07-19 사장님 지시):
+   LIVE 우선 → 킥오프 빠른 순(티켓 내 가장 이른 레그, 미상=Infinity로 마지막) → 동률=최신 베팅.
+   복사본 정렬 — openBets 원본 순서는 id 조회 경로가 쓰므로 불변. */
+function betKick(b){ let min=Infinity; (b.legs||[]).forEach(l=>{
+  const g=gamesStore.games.find(x=>x.gid===l.gid);
+  const kt=l.kt||(g&&g.iso)||''; const t=kt?Date.parse(kt):NaN; if(!isNaN(t)&&t<min)min=t; }); return min; }
+function sortedOpenBets(){ return ms.openBets.slice().sort((a,b)=>{
+  const la=(a.legs||[]).some(l=>legState(l)==='live'), lb=(b.legs||[]).some(l=>legState(l)==='live');
+  if(la!==lb) return la?-1:1;
+  const ka=betKick(a), kb=betKick(b); if(ka!==kb) return ka-kb;
+  return (+b.placedTs||0)-(+a.placedTs||0); }); }
 function renderBets(){
   const el=document.getElementById('mbList'); if(!el) return;
   const ms=moneyStore;
@@ -1277,7 +1288,7 @@ function renderBets(){
     return;
   }
   if(!ms.openBets.length){ el.innerHTML='<div class="loginp">No open bets — Place a bet to see it here</div>'; return; }
-  el.innerHTML=ms.openBets.map(b=>{
+  el.innerHTML=sortedOpenBets().map(b=>{
     try{
       const states=b.legs.map(legState);
       const st=states.includes('live')?'Live':states.includes('await')?'Awaiting result':'Upcoming';

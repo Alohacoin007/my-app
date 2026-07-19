@@ -198,6 +198,9 @@ if (/Total assets|Profit & loss/.test(src)) {
 if (/live_games/.test(src)) {
   pin(/\.eq\(\s*['"]id['"]\s*,\s*['"]all['"]\s*\)|id=eq\.all/, 'live_games 단일 행(id=all) 계약 (앱:3635)');
 }
+// 오픈벳 정렬 = 앱 계약 미러 (sports-live:2178-2187 — LIVE 우선 → 킥오프 빠른 순 → 최신, 2026-07-19 사장님 지시)
+pin(/function sortedOpenBets\(\)[\s\S]{0,300}?ka-kb/, '오픈벳: LIVE 우선 → 킥오프 오름차순 정렬 (앱 sortedOpen 미러)');
+pin(/el\.innerHTML=sortedOpenBets\(\)\.map/, '오픈벳 렌더가 정렬본 사용 (원본 무정렬 렌더 금지)');
 
 /* ── [4] 영어 전용 UI (2026-07-15 사용자 지시): 설정에 한국어 전환이 생기기 전까지
    사용자 노출 문자열에 한글 금지. 주석(HTML/JS)은 개발 문서라 허용 — 제거 후 스캔. ── */
