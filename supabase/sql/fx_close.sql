@@ -137,6 +137,11 @@ begin
   end if;
   v_pnl := round(v_pnl, 2);
 
+  -- SWAP (2026-07-19 fx_swap.sql): 야간 크론이 meta.swap에 적립한 스왑을 청산 실현에 포함 —
+  -- "표시되는 스왑 == 정산되는 스왑" 불변식. 적립이 없으면 0 (기존 동작 그대로).
+  v_pnl := round(v_pnl + coalesce((select (meta->>'swap')::numeric from public.positions
+             where local_id = p_local_id and acct_no = v_acct and server = 'fx' limit 1), 0), 2);
+
   -- ATOMIC CLAIM: close only if still open (prevents double-bank across devices)
   update public.positions set status = 'closed', pnl = v_pnl
     where local_id = p_local_id and acct_no = v_acct and server = 'fx' and status = 'open';
