@@ -1071,7 +1071,13 @@ const priceStore = {
     ws.onerror=()=>{ try{ ws.close(); }catch(e){} };
     this.ws=ws;
   }catch(e){} },
-  start(){ if(this.timer) return; this.loadMarks(); this.startRealtime(); this.startCryptoWS(); this.pull(); this.timer=setInterval(()=>this.pull(), 1000); }, // ws + realtime push + 1s poll fallback
+  start(){ if(this.timer) return; this.loadMarks(); this.startRealtime(); this.startCryptoWS(); this.pull(); this.timer=setInterval(()=>this.pull(), 1000); // ws + realtime push + 1s poll fallback
+    // 워치독(시세 하네스): 크립토 WS가 close 이벤트 없이 조용히 멈추면(30s 무프레임) 소켓을 갈아끼운다.
+    // 죽은 소켓이어도 표시는 1s 폴 덕에 계속 살아있지만 ms급→3s급으로 조용히 강등된 채 머무는 것을 방지.
+    this.dog=this.dog||setInterval(()=>{ const now=Date.now();
+      const newest=this.wsAt?Math.max.apply(null,Object.values(this.wsAt).concat(0)):0;
+      if(this.ws && newest && now-newest>30000){ try{ this.ws.onclose=null; this.ws.close(); }catch(e){} this.ws=null; this.startCryptoWS(); }
+    },10000); },
   subscribe(fn){ this.listeners.add(fn); fn(this.mids); return ()=>this.listeners.delete(fn); },
   get(sym){ return this.mids[sym]; },
 };

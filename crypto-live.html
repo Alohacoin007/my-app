@@ -559,7 +559,8 @@ window.__cryptoLiveMap = window.__cryptoLiveMap || {};
     if(typeof WebSocket==='undefined')return;
     var bases=Object.keys(BINANCE_SYM).map(function(k){return BINANCE_SYM[k];});
     var streams=bases.map(function(s){return s+'usdt@trade';}).concat(bases.map(function(s){return s+'usdt@ticker';})).join('/');
-    var ws; try{ ws=new WebSocket('wss://stream.binance.com:9443/stream?streams='+streams); }catch(e){ return; }
+    // 미러 도메인 필수(CLAUDE.md 데이터플랜) — binance.com 본체는 geo-fence(미국 차단)라 미국 고객에겐 조용히 실패했었다
+    var ws; try{ ws=new WebSocket('wss://data-stream.binance.vision/stream?streams='+streams); }catch(e){ return; }
     ws.onmessage=function(ev){ try{ var msg=JSON.parse(ev.data), d=msg&&msg.data; if(!d||!d.s)return;
       var sym=BREV[d.s]; if(!sym)return;
       if(d.e==='trade'){ setSrc('binance',sym,+d.p); }
@@ -591,7 +592,7 @@ function alpexaFetchChart(sym, range){
     var M = {'1m':{i:'1s',n:60},'5m':{i:'1s',n:300},'30m':{i:'1m',n:30},
              '1h':{i:'1m',n:60},'4h':{i:'5m',n:48},'1D':{i:'15m',n:96},'1W':{i:'2h',n:84}};
     var m = M[range]||M['1D'];
-    var url='https://api.binance.com/api/v3/klines?symbol='+base.toUpperCase()+'USDT&interval='+m.i+'&limit='+m.n;
+    var url='https://data-api.binance.vision/api/v3/klines?symbol='+base.toUpperCase()+'USDT&interval='+m.i+'&limit='+m.n;   // 미러(geo-fence 대응)
     return fetch(url).then(function(r){return r.json();}).then(function(j){
       if(!Array.isArray(j)||!j.length) return null;
       return j.map(function(k){return +k[4];}).filter(function(v){return isFinite(v)&&v>0;}); // close price

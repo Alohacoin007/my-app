@@ -102,6 +102,12 @@ const CHECKS = [
   { id: 'BODY-classname-assign', sev: 'HIGH', files: DEPLOYED,
     re: /body\.className\s*=(?![=+])/,
     why: 'Wholesale assignment to body.className wipes EVERY other body class — including the `dark` theme class (2026-07-16: tapping Parlay in the bet slip flipped dark→light on a real device). Swap state classes with classList.remove/add (e.g. setModeClass), never replace the whole className.' },
+  { id: 'FEED-geofenced-binance', sev: 'HIGH', files: DEPLOYED.concat(['dev/crypto-dashboard.html', 'dev/fx-terminal.html']),
+    re: /stream\.binance\.com|api\.binance\.com(?!.*vision)/,
+    why: 'binance.com 본체 직결 — geo-fence(미국 차단)라 베가스/미국 고객에겐 WS·klines가 조용히 실패해 폴백으로만 돈다 (2026-07-19 crypto-live에서 실발견). 반드시 미러(data-stream/data-api.binance.vision) 사용 — CLAUDE.md 📡 데이터플랜.' },
+  { id: 'FEED-sticky-live-flag', sev: 'HIGH', files: DEPLOYED.concat(['dev/crypto-dashboard.html']),
+    re: /if\s*\(\s*(?:this\.|mk\.)?wsLive\s*&&[^)\n]{0,60}\)\s*(?:return|continue)/,
+    why: '폴백 스킵을 sticky 라이브 플래그로 게이트 — 소켓이 close 없이 조용히 죽으면 플래그가 true로 굳어 폴백이 영구 억제되고 시세가 얼어붙는다 (2026-07-19 크립토 대시보드 실사고). 라이브 판정은 신선도(lastTick 나이)로만.' },
 ];
 
 // ── Reviewed-OK exceptions (Six-Sigma control plan). Suppressed but always printed. ──
