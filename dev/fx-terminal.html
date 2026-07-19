@@ -13,6 +13,7 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden; font-family:var(--lgd-font,s
   --lgd-r-widget:2px; --lgd-r-btn:2px; --lgd-r-pop:2px; display:flex; flex-direction:column; height:100vh}
 /* 컨셉 초록 → MT5 블루 (.lgd 특이도 이겨야 함). 차트 색 별도, --lgd-down 빨강 유지 */
 body.lgd{ --lgd-up:#2E90FA; --lgd-link2:#2E90FA }
+body{ --lgd-green:#00C805 }   /* 시세창(Market Watch) = 레전드 초록 상승 / 빨강 하락 */
 button:active:not(:disabled),.htab:active,.hic:active,.avatar:active{ transform:scale(.97); filter:brightness(1.15) }
 
 /* ── 헤더 (컴팩트 38px) ── */
@@ -163,7 +164,7 @@ body.symdrag .widget[id^="w-chart"]{outline:1px dashed var(--lgd-hair); outline-
 .mwrow.sel{background:var(--lgd-surface2); box-shadow:inset 2px 0 0 var(--lgd-up)}
 .mwsym{font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .mwpx{font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; font-weight:600; color:var(--lgd-dim)}
-.mwpx.up{color:var(--lgd-up)} .mwpx.down{color:var(--lgd-down,#EB5D2A)}
+.mwpx.up{color:var(--lgd-green,#00C805)} .mwpx.down{color:var(--lgd-down,#EB5D2A)}
 .mwspr{font-variant-numeric:tabular-nums; color:var(--lgd-dim); font-size:11px; opacity:.85}
 /* ── Market Watch 하위탭: Details(선택 심볼 상세, MT5) ── */
 .mwdetwrap{flex:1; min-height:0; display:flex; flex-direction:column; overflow:auto}
@@ -175,7 +176,7 @@ body.symdrag .widget[id^="w-chart"]{outline:1px dashed var(--lgd-hair); outline-
 .mwdrow:nth-child(even){background:var(--lgd-surface2)}
 .mwdlbl{color:var(--lgd-dim)}
 .mwdval{font-variant-numeric:tabular-nums; font-weight:700; text-align:right; color:var(--lgd-ink)}
-.mwdval.up{color:var(--lgd-up)} .mwdval.dn{color:var(--lgd-down,#EB5D2A)}
+.mwdval.up{color:var(--lgd-green,#00C805)} .mwdval.dn{color:var(--lgd-down,#EB5D2A)}
 .mwdar{font-size:11px; font-weight:800; text-align:center; line-height:1}
 .mwdar.up{color:#26A69A} .mwdar.dn{color:#EF5350} .mwdar.fl{color:var(--lgd-dim)}
 /* ── Market Watch 하위탭: Trading(원클릭·DEMO) ── */
@@ -215,7 +216,7 @@ body.symdrag .widget[id^="w-chart"]{outline:1px dashed var(--lgd-hair); outline-
 .widget.chart-active .wtb h3{color:var(--lgd-ink)}
 .cgtf{position:absolute; top:5px; left:8px; font-size:9.5px; font-weight:800; color:var(--lgd-dim); letter-spacing:.4px}
 /* 차트 지표 범례(원클릭 삭제) — 좌상단, TF 라벨 아래. 칩별 ✕ 한 번에 그 지표 제거 */
-.chleg{position:absolute; top:19px; left:8px; z-index:2; display:flex; flex-wrap:wrap; gap:4px; pointer-events:none; max-width:70%}
+.chleg{position:absolute; top:32px; left:8px; z-index:2; display:flex; flex-wrap:wrap; gap:4px; pointer-events:none; max-width:70%}
 .chchip{pointer-events:auto; display:inline-flex; align-items:center; gap:5px; font-size:9.5px; font-weight:700;
   line-height:1; padding:2px 4px 2px 6px; border-radius:3px; background:var(--lgd-pill); color:var(--lgd-dim);
   border:1px solid var(--lgd-hair); user-select:none}
@@ -231,6 +232,49 @@ body.symdrag .widget[id^="w-chart"]{outline:1px dashed var(--lgd-hair); outline-
 .chtb.on{background:var(--lgd-up); color:#fff}
 .chtb svg{pointer-events:none}
 .chtsep{height:1px; background:var(--lgd-hair); margin:2px 3px}
+/* 차트 원클릭 매매 바 — 상단, 가격 크고 뚜렷. SELL 빨강 / BUY 초록(레전드) */
+.ocbar{position:absolute; top:3px; left:40px; z-index:4; display:flex; align-items:stretch; gap:4px; font-size:10px; max-width:calc(100% - 96px)}
+.ocvol{display:flex; align-items:center; gap:1px; background:rgba(18,24,34,.72); border:1px solid var(--lgd-hair); border-radius:4px; padding:0 2px}
+.ocvb{width:15px; height:100%; min-height:22px; border:none; background:transparent; color:var(--lgd-ink); font-weight:800; font-size:13px; cursor:pointer; line-height:1}
+.ocvb:hover{color:var(--lgd-up)}
+.ocvv{min-width:32px; text-align:center; font-weight:700; font-variant-numeric:tabular-nums; color:var(--lgd-ink)}
+.octrade{display:flex; flex-direction:column; align-items:center; justify-content:center; min-width:70px; padding:2px 8px; border-radius:4px;
+  cursor:pointer; border:1px solid; background:rgba(18,24,34,.72); font-family:inherit; line-height:1.05}
+.ocl{font-size:8px; font-weight:800; letter-spacing:.7px; opacity:.85}
+.octrade b{font-size:13.5px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:.2px}
+.octrade b.dn{opacity:.9}
+.ocsell{color:var(--lgd-down,#EB5D2A); border-color:rgba(235,93,42,.55)} .ocsell:hover{background:rgba(235,93,42,.18)}
+.ocbuy{color:var(--lgd-green,#00C805); border-color:rgba(0,200,5,.5)} .ocbuy:hover{background:rgba(0,200,5,.16)}
+.ocspr{display:flex; align-items:center; justify-content:center; min-width:26px; padding:0 5px; font-size:10px; font-weight:800;
+  color:var(--lgd-dim); background:rgba(18,24,34,.72); border:1px solid var(--lgd-hair); border-radius:4px; font-variant-numeric:tabular-nums}
+.ocmore{width:18px; border:1px solid var(--lgd-hair); background:rgba(18,24,34,.72); color:var(--lgd-dim); border-radius:4px; cursor:pointer; font-size:11px}
+.ocmore:hover{color:var(--lgd-ink)}
+.ocohlc{display:flex; align-items:center; padding-left:8px; color:var(--lgd-dim); white-space:nowrap; overflow:hidden; font-size:9px; font-variant-numeric:tabular-nums}
+/* 주문 티켓 다이얼로그(MT5) */
+.ordback{position:fixed; inset:0; z-index:220; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center}
+.ordbox{width:320px; max-width:92vw; background:var(--lgd-surface); border:1px solid var(--lgd-hair); border-radius:6px; box-shadow:0 20px 60px rgba(0,0,0,.5); overflow:hidden}
+.ordhd{display:flex; align-items:center; justify-content:space-between; padding:9px 12px; border-bottom:1px solid var(--lgd-hair); font-size:13px}
+.ordx{cursor:pointer; color:var(--lgd-dim); font-size:14px} .ordx:hover{color:var(--lgd-ink)}
+.ordbadge{padding:5px 12px; font-size:9px; font-weight:800; letter-spacing:.4px; color:#E0A020; background:rgba(240,180,40,.10); border-bottom:1px solid var(--lgd-hair)}
+.ordbody{padding:10px 12px; display:flex; flex-direction:column; gap:7px}
+.ordrow{display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px}
+.ordlbl{color:var(--lgd-dim)}
+.ordsel{flex:1; max-width:190px; background:var(--lgd-pill); color:var(--lgd-ink); border:1px solid var(--lgd-hair); border-radius:3px; padding:3px 5px; font-family:inherit; font-weight:600}
+.ordfield{display:flex; align-items:center; gap:3px}
+.ordstep{width:20px; height:22px; border:1px solid var(--lgd-hair); background:var(--lgd-pill); color:var(--lgd-ink); border-radius:3px; cursor:pointer; font-weight:800}
+.ordinput{width:96px; height:22px; text-align:right; background:var(--lgd-bg,#0d1117); color:var(--lgd-ink); border:1px solid var(--lgd-hair); border-radius:3px; padding:0 6px; font-family:inherit; font-variant-numeric:tabular-nums; font-weight:600}
+.ordquote{display:flex; align-items:center; justify-content:space-between; gap:6px; padding:6px 8px; background:var(--lgd-surface2); border-radius:4px; font-size:12px; font-variant-numeric:tabular-nums}
+.ordquote .dot{width:7px; height:7px; border-radius:50%; display:inline-block; margin-right:4px}
+.ordquote .dot.sell{background:var(--lgd-down,#EB5D2A)} .ordquote .dot.buy{background:var(--lgd-green,#00C805)}
+.ordquote b{color:var(--lgd-ink)} .odsprwrap{color:var(--lgd-dim)}
+.ordbtns{display:flex; gap:8px; padding:10px 12px 12px}
+.ordsell,.ordbuy,.ordplace{flex:1; display:flex; flex-direction:column; align-items:center; gap:1px; padding:8px; border-radius:5px; cursor:pointer; border:1px solid; background:transparent; font-family:inherit}
+.ordsell span,.ordbuy span{font-size:9px; font-weight:800; letter-spacing:.6px}
+.ordsell b,.ordbuy b{font-size:15px; font-weight:800; font-variant-numeric:tabular-nums}
+.ordsell{color:var(--lgd-down,#EB5D2A); border-color:rgba(235,93,42,.55)} .ordsell:hover{background:rgba(235,93,42,.16)}
+.ordbuy{color:var(--lgd-green,#00C805); border-color:rgba(0,200,5,.5)} .ordbuy:hover{background:rgba(0,200,5,.16)}
+.ordplace{color:var(--lgd-ink); border-color:var(--lgd-up); background:rgba(46,144,250,.14); font-weight:800; font-size:13px}
+.ordplace:hover{background:rgba(46,144,250,.24)}
 .cgtag{position:absolute; top:5px; right:8px; background:var(--lgd-pill); color:var(--lgd-dim); font-size:9px;
   font-weight:800; border-radius:2px; padding:2px 6px; letter-spacing:.5px}
 
@@ -274,6 +318,8 @@ body.symdrag .widget[id^="w-chart"]{outline:1px dashed var(--lgd-hair); outline-
 .postbl th:first-child, .postbl td:first-child{text-align:left}
 .postbl td{text-align:right; padding:5px 10px; border-bottom:1px solid rgba(128,128,128,.08); font-variant-numeric:tabular-nums}
 .postbl .buy{color:var(--lgd-up); text-transform:capitalize} .postbl .sell{color:var(--lgd-down,#EB5D2A); text-transform:capitalize}
+.postbl .pend{color:#E0A020; text-transform:capitalize}   /* 대기 주문 = MT5 주황 */
+.postbl .pendhd td{background:var(--lgd-surface2); color:var(--lgd-dim); font-weight:800; font-size:10px; letter-spacing:.4px; padding:4px 10px; text-align:left}
 .postbl .pl-pos{color:var(--lgd-up)} .postbl .pl-neg{color:var(--lgd-down,#EB5D2A)}
 /* 계좌/합계 tfoot — colspan으로 Profit 열에 자동 정렬(하드코딩 margin 제거) */
 .postbl tfoot .acctrow td{background:var(--lgd-surface2); border-top:1px solid var(--lgd-hair); padding:6px 10px; overflow:visible}
@@ -682,7 +728,8 @@ const CH_MA='#F5A623', CH_BB='#8E9BB3', CH_RSI='#B37FEB';
 /* 차트별 설정 (id -> {type,grid,zoom,tf,ind}). 새 차트는 기본값. localStorage 저장 */
 const chartCfg=(()=>{ try{ return JSON.parse(localStorage.getItem('alpexa.fxdash.chartcfg')||'{}'); }catch(_){ return {}; } })();
 function cfg(id){ let c=chartCfg[id]; if(!c){ c=chartCfg[id]={type:'candles',grid:true,zoom:1,tf:curTF,ind:{},vol:true,scroll:0}; }
-  if(!c.ind) c.ind={}; if(!c.tf) c.tf=curTF; if(c.vol===undefined) c.vol=true; if(c.scroll===undefined) c.scroll=0; return c; }
+  if(!c.ind) c.ind={}; if(!c.tf) c.tf=curTF; if(c.vol===undefined) c.vol=true; if(c.scroll===undefined) c.scroll=0;
+  if(c.oclot===undefined) c.oclot=0.10; return c; }
 const chVolFmt=v=>{ v=+v||0; return v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(1)+'K':String(Math.round(v)); };
 function saveCfg(){ try{ localStorage.setItem('alpexa.fxdash.chartcfg', JSON.stringify(chartCfg)); }catch(_){} }
 function activeCfg(){ return activeChart?cfg(activeChart):null; }
@@ -846,7 +893,16 @@ const CH_TOOLS=[
 function chToolsHTML(){ return CH_TOOLS.map(o=> o.sep?'<div class="chtsep"></div>'
   :'<div class="chtb" data-ctool="'+o.k+'" title="'+o.t+'"><svg width="15" height="15" viewBox="0 0 24 24" '+
     (o.fill?'fill="currentColor"':'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"')+'>'+o.i+'</svg></div>').join(''); }
-function chartBody(){ return '<div class="cgwplot"><div class="chtools">'+chToolsHTML()+'</div><svg class="cgsvg"></svg><svg class="cgcross"></svg><span class="cgtf">'+curTF+'</span><div class="chleg"></div></div>'; }
+/* 차트 원클릭 매매 바(MT5/레전드) — 볼륨 · SELL(bid) · 스프레드 · BUY(ask) · 티켓(▾) · OHLCV. 가격 크게. */
+function ocbarHTML(){ return '<div class="ocbar">'+
+  '<span class="ocvol"><button class="ocvb" data-oc="dec">−</button><b class="ocvv">0.10</b><button class="ocvb" data-oc="inc">+</button></span>'+
+  '<button class="octrade ocsell" data-oc="sell"><span class="ocl">SELL</span><b class="ocbid">—</b></button>'+
+  '<span class="ocspr" title="Spread">—</span>'+
+  '<button class="octrade ocbuy" data-oc="buy"><span class="ocl">BUY</span><b class="ocask">—</b></button>'+
+  '<button class="ocmore" data-oc="more" title="Order ticket (F9)">▾</button>'+
+  '<span class="ocohlc"></span></div>'; }
+function chartBody(){ return '<div class="cgwplot"><div class="chtools">'+chToolsHTML()+'</div>'+ocbarHTML()+
+  '<svg class="cgsvg"></svg><svg class="cgcross"></svg><span class="cgtf">'+curTF+'</span><div class="chleg"></div></div>'; }
 function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) return;
   const box=el.querySelector('.cgwplot'), svg=box&&box.querySelector('.cgsvg'); if(!svg) return;
   const sym=(layout[id]&&layout[id].sym)||'', W=box.clientWidth, H=box.clientHeight;
@@ -894,9 +950,7 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
   out+='<line x1="0" y1="'+ly.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+ly.toFixed(1)+'" stroke="'+lcol+'" stroke-width="1" stroke-dasharray="3 3" opacity=".9"/>'+
     '<rect x="'+plotW.toFixed(1)+'" y="'+(ly-8).toFixed(1)+'" width="'+RA+'" height="16" fill="'+lcol+'"/>'+
     '<text x="'+(W-4)+'" y="'+(ly+3.5).toFixed(1)+'" text-anchor="end" fill="#fff" font-size="9.5" font-weight="700" font-family="inherit">'+lc.toFixed(dg)+'</text>';
-  /* ── OHLCV 리드아웃(상단, TF 라벨 우측) — 마지막 봉, 라이브 ── */
-  let info='O '+lk.o.toFixed(dg)+'  H '+lk.h.toFixed(dg)+'  L '+lk.l.toFixed(dg)+'  C '+lk.c.toFixed(dg)+'  V '+chVolFmt(lk.v);
-  out+='<text x="44" y="'+(padT+8)+'" fill="var(--lgd-ink)" font-size="8.5" font-family="inherit">'+info+'</text>';
+  /* OHLCV 리드아웃은 상단 원클릭 바로 이동(아래 updateOcbar) */
   /* ── Volume 히스토그램(최하단 서브창) ── */
   if(showVol){ let maxV=1; vis.forEach(k=>{ if((k.v||0)>maxV) maxV=k.v||0; }); const vbase=volTop+volH;
     out+='<line x1="0" y1="'+volTop.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+volTop.toFixed(1)+'" stroke="var(--lgd-hair)" stroke-width="1" opacity=".5"/>';
@@ -913,7 +967,7 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
     out+='<text x="4" y="'+(top+10).toFixed(1)+'" fill="'+CH_RSI+'" font-size="8.5" font-weight="700">RSI('+IND_RSI_P+')</text>'; }
   /* ── 드로잉 오브젝트(창별, 데이터 좌표) + 그리는 중 미리보기 + 선택 핸들 ── */
   { const xOf=t=>((t-vis[0].t)/(TF_MS[c.tf]||1800e3))*cw+cw/2, clampX=x=>Math.max(0,Math.min(plotW,x)), esc=s=>String(s).replace(/[<&>]/g,' ');
-    const drawOne=(o,sel)=>{ const sw=sel?1.2:1;   // MT5 = 얇은 1px 선(선택 시 살짝만 굵게)
+    const drawOne=(o,sel)=>{ const sw=sel?1:0.75;   // MT5 = 아주 얇은 선(선택 시에만 1px)
       if(o.k==='hline'){ const y=yOf(o.price); out+='<line x1="0" y1="'+y.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="'+sw+'"/><text x="3" y="'+(y-3).toFixed(1)+'" fill="'+CH_DRAW+'" font-size="8.5">'+o.price.toFixed(dg)+'</text>'; }
       else if(o.k==='vline'){ const x=clampX(xOf(o.t)); out+='<line x1="'+x.toFixed(1)+'" y1="'+padT+'" x2="'+x.toFixed(1)+'" y2="'+(padT+priceH).toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="'+sw+'"/>'; }
       else if(o.k==='trend'){ out+='<line x1="'+clampX(xOf(o.p1.t)).toFixed(1)+'" y1="'+yOf(o.p1.price).toFixed(1)+'" x2="'+clampX(xOf(o.p2.t)).toFixed(1)+'" y2="'+yOf(o.p2.price).toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="'+sw+'"/>'; }
@@ -939,6 +993,15 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
     if(ind.rsi) lg+=chip('rsi','RSI('+IND_RSI_P+')', CH_RSI);
     if(showVol) lg+=chip('vol','Vol', CH_UP);
     if(leg.innerHTML!==lg) leg.innerHTML=lg; }
+  /* ── 원클릭 매매 바 — 볼륨 · SELL(bid) · 스프레드 · BUY(ask) · OHLCV(라이브) ── */
+  const bar=box.querySelector('.ocbar');
+  if(bar){ const rr=mwStore.rows[sym]||{}, set=(sel,txt,cls)=>{ const el=bar.querySelector(sel); if(!el) return; if(el.textContent!==txt) el.textContent=txt; if(cls!==undefined) el.className=cls; };
+    set('.ocvv',(c.oclot||0.10).toFixed(2));
+    const bd=bar.querySelector('.ocbid'), ak=bar.querySelector('.ocask');
+    if(bd){ bd.textContent=mwFmt(sym,rr.bid); bd.classList.toggle('dn',rr.bDir<0); }
+    if(ak){ ak.textContent=mwFmt(sym,rr.ask); ak.classList.toggle('dn',rr.aDir<0); }
+    set('.ocspr', rr.bid!=null?mwSprText(sym,rr.ask-rr.bid):'—');
+    set('.ocohlc','O '+lk.o.toFixed(dg)+'  H '+lk.h.toFixed(dg)+'  L '+lk.l.toFixed(dg)+'  C '+lk.c.toFixed(dg)+'  V '+chVolFmt(lk.v)); }
   svg.setAttribute('viewBox','0 0 '+W+' '+H); svg.innerHTML=out; }
 function renderAllCharts(doTick){ chartIds().forEach(id=>{ const g=layout[id]; if(!g||g.hidden||g.__min) return;
   if(doTick&&g.sym) tickSeries(g.sym, cfg(id).tf); renderChart(id); }); }
@@ -969,7 +1032,16 @@ function mkChart(id, sym, i){ makeWidget(id, sym, 'var(--lgd-up)', chartBody());
         else { const c=cfg(id); if(c.obj&&c.obj.length){ c.obj.pop(); saveCfg(); renderChart(id); } else toast('No object to delete'); } }
       else setDrawTool(k);   // trend/hline/vline/fib/text
       syncChartUI(); });
-    plot.addEventListener('pointerdown', ev=>{ if(ev.button!==0||ev.target.closest('.chleg')||ev.target.closest('.chtools')) return; const d=dataAt(id,ev); if(!d||!d.inPrice) return; const c=cfg(id);
+    /* 상단 원클릭 매매 바 — 볼륨 ± · SELL/BUY 즉시 시장가(DEMO) · ▾ 주문 티켓(리밋/스탑) */
+    const ocbar=plot.querySelector('.ocbar');
+    if(ocbar) ocbar.addEventListener('click', ev=>{ const b=ev.target.closest('[data-oc]'); if(!b) return; ev.stopPropagation(); ev.preventDefault();
+      setActiveChart(id); const k=b.dataset.oc, c=cfg(id), sym=(layout[id]&&layout[id].sym)||'';
+      if(k==='dec'){ c.oclot=clampLot((c.oclot||0.10)-0.01); saveCfg(); renderChart(id); }
+      else if(k==='inc'){ c.oclot=clampLot((c.oclot||0.10)+0.01); saveCfg(); renderChart(id); }
+      else if(k==='sell'){ placeMarketDemo(sym,'sell',c.oclot||0.10,0,0); }
+      else if(k==='buy'){ placeMarketDemo(sym,'buy',c.oclot||0.10,0,0); }
+      else if(k==='more'){ openOrderDialog(sym); } });
+    plot.addEventListener('pointerdown', ev=>{ if(ev.button!==0||ev.target.closest('.chleg')||ev.target.closest('.chtools')||ev.target.closest('.ocbar')) return; const d=dataAt(id,ev); if(!d||!d.inPrice) return; const c=cfg(id);
       if(drawTool==='trend'||drawTool==='fib'){ drawDrag={id,k:drawTool,p1:{t:d.t,price:d.price},p2:{t:d.t,price:d.price}}; plot.setPointerCapture(ev.pointerId); ev.preventDefault(); return; }
       if(drawTool==='hline'){ (c.obj=c.obj||[]).push({k:'hline',price:d.price}); saveCfg(); setDrawTool(null); renderChart(id); return; }
       if(drawTool==='vline'){ (c.obj=c.obj||[]).push({k:'vline',t:d.t}); saveCfg(); setDrawTool(null); renderChart(id); return; }
@@ -1122,7 +1194,7 @@ function mwCell(s,r,k,tnow){ switch(k){
   case 'spread':{ const spr=(r.bid!=null)?mwSprText(s,r.ask-r.bid):'—'; return '<div class="mwspr">'+spr+'</div>'; }
   case 'time': return '<div class="mwspr">'+(r.bid!=null?tnow:'—')+'</div>';
   case 'change':{ const ch=mwDailyPct(s,r), c=ch>0?'up':ch<0?'down':'';
-    return '<div class="mwpx '+c+'">'+(ch==null?'—':(ch>=0?'+':'')+ch.toFixed(2)+'%')+'</div>'; }
+    return '<div class="mwpx '+c+'">'+(ch==null?'—':(ch>=0?'▲ ':'▼ ')+Math.abs(ch).toFixed(2)+'%')+'</div>'; }
 } return '<div></div>'; }
 function mwRender(){ const host=document.getElementById('mwBody'); if(!host) return;
   const fl=document.getElementById('mwFeed'); if(fl){ fl.textContent=mwStore.live?'LIVE':'SIM'; fl.classList.toggle('live',mwStore.live); }
@@ -1225,6 +1297,9 @@ let curTbxTab='Trade';
 let DEMO_POS=[
   {sym:'eurusd.fx', ticket:'3172308', time:'2026.07.09 20:17:40', type:'buy', vol:'0.01', price:'1.14318', sl:'', tp:'', cur:'1.14360', comm:'0.00', swap:'0.00', pl:'0.42'},
   {sym:'usdchf.fx', ticket:'3194818', time:'2026.07.13 09:34:06', type:'buy', vol:'0.07', price:'0.80808', sl:'', tp:'', cur:'0.80720', comm:'0.00', swap:'-0.21', pl:'-7.63'} ];
+/* 대기 주문(Pending) — 지정가/역지정가. 인메모리 DEMO(체결 시뮬 없음, 실주문 M4 서버). */
+let DEMO_PEND=[];
+let _ticketSeq=3200000; const newTicket=()=>String(++_ticketSeq);
 /* 청산된 거래 로그(History) — 데모 시드 + 청산 시 추가. 실이력은 M3 서버(settlements) */
 let DEMO_HIST=[
   {sym:'eurusd.fx', ticket:'3170112', ctime:'2026.07.08 14:22:10', type:'sell', vol:'0.02', open:'1.14210', close:'1.14090', profit:'2.40', ms:Date.parse('2026-07-08T14:22:10')},
@@ -1290,6 +1365,87 @@ function closePosDemo(ticket){ const p=DEMO_POS.find(x=>x.ticket===ticket); if(!
   JOURNAL.log('Closed #'+ticket+' '+p.sym+' '+p.type+' '+p.vol+' @ '+p.cur+'  P/L '+(+p.pl).toFixed(2), +p.pl>=0);
   renderToolbox(curTbxTab==='Trade'?'Trade':curTbxTab);
   toast('Position '+ticket+' closed (demo) — live close via fx_close in M5'); }
+/* ── 주문(DEMO) — 원클릭 시장가 + 대기(지정가/역지정가). 인메모리 전용, 돈/RPC 절대 안 건드림(M1 셸). 실체결=M4 서버. ── */
+const clampLot=v=>Math.max(0.01, Math.round((+v||0.01)*100)/100);
+function demoSym(sym){ return sym.toLowerCase()+mwSuffix(sym).toLowerCase(); }   // eurusd.fx / btcusd.xc / aapl.eq
+function placeMarketDemo(sym, side, vol, sl, tp){ const r=mwStore.rows[sym]; if(!r||r.bid==null){ toast('No price for '+sym); return false; }
+  const dg=mwDigits(sym), entry=side==='buy'?r.ask:r.bid; vol=clampLot(vol);
+  DEMO_POS.push({ sym:demoSym(sym), ticket:newTicket(), time:fxStamp(), type:side, vol:vol.toFixed(2),
+    price:entry.toFixed(dg), sl:sl?(+sl).toFixed(dg):'', tp:tp?(+tp).toFixed(dg):'', cur:entry.toFixed(dg), comm:'0.00', swap:'0.00', pl:'0.00' });
+  JOURNAL.log('Order — '+side.toUpperCase()+' '+vol.toFixed(2)+' '+sym+' @ '+entry.toFixed(dg)+' (demo)', true);
+  toast(side.toUpperCase()+' '+vol.toFixed(2)+' '+sym+' @ '+entry.toFixed(dg)+' — filled (DEMO)');
+  if(curTbxTab==='Trade') renderToolbox('Trade'); return true; }
+function placePendingDemo(sym, otype, vol, price, sl, tp){ const dg=mwDigits(sym); vol=clampLot(vol); const px=+price;
+  if(!(px>0)){ toast('Enter a valid price'); return false; }
+  DEMO_PEND.push({ sym:demoSym(sym), ticket:newTicket(), time:fxStamp(), otype, vol:vol.toFixed(2),
+    price:px.toFixed(dg), sl:sl?(+sl).toFixed(dg):'', tp:tp?(+tp).toFixed(dg):'' });
+  JOURNAL.log('Pending — '+otype+' '+vol.toFixed(2)+' '+sym+' @ '+px.toFixed(dg)+' (demo)', true);
+  toast(otype+' '+vol.toFixed(2)+' '+sym+' @ '+px.toFixed(dg)+' — placed (DEMO)');
+  if(curTbxTab==='Trade') renderToolbox('Trade'); return true; }
+function cancelPendDemo(ticket){ const p=DEMO_PEND.find(x=>x.ticket===ticket); if(!p) return; DEMO_PEND=DEMO_PEND.filter(x=>x.ticket!==ticket);
+  JOURNAL.log('Pending #'+ticket+' cancelled (demo)', true); toast('Pending order '+ticket+' cancelled (DEMO)');
+  if(curTbxTab==='Trade') renderToolbox('Trade'); }
+/* ── MT5 주문 티켓 다이얼로그 — 시장가 + 대기(지정가/역지정가/스탑리밋), S/L·T/P. 인메모리 DEMO(돈/RPC 없음). ── */
+const PEND_TYPES=['Buy Limit','Sell Limit','Buy Stop','Sell Stop','Buy Stop Limit','Sell Stop Limit'];
+let ordUI=null, _ordTick=null;
+function openOrderDialog(sym, side){ sym=(sym||mwSel||'EURUSD').toUpperCase(); if(!MW_WATCH.includes(sym)) sym='EURUSD';
+  ordUI={sym, mode:'market', otype:'Buy Limit'};
+  const m=orderEl(); m.style.display='flex'; buildOrder();
+  clearInterval(_ordTick); _ordTick=setInterval(refreshOrderQuote, 500); }
+function closeOrder(){ const m=document.getElementById('ordModal'); if(m) m.style.display='none'; clearInterval(_ordTick); ordUI=null; }
+function orderEl(){ let m=document.getElementById('ordModal'); if(m) return m;
+  m=document.createElement('div'); m.id='ordModal'; m.className='ordback'; document.body.appendChild(m);
+  m.addEventListener('click', e=>{ if(e.target===m){ closeOrder(); return; }
+    const st=e.target.closest('[data-ostep]'); if(st){ stepField(st.dataset.ostep); return; }
+    const b=e.target.closest('[data-od]'); if(!b) return; const k=b.dataset.od;
+    if(k==='close') closeOrder(); else if(k==='sell') submitOrder('sell'); else if(k==='buy') submitOrder('buy'); else if(k==='place') submitOrder('pending'); });
+  m.addEventListener('change', e=>{ const s=e.target.closest('[data-odc]'); if(!s||!ordUI) return;
+    if(s.dataset.odc==='sym') ordUI.sym=s.value; else if(s.dataset.odc==='mode') ordUI.mode=s.value; else if(s.dataset.odc==='otype') ordUI.otype=s.value;
+    buildOrder(); });
+  return m; }
+function stepField(spec){ const [id,delta,dg,min]=spec.split('|'); const el=document.getElementById(id); if(!el) return;
+  let v=(parseFloat(el.value)||0)+parseFloat(delta); v=Math.max(parseFloat(min), v); el.value=v.toFixed(+dg); }
+function refreshOrderQuote(){ if(!ordUI) return; const r=mwStore.rows[ordUI.sym]||{};
+  const b=document.getElementById('odBid'), a=document.getElementById('odAsk'), sp=document.getElementById('odSpr');
+  if(b) b.textContent=mwFmt(ordUI.sym,r.bid); if(a) a.textContent=mwFmt(ordUI.sym,r.ask);
+  if(sp) sp.textContent=r.bid!=null?mwSprText(ordUI.sym,r.ask-r.bid):'—'; }
+function buildOrder(){ const m=document.getElementById('ordModal'); if(!m||!ordUI) return; const sym=ordUI.sym, r=mwStore.rows[sym]||{}, dg=mwDigits(sym), step=mwPip(sym);
+  const isPend=ordUI.mode==='pending', isSL=isPend && /Stop Limit$/.test(ordUI.otype), buySide=/^Buy/.test(ordUI.otype);
+  const defPx=(buySide?r.ask:r.bid); const pxStr=(defPx!=null?defPx:1).toFixed(dg);
+  const opt=(arr,cur)=>arr.map(x=>'<option'+(x===cur?' selected':'')+'>'+x+'</option>').join('');
+  const modeOpt=['market','pending'].map(x=>'<option value="'+x+'"'+(x===ordUI.mode?' selected':'')+'>'+(x==='market'?'Market Execution':'Pending Order')+'</option>').join('');
+  const num=(label,id,val,stp,d,min)=>'<div class="ordrow"><span class="ordlbl">'+label+'</span><span class="ordfield">'+
+    '<button class="ordstep" data-ostep="'+id+'|-'+stp+'|'+d+'|'+(min||0)+'">−</button>'+
+    '<input class="ordinput" id="'+id+'" value="'+val+'" inputmode="decimal">'+
+    '<button class="ordstep" data-ostep="'+id+'|'+stp+'|'+d+'|'+(min||0)+'">+</button></span></div>';
+  m.innerHTML='<div class="ordbox">'+
+    '<div class="ordhd"><b>Order</b><span class="ordx" data-od="close">✕</span></div>'+
+    '<div class="ordbadge">DEMO · simulated order — no real funds (live execution: M4 server)</div>'+
+    '<div class="ordbody">'+
+      '<div class="ordrow"><span class="ordlbl">Symbol</span><select class="ordsel" data-odc="sym">'+opt(MW_WATCH,sym)+'</select></div>'+
+      '<div class="ordquote"><span><i class="dot sell"></i>Bid <b id="odBid">'+mwFmt(sym,r.bid)+'</b></span>'+
+        '<span class="odsprwrap">spr <b id="odSpr">'+(r.bid!=null?mwSprText(sym,r.ask-r.bid):'—')+'</b></span>'+
+        '<span><i class="dot buy"></i>Ask <b id="odAsk">'+mwFmt(sym,r.ask)+'</b></span></div>'+
+      num('Volume','odVol',(mwVol||0.10).toFixed(2),0.01,2,0.01)+
+      '<div class="ordrow"><span class="ordlbl">Type</span><select class="ordsel" data-odc="mode">'+modeOpt+'</select></div>'+
+      (isPend?'<div class="ordrow"><span class="ordlbl">Order type</span><select class="ordsel" data-odc="otype">'+opt(PEND_TYPES,ordUI.otype)+'</select></div>':'')+
+      (isPend?num('Price','odPrice',pxStr,step,dg,0):'')+
+      (isSL?num('Stop Limit price','odStopLimit',pxStr,step,dg,0):'')+
+      num('Stop Loss','odSL','0',step,dg,0)+
+      num('Take Profit','odTP','0',step,dg,0)+
+    '</div>'+
+    '<div class="ordbtns">'+ (isPend
+      ? '<button class="ordplace" data-od="place">Place '+ordUI.otype+'</button>'
+      : '<button class="ordsell" data-od="sell"><span>SELL</span><b id="odBidBtn">'+mwFmt(sym,r.bid)+'</b></button>'+
+        '<button class="ordbuy" data-od="buy"><span>BUY</span><b id="odAskBtn">'+mwFmt(sym,r.ask)+'</b></button>')+
+    '</div></div>'; }
+function submitOrder(kind){ if(!ordUI) return; const sym=ordUI.sym;
+  const vol=parseFloat((document.getElementById('odVol')||{}).value)||0;
+  const sl=parseFloat((document.getElementById('odSL')||{}).value)||0, tp=parseFloat((document.getElementById('odTP')||{}).value)||0;
+  let ok=false;
+  if(kind==='buy'||kind==='sell') ok=placeMarketDemo(sym,kind,vol,sl,tp);
+  else if(kind==='pending'){ const price=parseFloat((document.getElementById('odPrice')||{}).value)||0; ok=placePendingDemo(sym,ordUI.otype,vol,price,sl,tp); }
+  if(ok) closeOrder(); }
 
 /* Alerts 폼 제출/삭제, History 기간 필터 (툴박스 클릭 위임에서 호출) */
 let histPeriod='all';
@@ -1310,9 +1466,16 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
         '<td class="'+(+p.pl>=0?'pl-pos':'pl-neg')+'">'+p.pl+'</td>'+
         '<td class="pox"><span class="poclose" data-close="'+p.ticket+'" title="Close position (one-click)">✕</span></td></tr>').join('')
       : '<tr><td colspan="13" style="text-align:center;color:var(--lgd-dim);padding:16px">No open positions</td></tr>';
+    /* 대기 주문(Pending) — MT5는 포지션 아래 별도 섹션. 현재가는 라이브, 취소 ✕. */
+    const pmk=s=>{ const p=symPair(s), rr=mwStore.rows[p]; return rr&&rr.mid!=null?mwFmt(p,rr.mid):'—'; };
+    const pend=DEMO_PEND.length ? '<tr class="pendhd"><td colspan="13">Pending Orders ('+DEMO_PEND.length+')</td></tr>'+
+      DEMO_PEND.map(p=>'<tr><td>'+p.sym+'</td><td>'+p.ticket+'</td><td>'+p.time+'</td>'+
+        '<td class="pend">'+p.otype.toLowerCase()+'</td><td>'+p.vol+'</td><td>'+p.price+'</td><td>'+(p.sl||'—')+'</td>'+
+        '<td>'+(p.tp||'—')+'</td><td>'+pmk(p.sym)+'</td><td>—</td><td>—</td><td>—</td>'+
+        '<td class="pox"><span class="poclose" data-cancel="'+p.ticket+'" title="Cancel pending order">✕</span></td></tr>').join('') : '';
     body.innerHTML='<div class="tbxscroll"><table class="postbl">'+colg(TBX_COLW.trade)+'<thead><tr>'+
       ['Symbol','Ticket','Time','Type','Volume','Price','S / L','T / P','Price','Commission','Swap','Profit',''].map(h=>'<th>'+h+'</th>').join('')+
-      '</tr></thead><tbody>'+rows+'</tbody>'+
+      '</tr></thead><tbody>'+rows+pend+'</tbody>'+
       /* 계좌 바 = tfoot(마지막 행 바로 밑) · 총 P/L은 colspan으로 Profit 열에 정확히 정렬(margin 하드코딩 X) */
       '<tfoot><tr class="acctrow">'+
       '<td colspan="11"><div class="acctline">'+
@@ -1585,8 +1748,9 @@ function toolSvg(inner, fill){ return '<svg width="16" height="16" viewBox="0 0 
       const vol=e.target.closest('[data-vol]');
       if(vol){ mwVol=Math.max(0.01, +(mwVol+(+vol.dataset.vol)*0.01).toFixed(2)); mwRender(); return; }
       const tr=e.target.closest('[data-trade]');
-      if(tr){ toast(tr.dataset.trade.toUpperCase()+' '+tr.dataset.sym+' '+mwVol.toFixed(2)+' — New Order (DEMO, coming in build)'); return; }
+      if(tr){ placeMarketDemo(tr.dataset.sym, tr.dataset.trade, mwVol, 0, 0); return; }   // Trading 탭 원클릭 시장가(DEMO)
       const row=e.target.closest('.mwrow'); if(row&&row.dataset.sym){ mwSel=row.dataset.sym; mwRender(); } });
+    body.addEventListener('dblclick', e=>{ const row=e.target.closest('.mwrow'); if(row&&row.dataset.sym) openOrderDialog(row.dataset.sym); });   // MT5: 더블클릭 = 주문 티켓
     body.addEventListener('change', e=>{ const sel=e.target.closest('.mwticksel'); if(sel){ mwSel=sel.value; mwRender(); } }); }
   /* MT5 표준 우클릭 컨텍스트 메뉴 (골격 항목 = 토스트, 클래스 필터 = 실동작) */
   const mtItem=(l,k)=>'<button data-mt="'+l+'"><span>'+l+'</span>'+(k?'<span class="key">'+k+'</span>':'')+'</button>';
@@ -1612,7 +1776,7 @@ function toolSvg(inner, fill){ return '<svg width="16" height="16" viewBox="0 0 
     if(col){ mwCols[col.dataset.col]=!mwCols[col.dataset.col]; col.classList.toggle('on',mwCols[col.dataset.col]); mwSaveCols(); mwRender(); return; }  // 메뉴 유지(여러 개 토글)
     const cat=e.target.closest('[data-cat]'), mt=e.target.closest('[data-mt]');
     if(cat){ mwFilter=cat.dataset.cat; mwRender(); }
-    else if(mt){ toast(mt.dataset.mt+' — coming in build'); }
+    else if(mt){ if(mt.dataset.mt==='New Order') openOrderDialog(mwSel); else toast(mt.dataset.mt+' — coming in build'); }
     ctx.style.display='none'; });
 })();
 /* Navigator — 그룹 접기/펼치기 */
@@ -1639,7 +1803,7 @@ mwSimulate(); mwRender();
   if(closeBtn) closeBtn.addEventListener('click', ()=>{ setHiddenDock(true); toast('Toolbox closed — Ctrl+T to reopen'); });
   /* 툴박스 본문 위임: 원클릭 청산 · Alerts 추가/삭제 · History 기간 · Mailbox 펼치기 */
   content.addEventListener('click', e=>{
-    const x=e.target.closest('.poclose'); if(x){ closePosDemo(x.dataset.close); return; }
+    const x=e.target.closest('.poclose'); if(x){ if(x.dataset.cancel) cancelPendDemo(x.dataset.cancel); else closePosDemo(x.dataset.close); return; }
     const add=e.target.closest('#alAdd'); if(add){ tbxAddAlert(); return; }
     const del=e.target.closest('.aldel'); if(del){ alertsStore.remove(del.dataset.del); JOURNAL.log('Alert removed', true); renderToolbox('Alerts'); return; }
     const hp=e.target.closest('[data-hp]'); if(hp){ histPeriod=hp.dataset.hp; renderToolbox('History'); return; }
@@ -1724,10 +1888,11 @@ document.addEventListener('keydown', e=>{
   else if(cmd&&/^d$/i.test(k)){ e.preventDefault(); toast('Data Window — coming in build'); }
   else if(cmd&&/^g$/i.test(k)){ e.preventDefault(); toggleGrid(); }   // 활성 차트 그리드
   else if(cmd&&/^b$/i.test(k)){ e.preventDefault(); toast('Objects List — coming in build'); }
-  else if(k==='F9'){ e.preventDefault(); toast('New Order (F9) — coming in build'); }
+  else if(k==='F9'){ e.preventDefault(); const g=layout[activeChart]; openOrderDialog((g&&g.sym)||mwSel); }
   else if(k==='F8'){ e.preventDefault(); toast('Chart Properties (F8) — coming in build'); }
   else if(k==='F11'){ e.preventDefault(); if(!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{}); else document.exitFullscreen(); }
-  else if(k==='Escape'){ const cc=document.getElementById('chCtx'); const md=document.getElementById('menuDrop');   // 팝업 먼저 닫기
+  else if(k==='Escape'){ const om=document.getElementById('ordModal'); if(om&&om.style.display==='flex'){ closeOrder(); return; }   // 주문창 먼저
+    const cc=document.getElementById('chCtx'); const md=document.getElementById('menuDrop');   // 팝업 먼저 닫기
     if((cc&&cc.style.display==='block')||(md&&md.style.display==='block')){ if(cc) cc.style.display='none'; if(md) md.style.display='none'; }
     else if(drawDrag){ const id=drawDrag.id; drawDrag=null; renderChart(id); } else if(drawTool){ setDrawTool(null); }
     else if(selObj){ const id=selObj.id; selObj=null; renderChart(id); } }   // 팝업/그리기/툴/선택 취소
