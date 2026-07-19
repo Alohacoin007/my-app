@@ -312,6 +312,10 @@ body.symdrag .widget[id^="w-chart"]{outline:1px dashed var(--lgd-hair); outline-
 .poclose{display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:2px;
   color:var(--lgd-dim); cursor:pointer; font-size:11px; font-weight:700}
 .poclose:hover{background:var(--lgd-down,#EB5D2A); color:#fff}
+/* M3 실포지션 — 청산은 M5(fx_close)라 ✕ 대신 — (읽기 전용) */
+.ponoclose{display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; color:var(--lgd-dim); cursor:default; font-size:11px}
+.acctlive{display:inline-flex; align-items:center; padding:1px 6px; border-radius:3px; font-size:9.5px; font-weight:800; letter-spacing:.5px;
+  background:color-mix(in srgb, var(--lgd-up) 18%, transparent); color:var(--lgd-up); border:1px solid var(--lgd-up)}
 .postbl td.pox, .postbl th:last-child{text-align:center; padding:2px 6px; width:32px}
 /* Trade 탭: 포지션 스크롤(위) + 계좌 sticky 푸터(아래, 포지션 수 무관 항상 표시) */
 .tbxscroll{flex:1; min-height:0; overflow:auto}
@@ -1463,22 +1467,36 @@ function tbxAddAlert(){ const s=document.getElementById('alSym'), c=document.get
   if(!s||!c||!px) return; const v=+px.value; if(!(v>0)){ toast('Enter a price'); return; }
   alertsStore.add(s.value, c.value, v); JOURNAL.log('Alert set — '+s.value+' '+c.value+' '+v, true); renderToolbox('Alerts'); }
 
+/* 계좌 바(Trade tfoot·Exposure 하단 공용) — LIVE면 fxAcct.stats() 실수치(MT5 공백 천단위), 아니면 데모 고정치 */
+function acctSpans(live){
+  const mt5n=n=>(+n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).replace(/,/g,' ');
+  if(!live) return '<span>Balance:<b>100 000.00 USD</b></span><span>Equity:<b>99 992.79</b></span>'+
+    '<span>Margin:<b>256.64</b></span><span>Free Margin:<b>99 736.15</b></span><span>Margin Level:<b>38 962.28%</b></span>';
+  const st=fxAcct.stats();
+  return '<span class="acctlive" title="Real account (read-only) — execution lands in M5">LIVE</span>'+
+    '<span>Balance:<b>'+mt5n(st.bal)+' USD</b></span><span>Equity:<b>'+mt5n(st.equity)+'</b></span>'+
+    '<span>Margin:<b>'+mt5n(st.margin)+'</b></span><span>Free Margin:<b>'+mt5n(st.free)+'</b></span>'+
+    '<span>Margin Level:<b>'+(st.margin>0?mt5n(st.level)+'%':'—')+'</b></span>'; }
+
 function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!body) return; curTbxTab=tab;
   const emptyIC={News:['📰','News feed — connects in M6'], Mailbox:['✉️','No messages (Mailbox empty)'],
     Calendar:['📅','Economic calendar — connects in M6'], Articles:['📄','No articles'],
     'Code Base':['💾','Code Base is empty'], Experts:['🤖','No Expert Advisors attached']};
 
   if(tab==='Trade'){
-    const total=DEMO_POS.reduce((s,p)=>s+(+p.pl),0);
-    const rows=DEMO_POS.length ? DEMO_POS.map(p=>'<tr><td>'+p.sym+'</td><td>'+p.ticket+'</td><td>'+p.time+'</td>'+
+    /* M3: 로그인 시 실계좌·실포지션(fxAcct, 읽기 전용) — 아니면 DEMO 프리뷰. 실행은 M5. */
+    const LIVE=fxAcct.authed, POS=LIVE?fxAcct.rows():DEMO_POS;
+    const total=POS.reduce((s,p)=>s+(+p.pl),0);
+    const rows=POS.length ? POS.map(p=>'<tr><td>'+p.sym+'</td><td>'+p.ticket+'</td><td>'+p.time+'</td>'+
         '<td class="'+p.type+'">'+p.type+'</td><td>'+p.vol+'</td><td>'+p.price+'</td><td>'+(p.sl||'—')+'</td>'+
         '<td>'+(p.tp||'—')+'</td><td>'+p.cur+'</td><td>'+p.comm+'</td><td>'+p.swap+'</td>'+
         '<td class="'+(+p.pl>=0?'pl-pos':'pl-neg')+'">'+p.pl+'</td>'+
-        '<td class="pox"><span class="poclose" data-close="'+p.ticket+'" title="Close position (one-click)">✕</span></td></tr>').join('')
+        (p.noClose?'<td class="pox"><span class="ponoclose" title="Live close via fx_close (M5)">—</span></td>'
+                  :'<td class="pox"><span class="poclose" data-close="'+p.ticket+'" title="Close position (one-click)">✕</span></td>')+'</tr>').join('')
       : '<tr><td colspan="13" style="text-align:center;color:var(--lgd-dim);padding:16px">No open positions</td></tr>';
-    /* 대기 주문(Pending) — MT5는 포지션 아래 별도 섹션. 현재가는 라이브, 취소 ✕. */
+    /* 대기 주문(Pending) — MT5는 포지션 아래 별도 섹션. 현재가는 라이브, 취소 ✕. (LIVE엔 데모 대기주문 미표시) */
     const pmk=s=>{ const p=symPair(s), rr=mwStore.rows[p]; return rr&&rr.mid!=null?mwFmt(p,rr.mid):'—'; };
-    const pend=DEMO_PEND.length ? '<tr class="pendhd"><td colspan="13">Pending Orders ('+DEMO_PEND.length+')</td></tr>'+
+    const pend=(!LIVE&&DEMO_PEND.length) ? '<tr class="pendhd"><td colspan="13">Pending Orders ('+DEMO_PEND.length+')</td></tr>'+
       DEMO_PEND.map(p=>'<tr><td>'+p.sym+'</td><td>'+p.ticket+'</td><td>'+p.time+'</td>'+
         '<td class="pend">'+p.otype.toLowerCase()+'</td><td>'+p.vol+'</td><td>'+p.price+'</td><td>'+(p.sl||'—')+'</td>'+
         '<td>'+(p.tp||'—')+'</td><td>'+pmk(p.sym)+'</td><td>—</td><td>—</td><td>—</td>'+
@@ -1488,16 +1506,15 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
       '</tr></thead><tbody>'+rows+pend+'</tbody>'+
       /* 계좌 바 = tfoot(마지막 행 바로 밑) · 총 P/L은 colspan으로 Profit 열에 정확히 정렬(margin 하드코딩 X) */
       '<tfoot><tr class="acctrow">'+
-      '<td colspan="11"><div class="acctline">'+
-      '<span>Balance:<b>100 000.00 USD</b></span><span>Equity:<b>99 992.79</b></span>'+
-      '<span>Margin:<b>256.64</b></span><span>Free Margin:<b>99 736.15</b></span><span>Margin Level:<b>38 962.28%</b></span></div></td>'+
+      '<td colspan="11"><div class="acctline">'+acctSpans(LIVE)+'</div></td>'+
       '<td class="tbxtotal '+(total>=0?'pl-pos':'pl-neg')+'">'+total.toFixed(2)+'</td><td></td>'+
       '</tr></tfoot></table></div>';
 
   } else if(tab==='Exposure'){
     /* MT5 Exposure — 통화별 순노출 표(Asset/Volume/Rate/USD/Graph) + Long/Short Positions 파이 */
+    const LIVE=fxAcct.authed, POS=LIVE?fxAcct.rows():DEMO_POS;
     const ccy={};
-    DEMO_POS.forEach(p=>{ const pair=symPair(p.sym), base=pair.slice(0,3), quote=pair.slice(3,6);
+    POS.forEach(p=>{ const pair=symPair(p.sym), base=pair.slice(0,3), quote=pair.slice(3,6);
       const units=(+p.vol||0)*FX_CONTRACT, dir=p.type==='sell'?-1:1;
       const px=(mwStore.rows[pair]&&mwStore.rows[pair].mid)||+p.cur||+p.price||1;
       ccy[base]=(ccy[base]||0)+dir*units;          // base: 매수=+, 매도=−
@@ -1522,8 +1539,7 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
       '<div class="exppie" style="background:conic-gradient('+stops+')"></div>'+
       '<div class="explegend">'+legend+'</div></div>'
       : '<div class="exppiewrap"><div class="exphd">Long Positions</div><div class="tbxempty" style="padding:12px">—</div></div>';
-    const acctbar='<div class="tbxacct"><span>Balance:<b>100 000.00 USD</b></span><span>Equity:<b>99 992.79</b></span>'+
-      '<span>Margin:<b>256.64</b></span><span>Free Margin:<b>99 736.15</b></span><span>Margin Level:<b>38 962.28%</b></span></div>';
+    const acctbar='<div class="tbxacct">'+acctSpans(LIVE)+'</div>';
     body.innerHTML='<div class="tbxscroll"><div class="expwrap"><table class="postbl exptbl">'+colg(TBX_COLW.exposure)+'<thead><tr>'+
       ['Asset','Volume','Rate','USD','Graph'].map(h=>'<th>'+h+'</th>').join('')+
       '</tr></thead><tbody>'+rows+'</tbody></table>'+pie+'</div>'+acctbar+'</div>';
@@ -1837,6 +1853,59 @@ const fxFeed={ lastRealAt:0, wsAt:{}, realSyms:new Set(), ws:null, rt:null, _t:n
       if(this.ws && wsNew && Date.now()-wsNew>30000){ try{ this.ws.onclose=null; this.ws.close(); }catch(e){} this.ws=null; this.startWS(); }
     },5000); } };
 fxFeed.start();
+/* ══ M3 계좌 읽기 — 로그인 시 Trade/Exposure가 실계좌·실포지션 표시 (읽기 전용, 돈 쓰기 0).
+   계약 = webtrade positionsStore 락스텝: accounts/positions 쿼리·Realtime·BUY→bid/SELL→ash 청산가·
+   JPY 0.0067 환산·계약크기(FX 10만/기타 1)·마진 공식(fx_notional_usd). 실청산·실주문은 M5 — 여기선 표시만.
+   세션 게이트 = getSession 실존 + alpexa.me 태그(유령세션 가드) · 하이드레이션 레이스 자가치유(재판정). ══ */
+const FX_CONTRACT_OF=s=>mwCat(s)==='Forex'?100000:1;   // fx_notional_usd 락스텝
+const FX_LEVCAP_OF=s=>mwCat(s)==='Forex'?100:5;
+const fxAcct={ authed:false, acct:null, pos:[], _t:null, ch1:null, ch2:null,
+  async session(){ try{
+    if(!(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.auth)) return null;
+    const s=await AlpexaSync.db.auth.getSession();
+    const a=AlpexaSync.acctFor&&AlpexaSync.acctFor('fx');
+    return (s&&s.data&&s.data.session&&a)?a:null; }catch(e){ return null; } },
+  async load(){ const a=await this.session();
+    if(!a){ if(this.authed){ this.authed=false; this.acct=null; this.pos=[]; this.paint(); } return; }
+    try{
+      const [ar,pr]=await Promise.all([
+        AlpexaSync.db.from('accounts').select('acct_no,balance').eq('server','fx').eq('acct_no',a).limit(1),
+        AlpexaSync.db.from('positions').select('local_id,symbol,side,size,open_price,status,updated_at,meta')
+          .eq('server','fx').eq('acct_no',a).eq('status','open').limit(200) ]);
+      if(ar&&ar.data&&ar.data[0]){ this.acct=ar.data[0]; }
+      if(pr&&pr.data){ this.pos=pr.data; }
+      if(this.acct){ if(!this.authed){ this.authed=true; } this.paint(); }
+    }catch(e){} },
+  closePx(p){ const r=mwStore.rows[p.symbol]; if(!r||r.bid==null) return null;
+    return String(p.side).toUpperCase()==='SELL'?r.ask:r.bid; },   // BUY→BID · SELL→ASK (MT5)
+  pnl(p){ const cur=this.closePx(p); if(cur==null) return 0;
+    const dir=String(p.side).toUpperCase()==='SELL'?-1:1;
+    return dir*(cur-(+p.open_price||cur))*(+p.size||0)*FX_CONTRACT_OF(p.symbol)*(String(p.symbol).includes('JPY')?0.0067:1); },
+  baseUsd(sym){ const base=sym.slice(0,3), quote=sym.slice(3), r=mwStore.rows[sym];
+    if(mwCat(sym)!=='Forex') return r?r.mid:0;                      // 크립토/주식: 1계약=1코인/주 → USD가격
+    if(base==='USD') return 1; if(quote==='USD') return r?r.mid:0;
+    const b=mwStore.rows[base+'USD']; if(b) return b.mid;
+    const i=mwStore.rows['USD'+base]; if(i&&i.mid) return 1/i.mid; return r?r.mid:0; },
+  margin(p){ return (+p.size||0)*FX_CONTRACT_OF(p.symbol)*this.baseUsd(p.symbol)/FX_LEVCAP_OF(p.symbol); },
+  /* DEMO_POS 모양으로 변환 — Trade/Exposure 렌더가 그대로 먹게 (noClose: 실청산은 M5) */
+  rows(){ return this.pos.map(p=>{ const m=(p.meta&&typeof p.meta==='object')?p.meta:{}, dg=mwDigits(p.symbol), cur=this.closePx(p), pl=this.pnl(p);
+    return { sym:p.symbol, ticket:String(p.local_id||''), time:fxStamp(Date.parse(p.updated_at)||Date.now()),
+      type:String(p.side||'').toLowerCase(), vol:(+p.size||0).toFixed(2), price:(+p.open_price||0).toFixed(dg),
+      sl:m.sl?(+m.sl).toFixed(dg):'', tp:m.tp?(+m.tp).toFixed(dg):'',
+      cur:cur!=null?cur.toFixed(dg):'—', comm:'0.00', swap:m.swap!=null?(+m.swap).toFixed(2):'0.00',
+      pl:pl.toFixed(2), noClose:true }; }); },
+  stats(){ const floating=this.pos.reduce((s,p)=>s+this.pnl(p),0), bal=+((this.acct&&this.acct.balance))||0;
+    const margin=this.pos.reduce((s,p)=>s+this.margin(p),0), equity=bal+floating;
+    return { bal, floating, equity, margin, free:equity-margin, level:margin>0?equity/margin*100:0 }; },
+  paint(){ if(curTbxTab==='Trade'||curTbxTab==='Exposure') renderToolbox(curTbxTab); },
+  start(){ if(this._t) return;
+    this.load(); [1500,4000].forEach(ms=>setTimeout(()=>{ if(!this.authed) this.load(); },ms));   // 세션 하이드레이션 레이스 자가치유
+    this._t=setInterval(()=>{ if(!document.hidden) this.load(); },5000);   // 폴백 폴 (Realtime 죽어도 5s 내 따라감)
+    try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.channel){
+      this.ch1=AlpexaSync.db.channel('fxterm-acct').on('postgres_changes',{event:'*',schema:'public',table:'accounts'},()=>this.load()).subscribe();
+      this.ch2=AlpexaSync.db.channel('fxterm-pos').on('postgres_changes',{event:'*',schema:'public',table:'positions'},()=>this.load()).subscribe();
+    } }catch(e){} } };
+fxAcct.start();
 mwSimulate(); mwRender();
 
 /* Toolbox 도크 — 탭(바닥) · Trade 렌더 · 상단 리사이즈 · X 닫기(왼쪽 헤드, Ctrl+T 재오픈) · 원클릭 청산 */
@@ -1884,6 +1953,7 @@ function updateStatus(){ const el=document.getElementById('sbClock'); if(!el) re
 updateStatus();
 setInterval(()=>{ if(!mwStore.live) mwSimulate(); mwRender(); alertsStore.check();
   if(curTbxTab==='Exposure') renderToolbox('Exposure');   // 통화 노출 실시간 마크(MT5)
+  if(curTbxTab==='Trade'&&fxAcct.authed) renderToolbox('Trade');   // M3: 실포지션 플로팅 P/L 실시간 마크
   renderAllCharts(true);                                   // 라이브 봉 갱신(현재 봉 close/high/low)
   updateStatus(); }, 1000);
 renderAllCharts(false);   // 초기 1회 (봉 즉시 표시)
