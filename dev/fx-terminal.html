@@ -1807,13 +1807,19 @@ function toolSvg(inner, fill){ return '<svg width="16" height="16" viewBox="0 0 
     try{ e.dataTransfer.setData('text/mt5-symbol', sym); e.dataTransfer.setData('text/plain', sym); e.dataTransfer.effectAllowed='copy'; }catch(_){} });
   if(body) body.addEventListener('dragend', ()=>document.body.classList.remove('symdrag'));
   /* 하위탭 상호작용: 행 선택(Ticks 따라감) · Trading 볼륨/원클릭(DEMO 토스트) · Ticks 심볼 선택 */
+  let mwDbl={sym:null,t:0};   // 수동 더블클릭 판정 상태
   if(body){ body.addEventListener('click', e=>{
       const vol=e.target.closest('[data-vol]');
       if(vol){ mwVol=Math.max(0.01, +(mwVol+(+vol.dataset.vol)*0.01).toFixed(2)); mwRender(); return; }
       const tr=e.target.closest('[data-trade]');
       if(tr){ placeMarketDemo(tr.dataset.sym, tr.dataset.trade, mwVol, 0, 0); return; }   // Trading 탭 원클릭 시장가(DEMO)
-      const row=e.target.closest('.mwrow'); if(row&&row.dataset.sym){ mwSel=row.dataset.sym; mwRender(); } });
-    body.addEventListener('dblclick', e=>{ const row=e.target.closest('.mwrow'); if(row&&row.dataset.sym) openOrderDialog(row.dataset.sym); });   // MT5: 더블클릭 = 주문 티켓
+      const row=e.target.closest('.mwrow'); if(row&&row.dataset.sym){ const sym=row.dataset.sym, now=Date.now();
+        /* MT5: 더블클릭 = 주문 티켓. 네이티브 dblclick은 못 쓴다 — 첫 클릭의 mwRender()(선택 표시)와
+           1초 주기 재렌더가 행 노드를 교체해 "같은 노드 2클릭" 조건이 영영 안 채워짐(2026-07-19 실측).
+           그래서 심볼 기준 수동 판정(450ms) — DOM이 갈려도 죽지 않는다. */
+        if(mwDbl.sym===sym && now-mwDbl.t<450){ mwDbl={sym:null,t:0}; openOrderDialog(sym); return; }
+        mwDbl={sym,t:now};
+        if(mwSel!==sym){ mwSel=sym; mwRender(); } } });
     body.addEventListener('change', e=>{ const sel=e.target.closest('.mwticksel'); if(sel){ mwSel=sel.value; mwRender(); } }); }
   /* MT5 표준 우클릭 컨텍스트 메뉴 (골격 항목 = 토스트, 클래스 필터 = 실동작) */
   const mtItem=(l,k)=>'<button data-mt="'+l+'"><span>'+l+'</span>'+(k?'<span class="key">'+k+'</span>':'')+'</button>';
