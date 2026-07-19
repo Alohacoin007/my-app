@@ -1240,9 +1240,12 @@ function legState(l){ // Open 위계: Live > Awaiting result > Upcoming (앱:211
 function betKick(b){ let min=Infinity; (b.legs||[]).forEach(l=>{
   const g=gamesStore.games.find(x=>x.gid===l.gid);
   const kt=l.kt||(g&&g.iso)||''; const t=kt?Date.parse(kt):NaN; if(!isNaN(t)&&t<min)min=t; }); return min; }
+/* 티켓 버킷 = 앱 ticketBucket 미러: Live(0) → Upcoming(1) → Awaiting result(2, 정산 대기 맨 아래) */
+function betBucket(b){ const legs=b.legs||[];
+  if(legs.some(l=>legState(l)==='live')) return 0;
+  return legs.some(l=>legState(l)==='await')?2:1; }
 function sortedOpenBets(bets){ return (bets||[]).slice().sort((a,b)=>{   // bets 인자 필수 — ms는 renderBets 지역 별칭(전역 아님)
-  const la=(a.legs||[]).some(l=>legState(l)==='live'), lb=(b.legs||[]).some(l=>legState(l)==='live');
-  if(la!==lb) return la?-1:1;
+  const ba=betBucket(a), bb=betBucket(b); if(ba!==bb) return ba-bb;
   const ka=betKick(a), kb=betKick(b); if(ka!==kb) return ka-kb;
   return (+b.placedTs||0)-(+a.placedTs||0); }); }
 function renderBets(){

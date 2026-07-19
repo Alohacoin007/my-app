@@ -56,6 +56,7 @@ const ok = (n, c, d) => { if (c) { pass++; console.log('  ✅ ' + n); } else { f
       moneyStore.authed = true; moneyStore.sessAbsent = false;
       moneyStore.openBets = [
         { id: 'b-late',  type: 'Single', placedTs: now - 100, stake: 10, potential: 20, legs: [{ sel: 'LateTeam',  am: -110, gid: 'gx1', kt: iso(7200e3) }] },
+        { id: 'b-await', type: 'Single', placedTs: now - 200, stake: 10, potential: 20, legs: [{ sel: 'AwaitTeam', am: -110, gid: 'gx-done', kt: iso(-90000e3) }] },   // 어제 끝남 — 정산 대기
         { id: 'b-early', type: 'Single', placedTs: now - 50,  stake: 10, potential: 20, legs: [{ sel: 'EarlyTeam', am: -110, gid: 'gx2', kt: iso(600e3) }] },
         { id: 'b-live',  type: 'Single', placedTs: now - 10,  stake: 10, potential: 20, legs: [{ sel: 'LiveTeam',  am: -110, gid: 'g-live', kt: iso(-3600e3) }] } ];
       renderBets();
@@ -65,9 +66,10 @@ const ok = (n, c, d) => { if (c) { pass++; console.log('  ✅ ' + n); } else { f
     } catch (e) { return { threw: e.message }; }
   });
   ok('renderBets runs without exception', r.threw === null, r.threw || '');
-  ok('ALL stub tickets render (3/3 — 사라짐 금지)', r.n === 3, JSON.stringify(r));
-  ok('order = LIVE → earliest kickoff → latest (' + (r.picks || []).join(' → ') + ')',
-     Array.isArray(r.picks) && r.picks[0] === 'LiveTeam' && r.picks[1] === 'EarlyTeam' && r.picks[2] === 'LateTeam');
+  ok('ALL stub tickets render (4/4 — 사라짐 금지)', r.n === 4, JSON.stringify(r));
+  ok('order = LIVE → 곧 시작(빠른 순) → 정산 대기 맨 아래 (' + (r.picks || []).join(' → ') + ')',
+     Array.isArray(r.picks) && r.picks[0] === 'LiveTeam' && r.picks[1] === 'EarlyTeam'
+     && r.picks[2] === 'LateTeam' && r.picks[3] === 'AwaitTeam');
   ok('no page errors', errs.length === 0, errs.join(' | '));
 
   // 엣지: 게임 목록이 비어도(gamesStore 미적재) 렌더는 절대 죽지 않는다
@@ -76,7 +78,7 @@ const ok = (n, c, d) => { if (c) { pass++; console.log('  ✅ ' + n); } else { f
       return { threw: null, n: document.getElementById('mbList').querySelectorAll('.tleg').length };
     } catch (e) { return { threw: e.message }; }
   });
-  ok('empty games list → still renders (no crash)', r2.threw === null && r2.n === 3, JSON.stringify(r2));
+  ok('empty games list → still renders (no crash)', r2.threw === null && r2.n === 4, JSON.stringify(r2));
 
   await page.close(); await browser.close(); server.close();
   console.log((fail ? '🔴' : '🟢') + ' sports-dashboard-bets — ' + pass + ' pass, ' + fail + ' fail');

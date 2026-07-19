@@ -2179,10 +2179,19 @@
   function ticketKick(b){ var min=Infinity; (b.legs||[]).forEach(function(l){
     var g=(l.gid&&typeof GAMES!=='undefined'&&GAMES)?GAMES.find(function(x){return x.id===l.gid;}):null;
     var kt=l.kt||(g&&g.kickoff)||''; var t=kt?Date.parse(kt):NaN; if(!isNaN(t)&&t<min)min=t; }); return min; }
-  // Open tickets: LIVE (in-play) first, then by soonest kickoff. Sort a COPY — openBets order
-  // is used elsewhere (find/remove by id), so we must not mutate it.
+  // 티켓 버킷: Live(0) → Upcoming(1) → Awaiting result(2 — 이미 시작/종료, 정산 대기).
+  // 2026-07-19 사장님: 끝난 경기(정산 대기)가 맨 위는 어색 — "곧 시작"이 위로, 정산 대기는 맨 아래.
+  // started 판정은 상태칩(stState)과 동일 조건 — 칩과 정렬이 어긋나면 더 헷갈린다.
+  function ticketBucket(b){ if(ticketIsLive(b)) return 0;
+    var started=false; (b.legs||[]).forEach(function(l){
+      var g=(l.gid&&typeof GAMES!=='undefined'&&GAMES)?GAMES.find(function(x){return x.id===l.gid;}):null;
+      var kt=l.kt||(g&&g.kickoff)||''; var t=kt?Date.parse(kt):NaN;
+      if(!isNaN(t)){ if(Date.now()>=t) started=true; } else if(!g){ started=true; } });
+    return started?2:1; }
+  // Open tickets: LIVE first → upcoming by soonest kickoff → awaiting-result last. Sort a COPY —
+  // openBets order is used elsewhere (find/remove by id), so we must not mutate it.
   function sortedOpen(){ return openBets.slice().sort(function(a,b){
-    var la=ticketIsLive(a), lb=ticketIsLive(b); if(la!==lb) return la?-1:1;
+    var ba=ticketBucket(a), bb=ticketBucket(b); if(ba!==bb) return ba-bb;
     var ka=ticketKick(a), kb=ticketKick(b); if(ka!==kb) return ka-kb;
     return (b.placedTs||0)-(a.placedTs||0); }); }   // tie → newest placed first
 
