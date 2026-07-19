@@ -39,7 +39,8 @@ const LEAGUES = [
   { lg: "SOC", path: "soccer/usa.1" },
 ];
 
-type Result = { hs: number; as: number; homeNm: string; awayNm: string; homeAb: string; awayAb: string };
+type Result = { hs: number; as: number; homeNm: string; awayNm: string; homeAb: string; awayAb: string;
+  homeAll?: string[]; awayAll?: string[] };   // 모든 이름 변형(short/display/name/location) — 팀명 매칭용
 
 async function fetchLeagueResults(L: { lg: string; path: string }, out: Record<string, Result>) {
   // CATCH-UP WINDOW (#33): ESPN's default scoreboard returns ONLY the current day. A game that
@@ -69,12 +70,18 @@ async function fetchLeagueResults(L: { lg: string; path: string }, out: Record<s
           const hs = parseInt(hc.score, 10), as = parseInt(ac.score, 10);
           if (isNaN(hs) || isNaN(as)) continue;
           const gid = L.lg + "_" + ev.id;
+          // 이름 변형 전부 수록 — MLS/축구 클럽은 shortDisplayName("Sporting KC")과 베팅 leg의
+          // 픽 이름("Kansas City")이 다르다. displayName("Sporting Kansas City")·location까지
+          // 가지고 있어야 토큰 매칭이 산다 (2026-07-19 SP-100058 영구 미정산 사고).
+          const variants = (t: any) => [t.shortDisplayName, t.displayName, t.name, t.location]
+            .filter((x: any) => typeof x === "string" && x.trim());
           out[gid] = {
             hs, as,
             homeNm: hc.team.shortDisplayName || hc.team.name || hc.team.displayName || "Home",
             awayNm: ac.team.shortDisplayName || ac.team.name || ac.team.displayName || "Away",
             homeAb: String(hc.team.abbreviation || hc.team.shortDisplayName || "").toUpperCase(),
             awayAb: String(ac.team.abbreviation || ac.team.shortDisplayName || "").toUpperCase(),
+            homeAll: variants(hc.team), awayAll: variants(ac.team),
           };
         } catch (_e) { /* skip event */ }
       }
@@ -166,15 +173,31 @@ function playerMatch(a: string, b: string): boolean {
   return short.every((t) => long.includes(t));
 }
 
+// 팀 → 홈/원정 판정. 오즈 매칭과 같은 규율(정규화 토큰 부분집합 + 유일매칭 — 2026-07-08 오즈 불변식):
+// "Kansas City" ⊆ "Sporting Kansas City" ✓, "Vancouver" ⊆ "Vancouver Whitecaps FC" ✓.
+// 양쪽 다 맞으면(모호) null = 채점 보류 — 돈은 절대 추측으로 안 움직인다(fail-safe).
+function normTeam(s: string): string { return String(s || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim(); }
+function nameHit(t: string, names: string[]): number {   // 0=불일치 · 1=토큰/부분 · 2=정확
+  const tt = normTeam(t); if (!tt) return 0;
+  const toks = tt.split(" ").filter((w) => w.length > 1);
+  let best = 0;
+  for (const n of names) {
+    const nn = normTeam(n); if (!nn) continue;
+    if (nn === tt) return 2;
+    const nt = nn.split(" ").filter((w) => w.length > 1);
+    const sub = toks.length && nt.length && (toks.every((w) => nt.includes(w)) || nt.every((w) => toks.includes(w)));
+    if (sub || nn.indexOf(tt) >= 0) best = Math.max(best, 1);
+  }
+  return best;
+}
 function teamSide(team: string, r: Result): "home" | "away" | null {
-  const t = (team || "").toLowerCase().trim(); if (!t) return null;
-  if (r.homeNm && r.homeNm.toLowerCase() === t) return "home";
-  if (r.awayNm && r.awayNm.toLowerCase() === t) return "away";
-  if (r.homeAb && r.homeAb.toLowerCase() === t) return "home";
-  if (r.awayAb && r.awayAb.toLowerCase() === t) return "away";
-  if (r.homeNm && r.homeNm.toLowerCase().indexOf(t) >= 0) return "home";
-  if (r.awayNm && r.awayNm.toLowerCase().indexOf(t) >= 0) return "away";
-  return null;
+  const t = (team || "").trim(); if (!t) return null;
+  const H = (r.homeAll && r.homeAll.length ? r.homeAll : [r.homeNm]).concat(r.homeAb ? [r.homeAb] : []);
+  const A = (r.awayAll && r.awayAll.length ? r.awayAll : [r.awayNm]).concat(r.awayAb ? [r.awayAb] : []);
+  const h = nameHit(t, H), a = nameHit(t, A);
+  if (h > a) return "home";
+  if (a > h) return "away";
+  return null;   // 동점(모호) 또는 무일치 → 채점 불가(베팅 열린 채 유지)
 }
 // Returns 'won' | 'lost' | 'push' | null(not gradeable). Mirrors the app's gradeLeg.
 function gradeLeg(l: any, r: Result): string | null {
