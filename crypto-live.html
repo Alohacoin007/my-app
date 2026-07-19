@@ -533,6 +533,7 @@ window.__cryptoLiveMap = window.__cryptoLiveMap || {};
   var SRC = {};                                // sym -> { binance:{p,ts}, coinbase:{p,ts} }
   var CHG = {};                                // sym -> 24h % change (Binance ticker)
   var FRESH_MS = 6000, lastApply = 0;
+  var WS_B = null, WS_C = null;                // 워치독용 소켓 핸들 (조용한 정지 시 재활용)
   function median(a){ a.sort(function(x,y){return x-y;}); var n=a.length; return n%2 ? a[(n-1)/2] : (a[n/2-1]+a[n/2])/2; }
   function aggregate(sym){
     var s=SRC[sym]; if(!s)return; var now=Date.now();
@@ -566,8 +567,9 @@ window.__cryptoLiveMap = window.__cryptoLiveMap || {};
       if(d.e==='trade'){ setSrc('binance',sym,+d.p); }
       else if(d.e==='24hrTicker'){ var P=+d.P; if(isFinite(P))CHG[sym]=P; setSrc('binance',sym,+d.c); }
     }catch(e){} };
-    ws.onclose=function(){ setTimeout(connectBinance,3000); };
+    ws.onclose=function(){ WS_B=null; setTimeout(connectBinance,3000); };
     ws.onerror=function(){ try{ws.close();}catch(e){} };
+    WS_B=ws;
   }
   // ── Source 2: Coinbase (majors; redundancy + outlier check) ──
   var CREV={}; Object.keys(COINBASE_MAP).forEach(function(k){ CREV[COINBASE_MAP[k]]=k; });
@@ -576,10 +578,21 @@ window.__cryptoLiveMap = window.__cryptoLiveMap || {};
     var ws; try{ ws=new WebSocket('wss://ws-feed.exchange.coinbase.com'); }catch(e){ return; }
     ws.onopen=function(){ try{ ws.send(JSON.stringify({type:'subscribe',product_ids:Object.values(COINBASE_MAP),channels:['ticker']})); }catch(e){} };
     ws.onmessage=function(ev){ try{ var d=JSON.parse(ev.data); if(d&&d.type==='ticker'&&d.product_id){ var sym=CREV[d.product_id]; if(sym)setSrc('coinbase',sym,+d.price); } }catch(e){} };
-    ws.onclose=function(){ setTimeout(connectCoinbase,3000); };
+    ws.onclose=function(){ WS_C=null; setTimeout(connectCoinbase,3000); };
     ws.onerror=function(){ try{ws.close();}catch(e){} };
+    WS_C=ws;
   }
   connectBinance(); connectCoinbase();
+  /* 시세 하네스(미니 워치독) — 소켓이 close 이벤트 없이 조용히 멈추는 클래스 대응 (2026-07-19).
+     틱이 "오다가" 30s 끊기면 그 소스 소켓을 닫는다 → 기존 onclose 경로가 3s 뒤 재접속.
+     한 번도 틱이 없던 소스(지역차단 등)는 건드리지 않음 — 8s 서버 폴이 어차피 실가격을 받친다(과부하 0). */
+  function srcNewest(src){ var t=0; for(var k in SRC){ var q=SRC[k][src]; if(q&&q.ts>t)t=q.ts; } return t; }
+  setInterval(function(){ if(document.hidden) return; var now=Date.now();
+    [['binance',WS_B],['coinbase',WS_C]].forEach(function(pair){
+      var t=srcNewest(pair[0]), ws=pair[1];
+      if(ws && t && now-t>30000){ try{ console.warn('[feedHz] '+pair[0]+' silent-stall — recycling socket'); ws.close(); }catch(e){} }
+    });
+  },10000);
 })();
 
 // Real coin chart history from Binance klines (free, no key). Maps each range to

@@ -2,6 +2,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Alpexa · FX Terminal (Legend)</title>
 <link rel="stylesheet" href="../legend-ui.css">
+<!-- M2 실시세: 서버 prices 읽기 전용(공개 키). CDN/AlpexaSync 실패 시 SIM 폴백 유지 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../alpexa-sync.js?v=16"></script>
 <style>
 /* ══ FX 레전드 터미널 — M1 셸(기초공사). 크립토/스포츠 대시보드 위젯 엔진 재사용.
    기존 FX 코드(webtrade/trading) 0터치 · legend-ui.css 읽기 전용 링크. 돈 코드 0. ══ */
@@ -162,6 +165,11 @@ body.light .cgmenu{box-shadow:0 8px 24px rgba(15,23,40,.18)}
 body.symdrag .widget[id^="w-chart"]{outline:1px dashed var(--lgd-hair); outline-offset:-2px}
 .widget.dropok{outline:2px solid var(--lgd-up)!important; outline-offset:-2px}
 .mwrow.sel{background:var(--lgd-surface2); box-shadow:inset 2px 0 0 var(--lgd-up)}
+/* M2 실시세 배지 — LIVE(초록)=신선 · STALE(주황 점멸)=실피드 끊김(동결) · 배지 없음=SIM */
+.mwlive{font-size:8.5px; font-weight:800; letter-spacing:.6px; padding:2px 7px; border-radius:2px; margin-right:6px}
+.mwlive.live{background:rgba(0,200,5,.15); color:var(--lgd-green,#00C805)}
+.mwlive.stale{background:rgba(240,180,40,.15); color:#E0A020; animation:mwstale 1.6s ease-in-out infinite}
+@keyframes mwstale{0%,100%{opacity:1}50%{opacity:.4}}
 .mwsym{font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .mwpx{font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; font-weight:600; color:var(--lgd-dim)}
 .mwpx.up{color:var(--lgd-green,#00C805)} .mwpx.down{color:var(--lgd-down,#EB5D2A)}
@@ -1199,7 +1207,9 @@ function mwCell(s,r,k,tnow){ switch(k){
 function mwRender(){ const host=document.getElementById('mwBody'); if(!host) return;
   const fl=document.getElementById('mwFeed'); if(fl){ fl.textContent=mwStore.live?'LIVE':'SIM'; fl.classList.toggle('live',mwStore.live); }
   const head=document.getElementById('mwHead');
-  const list=mwFilter==='All'?MW_WATCH:MW_WATCH.filter(s=>mwCat(s)===mwFilter);
+  let list=mwFilter==='All'?MW_WATCH:MW_WATCH.filter(s=>mwCat(s)===mwFilter);
+  /* 라이브 전환 후엔 실시세 있는 심볼만 (feed-filter 규율 — SIM 잔상·비실가 노출 금지) */
+  if(mwStore.live && typeof fxFeed!=='undefined' && fxFeed.realSyms.size) list=list.filter(s=>fxFeed.realSyms.has(s));
   const d=new Date(),p=n=>(n<10?'0':'')+n, tnow=p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
   if(mwView==='Details'){ if(head) head.innerHTML=''; mwRenderDetails(host); return; }   // Details = 선택 심볼 상세(MT5)
   if(mwView==='Trading'){ if(head) head.innerHTML=''; mwRenderTrading(host, list); return; }   // 원클릭 트레이딩(DEMO)
@@ -1782,6 +1792,51 @@ function toolSvg(inner, fill){ return '<svg width="16" height="16" viewBox="0 0 
 /* Navigator — 그룹 접기/펼치기 */
 (function navControls(){ const tree=document.getElementById('nvTree'); if(!tree) return;
   tree.addEventListener('click', e=>{ const h=e.target.closest('.nvhead'); if(!h) return; h.parentNode.classList.toggle('closed'); }); })();
+/* ══ M2 실시세 펌프 — 서버 prices(3s 폴 + Realtime 푸시) + 크립토 Binance 미러 WS 직결(ms).
+   mwStore.apply()가 유일한 실피드 진입점(기존 계약 그대로). SIM은 "실데이터를 한 번도 못 본" 때만.
+   정직 표시(#5): LIVE=신선 · STALE=실피드 끊김(가짜로 안 흔듦, 마지막 실가격에 동결) · 배지 없음=SIM.
+   라이브 전환 후 실시세 없는 심볼은 목록에서 제외(feed-filter 규율 — 비실가 심볼 노출 금지). ══ */
+const fxFeed={ lastRealAt:0, wsAt:{}, realSyms:new Set(), ws:null, rt:null, _t:null,
+  SRV2MW:s=>/^(BTC|ETH|SOL|XRP|DOGE)$/.test(s)?s+'USD':s,   // 서버 크립토 행(BTC…) → 터미널 심볼(BTCUSD…)
+  mapRows(rows){ const out=[], now=Date.now(); (rows||[]).forEach(p=>{ const mw=this.SRV2MW(p&&p.symbol); if(!MW_WATCH.includes(mw)) return;
+    this.realSyms.add(mw);
+    if(this.wsAt[mw] && now-this.wsAt[mw]<10000) return;   // WS 신선(<10s) 심볼은 3s 크론에 양보 안 함(webtrade 게이트 미러)
+    out.push({symbol:mw, mid:p.mid, spr_pts:p.spr_pts}); }); return out; },
+  applyReal(rows){ const m=this.mapRows(rows); if(m.length){ mwStore.apply(m); this.lastRealAt=Date.now(); this.badge(); } },
+  async poll(){ try{ if(!(window.AlpexaSync&&AlpexaSync.db)) return;
+      try{ if(AlpexaSync.db.functions){ const x=await AlpexaSync.db.functions.invoke('feed',{body:{t:'prices'}});
+        if(x&&!x.error&&Array.isArray(x.data)){ this.applyReal(x.data); return; } } }catch(e){}   // 1s 캐시 Edge 우선(DB 과부하 방지)
+      const r=await AlpexaSync.db.from('prices').select('symbol,mid,spr_pts'); if(r&&r.data) this.applyReal(r.data);
+    }catch(e){} },
+  startRT(){ try{ if(this.rt||!(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.channel)) return;
+      this.rt=AlpexaSync.db.channel('fxterm-prices').on('postgres_changes',{event:'*',schema:'public',table:'prices'},m=>{
+        const row=m&&m.new; if(row&&row.symbol) this.applyReal([row]); }).subscribe(); }catch(e){} },
+  startWS(){ try{ if(this.ws||typeof WebSocket==='undefined') return;
+      const MAP={BTCUSD:'btcusdt',ETHUSD:'ethusdt',SOLUSD:'solusdt',XRPUSD:'xrpusdt',DOGEUSD:'dogeusdt'};
+      const REV={}; Object.keys(MAP).forEach(k=>REV[MAP[k].toUpperCase()]=k);
+      const ws=new WebSocket('wss://data-stream.binance.vision/stream?streams='+Object.values(MAP).map(s=>s+'@bookTicker').join('/'));
+      ws.onmessage=ev=>{ try{ const d=JSON.parse(ev.data).data; if(!d||!d.s) return; const sym=REV[d.s]; if(!sym) return;
+        const b=+d.b,a=+d.a; if(!(b>0&&a>0)) return; const mid=(a+b)/2, spr=Math.round((a-b)/mid*1e6)/100;   // 실스프레드 BPS(crypto-prices 단위 락스텝)
+        this.wsAt[sym]=Date.now(); this.realSyms.add(sym); mwStore.apply([{symbol:sym,mid,spr_pts:spr}]); this.lastRealAt=Date.now(); this.badge(); }catch(e){} };
+      ws.onclose=()=>{ this.ws=null; setTimeout(()=>this.startWS(),5000); };
+      ws.onerror=()=>{ try{ws.close();}catch(e){} };
+      this.ws=ws; }catch(e){} },
+  state(){ if(!this.lastRealAt) return 'sim'; return (Date.now()-this.lastRealAt<15000)?'live':'stale'; },
+  badge(){ let el=document.getElementById('mwLive');
+    if(!el){ const host=document.querySelector('#w-marketwatch .wtb'), sp=host&&host.querySelector('.wsp'); if(!sp) return;
+      el=document.createElement('span'); el.id='mwLive'; sp.parentNode.insertBefore(el, sp.nextSibling); }
+    const st=this.state();
+    if(st==='sim'){ el.style.display='none'; return; }
+    el.style.display=''; el.textContent=st==='live'?'LIVE':'STALE'; el.className='mwlive '+st; },
+  start(){ if(this._t) return; this.poll(); this._t=setInterval(()=>{ if(!document.hidden) this.poll(); },3000);
+    this.startRT(); this.startWS();
+    /* 워치독(feedHz 미러): 배지 재평가 + 조용히 죽은 WS(30s 무프레임) 소켓 재활용.
+       실피드가 끊겨도 SIM으로 되돌아가 가짜로 흔들지 않는다 — 마지막 실가격 동결 + STALE 정직 표시. */
+    setInterval(()=>{ if(document.hidden) return; this.badge();
+      const wsNew=Object.values(this.wsAt).reduce((a,b)=>Math.max(a,b),0);
+      if(this.ws && wsNew && Date.now()-wsNew>30000){ try{ this.ws.onclose=null; this.ws.close(); }catch(e){} this.ws=null; this.startWS(); }
+    },5000); } };
+fxFeed.start();
 mwSimulate(); mwRender();
 
 /* Toolbox 도크 — 탭(바닥) · Trade 렌더 · 상단 리사이즈 · X 닫기(왼쪽 헤드, Ctrl+T 재오픈) · 원클릭 청산 */
