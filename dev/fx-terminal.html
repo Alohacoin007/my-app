@@ -207,7 +207,7 @@ body.symdrag .widget[id^="w-chart"]{outline:1px dashed var(--lgd-hair); outline-
 .mwticksvg{width:100%; height:100%; display:block}
 /* 차트 창 본문(스켈레톤 + TF/M2 오버레이) — 껍데기는 표준 .widget/.wtb/.rz 재사용 */
 .cgwplot{flex:1; min-height:0; position:relative; display:flex}
-.cgwplot svg{width:100%; height:100%; display:block; position:absolute; inset:0}
+.cgwplot > svg{width:100%; height:100%; display:block; position:absolute; inset:0}   /* 직계 svg만(=cgsvg/cgcross). 툴바 아이콘 svg는 제외 */
 .cgwplot .cgcross{pointer-events:none; z-index:1}   /* 크로스헤어 오버레이(별도 레이어 — 틱 재렌더에 안 지워짐) */
 .cgwplot.crossmode{cursor:crosshair}
 /* 활성(포커스) 차트 — 헤더만 아주 은은하게(네온 파랑 제거, 티 안나게) */
@@ -222,6 +222,15 @@ body.symdrag .widget[id^="w-chart"]{outline:1px dashed var(--lgd-hair); outline-
 .chchip .chsw{width:7px; height:7px; border-radius:1px; flex:none}
 .chchip .chx{cursor:pointer; font-size:11px; font-weight:800; color:var(--lgd-dim); opacity:.55; padding:0 1px; border-radius:2px}
 .chchip .chx:hover{opacity:1; color:var(--lgd-down,#EB5D2A); background:var(--lgd-surface2)}
+/* 차트 왼쪽 원클릭 라인스터디 툴바(MT5) — 세로 스트립, 평소 은은하고 hover 시 또렷 */
+.chtools{position:absolute; left:3px; top:50%; transform:translateY(-50%); z-index:3; display:flex; flex-direction:column; gap:1px;
+  background:rgba(18,24,34,.66); border:1px solid var(--lgd-hair); border-radius:5px; padding:2px; opacity:.45; transition:opacity .12s}
+.cgwplot:hover .chtools{opacity:1}
+.chtb{width:21px; height:21px; display:flex; align-items:center; justify-content:center; border-radius:3px; cursor:pointer; color:var(--lgd-dim)}
+.chtb:hover{background:var(--lgd-pill); color:var(--lgd-ink)}
+.chtb.on{background:var(--lgd-up); color:#fff}
+.chtb svg{pointer-events:none}
+.chtsep{height:1px; background:var(--lgd-hair); margin:2px 3px}
 .cgtag{position:absolute; top:5px; right:8px; background:var(--lgd-pill); color:var(--lgd-dim); font-size:9px;
   font-weight:800; border-radius:2px; padding:2px 6px; letter-spacing:.5px}
 
@@ -696,6 +705,10 @@ function syncChartUI(){ const c=activeCfg();
     else if(n==='Cursor') on=!crossOn&&!drawTool;
     else if(DRAW_TIP[n]) on=drawTool===DRAW_TIP[n];
     if(on!==null) t.classList.toggle('on',!!on); });
+  /* 차트별 왼쪽 툴바도 활성 툴 반영 */
+  document.querySelectorAll('.chtools [data-ctool]').forEach(b=>{ const k=b.dataset.ctool;
+    const on=k==='cursor'?(!crossOn&&!drawTool):k==='cross'?crossOn:k==='del'?false:drawTool===k;
+    b.classList.toggle('on',on); });
   if(c) document.querySelectorAll('#tfStrip [data-tf]').forEach(x=>x.classList.toggle('on',x.dataset.tf===c.tf)); }
 /* ── 드로잉 툴 — 좌표는 데이터 공간(시간 t·가격) 저장(줌/리사이즈 고정). 창별(cfg.obj).
    2점 오브젝트(추세선·피보)는 클릭-드래그-놓기, 그린 후 더블클릭으로 선택 → 핸들 드래그로 수정. ── */
@@ -714,7 +727,10 @@ function objDist(sc,o,x,y){ if(o.k==='hline') return Math.abs(y-objYOf(sc,o.pric
   if(o.k==='text') return Math.hypot(x-objXOf(sc,o.t),y-objYOf(sc,o.price)); return 1e9; }
 function handleAt(sc,o,x,y){ const H=9;
   if(o.k==='trend'||o.k==='fib'){ if(Math.hypot(x-objXOf(sc,o.p1.t),y-objYOf(sc,o.p1.price))<H) return 'p1';
-    if(Math.hypot(x-objXOf(sc,o.p2.t),y-objYOf(sc,o.p2.price))<H) return 'p2'; return 'move'; }
+    if(Math.hypot(x-objXOf(sc,o.p2.t),y-objYOf(sc,o.p2.price))<H) return 'p2';
+    const mx=(objXOf(sc,o.p1.t)+objXOf(sc,o.p2.t))/2, my=(objYOf(sc,o.p1.price)+objYOf(sc,o.p2.price))/2;
+    if(Math.hypot(x-mx,y-my)<H) return 'move';   // 중간점 = 선 전체 이동(MT5)
+    return 'move'; }
   return o.k; }   // hline/vline/text = 통째 이동
 function objMove(o,which,d){ if(which==='p1') o.p1={t:d.t,price:d.price}; else if(which==='p2') o.p2={t:d.t,price:d.price};
   else if(o.k==='hline') o.price=d.price; else if(o.k==='vline') o.t=d.t;
@@ -815,7 +831,22 @@ function tickSeries(sym,tf){ const s=series(sym,tf), r=mwStore.rows[sym], mid=r&
   if(now-last.t>=step){ s.c.push({t:last.t+step,o:last.c,h:Math.max(last.c,mid),l:Math.min(last.c,mid),c:mid,v:Math.round(80+Math.random()*160)}); if(s.c.length>700) s.c.shift(); }
   else { last.c=mid; if(mid>last.h) last.h=mid; if(mid<last.l) last.l=mid; last.v=(last.v||0)+Math.round(1+Math.random()*3); } return s; }
 /* 각 차트 = 최상위 위젯(chart1..N). 표준 위젯 엔진으로 스테이지 어디든 드래그/스냅/리사이즈. */
-function chartBody(){ return '<div class="cgwplot"><svg class="cgsvg"></svg><svg class="cgcross"></svg><span class="cgtf">'+curTF+'</span><div class="chleg"></div></div>'; }
+/* 차트 창 왼쪽 원클릭 라인스터디 툴바(MT5 Line Studies) — 커서·크로스헤어·추세·수평·수직·피보·텍스트·삭제 */
+const CH_TOOLS=[
+  {k:'cursor', t:'Cursor', i:'<path d="M5 3l6 15 2.2-5.6L19 10z"/>', fill:1},
+  {k:'cross', t:'Crosshair', i:'<circle cx="12" cy="12" r="1.6"/><path d="M12 4v4M12 16v4M4 12h4M16 12h4"/>'},
+  {sep:1},
+  {k:'trend', t:'Trend line', i:'<path d="M4 20L20 4"/><circle cx="4" cy="20" r="1.6"/><circle cx="12" cy="12" r="1.4"/><circle cx="20" cy="4" r="1.6"/>'},
+  {k:'hline', t:'Horizontal line', i:'<path d="M3 12h18"/>'},
+  {k:'vline', t:'Vertical line', i:'<path d="M12 3v18"/>'},
+  {k:'fib', t:'Fibonacci retracement', i:'<path d="M4 5h16M4 10h16M4 14h16M4 19h16"/>'},
+  {k:'text', t:'Text', i:'<path d="M6 5h12M12 5v14"/>'},
+  {sep:1},
+  {k:'del', t:'Delete (selected / last)', i:'<path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13"/>'} ];
+function chToolsHTML(){ return CH_TOOLS.map(o=> o.sep?'<div class="chtsep"></div>'
+  :'<div class="chtb" data-ctool="'+o.k+'" title="'+o.t+'"><svg width="15" height="15" viewBox="0 0 24 24" '+
+    (o.fill?'fill="currentColor"':'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"')+'>'+o.i+'</svg></div>').join(''); }
+function chartBody(){ return '<div class="cgwplot"><div class="chtools">'+chToolsHTML()+'</div><svg class="cgsvg"></svg><svg class="cgcross"></svg><span class="cgtf">'+curTF+'</span><div class="chleg"></div></div>'; }
 function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) return;
   const box=el.querySelector('.cgwplot'), svg=box&&box.querySelector('.cgsvg'); if(!svg) return;
   const sym=(layout[id]&&layout[id].sym)||'', W=box.clientWidth, H=box.clientHeight;
@@ -882,18 +913,19 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
     out+='<text x="4" y="'+(top+10).toFixed(1)+'" fill="'+CH_RSI+'" font-size="8.5" font-weight="700">RSI('+IND_RSI_P+')</text>'; }
   /* ── 드로잉 오브젝트(창별, 데이터 좌표) + 그리는 중 미리보기 + 선택 핸들 ── */
   { const xOf=t=>((t-vis[0].t)/(TF_MS[c.tf]||1800e3))*cw+cw/2, clampX=x=>Math.max(0,Math.min(plotW,x)), esc=s=>String(s).replace(/[<&>]/g,' ');
-    const drawOne=(o,sel)=>{ const sw=sel?1.8:1;
+    const drawOne=(o,sel)=>{ const sw=sel?1.2:1;   // MT5 = 얇은 1px 선(선택 시 살짝만 굵게)
       if(o.k==='hline'){ const y=yOf(o.price); out+='<line x1="0" y1="'+y.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="'+sw+'"/><text x="3" y="'+(y-3).toFixed(1)+'" fill="'+CH_DRAW+'" font-size="8.5">'+o.price.toFixed(dg)+'</text>'; }
       else if(o.k==='vline'){ const x=clampX(xOf(o.t)); out+='<line x1="'+x.toFixed(1)+'" y1="'+padT+'" x2="'+x.toFixed(1)+'" y2="'+(padT+priceH).toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="'+sw+'"/>'; }
-      else if(o.k==='trend'){ out+='<line x1="'+clampX(xOf(o.p1.t)).toFixed(1)+'" y1="'+yOf(o.p1.price).toFixed(1)+'" x2="'+clampX(xOf(o.p2.t)).toFixed(1)+'" y2="'+yOf(o.p2.price).toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="'+(sw+0.4)+'"/>'; }
+      else if(o.k==='trend'){ out+='<line x1="'+clampX(xOf(o.p1.t)).toFixed(1)+'" y1="'+yOf(o.p1.price).toFixed(1)+'" x2="'+clampX(xOf(o.p2.t)).toFixed(1)+'" y2="'+yOf(o.p2.price).toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="'+sw+'"/>'; }
       else if(o.k==='fib'){ const x1=clampX(xOf(o.p1.t)),x2=clampX(xOf(o.p2.t)),lo=Math.min(x1,x2),hi2=Math.max(x1,x2);
         out+='<line x1="'+x1.toFixed(1)+'" y1="'+yOf(o.p1.price).toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+yOf(o.p2.price).toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="'+sw+'" opacity=".5"/>';
         [0,0.236,0.382,0.5,0.618,0.786,1].forEach(f=>{ const p=o.p1.price+(o.p2.price-o.p1.price)*f, y=yOf(p);
           out+='<line x1="'+lo.toFixed(1)+'" y1="'+y.toFixed(1)+'" x2="'+hi2.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="'+CH_DRAW+'" stroke-width="0.8" stroke-dasharray="3 2" opacity=".85"/><text x="'+(hi2+2).toFixed(1)+'" y="'+(y+3).toFixed(1)+'" fill="'+CH_DRAW+'" font-size="7.5">'+(f*100).toFixed(1)+'</text>'; }); }
       else if(o.k==='text'){ out+='<text x="'+clampX(xOf(o.t)).toFixed(1)+'" y="'+yOf(o.price).toFixed(1)+'" fill="'+CH_DRAW+'" font-size="10" font-weight="600">'+esc(o.s)+'</text>'; }
-      if(sel){ const pts=(o.k==='trend'||o.k==='fib')?[[xOf(o.p1.t),yOf(o.p1.price)],[xOf(o.p2.t),yOf(o.p2.price)]]
+      if(sel){ const pts=(o.k==='trend'||o.k==='fib')
+            ?[[xOf(o.p1.t),yOf(o.p1.price)],[(xOf(o.p1.t)+xOf(o.p2.t))/2,(yOf(o.p1.price)+yOf(o.p2.price))/2],[xOf(o.p2.t),yOf(o.p2.price)]]   // MT5 = 3점(끝·중간·끝)
           :o.k==='hline'?[[plotW/2,yOf(o.price)]]:o.k==='vline'?[[clampX(xOf(o.t)),padT+priceH/2]]:[[clampX(xOf(o.t)),yOf(o.price)]];
-        pts.forEach(p=>{ out+='<rect x="'+(p[0]-3).toFixed(1)+'" y="'+(p[1]-3).toFixed(1)+'" width="6" height="6" fill="#fff" stroke="'+CH_DRAW+'" stroke-width="1"/>'; }); } };
+        pts.forEach(p=>{ out+='<rect x="'+(p[0]-2.5).toFixed(1)+'" y="'+(p[1]-2.5).toFixed(1)+'" width="5" height="5" fill="#fff" stroke="'+CH_DRAW+'" stroke-width="1"/>'; }); } };
     (c.obj||[]).forEach((o,i)=>drawOne(o, selObj&&selObj.id===id&&selObj.idx===i));
     if(drawDrag&&drawDrag.id===id) drawOne(drawDrag, false);   // 그리는 중 미리보기
   }
@@ -927,7 +959,17 @@ function mkChart(id, sym, i){ makeWidget(id, sym, 'var(--lgd-up)', chartBody());
     const leg=plot.querySelector('.chleg');
     if(leg) leg.addEventListener('click', ev=>{ const x=ev.target.closest('.chx'); if(!x) return; ev.stopPropagation(); ev.preventDefault();
       const k=x.dataset.legx, c=cfg(id); if(k==='vol') c.vol=false; else c.ind[k]=false; saveCfg(); renderChart(id); });
-    plot.addEventListener('pointerdown', ev=>{ if(ev.button!==0||ev.target.closest('.chleg')) return; const d=dataAt(id,ev); if(!d||!d.inPrice) return; const c=cfg(id);
+    /* 왼쪽 원클릭 라인스터디 툴바 — 툴 선택/커서/크로스헤어/삭제 */
+    const ctools=plot.querySelector('.chtools');
+    if(ctools) ctools.addEventListener('click', ev=>{ const b=ev.target.closest('[data-ctool]'); if(!b) return; ev.stopPropagation(); ev.preventDefault();
+      setActiveChart(id); const k=b.dataset.ctool;
+      if(k==='cursor'){ setDrawTool(null); setCrossMode(false); }
+      else if(k==='cross'){ setCrossMode(true); }
+      else if(k==='del'){ if(selObj&&selObj.id===id) delSelObj();
+        else { const c=cfg(id); if(c.obj&&c.obj.length){ c.obj.pop(); saveCfg(); renderChart(id); } else toast('No object to delete'); } }
+      else setDrawTool(k);   // trend/hline/vline/fib/text
+      syncChartUI(); });
+    plot.addEventListener('pointerdown', ev=>{ if(ev.button!==0||ev.target.closest('.chleg')||ev.target.closest('.chtools')) return; const d=dataAt(id,ev); if(!d||!d.inPrice) return; const c=cfg(id);
       if(drawTool==='trend'||drawTool==='fib'){ drawDrag={id,k:drawTool,p1:{t:d.t,price:d.price},p2:{t:d.t,price:d.price}}; plot.setPointerCapture(ev.pointerId); ev.preventDefault(); return; }
       if(drawTool==='hline'){ (c.obj=c.obj||[]).push({k:'hline',price:d.price}); saveCfg(); setDrawTool(null); renderChart(id); return; }
       if(drawTool==='vline'){ (c.obj=c.obj||[]).push({k:'vline',t:d.t}); saveCfg(); setDrawTool(null); renderChart(id); return; }
