@@ -11,13 +11,13 @@
 //             FX quote=USD   → size*lot*price      (EURUSD, XAUUSD, XAGUSD)
 //             FX base=USD    → size*lot            (USDJPY)
 //             FX cross       → size*lot*ccyToUsd(base)   (EURGBP)
-//   lev cap:  FX=100, INDEX=20, STOCK=5, CRYPTO=5, else=1
+//   lev cap:  FX=500 (2026-07-19 승인), INDEX=20, STOCK=5, CRYPTO=5, else=1
 'use strict';
 
 // Reference USD value of 1 unit of a currency (server reads these live from `prices`;
 // here we pin them so the cross-pair case is a concrete, checkable number).
 const REF = { USD: 1, EUR: 1.10, GBP: 1.27, JPY: 0.0067, AUD: 0.66 };
-const LEV = { FX: 100, INDEX: 20, STOCK: 5, CRYPTO: 5 };
+const LEV = { FX: 500, INDEX: 20, STOCK: 5, CRYPTO: 5 };
 
 function lotSize(sym, cls) {
   if (sym === 'XAUUSD') return 100;
@@ -39,11 +39,11 @@ function marginUSD(sym, cls, size, price) {
 
 // [symbol, cls, size, price, expectedNotional, expectedMargin]
 const cases = [
-  ['EURUSD', 'FX',     1,   1.10,   110000, 1100],   // major, quote USD
-  ['USDJPY', 'FX',     1,   150,    100000, 1000],   // base USD → no price
-  ['EURGBP', 'FX',     1,   0.85,   110000, 1100],   // cross → convert base EUR (1.10)
-  ['XAUUSD', 'FX',     1,   2000,   200000, 2000],   // metal: lot 100
-  ['XAGUSD', 'FX',     1,   25,     125000, 1250],   // metal: lot 5000
+  ['EURUSD', 'FX',     1,   1.10,   110000, 220],    // major, quote USD (500:1)
+  ['USDJPY', 'FX',     1,   150,    100000, 200],    // base USD → no price (500:1)
+  ['EURGBP', 'FX',     1,   0.85,   110000, 220],    // cross → convert base EUR (500:1)
+  ['XAUUSD', 'FX',     1,   2000,   200000, 400],    // metal: lot 100 (500:1)
+  ['XAGUSD', 'FX',     1,   25,     125000, 250],    // metal: lot 5000 (500:1)
   ['AAPL',   'STOCK',  10,  200,    2000,   400],    // stock: lot 1, lev 5
   ['BTCUSD', 'CRYPTO', 0.5, 60000,  30000,  6000],   // crypto: lot 1, lev 5
   ['US30',   'INDEX',  2,   40000,  80000,  4000],   // index: lot 1, lev 20

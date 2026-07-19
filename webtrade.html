@@ -1354,7 +1354,7 @@ const contractSize = (symbol)=> (catOf(symbol)==='Forex' ? CONTRACT : 1);
 // House leverage cap per asset class — LOCKSTEP with the server (fx_open_margin.sql: FX 100, STOCK 5,
 // CRYPTO 5). The client clamps the trader's chosen leverage to this cap so the DISPLAYED required
 // margin == what the server will actually enforce; the server stays the real authority.
-const LEV_CAP = (symbol)=> catOf(symbol)==='Forex' ? 100 : 5;   // Stocks & Crypto capped at 5×
+const LEV_CAP = (symbol)=> catOf(symbol)==='Forex' ? 500 : 5;   // FX 500:1 (2026-07-19 사장님 승인, 서버 fx_lev_cap 락스텝) · Stocks & Crypto 5×
 // ── ONE source of truth for a position's live floating P&L + its current close price. Each
 //    position marks against ITS OWN symbol's live quote and ITS OWN stored entry (open_price);
 //    nothing is shared between rows, so N positions never copy each other's price/P&L. MT5 side
@@ -1399,7 +1399,7 @@ function baseUsdRate(symbol){
 }
 // required margin (in USD account ccy) for a volume at a leverage — the MT5 formula.
 function requiredMargin(symbol, volume, leverage){
-  const lev=Math.max(1, Math.min(+leverage||100, LEV_CAP(symbol))); return (+volume||0)*contractSize(symbol)*baseUsdRate(symbol)/lev;   // leverage clamped to the house cap (server lockstep)
+  const lev=Math.max(1, Math.min(+leverage||500, LEV_CAP(symbol))); return (+volume||0)*contractSize(symbol)*baseUsdRate(symbol)/lev;   // leverage clamped to the house cap 500:1 (server fx_lev_cap lockstep)
 }
 
 function useTradeEngine(){
