@@ -91,6 +91,10 @@ body.light .avatar .pdot{border-color:#fff}
 .widget.drag .wtb{cursor:grabbing}
 .linksq{width:12px; height:12px; border-radius:3px; flex:none; cursor:pointer}
 .wtb h3{margin:0; font-size:var(--lgd-fs-widget-title); font-weight:700}
+/* 시세 하네스 배지 — 피드 25s+ 정지 시 정직 표시 (가짜로 흐르는 척 금지) */
+.feedstale{margin-left:8px; font-size:9px; font-weight:800; letter-spacing:.5px; padding:2px 7px; border-radius:999px;
+  background:rgba(235,93,42,.15); color:var(--lgd-down,#EB5D2A); animation:fspulse 1.6s ease-in-out infinite}
+@keyframes fspulse{0%,100%{opacity:1}50%{opacity:.45}}
 .wtb .wsub{font-size:var(--lgd-fs-label); color:var(--lgd-dim)}
 .wtb .wsp{flex:1}
 .wtb .wic{width:24px; height:24px; display:flex; align-items:center; justify-content:center;
@@ -1319,9 +1323,29 @@ async function mkPoll(){
   }catch(e){}
 }
 setInterval(()=>{ if(!document.hidden) mkPoll(); },8000);
-/* 워치독 — WS가 조용히 멈추면(15s 무틱) 강제 재접속. close 없이 정지하는 소켓 복구 + wsLive 실상 반영. */
+/* ════ 시세 하네스(feedHz) — 감지→자가치유→정직 표시. 단일 제어루프(진실 한 곳, 사장님 지시 2026-07-19) ════
+   ① 12s 무틱 → 즉시 폴백 폴 + WS 강제 재접속 (조용히 죽는 소켓 복구)
+   ② 25s 넘게 복구 실패 → Markets 헤더에 ⚠ FEED STALE 배지 (가짜로 흐르는 척 금지 — 정직 표시), 복구 시 자동 숨김
+   ③ 차트 캔들 비어있으면 chLoad 재시도 (3회 연속 + 이후 60s 간격 백오프) — 일시 장애로 차트 영구정지 방지
+   치유 이력은 feedHz.log(링버퍼 50)와 콘솔 [feedHz]로 남긴다. */
+const feedHz={ log:[], badge:null, chFail:0,
+  note(action,detail){ this.log.unshift({t:new Date().toISOString().slice(11,19),action,detail:detail||''});
+    if(this.log.length>50) this.log.length=50; try{ console.warn('[feedHz]',action,detail||''); }catch(e){} },
+  age(){ return mk.lastTick?Date.now()-mk.lastTick:Infinity; },
+  showBadge(on){ let b=this.badge;
+    if(!b){ const host=document.querySelector('#w-markets .wtb'); if(!host) return;
+      b=this.badge=document.createElement('span'); b.className='feedstale'; b.textContent='⚠ FEED STALE'; host.appendChild(b); }
+    b.style.display=on?'':'none'; } };
 setInterval(()=>{ if(document.hidden) return;
-  if(mk.list.some(s=>MK_BSYM[s]) && (!mk.lastTick || Date.now()-mk.lastTick>15000)){ mk.wsLive=false; mkConnect(); } },5000);
+  const age=feedHz.age();
+  if(mk.list.some(s=>MK_BSYM[s]) && age>12000){
+    feedHz.note('heal:poll+reconnect','age='+(age===Infinity?'∞':Math.round(age/1000)+'s'));
+    mkPoll(); mk.wsLive=false; mkConnect(); }
+  feedHz.showBadge(age>25000);
+  if(typeof ch!=='undefined' && !ch.candles.length && MK_BSYM[ch.sym]){ feedHz.chFail++;
+    if(feedHz.chFail<=3 || feedHz.chFail%24===0){ feedHz.note('heal:chLoad','retry#'+feedHz.chFail); chLoad(); } }
+  else feedHz.chFail=0;
+},2500);
 /* 정렬 토글 + 행 선택(차트 연동 예정) */
 document.getElementById('mkSortChg').onclick=()=>{ mk.dir=-mk.dir;
   document.getElementById('mkArr').textContent=mk.dir<0?'▼':'▲'; mkRender(); };

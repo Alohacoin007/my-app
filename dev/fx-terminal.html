@@ -216,7 +216,7 @@ body.symdrag .widget[id^="w-chart"]{outline:1px dashed var(--lgd-hair); outline-
 .widget.chart-active .wtb h3{color:var(--lgd-ink)}
 .cgtf{position:absolute; top:5px; left:8px; font-size:9.5px; font-weight:800; color:var(--lgd-dim); letter-spacing:.4px}
 /* 차트 지표 범례(원클릭 삭제) — 좌상단, TF 라벨 아래. 칩별 ✕ 한 번에 그 지표 제거 */
-.chleg{position:absolute; top:32px; left:8px; z-index:2; display:flex; flex-wrap:wrap; gap:4px; pointer-events:none; max-width:70%}
+.chleg{position:absolute; top:36px; left:8px; z-index:2; display:flex; flex-wrap:wrap; gap:4px; pointer-events:none; max-width:70%}
 .chchip{pointer-events:auto; display:inline-flex; align-items:center; gap:5px; font-size:9.5px; font-weight:700;
   line-height:1; padding:2px 4px 2px 6px; border-radius:3px; background:var(--lgd-pill); color:var(--lgd-dim);
   border:1px solid var(--lgd-hair); user-select:none}
@@ -906,9 +906,9 @@ function chartBody(){ return '<div class="cgwplot"><div class="chtools">'+chTool
 function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) return;
   const box=el.querySelector('.cgwplot'), svg=box&&box.querySelector('.cgsvg'); if(!svg) return;
   const sym=(layout[id]&&layout[id].sym)||'', W=box.clientWidth, H=box.clientHeight;
-  if(W<40||H<28){ svg.innerHTML=''; return; }
+  if(W<40||H<70){ svg.innerHTML=''; return; }   // padT=34 반영: 너무 낮은 창은 그리지 않음(음수 플롯 방지)
   const c=cfg(id), ind=c.ind, dg=mwDigits(sym), s=series(sym, c.tf);   // ← 차트별 설정
-  const RA=Math.round(Math.min(60, Math.max(36, W*0.12))), padT=6, padB=6, plotW=W-RA, plotH=H-padT-padB;
+  const RA=Math.round(Math.min(60, Math.max(36, W*0.12))), padT=34, padB=6, plotW=W-RA, plotH=H-padT-padB;   // padT=34: 상단 원클릭 매매바(ocbar) 아래부터 그림 — 바가 캔들을 덮지 않게
   /* 하단 서브창 스택: 가격창 → (RSI) → (Volume). 켜진 만큼 가격창 높이 축소 */
   const showVol=c.vol!==false && H>110;
   const volH=showVol?Math.max(22,Math.min(64,plotH*0.16)):0;

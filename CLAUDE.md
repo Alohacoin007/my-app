@@ -73,6 +73,9 @@
 ## 🧪 테스트
 - `node tests/sports-balance.test.js` — 베팅 잔고 이중차감 회귀 테스트(프로덕션 ledger와 일치하는 RED + 수정 GREEN). 돈 로직 건드리면 반드시 통과 확인.
 - `node tests/fx-floating-spread.test.js` — FX앱 플로팅이 서버 `fx_close` 실현손익과 동일(전 상품 스프레드, 실제 mid 마크). FX 체결/스프레드 손대면 반드시 통과.
+- `node tests/crypto-dashboard-wallet.test.js` — 지갑 헤드라인 행위 게이트(헤드리스+스텁): 미로그인=Sign-in CTA · 로그인=실총액(KV Total 동일소스) · 세션 하이드레이션 레이스 자가치유 (결함-로그 2026-07-19 ×2의 영구핀, verify 자동 포함).
+- `node tests/login-flow.test.js` — login.html 클라 E2E(스텁 인증): 로드 무에러·해피패스(성공화면→alpexa.me→dest2 라우팅)·실패패스(에러바+버튼복구). verify 자동 포함.
+- `node tests/feed-liveness-check.js` — **시세 라이브니스 프로브**(네트워크 필요·크론/수동): 라이브 화면의 시세 셀을 20s 관찰해 "값은 있는데 안 움직임"(sticky wsLive류) 실측. 크립토 24/7 필수, FX 주말 자동 스킵. 크론 = `.github/workflows/feed-liveness.yml`(⚠️ main에 있어야 스케줄 활성 — daily-sports-check와 동일).
 
 ## 🏟️ 스포츠/피드 작업 규율 (무관용 — 2026-07-07 블랙아웃에서 나옴)
 > 스포츠·피드·배당·경기목록을 손대기 전 **이 순서를 강제**한다. 안 지켜서 하루를 날렸다 (죽은 경로 수정·전종목 블랙아웃·이상배당·NFL 사라짐).

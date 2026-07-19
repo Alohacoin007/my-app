@@ -1,0 +1,25 @@
+# Alpexa — 시세 라이브니스 감시 (침묵 게이트: 빨강일 때만 GitHub이 이메일)
+# 잡는 것: "값은 떠 있는데 안 움직임" — sticky wsLive류 얼어붙음 (결함-로그 2026-07-19)
+# ⚠️ 스케줄 워크플로는 기본 브랜치(main)에서만 돈다 — daily-sports-check.yml처럼
+#    이 파일을 main에 올려야 활성화됨 (Pages 브랜치에선 inert).
+name: feed-liveness
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # 6시간마다 (크립토 24/7 감시)
+  workflow_dispatch: {}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install headless Chromium
+        run: |
+          npm i playwright-core --no-save
+          PLAYWRIGHT_BROWSERS_PATH=$HOME/pw npx playwright-core install chromium
+      - name: Probe live feeds (crypto 24/7 · fx weekdays)
+        run: PLAYWRIGHT_BROWSERS_PATH=$HOME/pw node tests/feed-liveness-check.js --url https://alpexa-sports.com --window 20

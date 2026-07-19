@@ -47,6 +47,12 @@ const PINS = [
   ['지갑 헤드라인 = 세션으로 판정(wal.authed=!!sess)', /wal\.authed\s*=\s*!!sess/],
   ['헤드라인 분기 = wal.authed (히스토리 RPC 아님)', /if\(wal\.authed\)\{[\s\S]{0,400}?amtEl\.innerHTML/],
   ['로그인 총액 = KV Total과 동일 소스(wal.total=cash+cryptoV+staked)', /wal\.total\s*=\s*cash\+cryptoV\+staked/],
+  /* 시세 하네스(feedHz) — 지우면 얼어붙음 자가치유가 사라진다 (2026-07-19 사장님 지시) */
+  ['시세 하네스 존재(feedHz 제어루프)', /const feedHz=\{/],
+  ['하네스 치유① 무틱 → 폴백+재접속', /heal:poll\+reconnect/],
+  ['하네스 치유③ 차트 캔들 재적재', /heal:chLoad/],
+  ['하네스 정직표시 ⚠ FEED STALE 배지', /FEED STALE/],
+  ['폴백 게이트 = 신선도(sticky wsLive 금지)', /wsFresh=mk\.lastTick&&/],
   ['Open orders 정직 표기 = Pending (manual)', /Pending \(manual\)/],
   ['미구현 기능 정직 표기 = Soon 칩',          /title="Soon"/],
   ['ALPXS 하드락 안내(만기 전 언스테이크 불가)', /cannot be unstaked before maturity/],
