@@ -1281,10 +1281,13 @@ function mkConnect(){
 async function mkPoll(){
   try{
     if(!(window.AlpexaSync&&AlpexaSync.db)) return;
+    /* WS가 "최근에" 틱을 준 심볼만 폴백에서 스킵. wsLive 플래그만 믿으면 소켓이 조용히 멈췄을 때
+       (close 이벤트 없이 정지 — 프록시/유휴에서 흔함) 폴백이 영구 억제돼 시세가 얼어붙는다. */
+    const wsFresh=mk.lastTick&&(Date.now()-mk.lastTick<12000);
     const r=await AlpexaSync.db.from('prices').select('symbol,mid,spr_pts');
     (r.data||[]).forEach(row=>{
       const s=row.symbol; if(!mk.list.includes(s)) return;
-      if(mk.wsLive&&mk.q[s]&&mk.q[s].last!=null) return;
+      if(wsFresh&&mk.q[s]&&mk.q[s].last!=null) return;
       const mid=+row.mid||0; if(!mid) return;
       const half=mid*((+row.spr_pts||0)/1e4)/2;
       mkTouch(s,mid,(mk.q[s]&&mk.q[s].chg)!=null?mk.q[s].chg:null,mid-half,mid+half);
@@ -1293,6 +1296,9 @@ async function mkPoll(){
   }catch(e){}
 }
 setInterval(()=>{ if(!document.hidden) mkPoll(); },8000);
+/* 워치독 — WS가 조용히 멈추면(15s 무틱) 강제 재접속. close 없이 정지하는 소켓 복구 + wsLive 실상 반영. */
+setInterval(()=>{ if(document.hidden) return;
+  if(mk.list.some(s=>MK_BSYM[s]) && (!mk.lastTick || Date.now()-mk.lastTick>15000)){ mk.wsLive=false; mkConnect(); } },5000);
 /* 정렬 토글 + 행 선택(차트 연동 예정) */
 document.getElementById('mkSortChg').onclick=()=>{ mk.dir=-mk.dir;
   document.getElementById('mkArr').textContent=mk.dir<0?'▼':'▲'; mkRender(); };
