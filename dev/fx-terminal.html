@@ -1439,11 +1439,51 @@ const MAILBOX=[
   {t:'2026.07.18 08:00', unread:true, subject:'🎉 Account opened — welcome to ALPEXA FX',
     detail:'Dear trader,\n\nYour demo trading account is open and ready:\n'+
       '  · Login (account):  3172308\n  · Server:           Alpexa-Demo\n'+
-      '  · Account type:     Standard · USD · leverage up to 1:100\n\n'+
+      '  · Account type:     Standard · USD · leverage up to 1:500\n\n'+
       'Live account data connects in a later build (server-only). Good trading!\nALPEXA Dealing Desk'},
   {t:'2026.07.18 08:00', subject:'Trading conditions & risk disclosure',
     detail:'Leveraged FX/CFD trading carries a high level of risk and may not be suitable for all investors. '+
       'This terminal is a demo environment — all funds and positions are simulated. No real money is at risk.\n\nALPEXA Dealing Desk'}];
+/* ── 실시간 마진·스왑 엔진 (2026-07-19 사장님 "앱이랑 동일하게 · 500:1") — 표시 전용, 돈 0.
+   P/L·청산가 = 앱(webtrade) 공식 락스텝(BUY→bid/SELL→ask · dir*(cur-open)*lots*계약*JPY0.0067).
+   마진 = lots*계약*기준통화USD / 레버리지(FX 500:1 · 기타 5:1). 스왑 = MT5 표준:
+   뉴욕 17시(≈21:00 UTC) 롤오버마다 적립, FX는 주말 무스왑+수요일 3배, 크립토는 매일. ── */
+const FX_LEV_TERM=500;   // 사장님 지시 500:1
+const SWAP_PIPS={ EURUSD:[-0.62,0.21], GBPUSD:[-0.42,-0.05], USDJPY:[0.55,-1.31], AUDUSD:[-0.35,-0.11],
+  USDCAD:[0.12,-0.60], USDCHF:[0.68,-1.42], NZDUSD:[-0.28,-0.18], GBPJPY:[0.85,-1.95], AUDJPY:[0.42,-1.10], EURJPY:[0.30,-1.25] };   // [롱,숏] 핍/夜 (MT5 관례 근사)
+function swapNights(openMs, fx){ let n=0; const now=Date.now();
+  const roll=new Date(openMs); roll.setUTCHours(21,0,0,0);
+  if(roll.getTime()<=openMs) roll.setUTCDate(roll.getUTCDate()+1);
+  let guard=0;
+  while(roll.getTime()<=now && guard++<1000){ const dow=roll.getUTCDay();
+    if(fx){ if(dow>=1&&dow<=5) n+=(dow===3?3:1); } else n+=1;   // FX: 월~금만, 수 3배(주말분) · 크립토/주식: 매일
+    roll.setUTCDate(roll.getUTCDate()+1); }
+  return n; }
+function demoSwap(p, pair){
+  const openMs=p.__openMs||(p.__openMs=Date.parse(p.time.replace(/\./g,'-').replace(' ','T'))||Date.now());
+  const lots=+p.vol||0, cat=mwCat(pair), long=p.type!=='sell';
+  const nights=swapNights(openMs, cat==='Forex'); if(!nights||!lots) return 0;
+  if(cat==='Forex'){ const rate=(SWAP_PIPS[pair]||[-0.5,-0.3])[long?0:1];
+    const quote=pair.slice(3), qUsd=quote==='USD'?1:(ccyUsdRate(quote)||1);
+    const pipVal=100000*(pair.includes('JPY')?0.01:0.0001)*qUsd;
+    return nights*lots*rate*pipVal; }
+  const notional=lots*(((mwStore.rows[pair]||{}).mid)||0);
+  return -notional*(long?0.0003:0.0001)*nights; }   // 크립토/주식: 명목가 %/夜 (롱 0.03%·숏 0.01%)
+function demoMarkAll(){ DEMO_POS.forEach(p=>{ const pair=symPair(p.sym), r=mwStore.rows[pair]; if(!r||r.bid==null) return;
+  const dg=mwDigits(pair), dir=p.type==='sell'?-1:1, cur=p.type==='sell'?r.ask:r.bid;
+  const contract=mwCat(pair)==='Forex'?100000:1;
+  const pl=dir*(cur-(+p.price))*(+p.vol||0)*contract*(pair.includes('JPY')?0.0067:1);
+  p.cur=cur.toFixed(dg); p.pl=pl.toFixed(2); p.swap=demoSwap(p,pair).toFixed(2); }); }
+function demoStats(){ demoMarkAll();
+  const bal=100000; let floating=0, swap=0, margin=0;
+  DEMO_POS.forEach(p=>{ floating+=+p.pl||0; swap+=+p.swap||0;
+    const pair=symPair(p.sym), cat=mwCat(pair);
+    const contract=cat==='Forex'?100000:1, lev=cat==='Forex'?FX_LEV_TERM:5;
+    const base=pair.slice(0,3);
+    const bUsd=cat!=='Forex'?(((mwStore.rows[pair]||{}).mid)||0):(base==='USD'?1:(ccyUsdRate(base)||0));
+    margin+=(+p.vol||0)*contract*bUsd/lev; });
+  const equity=bal+floating+swap;   // MT5: Equity = Balance + Floating + Swap
+  return { bal, floating, swap, equity, margin, free:equity-margin, level:margin>0?equity/margin*100:0 }; }
 /* 원클릭 청산 (DEMO) — 행 제거 + History/Journal 기록 + 총 P/L 재계산. 실청산은 fx_close RPC(M5, 서버 전용) */
 function closePosDemo(ticket){ const p=DEMO_POS.find(x=>x.ticket===ticket); if(!p) return;
   DEMO_POS=DEMO_POS.filter(x=>x.ticket!==ticket);
@@ -1583,8 +1623,10 @@ function tbxAddAlert(){ const s=document.getElementById('alSym'), c=document.get
 /* 계좌 바(Trade tfoot·Exposure 하단 공용) — LIVE면 fxAcct.stats() 실수치(MT5 공백 천단위), 아니면 데모 고정치 */
 function acctSpans(live){
   const mt5n=n=>(+n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}).replace(/,/g,' ');
-  if(!live) return '<span>Balance:<b>100 000.00 USD</b></span><span>Equity:<b>99 992.79</b></span>'+
-    '<span>Margin:<b>256.64</b></span><span>Free Margin:<b>99 736.15</b></span><span>Margin Level:<b>38 962.28%</b></span>';
+  if(!live){ const st=demoStats();   // DEMO도 실시간 계산 — 마진(500:1)·스왑·플로팅 (2026-07-19 사장님)
+    return '<span>Balance:<b>'+mt5n(st.bal)+' USD</b></span><span>Equity:<b>'+mt5n(st.equity)+'</b></span>'+
+      '<span>Margin:<b>'+mt5n(st.margin)+'</b></span><span>Free Margin:<b>'+mt5n(st.free)+'</b></span>'+
+      '<span>Margin Level:<b>'+(st.margin>0?mt5n(st.level)+'%':'—')+'</b></span>'; }
   const st=fxAcct.stats();
   return '<span class="acctlive" title="Real account (read-only) — execution lands in M5">LIVE</span>'+
     '<span>Balance:<b>'+mt5n(st.bal)+' USD</b></span><span>Equity:<b>'+mt5n(st.equity)+'</b></span>'+
@@ -1598,7 +1640,8 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
 
   if(tab==='Trade'){
     /* M3: 로그인 시 실계좌·실포지션(fxAcct, 읽기 전용) — 아니면 DEMO 프리뷰. 실행은 M5. */
-    const LIVE=fxAcct.authed, POS=LIVE?fxAcct.rows():DEMO_POS;
+    const LIVE=fxAcct.authed; if(!LIVE) demoMarkAll();   // DEMO 행 실시간 마크(P/L·현재가·스왑)
+    const POS=LIVE?fxAcct.rows():DEMO_POS;
     const total=POS.reduce((s,p)=>s+(+p.pl),0);
     const slTd=p=>p.noClose?('<td>'+(p.sl||'—')+'</td><td>'+(p.tp||'—')+'</td>')   // LIVE = 읽기 전용(M5)
       :('<td class="sltp" data-mod="'+p.ticket+'" title="Set Stop Loss / Take Profit">'+(p.sl||'—')+'</td>'+
@@ -1989,7 +2032,7 @@ fxFeed.start();
    JPY 0.0067 환산·계약크기(FX 10만/기타 1)·마진 공식(fx_notional_usd). 실청산·실주문은 M5 — 여기선 표시만.
    세션 게이트 = getSession 실존 + alpexa.me 태그(유령세션 가드) · 하이드레이션 레이스 자가치유(재판정). ══ */
 const FX_CONTRACT_OF=s=>mwCat(s)==='Forex'?100000:1;   // fx_notional_usd 락스텝
-const FX_LEVCAP_OF=s=>mwCat(s)==='Forex'?100:5;
+const FX_LEVCAP_OF=s=>mwCat(s)==='Forex'?FX_LEV_TERM:5;   // 500:1 (2026-07-19 사장님)
 const fxAcct={ authed:false, acct:null, pos:[], _t:null, ch1:null, ch2:null,
   async session(){ try{
     if(!(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.auth)) return null;
@@ -2085,7 +2128,7 @@ function updateStatus(){ const el=document.getElementById('sbClock'); if(!el) re
 updateStatus();
 setInterval(()=>{ if(!mwStore.live) mwSimulate(); mwRender(); alertsStore.check();
   if(curTbxTab==='Exposure') renderToolbox('Exposure');   // 통화 노출 실시간 마크(MT5)
-  if(curTbxTab==='Trade'&&fxAcct.authed) renderToolbox('Trade');   // M3: 실포지션 플로팅 P/L 실시간 마크
+  if(curTbxTab==='Trade') renderToolbox('Trade');   // 실시간 마크 — LIVE 실포지션 + DEMO(마진 500:1·스왑·플로팅)
   renderAllCharts(true);                                   // 라이브 봉 갱신(현재 봉 close/high/low)
   updateStatus(); }, 1000);
 renderAllCharts(false);   // 초기 1회 (봉 즉시 표시)
