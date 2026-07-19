@@ -32,10 +32,19 @@ declare
   verdict text;
 begin
   -- C1 · 묵은 미정산 (경기 끝났는데 open 36h+) 🔴
-  -- positions엔 created_at이 없고 updated_at만 있음 → 36h+ 손 안 댄 open = 묵은 베팅.
+  -- v2 (2026-07-19, 사장님 승인): 구버전(updated_at 36h)은 "오래 열려있는 게 정상"인 선물
+  -- 베팅(예: 8/21 경기를 7/5에 베팅)을 영구 오탐 → 매일 가짜 빨강 = 늑대소년 알람.
+  -- 판정 교체: "티켓의 마지막 leg 킥오프(meta.legs[].kt)가 36h+ 지났는데 아직 open"만 빨강.
+  -- 미래/오늘 경기 티켓은 조용. kt 정보가 아예 없는 구형 행만 updated_at 폴백(구 동작 유지).
   begin
-    select count(*) into v from public.positions
-      where server='sports' and status='open' and updated_at < now() - interval '36 hours';
+    select count(*) into v from public.positions p
+      where p.server='sports' and p.status='open'
+        and coalesce(
+          (select max((l->>'kt')::timestamptz)
+             from jsonb_array_elements(coalesce(p.meta->'legs','[]'::jsonb)) l
+            where coalesce(l->>'kt','') <> ''),
+          p.updated_at
+        ) < now() - interval '36 hours';
     rep := rep || jsonb_build_object('C1', jsonb_build_object('label','묵은 미정산','sev', case when v>0 then 'red' else 'green' end,'count',v));
     if v>0 then red := red+1; end if;
   exception when others then rep := rep || jsonb_build_object('C1', jsonb_build_object('label','묵은 미정산','sev','error','count',0,'err',SQLERRM)); end;
