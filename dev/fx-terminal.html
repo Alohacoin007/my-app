@@ -884,11 +884,48 @@ function seedSeries(sym,tf){ const base=chBase(sym), vol=base*(mwCat(sym)==='Cry
   /* 마지막 봉 종가를 현재가(base=SIM mid ≈ base)에 앵커 → 라이브 전환 시 거대 봉 방지(평행 이동, OHLC 관계 보존) */
   const shift=base-arr[arr.length-1].c; if(shift) arr.forEach(k=>{ k.o+=shift; k.h+=shift; k.l+=shift; k.c+=shift; });
   return arr; }
-function series(sym,tf){ const k=sym+'|'+tf; let s=chartSeries[k]; if(!s) s=chartSeries[k]={tf,c:seedSeries(sym,tf)}; return s; }
+function series(sym,tf){ const k=sym+'|'+tf; let s=chartSeries[k]; if(!s){ s=chartSeries[k]={tf,c:seedSeries(sym,tf)}; loadRealSeries(sym,tf); } return s; }
 function tickSeries(sym,tf){ const s=series(sym,tf), r=mwStore.rows[sym], mid=r&&r.mid; if(!(mid>0)) return s;
   const step=TF_MS[tf]||1800e3, now=Date.now(), last=s.c[s.c.length-1];
-  if(now-last.t>=step){ s.c.push({t:last.t+step,o:last.c,h:Math.max(last.c,mid),l:Math.min(last.c,mid),c:mid,v:Math.round(80+Math.random()*160)}); if(s.c.length>700) s.c.shift(); }
+  if(now-last.t>=step){
+    /* 갭 점프: 마지막 봉이 2스텝+ 과거(실봉 히스토리 끝=금요일 등)면 현재 버킷으로 점프 —
+       1초마다 갭 봉을 하나씩 채우며 히스토리를 밀어내는 플러드 방지 */
+    const nt=(now-last.t>=2*step)?Math.floor(now/step)*step:last.t+step;
+    s.c.push({t:nt,o:last.c,h:Math.max(last.c,mid),l:Math.min(last.c,mid),c:mid,v:Math.round(80+Math.random()*160)}); if(s.c.length>1500) s.c.shift(); }
   else { last.c=mid; if(mid>last.h) last.h=mid; if(mid<last.l) last.l=mid; last.v=(last.v||0)+Math.round(1+Math.random()*3); } return s; }
+/* ── 실봉 로더 (webtrade fetchRealCandles 락스텝): 크립토=Binance 미러 klines · FX=fx-prices ?candles(폴리곤) ·
+   주식=합성 유지(Finnhub 캔들 유료 — 보류). 수락 게이트: ≥160봉·전값 유한·엄격 오름차순 아니면 통째로 버림
+   (희소/역순 응답이 차트를 못 깨게). 실패/차단 = 기존 합성 그대로(SIM) — 읽기 전용 시장데이터, 돈 0. ── */
+const KLINE_IV={M1:'1m',M5:'5m',M15:'15m',M30:'30m',H1:'1h',H4:'4h',D1:'1d',W1:'1w'};
+const realSeriesState={};   // 'sym|tf' → 'pending'|'real'|'synth'
+async function fetchRealSeries(sym,tf){
+  try{
+    if(!KLINE_IV[tf]) return null;   // MN 등 소스 없음 → 합성
+    const cat=mwCat(sym); let raw=null;
+    const timed=p=>Promise.race([p,new Promise(res=>setTimeout(()=>res(null),8000))]);
+    if(cat==='Crypto'){
+      const r=await timed(fetch('https://data-api.binance.vision/api/v3/klines?symbol='+sym+'T&interval='+KLINE_IV[tf]+'&limit=1000'));
+      if(!r||!r.ok) return null; const j=await r.json();
+      if(Array.isArray(j)&&j.length) raw=j.map(k=>({t:+k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:Math.round(+k[5])||0}));
+    } else if(cat==='Forex'){
+      const r=await timed(fetch('https://grxnbgtfnaayeluenvqh.supabase.co/functions/v1/fx-prices?candles='+sym+'&tf='+tf+'&n=1000'));
+      if(!r||!r.ok) return null; const j=await r.json();
+      if(j&&Array.isArray(j.candles)) raw=j.candles.map(c=>({t:+c.t,o:+c.o,h:+c.h,l:+c.l,c:+c.c,v:Math.round(+c.v)||0}));
+    } else return null;
+    if(!Array.isArray(raw)||!raw.length) return null;
+    const bars=raw.filter(b=>[b.t,b.o,b.h,b.l,b.c].every(Number.isFinite)&&b.c>0);
+    if(bars.length<160) return null;
+    for(let i=1;i<bars.length;i++) if(bars[i].t<=bars[i-1].t) return null;
+    bars.forEach(b=>{ if(!(b.v>0)) b.v=Math.round(120+(b.h-b.l)/(b.c||1)*4e5); });   // 폴리곤 v=0 대비 틱볼륨 근사
+    return bars.slice(-1000);
+  }catch(e){ return null; }
+}
+function loadRealSeries(sym,tf){ const k=sym+'|'+tf; if(realSeriesState[k]) return; realSeriesState[k]='pending';
+  fetchRealSeries(sym,tf).then(bars=>{
+    if(!bars){ realSeriesState[k]='synth'; return; }
+    realSeriesState[k]='real';
+    const s=chartSeries[k]; if(!s) return;
+    s.c=bars; s.real=true; renderAllCharts(false); }); }
 /* 각 차트 = 최상위 위젯(chart1..N). 표준 위젯 엔진으로 스테이지 어디든 드래그/스냅/리사이즈. */
 /* 차트 창 왼쪽 원클릭 라인스터디 툴바(MT5 Line Studies) — 커서·크로스헤어·추세·수평·수직·피보·텍스트·삭제 */
 const CH_TOOLS=[
