@@ -1019,17 +1019,18 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
       const col=p.type==='buy'?'#00C805':'#F23645';   // BUY 초록 · SELL 빨강 (2026-07-19 사장님, 캔들색과 구분)
       const base={ ticket:p.ticket, side:p.type, real:isLive, entry:+p.price, sl:+p.sl||0, tp:+p.tp||0 };
       tl(p.price, p.type+' '+p.vol+' #'+p.ticket, col, false, Object.assign({kind:'entry'}, base));
-      tl(p.sl, 'sl '+p.sl, '#EB5D2A', true, Object.assign({kind:'sl'}, base));
-      tl(p.tp, 'tp '+p.tp, '#26A69A', true, Object.assign({kind:'tp'}, base)); });
+      tl(p.sl, 'sl '+p.sl, '#B57BFF', true, Object.assign({kind:'sl'}, base));   // SL 보라(셀 빨강과 구분, 2026-07-19 사장님)
+      tl(p.tp, 'tp '+p.tp, '#2E90FA', true, Object.assign({kind:'tp'}, base));   // TP 파랑(사장님 지시)
+    });
     if(!isLive) DEMO_PEND.forEach(p=>{ if(p.sym!==dsym) return;
       tl(p.price, p.otype.toLowerCase()+' '+p.vol+' #'+p.ticket, '#E0A020', true);
-      tl(p.sl, 'sl '+p.sl, '#EB5D2A', true);
-      tl(p.tp, 'tp '+p.tp, '#26A69A', true); });
+      tl(p.sl, 'sl '+p.sl, '#B57BFF', true);
+      tl(p.tp, 'tp '+p.tp, '#2E90FA', true); });
     chartScale[id].tradeLines=TL;
     if(sltpDrag&&sltpDrag.id===id&&sltpDrag.price!=null){   // 드래그 프리뷰
       const py=yOf(Math.max(mn,Math.min(mx,sltpDrag.price)));
       const isSL=sltpDrag.side==='buy' ? sltpDrag.price<sltpDrag.entry : sltpDrag.price>sltpDrag.entry;
-      const pc=isSL?'#EB5D2A':'#26A69A', plab=(isSL?'SL ':'TP ')+sltpDrag.price.toFixed(dg);
+      const pc=isSL?'#B57BFF':'#2E90FA', plab=(isSL?'SL ':'TP ')+sltpDrag.price.toFixed(dg);
       out+='<line x1="0" y1="'+py.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+py.toFixed(1)+'" stroke="'+pc+'" stroke-width="1.2" stroke-dasharray="5 3"/>'+
         '<rect x="4" y="'+(py-16).toFixed(1)+'" width="'+(plab.length*6+10)+'" height="13" rx="2" fill="'+pc+'"/>'+
         '<text x="9" y="'+(py-6).toFixed(1)+'" fill="#fff" font-size="9" font-weight="800">'+plab+'</text>'; } }
