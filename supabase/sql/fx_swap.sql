@@ -60,3 +60,7 @@ select cron.schedule('fx-swap-nightly','5 21 * * *', $$ select public.fx_swap_ac
 
 -- 4) 확인(읽기 전용):  select public.fx_swap_accrue();  -- 주말이면 skipped, 평일이면 accrued N
 --    select symbol, side, size, meta->>'swap' as swap, meta->>'swap_date' from positions where server='fx' and status='open';
+
+-- ── 2026-07-20 추가 (사장님 "청산은 초단위로"): 펌프 Edge(fx-stream·crypto-prices)가
+--    service_role로 fx_sltp를 직접 호출할 수 있게 실행 권한 부여. 1분 pg_cron은 폴백으로 유지.
+grant execute on function public.fx_sltp(int) to service_role;
