@@ -71,12 +71,15 @@ function installStub(mode) {
   await page.goto(`http://localhost:${PORT}/dev/fx-terminal.html`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(700);
 
-  // ── 기준선: 미로그인 = DEMO 프리뷰 (✕ 청산 가능, LIVE 태그 없음) ──
-  const demo0 = await page.evaluate(() => ({
-    authed: fxAcct.authed, closes: document.querySelectorAll('#tbxBody .poclose[data-close]').length,
-    liveTag: !!document.querySelector('#tbxBody .acctlive'),
-    bal: (document.querySelector('#tbxBody .acctline span b') || {}).textContent }));
-  ok('baseline: DEMO rows with close ✕, no LIVE tag', demo0.authed === false && demo0.closes >= 2 && !demo0.liveTag, JSON.stringify(demo0));
+  // ── 기준선: 미로그인 = 클린 슬레이트(시드 0) + 연습 체결은 가능 ──
+  const demo0 = await page.evaluate(() => {
+    const seeded = DEMO_POS.length;
+    mwStore.apply([{ symbol: 'EURUSD', mid: 1.15000, spr_pts: 1.0 }]);
+    placeMarketDemo('EURUSD', 'buy', 0.02, 0, 0);
+    return ({ seeded, authed: fxAcct.authed, closes: document.querySelectorAll('#tbxBody .poclose[data-close]').length,
+      liveTag: !!document.querySelector('#tbxBody .acctlive'),
+      bal: (document.querySelector('#tbxBody .acctline span b') || {}).textContent }); });
+  ok('baseline: no seeded demo rows (clean slate) + practice fill works with ✕', demo0.seeded === 0 && demo0.authed === false && demo0.closes === 1 && !demo0.liveTag, JSON.stringify(demo0));
   ok('baseline: demo balance 100 000.00', /100 000\.00/.test(demo0.bal || ''));
 
   // ── ① 유령세션 가드: 태그(acctFor)만 있고 세션 없음 → DEMO 유지 ──
@@ -85,7 +88,7 @@ function installStub(mode) {
   await page.waitForTimeout(200);
   const ghost = await page.evaluate(() => ({ authed: fxAcct.authed,
     closes: document.querySelectorAll('#tbxBody .poclose[data-close]').length }));
-  ok('ghost session (tag, no session) → stays DEMO', ghost.authed === false && ghost.closes >= 2, JSON.stringify(ghost));
+  ok('ghost session (tag, no session) → stays DEMO (practice row kept)', ghost.authed === false && ghost.closes === 1, JSON.stringify(ghost));
 
   // ── ② 로그인 → 실계좌·실포지션 ──  (실시세 먼저 주입: BUY 청산가 = bid)
   await page.evaluate(() => { mwStore.apply([{ symbol: 'EURUSD', mid: 1.20000, spr_pts: 1.0 }]); });
@@ -106,8 +109,8 @@ function installStub(mode) {
   ok('login → real position row (EURUSD buy 0.10 @1.10000, ticket FXP-77001)',
      live.authed === true && live.cells[0] === 'EURUSD' && live.cells[1] === 'FXP-77001' &&
      live.cells[3] === 'buy' && live.cells[4] === '0.10' && live.cells[5] === '1.10000', JSON.stringify(live.cells));
-  ok('LIVE tag + demo positions only under explicit Practice header (no bare pending)',
-     live.liveTag === true && !/Pending Orders/.test(live.practiceHd) && /Practice \(DEMO\)/.test(live.practiceHd));
+  ok('LIVE view = real account ONLY (no practice/demo section, no bare pending)',
+     live.liveTag === true && live.practiceHd === '');
   const expPl = 1 * (live.bid - 1.10) * 0.10 * 100000;                       // dir*(bid-open)*lots*contract
   ok('floating P/L = server formula (dir*(bid-open)*lots*100000 = ' + expPl.toFixed(2) + ')',
      Math.abs(+live.cells[11] - expPl) < 0.01 && Math.abs(+live.total - expPl) < 0.01, live.cells[11] + ' / ' + live.total);
@@ -136,7 +139,7 @@ function installStub(mode) {
   const out = await page.evaluate(() => ({ authed: fxAcct.authed,
     closes: document.querySelectorAll('#tbxBody .poclose[data-close]').length,
     liveTag: !!document.querySelector('#tbxBody .acctlive') }));
-  ok('logout → DEMO preview restored', out.authed === false && out.closes >= 2 && out.liveTag === false, JSON.stringify(out));
+  ok('logout → DEMO preview restored (practice row back)', out.authed === false && out.closes === 1 && out.liveTag === false, JSON.stringify(out));
 
   await page.close(); await browser.close(); server.close();
   console.log((fail ? '🔴' : '🟢') + ' fx-terminal-account — ' + pass + ' pass, ' + fail + ' fail');

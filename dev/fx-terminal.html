@@ -1399,16 +1399,12 @@ function navBodyHTML(){ return '<div class="nvtree" id="nvTree">'+NAV_TREE.map(n
    계좌·포지션 값은 사장님이 준 MT5 데모 스샷 그대로(DEMO·preview 표기). 실계좌 연동은 M3(서버 전용). */
 const TBX_TABS=['Trade','Exposure','History','News','Mailbox','Calendar','Company','Alerts','Articles','Code Base','Experts','Journal'];
 let curTbxTab='Trade';
-let DEMO_POS=[
-  {sym:'eurusd.fx', ticket:'3172308', time:'2026.07.09 20:17:40', type:'buy', vol:'0.01', price:'1.14318', sl:'', tp:'', cur:'1.14360', comm:'0.00', swap:'0.00', pl:'0.42'},
-  {sym:'usdchf.fx', ticket:'3194818', time:'2026.07.13 09:34:06', type:'buy', vol:'0.07', price:'0.80808', sl:'', tp:'', cur:'0.80720', comm:'0.00', swap:'-0.21', pl:'-7.63'} ];
+let DEMO_POS=[];   // 시드 제거(2026-07-19 사장님 "데모 지우자") — 미로그인 연습 체결만 담김
 /* 대기 주문(Pending) — 지정가/역지정가. 인메모리 DEMO(체결 시뮬 없음, 실주문 M4 서버). */
 let DEMO_PEND=[];
 let _ticketSeq=3200000; const newTicket=()=>String(++_ticketSeq);
 /* 청산된 거래 로그(History) — 데모 시드 + 청산 시 추가. 실이력은 M3 서버(settlements) */
-let DEMO_HIST=[
-  {sym:'eurusd.fx', ticket:'3170112', ctime:'2026.07.08 14:22:10', type:'sell', vol:'0.02', open:'1.14210', close:'1.14090', profit:'2.40', ms:Date.parse('2026-07-08T14:22:10')},
-  {sym:'gbpjpy.fx', ticket:'3169044', ctime:'2026.07.07 09:05:33', type:'buy',  vol:'0.05', open:'217.400', close:'217.050', profit:'-8.05', ms:Date.parse('2026-07-07T09:05:33')} ];
+let DEMO_HIST=[];   // 시드 제거 — 미로그인 연습 청산만 담김 (실이력은 서버 settlements)
 /* 타임스탬프 (MT5: 2026.07.09 20:17:40) */
 function fxStamp(t){ const d=t?new Date(t):new Date(), p=n=>(n<10?'0':'')+n;
   return d.getFullYear()+'.'+p(d.getMonth()+1)+'.'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds()); }
@@ -1695,14 +1691,7 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
         (p.real?'<td class="pox"><span class="poclose" data-rclose="'+p.ticket+'" title="Close position — LIVE (server fx_close)">✕</span></td>'
                :'<td class="pox"><span class="poclose" data-close="'+p.ticket+'" title="Close position (one-click)">✕</span></td>')+'</tr>').join('')
       : '<tr><td colspan="13" style="text-align:center;color:var(--lgd-dim);padding:16px">No open positions</td></tr>';
-    /* LIVE에서도 데모(연습) 체결은 별도 섹션으로 보인다 — "주문이 사라졌다" 착각 방지(갭감사 1순위) */
-    if(LIVE) demoMarkAll();
-    const demoSec=(LIVE&&DEMO_POS.length)?'<tr class="pendhd"><td colspan="13">Practice (DEMO) — simulated, not your account ('+DEMO_POS.length+')</td></tr>'+
-      DEMO_POS.map(p=>'<tr><td>'+p.sym+'</td><td>'+p.ticket+'</td><td>'+p.time+'</td>'+
-        '<td class="'+p.type+'">'+p.type+'</td><td>'+p.vol+'</td><td>'+p.price+'</td><td>'+(p.sl||'—')+'</td>'+
-        '<td>'+(p.tp||'—')+'</td><td>'+p.cur+'</td><td>'+p.comm+'</td><td>'+p.swap+'</td>'+
-        '<td class="'+(+p.pl>=0?'pl-pos':'pl-neg')+'">'+p.pl+'</td>'+
-        '<td class="pox"><span class="poclose" data-close="'+p.ticket+'" title="Close practice position">✕</span></td></tr>').join(''):'';
+    /* 로그인 화면 = 실계좌만 (연습 섹션 제거 — 2026-07-19 사장님 "데모 지우자". M4로 주문이 실체결이라 혼동 없음) */
     /* 대기 주문(Pending) — MT5는 포지션 아래 별도 섹션. 현재가는 라이브, 취소 ✕. (LIVE엔 데모 대기주문 미표시) */
     const pmk=s=>{ const p=symPair(s), rr=mwStore.rows[p]; return rr&&rr.mid!=null?mwFmt(p,rr.mid):'—'; };
     const pend=(!LIVE&&DEMO_PEND.length) ? '<tr class="pendhd"><td colspan="13">Pending Orders ('+DEMO_PEND.length+')</td></tr>'+
@@ -1712,7 +1701,7 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
         '<td class="pox"><span class="poclose" data-cancel="'+p.ticket+'" title="Cancel pending order">✕</span></td></tr>').join('') : '';
     body.innerHTML='<div class="tbxscroll"><table class="postbl">'+colg(TBX_COLW.trade)+'<thead><tr>'+
       ['Symbol','Ticket','Time','Type','Volume','Price','S / L','T / P','Price','Commission','Swap','Profit',''].map(h=>'<th>'+h+'</th>').join('')+
-      '</tr></thead><tbody>'+rows+demoSec+pend+'</tbody>'+
+      '</tr></thead><tbody>'+rows+pend+'</tbody>'+
       /* 계좌 바 = tfoot(마지막 행 바로 밑) · 총 P/L은 colspan으로 Profit 열에 정확히 정렬(margin 하드코딩 X) */
       '<tfoot><tr class="acctrow">'+
       '<td colspan="11"><div class="acctline">'+acctSpans(LIVE)+'</div></td>'+
