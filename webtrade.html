@@ -1361,11 +1361,23 @@ const LEV_CAP = (symbol)=> catOf(symbol)==='Forex' ? 500 : 5;   // FX 500:1 (202
 //    convention: a BUY closes at the BID, a SELL closes at the ASK (so a fresh trade shows the
 //    spread as a small loss). q = the live {bid,ask} for p.symbol.
 const closePx = (p, q)=> !q ? null : (sideUp(p.side)==='SELL' ? (q.ask==null?null:q.ask) : (q.bid==null?null:q.bid));
+// quote→USD 라이브 환산 — 서버 fx_close 락스텝(USD-base는 v_pnlq/v_mid, 크로스는 quote→USD 실환율).
+// 옛 0.0067 하드코딩(엔 149 시절 고정값)은 환율이 움직이면 플로팅≠실현 (2026-07-19 갭감사 🔴 → 수정).
+function quoteUsd(symbol, cur){
+  if(catOf(symbol)!=='Forex') return 1;                        // 비FX 손익은 이미 USD
+  const quote=String(symbol).slice(3,6);
+  if(quote==='USD') return 1;                                  // EURUSD·XAUUSD류
+  if(String(symbol).slice(0,3)==='USD') return cur>0?1/cur:0;  // USDJPY/USDCHF/USDCAD = 서버 v_pnlq/v_mid
+  const d=priceStore.get(quote+'USD'); if(d&&(d.mid||d.bid)>0) return d.mid||((d.bid+d.ask)/2);   // 크로스 직접
+  const i=priceStore.get('USD'+quote); const im=i&&(i.mid||((i.bid+i.ask)/2));
+  if(im>0) return 1/im;                                        // 크로스 역수
+  return 0;                                                    // 기준환율 없음 → 0 (가짜 환산 금지, 서버도 거절)
+}
 function positionPnL(p, q){
   if(p._demo && p.profit!=null) return +p.profit;                 // pinned demo-seed P/L
   const cur=closePx(p, q); if(cur==null) return 0;                // BUY→BID · SELL→ASK
   const dir=sideUp(p.side)==='SELL'?-1:1;
-  return dir*(cur-(+p.open_price||cur))*lotsOf(p)*contractSize(p.symbol)*(p.symbol.includes('JPY')?0.0067:1);
+  return dir*(cur-(+p.open_price||cur))*lotsOf(p)*contractSize(p.symbol)*quoteUsd(p.symbol, cur);
 }
 const LEVERAGES = [10,50,100,500];
 

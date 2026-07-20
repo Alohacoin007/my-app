@@ -20,13 +20,14 @@ const ccy_src          = grab(/const CCY = \/[^\n]*/, 'CCY');
 const catOf_src        = grab(/const catOf = \(s\)=>[^\n]*/, 'catOf');
 const contractSize_src = grab(/const contractSize = \(symbol\)=>[^\n]*/, 'contractSize');
 const closePx_src      = grab(/const closePx = \(p, q\)=>[^\n]*/, 'closePx');
+const quoteUsd_src     = grab(/function quoteUsd\(symbol, cur\)\{[\s\S]*?\n\}/, 'quoteUsd');   // quote→USD 라이브 환산(2026-07-19)
 const positionPnL_src  = grab(/function positionPnL\(p, q\)\{[\s\S]*?\n\}/, 'positionPnL');
 
 if (!fail) {
   const SYM_CAT = { EURUSD:'Forex', BTCUSD:'Crypto' };
   const scope = new Function('SYM_CAT',
-    'const CONTRACT=100000;\n' + ccy_src + '\n' + catOf_src + '\n' + lotsOf_src + '\n' + sideUp_src + '\n' + contractSize_src + '\n' +
-    closePx_src + '\n' + positionPnL_src + '\nreturn { positionPnL, closePx };')(SYM_CAT);
+    'const CONTRACT=100000;\nconst priceStore={get:()=>null};\n' + ccy_src + '\n' + catOf_src + '\n' + lotsOf_src + '\n' + sideUp_src + '\n' + contractSize_src + '\n' +
+    closePx_src + '\n' + quoteUsd_src + '\n' + positionPnL_src + '\nreturn { positionPnL, closePx };')(SYM_CAT);
   const { positionPnL, closePx } = scope;
 
   // [1] three BUYs, same symbol, DIFFERENT entries → three DIFFERENT P&Ls (no copy)

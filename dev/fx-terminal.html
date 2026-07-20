@@ -1465,7 +1465,7 @@ const MAILBOX=[
     detail:'Leveraged FX/CFD trading carries a high level of risk and may not be suitable for all investors. '+
       'This terminal is a demo environment — all funds and positions are simulated. No real money is at risk.\n\nALPEXA Dealing Desk'}];
 /* ── 실시간 마진·스왑 엔진 (2026-07-19 사장님 "앱이랑 동일하게 · 500:1") — 표시 전용, 돈 0.
-   P/L·청산가 = 앱(webtrade) 공식 락스텝(BUY→bid/SELL→ask · dir*(cur-open)*lots*계약*JPY0.0067).
+   P/L·청산가 = 앱(webtrade)·서버 fx_close 락스텝(BUY→bid/SELL→ask · quote→USD 라이브 환산).
    마진 = lots*계약*기준통화USD / 레버리지(FX 500:1 · 기타 5:1). 스왑 = MT5 표준:
    뉴욕 17시(≈21:00 UTC) 롤오버마다 적립, FX는 주말 무스왑+수요일 3배, 크립토는 매일. ── */
 const FX_LEV_TERM=500;   // 사장님 지시 500:1
@@ -1489,10 +1489,15 @@ function demoSwap(p, pair){
     return nights*lots*rate*pipVal; }
   const notional=lots*(((mwStore.rows[pair]||{}).mid)||0);
   return -notional*(long?0.0003:0.0001)*nights; }   // 크립토/주식: 명목가 %/夜 (롱 0.03%·숏 0.01%)
+/* quote→USD 라이브 환산 — 서버 fx_close·webtrade quoteUsd 락스텝 (0.0067 고정값 제거, 갭감사 🔴) */
+function fxQuoteUsd(sym, cur){ if(mwCat(sym)!=='Forex') return 1;
+  const quote=String(sym).slice(3,6); if(quote==='USD') return 1;
+  if(String(sym).slice(0,3)==='USD') return cur>0?1/cur:0;   // USDJPY/CHF/CAD = 서버 v_pnlq/v_mid
+  const r=ccyUsdRate(quote); return r==null?0:r; }            // 크로스 — 환율 없으면 0(가짜 금지)
 function demoMarkAll(){ DEMO_POS.forEach(p=>{ const pair=symPair(p.sym), r=mwStore.rows[pair]; if(!r||r.bid==null) return;
   const dg=mwDigits(pair), dir=p.type==='sell'?-1:1, cur=p.type==='sell'?r.ask:r.bid;
   const contract=mwCat(pair)==='Forex'?100000:1;
-  const pl=dir*(cur-(+p.price))*(+p.vol||0)*contract*(pair.includes('JPY')?0.0067:1);
+  const pl=dir*(cur-(+p.price))*(+p.vol||0)*contract*fxQuoteUsd(pair, cur);
   p.cur=cur.toFixed(dg); p.pl=pl.toFixed(2); p.swap=demoSwap(p,pair).toFixed(2); }); }
 function demoStats(){ demoMarkAll();
   const bal=100000; let floating=0, swap=0, margin=0;
@@ -2061,7 +2066,7 @@ const fxFeed={ lastRealAt:0, wsAt:{}, realSyms:new Set(), ws:null, rt:null, _t:n
 fxFeed.start();
 /* ══ M3 계좌 읽기 — 로그인 시 Trade/Exposure가 실계좌·실포지션 표시 (읽기 전용, 돈 쓰기 0).
    계약 = webtrade positionsStore 락스텝: accounts/positions 쿼리·Realtime·BUY→bid/SELL→ash 청산가·
-   JPY 0.0067 환산·계약크기(FX 10만/기타 1)·마진 공식(fx_notional_usd). 실청산·실주문은 M5 — 여기선 표시만.
+   quote→USD 라이브 환산·계약크기(FX 10만/기타 1)·마진 공식(fx_notional_usd). 실청산·실주문은 M5 — 여기선 표시만.
    세션 게이트 = getSession 실존 + alpexa.me 태그(유령세션 가드) · 하이드레이션 레이스 자가치유(재판정). ══ */
 const FX_CONTRACT_OF=s=>mwCat(s)==='Forex'?100000:1;   // fx_notional_usd 락스텝
 const FX_LEVCAP_OF=s=>mwCat(s)==='Forex'?FX_LEV_TERM:5;   // 500:1 (2026-07-19 사장님)
@@ -2086,7 +2091,7 @@ const fxAcct={ authed:false, acct:null, pos:[], _t:null, ch1:null, ch2:null,
     return String(p.side).toUpperCase()==='SELL'?r.ask:r.bid; },   // BUY→BID · SELL→ASK (MT5)
   pnl(p){ const cur=this.closePx(p); if(cur==null) return 0;
     const dir=String(p.side).toUpperCase()==='SELL'?-1:1;
-    return dir*(cur-(+p.open_price||cur))*(+p.size||0)*FX_CONTRACT_OF(p.symbol)*(String(p.symbol).includes('JPY')?0.0067:1); },
+    return dir*(cur-(+p.open_price||cur))*(+p.size||0)*FX_CONTRACT_OF(p.symbol)*fxQuoteUsd(p.symbol, cur); },
   baseUsd(sym){ const base=sym.slice(0,3), quote=sym.slice(3), r=mwStore.rows[sym];
     if(mwCat(sym)!=='Forex') return r?r.mid:0;                      // 크립토/주식: 1계약=1코인/주 → USD가격
     if(base==='USD') return 1; if(quote==='USD') return r?r.mid:0;
