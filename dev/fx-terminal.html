@@ -234,8 +234,6 @@ body.symdrag .widget[id^="w-chart"]{outline:1px dashed var(--lgd-hair); outline-
 .chchip .chx:hover{opacity:1; color:var(--lgd-down,#EB5D2A); background:var(--lgd-surface2)}
 /* (차트 왼쪽 라인스터디 사이드바 CSS 제거 — 2026-07-19, 기능은 상단 툴바) */
 /* 차트 원클릭 매매 바 — 상단, 가격 크고 뚜렷. SELL 빨강 / BUY 초록(레전드) */
-.ocdemo{display:flex; align-items:center; padding:0 6px; border-radius:4px; font-size:8.5px; font-weight:800; letter-spacing:.5px;
-  color:#E0A020; border:1px solid rgba(224,160,32,.55); background:rgba(224,160,32,.10)}
 .ocbar{position:absolute; top:3px; left:6px; z-index:4; display:flex; align-items:stretch; gap:4px; font-size:10px; max-width:calc(100% - 62px)}
 .ocvol{display:flex; align-items:center; gap:1px; background:rgba(18,24,34,.72); border:1px solid var(--lgd-hair); border-radius:4px; padding:0 2px}
 .ocvb{width:15px; height:100%; min-height:22px; border:none; background:transparent; color:var(--lgd-ink); font-weight:800; font-size:13px; cursor:pointer; line-height:1}
@@ -259,6 +257,7 @@ body.symdrag .widget[id^="w-chart"]{outline:1px dashed var(--lgd-hair); outline-
 .ordhd{display:flex; align-items:center; justify-content:space-between; padding:9px 12px; border-bottom:1px solid var(--lgd-hair); font-size:13px}
 .ordx{cursor:pointer; color:var(--lgd-dim); font-size:14px} .ordx:hover{color:var(--lgd-ink)}
 .ordbadge{padding:5px 12px; font-size:9px; font-weight:800; letter-spacing:.4px; color:#E0A020; background:rgba(240,180,40,.10); border-bottom:1px solid var(--lgd-hair)}
+.ordbadge.ordlive{color:#F23645; border-color:rgba(242,54,69,.5); background:rgba(242,54,69,.08)}
 .ordbody{padding:10px 12px; display:flex; flex-direction:column; gap:7px}
 .ordrow{display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px}
 .ordlbl{color:var(--lgd-dim)}
@@ -933,7 +932,6 @@ function loadRealSeries(sym,tf){ const k=sym+'|'+tf; if(realSeriesState[k]) retu
 /* (차트창 왼쪽 라인스터디 사이드바는 2026-07-19 사장님 지시로 제거 — 같은 기능 전부 상단 툴바에 있음) */
 /* 차트 원클릭 매매 바(MT5/레전드) — 볼륨 · SELL(bid) · 스프레드 · BUY(ask) · 티켓(▾) · OHLCV. 가격 크게. */
 function ocbarHTML(){ return '<div class="ocbar">'+
-  '<span class="ocdemo" title="Orders here are simulated practice fills — no real funds (live execution: M4)">DEMO</span>'+
   '<span class="ocvol"><button class="ocvb" data-oc="dec">−</button><b class="ocvv">0.10</b><button class="ocvb" data-oc="inc">+</button></span>'+
   '<button class="octrade ocsell" data-oc="sell"><span class="ocl">SELL</span><b class="ocbid">—</b></button>'+
   '<span class="ocspr" title="Spread">—</span>'+
@@ -1104,8 +1102,9 @@ function mkChart(id, sym, i){ makeWidget(id, sym, 'var(--lgd-up)', chartBody());
     const ocbar=plot.querySelector('.ocbar');
     if(ocbar){ ocbar.addEventListener('click', ev=>{ const b=ev.target.closest('[data-oc]'); if(!b) return; ev.stopPropagation(); ev.preventDefault();
       setActiveChart(id); const k=b.dataset.oc, c=cfg(id), sym=(layout[id]&&layout[id].sym)||'';
-      if(k==='sell'){ placeMarketDemo(sym,'sell',c.oclot||0.10,0,0); }
-      else if(k==='buy'){ placeMarketDemo(sym,'buy',c.oclot||0.10,0,0); } });
+      if(k==='sell'||k==='buy'){
+        if(window.fxAcct&&fxAcct.authed) fxPlaceReal(sym, k, c.oclot||0.10);   // M4: 로그인=서버 실체결
+        else placeMarketDemo(sym, k, c.oclot||0.10, 0, 0); } });
     /* 볼륨 ±: pointerdown 즉시 1스텝 + 320ms 후 55ms 연타, 20스텝 넘으면 ×10(0.10씩) — MT5 홀드 */
     bindHoldRepeat(ocbar,'.ocvb',(b,m)=>{ setActiveChart(id); const c=cfg(id);
       c.oclot=clampLot((c.oclot||0.10)+(b.dataset.oc==='inc'?1:-1)*0.01*m);
@@ -1584,7 +1583,9 @@ function buildOrder(){ const m=document.getElementById('ordModal'); if(!m||!ordU
     '<button class="ordstep" data-ostep="'+id+'|'+stp+'|'+d+'|'+(min||0)+'">+</button></span></div>';
   m.innerHTML='<div class="ordbox">'+
     '<div class="ordhd"><b>Order</b><span class="ordx" data-od="close">✕</span></div>'+
-    '<div class="ordbadge">DEMO · simulated order — no real funds (live execution: M4 server)</div>'+
+    ((window.fxAcct&&fxAcct.authed)
+      ?'<div class="ordbadge ordlive">LIVE · server execution — real funds (market orders)</div>'
+      :'<div class="ordbadge">DEMO · practice order — no real funds (sign in to trade live)</div>')+
     '<div class="ordbody">'+
       '<div class="ordrow"><span class="ordlbl">Symbol</span><select class="ordsel" data-odc="sym">'+opt(MW_WATCH,sym)+'</select></div>'+
       '<div class="ordquote"><span><i class="dot sell"></i>Bid <b id="odBid">'+mwFmt(sym,r.bid)+'</b></span>'+
@@ -1606,10 +1607,18 @@ function buildOrder(){ const m=document.getElementById('ordModal'); if(!m||!ordU
 function submitOrder(kind){ if(!ordUI) return; const sym=ordUI.sym;
   const vol=parseFloat((document.getElementById('odVol')||{}).value)||0;
   const sl=parseFloat((document.getElementById('odSL')||{}).value)||0, tp=parseFloat((document.getElementById('odTP')||{}).value)||0;
-  let ok=false;
-  if(kind==='buy'||kind==='sell') ok=placeMarketDemo(sym,kind,vol,sl,tp);
-  else if(kind==='pending'){ const price=parseFloat((document.getElementById('odPrice')||{}).value)||0; ok=placePendingDemo(sym,ordUI.otype,vol,price,sl,tp); }
-  if(ok) closeOrder(); }
+  const LIVE=window.fxAcct&&fxAcct.authed;
+  if(kind==='buy'||kind==='sell'){
+    if(LIVE){ closeOrder();   // M4: 시장가 실체결 (SL/TP는 체결 후 fx_modify로)
+      fxPlaceReal(sym,kind,vol).then(okd=>{ if(okd&&(sl>0||tp>0)){
+        setTimeout(async()=>{ const p=(fxAcct.pos||[]).slice().sort((a,b)=>Date.parse(b.updated_at||0)-Date.parse(a.updated_at||0))[0];
+          if(p&&p.symbol===sym) fxModifyReal(p.local_id, sl, tp); }, 900); } });
+      return; }
+    if(placeMarketDemo(sym,kind,vol,sl,tp)) closeOrder(); return; }
+  if(kind==='pending'){
+    if(LIVE){ toast('Pending orders (limit/stop) go live with the server matching engine — market orders only for now'); return; }
+    const price=parseFloat((document.getElementById('odPrice')||{}).value)||0;
+    if(placePendingDemo(sym,ordUI.otype,vol,price,sl,tp)) closeOrder(); } }
 
 /* ── MT5 Modify — Trade 탭 S/L·T/P 셀 클릭 → SL/TP 설정 창 (DEMO 전용, LIVE 수정은 M5) ── */
 function modifyPosDemo(ticket, sl, tp){ const p=DEMO_POS.find(x=>x.ticket===ticket); if(!p) return;
@@ -1618,24 +1627,31 @@ function modifyPosDemo(ticket, sl, tp){ const p=DEMO_POS.find(x=>x.ticket===tick
   JOURNAL.log('Modify #'+ticket+' — S/L '+(p.sl||'—')+' · T/P '+(p.tp||'—')+' (demo)', true);
   toast('#'+ticket+' modified — S/L '+(p.sl||'—')+' / T/P '+(p.tp||'—')+' (DEMO)');
   if(curTbxTab==='Trade') renderToolbox('Trade'); renderAllCharts(false); }
-function openModifyDemo(ticket){ const p=DEMO_POS.find(x=>x.ticket===ticket); if(!p) return;
+function openModifyDemo(ticket, isReal){
+  /* isReal: 실포지션(fxAcct) — 저장 시 fx_modify RPC. 아니면 데모 인메모리. */
+  const p=isReal ? (fxAcct.pos||[]).map(x=>({ sym:x.symbol, ticket:String(x.local_id||''), type:String(x.side||'').toLowerCase(),
+      vol:(+x.size||0).toFixed(2), price:(+x.open_price||0), sl:(x.meta&&x.meta.sl)||'', tp:(x.meta&&x.meta.tp)||'' })).find(x=>x.ticket===ticket)
+    : DEMO_POS.find(x=>x.ticket===ticket);
+  if(!p) return;
   const pair=symPair(p.sym), dg=mwDigits(pair), step=mwPip(pair), r=mwStore.rows[pair]||{};
   let m=document.getElementById('modModal');
   if(!m){ m=document.createElement('div'); m.id='modModal'; m.className='ordback'; document.body.appendChild(m);
     m.addEventListener('click', e=>{ if(e.target===m||e.target.closest('[data-md="close"]')){ m.style.display='none'; return; }
       if(e.target.closest('[data-md="save"]')){
-        modifyPosDemo(m.dataset.ticket, parseFloat((document.getElementById('mdSL')||{}).value)||0,
-                                        parseFloat((document.getElementById('mdTP')||{}).value)||0);
+        const sl=parseFloat((document.getElementById('mdSL')||{}).value)||0,
+              tp=parseFloat((document.getElementById('mdTP')||{}).value)||0;
+        if(m.dataset.real==='1') fxModifyReal(m.dataset.ticket, sl, tp);   // M4: 서버 fx_modify
+        else modifyPosDemo(m.dataset.ticket, sl, tp);
         m.style.display='none'; } });
     bindHoldRepeat(m,'[data-ostep]',(b,mult)=>stepField(b.dataset.ostep, mult)); }
-  m.dataset.ticket=ticket;
+  m.dataset.ticket=ticket; m.dataset.real=isReal?'1':'0';
   const num=(label,id,val)=>'<div class="ordrow"><span class="ordlbl">'+label+'</span><span class="ordfield">'+
     '<button class="ordstep" data-ostep="'+id+'|-'+step+'|'+dg+'|0">−</button>'+
     '<input class="ordinput" id="'+id+'" value="'+val+'" inputmode="decimal">'+
     '<button class="ordstep" data-ostep="'+id+'|'+step+'|'+dg+'|0">+</button></span></div>';
   m.innerHTML='<div class="ordbox">'+
     '<div class="ordhd"><b>Modify #'+ticket+' — '+p.sym+'</b><span class="ordx" data-md="close">✕</span></div>'+
-    '<div class="ordbadge">DEMO · '+p.type.toUpperCase()+' '+p.vol+' @ '+p.price+(r.bid!=null?' · now '+mwFmt(pair,p.type==='buy'?r.bid:r.ask):'')+'</div>'+
+    '<div class="ordbadge'+(isReal?' ordlive':'')+'">'+(isReal?'LIVE':'DEMO')+' · '+p.type.toUpperCase()+' '+p.vol+' @ '+(typeof p.price==='number'?p.price.toFixed(dg):p.price)+(r.bid!=null?' · now '+mwFmt(pair,p.type==='buy'?r.bid:r.ask):'')+'</div>'+
     '<div class="ordbody">'+num('Stop Loss','mdSL',p.sl||'0')+num('Take Profit','mdTP',p.tp||'0')+'</div>'+
     '<div class="ordbtns"><button class="ordplace" data-md="save">Modify</button></div></div>';
   m.style.display='flex'; }
@@ -1668,15 +1684,16 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
     const LIVE=fxAcct.authed; if(!LIVE) demoMarkAll();   // DEMO 행 실시간 마크(P/L·현재가·스왑)
     const POS=LIVE?fxAcct.rows():DEMO_POS;
     const total=POS.reduce((s,p)=>s+(+p.pl),0);
-    const slTd=p=>p.noClose?('<td>'+(p.sl||'—')+'</td><td>'+(p.tp||'—')+'</td>')   // LIVE = 읽기 전용(M5)
-      :('<td class="sltp" data-mod="'+p.ticket+'" title="Set Stop Loss / Take Profit">'+(p.sl||'—')+'</td>'+
-        '<td class="sltp" data-mod="'+p.ticket+'" title="Set Stop Loss / Take Profit">'+(p.tp||'—')+'</td>');
+    /* M4: 실포지션도 S/L·T/P 수정(fx_modify) — data-rmod, 데모는 data-mod */
+    const slTd=p=>{ const attr=p.real?('data-rmod="'+p.ticket+'"'):('data-mod="'+p.ticket+'"');
+      return '<td class="sltp" '+attr+' title="Set Stop Loss / Take Profit">'+(p.sl||'—')+'</td>'+
+             '<td class="sltp" '+attr+' title="Set Stop Loss / Take Profit">'+(p.tp||'—')+'</td>'; };
     const rows=POS.length ? POS.map(p=>'<tr><td>'+p.sym+'</td><td>'+p.ticket+'</td><td>'+p.time+'</td>'+
         '<td class="'+p.type+'">'+p.type+'</td><td>'+p.vol+'</td><td>'+p.price+'</td>'+slTd(p)+
         '<td>'+p.cur+'</td><td>'+p.comm+'</td><td>'+p.swap+'</td>'+
         '<td class="'+(+p.pl>=0?'pl-pos':'pl-neg')+'">'+p.pl+'</td>'+
-        (p.noClose?'<td class="pox"><span class="ponoclose" title="Live close via fx_close (M5)">—</span></td>'
-                  :'<td class="pox"><span class="poclose" data-close="'+p.ticket+'" title="Close position (one-click)">✕</span></td>')+'</tr>').join('')
+        (p.real?'<td class="pox"><span class="poclose" data-rclose="'+p.ticket+'" title="Close position — LIVE (server fx_close)">✕</span></td>'
+               :'<td class="pox"><span class="poclose" data-close="'+p.ticket+'" title="Close position (one-click)">✕</span></td>')+'</tr>').join('')
       : '<tr><td colspan="13" style="text-align:center;color:var(--lgd-dim);padding:16px">No open positions</td></tr>';
     /* LIVE에서도 데모(연습) 체결은 별도 섹션으로 보인다 — "주문이 사라졌다" 착각 방지(갭감사 1순위) */
     if(LIVE) demoMarkAll();
@@ -2104,7 +2121,7 @@ const fxAcct={ authed:false, acct:null, pos:[], _t:null, ch1:null, ch2:null,
       type:String(p.side||'').toLowerCase(), vol:(+p.size||0).toFixed(2), price:(+p.open_price||0).toFixed(dg),
       sl:m.sl?(+m.sl).toFixed(dg):'', tp:m.tp?(+m.tp).toFixed(dg):'',
       cur:cur!=null?cur.toFixed(dg):'—', comm:'0.00', swap:m.swap!=null?(+m.swap).toFixed(2):'0.00',
-      pl:pl.toFixed(2), noClose:true }; }); },
+      pl:pl.toFixed(2), real:true }; }); },   // real: ✕=fx_close · S/L·T/P=fx_modify (M4/M5)
   stats(){ const floating=this.pos.reduce((s,p)=>s+this.pnl(p),0), bal=+((this.acct&&this.acct.balance))||0;
     const margin=this.pos.reduce((s,p)=>s+this.margin(p),0), equity=bal+floating;
     return { bal, floating, equity, margin, free:equity-margin, level:margin>0?equity/margin*100:0 }; },
@@ -2131,6 +2148,45 @@ const fxAcct={ authed:false, acct:null, pos:[], _t:null, ch1:null, ch2:null,
       this.ch2=AlpexaSync.db.channel('fxterm-pos').on('postgres_changes',{event:'*',schema:'public',table:'positions'},()=>this.load()).subscribe();
     } }catch(e){} } };
 fxAcct.start(); window.fxAcct=fxAcct;   // 차트 주문라인 등 이른 코드가 window 경유로 안전 참조
+/* ══ M4 실체결 (2026-07-19 사장님 "고고") — webtrade placeOrder/closeOrder/fx_modify 락스텝.
+   불변식: 터미널은 체결가·손익·잔고를 절대 정하지 않는다 — 서버 RPC 호출 + 성공 시 재조회(fxAcct.load)만.
+   멱등: local_id 'fxt-'+ts+rand (webtrade 'wt-' 패턴). 미로그인 = 서버 접촉 0(연습 체결 유지). ══ */
+async function fxPlaceReal(sym, side, vol){
+  const local_id='fxt-'+Date.now()+'-'+Math.floor(Math.random()*1e6);
+  try{
+    const base={ p_local_id:local_id, p_symbol:sym, p_side:String(side).toUpperCase(), p_size:+vol };
+    let r=await AlpexaSync.db.rpc('fx_open', { ...base, p_leverage:null, p_requested_price:null, p_max_slippage:null });
+    if(r&&r.error && /PGRST202|could not find the function|does not exist|schema cache/i.test(((r.error&&r.error.message)||'')+((r.error&&r.error.code)||'')))
+      r=await AlpexaSync.db.rpc('fx_open', base);   // 구 4-인자 시그니처 폴백(webtrade 동일)
+    const d=r&&r.data;
+    if(r&&!r.error&&d&&d.ok){
+      JOURNAL.log('LIVE order filled — '+String(side).toUpperCase()+' '+vol+' '+sym+' @ '+d.open, true);
+      toast('✅ '+String(side).toUpperCase()+' '+vol+' '+sym+' @ '+d.open+' — filled (LIVE)');
+      fxAcct.load(); return true; }
+    const why=(d&&d.error)||(r&&r.error&&r.error.message)||'rejected';
+    JOURNAL.log('LIVE order rejected — '+String(side).toUpperCase()+' '+vol+' '+sym+': '+why, false);
+    toast('❌ Order rejected: '+why); return false;
+  }catch(e){ toast('❌ Order failed: '+String(e&&e.message||e)); return false; } }
+async function fxCloseReal(localId){
+  try{
+    const r=await AlpexaSync.db.rpc('fx_close', { p_local_id:localId });
+    const d=r&&r.data;
+    if(r&&!r.error&&d&&d.ok){
+      JOURNAL.log('LIVE position closed — '+localId+'  P&L '+(d.pnl!=null?(+d.pnl).toFixed(2):'—'), d.pnl==null||d.pnl>=0);
+      toast('✅ Closed '+localId+' — P&L '+(d.pnl!=null?(+d.pnl).toFixed(2):'—')+' (LIVE)');
+      fxAcct.load(); return true; }
+    const why=(d&&d.error)||(r&&r.error&&r.error.message)||'close failed';
+    toast('❌ Close rejected: '+why); return false;
+  }catch(e){ toast('❌ Close failed: '+String(e&&e.message||e)); return false; } }
+async function fxModifyReal(localId, sl, tp){
+  try{
+    const r=await AlpexaSync.db.rpc('fx_modify', { p_local_id:localId, p_sl:(sl>0?+sl:null), p_tp:(tp>0?+tp:null) });
+    const d=r&&r.data;
+    if(r&&!r.error&&d&&d.ok){ JOURNAL.log('LIVE modify — '+localId+' S/L '+(sl||'—')+' T/P '+(tp||'—'), true);
+      toast('✅ '+localId+' modified (LIVE)'); fxAcct.load(); return true; }
+    const why=(d&&d.error)||(r&&r.error&&r.error.message)||'modify failed';
+    toast('❌ Modify rejected: '+why); return false;
+  }catch(e){ toast('❌ Modify failed: '+String(e&&e.message||e)); return false; } }
 /* Sign in 아바타 — 미로그인: login.html(FX)로, 복귀토큰 fx-terminal. 로그인: 계좌번호 표시(장식 해제) */
 (function avatarWire(){ const av=document.querySelector('.avatar'); if(!av) return;
   av.style.cursor='pointer';
@@ -2163,8 +2219,11 @@ mwSimulate(); mwRender();
   if(closeBtn) closeBtn.addEventListener('click', ()=>{ setHiddenDock(true); toast('Toolbox closed — Ctrl+T to reopen'); });
   /* 툴박스 본문 위임: 원클릭 청산 · Alerts 추가/삭제 · History 기간 · Mailbox 펼치기 */
   content.addEventListener('click', e=>{
-    const x=e.target.closest('.poclose'); if(x){ if(x.dataset.cancel) cancelPendDemo(x.dataset.cancel); else closePosDemo(x.dataset.close); return; }
-    const md=e.target.closest('[data-mod]'); if(md){ openModifyDemo(md.dataset.mod); return; }   // S/L·T/P 셀 → Modify(MT5)
+    const x=e.target.closest('.poclose'); if(x){
+      if(x.dataset.rclose){ fxCloseReal(x.dataset.rclose); return; }   // M4: 서버 청산
+      if(x.dataset.cancel) cancelPendDemo(x.dataset.cancel); else closePosDemo(x.dataset.close); return; }
+    const rmd=e.target.closest('[data-rmod]'); if(rmd){ openModifyDemo(rmd.dataset.rmod, true); return; }   // 실포지션 S/L·T/P → fx_modify
+    const md=e.target.closest('[data-mod]'); if(md){ openModifyDemo(md.dataset.mod); return; }   // 데모 Modify
     const add=e.target.closest('#alAdd'); if(add){ tbxAddAlert(); return; }
     const del=e.target.closest('.aldel'); if(del){ alertsStore.remove(del.dataset.del); JOURNAL.log('Alert removed', true); renderToolbox('Alerts'); return; }
     const hp=e.target.closest('[data-hp]'); if(hp){ histPeriod=hp.dataset.hp; renderToolbox('History'); return; }

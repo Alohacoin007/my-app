@@ -4,7 +4,7 @@
 //  ① 유령세션 가드 — alpexa.me 태그만 있고 실세션 없음 → DEMO 유지 (남의/옛 계좌 표시 금지)
 //  ② 로그인 → Trade 탭이 실계좌 잔고 + 실포지션 표시 (LIVE 태그·데모 대기주문 숨김)
 //  ③ 플로팅 P/L = 서버 공식 락스텝: dir*(bid-open)*lots*100000 (BUY→bid 청산) · Equity=Balance+Floating
-//  ④ 실포지션엔 청산 ✕ 없음 (실청산 = M5 fx_close — 읽기 전용 단계)
+//  ④ 실포지션 ✕ = 서버 청산(data-rclose) · S/L·T/P 셀 = fx_modify(data-rmod) — M4
 //  ⑤ 시세 이동 → 1s 마스터 루프가 Trade 재마킹 (P/L이 굳지 않음)
 //  ⑥ 로그아웃 → DEMO 프리뷰 복귀
 // playwright/Chromium 없으면 SKIP(exit 0).
@@ -98,7 +98,8 @@ function installStub(mode) {
     return { authed: fxAcct.authed, cells, spans,
       bid: mwStore.rows.EURUSD.bid,
       liveTag: !!document.querySelector('#tbxBody .acctlive'),
-      firstRowNoClose: !!document.querySelector('#tbxBody tbody tr:first-child .ponoclose'),
+      firstRowRealClose: !!document.querySelector('#tbxBody tbody tr:first-child .poclose[data-rclose="FXP-77001"]'),
+      firstRowRealMod: !!document.querySelector('#tbxBody tbody tr:first-child .sltp[data-rmod="FXP-77001"]'),
       practiceHd: [...document.querySelectorAll('#tbxBody .pendhd td')].map(x=>x.textContent).join('|'),
       total: (document.querySelector('#tbxBody .tbxtotal') || {}).textContent };
   });
@@ -115,8 +116,9 @@ function installStub(mode) {
   const expEq = 50000 + expPl;
   ok('Equity = Balance + Floating (' + expEq.toFixed(2) + ')',
      eqTxt.replace(/\s/g, '').includes(expEq.toLocaleString('en-US', { minimumFractionDigits: 2 }).replace(/,/g, '')), eqTxt);
-  // ── ④ 실포지션(첫 행)엔 ✕ 없음 — 연습 섹션의 ✕는 허용(데모 청산) ──
-  ok('real row: no close ✕ (read-only until M5)', live.firstRowNoClose === true);
+  // ── ④ M4: 실포지션 ✕=서버 청산 경로 · S/L·T/P=fx_modify 경로로 배선 ──
+  ok('real row: ✕ wired to server close (data-rclose)', live.firstRowRealClose === true);
+  ok('real row: S/L·T/P wired to fx_modify (data-rmod)', live.firstRowRealMod === true);
 
   // ── ⑤ 시세 이동 → 1s 루프가 Trade 재마킹 ──
   await page.evaluate(() => { mwStore.apply([{ symbol: 'EURUSD', mid: 1.30000, spr_pts: 1.0 }]); });
