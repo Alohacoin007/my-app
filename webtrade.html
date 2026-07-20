@@ -3296,7 +3296,23 @@ function OrderModal({ symbol:sym0, onClose }){
     const q=priceStore.get(symbol)||m; const price=side==='buy'?q.ask:q.bid;   // requested price the trader sees
     const maxSlip=SLIP_PIPS*pip(symbol);
     const r=await eng.placeOrder({ symbol, side, volume:vol, leverage:eng.leverage, requestedPrice:price, maxSlippage:maxSlip });   // +leverage +slippage
-    if(r.ok){ onClose(); return; }                                   // B-Book fill booked server-side (sndOpen in placeOrder)
+    if(r.ok){
+      // 주문창에 입력된 SL/TP는 체결 직후 fx_modify로 서버에 저장한다(서버가 방향 검증, fx_sltp 스위프가 발동).
+      // 거절/실패 시 무음 탈락 금지 — 소리+알림+Journal (결함-로그 2026-07-20 "보이는 입력칸, 버려지는 값").
+      const slPx=(+sl>0)?+(+sl).toFixed(digits(symbol)):null, tpPx=(+tp>0)?+(+tp).toFixed(digits(symbol)):null;
+      if((slPx!=null||tpPx!=null)&&r.local_id&&window.AlpexaSync&&AlpexaSync.db){
+        try{
+          const m2=await AlpexaSync.db.rpc('fx_modify',{ p_local_id:r.local_id, p_sl:slPx, p_tp:tpPx });
+          const d2=m2&&m2.data, why=(d2&&d2.error)||(m2&&m2.error&&m2.error.message)||'';
+          if((m2&&m2.error)||(d2&&d2.ok===false)){ playSnd(sndError);
+            journalStore.log('SL/TP NOT set — '+r.local_id+': '+(why||'error'), 0);
+            alert(t('Order filled, but SL/TP was rejected')+': '+why); }
+          else{ journalStore.log('SL/TP set at order — '+symbol+(slPx!=null?'  SL '+fmtPx(symbol,slPx):'')+(tpPx!=null?'  TP '+fmtPx(symbol,tpPx):''), 1);
+            positionsStore.loadPos(); }
+        }catch(e){ playSnd(sndError); journalStore.log('SL/TP NOT set — '+r.local_id+': '+String(e&&e.message||e), 0);
+          alert(t('Order filled, but SL/TP was rejected')+': '+String(e&&e.message||e)); }
+      }
+      onClose(); return; }                                   // B-Book fill booked server-side (sndOpen in placeOrder)
     // PRODUCTION: no client demo fill. Server rejection already fired sndError; logged-out prompts login.
     if(r.reason==='not_logged_in'){ playSnd(sndError); alert(t('Please log in to trade')); return; }
     else if(r.reason){ console.warn('order rejected:', r.code||r.reason); alert(t('Order rejected')+': '+(r.reason||r.code)); return; }   // show WHY (server reason)
