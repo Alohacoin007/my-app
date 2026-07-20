@@ -60,10 +60,13 @@ function oddsStatus(g) {
   // ── ③ 시세 라이브니스 (서버 prices — 크립토는 24/7이라 항상 신선해야) ──
   try {
     const q = () => fetch(`${URL}/rest/v1/prices?select=symbol,mid,updated_at&symbol=in.(BTC,ETH)`, { headers: H }).then(r => r.json());
-    const t0 = await q(); await new Promise(r => setTimeout(r, 4000)); const t1 = await q();
-    const age = Math.min(...t1.map(x => (Date.now() - Date.parse(x.updated_at)) / 1000));
-    const moved = t1.some((x, i) => t0[i] && (x.updated_at !== t0[i].updated_at));
-    flag(!(age < 15 && moved), `시세(크립토 서버): 신선도 ${age.toFixed(1)}s · 4s 내 갱신 ${moved ? '확인' : '없음'}` + (!(age < 15 && moved) ? ' — 펌프/크론 확인' : ''));
+    const probe = async () => { const t0 = await q(); await new Promise(r => setTimeout(r, 4000)); const t1 = await q();
+      const age = Math.min(...t1.map(x => (Date.now() - Date.parse(x.updated_at)) / 1000));
+      const moved = t1.some((x, i) => t0[i] && (x.updated_at !== t0[i].updated_at));
+      return { age, moved, ok: age < 15 && moved }; };
+    let p = await probe();
+    if (!p.ok) { await new Promise(r => setTimeout(r, 6000)); p = await probe(); }   // 크론 틱 1회 늦은 블립 필터(2026-07-19 오탐)
+    flag(!p.ok, `시세(크립토 서버): 신선도 ${p.age.toFixed(1)}s · 4s 내 갱신 ${p.moved ? '확인' : '없음'}` + (!p.ok ? ' — 펌프/크론 확인(재시도 후에도)' : ''));
   } catch (e) { flag(true, '시세 점검 실패: ' + e.message); }
 
   console.log(red ? `\n🔴 자가검진: ${red}건 이상 — 원인 추적 후 보고할 것` : '\n🟢 자가검진 전부 정상');
