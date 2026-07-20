@@ -137,6 +137,34 @@ const STUB = (rpcMode) => `(() => {
     demoGrew: DEMO_POS.length - n1 }), demoN1);
   ok('server reject → reason toast + no local mutation', /rejected|margin/i.test(rej.toast) && rej.demoGrew === 0, JSON.stringify(rej));
 
+  // ── ⑦ 차트 트레이드 레벨 드래그: 진입선 잡고 아래로 → fx_modify(p_sl) (2026-07-19 사장님) ──
+  await page.evaluate(STUB('ok'));
+  await page.evaluate(() => fxAcct.load());
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { const g = Object.keys(layout).find(k => /^chart\d+$/.test(k) && layout[k].sym === 'EURUSD');
+    window.__cid = g; setActiveChart(g); renderChart(g);
+    const sc = chartScale[g];                                   // 진입가를 화면 범위 중앙으로 → 라인이 반드시 보이게
+    fxAcct.pos[0].open_price = (sc.mn + sc.mx) / 2;
+    renderChart(g); window.__rpcLog = []; });
+  const dragGeo = await page.evaluate(() => {
+    const sc = chartScale[window.__cid];
+    const line = sc.tradeLines.find(t => t.kind === 'entry');
+    const box = document.querySelector('#w-' + window.__cid + ' .cgwplot').getBoundingClientRect();
+    return line ? { x: box.x + sc.plotW * 0.5, y: box.y + line.y, entry: line.entry } : null;
+  });
+  ok('entry trade-line is hit-registered on chart', !!dragGeo, JSON.stringify(dragGeo));
+  if (dragGeo) {
+    await page.mouse.move(dragGeo.x, dragGeo.y); await page.mouse.down();
+    await page.mouse.move(dragGeo.x, dragGeo.y + 40, { steps: 6 });   // 아래로 = 롱 SL
+    const preview = await page.evaluate(() => document.querySelector('#w-' + window.__cid + ' .cgsvg').innerHTML.includes('SL '));
+    await page.mouse.up(); await page.waitForTimeout(250);
+    const mod2 = await page.evaluate(() => window.__rpcLog.find(x => x.fn === 'fx_modify'));
+    ok('drag preview shows SL label while dragging', preview === true);
+    ok('drop below entry → rpc(fx_modify) with p_sl < entry, tp untouched',
+       !!mod2 && mod2.args.p_local_id === 'FXP-1' && mod2.args.p_sl != null && mod2.args.p_sl < dragGeo.entry && mod2.args.p_tp == null,
+       JSON.stringify(mod2 && mod2.args));
+  }
+
   await page.close(); await browser.close(); server.close();
   console.log((fail ? '🔴' : '🟢') + ' fx-terminal-trade — ' + pass + ' pass, ' + fail + ' fail');
   process.exit(fail ? 1 : 0);

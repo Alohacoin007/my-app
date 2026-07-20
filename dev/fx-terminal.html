@@ -734,6 +734,7 @@ let selObj=null;                                   // 선택된 오브젝트 {id
 let handleDrag=null;                               // 핸들 드래그 중 {id,idx,which}
 let panDrag=null;                                  // 차트 팬(과거 보기) 드래그 중 {id,x0,s0,moved}
 const hoverOHLC={};                                // 차트별 크로스헤어 호버 OHLCV 텍스트 (있을 때만 바에 표시)
+let sltpDrag=null;                                 // 트레이드 레벨 드래그 {id,ticket,side,real,entry,sl,tp,kind,price}
 const CH_DRAW='#E8B84B';                            // 드로잉 오브젝트 색(노랑)
 let toggleDock=null;                               // 툴박스 도크 토글(toolboxDock가 주입 — ☰ View>Toolbox)
 let activeChart=null;                              // 현재 활성(포커스) 차트 id
@@ -1004,22 +1005,34 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
   if(ind.boll){ out+=polyOf(ai=>{ const m=smaAt(closes,IND_BB_P,ai); return m==null?null:m+IND_BB_K*stdAt(closes,IND_BB_P,ai,m); }, CH_BB, 0)+
     polyOf(ai=>smaAt(closes,IND_BB_P,ai), CH_BB, 1)+
     polyOf(ai=>{ const m=smaAt(closes,IND_BB_P,ai); return m==null?null:m-IND_BB_K*stdAt(closes,IND_BB_P,ai,m); }, CH_BB, 0); }
-  /* ── 주문/포지션 라인(MT5 trade levels) — 이 심볼 것만: 진입 실선+라벨 · S/L·T/P 점선 · 대기주문 주황 점선 ── */
-  { const dsym=demoSym(sym);
-    const tl=(price,lab,col,dash)=>{ const v=+price; if(!(v>0)||v<mn||v>mx) return;
+  /* ── 주문/포지션 라인(MT5 trade levels) — 진입 실선+라벨 · S/L·T/P 점선 · 대기 주황 점선.
+     tradeLines 히트정보 → 라인 클릭-드래그로 S/L(밑)·T/P(위) 설정(2026-07-19 사장님, 숏은 반전) ── */
+  { const dsym=demoSym(sym); const TL=[];
+    const acct=window.fxAcct;   // renderChart는 fxAcct 선언 전(초기 렌더)에도 돎 — window 경유로 TDZ 회피
+    const isLive=!!(acct&&acct.authed);
+    const tl=(price,lab,col,dash,hit)=>{ const v=+price; if(!(v>0)||v<mn||v>mx) return;
       const y=yOf(v);
       out+='<line x1="0" y1="'+y.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="'+col+'" stroke-width="0.9" stroke-dasharray="'+(dash?'4 3':'8 4')+'" opacity=".85"/>'+
-        '<text x="4" y="'+(y-3).toFixed(1)+'" fill="'+col+'" font-size="8.5" font-weight="700">'+lab+'</text>'; };
-    const acct=window.fxAcct;   // renderChart는 fxAcct 선언 전(초기 렌더)에도 돎 — window 경유로 TDZ 회피
-    ((acct&&acct.authed)?acct.rows():DEMO_POS).forEach(p=>{ if(p.sym!==dsym&&p.sym!==sym) return;
+        '<text x="4" y="'+(y-3).toFixed(1)+'" fill="'+col+'" font-size="8.5" font-weight="700">'+lab+'</text>';
+      if(hit) TL.push(Object.assign({}, hit, {y, price:v})); };
+    (isLive?acct.rows():DEMO_POS).forEach(p=>{ if(p.sym!==dsym&&p.sym!==sym) return;
       const col=p.type==='buy'?'#00C805':'#F23645';   // BUY 초록 · SELL 빨강 (2026-07-19 사장님, 캔들색과 구분)
-      tl(p.price, p.type+' '+p.vol+' #'+p.ticket, col, false);
-      tl(p.sl, 'sl '+p.sl, '#EB5D2A', true);
-      tl(p.tp, 'tp '+p.tp, '#26A69A', true); });
-    if(!(acct&&acct.authed)) DEMO_PEND.forEach(p=>{ if(p.sym!==dsym) return;
+      const base={ ticket:p.ticket, side:p.type, real:isLive, entry:+p.price, sl:+p.sl||0, tp:+p.tp||0 };
+      tl(p.price, p.type+' '+p.vol+' #'+p.ticket, col, false, Object.assign({kind:'entry'}, base));
+      tl(p.sl, 'sl '+p.sl, '#EB5D2A', true, Object.assign({kind:'sl'}, base));
+      tl(p.tp, 'tp '+p.tp, '#26A69A', true, Object.assign({kind:'tp'}, base)); });
+    if(!isLive) DEMO_PEND.forEach(p=>{ if(p.sym!==dsym) return;
       tl(p.price, p.otype.toLowerCase()+' '+p.vol+' #'+p.ticket, '#E0A020', true);
       tl(p.sl, 'sl '+p.sl, '#EB5D2A', true);
-      tl(p.tp, 'tp '+p.tp, '#26A69A', true); }); }
+      tl(p.tp, 'tp '+p.tp, '#26A69A', true); });
+    chartScale[id].tradeLines=TL;
+    if(sltpDrag&&sltpDrag.id===id&&sltpDrag.price!=null){   // 드래그 프리뷰
+      const py=yOf(Math.max(mn,Math.min(mx,sltpDrag.price)));
+      const isSL=sltpDrag.side==='buy' ? sltpDrag.price<sltpDrag.entry : sltpDrag.price>sltpDrag.entry;
+      const pc=isSL?'#EB5D2A':'#26A69A', plab=(isSL?'SL ':'TP ')+sltpDrag.price.toFixed(dg);
+      out+='<line x1="0" y1="'+py.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+py.toFixed(1)+'" stroke="'+pc+'" stroke-width="1.2" stroke-dasharray="5 3"/>'+
+        '<rect x="4" y="'+(py-16).toFixed(1)+'" width="'+(plab.length*6+10)+'" height="13" rx="2" fill="'+pc+'"/>'+
+        '<text x="9" y="'+(py-6).toFixed(1)+'" fill="#fff" font-size="9" font-weight="800">'+plab+'</text>'; } }
   const lk=vis[vis.length-1], lc=lk.c, ly=yOf(lc), lcol=c.type==='line'?CH_LINE:(lc>=lk.o?CH_UP:CH_DN);
   if(off===0)   // 과거 스크롤 중엔 현재가 라인 미표시(마지막 보이는 봉 ≠ 현재가 — 오독 방지)
   out+='<line x1="0" y1="'+ly.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+ly.toFixed(1)+'" stroke="'+lcol+'" stroke-width="1" stroke-dasharray="3 3" opacity=".9"/>'+
@@ -1117,6 +1130,9 @@ function mkChart(id, sym, i){ makeWidget(id, sym, 'var(--lgd-up)', chartBody());
       if(selObj&&selObj.id===id&&c.obj&&c.obj[selObj.idx]){ const w=handleAt(chartScale[id],c.obj[selObj.idx],d.x,d.y);
         if(w){ handleDrag={id,idx:selObj.idx,which:w}; plot.setPointerCapture(ev.pointerId); ev.preventDefault(); return; } }
       if(selObj){ selObj=null; renderChart(id); }   // 빈 곳 클릭 = 선택 해제
+      /* 트레이드 레벨 드래그(MT5) — 포지션/SL/TP 라인 6px 이내 클릭 → 끌어서 S/L(아래)·T/P(위), 숏은 반전 */
+      { const sc2=chartScale[id], hitL=sc2&&sc2.tradeLines&&sc2.tradeLines.find(t2=>Math.abs(t2.y-d.y)<=6);
+        if(hitL){ ev.preventDefault(); sltpDrag=Object.assign({id, price:null}, hitL); plot.setPointerCapture(ev.pointerId); return; } }
       /* MT5: 빈 차트 드래그 = 팬(과거 보기). 오른쪽으로 끌면 과거로. Auto Scroll ON이어도 팬 가능 —
          새 봉 오면 최신 스냅(MT5 동일). 5px 임계값: 클릭(미세 떨림 포함)으론 차트가 안 움직임. */
       ev.preventDefault();   // 브라우저 기본 선택/드래그 차단 — 클릭 시 하얀 선택 하이라이트가 뜨던 원인
@@ -1129,8 +1145,11 @@ function mkChart(id, sym, i){ makeWidget(id, sym, 'var(--lgd-up)', chartBody());
           const k=s.c[(sc.visStart||0)+Math.round((d.t-sc.t0)/sc.step)], dg2=mwDigits(g.sym);
           hoverOHLC[id]=k?('O '+k.o.toFixed(dg2)+'  H '+k.h.toFixed(dg2)+'  L '+k.l.toFixed(dg2)+'  C '+k.c.toFixed(dg2)+'  V '+chVolFmt(k.v)):'';
           const oc=plot.querySelector('.ocohlc'); if(oc&&oc.textContent!==hoverOHLC[id]) oc.textContent=hoverOHLC[id]; } }
+      if(sltpDrag&&sltpDrag.id===id){ const d2=dataAt(id,ev); if(d2){ sltpDrag.price=d2.price; renderChart(id); } return; }
       if(drawDrag&&drawDrag.id===id){ const d=dataAt(id,ev); if(d){ drawDrag.p2={t:d.t,price:d.price}; renderChart(id); } return; }
       if(handleDrag&&handleDrag.id===id){ const d=dataAt(id,ev), o=cfg(id).obj[handleDrag.idx]; if(d&&o){ objMove(o,handleDrag.which,d); renderChart(id); } return; }
+      if(!drawTool&&!panDrag){ const scH=chartScale[id], dH=dataAt(id,ev);   // 라인 근처 = 상하 리사이즈 커서
+        plot.style.cursor=(scH&&dH&&scH.tradeLines&&scH.tradeLines.some(t2=>Math.abs(t2.y-dH.y)<=6))?'ns-resize':''; }
       if(panDrag&&panDrag.id===id){ const sc=chartScale[id]; if(!sc) return;
         const dx=ev.clientX-panDrag.x0;
         if(!panDrag.moved){ if(Math.abs(dx)<5) return; panDrag.moved=true; }   // 클릭 떨림 무시
@@ -1142,6 +1161,7 @@ function mkChart(id, sym, i){ makeWidget(id, sym, 'var(--lgd-up)', chartBody());
         if(dd.p1.t===dd.p2.t&&dd.p1.price===dd.p2.price){ renderChart(id); return; }   // 안 끌면 취소(툴 유지)
         const c=cfg(id); (c.obj=c.obj||[]).push({k:dd.k,p1:dd.p1,p2:dd.p2}); saveCfg(); setDrawTool(null); selObj={id,idx:c.obj.length-1}; renderChart(id); return; }
       if(handleDrag&&handleDrag.id===id){ handleDrag=null; saveCfg(); }
+      if(sltpDrag&&sltpDrag.id===id){ commitSltpDrag(); return; }
       if(panDrag&&panDrag.id===id){ panDrag=null; saveCfg(); } });
     plot.addEventListener('mouseleave', ()=>{ const cx=plot.querySelector('.cgcross'); if(cx) cx.innerHTML='';
       hoverOHLC[id]=''; const oc=plot.querySelector('.ocohlc'); if(oc) oc.textContent=''; });
@@ -1651,6 +1671,17 @@ function openModifyDemo(ticket, isReal){
     '<div class="ordbody">'+num('Stop Loss','mdSL',p.sl||'0')+num('Take Profit','mdTP',p.tp||'0')+'</div>'+
     '<div class="ordbtns"><button class="ordplace" data-md="save">Modify</button></div></div>';
   m.style.display='flex'; }
+/* 트레이드 레벨 드래그 커밋 — 진입선에서 끌면 방향으로 SL/TP 판정(롱: 아래=SL·위=TP, 숏 반전),
+   기존 SL/TP 라인을 끌면 그 값 이동. 실포지션=fx_modify(서버 검증), 데모=인메모리. */
+function commitSltpDrag(){ const d=sltpDrag; sltpDrag=null; if(!d) return;
+  if(d.price==null || Math.abs(d.price-d.entry)<1e-12){ renderChart(d.id); return; }   // 안 끌었으면 취소
+  let sl=d.sl||0, tp=d.tp||0;
+  if(d.kind==='sl') sl=d.price;
+  else if(d.kind==='tp') tp=d.price;
+  else { const isSL=d.side==='buy' ? d.price<d.entry : d.price>d.entry; if(isSL) sl=d.price; else tp=d.price; }
+  if(d.real) fxModifyReal(d.ticket, sl, tp);
+  else modifyPosDemo(d.ticket, sl, tp);
+  renderChart(d.id); }
 /* Alerts 폼 제출/삭제, History 기간 필터 (툴박스 클릭 위임에서 호출) */
 let histPeriod='all';
 function tbxAddAlert(){ const s=document.getElementById('alSym'), c=document.getElementById('alCond'), px=document.getElementById('alPx');
@@ -2301,7 +2332,8 @@ document.addEventListener('keydown', e=>{
   else if(k==='F9'){ e.preventDefault(); const g=layout[activeChart]; openOrderDialog((g&&g.sym)||mwSel); }
   else if(k==='F8'){ e.preventDefault(); toast('Chart Properties (F8) — coming in build'); }
   else if(k==='F11'){ e.preventDefault(); if(!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{}); else document.exitFullscreen(); }
-  else if(k==='Escape'){ const om=document.getElementById('ordModal'); if(om&&om.style.display==='flex'){ closeOrder(); return; }   // 주문창 먼저
+  else if(k==='Escape'){ if(sltpDrag){ const cid=sltpDrag.id; sltpDrag=null; renderChart(cid); return; }   // 레벨 드래그 취소
+    const om=document.getElementById('ordModal'); if(om&&om.style.display==='flex'){ closeOrder(); return; }   // 주문창 먼저
     const cc=document.getElementById('chCtx'); const md=document.getElementById('menuDrop');   // 팝업 먼저 닫기
     if((cc&&cc.style.display==='block')||(md&&md.style.display==='block')){ if(cc) cc.style.display='none'; if(md) md.style.display='none'; }
     else if(drawDrag){ const id=drawDrag.id; drawDrag=null; renderChart(id); } else if(drawTool){ setDrawTool(null); }
