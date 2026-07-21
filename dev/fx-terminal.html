@@ -1514,7 +1514,26 @@ function demoMarkAll(){ DEMO_POS.forEach(p=>{ const pair=symPair(p.sym), r=mwSto
   const dg=mwDigits(pair), dir=p.type==='sell'?-1:1, cur=p.type==='sell'?r.ask:r.bid;
   const contract=mwCat(pair)==='Forex'?100000:1;
   const pl=dir*(cur-(+p.price))*(+p.vol||0)*contract*fxQuoteUsd(pair, cur);
-  p.cur=cur.toFixed(dg); p.pl=pl.toFixed(2); p.swap=demoSwap(p,pair).toFixed(2); }); }
+  p.cur=cur.toFixed(dg); p.pl=pl.toFixed(2); p.swap=demoSwap(p,pair).toFixed(2); });
+  demoSltpSweep(); }
+/* 데모 SL/TP 자동 청산 — 서버 무접촉 로컬 엔진 (2026-07-21 사장님 "서버랑 관계없는 곳에").
+   MT5 판정: BUY는 청산가=bid로 SL(bid≤sl)/TP(bid≥tp), SELL은 ask로 반전. 매초 demoMarkAll 뒤 실행.
+   히트 시 closePosDemo와 동일 흐름 + History/Journal/토스트에 SL·TP 표기. */
+function demoSltpSweep(){ if(!DEMO_POS.length) return;
+  const hits=[];
+  DEMO_POS.forEach(p=>{ const sl=+p.sl||0, tp=+p.tp||0; if(!sl&&!tp) return;
+    const cur=+p.cur; if(!(cur>0)) return;
+    let hit=null;
+    if(p.type==='buy'){ if(sl&&cur<=sl) hit='SL'; else if(tp&&cur>=tp) hit='TP'; }
+    else              { if(sl&&cur>=sl) hit='SL'; else if(tp&&cur<=tp) hit='TP'; }
+    if(hit) hits.push({p, hit}); });
+  hits.forEach(({p,hit})=>{
+    DEMO_POS=DEMO_POS.filter(x=>x.ticket!==p.ticket);
+    DEMO_HIST.unshift({sym:p.sym,ticket:p.ticket,ctime:fxStamp(),type:p.type,vol:p.vol,open:p.price,
+      close:p.cur,profit:(+p.pl).toFixed(2),ms:Date.now(),via:hit});
+    JOURNAL.log(hit+' hit — #'+p.ticket+' '+p.sym+' '+p.type+' '+p.vol+' @ '+p.cur+'  P/L '+(+p.pl).toFixed(2), +p.pl>=0);
+    toast('🔔 '+hit+' triggered — #'+p.ticket+' '+p.sym+' closed @ '+p.cur+' (DEMO)'); });
+  if(hits.length){ if(curTbxTab==='Trade') renderToolbox('Trade'); renderAllCharts(false); } }
 function demoStats(){ demoMarkAll();
   const bal=100000; let floating=0, swap=0, margin=0;
   DEMO_POS.forEach(p=>{ floating+=+p.pl||0; swap+=+p.swap||0;
@@ -2269,6 +2288,7 @@ function updateStatus(){ const el=document.getElementById('sbClock'); if(!el) re
   el.textContent=d.getFullYear()+'.'+p(d.getMonth()+1)+'.'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds()); }
 updateStatus();
 setInterval(()=>{ if(!mwStore.live) mwSimulate(); mwRender(); alertsStore.check();
+  if(!(window.fxAcct&&fxAcct.authed)) demoMarkAll();   // 데모 SL/TP 스위프 — 어느 탭에서든 매초 (마크+demoSltpSweep)
   if(curTbxTab==='Exposure') renderToolbox('Exposure');   // 통화 노출 실시간 마크(MT5)
   if(curTbxTab==='Trade') renderToolbox('Trade');   // 실시간 마크 — LIVE 실포지션 + DEMO(마진 500:1·스왑·플로팅)
   renderAllCharts(true);                                   // 라이브 봉 갱신(현재 봉 close/high/low)
