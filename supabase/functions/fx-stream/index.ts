@@ -61,6 +61,8 @@ Deno.serve(async (req) => {
   if (!SB_URL || !SB_KEY) return json({ ok: false, error: "Supabase env missing" }, 500);
 
   const lastWrite: Record<string, number> = {};
+  // 스파이크 워터마크(v1): 1s 스로틀로 버려지던 프레임들의 mid 고저를 누적 → 다음 기록에 포함 후 리셋.
+  const wmHi: Record<string, number> = {}, wmLo: Record<string, number> = {};
   let wrote = 0, frames = 0, authErr = "";
 
   // 초단위 스위프 (2026-07-20 "청산은 초단위로" + 2026-07-22 대기주문 M4.5) — 가격을 쓴 직후
@@ -79,7 +81,7 @@ Deno.serve(async (req) => {
     } catch (_e) { /* cron fallback */ }
   };
 
-  const upsert = async (rows: { symbol: string; mid: number; spr_pts: number }[]) => {
+  const upsert = async (rows: { symbol: string; mid: number; spr_pts: number; tick_hi?: number; tick_lo?: number }[]) => {
     const up = await fetch(`${SB_URL}/rest/v1/prices?on_conflict=symbol`, {
       method: "POST",
       headers: {
@@ -113,14 +115,16 @@ Deno.serve(async (req) => {
             const sym = APP_SYMBOL[m.p]; const b = +m.b, a = +m.a;
             if (!sym || !(b > 0 && a > 0)) continue;
             const now = Date.now();
+            const midRaw = Math.round(((a + b) / 2) * 1e6) / 1e6;
+            wmHi[sym] = wmHi[sym] == null ? midRaw : Math.max(wmHi[sym], midRaw);   // 워터마크 누적(스킵 프레임 포함)
+            wmLo[sym] = wmLo[sym] == null ? midRaw : Math.min(wmLo[sym], midRaw);
             if (lastWrite[sym] && now - lastWrite[sym] < PER_SYMBOL_MS) continue;
             lastWrite[sym] = now;
-            const mid = Math.round(((a + b) / 2) * 1e6) / 1e6;
-            // PIPS at 0.1 precision (unit unchanged — fx_close reads pips). Interbank quotes are
-            // often sub-pip (0.1–0.4); integer rounding collapsed those to 0 (AUDUSD live, 2026-07-13)
-            // leaving only the 0.1-pip floor on screen AND at close. Never round a real spread to 0.
+            const mid = midRaw;
+            // PIPS at 0.1 precision (unit unchanged — fx_close reads pips). Never round a real spread to 0.
             const spr = Math.max(0, Math.round((a - b) / pip(sym) * 10) / 10);
-            upsert([{ symbol: sym, mid, spr_pts: spr }]);
+            upsert([{ symbol: sym, mid, spr_pts: spr, tick_hi: wmHi[sym], tick_lo: wmLo[sym] } as any]);
+            delete wmHi[sym]; delete wmLo[sym];   // 창 하나짜리 — 기록 후 리셋(유령 발동 금지)
             sweep();   // 새 가격 반영 직후 SL/TP 검사 (1s 스로틀)
           }
         } catch (_e) { /* junk frame */ }

@@ -20,8 +20,12 @@
 --    close-side spread — identical to fx_close. Returns NULL if it can't be priced
 --    (missing spec / missing-or-stale price / missing cross rate) so callers can bail
 --    safely instead of liquidating on bad data.
+-- 5-인자 버전(워터마크 v1, 2026-07-22): p_close_override = 청산가 직접 지정(SL/TP 레벨가 정산).
+-- null이면 기존과 자구 동일. 구 4-인자 시그니처는 모호성 방지 위해 drop (4-인자 호출은 default로 해소).
+drop function if exists public.fx_realized_pnl(text, text, numeric, numeric);
 create or replace function public.fx_realized_pnl(
-  p_symbol text, p_side text, p_open numeric, p_size numeric
+  p_symbol text, p_side text, p_open numeric, p_size numeric,
+  p_close_override numeric default null
 ) returns numeric language plpgsql stable security definer set search_path to 'public' as $$
 declare
   v_cls text; v_mid numeric; v_pts timestamptz;
@@ -51,6 +55,8 @@ begin
       ) / 10000.0 / 2.0;
   end if;
   v_close := v_mid + (case when upper(p_side) = 'BUY' then -v_half else v_half end);
+  -- 워터마크 레벨가 정산: 오버라이드가 오면 그 가격이 청산가 (레벨=고객 지정가, 스프레드 기반영 간주)
+  if p_close_override is not null and p_close_override > 0 then v_close := p_close_override; end if;
 
   v_lot  := case when p_symbol = 'XAUUSD' then 100 when p_symbol = 'XAGUSD' then 5000
                  when v_cls = 'FX' then 100000 else 1 end;

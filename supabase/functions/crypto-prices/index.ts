@@ -38,14 +38,16 @@ const CG_IDS: Record<string, string> = {
 };
 const STABLES: Record<string, number> = { USDT: 1, USDC: 1, DAI: 1 };
 
-type Row = { symbol: string; mid: number; spr_pts: number };
+type Row = { symbol: string; mid: number; spr_pts: number; tick_hi?: number; tick_lo?: number };
 // spr_pts for CRYPTO = the REAL exchange spread in BASIS POINTS (from Binance bookTicker
 // bid/ask). fx_close.sql floors it with the house minimum (greatest(FLOOR_BPS, spr_pts)),
 // so calm markets show the house floor and volatile/illiquid pairs widen automatically.
 // Stables and the CoinGecko fallback have no order book → spr 0 → the house floor applies.
-const px2row = (sym: string, p: number): Row => ({ symbol: sym, mid: Math.round(p * 1e6) / 1e6, spr_pts: 0 });
-const bookRow = (sym: string, mid: number, sprBps: number): Row =>
-  ({ symbol: sym, mid: Math.round(mid * 1e6) / 1e6, spr_pts: Math.round(sprBps * 100) / 100 });
+/* 워터마크: REST 스냅샷이라 창 내부 고저가 없음 → tick_hi=tick_lo=mid (판정 자동으로 현행 동일) */
+const px2row = (sym: string, p: number): Row => { const m = Math.round(p * 1e6) / 1e6;
+  return { symbol: sym, mid: m, spr_pts: 0, tick_hi: m, tick_lo: m } as Row; };
+const bookRow = (sym: string, mid: number, sprBps: number): Row => { const m = Math.round(mid * 1e6) / 1e6;
+  return { symbol: sym, mid: m, spr_pts: Math.round(sprBps * 100) / 100, tick_hi: m, tick_lo: m } as Row; };
 
 // Source 1: Binance public data mirror (real-time). bookTicker gives best bid/ask so we
 // publish the true mid AND the real exchange spread (bps).

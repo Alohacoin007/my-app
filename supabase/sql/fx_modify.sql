@@ -7,6 +7,11 @@
 -- watch it auto-close on the next sweep) BEFORE relying on it.
 -- =============================================================================================
 
+-- 0) 스파이크 워터마크(v1, 2026-07-22 사장님 "1번 고"): 펌프가 기록 사이 mid의 고저를 함께 적는다.
+--    null이면(폴백·크립토·미배포) 판정·정산 전부 기존과 자구 동일 — 배포 순서 무관, 안전 저하 0.
+alter table public.prices add column if not exists tick_hi numeric;
+alter table public.prices add column if not exists tick_lo numeric;
+
 -- 1) fx_modify — the trader's own open FX position gets sl/tp written into meta. Auth + side check.
 create or replace function public.fx_modify(p_local_id text, p_sl numeric default null, p_tp numeric default null)
 returns jsonb language plpgsql security definer set search_path to 'public' as $function$
@@ -48,6 +53,7 @@ create or replace function public.fx_sltp(p_max int default 1000)
 returns jsonb language plpgsql as $function$
 declare
   r_pos record; v_sl numeric; v_tp numeric; v_mid numeric; v_pts timestamptz;
+  v_lo numeric; v_hi numeric; v_lvl numeric; v_wm boolean;
   v_side text; v_hit text; v_pnl numeric; v_closed int := 0;
 begin
   for r_pos in
@@ -61,21 +67,26 @@ begin
     v_tp := nullif(r_pos.meta->>'tp','')::numeric;
     if v_sl is null and v_tp is null then continue; end if;
 
-    select mid, updated_at into v_mid, v_pts from public.prices where symbol = r_pos.symbol limit 1;
+    select mid, updated_at, coalesce(tick_lo, mid), coalesce(tick_hi, mid)
+      into v_mid, v_pts, v_lo, v_hi from public.prices where symbol = r_pos.symbol limit 1;
     if v_mid is null or v_mid <= 0 then continue; end if;                          -- can't price → skip (safe)
     if v_pts is null or (now() - v_pts) > interval '120 seconds' then continue; end if;  -- stale → skip
 
-    v_side := upper(r_pos.side); v_hit := null;
+    -- 워터마크 판정(v1): 기록 창의 고저(lo/hi)로 교차 검사 — 워터마크 없으면 lo=hi=mid = 기존과 동일.
+    -- 정산: mid 자체가 교차했으면 기존대로 시장가(mid∓half) 정산, "스침"(워터마크만 교차)이면
+    -- 레벨가 정산(MT5 — 스쳤다고 판정하고 딴 가격으로 정산 금지) + detail '~WM' 감사 표기.
+    v_side := upper(r_pos.side); v_hit := null; v_lvl := null;
     if v_side = 'BUY' then
-      if    v_sl is not null and v_mid <= v_sl then v_hit := 'SL';
-      elsif v_tp is not null and v_mid >= v_tp then v_hit := 'TP'; end if;
+      if    v_sl is not null and v_lo <= v_sl then v_hit := 'SL'; v_lvl := v_sl; v_wm := v_mid > v_sl;
+      elsif v_tp is not null and v_hi >= v_tp then v_hit := 'TP'; v_lvl := v_tp; v_wm := v_mid < v_tp; end if;
     else -- SELL
-      if    v_sl is not null and v_mid >= v_sl then v_hit := 'SL';
-      elsif v_tp is not null and v_mid <= v_tp then v_hit := 'TP'; end if;
+      if    v_sl is not null and v_hi >= v_sl then v_hit := 'SL'; v_lvl := v_sl; v_wm := v_mid < v_sl;
+      elsif v_tp is not null and v_lo <= v_tp then v_hit := 'TP'; v_lvl := v_tp; v_wm := v_mid > v_tp; end if;
     end if;
     if v_hit is null then continue; end if;
 
-    v_pnl := public.fx_realized_pnl(r_pos.symbol, r_pos.side, r_pos.open_price, r_pos.size);
+    v_pnl := public.fx_realized_pnl(r_pos.symbol, r_pos.side, r_pos.open_price, r_pos.size,
+                                    case when v_wm then v_lvl else null end);
     if v_pnl is null then continue; end if;
     -- 적립 스왑 포함 (2026-07-22 불변식: 청산 경로 무관 실현손익 = 가격 P&L + meta.swap — fx_close.sql:142와 동일)
     v_pnl := round(v_pnl + coalesce((r_pos.meta->>'swap')::numeric, 0), 2);
@@ -85,7 +96,8 @@ begin
     if found then   -- atomic claim: only the sweep that flips 'open'→'closed' banks it (no double vs manual close)
       insert into public.settlements(cust_id, acct_no, server, kind, local_id, symbol, stake, pnl, detail)
         values (r_pos.cust_id, r_pos.acct_no, 'fx', 'fx_close', r_pos.local_id, r_pos.symbol, r_pos.size, v_pnl,
-                v_hit||' '||v_side||' '||r_pos.size||' @ '||r_pos.open_price||' → '||round(v_mid,6));
+                v_hit||(case when v_wm then '~WM' else '' end)||' '||v_side||' '||r_pos.size||' @ '||r_pos.open_price
+                ||' → '||round((case when v_wm then v_lvl else v_mid end),6));
       v_closed := v_closed + 1;
     end if;
   end loop;
