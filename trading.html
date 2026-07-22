@@ -570,22 +570,18 @@ window.getFundingHistory=getFundingHistory;window.pushFundingHistory=pushFunding
 window.broadcastPositionOpen = function(){};
 window.broadcastPositionClose = function(){};
 
-// ── Pending orders: server-backed (fx_pending table). localStorage stays as a fast
-// cache/fallback; these helpers mirror every create/cancel/modify/fill to the server
-// so pending orders aren't device-bound. All best-effort: if the table/RLS isn't set
-// up (or offline), they silently no-op and the app keeps working from localStorage. ──
+// ── Pending orders v2 (2026-07-22 "고고"): 접수·취소는 서버 RPC만 — 직접 테이블 쓰기 폐쇄.
+// fx_place_pending = 방향 검증 + 멱등 접수 · fx_cancel_pending = pending 상태만 원자 취소
+// (filled/rejected 감사 행은 절대 안 지움 — 옛 delete는 status 무관이라 감사 유실 위험이 있었다).
+// 판정·체결은 서버 fx_pending_fill(워터마크+원자 선점+단일 코어)이 유일 경로 — 클라 감시 없음.
 function fxMe(){ try{ return JSON.parse(localStorage.getItem('alpexa.me')||'null'); }catch(e){ return null; } }
-function fxPendingRow(p){
-  const me=fxMe(); if(!me||!me.accts||!me.accts.fx) return null;
-  return { cust_id:me.custId||null, acct_no:me.accts.fx, server:'fx', local_id:String(p.id),
-    ticket:p.ticket||'', symbol:p.sym||'', side:p.side||'', size:+p.vol||0, otype:p.otype||'',
-    trigger:(p.trigger!=null?+p.trigger:null), sl:(p.sl!=null?+p.sl:null), tp:(p.tp!=null?+p.tp:null),
-    status:'pending' };
-}
-function fxPendingInsert(p){ try{ if(!(window.AlpexaSync&&AlpexaSync.db))return; const r=fxPendingRow(p); if(!r)return;
-  AlpexaSync.db.from('fx_pending').upsert(r,{onConflict:'acct_no,local_id'}).then(function(){},function(){}); }catch(e){} }
-function fxPendingDelete(id){ try{ if(!(window.AlpexaSync&&AlpexaSync.db))return; const me=fxMe(); if(!me||!me.accts||!me.accts.fx)return;
-  AlpexaSync.db.from('fx_pending').delete().eq('acct_no',me.accts.fx).eq('local_id',String(id)).then(function(){},function(){}); }catch(e){} }
+function fxPendingPlace(p, onReject){ try{ if(!(window.AlpexaSync&&AlpexaSync.db))return; const me=fxMe(); if(!me||!me.accts||!me.accts.fx)return;
+  AlpexaSync.db.rpc('fx_place_pending',{ p_local_id:String(p.id), p_symbol:p.sym||'', p_side:p.side||'', p_otype:p.otype||'',
+    p_size:+p.vol||0, p_trigger:(p.trigger!=null?+p.trigger:null),
+    p_sl:(p.sl!=null&&+p.sl>0?+p.sl:null), p_tp:(p.tp!=null&&+p.tp>0?+p.tp:null) })
+    .then(function(r){ const d=r&&r.data; if(d&&d.ok===false&&onReject) onReject(String(d.error||'rejected')); },function(){}); }catch(e){} }
+function fxPendingCancel(id){ try{ if(!(window.AlpexaSync&&AlpexaSync.db))return; const me=fxMe(); if(!me||!me.accts||!me.accts.fx)return;
+  AlpexaSync.db.rpc('fx_cancel_pending',{ p_local_id:String(id) }).then(function(){},function(){}); }catch(e){} }
 
 // No fake seed — the real balance is loaded from the server (accounts.balance).
 // Held IN MEMORY only (window.__fxBal); never persisted to localStorage.
@@ -3614,7 +3610,21 @@ function App(){
       let me; try{ me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); }catch(e){ me=null; }
       if(me&&me.accts&&me.accts.fx&&AlpexaSync.db.channel){
         ch=AlpexaSync.db.channel('fxpend-'+me.accts.fx)
-          .on('postgres_changes',{event:'*',schema:'public',table:'fx_pending',filter:'acct_no=eq.'+me.accts.fx},function(){ pullPending(); })
+          .on('postgres_changes',{event:'*',schema:'public',table:'fx_pending',filter:'acct_no=eq.'+me.accts.fx},function(pl){
+            /* 서버 스위프가 체결/거절한 순간을 그대로 알림 (클라 감시 제거 후의 UX 유지) */
+            try{ const n=pl&&pl.new;
+              if(n&&n.status==='filled'){
+                const px=(n.meta&&n.meta.fill_px)||n.trigger;
+                setToast({side:n.side,sym:n.symbol,vol:+n.size||0,price:px,triggered:true});
+                setTimeout(()=>setToast(null),3200);
+                if(window.ALPEXA_SFX)window.ALPEXA_SFX.triggered();
+                try{window.alpexaNotify&&alpexaNotify({type:'pendingTriggered',pref:'pendingTriggered',side:n.side,sym:n.symbol,px:String(px),title:n.side+' '+n.symbol+' pending order filled'});}catch(e){}
+              } else if(n&&n.status==='rejected'){
+                setToast({error:true,soft:true,icon:'warning',msg:n.symbol+' not filled',sub:'Order triggered, but '+((n.meta&&n.meta.reason)||'the server rejected the fill')});
+                setTimeout(()=>setToast(null),4500);
+              }
+            }catch(e){}
+            pullPending(); })
           .subscribe();
       }
     }catch(e){}
@@ -3729,60 +3739,12 @@ function App(){
           setTimeout(()=>setToast(null),4500);
         } } else if(lvl>=120){ marginCallRef.current=false; } // re-arm once safely recovered
       } else { marginCallRef.current=false; }
-      setPendingOrders(prev=>{
-        const triggered=[];
-        const stillPending=prev.filter(p=>{
-          const m=marketRef.current.state.find(s=>s.sym===p.sym);
-          if(!m)return true;
-          const px=p.side==='BUY'?ALPEXA_MARKET.fxAskPx(m):ALPEXA_MARKET.fxBidPx(m);   // pending triggers watch the DEALT quotes (display lockstep)
-          let hit=false;
-          if(p.otype==='LIMIT'){hit=p.side==='BUY'?px<=p.trigger:px>=p.trigger;}
-          else if(p.otype==='STOP'){hit=p.side==='BUY'?px>=p.trigger:px<=p.trigger;}
-          if(hit){
-            const now=new Date();
-            const time=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
-            // client fill is the FALLBACK; the real fill price comes from fx_open (server)
-            const fillPx=applySlippage(m,p.side,px,p.otype);
-            triggered.push({order:p,time:time,fillPx:fillPx});
-            return false;
-          }
-          return true;
-        });
-        if(triggered.length>0){
-          let me; try{me=JSON.parse(localStorage.getItem('alpexa.me')||'null');}catch(e){}
-          triggered.forEach(function(tg){
-            const p=tg.order;
-            fxPendingDelete(p.id);   // triggered → no longer pending; drop the server row
-            const addLive=function(openPx){
-              const lo={...p,status:'OPEN',open:openPx,placedAt:tg.time,fresh:true,pnl:0};
-              // dedupe vs the realtime adopt (pullPos) of the fx_open-created row
-              setLiveOrders(prevLo=> prevLo.some(o=>String(o.id)===String(p.id)) ? prevLo : [lo,...prevLo]);
-              setToast({side:p.side,sym:p.sym,vol:p.vol,price:openPx,triggered:true});
-              setTimeout(()=>setToast(null),3200);
-              if(window.ALPEXA_SFX)window.ALPEXA_SFX.triggered();
-              setTimeout(()=>{setLiveOrders(lo2=>lo2.map(o=>o.id===p.id?{...o,fresh:false}:o));},1500);
-            };
-            // Trigger watching stays client-side (real-time); the FILL is server-
-            // authoritative via fx_open, so a triggered order's entry can't be forged.
-            const rejectFill=function(why){
-              // #5/F: a triggered pending order fills ONLY if fx_open opens it server-side.
-              // If the server refuses (margin / price / spec / offline) it does NOT open
-              // client-side — show a non-blocking banner (the order was consumed; re-place).
-              setToast({error:true,soft:true,icon:'warning',msg:p.sym+' not filled',sub:(p.otype||'Order')+' triggered, but '+why});
-              setTimeout(()=>setToast(null),4500);
-            };
-            if(window.AlpexaSync&&AlpexaSync.db&&me&&me.accts&&me.accts.fx){
-              AlpexaSync.db.rpc('fx_open',{p_local_id:String(p.id),p_symbol:p.sym,p_side:p.side,p_size:p.vol}).then(function(r){
-                const d=r&&r.data;
-                if(d&&d.ok&&d.open!=null){ addLive(+d.open); return; }
-                var err=String((d&&d.error)||'');
-                rejectFill(/margin|insufficient|balance/i.test(err)?'insufficient margin':/stale|price/i.test(err)?'price unavailable':/spec/i.test(err)?'not tradeable now':'try again');
-              }, function(){ rejectFill('connection issue'); });
-            } else { rejectFill('no server connection'); }
-          });
-        }
-        return stillPending;
-      });
+      /* (구식 클라 트리거 감시 제거 — 2026-07-22 "고고", "진실은 한 곳" #5.)
+         판정·체결·감사는 서버 fx_pending_fill이 유일 경로: 워터마크(스침) 판정 + 원자 선점 +
+         단일 체결 코어(fx_fill_internal) + rejected 사유 보존, 에지 스위프로 초단위 반응.
+         체결의 화면 반영은 fx_pending Realtime(status 변경 → 토스트/사운드 + pullPending)과
+         positions 어댑트(pullPos)가 담당. 클라가 fx_pending 행을 지우던 경로는 폐쇄됐다
+         (옛 delete는 status 무관이라 서버의 filled/rejected 감사 행까지 지울 수 있었다). */
       force(x=>x+1);
     },700);
     return()=>clearInterval(id);
@@ -3820,7 +3782,11 @@ function App(){
     if(orderData.otype&&orderData.otype!=='MARKET'){
       const newPending={id,...orderData,status:'PENDING',placedAt:time,placedTs:Date.now(),ticket:alpexaTicket('FX')};
       setPendingOrders(prev=>[newPending,...prev]);
-      fxPendingInsert(newPending);   // mirror to server (fx_pending)
+      fxPendingPlace(newPending, function(err){   // 서버 검증 거절 → 로컬 행 회수 + 사유 (조용한 유령 대기주문 금지)
+        setPendingOrders(prev=>prev.filter(p=>p.id!==id));
+        setToast({error:true,icon:'warning',msg:'Pending order rejected',sub:/wrong side/i.test(err)?'Trigger price is on the wrong side of the market':err});
+        setTimeout(()=>setToast(null),3800);
+      });
       setToast({side:orderData.side,sym:orderData.sym,vol:orderData.vol,price:orderData.trigger,pending:true,otype:orderData.otype});
       setTimeout(()=>setToast(null),3200);
       if(window.ALPEXA_SFX)window.ALPEXA_SFX.pendingPlaced();
@@ -3883,9 +3849,21 @@ function App(){
     }
   }
 
-  function cancelPending(id){setPendingOrders(prev=>prev.filter(p=>p.id!==id));fxPendingDelete(id);}
+  function cancelPending(id){setPendingOrders(prev=>prev.filter(p=>p.id!==id));fxPendingCancel(id);}
   function modifyPosition(updated){setLiveOrders(prev=>prev.map(o=>o.id===updated.id?{...o,sl:updated.sl,tp:updated.tp}:o));if(window.ALPEXA_SFX)window.ALPEXA_SFX.tick();}
-  function modifyPending(updated){setPendingOrders(prev=>prev.map(p=>{if(p.id!==updated.id)return p;const np={...p,sl:updated.sl,tp:updated.tp,trigger:updated.trigger};try{fxPendingInsert(np);}catch(e){}return np;}));if(window.ALPEXA_SFX)window.ALPEXA_SFX.tick();}
+  // 수정 = 서버 취소 + 새 local_id로 재접수. (fx_place_pending은 멱등 on-conflict-do-nothing이라
+  // 같은 키 재접수는 침묵 무시 — cancelled 행이 키를 점유하므로 반드시 새 id. 검증도 재적용된다.)
+  function modifyPending(updated){
+    const nid=Date.now();
+    setPendingOrders(prev=>prev.map(p=>{ if(p.id!==updated.id) return p;
+      const np={...p,id:nid,sl:updated.sl,tp:updated.tp,trigger:updated.trigger,placedTs:Date.now()};
+      try{ fxPendingCancel(p.id); fxPendingPlace(np, function(err){
+        setPendingOrders(pr=>pr.filter(x=>x.id!==nid));
+        setToast({error:true,icon:'warning',msg:'Modify rejected',sub:/wrong side/i.test(err)?'Trigger price is on the wrong side of the market':err});
+        setTimeout(()=>setToast(null),3800);
+      }); }catch(e){}
+      return np; }));
+    if(window.ALPEXA_SFX)window.ALPEXA_SFX.tick();}
 
   function closeOrder(id){
     const order=liveOrders.find(o=>String(o.id)===String(id));
