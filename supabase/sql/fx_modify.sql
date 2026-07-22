@@ -77,6 +77,8 @@ begin
 
     v_pnl := public.fx_realized_pnl(r_pos.symbol, r_pos.side, r_pos.open_price, r_pos.size);
     if v_pnl is null then continue; end if;
+    -- 적립 스왑 포함 (2026-07-22 불변식: 청산 경로 무관 실현손익 = 가격 P&L + meta.swap — fx_close.sql:142와 동일)
+    v_pnl := round(v_pnl + coalesce((r_pos.meta->>'swap')::numeric, 0), 2);
 
     update public.positions set status = 'closed', pnl = v_pnl
       where local_id = r_pos.local_id and acct_no = r_pos.acct_no and server = 'fx' and status = 'open';
