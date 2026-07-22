@@ -24,6 +24,9 @@
 -- 0) 레거시 테이블 보강 (meta/filled_at — 재실행 안전)
 alter table public.fx_pending add column if not exists meta jsonb not null default '{}'::jsonb;
 alter table public.fx_pending add column if not exists filled_at timestamptz;
+-- 레거시 테이블이 PK 없이 Realtime 발행에 등록돼 있어 UPDATE가 55000으로 거부됨(2026-07-22 실전 발견,
+-- 스위프의 filled 선점이 매번 실패) → 유니크 인덱스를 replica identity로 지정 (재실행 안전)
+alter table public.fx_pending replica identity using index fx_pending_acct_localid_uidx;
 
 -- 1) 단일 체결 코어 — fx_open v3의 본문을 그대로 옮긴 내부 함수 (auth 없음 — 호출자가 신원 보증).
 --    클라 직접 호출 불가(revoke). 시장가(fx_open)와 대기 체결(fx_pending_fill)이 공유.
