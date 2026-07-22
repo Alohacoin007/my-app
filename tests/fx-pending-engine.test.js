@@ -51,6 +51,63 @@ ok('SQL의 판정식이 미러와 자구 대응 (4분기 존재)',
    /v_ask <= r\.trigger/.test(fillBody) && /v_ask >= r\.trigger/.test(fillBody) &&
    /v_bid >= r\.trigger/.test(fillBody) && /v_bid <= r\.trigger/.test(fillBody));
 
+// ── ②-b 워터마크 v1.1 (2026-07-22 "고고") — 정적 핀 + 판정·체결가 미러 ──
+// 계약: 스침(워터마크만 교차) → 트리거 레벨가 체결 + meta.wm · 현재가 교차 → 기존 시장가 체결 ·
+//       워터마크 null → 자구 동일(폴백 불변) · LIMIT은 지정가보다 나쁘게 체결 구조적 불가.
+ok('v1.1: fx_pending_fill이 워터마크(coalesce(tick_lo/tick_hi, mid)) 읽음',
+   /coalesce\(tick_lo, mid\), coalesce\(tick_hi, mid\)/.test(fillBody));
+ok('v1.1: 창 판정 4분기 (lo/hi에 같은 half 적용)',
+   /\(v_lo \+ v_half\) <= r\.trigger/.test(fillBody) && /\(v_hi \+ v_half\) >= r\.trigger/.test(fillBody) &&
+   /\(v_hi - v_half\) >= r\.trigger/.test(fillBody) && /\(v_lo - v_half\) <= r\.trigger/.test(fillBody));
+ok('v1.1: 스침 체결 = 트리거 레벨가 오버라이드 전달', /case when v_wm then r\.trigger else null end/.test(fillBody));
+ok('v1.1: 워터마크 체결 감사 표기 (fx_pending.meta.wm + fill_px)',
+   /jsonb_build_object\('wm', true, 'fill_px', r\.trigger\)/.test(fillBody));
+ok('v1.1: fx_fill_internal p_price_override(default null) + 구 9-인자 drop(42725 방지) + v_open 대체',
+   /p_price_override numeric default null/.test(sql) &&
+   /drop function if exists public\.fx_fill_internal\(text,text,text,text,text,numeric,numeric,numeric,numeric\);/.test(sql) &&
+   /if p_price_override is not null and p_price_override > 0 then v_open := p_price_override/.test(sql));
+ok('v1.1: 새 10-인자 시그니처 revoke 유지 (클라 호출 불가)',
+   /revoke all on function public\.fx_fill_internal\(text,text,text,text,text,numeric,numeric,numeric,numeric,numeric\) from public, anon, authenticated/.test(sql));
+
+// 판정·체결가 미러 (SQL v_hit_now/v_hit/v_wm/오버라이드와 자구 동일 의미)
+const judge2 = (side, otype, mid, lo, hi, half, tr) => {
+  lo = lo == null ? mid : lo; hi = hi == null ? mid : hi;
+  const now = hit(side, otype, mid - half, mid + half, tr);
+  const w = side === 'BUY'  && otype === 'LIMIT' ? (lo + half) <= tr :
+            side === 'BUY'  && otype === 'STOP'  ? (hi + half) >= tr :
+            side === 'SELL' && otype === 'LIMIT' ? (hi - half) >= tr :
+            side === 'SELL' && otype === 'STOP'  ? (lo - half) <= tr : false;
+  if (!w) return { fill: false };
+  const wm = !now;
+  return { fill: true, wm, px: wm ? tr : (side === 'BUY' ? mid + half : mid - half) };
+};
+const H = 0.00005;   // half (1.0pip 스프레드)
+let j = judge2('BUY', 'LIMIT', 1.1420, null, null, H, 1.1400);
+ok('v1.1 ① null 워터마크 + 미교차 → 대기 (폴백 불변)', j.fill === false);
+j = judge2('BUY', 'LIMIT', 1.1395, null, null, H, 1.1400);
+ok('v1.1 ① null 워터마크 + 현재가 교차 → 시장가 체결 (폴백 불변)', j.fill === true && j.wm === false && j.px === 1.1395 + H);
+j = judge2('BUY', 'LIMIT', 1.1420, 1.1395, 1.1425, H, 1.1400);
+ok('v1.1 ② BUY LIMIT 스침(lo<tr<mid) → 레벨가(1.14) 체결 + wm', j.fill === true && j.wm === true && j.px === 1.1400);
+j = judge2('BUY', 'STOP', 1.1400, 1.1398, 1.1425, H, 1.1410);
+ok('v1.1 ② BUY STOP 스침(hi>tr>mid) → 레벨가 체결 + wm', j.fill === true && j.wm === true && j.px === 1.1410);
+j = judge2('SELL', 'LIMIT', 1.1400, 1.1398, 1.1425, H, 1.1410);
+ok('v1.1 ② SELL LIMIT 스침(hi>tr>mid) → 레벨가 체결 + wm', j.fill === true && j.wm === true && j.px === 1.1410);
+j = judge2('SELL', 'STOP', 1.1420, 1.1395, 1.1425, H, 1.1400);
+ok('v1.1 ② SELL STOP 스침(lo<tr<mid) → 레벨가 체결 + wm', j.fill === true && j.wm === true && j.px === 1.1400);
+j = judge2('BUY', 'LIMIT', 1.1420, 1.1405, 1.1425, H, 1.1400);
+ok('v1.1 ③ 창이 트리거에 안 닿음 → 대기 (유령 체결 금지)', j.fill === false);
+// 속성: LIMIT은 어떤 경우에도 지정가보다 나쁘게 체결되지 않는다
+let limOk = true;
+for (const mid of [1.1380, 1.1395, 1.1400, 1.1410, 1.1430])
+  for (const lo of [null, mid - 0.002, mid - 0.0005])
+    for (const hi of [null, mid + 0.002, mid + 0.0005]) {
+      const b = judge2('BUY', 'LIMIT', mid, lo, hi, H, 1.1400);
+      if (b.fill && b.px > 1.1400 + 1e-12) limOk = false;
+      const s = judge2('SELL', 'LIMIT', mid, lo, hi, H, 1.1400);
+      if (s.fill && s.px < 1.1400 - 1e-12) limOk = false;
+    }
+ok('v1.1 속성: LIMIT 체결가는 지정가보다 항상 같거나 유리 (30조합)', limOk);
+
 // ── ④ 터미널 배선 (헤드리스 — playwright 없으면 여기까지만) ──
 function findChromium() {
   const base = process.env.PLAYWRIGHT_BROWSERS_PATH || '/opt/pw-browsers';

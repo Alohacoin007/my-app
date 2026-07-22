@@ -14,6 +14,10 @@
 --  · 트리거 판정(MT5, 서버 bid/ask = mid ∓ half):
 --      BUY LIMIT: ask ≤ trigger · BUY STOP: ask ≥ trigger
 --      SELL LIMIT: bid ≥ trigger · SELL STOP: bid ≤ trigger
+--  · 워터마크 v1.1 (2026-07-22 "고고"): 기록 창의 고저(tick_lo/tick_hi)로도 판정 —
+--    스파이크가 "스치고" 지나갔으면(현재가는 미교차) 트리거 **레벨가로** 체결 + meta.wm 감사.
+--    현재가가 교차했으면 기존대로 시장가(bid/ask) 체결. 워터마크 null이면 자구 동일(폴백 불변).
+--    ∴ LIMIT은 구조적으로 지정가보다 나쁘게 체결 불가(레벨가=지정가 · 시장가=지정가 이상 유리).
 --  · fail-safe: 시세 없음/신선도 초과/장마감 → 그 주문 스킵(돈은 추측으로 안 움직임).
 --    체결 시점 마진 부족 → status 'rejected' + meta.reason (MT5 동일 — 조용히 안 사라짐).
 --
@@ -30,11 +34,16 @@ alter table public.fx_pending replica identity using index fx_pending_acct_local
 
 -- 1) 단일 체결 코어 — fx_open v3의 본문을 그대로 옮긴 내부 함수 (auth 없음 — 호출자가 신원 보증).
 --    클라 직접 호출 불가(revoke). 시장가(fx_open)와 대기 체결(fx_pending_fill)이 공유.
+--    v1.1: p_price_override — 워터마크 "스침" 체결 시 트리거 레벨가를 그대로 체결가로 (스프레드 기반영 간주,
+--    fx_realized_pnl의 p_close_override와 같은 규약). null이면 자구 동일. 구 9-인자 시그니처는 모호성 방지 drop
+--    (fx_realized_pnl 42725 교훈 — 디폴트 인자 추가는 drop 없이 두 후보를 남긴다).
+drop function if exists public.fx_fill_internal(text,text,text,text,text,numeric,numeric,numeric,numeric);
 create or replace function public.fx_fill_internal(
   p_cust text, p_acct text, p_local_id text, p_symbol text, p_side text, p_size numeric,
   p_leverage numeric default null,
   p_requested_price numeric default null,
-  p_max_slippage numeric default null
+  p_max_slippage numeric default null,
+  p_price_override numeric default null
 ) returns jsonb language plpgsql security definer set search_path to 'public' as $$
 declare
   v_cls text; v_mid numeric; v_pts timestamptz; v_open numeric; v_side text := upper(coalesce(p_side,''));
@@ -63,6 +72,8 @@ begin
   else
     v_open := v_mid;
   end if;
+  -- 워터마크 레벨가 체결 (v1.1): 오버라이드가 오면 그 가격이 체결가 — 마진·notional도 이 가격 기준.
+  if p_price_override is not null and p_price_override > 0 then v_open := p_price_override; end if;
 
   if exists (select 1 from public.positions where local_id = p_local_id and acct_no = p_acct and server = 'fx') then
     select open_price into v_open from public.positions where local_id = p_local_id and acct_no = p_acct and server = 'fx' limit 1;
@@ -104,7 +115,7 @@ begin
   return jsonb_build_object('ok',true,'open',round(v_open,6),'symbol',p_symbol,'side',v_side,'size',p_size,
                             'margin',round(v_new_margin,2),'leverage',v_lev);
 end;$$;
-revoke all on function public.fx_fill_internal(text,text,text,text,text,numeric,numeric,numeric,numeric) from public, anon, authenticated;
+revoke all on function public.fx_fill_internal(text,text,text,text,text,numeric,numeric,numeric,numeric,numeric) from public, anon, authenticated;
 
 -- 2) fx_open v4 — 얇은 래퍼: auth + 계좌 해석 + 세션 게이트 → 코어 호출. 시그니처 동일(클라 무변경).
 create or replace function public.fx_open(
@@ -201,14 +212,16 @@ create or replace function public.fx_pending_fill(p_max int default 200)
 returns jsonb language plpgsql security definer set search_path to 'public' as $$
 declare
   r record; v_mid numeric; v_pts timestamptz; v_spr numeric; v_mk numeric; v_pip numeric; v_half numeric;
-  v_bid numeric; v_ask numeric; v_hit boolean; v_res jsonb; v_filled int := 0; v_rejected int := 0;
+  v_bid numeric; v_ask numeric; v_lo numeric; v_hi numeric;
+  v_hit boolean; v_hit_now boolean; v_wm boolean; v_res jsonb; v_filled int := 0; v_rejected int := 0;
 begin
   for r in
     select fp.*, s.cls from public.fx_pending fp join public.fx_specs s on s.symbol = fp.symbol
      where fp.status = 'pending' limit p_max
   loop
     if not public.fx_market_open(r.cls) then continue; end if;              -- 장마감 → 스킵
-    select mid, updated_at into v_mid, v_pts from public.prices where symbol = r.symbol limit 1;
+    select mid, updated_at, coalesce(tick_lo, mid), coalesce(tick_hi, mid)
+      into v_mid, v_pts, v_lo, v_hi from public.prices where symbol = r.symbol limit 1;
     if v_mid is null or v_mid <= 0 then continue; end if;
     if v_pts is null or (now() - v_pts) > interval '120 seconds' then continue; end if;
 
@@ -222,22 +235,38 @@ begin
     else v_half := 0; end if;
     v_bid := v_mid - v_half; v_ask := v_mid + v_half;
 
-    v_hit := case
+    -- 현재가 판정 (기존과 자구 동일)
+    v_hit_now := case
       when r.side='BUY'  and r.otype='LIMIT' then v_ask <= r.trigger
       when r.side='BUY'  and r.otype='STOP'  then v_ask >= r.trigger
       when r.side='SELL' and r.otype='LIMIT' then v_bid >= r.trigger
       when r.side='SELL' and r.otype='STOP'  then v_bid <= r.trigger
       else false end;
+    -- 워터마크 판정 (v1.1): 기록 창의 고저에 같은 half를 적용한 창 내 최우호 bid/ask로 교차 검사.
+    -- 워터마크 없으면 lo=hi=mid → v_hit == v_hit_now (폴백 불변).
+    v_hit := case
+      when r.side='BUY'  and r.otype='LIMIT' then (v_lo + v_half) <= r.trigger
+      when r.side='BUY'  and r.otype='STOP'  then (v_hi + v_half) >= r.trigger
+      when r.side='SELL' and r.otype='LIMIT' then (v_hi - v_half) >= r.trigger
+      when r.side='SELL' and r.otype='STOP'  then (v_lo - v_half) <= r.trigger
+      else false end;
     if not v_hit then continue; end if;
+    -- "스침"(워터마크만 교차) → 트리거 레벨가 체결. 현재가 교차 → 기존대로 시장가 체결.
+    v_wm := not v_hit_now;
 
     -- 원자적 선점: pending→filled로 먼저 뺏은 쪽만 체결 (구클라 경합 시에도 1회)
     update public.fx_pending set status = 'filled', filled_at = now()
      where local_id = r.local_id and acct_no = r.acct_no and status = 'pending';
     if not found then continue; end if;
 
-    v_res := public.fx_fill_internal(r.cust_id, r.acct_no, r.local_id, r.symbol, r.side, r.size, null, null, null);
+    v_res := public.fx_fill_internal(r.cust_id, r.acct_no, r.local_id, r.symbol, r.side, r.size, null, null, null,
+                                     case when v_wm then r.trigger else null end);
     if coalesce((v_res->>'ok')::boolean, false) then
       v_filled := v_filled + 1;
+      if v_wm then                                                          -- 워터마크 체결 감사 표기 (fx_sltp '~WM'과 동격)
+        update public.fx_pending set meta = coalesce(meta,'{}'::jsonb) || jsonb_build_object('wm', true, 'fill_px', r.trigger)
+         where local_id = r.local_id and acct_no = r.acct_no;
+      end if;
       if r.sl is not null or r.tp is not null then                          -- SL/TP 이식 (fx_sltp가 발동)
         update public.positions set meta = coalesce(meta,'{}'::jsonb)
              || jsonb_build_object('sl', r.sl, 'tp', r.tp)
