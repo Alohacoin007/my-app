@@ -23,7 +23,7 @@ if (!/React\.useEffect\(\(\)=> journalStore\.subscribe\(e=>setRows\(\[\.\.\.e\]\
 // 2) Exposure — real notional (per-asset contract size) + % of equity + totals
 if (!/function ExposureTab\(\{ pos, mids, equity, leverage \}\)/.test(src)) bad('ExposureTab must receive equity + leverage');
 if (!/const notl=\(s\)=> gross\(s\)\*contractSize\(s\)\*baseUsdRate\(s\);/.test(src)) bad('Exposure notional must use GROSS lots × per-asset contract size × USD rate (not a flat 100000)');
-if (!/const marg=\(s\)=> requiredMargin\(s, gross\(s\), leverage\);/.test(src)) bad('Exposure must compute GROSS MARGIN (both legs, matches the bottom bar)');
+if (!/const marg=\(s\)=> usedMarginOf\(s, gross\(s\)\);/.test(src)) bad('Exposure must compute GROSS MARGIN at HOUSE CAP (both legs, matches the bottom bar)');
 if (!/\(mg\/eq\*100\)\.toFixed\(2\)\+' %'/.test(src)) bad('% of Equity must be MARGIN/equity (capital utilization), not notional/equity');
 if (!/<ExposureTab pos=\{pos\} mids=\{mids\} equity=\{equity\} leverage=\{leverage\} \/>/.test(src)) bad('ExposureTab must be passed equity + leverage');
 

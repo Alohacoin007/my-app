@@ -1413,6 +1413,10 @@ function baseUsdRate(symbol){
 function requiredMargin(symbol, volume, leverage){
   const lev=Math.max(1, Math.min(+leverage||500, LEV_CAP(symbol))); return (+volume||0)*contractSize(symbol)*baseUsdRate(symbol)/lev;   // leverage clamped to the house cap 500:1 (server fx_lev_cap lockstep)
 }
+/* 열린 포지션의 사용중 마진 = 서버 v_used 미러 (2026-07-22 차이감사 ③): notional / fx_lev_cap — 하우스 캡
+   기준, 사용자 레버리지 무관. 서버의 마진 게이트·스탑아웃이 이 값으로 판정하므로 화면도 이것이 진실.
+   (사용자 레버리지는 "신규 주문"의 증거금(marginFor)에만 반영 — 서버 v_new_margin과 동일 규칙.) */
+function usedMarginOf(symbol, volume){ return requiredMargin(symbol, volume, LEV_CAP(symbol)); }
 
 function useTradeEngine(){
   const [acct,setAcct]=React.useState(positionsStore.acct);
@@ -1428,7 +1432,7 @@ function useTradeEngine(){
   const floating = pos.reduce((s,p)=> s + positionPnL(p, priceStore.get(p.symbol)), 0);   // per-position, per-side (BID/ASK)
   const balance = acct?+acct.balance||0:0;
   const equity  = balance + floating;
-  const usedMargin = pos.reduce((s,p)=> s + requiredMargin(p.symbol, lotsOf(p), leverage), 0);
+  const usedMargin = pos.reduce((s,p)=> s + usedMarginOf(p.symbol, lotsOf(p)), 0);   // 서버 v_used 락스텝(캡 기준, LEV_CAP)
   const freeMargin = equity - usedMargin;
   const marginFor  = (symbol, volume)=> requiredMargin(symbol, volume, leverage);
   const maxVolume  = (symbol)=>{ const one=requiredMargin(symbol, 1, leverage);
@@ -2488,7 +2492,7 @@ function ExposureTab({ pos, mids, equity, leverage }){
   const net=(s)=> agg[s].long-agg[s].short;                  // signed net volume (0 → fully hedged)
   const gross=(s)=> agg[s].long+agg[s].short;                // GROSS lots = real exposure / capital at work
   const notl=(s)=> gross(s)*contractSize(s)*baseUsdRate(s);  // full market value of BOTH legs
-  const marg=(s)=> requiredMargin(s, gross(s), leverage);    // margin locked by BOTH legs (matches the bottom bar)
+  const marg=(s)=> usedMarginOf(s, gross(s));    // margin locked by BOTH legs — 서버 v_used 락스텝(캡 기준, LEV_CAP)
   const totN=rows.reduce((a,s)=>a+notl(s),0), totM=rows.reduce((a,s)=>a+marg(s),0), eq=+equity||0;
   return (
     <div className="postbl"><table className="pos">
@@ -2762,7 +2766,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
   const plOf=(p)=> positionPnL(p, mids[p.symbol]);
   const floating = pos.reduce((s,p)=> s+plOf(p), 0);
   const balance=acct?+acct.balance||0:0, equity=balance+floating;
-  const marginUsed=pos.reduce((s,p)=> s+requiredMargin(p.symbol, lotsOf(p), leverage), 0);  // leverage-driven
+  const marginUsed=pos.reduce((s,p)=> s+usedMarginOf(p.symbol, lotsOf(p)), 0);  // 서버 v_used 락스텝(캡 기준, LEV_CAP)
   const level=marginUsed>0?(equity/marginUsed*100):0;
   const num=(n)=>(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 

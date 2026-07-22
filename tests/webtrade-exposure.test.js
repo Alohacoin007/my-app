@@ -14,7 +14,7 @@ const bad = (m) => { console.error('🔴 ' + m); fail++; };
 if (!/const agg=\{\}; pos\.forEach\(p=>\{ const s=p\.symbol, lots=lotsOf\(p\);/.test(src)) bad('must aggregate long/short lots per symbol');
 if (!/const rows=Object\.keys\(agg\)\.filter\(s=>\(agg\[s\]\.long\+agg\[s\]\.short\)>1e-9\);/.test(src)) bad('rows must include any symbol with an open position (hedged included)');
 if (!/const gross=\(s\)=> agg\[s\]\.long\+agg\[s\]\.short;/.test(src)) bad('gross = long+short lots');
-if (!/const marg=\(s\)=> requiredMargin\(s, gross\(s\), leverage\);/.test(src)) bad('margin must be GROSS (both legs), matching the bottom bar');
+if (!/const marg=\(s\)=> usedMarginOf\(s, gross\(s\)\);/.test(src)) bad('margin must be GROSS (both legs) at HOUSE CAP — 서버 v_used 락스텝, matching the bottom bar');
 if (!/flat\?'Flat \(hedged\)':\(v>0\?'Long':'Short'\)/.test(src)) bad('net 0 must read "Flat (hedged)"');
 if (/No net exposure/.test(src)) bad('the misleading "No net exposure" empty text must be gone');
 

@@ -44,7 +44,7 @@ if (!fail) {
 
 // ── the Equity / Free Margin / Margin Level chain must be wired per spec ──
 if (!/const equity  = balance \+ floating;/.test(src)) bad('Equity = Balance + floating');
-if (!/const usedMargin = pos\.reduce\(\(s,p\)=> s \+ requiredMargin\(p\.symbol, lotsOf\(p\), leverage\), 0\);/.test(src)) bad('used margin = Σ requiredMargin(open positions)');
+if (!/const usedMargin = pos\.reduce\(\(s,p\)=> s \+ usedMarginOf\(p\.symbol, lotsOf\(p\)\), 0\);/.test(src)) bad('used margin = Σ usedMarginOf(open positions) — 서버 v_used 락스텝(캡 기준), 2026-07-22');
 if (!/const freeMargin = equity - usedMargin;/.test(src)) bad('Free Margin = Equity − used margin');
 if (!/const level=marginUsed>0\?\(equity\/marginUsed\*100\):0;/.test(src)) bad('Margin Level = Equity/Margin × 100');
 // contract size must NOT hardcode 100000 in the P&L paths any more
