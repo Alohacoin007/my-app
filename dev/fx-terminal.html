@@ -1026,6 +1026,10 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
       tl(p.price, p.otype.toLowerCase()+' '+p.vol+' #'+p.ticket, '#E0A020', true);
       tl(p.sl, 'sl '+p.sl, '#B57BFF', true);
       tl(p.tp, 'tp '+p.tp, '#2E90FA', true); });
+    else (acct.pend||[]).forEach(p=>{ if(p.symbol!==sym) return;   // LIVE 대기주문 라인 (서버 매칭 대기, 주황 점선)
+      tl(+p.trigger, String(p.side||'').toLowerCase()+' '+String(p.otype||'').toLowerCase()+' '+(+p.size||0).toFixed(2)+' #'+p.local_id, '#E0A020', true);
+      tl(+p.sl, 'sl '+p.sl, '#B57BFF', true);
+      tl(+p.tp, 'tp '+p.tp, '#2E90FA', true); });
     chartScale[id].tradeLines=TL;
     if(sltpDrag&&sltpDrag.id===id&&sltpDrag.price!=null){   // 드래그 프리뷰
       const py=yOf(Math.max(mn,Math.min(mx,sltpDrag.price)));
@@ -1676,8 +1680,13 @@ function submitOrder(kind){ if(!ordUI) return; const sym=ordUI.sym;
       return; }
     if(placeMarketDemo(sym,kind,vol,sl,tp)) closeOrder(); return; }
   if(kind==='pending'){
-    if(LIVE){ toast('Pending orders (limit/stop) go live with the server matching engine — market orders only for now'); return; }
     const price=parseFloat((document.getElementById('odPrice')||{}).value)||0;
+    if(LIVE){   // M4.5: 서버 매칭 엔진 — Limit/Stop 4종. Stop Limit은 정직 거절(v2)
+      const parts=String(ordUI.otype||'').split(' '), pSide=parts[0].toLowerCase(), pType=parts.slice(1).join(' ').toUpperCase();
+      if(pType==='STOP LIMIT'){ toast('Stop Limit orders come in v2 — Limit/Stop available now'); return; }
+      if(!(price>0)){ toast('Enter a valid price'); return; }
+      fxPlacePendingReal(sym, pSide, pType, vol, price, sl, tp).then(okd=>{ if(okd) closeOrder(); });
+      return; }
     if(placePendingDemo(sym,ordUI.otype,vol,price,sl,tp)) closeOrder(); } }
 
 /* ── MT5 Modify — Trade 탭 S/L·T/P 셀 클릭 → SL/TP 설정 창 (DEMO 전용, LIVE 수정은 M5) ── */
@@ -1773,7 +1782,14 @@ function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!
       DEMO_PEND.map(p=>'<tr><td>'+p.sym+'</td><td>'+p.ticket+'</td><td>'+p.time+'</td>'+
         '<td class="pend">'+p.otype.toLowerCase()+'</td><td>'+p.vol+'</td><td>'+p.price+'</td><td>'+(p.sl||'—')+'</td>'+
         '<td>'+(p.tp||'—')+'</td><td>'+pmk(p.sym)+'</td><td>—</td><td>—</td><td>—</td>'+
-        '<td class="pox"><span class="poclose" data-cancel="'+p.ticket+'" title="Cancel pending order">✕</span></td></tr>').join('') : '';
+        '<td class="pox"><span class="poclose" data-cancel="'+p.ticket+'" title="Cancel pending order">✕</span></td></tr>').join('')
+      /* LIVE 대기주문 — 서버 fx_pending(매칭은 서버 스위프). ✕ = fx_cancel_pending (M4.5) */
+      : (LIVE&&fxAcct.pend.length) ? '<tr class="pendhd"><td colspan="13">Pending Orders — server matched ('+fxAcct.pend.length+')</td></tr>'+
+      fxAcct.pend.map(p=>'<tr><td>'+p.symbol+'</td><td>'+p.local_id+'</td><td>'+fxStamp(Date.parse(p.created_at)||Date.now())+'</td>'+
+        '<td class="pend">'+String(p.side||'').toLowerCase()+' '+String(p.otype||'').toLowerCase()+'</td><td>'+(+p.size||0).toFixed(2)+'</td>'+
+        '<td>'+mwFmt(p.symbol,+p.trigger)+'</td><td>'+(p.sl?mwFmt(p.symbol,+p.sl):'—')+'</td>'+
+        '<td>'+(p.tp?mwFmt(p.symbol,+p.tp):'—')+'</td><td>'+pmk(p.symbol)+'</td><td>—</td><td>—</td><td>—</td>'+
+        '<td class="pox"><span class="poclose" data-rpcancel="'+p.local_id+'" title="Cancel pending order — LIVE (server)">✕</span></td></tr>').join('') : '';
     body.innerHTML='<div class="tbxscroll"><table class="postbl">'+colg(TBX_COLW.trade)+'<thead><tr>'+
       ['Symbol','Ticket','Time','Type','Volume','Price','S / L','T / P','Price','Commission','Swap','Profit',''].map(h=>'<th>'+h+'</th>').join('')+
       '</tr></thead><tbody>'+rows+pend+'</tbody>'+
@@ -2153,21 +2169,24 @@ fxFeed.start();
    세션 게이트 = getSession 실존 + alpexa.me 태그(유령세션 가드) · 하이드레이션 레이스 자가치유(재판정). ══ */
 const FX_CONTRACT_OF=s=>mwCat(s)==='Forex'?100000:1;   // fx_notional_usd 락스텝
 const FX_LEVCAP_OF=s=>mwCat(s)==='Forex'?FX_LEV_TERM:5;   // 500:1 (2026-07-19 사장님)
-const fxAcct={ authed:false, acct:null, pos:[], _t:null, ch1:null, ch2:null,
+const fxAcct={ authed:false, acct:null, pos:[], pend:[], _t:null, ch1:null, ch2:null,
   async session(){ try{
     if(!(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.auth)) return null;
     const s=await AlpexaSync.db.auth.getSession();
     const a=AlpexaSync.acctFor&&AlpexaSync.acctFor('fx');
     return (s&&s.data&&s.data.session&&a)?a:null; }catch(e){ return null; } },
   async load(){ const a=await this.session();
-    if(!a){ if(this.authed){ this.authed=false; this.acct=null; this.pos=[]; this.paint(); } return; }
+    if(!a){ if(this.authed){ this.authed=false; this.acct=null; this.pos=[]; this.pend=[]; this.paint(); } return; }
     try{
-      const [ar,pr]=await Promise.all([
+      const [ar,pr,dr]=await Promise.all([
         AlpexaSync.db.from('accounts').select('acct_no,balance').eq('server','fx').eq('acct_no',a).limit(1),
         AlpexaSync.db.from('positions').select('local_id,symbol,side,size,open_price,status,updated_at,meta')
-          .eq('server','fx').eq('acct_no',a).eq('status','open').limit(200) ]);
+          .eq('server','fx').eq('acct_no',a).eq('status','open').limit(200),
+        AlpexaSync.db.from('fx_pending').select('local_id,symbol,side,size,otype,trigger,sl,tp,status,created_at')
+          .eq('acct_no',a).eq('status','pending').limit(100) ]);
       if(ar&&ar.data&&ar.data[0]){ this.acct=ar.data[0]; }
       if(pr&&pr.data){ this.pos=pr.data; }
+      if(dr&&dr.data){ this.pend=dr.data; }   // 서버 대기주문 (매칭은 서버 스위프 — M4.5)
       if(this.acct){ if(!this.authed){ this.authed=true; } this.paint(); }
     }catch(e){} },
   closePx(p){ const r=mwStore.rows[p.symbol]; if(!r||r.bid==null) return null;
@@ -2215,6 +2234,7 @@ const fxAcct={ authed:false, acct:null, pos:[], _t:null, ch1:null, ch2:null,
       /* 정산 실시간(차이감사 #5, webtrade ch3 락스텝) — SL/TP/STOPOUT 자동청산을 즉시 알리고 잔고·이력 갱신.
          이거 없으면 강제청산당해도 화면 무반응 + History 영구 stale. */
       this.ch3=AlpexaSync.db.channel('fxterm-settle').on('postgres_changes',{event:'INSERT',schema:'public',table:'settlements'},m=>this.onSettle(m&&m.new)).subscribe();
+      this.ch4=AlpexaSync.db.channel('fxterm-pend').on('postgres_changes',{event:'*',schema:'public',table:'fx_pending'},()=>this.load()).subscribe();   // 대기 접수/체결/취소 실시간
     } }catch(e){} },
   /* settlements INSERT 수신 — 내 fx 계좌 행만. SL/TP/STOPOUT은 소리+토스트+Journal(자동청산 통보), 전부 재조회. */
   onSettle(row){ try{ if(!row||!this.authed) return;
@@ -2264,6 +2284,31 @@ async function fxCloseReal(localId){
     const why=(d&&d.error)||(r&&r.error&&r.error.message)||'close failed';
     fxSnd('timeout.wav'); toast('❌ Close rejected: '+why); return false;
   }catch(e){ fxSnd('timeout.wav'); toast('❌ Close failed: '+String(e&&e.message||e)); return false; } }
+/* M4.5 대기주문 — 서버 매칭(fx_place_pending/fx_cancel_pending). 클라는 접수·취소·표시만, 체결은 서버 스위프. */
+async function fxPlacePendingReal(sym, side, otype, vol, trigger, sl, tp){
+  const local_id='fxt-'+Date.now()+'-'+Math.floor(Math.random()*1e6);
+  try{
+    const r=await AlpexaSync.db.rpc('fx_place_pending', { p_local_id:local_id, p_symbol:sym,
+      p_side:String(side).toUpperCase(), p_otype:String(otype).toUpperCase(), p_size:+vol,
+      p_trigger:+trigger, p_sl:(sl>0?+sl:null), p_tp:(tp>0?+tp:null) });
+    const d=r&&r.data;
+    if(r&&!r.error&&d&&d.ok){ fxSnd('ok.wav');
+      JOURNAL.log('LIVE pending placed — '+String(side).toUpperCase()+' '+String(otype).toUpperCase()+' '+vol+' '+sym+' @ '+trigger, true);
+      toast('✅ '+String(otype).toUpperCase()+' '+vol+' '+sym+' @ '+trigger+' — placed (LIVE, server-matched)');
+      fxAcct.load(); return local_id; }
+    const why=(d&&d.error)||(r&&r.error&&r.error.message)||'rejected';
+    fxSnd('timeout.wav'); JOURNAL.log('LIVE pending rejected — '+sym+': '+why, false);
+    toast('❌ Pending rejected: '+why); return false;
+  }catch(e){ fxSnd('timeout.wav'); toast('❌ Pending failed: '+String(e&&e.message||e)); return false; } }
+async function fxCancelPendingReal(localId){
+  try{
+    const r=await AlpexaSync.db.rpc('fx_cancel_pending', { p_local_id:localId });
+    const d=r&&r.data;
+    if(r&&!r.error&&d&&d.ok){ JOURNAL.log('LIVE pending cancelled — '+localId, true);
+      toast('✅ Pending '+localId+' cancelled (LIVE)'); fxAcct.load(); return true; }
+    const why=(d&&d.error)||(r&&r.error&&r.error.message)||'cancel failed';
+    toast('❌ Cancel rejected: '+why); return false;
+  }catch(e){ toast('❌ Cancel failed: '+String(e&&e.message||e)); return false; } }
 async function fxModifyReal(localId, sl, tp){
   try{
     const r=await AlpexaSync.db.rpc('fx_modify', { p_local_id:localId, p_sl:(sl>0?+sl:null), p_tp:(tp>0?+tp:null) });
@@ -2307,6 +2352,7 @@ mwSimulate(); mwRender();
   content.addEventListener('click', e=>{
     const x=e.target.closest('.poclose'); if(x){
       if(x.dataset.rclose){ fxCloseReal(x.dataset.rclose); return; }   // M4: 서버 청산
+      if(x.dataset.rpcancel){ fxCancelPendingReal(x.dataset.rpcancel); return; }   // M4.5: 서버 대기 취소
       if(x.dataset.cancel) cancelPendDemo(x.dataset.cancel); else closePosDemo(x.dataset.close); return; }
     const rmd=e.target.closest('[data-rmod]'); if(rmd){ openModifyDemo(rmd.dataset.rmod, true); return; }   // 실포지션 S/L·T/P → fx_modify
     const md=e.target.closest('[data-mod]'); if(md){ openModifyDemo(md.dataset.mod); return; }   // 데모 Modify

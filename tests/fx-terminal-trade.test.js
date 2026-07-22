@@ -124,7 +124,7 @@ const STUB = (rpcMode) => `(() => {
   await page.evaluate(() => { document.querySelector('#ordModal [data-od="place"]').click(); });
   await page.waitForTimeout(200);
   const pend = await page.evaluate(() => ({ rpc: window.__rpcLog.length, toast: (document.getElementById('toast') || {}).textContent || '' }));
-  ok('authed pending order → honest refusal, zero RPC', pend.rpc === 0 && /matching engine|market orders/i.test(pend.toast), JSON.stringify(pend));
+  ok('authed pending order → server-matched placement (fx_place_pending) — M4.5', pend.rpc === 1 && /placed \(LIVE, server-matched\)/i.test(pend.toast), JSON.stringify(pend));
   await page.keyboard.press('Escape');
 
   // ── ③ 거절 응답 → 사유 토스트, 로컬 무변화 ──

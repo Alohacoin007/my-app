@@ -56,7 +56,7 @@ function installStub(mode) {
       acctFor: k => k === 'fx' ? 'FX-1' : null,
       db: {
         auth: { getSession: async () => ({ data: { session: ${mode === 'live' ? "{ user: { id: 'u1' } }" : 'null'} } }) },
-        from: t => q(t === 'accounts' ? ${JSON.stringify([ACCT])} : ${JSON.stringify(POS)}),
+        from: t => q(t === 'accounts' ? ${JSON.stringify([ACCT])} : t === 'positions' ? ${JSON.stringify(POS)} : []),
         channel: () => ({ on(){ return this; }, subscribe(){ return this; } })
       } };
   })()`;
