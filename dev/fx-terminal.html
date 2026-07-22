@@ -1117,6 +1117,7 @@ function mkChart(id, sym, i){ makeWidget(id, sym, 'var(--lgd-up)', chartBody());
     if(ocbar){ ocbar.addEventListener('click', ev=>{ const b=ev.target.closest('[data-oc]'); if(!b) return; ev.stopPropagation(); ev.preventDefault();
       setActiveChart(id); const k=b.dataset.oc, c=cfg(id), sym=(layout[id]&&layout[id].sym)||'';
       if(k==='sell'||k==='buy'){
+        if(!fxGateOrder(sym)) return;   // 세션 게이트(차이감사 #2)
         if(window.fxAcct&&fxAcct.authed) fxPlaceReal(sym, k, c.oclot||0.10);   // M4: 로그인=서버 실체결
         else placeMarketDemo(sym, k, c.oclot||0.10, 0, 0); } });
     /* 볼륨 ±: pointerdown 즉시 1스텝 + 320ms 후 55ms 연타, 20스텝 넘으면 ×10(0.10씩) — MT5 홀드 */
@@ -1251,13 +1252,18 @@ const MW_FLOOR_BPS={Crypto:10,Stocks:8};
 const MW_DEFAULT_SPREAD={EURUSD:1.0,GBPUSD:1.2,USDJPY:1.9,AUDUSD:1.2,USDCAD:1.5,USDCHF:1.6,NZDUSD:1.8,
   EURJPY:1.8,GBPJPY:2.2,AUDJPY:1.9,Forex:1.5,Crypto:10,Stocks:8};
 const mwSeedSpr=s=>MW_DEFAULT_SPREAD[s]!=null?MW_DEFAULT_SPREAD[s]:MW_DEFAULT_SPREAD[mwCat(s)];
-/* half-spread(가격단위) = fx_close.sql v_half / webtrade fxHalfSpread 미러. FX=pip기반, 비FX=bps */
-const mwHalf=(s,mid,spr)=>mwCat(s)==='Forex'?Math.max(0.1,(+spr||0))*mwPip(s)/2
+/* half-spread(가격단위) = fx_close.sql v_half / webtrade halfPx 미러. FX=pip기반 spr+markup, 비FX=bps.
+   markup_pts(pricing_marks) 누락은 "화면 플로팅≠서버 실현" 클래스(차이감사 2026-07-21 #1) — 반드시 포함. */
+const mwHalf=(s,mid,spr)=>mwCat(s)==='Forex'?Math.max(0.1,(+spr||0)+((mwStore.marks&&mwStore.marks[s])||0))*mwPip(s)/2
   :mid*Math.max(MW_FLOOR_BPS[mwCat(s)]||0,+spr||0)/10000/2;
 const MW_BASE={ EURUSD:1.143,GBPUSD:1.3417,USDJPY:162.36,AUDUSD:0.694,USDCAD:1.417,USDCHF:0.8068,NZDUSD:0.5758,
   GBPJPY:217.8,AUDJPY:112.7,EURJPY:185.6, AAPL:229.5,MSFT:465.2,NVDA:128.4,TSLA:248.6,AMZN:198.3,GOOGL:178.9,
   META:562.1, BTCUSD:64250,ETHUSD:3420,SOLUSD:148.5,XRPUSD:0.612,DOGEUSD:0.145 };
-const mwStore={ rows:{}, ticks:{}, live:false,
+const mwStore={ rows:{}, ticks:{}, live:false, marks:{},
+  /* FX markup_pts(pips) — webtrade loadMarks 락스텝([0,50] 클램프). 실패=markup 0 유지(서버는 청산 때 그대로 부과). */
+  async loadMarks(){ try{ if(!(window.AlpexaSync&&AlpexaSync.db)) return;
+    const r=await AlpexaSync.db.from('pricing_marks').select('symbol,markup_pts');
+    if(r&&r.data){ const m={}; r.data.forEach(p=>{ m[p.symbol]=Math.max(0,Math.min(50,+p.markup_pts||0)); }); this.marks=m; } }catch(e){} },
   set(sym,mid,spr){ const half=mwHalf(sym,mid,spr), prev=this.rows[sym], bid=mid-half, ask=mid+half;
     const open=prev?prev.open:mid, hi=prev?Math.max(prev.hi,mid):mid, lo=prev?Math.min(prev.lo,mid):mid;
     const bidHi=prev?Math.max(prev.bidHi,bid):bid, bidLo=prev?Math.min(prev.bidLo,bid):bid,   // Details 탭: bid/ask 세션 고저 개별 추적
@@ -1273,6 +1279,24 @@ const mwStore={ rows:{}, ticks:{}, live:false,
     this.set(s,mid,spr); }); this.live=true; } };
 function fxWeekendClosed(){ const d=new Date(), day=d.getUTCDay(), h=d.getUTCHours();
   return day===6 || (day===0&&h<21) || (day===5&&h>=21); }   // 금 21UTC ~ 일 21UTC = FX 휴장
+/* ── 주문 세션 게이트 — webtrade marketOpen 락스텝 (차이감사 #2: 주말 동결가 체결 구멍 폐쇄).
+   세션은 캘린더로 판정(피드 신선도 아님 — prices.updated_at은 주말에도 재스탬프됨). function 선언 =
+   테스트에서 스텁 가능. Crypto 24/7 · Forex 일 22:00→금 22:00 UTC · 미국주식 13:30–20:00 UTC−휴일. */
+const FX_US_HOLIDAYS=new Set(['2026-01-01','2026-01-19','2026-02-16','2026-04-03','2026-05-25',
+  '2026-06-19','2026-07-03','2026-09-07','2026-11-26','2026-12-25','2027-01-01']);
+function fxMarketOpen(sym, at){ const cat=mwCat(sym);
+  const d=at!=null?new Date(at):new Date();
+  if(cat==='Crypto') return true;
+  const day=d.getUTCDay(), min=d.getUTCHours()*60+d.getUTCMinutes();
+  if(cat==='Forex'){ if(day===6) return false; if(day===0) return min>=22*60; if(day===5) return min<22*60; return true; }
+  if(day===0||day===6) return false;
+  if(FX_US_HOLIDAYS.has(d.toISOString().slice(0,10))) return false;
+  return min>=13*60+30 && min<20*60; }
+function fxGateOrder(sym){ if(fxMarketOpen(sym)) return true;
+  fxSnd('timeout.wav'); toast('🔒 Market closed — '+sym+' (session gate)');
+  JOURNAL.log('Order refused — '+sym+' market closed', false); return false; }
+/* MT5 효과음 — webtrade mkSnd 미러(에셋 동일 경로, 실패 무음). 체결 ok / 청산 close / 에러 timeout / 강제 stops */
+function fxSnd(name){ try{ const a=new Audio('../assets/sounds/'+name); a.volume=0.5; a.play().catch(()=>{}); }catch(e){} }
 function mwSimulate(){ const closed=fxWeekendClosed();
   MW_WATCH.forEach(s=>{ const prev=mwStore.rows[s], base=prev?prev.mid:(MW_BASE[s]||1);
     if(closed && mwCat(s)!=='Crypto'){ if(!prev) mwStore.set(s, base, mwSeedSpr(s)); return; }   // 휴장 = 동결(가짜 움직임 금지, webtrade 동일)
@@ -1645,10 +1669,10 @@ function submitOrder(kind){ if(!ordUI) return; const sym=ordUI.sym;
   const sl=parseFloat((document.getElementById('odSL')||{}).value)||0, tp=parseFloat((document.getElementById('odTP')||{}).value)||0;
   const LIVE=window.fxAcct&&fxAcct.authed;
   if(kind==='buy'||kind==='sell'){
+    if(!fxGateOrder(sym)) return;   // 세션 게이트 — 장마감이면 LIVE·데모 모두 거절(주말 동결가 체결 금지)
     if(LIVE){ closeOrder();   // M4: 시장가 실체결 (SL/TP는 체결 후 fx_modify로)
-      fxPlaceReal(sym,kind,vol).then(okd=>{ if(okd&&(sl>0||tp>0)){
-        setTimeout(async()=>{ const p=(fxAcct.pos||[]).slice().sort((a,b)=>Date.parse(b.updated_at||0)-Date.parse(a.updated_at||0))[0];
-          if(p&&p.symbol===sym) fxModifyReal(p.local_id, sl, tp); }, 900); } });
+      /* SL/TP 결정적 부착 — fxPlaceReal이 돌려준 그 local_id로 즉시(900ms 최신-포지션 추정 폐기, 차이감사 #4) */
+      fxPlaceReal(sym,kind,vol).then(lid=>{ if(lid&&(sl>0||tp>0)) fxModifyReal(lid, sl, tp); });
       return; }
     if(placeMarketDemo(sym,kind,vol,sl,tp)) closeOrder(); return; }
   if(kind==='pending'){
@@ -2037,7 +2061,8 @@ function toolSvg(inner, fill){ return '<svg width="16" height="16" viewBox="0 0 
       const vol=e.target.closest('[data-vol]');
       if(vol){ mwVol=Math.max(0.01, +(mwVol+(+vol.dataset.vol)*0.01).toFixed(2)); mwRender(); return; }
       const tr=e.target.closest('[data-trade]');
-      if(tr){ placeMarketDemo(tr.dataset.sym, tr.dataset.trade, mwVol, 0, 0); return; }   // Trading 탭 원클릭 시장가(DEMO)
+      if(tr){ if(!fxGateOrder(tr.dataset.sym)) return;   // 세션 게이트(차이감사 #2)
+        placeMarketDemo(tr.dataset.sym, tr.dataset.trade, mwVol, 0, 0); return; }   // Trading 탭 원클릭 시장가(DEMO)
       const row=e.target.closest('.mwrow'); if(row&&row.dataset.sym){ const sym=row.dataset.sym, now=Date.now();
         /* MT5: 더블클릭 = 주문 티켓. 네이티브 dblclick은 못 쓴다 — 첫 클릭의 mwRender()(선택 표시)와
            1초 주기 재렌더가 행 노드를 교체해 "같은 노드 2클릭" 조건이 영영 안 채워짐(2026-07-19 실측).
@@ -2113,6 +2138,7 @@ const fxFeed={ lastRealAt:0, wsAt:{}, realSyms:new Set(), ws:null, rt:null, _t:n
     el.style.display=''; el.textContent=st==='live'?'LIVE':st==='stale'?'STALE':'SIM'; el.className='mwlive '+st; },
   start(){ if(this._t) return; this.poll(); this._t=setInterval(()=>{ if(!document.hidden) this.poll(); },3000);
     this.badge();   // SIM 상태도 즉시 정직 표기(지연 없이)
+    mwStore.loadMarks();   // FX markup — 서버 청산 half와 화면 half 락스텝(차이감사 #1)
     this.startRT(); this.startWS();
     /* 워치독(feedHz 미러): 배지 재평가 + 조용히 죽은 WS(30s 무프레임) 소켓 재활용.
        실피드가 끊겨도 SIM으로 되돌아가 가짜로 흔들지 않는다 — 마지막 실가격 동결 + STALE 정직 표시. */
@@ -2186,7 +2212,20 @@ const fxAcct={ authed:false, acct:null, pos:[], _t:null, ch1:null, ch2:null,
     try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.channel){
       this.ch1=AlpexaSync.db.channel('fxterm-acct').on('postgres_changes',{event:'*',schema:'public',table:'accounts'},()=>this.load()).subscribe();
       this.ch2=AlpexaSync.db.channel('fxterm-pos').on('postgres_changes',{event:'*',schema:'public',table:'positions'},()=>this.load()).subscribe();
-    } }catch(e){} } };
+      /* 정산 실시간(차이감사 #5, webtrade ch3 락스텝) — SL/TP/STOPOUT 자동청산을 즉시 알리고 잔고·이력 갱신.
+         이거 없으면 강제청산당해도 화면 무반응 + History 영구 stale. */
+      this.ch3=AlpexaSync.db.channel('fxterm-settle').on('postgres_changes',{event:'INSERT',schema:'public',table:'settlements'},m=>this.onSettle(m&&m.new)).subscribe();
+    } }catch(e){} },
+  /* settlements INSERT 수신 — 내 fx 계좌 행만. SL/TP/STOPOUT은 소리+토스트+Journal(자동청산 통보), 전부 재조회. */
+  onSettle(row){ try{ if(!row||!this.authed) return;
+    const mine=(this.acct&&this.acct.acct_no)||((window.AlpexaSync&&AlpexaSync.acctFor)?AlpexaSync.acctFor('fx'):null);
+    if(row.server!=='fx'||!mine||row.acct_no!==mine) return;
+    const d=String(row.detail||''), auto=/^(SL|TP|STOPOUT)/.exec(d);
+    if(auto){ fxSnd('stops.wav');
+      toast('🔔 '+auto[0]+' — '+row.symbol+' closed  P/L '+(+row.pnl||0).toFixed(2)+' (LIVE)');
+      JOURNAL.log('Auto close ('+auto[0]+') — '+row.symbol+'  '+d+'  P/L '+(+row.pnl||0).toFixed(2), (+row.pnl||0)>=0); }
+    this.load(); this.loadHist();
+  }catch(e){} } };
 fxAcct.start(); window.fxAcct=fxAcct;   // 차트 주문라인 등 이른 코드가 window 경유로 안전 참조
 /* ══ M4 실체결 (2026-07-19 사장님 "고고") — webtrade placeOrder/closeOrder/fx_modify 락스텝.
    불변식: 터미널은 체결가·손익·잔고를 절대 정하지 않는다 — 서버 RPC 호출 + 성공 시 재조회(fxAcct.load)만.
@@ -2195,29 +2234,36 @@ async function fxPlaceReal(sym, side, vol){
   const local_id='fxt-'+Date.now()+'-'+Math.floor(Math.random()*1e6);
   try{
     const base={ p_local_id:local_id, p_symbol:sym, p_side:String(side).toUpperCase(), p_size:+vol };
-    let r=await AlpexaSync.db.rpc('fx_open', { ...base, p_leverage:null, p_requested_price:null, p_max_slippage:null });
+    /* 슬리피지 가드 + 레버리지 전달 — webtrade placeOrder 락스텝(차이감사 #3: null 고정은 서버 가드 우회).
+       requested = 클릭 순간 트레이더가 본 체결측 가격(BUY=ask/SELL=bid) · 허용 이탈 = 15핍(webtrade SLIP_PIPS). */
+    const q=mwStore.rows[sym]||{}, req=String(side).toLowerCase()==='buy'?q.ask:q.bid;
+    let r=await AlpexaSync.db.rpc('fx_open', { ...base, p_leverage:FX_LEVCAP_OF(sym),
+      p_requested_price:(req>0?+req:null), p_max_slippage:(req>0?15*mwPip(sym):null) });
     if(r&&r.error && /PGRST202|could not find the function|does not exist|schema cache/i.test(((r.error&&r.error.message)||'')+((r.error&&r.error.code)||'')))
       r=await AlpexaSync.db.rpc('fx_open', base);   // 구 4-인자 시그니처 폴백(webtrade 동일)
     const d=r&&r.data;
     if(r&&!r.error&&d&&d.ok){
+      fxSnd('ok.wav');
       JOURNAL.log('LIVE order filled — '+String(side).toUpperCase()+' '+vol+' '+sym+' @ '+d.open, true);
       toast('✅ '+String(side).toUpperCase()+' '+vol+' '+sym+' @ '+d.open+' — filled (LIVE)');
-      fxAcct.load(); return true; }
+      fxAcct.load(); return local_id; }   // local_id 반환 = SL/TP 결정적 부착용(차이감사 #4: 최신-포지션 추정 금지)
     const why=(d&&d.error)||(r&&r.error&&r.error.message)||'rejected';
+    fxSnd('timeout.wav');
     JOURNAL.log('LIVE order rejected — '+String(side).toUpperCase()+' '+vol+' '+sym+': '+why, false);
     toast('❌ Order rejected: '+why); return false;
-  }catch(e){ toast('❌ Order failed: '+String(e&&e.message||e)); return false; } }
+  }catch(e){ fxSnd('timeout.wav'); toast('❌ Order failed: '+String(e&&e.message||e)); return false; } }
 async function fxCloseReal(localId){
   try{
     const r=await AlpexaSync.db.rpc('fx_close', { p_local_id:localId });
     const d=r&&r.data;
     if(r&&!r.error&&d&&d.ok){
+      fxSnd('close.wav');
       JOURNAL.log('LIVE position closed — '+localId+'  P&L '+(d.pnl!=null?(+d.pnl).toFixed(2):'—'), d.pnl==null||d.pnl>=0);
       toast('✅ Closed '+localId+' — P&L '+(d.pnl!=null?(+d.pnl).toFixed(2):'—')+' (LIVE)');
       fxAcct.load(); return true; }
     const why=(d&&d.error)||(r&&r.error&&r.error.message)||'close failed';
-    toast('❌ Close rejected: '+why); return false;
-  }catch(e){ toast('❌ Close failed: '+String(e&&e.message||e)); return false; } }
+    fxSnd('timeout.wav'); toast('❌ Close rejected: '+why); return false;
+  }catch(e){ fxSnd('timeout.wav'); toast('❌ Close failed: '+String(e&&e.message||e)); return false; } }
 async function fxModifyReal(localId, sl, tp){
   try{
     const r=await AlpexaSync.db.rpc('fx_modify', { p_local_id:localId, p_sl:(sl>0?+sl:null), p_tp:(tp>0?+tp:null) });
