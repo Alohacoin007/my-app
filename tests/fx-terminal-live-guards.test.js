@@ -93,6 +93,15 @@ const STUB = `(() => {
   ok('closed market: one-click BUY → ZERO rpc + refusal journal', closed.rpc === 0 && /market closed/i.test(closed.j), JSON.stringify(closed));
   await page.evaluate(() => { fxMarketOpen = window.__gateReal; });
 
+  // ── ②-b 장마감 시각화: ocbar 🔒 (게이트와 표시가 함께 — 정직 UI) ──
+  await page.evaluate(() => { fxMarketOpen = () => false; renderAllCharts(false); });
+  await page.waitForTimeout(300);
+  const mcl = await page.evaluate(() => document.querySelector('#w-chart1 .ocbar').classList.contains('mclosed'));
+  await page.evaluate(() => { fxMarketOpen = () => true; renderAllCharts(false); });
+  await page.waitForTimeout(300);
+  const mopen = await page.evaluate(() => document.querySelector('#w-chart1 .ocbar').classList.contains('mclosed'));
+  ok('closed market → ocbar 🔒(mclosed) · open → 해제', mcl === true && mopen === false, JSON.stringify({ mcl, mopen }));
+
   // ── ① 슬리피지·레버리지 전달 ──
   await page.evaluate(() => { fxMarketOpen = () => true;
     mwStore.apply([{ symbol: 'EURUSD', mid: 1.15000, spr_pts: 1.0 }]); window.__rpcLog = []; });

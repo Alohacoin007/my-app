@@ -235,6 +235,8 @@ body.symdrag .widget[id^="w-chart"]{outline:1px dashed var(--lgd-hair); outline-
 /* (차트 왼쪽 라인스터디 사이드바 CSS 제거 — 2026-07-19, 기능은 상단 툴바) */
 /* 차트 원클릭 매매 바 — 상단, 가격 크고 뚜렷. SELL 빨강 / BUY 초록(레전드) */
 .ocbar{position:absolute; top:3px; left:6px; z-index:4; display:flex; align-items:stretch; gap:4px; font-size:10px; max-width:calc(100% - 62px)}
+.ocbar.mclosed .ocsell,.ocbar.mclosed .ocbuy{opacity:.35; filter:grayscale(.6); cursor:not-allowed}
+.ocbar.mclosed .ocsell::after,.ocbar.mclosed .ocbuy::after{content:' 🔒'}
 .ocvol{display:flex; align-items:center; gap:1px; background:rgba(18,24,34,.72); border:1px solid var(--lgd-hair); border-radius:4px; padding:0 2px}
 .ocvb{width:15px; height:100%; min-height:22px; border:none; background:transparent; color:var(--lgd-ink); font-weight:800; font-size:13px; cursor:pointer; line-height:1}
 .ocvb:hover{color:var(--lgd-up)}
@@ -1089,6 +1091,10 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
   /* ── 원클릭 매매 바 — 볼륨 · SELL(bid) · 스프레드 · BUY(ask) · OHLCV(라이브) ── */
   const bar=box.querySelector('.ocbar');
   if(bar){ const rr=mwStore.rows[sym]||{}, set=(sel,txt,cls)=>{ const el=bar.querySelector(sel); if(!el) return; if(el.textContent!==txt) el.textContent=txt; if(cls!==undefined) el.className=cls; };
+    /* 장마감 시각화(차이감사 UI 갭) — 게이트는 fxGateOrder가 이미 막음, 이건 정직 표시 */
+    const mcl=!fxMarketOpen(sym); if(bar.classList.contains('mclosed')!==mcl){ bar.classList.toggle('mclosed', mcl);
+      const sb=bar.querySelector('.ocsell'), bb=bar.querySelector('.ocbuy');
+      if(sb) sb.title=mcl?'Market closed':''; if(bb) bb.title=mcl?'Market closed':''; }
     set('.ocvv',(c.oclot||0.10).toFixed(2));
     const bd=bar.querySelector('.ocbid'), ak=bar.querySelector('.ocask');
     if(bd){ bd.textContent=mwFmt(sym,rr.bid); bd.classList.toggle('dn',rr.bDir<0); }
@@ -2321,8 +2327,11 @@ async function fxModifyReal(localId, sl, tp){
 /* Sign in 아바타 — 미로그인: login.html(FX)로, 복귀토큰 fx-terminal. 로그인: 계좌번호 표시(장식 해제) */
 (function avatarWire(){ const av=document.querySelector('.avatar'); if(!av) return;
   av.style.cursor='pointer';
-  av.addEventListener('click', ()=>{
-    if(fxAcct.authed){ toast('Signed in — FX account '+((fxAcct.acct&&fxAcct.acct.acct_no)||'')); return; }
+  av.addEventListener('click', async ()=>{
+    if(fxAcct.authed){   // 로그아웃(차이감사 UI 갭) — MT5 File>Logout 대응. confirm 후 세션 종료 → 데모 복귀
+      if(!confirm('Sign out of FX account '+((fxAcct.acct&&fxAcct.acct.acct_no)||'')+'?')) return;
+      try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.auth&&AlpexaSync.db.auth.signOut) await AlpexaSync.db.auth.signOut(); }catch(e){}
+      JOURNAL.log('Signed out', true); toast('Signed out — demo mode'); fxAcct.load(); return; }
     try{ sessionStorage.setItem('alpexa.dest2','fx-terminal'); }catch(e){}
     location.href='../login.html'; });
   const sync=()=>{ av.classList.toggle('signin', !fxAcct.authed);
