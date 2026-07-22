@@ -23,6 +23,9 @@ returns boolean language sql immutable as $$
 $$;
 
 -- 2) 자산군(fx_specs.cls) 기준 세션 판정 — 순수 UTC 계산 (p_at 주입 가능 = 테스트 용이)
+-- 구 DRAFT(fx_market_open(p_symbol,…)·fx_symbol_class)가 배포돼 있으면 파라미터명 변경 불가(42P13) → 먼저 제거
+drop function if exists public.fx_market_open(text, timestamptz);
+drop function if exists public.fx_symbol_class(text);
 create or replace function public.fx_market_open(p_cls text, p_at timestamptz default now())
 returns boolean language plpgsql immutable as $$
 declare
