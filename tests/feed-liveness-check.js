@@ -68,10 +68,23 @@ async function probeCrypto(browser) {
     const c0 = await chSnap();
     if (c0 == null) report('crypto: W4 chart has candles', false, 'ch.candles empty (chLoad dead + heal not firing?)');
     else {
+      /* 조용한 장에선 마지막 캔들 종가가 몇 초씩 같은 값일 수 있다(2dp 평평) — 6s 단발 비교는 오탐
+         (2026-07-22 08:26 크론 빨강: 피드 0s 신선인데 66026.76→66026.76 6s 동일 → FROZEN 오판).
+         교정: 같으면 8s씩 최대 3회 재관찰 + 기초 피드(mk.lastTick)가 그 사이 실제로 움직였는지 대조 —
+         "피드는 움직였는데 캔들만 그대로"일 때만 빨강 (평평한 장은 정상). */
+      const tickAt = () => page.evaluate(() => (typeof mk !== 'undefined' && mk.lastTick) ? mk.lastTick : null);
       await page.waitForTimeout(6000);   // 2s 라이브틱 스로틀 대비 여유
-      const c1 = await chSnap();
-      report('crypto: W4 chart last candle live (' + c0 + '→' + c1 + ')', c1 != null && c1 !== c0,
-        c1 === c0 ? 'chart FROZEN while feed alive' : '');
+      let c1 = await chSnap();
+      const tk0 = await tickAt(); let feedTicked = false;
+      for (let i = 0; i < 3 && c1 === c0; i++) {
+        await page.waitForTimeout(8000);
+        c1 = await chSnap();
+        const tk1 = await tickAt();
+        if (tk0 != null && tk1 != null && tk1 > tk0) feedTicked = true;
+      }
+      const okChart = (c1 != null && c1 !== c0) || !feedTicked;
+      report('crypto: W4 chart last candle live (' + c0 + '→' + c1 + (okChart && c1 === c0 ? ', flat market' : '') + ')',
+        okChart, okChart ? '' : 'chart FROZEN while feed alive (feed ticked, candle unchanged ~30s)');
     }
   } finally { await page.close(); }
 }
