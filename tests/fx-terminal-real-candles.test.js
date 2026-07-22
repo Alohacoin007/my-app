@@ -64,6 +64,13 @@ const ok = (n, c, d) => { if (c) { pass++; console.log('  ✅ ' + n); } else { f
         }
         return { ok: true, json: async () => rows };
       }
+      if (/binance\.vision.*symbol=SOLUSDT/.test(url)) {
+        // 깊은 이력 페이지 스텁: endTime 기준 직전 1000봉 (역보행 페이지네이션 검증용)
+        const end = +((String(url).match(/endTime=(\d+)/) || [])[1] || Date.now());
+        const last = Math.floor(end / bar1m) * bar1m;
+        const rows = []; for (let i = 999; i >= 0; i--) rows.push([last - i * bar1m, '100', '101', '99', '100.5', '7']);
+        return { ok: true, json: async () => rows };
+      }
       if (/binance\.vision.*symbol=ETHUSDT/.test(url)) {
         // 짧은 응답(50봉) → 거절돼야 함
         const rows = []; for (let i = 49; i >= 0; i--) rows.push([now - i * bar1m, '3000', '3010', '2990', '3005', '9']);
@@ -106,6 +113,26 @@ const ok = (n, c, d) => { if (c) { pass++; console.log('  ✅ ' + n); } else { f
   ok('fx: fx-prices candles accepted → series replaced', c2.st === 'real' && c2.real && c2.n === 300, JSON.stringify(c2));
   ok('fx: request = ?candles=EURUSD&tf=M5', /fx-prices\?candles=EURUSD&tf=M5/.test(c2.url || ''), c2.url);
   ok('fx: v=0(폴리곤) → 틱볼륨 근사 채움 (v>0)', c2.v > 0, String(c2.v));
+
+  // ── ②b 깊은 이력 (2026-07-22 "고고" — webtrade HIST_N 락스텝, 1,000→15,000봉) ──
+  const src = fs.readFileSync(path.join(REPO, 'dev/fx-terminal.html'), 'utf8');
+  const wsrc = fs.readFileSync(path.join(REPO, 'webtrade.html'), 'utf8');
+  const histOf = s => (s.match(/const HIST_N=\{[^}]*\}/) || [''])[0];
+  ok('deep: HIST_N 자구 락스텝 (터미널 == webtrade, H1/H4 15000)',
+     histOf(src) !== '' && histOf(src) === histOf(wsrc) && /H4:15000/.test(histOf(src)), histOf(src));
+  ok('deep: FX 요청 n=HIST_N (M5→5000)', /candles=EURUSD&tf=M5&n=5000/.test(c2.url || ''), c2.url);
+  ok('deep: 실이력은 라이브 1500봉 트림에서 제외 (합성만 트림)', /if\(!s\.real&&s\.c\.length>1500\) s\.c\.shift\(\)/.test(src));
+  const cdeep = await page.evaluate(async () => {
+    series('SOLUSD', 'M1'); await new Promise(r => setTimeout(r, 500));
+    const s = chartSeries['SOLUSD|M1'];
+    const reqs = window.__req.filter(u => /SOLUSDT/.test(u));
+    const ends = reqs.map(u => +((u.match(/endTime=(\d+)/) || [])[1] || 0));
+    return { st: realSeriesState['SOLUSD|M1'], n: s ? s.c.length : 0, pages: reqs.length,
+             desc: ends.every((e, i) => i === 0 || e < ends[i - 1]),
+             asc: s ? s.c.every((b, i) => i === 0 || b.t > s.c[i - 1].t) : false };
+  });
+  ok('deep: crypto 1000봉 페이지 ×5 역보행(endTime 감소) → 5,000봉 엄격 오름차순',
+     cdeep.st === 'real' && cdeep.n === 5000 && cdeep.pages === 5 && cdeep.desc && cdeep.asc, JSON.stringify(cdeep));
 
   // ── ③ 수락 게이트 — 짧은/역순 응답 거절 → 합성 유지 ──
   const c3 = await page.evaluate(async () => {
