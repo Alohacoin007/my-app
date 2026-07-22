@@ -250,9 +250,12 @@ async function overlayRealOdds(games: any[], SB_URL: string, H: Record<string, s
         data = bySport[sk] || [];
       }
       if (!data.length) return;
-      // Match by robust team tokens + kickoff proximity, and require a UNIQUE hit — if two
-      // events could be this game (ambiguous), attach nothing (the game stays locked) rather
-      // than risk pinning the wrong odds. gt/et within 6h when both timestamps are known.
+      // Match by robust team tokens + kickoff proximity. 판정 규칙 (2026-07-22 더블헤더 사건):
+      //  · 히트 0 → 잠금 유지. 히트 1 이상이면 킥오프 "상호 최근접"으로 부착 —
+      //    ① 복수 히트: 이 경기에 가장 가까운 이벤트(유일 최솟값, 동률이면 fail-safe 잠금).
+      //    ② 그 이벤트가 같은 팀 조합의 "다른" 경기(더블헤더 상대편)에 더 가깝다면 양보(잠금) —
+      //       프로바이더가 1차전 배당만 냈을 때 그게 2차전에 붙는 오배당을 구조적으로 차단.
+      //  타임스탬프를 모르면 예전처럼 유일 히트만 수락. gt/et within 6h when both known.
       const gt = Date.parse(g.iso || "");
       const hits = data.filter((e: any) => {
         const teamsOk = (teamMatch(e.home_team, g.home.nm) && teamMatch(e.away_team, g.away.nm)) ||
@@ -261,7 +264,21 @@ async function overlayRealOdds(games: any[], SB_URL: string, H: Record<string, s
         const et = Date.parse(e.commence_time || "");
         return (isNaN(gt) || isNaN(et)) ? true : Math.abs(et - gt) <= 6 * 3600 * 1000;
       });
-      const ev = hits.length === 1 ? hits[0] : null;
+      const ev = (() => {
+        if (!hits.length) return null;
+        if (isNaN(gt)) return hits.length === 1 ? hits[0] : null;   // 우리 시각 미상 → 보수적(구규칙)
+        const dist = (e: any) => { const et = Date.parse(e.commence_time || ""); return isNaN(et) ? Infinity : Math.abs(et - gt); };
+        const sorted = hits.slice().sort((a: any, b: any) => dist(a) - dist(b));
+        if (sorted.length > 1 && dist(sorted[0]) === dist(sorted[1])) return null;   // 최근접 동률 → fail-safe
+        const e0 = sorted[0]; const et0 = Date.parse(e0.commence_time || "");
+        if (isNaN(et0)) return hits.length === 1 ? e0 : null;        // 이벤트 시각 미상 → 유일 히트만
+        // 상호 최근접: 같은 리그·같은 팀 조합의 다른 경기가 이 이벤트에 더 가까우면 그쪽 몫
+        const rival = games.some((o: any) => o !== g && o.lg === g.lg &&
+          ((teamMatch(e0.home_team, o.home.nm) && teamMatch(e0.away_team, o.away.nm)) ||
+           (teamMatch(e0.home_team, o.away.nm) && teamMatch(e0.away_team, o.home.nm))) &&
+          !isNaN(Date.parse(o.iso || "")) && Math.abs(Date.parse(o.iso) - et0) < Math.abs(gt - et0));
+        return rival ? null : e0;
+      })();
       if (!ev) return;
       const core = oddsToCore(ev, g.home, g.away);
       if (core) {
