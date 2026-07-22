@@ -63,15 +63,15 @@ Deno.serve(async (req) => {
   const lastWrite: Record<string, number> = {};
   let wrote = 0, frames = 0, authErr = "";
 
-  // SL/TP 초단위 발동 (2026-07-20 사장님 "청산은 초단위로") — 가격을 쓴 직후 스위프를 같이 돌린다.
-  // 1s 스로틀(프레임마다 중복 방지). 실패해도 무해 — 1분 pg_cron(fx_sltp)이 폴백으로 받친다.
+  // 초단위 스위프 (2026-07-20 "청산은 초단위로" + 2026-07-22 대기주문 M4.5) — 가격을 쓴 직후
+  // fx_sweep_all(SL/TP + 대기주문 매칭)을 돌린다. 1s 스로틀. 실패해도 무해 — 1분 pg_cron 폴백.
   let lastSweep = 0;
   const sweep = async () => {
     const now = Date.now();
     if (now - lastSweep < 1_000) return;
     lastSweep = now;
     try {
-      await fetch(`${SB_URL}/rest/v1/rpc/fx_sltp`, {
+      await fetch(`${SB_URL}/rest/v1/rpc/fx_sweep_all`, {
         method: "POST",
         headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json" },
         body: "{}",

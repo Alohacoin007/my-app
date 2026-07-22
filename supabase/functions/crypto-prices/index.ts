@@ -113,10 +113,10 @@ Deno.serve(async (req) => {
     body: JSON.stringify(rows),
   });
   if (!r.ok) return json({ ok: false, error: "store " + r.status + " " + (await r.text()) }, 500);
-  // SL/TP 발동 스위프 (2026-07-20 사장님 "청산은 초단위로") — 크립토 가격 반영 직후 검사.
-  // 크립토는 이 크론이 3s 주기라 3s 이내 발동. 실패해도 1분 pg_cron 폴백이 받친다.
+  // 초단위 스위프 (SL/TP + 대기주문 매칭 = fx_sweep_all, 2026-07-22 M4.5) — 크립토 가격 반영 직후.
+  // 이 크론이 3s 주기라 3s 이내 발동. 실패해도 1분 pg_cron 폴백이 받친다.
   try {
-    await fetch(`${SB_URL}/rest/v1/rpc/fx_sltp`, {
+    await fetch(`${SB_URL}/rest/v1/rpc/fx_sweep_all`, {
       method: "POST", headers: { ...H, "Content-Type": "application/json" }, body: "{}",
     });
   } catch (_e) { /* cron fallback */ }
