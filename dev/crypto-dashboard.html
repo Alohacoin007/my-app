@@ -849,8 +849,8 @@ makeWidget('chart','Chart','','var(--lgd-link4)',
   '<div class="ch tnum">'+
   '<div class="chd"><span class="csym"><span id="chSym">BTC</span><span class="cbadge">₿</span></span>'+
   '<span class="cchg" id="chChg"></span><span class="csp"></span>'+
-  '<button class="cbtn" title="Trade 위젯에서 연결 예정 (M2)">Buy</button>'+
-  '<button class="cbtn" title="Trade 위젯에서 연결 예정 (M2)">Sell</button></div>'+
+  '<button class="cbtn" id="chBuy">Buy</button>'+
+  '<button class="cbtn" id="chSell">Sell</button></div>'+
   '<div class="ohlc" id="chOhlc"></div>'+
   '<div class="cwrap" id="chWrap"><canvas id="chCv"></canvas>'+
   '<span class="ctag" id="chTag" style="display:none"></span>'+
@@ -1830,6 +1830,13 @@ function tkCalc(){
   document.getElementById('tkGo').disabled=!!w||!usd||tr.busy;
 }
 document.getElementById('trBuy').onclick=()=>tkOpen('buy');
+/* 차트 위젯 Buy/Sell (2026-07-23 사장님 "활성화 해줘") — 차트의 현재 심볼로 티켓 동기 후 팝업 주문창.
+   coin-list 클릭과 동일 경로(cb-sel → tkFloat → tkOpen) — 매매는 기존 서버 RPC(crypto_trade) 그대로. */
+function chTrade(side){ const s=ch.sym; if(!(MK_BSYM[s]||s==='ALPXS')){ return; }
+  window.__cbSel=s; document.dispatchEvent(new CustomEvent('cb-sel',{detail:s}));
+  tkFloat(true); tkOpen(side); }
+document.getElementById('chBuy').onclick=()=>chTrade('buy');
+document.getElementById('chSell').onclick=()=>chTrade('sell');
 document.getElementById('trSell').onclick=()=>tkOpen('sell');
 document.getElementById('tkBuyT').onclick=()=>{ tr.side='buy'; tkSide(); };
 document.getElementById('tkSellT').onclick=()=>{ tr.side='sell'; tkSide(); };

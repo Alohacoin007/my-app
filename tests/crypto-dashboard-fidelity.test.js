@@ -126,6 +126,15 @@ BANS.forEach(([name, re]) => ok('BAN ' + name + ' 없음', !re.test(html)));
     bad.join(' | '));
 })();
 
+// ── 차트 위젯 Buy/Sell 활성화 (2026-07-23 사장님 "활성화 해줘") — 티켓과 같은 단일 주문 경로 ──
+ok('PIN 차트 Buy/Sell 배선 (chBuy/chSell → chTrade)',
+   /id="chBuy"/.test(html) && /id="chSell"/.test(html) &&
+   /getElementById\('chBuy'\)\.onclick=\(\)=>chTrade\('buy'\)/.test(html) &&
+   /getElementById\('chSell'\)\.onclick=\(\)=>chTrade\('sell'\)/.test(html));
+ok('PIN chTrade = cb-sel 동기 + tkOpen (coin-list와 동일 경로 — 별도 매매 코드 금지)',
+   /function chTrade\(side\)\{ const s=ch\.sym;[\s\S]{0,260}new CustomEvent\('cb-sel',\{detail:s\}\)[\s\S]{0,140}tkOpen\(side\)/.test(html));
+ok('BAN 차트 버튼 "연결 예정" 플레이스홀더 잔재 0', !/Trade 위젯에서 연결 예정/.test(html));
+
 console.log(failN === 0
   ? `🟢 crypto-dashboard fidelity — pins/bans ${pass} all green`
   : `🔴 crypto-dashboard fidelity — ${failN} FAILED / ${pass} passed`);
