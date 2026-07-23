@@ -1374,7 +1374,39 @@ function fxGateOrder(sym){ if(fxMarketOpen(sym)) return true;
   fxSnd('timeout.wav'); toast('🔒 '+t('Market closed')+' — '+sym+' (session gate)');
   JOURNAL.log('Order refused — '+sym+' market closed', false); return false; }
 /* MT5 효과음 — webtrade mkSnd 미러(에셋 동일 경로, 실패 무음). 체결 ok / 청산 close / 에러 timeout / 강제 stops */
-function fxSnd(name){ try{ const a=new Audio('../assets/sounds/'+name); a.volume=0.5; a.play().catch(()=>{}); }catch(e){} }
+/* ══ MT5 주문 사운드 (2026-07-23 사장님 "사운드 전부" — webtrade 엔진 락스텝 이식) ══
+   .wav가 /assets/sounds/에 있으면 그걸, 없으면 WebAudio 합성음이 항상 울린다(현재 파일 0개 = 그동안 무음이던 원인).
+   첫 제스처에서 AudioContext 언락(모바일 자동재생 차단 회피). fxSnd(name) 시그니처 유지 — 기존 호출부 무변경. */
+let _actx=null;
+function _primeCtx(){ try{ _actx=_actx||new (window.AudioContext||window.webkitAudioContext)(); if(_actx.state==='suspended') _actx.resume(); }catch(e){} return _actx; }
+function _tone(specs){ const ctx=_primeCtx(); if(!ctx) return; const now=ctx.currentTime;
+  specs.forEach(s=>{ try{ const osc=ctx.createOscillator(), g=ctx.createGain();
+    osc.type=s.type||'square'; osc.frequency.setValueAtTime(s.f0, now+s.t0);
+    if(s.f1) osc.frequency.exponentialRampToValueAtTime(s.f1, now+s.t0+s.dur);
+    g.gain.setValueAtTime(0.0001, now+s.t0);
+    g.gain.exponentialRampToValueAtTime(s.gain||0.2, now+s.t0+0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, now+s.t0+s.dur);
+    osc.connect(g); g.connect(ctx.destination); osc.start(now+s.t0); osc.stop(now+s.t0+s.dur+0.03); }catch(e){} }); }
+const FX_SYN={
+  'ok.wav':      ()=>_tone([{f0:1750,f1:950,type:'square',t0:0,dur:0.055,gain:0.22}]),                                            // 진입: 칼틱!
+  'close.wav':   ()=>_tone([{f0:680,f1:1020,type:'sine',t0:0,dur:0.10,gain:0.20}]),                                               // 청산: 확인음
+  'timeout.wav': ()=>_tone([{f0:320,f1:170,type:'sawtooth',t0:0,dur:0.20,gain:0.17}]),                                            // 거절/에러: 부저
+  'stops.wav':   ()=>_tone([{f0:500,type:'square',t0:0,dur:0.10,gain:0.20},{f0:500,type:'square',t0:0.14,dur:0.10,gain:0.20}]),   // SL/TP/스탑아웃: 삐-삐
+  'request.wav': ()=>_tone([{f0:740,type:'triangle',t0:0,dur:0.09,gain:0.16},{f0:990,type:'triangle',t0:0.10,dur:0.09,gain:0.16}]),// 대기 접수: 또록
+  'tick.wav':    ()=>_tone([{f0:1200,type:'square',t0:0,dur:0.03,gain:0.12}]),                                                     // 수정/취소: 틱
+  'alert.wav':   ()=>_tone([{f0:880,type:'sine',t0:0,dur:0.12,gain:0.20},{f0:1174,type:'sine',t0:0.13,dur:0.16,gain:0.20}]),       // 프라이스 알림: 딩동
+  'startup.wav': ()=>_tone([{f0:660,f1:880,type:'sine',t0:0,dur:0.10,gain:0.16},{f0:990,f1:1320,type:'sine',t0:0.10,dur:0.14,gain:0.18}]) }; // 로그인 차임
+const FX_SNDS={};
+function fxSnd(name){ try{
+  let s=FX_SNDS[name];
+  if(!s){ let fileOk=false; const a=new Audio('assets/sounds/'+name); a.preload='auto'; a.volume=0.5;
+    a.addEventListener('canplaythrough',()=>{fileOk=true;}); a.addEventListener('loadeddata',()=>{fileOk=true;});
+    a.addEventListener('error',()=>{fileOk=false;}); try{ a.load(); }catch(e){}
+    s=FX_SNDS[name]={ play(){ const syn=FX_SYN[name]||FX_SYN['tick.wav'];
+      if(fileOk){ try{ a.currentTime=0; const p=a.play(); if(p&&p.catch) p.catch(()=>syn()); return; }catch(e){} } syn(); } }; }
+  s.play(); }catch(e){} }
+if(typeof document!=='undefined'){ ['touchstart','pointerdown','click','keydown'].forEach(ev=>
+  document.addEventListener(ev, ()=>_primeCtx(), {once:true, passive:true})); }
 function mwSimulate(){ const closed=fxWeekendClosed();
   MW_WATCH.forEach(s=>{ const prev=mwStore.rows[s], base=prev?prev.mid:(MW_BASE[s]||1);
     if(closed && mwCat(s)!=='Crypto'){ if(!prev) mwStore.set(s, base, mwSeedSpr(s)); return; }   // 휴장 = 동결(가짜 움직임 금지, webtrade 동일)
@@ -1543,7 +1575,7 @@ const alertsStore={ list:(()=>{ try{ return JSON.parse(localStorage.getItem(AL_K
   remove(id){ this.list=this.list.filter(a=>a.id!==id); this.save(); },
   check(){ let hit=false; this.list.forEach(a=>{ if(!a.armed) return; const r=mwStore.rows[a.sym]; if(!r||!(r.mid>0)) return;
     if(a.cond==='>=' ? r.mid>=a.px : r.mid<=a.px){ a.armed=false; a.hitAt=Date.now(); hit=true;
-      JOURNAL.log('Alert — '+a.sym+' '+a.cond+' '+a.px+' hit @ '+mwFmt(a.sym,r.mid), true); } });
+      fxSnd('alert.wav'); JOURNAL.log('Alert — '+a.sym+' '+a.cond+' '+a.px+' hit @ '+mwFmt(a.sym,r.mid), true); } });
     if(hit){ this.save(); if(curTbxTab==='Alerts') renderToolbox('Alerts'); } } };
 /* 노셔널/마진 수학 (MT5 익스포저) — DEMO. 실값은 M3 서버. contract 100k, leverage 1:100 */
 const FX_CONTRACT=100000, FX_LEV=100, FX_EQUITY=99992.79;
@@ -1650,6 +1682,7 @@ function demoStats(){ demoMarkAll();
 function closePosDemo(ticket){ const p=DEMO_POS.find(x=>x.ticket===ticket); if(!p) return;
   DEMO_POS=DEMO_POS.filter(x=>x.ticket!==ticket);
   DEMO_HIST.unshift({sym:p.sym,ticket:p.ticket,ctime:fxStamp(),type:p.type,vol:p.vol,open:p.price,close:p.cur,profit:(+p.pl).toFixed(2),ms:Date.now()});
+  fxSnd('close.wav');
   JOURNAL.log('Closed #'+ticket+' '+p.sym+' '+p.type+' '+p.vol+' @ '+p.cur+'  P/L '+(+p.pl).toFixed(2), +p.pl>=0);
   renderToolbox(curTbxTab==='Trade'?'Trade':curTbxTab); renderAllCharts(false);
   toast('Position '+ticket+' closed (demo) — live close via fx_close in M5'); }
@@ -1672,6 +1705,7 @@ function placeMarketDemo(sym, side, vol, sl, tp){ const r=mwStore.rows[sym]; if(
   const dg=mwDigits(sym), entry=side==='buy'?r.ask:r.bid; vol=clampLot(vol);
   DEMO_POS.push({ sym:demoSym(sym), ticket:newTicket(), time:fxStamp(), type:side, vol:vol.toFixed(2),
     price:entry.toFixed(dg), sl:sl?(+sl).toFixed(dg):'', tp:tp?(+tp).toFixed(dg):'', cur:entry.toFixed(dg), comm:'0.00', swap:'0.00', pl:'0.00' });
+  fxSnd('ok.wav');
   JOURNAL.log('Order — '+side.toUpperCase()+' '+vol.toFixed(2)+' '+sym+' @ '+entry.toFixed(dg)+' (demo)', true);
   toast(side.toUpperCase()+' '+vol.toFixed(2)+' '+sym+' @ '+entry.toFixed(dg)+' — filled (DEMO)');
   if(curTbxTab==='Trade') renderToolbox('Trade'); renderAllCharts(false); return true; }
@@ -1679,10 +1713,12 @@ function placePendingDemo(sym, otype, vol, price, sl, tp){ const dg=mwDigits(sym
   if(!(px>0)){ toast('Enter a valid price'); return false; }
   DEMO_PEND.push({ sym:demoSym(sym), ticket:newTicket(), time:fxStamp(), otype, vol:vol.toFixed(2),
     price:px.toFixed(dg), sl:sl?(+sl).toFixed(dg):'', tp:tp?(+tp).toFixed(dg):'' });
+  fxSnd('request.wav');
   JOURNAL.log('Pending — '+otype+' '+vol.toFixed(2)+' '+sym+' @ '+px.toFixed(dg)+' (demo)', true);
   toast(otype+' '+vol.toFixed(2)+' '+sym+' @ '+px.toFixed(dg)+' — placed (DEMO)');
   if(curTbxTab==='Trade') renderToolbox('Trade'); renderAllCharts(false); return true; }
 function cancelPendDemo(ticket){ const p=DEMO_PEND.find(x=>x.ticket===ticket); if(!p) return; DEMO_PEND=DEMO_PEND.filter(x=>x.ticket!==ticket);
+  fxSnd('tick.wav');
   JOURNAL.log('Pending #'+ticket+' cancelled (demo)', true); toast('Pending order '+ticket+' cancelled (DEMO)');
   if(curTbxTab==='Trade') renderToolbox('Trade'); renderAllCharts(false); }
 /* ── MT5 주문 티켓 다이얼로그 — 시장가 + 대기(지정가/역지정가/스탑리밋), S/L·T/P. 인메모리 DEMO(돈/RPC 없음). ── */
@@ -2264,7 +2300,7 @@ const fxAcct={ authed:false, acct:null, pos:[], pend:[], _t:null, ch1:null, ch2:
       if(ar&&ar.data&&ar.data[0]){ this.acct=ar.data[0]; }
       if(pr&&pr.data){ this.pos=pr.data; }
       if(dr&&dr.data){ this.pend=dr.data; }   // 서버 대기주문 (매칭은 서버 스위프 — M4.5)
-      if(this.acct){ if(!this.authed){ this.authed=true; } this.paint(); }
+      if(this.acct){ if(!this.authed){ this.authed=true; fxSnd('startup.wav'); } this.paint(); }   // 로그인 차임 (webtrade sndLogin 락스텝)
     }catch(e){} },
   closePx(p){ const r=mwStore.rows[p.symbol]; if(!r||r.bid==null) return null;
     return String(p.side).toUpperCase()==='SELL'?r.ask:r.bid; },   // BUY→BID · SELL→ASK (MT5)
@@ -2381,19 +2417,19 @@ async function fxCancelPendingReal(localId){
   try{
     const r=await AlpexaSync.db.rpc('fx_cancel_pending', { p_local_id:localId });
     const d=r&&r.data;
-    if(r&&!r.error&&d&&d.ok){ JOURNAL.log('LIVE pending cancelled — '+localId, true);
+    if(r&&!r.error&&d&&d.ok){ fxSnd('tick.wav'); JOURNAL.log('LIVE pending cancelled — '+localId, true);
       toast('✅ Pending '+localId+' cancelled (LIVE)'); fxAcct.load(); return true; }
     const why=(d&&d.error)||(r&&r.error&&r.error.message)||'cancel failed';
-    toast('❌ Cancel rejected: '+why); return false;
+    fxSnd('timeout.wav'); toast('❌ Cancel rejected: '+why); return false;
   }catch(e){ toast('❌ Cancel failed: '+String(e&&e.message||e)); return false; } }
 async function fxModifyReal(localId, sl, tp){
   try{
     const r=await AlpexaSync.db.rpc('fx_modify', { p_local_id:localId, p_sl:(sl>0?+sl:null), p_tp:(tp>0?+tp:null) });
     const d=r&&r.data;
-    if(r&&!r.error&&d&&d.ok){ JOURNAL.log('LIVE modify — '+localId+' S/L '+(sl||'—')+' T/P '+(tp||'—'), true);
+    if(r&&!r.error&&d&&d.ok){ fxSnd('tick.wav'); JOURNAL.log('LIVE modify — '+localId+' S/L '+(sl||'—')+' T/P '+(tp||'—'), true);
       toast('✅ '+localId+' modified (LIVE)'); fxAcct.load(); return true; }
     const why=(d&&d.error)||(r&&r.error&&r.error.message)||'modify failed';
-    toast('❌ Modify rejected: '+why); return false;
+    fxSnd('timeout.wav'); toast('❌ Modify rejected: '+why); return false;
   }catch(e){ toast('❌ Modify failed: '+String(e&&e.message||e)); return false; } }
 /* Sign in 아바타 — 미로그인: login.html(FX)로, 복귀토큰 fx-terminal. 로그인: 계좌번호 표시(장식 해제) */
 (function avatarWire(){ const av=document.querySelector('.avatar'); if(!av) return;
