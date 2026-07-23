@@ -762,11 +762,11 @@ const TF_MS={M1:60e3,M5:300e3,M15:900e3,M30:1800e3,H1:3600e3,H4:14400e3,D1:864e5
 let AUTO_SCROLL=localStorage.getItem('alpexa.fxdash.autoscroll')!=='0';
 let CHART_SHIFT=localStorage.getItem('alpexa.fxdash.chartshift')==='1';
 const CHART_BASE={XAUUSD:2400};
-/* 캔들 팔레트 = 진한 네온 파랑/빨강 (2026-07-23 사장님 "진한 네온 파랑") — 상승 파랑·하락 빨강.
-   라이트 #0052FF (검증 전 항목 통과 — 흰 배경에서도 안 죽는 최심 네온) · 다크 #2E7DFF (검정 위 발광 톤). */
-let CH_UP='#2E7DFF', CH_DN='#FF4D4F', CH_LINE='#2E7DFF';
+/* 모노-블루 캔들 (2026-07-23 사장님 "MT5도 초록으로 하는데 우린 파랑") — 상승/하락 모두 네온 파랑,
+   방향 구분은 MT5식 채움(상승)/속빈(하락). 라이트 #0052FF · 다크 #2E7DFF (검정 위 발광 톤). */
+let CH_UP='#2E7DFF', CH_DN='#2E7DFF', CH_LINE='#2E7DFF';
 function applyChartPalette(){ const light=document.body.classList.contains('light');
-  CH_UP=light?'#0052FF':'#2E7DFF'; CH_DN=light?'#F04443':'#FF4D4F'; CH_LINE=CH_UP; }
+  CH_UP=light?'#0052FF':'#2E7DFF'; CH_DN=CH_UP; CH_LINE=CH_UP; }
 const chartSeries={};                              // sym -> {tf, c:[{t,o,h,l,c}]}
 /* ── 차트 조작 상태 — 차트별 독립(각 창이 자기 타입·TF·줌·그리드·지표). 툴바/☰/TF는 활성 차트에만 적용 ── */
 let crossOn=false;                                 // 크로스헤어 모드(커서 모드라 전역 — 그리기는 창별 스케일)
@@ -1046,8 +1046,11 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
         '<line x1="'+(x-t).toFixed(1)+'" y1="'+yOf(k.o).toFixed(1)+'" x2="'+x.toFixed(1)+'" y2="'+yOf(k.o).toFixed(1)+'" stroke="'+col+'" stroke-width="1"/>'+
         '<line x1="'+x.toFixed(1)+'" y1="'+yOf(k.c).toFixed(1)+'" x2="'+(x+t).toFixed(1)+'" y2="'+yOf(k.c).toFixed(1)+'" stroke="'+col+'" stroke-width="1"/>';
     } else { const bt=Math.min(yOf(k.o),yOf(k.c)), bb=Math.max(yOf(k.o),yOf(k.c));   // candles
+      /* MT5식 속빈 캔들, 우린 파랑 (2026-07-23 사장님) — 하락 = 테두리만(채움 없음) · 상승 = 채움 */
       out+='<line x1="'+x.toFixed(1)+'" y1="'+yOf(k.h).toFixed(1)+'" x2="'+x.toFixed(1)+'" y2="'+yOf(k.l).toFixed(1)+'" stroke="'+col+'" stroke-width="1"/>'+
-        '<rect x="'+(x-bw/2).toFixed(1)+'" y="'+bt.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(1,bb-bt).toFixed(1)+'" fill="'+col+'"/>'; } });
+        (up
+          ? '<rect x="'+(x-bw/2).toFixed(1)+'" y="'+bt.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(1,bb-bt).toFixed(1)+'" fill="'+col+'"/>'
+          : '<rect x="'+(x-bw/2).toFixed(1)+'" y="'+bt.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(1,bb-bt).toFixed(1)+'" fill="none" stroke="'+col+'" stroke-width="1"/>'); } });
   /* ── 지표 오버레이(가격창) ── */
   const polyOf=(fn,col,dash)=>{ const pts=[]; vis.forEach((k,i)=>{ const v=fn(absBase+i); if(v!=null) pts.push((i*cw+cw/2).toFixed(1)+','+yOf(v).toFixed(1)); });
     return pts.length?'<polyline points="'+pts.join(' ')+'" fill="none" stroke="'+col+'" stroke-width="1.2"'+(dash?' stroke-dasharray="3 2"':'')+' opacity=".95"/>':''; };
