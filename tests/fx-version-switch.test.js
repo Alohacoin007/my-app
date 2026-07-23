@@ -37,6 +37,9 @@ ok('② View 메뉴 = Legend 1(체크)/Legend 2 · theme.toggle 폐지',
 ok('③ terminal 로드 = legend2 기록', /setItem\('alpexa\.fx\.version','legend2'\)/.test(term));
 ok('③ Settings Legend 1 버튼 → legend1 기록 + webtrade.html 이동',
    /sgVer1/.test(term) && /setItem\('alpexa\.fx\.version','legend1'\)/.test(term) && /location\.href='webtrade\.html'/.test(term));
+ok('③ ☰ 메뉴에도 Version 섹션 (Legend 1 즉시 이동 · Legend 2 체크)',
+   /mact\('ver:legend1','Legend 1 — Classic'/.test(term) && /mact\('ver:legend2','Legend 2 — Terminal','',true\)/.test(term) &&
+   /a==='ver:legend1'/.test(term));
 
 // ④ 라우팅·스모크
 ok('④ login.html fx-terminal 라우팅 = terminal.html', /return 'terminal\.html'/.test(login) && !/dev\/fx-terminal/.test(login));
