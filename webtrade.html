@@ -2141,15 +2141,75 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       lines.current=[];
       const mine=store.forSymbol(symbol);
       const DOT=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dotted)!=null?LightweightCharts.LineStyle.Dotted:1;
+      const DASH=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dashed)!=null?LightweightCharts.LineStyle.Dashed:2;
       mine.slice(0,40).forEach(p=>{ const price=+p.open_price; if(!price) return;   // cap lines so 100 positions don't flood the chart
         const col=sideUp(p.side)==='SELL'?'#ff2020':'#00ff00';   // SELL=red, BUY=green (colour carries the side)
         try{ lines.current.push(s.createPriceLine({ price, color:col, lineWidth:1,
           lineStyle:DOT, axisLabelVisible:true, title:'' })); }catch(e){}   // price-only tag (no "BUY 0.01") so it doesn't cover the candles
+        // 서버 저장 SL/TP 라인 (positions.meta — fx_modify 저장분). MT5처럼 점선 + sl/tp 태그, 드래그로 이동 가능.
+        const meta=p.meta||{};
+        if(meta.sl!=null&&+meta.sl>0){ try{ lines.current.push(s.createPriceLine({ price:+meta.sl, color:'#ff2020', lineWidth:1, lineStyle:DASH, axisLabelVisible:true, title:'sl' })); }catch(e){} }
+        if(meta.tp!=null&&+meta.tp>0){ try{ lines.current.push(s.createPriceLine({ price:+meta.tp, color:'#00c800', lineWidth:1, lineStyle:DASH, axisLabelVisible:true, title:'tp' })); }catch(e){} }
       });
       setPosLbl(mine.map(p=>({ side:sideUp(p.side), lots:lotsOf(p), price:+p.open_price })));
     };
     return positionsStore.subscribe(draw);
   }, [symbol, tf, lazyHold, hydrated]);   // redraw the position lines when the chart/series is recreated (tf change) — else they vanish
+
+  // ── TRADE-LEVEL DRAG (2026-07-23 사장님 "밑으로 땡기면 스탑로쓰 설정 없는데" — 터미널 commitSltpDrag 이식):
+  //    진입선을 끌면 방향으로 SL/TP 판정(롱: 아래=SL·위=TP, 숏 반전), 기존 sl/tp 선을 끌면 그 값 이동.
+  //    커밋 = fx_modify(서버 검증·저장 — 집행은 fx_sltp). 데모/비로그인은 무시. 도구 활성 시(추세선 등) 양보. ──
+  React.useEffect(()=>{
+    const el=box.current; if(!el||WT_DEMO) return;
+    const drag={ cur:null };   // effect-scoped drag state
+    let preview=null;
+    const p2y=px=>{ try{ return series.current&&series.current.priceToCoordinate?series.current.priceToCoordinate(px):null; }catch(e){ return null; } };
+    const y2p=y=>{ try{ return series.current&&series.current.coordinateToPrice?series.current.coordinateToPrice(y):null; }catch(e){ return null; } };
+    const clearPreview=()=>{ if(preview){ try{ series.current.removePriceLine(preview); }catch(e){} preview=null; } };
+    const hitTest=(y)=>{   // 6px 안의 진입선/sl/tp 탐색 (가까운 것 우선)
+      let best=null;
+      positionsStore.forSymbol(symbol).slice(0,40).forEach(p=>{ if(!p.local_id) return; const meta=p.meta||{};
+        [['entry',+p.open_price],['sl',meta.sl!=null?+meta.sl:null],['tp',meta.tp!=null?+meta.tp:null]].forEach(([kind,px])=>{
+          if(!(px>0)) return; const ly=p2y(px); if(ly==null) return; const d0=Math.abs(ly-y);
+          if(d0<=6&&(!best||d0<best.d0)) best={p,kind,d0}; }); });
+      return best; };
+    const onDown=(e)=>{
+      if(e.button!==0) return;
+      const t0=toolRef.current; if(t0&&t0!=='arrow') return;   // 그리기 도구 중엔 양보
+      const r=el.getBoundingClientRect(); const hit=hitTest(e.clientY-r.top); if(!hit) return;
+      drag.cur={ p:hit.p, kind:hit.kind, price:null, eff:null };
+      e.preventDefault(); e.stopPropagation();   // LWC 팬 차단 (capture)
+    };
+    const onMove=(e)=>{ const d=drag.cur; if(!d) return;
+      const r=el.getBoundingClientRect(); const px=y2p(e.clientY-r.top); if(!(px>0)) return;
+      const side=sideUp(d.p.side), entry=+d.p.open_price;
+      d.eff = d.kind!=='entry' ? d.kind : ((side==='BUY')===(px<entry)?'sl':'tp');
+      d.price=px;
+      clearPreview();
+      try{ preview=series.current.createPriceLine({ price:px, color:d.eff==='sl'?'#ff2020':'#00c800',
+        lineWidth:1, lineStyle:2, axisLabelVisible:true, title:d.eff }); }catch(e){}
+    };
+    const onUp=async ()=>{ const d=drag.cur; drag.cur=null; if(!d) return; clearPreview();
+      if(d.price==null||!d.eff) return;
+      const meta=d.p.meta||{}, dgt=digits(symbol);
+      let sl=(meta.sl!=null&&+meta.sl>0)?+meta.sl:null, tp=(meta.tp!=null&&+meta.tp>0)?+meta.tp:null;
+      if(d.eff==='sl') sl=+(+d.price).toFixed(dgt); else tp=+(+d.price).toFixed(dgt);
+      try{
+        const r=await AlpexaSync.db.rpc('fx_modify',{ p_local_id:d.p.local_id, p_sl:sl, p_tp:tp });
+        const dd=r&&r.data;
+        if(r&&r.error||dd&&dd.ok===false){ playSnd(sndError);
+          journalStore.log('SL/TP drag rejected — '+symbol+' '+((dd&&dd.error)||(r.error&&r.error.message)||''), 0); }
+        else { playSnd(sndOpen);
+          journalStore.log('SL/TP drag — '+symbol+(sl!=null?'  SL '+fmtPx(symbol,sl):'')+(tp!=null?'  TP '+fmtPx(symbol,tp):''), 1); }
+      }catch(e){ playSnd(sndError); }
+      positionsStore.loadPos();   // 서버 진실 재적재 → 라인 재도장 (거절이면 원위치로 보임)
+    };
+    el.addEventListener('mousedown',onDown,true);
+    document.addEventListener('mousemove',onMove);
+    document.addEventListener('mouseup',onUp);
+    return ()=>{ el.removeEventListener('mousedown',onDown,true); document.removeEventListener('mousemove',onMove);
+      document.removeEventListener('mouseup',onUp); clearPreview(); };
+  }, [symbol, tf, lazyHold, hydrated]);
 
   const [cmenu,setCmenu]=React.useState(null);   // chart right-click menu {x,y}
   const [delMenu,setDelMenu]=React.useState(null);   // selected-drawing Delete popup {x,y}
