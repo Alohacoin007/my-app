@@ -582,6 +582,12 @@ function fxPendingPlace(p, onReject){ try{ if(!(window.AlpexaSync&&AlpexaSync.db
     .then(function(r){ const d=r&&r.data; if(d&&d.ok===false&&onReject) onReject(String(d.error||'rejected')); },function(){}); }catch(e){} }
 function fxPendingCancel(id){ try{ if(!(window.AlpexaSync&&AlpexaSync.db))return; const me=fxMe(); if(!me||!me.accts||!me.accts.fx)return;
   AlpexaSync.db.rpc('fx_cancel_pending',{ p_local_id:String(id) }).then(function(){},function(){}); }catch(e){} }
+// SL/TP는 서버 주문 (2026-07-22 "고고"): fx_modify가 positions.meta에 저장 → 서버 fx_sltp가
+// 24시간 초단위+워터마크로 집행. 폰 메모리 SL/TP(새로고침에 증발·앱 닫으면 미집행)는 폐지.
+function fxModifyReal(id, sl, tp, onReject){ try{ if(!(window.AlpexaSync&&AlpexaSync.db))return; const me=fxMe(); if(!me||!me.accts||!me.accts.fx)return;
+  AlpexaSync.db.rpc('fx_modify',{ p_local_id:String(id),
+    p_sl:(sl!=null&&+sl>0?+sl:null), p_tp:(tp!=null&&+tp>0?+tp:null) })
+    .then(function(r){ const d=r&&r.data; if(d&&d.ok===false&&onReject) onReject(String(d.error||'rejected')); },function(){}); }catch(e){} }
 
 // No fake seed — the real balance is loaded from the server (accounts.balance).
 // Held IN MEMORY only (window.__fxBal); never persisted to localStorage.
@@ -3526,22 +3532,30 @@ function App(){
       let me; try{ me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); }catch(e){ me=null; }
       if(!me||!me.accts||!me.accts.fx) return;
       AlpexaSync.db.from('positions')
-        .select('local_id,symbol,side,size,open_price,pnl,status')
+        .select('local_id,symbol,side,size,open_price,pnl,status,meta')
         .eq('acct_no',me.accts.fx).eq('server','fx').eq('status','open')
         .then(function(r){
           if(stop||!r||!r.data) return;
           const srv=r.data, srvIds={}; srv.forEach(p=>{srvIds[String(p.local_id)]=p;});
+          const metaSl=p=>{ const v=p&&p.meta&&p.meta.sl; return (v!=null&&+v>0)?+v:undefined; };
+          const metaTp=p=>{ const v=p&&p.meta&&p.meta.tp; return (v!=null&&+v>0)?+v:undefined; };
           setLiveOrders(prev=>{
             const have={}; prev.forEach(o=>{have[String(o.id)]=true;});
             const now=Date.now();
             const kept=prev.filter(o=> srvIds[String(o.id)] || (now-(o.placedTs||0))<6000 );
+            // SL/TP 진실 = 서버 positions.meta (fx_modify 저장분). 다른 기기에서 바꾼 값도 여기로 합류.
+            // 방금 로컬에서 수정한 건 6s 유예(낙관 반영이 서버 왕복 전에 되돌아가는 깜빡임 방지).
+            const merged=kept.map(o=>{ const s=srvIds[String(o.id)]; if(!s) return o;
+              if(o.slTpTs && (now-o.slTpTs)<6000) return o;
+              const nsl=metaSl(s), ntp=metaTp(s);
+              return (nsl===o.sl&&ntp===o.tp)?o:{...o, sl:nsl, tp:ntp}; });
             const add=[];
             srv.forEach(p=>{ if(have[String(p.local_id)]) return;
               add.push({ id:p.local_id, sym:p.symbol, side:p.side, vol:+p.size||0,
-                open:+p.open_price||0, pnl:+p.pnl||0, status:'OPEN',
+                open:+p.open_price||0, pnl:+p.pnl||0, status:'OPEN', sl:metaSl(p), tp:metaTp(p),
                 placedAt:'', placedTs:0, ticket:'', fresh:false, adopted:true }); });
-            if(add.length===0 && kept.length===prev.length) return prev;
-            return [...add, ...kept];
+            const changed = add.length>0 || kept.length!==prev.length || merged.some((m,i)=>m!==kept[i]);
+            return changed ? [...add, ...merged] : prev;
           });
         }, function(){});
     }
@@ -3557,7 +3571,21 @@ function App(){
       let me; try{ me=JSON.parse(localStorage.getItem('alpexa.me')||'null'); }catch(e){ me=null; }
       if(me&&me.accts&&me.accts.fx&&AlpexaSync.db.channel){
         ch=AlpexaSync.db.channel('fxpos-'+me.accts.fx)
-          .on('postgres_changes',{event:'*',schema:'public',table:'positions',filter:'acct_no=eq.'+me.accts.fx},function(){ pullPos(); })
+          .on('postgres_changes',{event:'*',schema:'public',table:'positions',filter:'acct_no=eq.'+me.accts.fx},function(pl){
+            /* 서버 자동청산(fx_sltp/fx_stopout) 알림 — 이 기기에서 방금 누른 청산(closeOrder)은 중복 토스트 방지 */
+            try{ const n=pl&&pl.new;
+              if(n&&n.status==='closed'){
+                const mine=(window.__fxClosing||{})[String(n.local_id)];
+                if(!(mine&&Date.now()-mine<20000)){
+                  const win=(+n.pnl||0)>=0;
+                  setToast({error:!win,soft:true,icon:win?'flag':'shield',msg:'Position closed — '+n.symbol,sub:'Server SL/TP · P/L '+(win?'+':'')+(+n.pnl||0).toFixed(2)});
+                  setTimeout(()=>setToast(null),4000);
+                  try{window.alpexaNotify&&alpexaNotify({type:win?'tp':'sl',pref:'slTpHit',title:n.symbol+' closed by server SL/TP · P/L '+(+n.pnl||0).toFixed(2)});}catch(e){}
+                  if(window.ALPEXA_SFX&&ALPEXA_SFX.triggered)ALPEXA_SFX.triggered();
+                }
+              }
+            }catch(e){}
+            pullPos(); })
           .subscribe();
       }
     }catch(e){}
@@ -3685,7 +3713,9 @@ function App(){
   useEffect(()=>{
     const id=setInterval(()=>{
       marketRef.current.tick();
-      const sltpHits=[];
+      /* (클라 SL/TP 자동청산 제거 — 2026-07-22 "고고". SL/TP는 fx_modify로 서버 저장,
+         집행은 서버 fx_sltp 단독: 24시간 초단위+워터마크(스침) 판정 + 레벨가 정산 + 원자 선점.
+         앱이 꺼져 있어도 터진다. 청산 알림은 positions Realtime status='closed'에서.) */
       const levSet=(window.getLeverageSettings?window.getLeverageSettings():{FX:100,INDEX:20,STOCK:5,CRYPTO:5});
       let floatPnl=0,usedM=0,worst=null;
       setLiveOrders(prev=>prev.map(o=>{
@@ -3697,20 +3727,8 @@ function App(){
         // tally floating P&L + used margin for the margin-level check
         floatPnl+=pnl; usedM+=ALPEXA_MARKET.getMarginUSD(m,o.vol||0,o.open||0,(levSet[m.cls]||100));
         if(!worst||pnl<worst.pnl)worst={id:o.id,pnl,sym:o.sym};
-        // Auto-close when the live price reaches the take-profit or stop-loss.
-        if(o.tp&&(o.side==='BUY'?cur>=o.tp:cur<=o.tp))sltpHits.push({id:o.id,reason:'TP',sym:o.sym});
-        else if(o.sl&&(o.side==='BUY'?cur<=o.sl:cur>=o.sl))sltpHits.push({id:o.id,reason:'SL',sym:o.sym});
         return{...o,pnl,current:cur};
       }));
-      if(sltpHits.length){
-        sltpHits.forEach(h=>{
-          closeOrder(h.id);
-          try{window.alpexaNotify&&alpexaNotify({type:h.reason==='TP'?'tp':'sl',title:(h.reason==='TP'?'Take profit hit ✓ · ':'Stop loss hit · ')+h.sym+' closed automatically'});}catch(e){}
-        });
-        const last=sltpHits[sltpHits.length-1];
-        setToast({error:last.reason==='SL',icon:last.reason==='TP'?'flag':'shield',msg:last.reason==='TP'?'Take profit hit':'Stop loss hit',sub:last.sym+' closed automatically'});
-        setTimeout(()=>setToast(null),3200);
-      }
       // ── Margin call (100%) + stop out (50%) ──
       // Include the static demo positions in the floating P&L / used margin too.
       ALPEXA_MARKET.POSITIONS.forEach(p=>{ floatPnl+=(p.pnl||0); const m=marketRef.current.state.find(s=>s.sym===p.sym); if(m)usedM+=ALPEXA_MARKET.getMarginUSD(m,p.vol||0,p.open||0,(levSet[m.cls]||100)); });
@@ -3728,7 +3746,7 @@ function App(){
       if(usedM>=0.01){
         const bal=(window.getBalances?window.getBalances():{})[accountRef.current]||0;
         const lvl=((bal+floatPnl)/usedM)*100;
-        if(lvl<50&&worst&&!sltpHits.some(h=>h.id===worst.id)){ // stop out: liquidate the worst-losing live position (skip if it's already being SL/TP-closed this tick → no double close)
+        if(lvl<50&&worst){ // stop out: liquidate the worst-losing live position (서버 fx_stopout(30)이 최종 안전망 — fx_close 멱등이라 경합 무해)
           closeOrder(worst.id);
           try{window.alpexaNotify&&alpexaNotify({type:'marginCall',pref:'marginCall',title:'Stop out · '+worst.sym+' liquidated at '+Math.round(lvl)+'% margin'});}catch(e){}
           setToast({error:true,soft:true,icon:'warning',msg:'Stop out — '+Math.round(lvl)+'%',sub:worst.sym+' liquidated to protect your account'});
@@ -3828,7 +3846,14 @@ function App(){
     if(window.AlpexaSync&&AlpexaSync.db&&_me&&_me.accts&&_me.accts.fx){
       AlpexaSync.db.rpc('fx_open',{p_local_id:String(id),p_symbol:orderData.sym,p_side:orderData.side,p_size:orderData.vol}).then(function(r){
         const d=r&&r.data;
-        if(d&&d.ok&&d.open!=null){ finalize(+d.open); return; }   // server CREATED it → show
+        if(d&&d.ok&&d.open!=null){ finalize(+d.open);
+          // SL/TP 결정적 부착 — 서버가 돌려준 그 local_id로 즉시 fx_modify (웹트레이드·터미널과 동일 패턴)
+          if((+orderData.sl>0)||(+orderData.tp>0)) fxModifyReal(id, orderData.sl, orderData.tp, function(err){
+            setToast({error:true,icon:'warning',msg:'SL/TP not set',sub:/wrong side/i.test(err)?'Level is on the wrong side of the market':err});
+            setTimeout(()=>setToast(null),3800);
+            setLiveOrders(prev=>prev.map(o=>String(o.id)===String(id)?{...o,sl:undefined,tp:undefined,slTpTs:0}:o));
+          });
+          return; }   // server CREATED it → show
         // #5/F ONE-WAY: fx_open is the ONLY creator of a position. ANY non-ok (margin / no
         // price / stale / no spec) → REJECT — never a client-side open (that was the bypass:
         // over-leverage, un-priced symbols). Tell the user why instead of faking a fill.
@@ -3850,7 +3875,16 @@ function App(){
   }
 
   function cancelPending(id){setPendingOrders(prev=>prev.filter(p=>p.id!==id));fxPendingCancel(id);}
-  function modifyPosition(updated){setLiveOrders(prev=>prev.map(o=>o.id===updated.id?{...o,sl:updated.sl,tp:updated.tp}:o));if(window.ALPEXA_SFX)window.ALPEXA_SFX.tick();}
+  // 열린 포지션 SL/TP = 서버 저장(fx_modify) + 서버 집행(fx_sltp). 낙관 반영 → 거절 시 원복+사유.
+  function modifyPosition(updated){
+    const old=liveOrders.find(o=>o.id===updated.id)||{};
+    setLiveOrders(prev=>prev.map(o=>o.id===updated.id?{...o,sl:updated.sl,tp:updated.tp,slTpTs:Date.now()}:o));
+    fxModifyReal(updated.id, updated.sl, updated.tp, function(err){
+      setLiveOrders(prev=>prev.map(o=>o.id===updated.id?{...o,sl:old.sl,tp:old.tp,slTpTs:0}:o));
+      setToast({error:true,icon:'warning',msg:'SL/TP rejected',sub:/wrong side/i.test(err)?'Level is on the wrong side of the market':err});
+      setTimeout(()=>setToast(null),3800);
+    });
+    if(window.ALPEXA_SFX)window.ALPEXA_SFX.tick();}
   // 수정 = 서버 취소 + 새 local_id로 재접수. (fx_place_pending은 멱등 on-conflict-do-nothing이라
   // 같은 키 재접수는 침묵 무시 — cancelled 행이 키를 점유하므로 반드시 새 id. 검증도 재적용된다.)
   function modifyPending(updated){
@@ -3869,6 +3903,7 @@ function App(){
     const order=liveOrders.find(o=>String(o.id)===String(id));
     setLiveOrders(prev=>prev.filter(o=>String(o.id)!==String(id)));   // remove from this device's UI now
     if(!order) return;
+    try{ (window.__fxClosing=window.__fxClosing||{})[String(id)]=Date.now(); }catch(e){}   // 이 기기발 청산 표식(Realtime 중복 토스트 방지)
     const m=marketRef.current.state.find(s=>s.sym===order.sym);
     const closePrice=m?ALPEXA_MARKET.fxClosePx(m,order.side):order.open;   // server-mirror (matches realized)
     const pnl=order.pnl||0, acct=accountRef.current;
