@@ -3746,12 +3746,10 @@ function App(){
       if(usedM>=0.01){
         const bal=(window.getBalances?window.getBalances():{})[accountRef.current]||0;
         const lvl=((bal+floatPnl)/usedM)*100;
-        if(lvl<50&&worst){ // stop out: liquidate the worst-losing live position (서버 fx_stopout(30)이 최종 안전망 — fx_close 멱등이라 경합 무해)
-          closeOrder(worst.id);
-          try{window.alpexaNotify&&alpexaNotify({type:'marginCall',pref:'marginCall',title:'Stop out · '+worst.sym+' liquidated at '+Math.round(lvl)+'% margin'});}catch(e){}
-          setToast({error:true,soft:true,icon:'warning',msg:'Stop out — '+Math.round(lvl)+'%',sub:worst.sym+' liquidated to protect your account'});
-          setTimeout(()=>setToast(null),4000);
-        } else if(lvl<100){ if(!marginCallRef.current){ marginCallRef.current=true;
+        /* (클라 스탑아웃 제거 — 2026-07-23 "1번 고". 강제청산은 서버 fx_stopout(30%) 단독:
+           클라 자체 계산(50% 기준·표시가)이 서버와 어긋나면 멀쩡한 계좌를 일찍 청산할 수 있는
+           이중 판정 경로였다. 클라는 경고(마진콜 토스트)까지만 — 집행은 서버.) */
+        if(lvl<100){ if(!marginCallRef.current){ marginCallRef.current=true;
           try{window.alpexaNotify&&alpexaNotify({type:'marginCall',pref:'marginCall',title:'Margin call · level '+Math.round(lvl)+'% — add funds or reduce positions'});}catch(e){}
           setToast({error:true,soft:true,icon:'warning',msg:'Margin call — '+Math.round(lvl)+'%',sub:'Add funds or close positions to avoid stop out (50%)'});
           setTimeout(()=>setToast(null),4500);
@@ -3918,22 +3916,15 @@ function App(){
     }
     function done(px,realized){ try{window.broadcastPositionClose&&window.broadcastPositionClose(order.id, px, realized);}catch(e){} if(window.ALPEXA_SFX)window.ALPEXA_SFX.closed(); }
     let me; try{me=JSON.parse(localStorage.getItem('alpexa.me')||'null');}catch(e){}
-    // CLIENT fallback — used when there's no server, or the symbol has no fresh
-    // server price / spec (e.g. some crypto/index symbols). Mirrors the old flow:
-    // client close price + settlement (settlements trigger banks the server balance).
-    function clientClose(){
-      const bankFallback=function(){
-        bankLocal(closePrice, pnl);
-        try{window.__alpexaSettle&&window.__alpexaSettle({server:'fx',kind:'fx_close',local_id:order.id,ticket:order.ticket,symbol:order.sym,stake:order.vol,pnl:pnl,detail:order.side+' '+order.vol+' @ '+(+order.open).toFixed(m?m.digits:5)+' → '+(+closePrice).toFixed(m?m.digits:5)});}catch(e){}
-      };
-      // Atomic claim: only the device whose DELETE removes the open row banks the
-      // P&L, so closing an (unpriced) symbol on two devices can't double-count.
-      if(window.AlpexaSync&&AlpexaSync.db&&me&&me.accts&&me.accts.fx){
-        AlpexaSync.db.from('positions').delete().eq('acct_no',me.accts.fx).eq('server','fx').eq('local_id',String(order.id)).eq('status','open').select('local_id').then(function(r){
-          if(r&&r.data&&r.data.length>0){ bankFallback(); }   // we won → bank once
-          done(closePrice, pnl);
-        }, function(){ bankFallback(); done(closePrice, pnl); });   // network blip → bank (rare)
-      } else { bankFallback(); done(closePrice, pnl); }            // offline / single device
+    // 청산 실패 = 포지션 그대로 (2026-07-23 "1번 고" — 클라 정산 폴백 폐지, "돈은 서버만" #5 완결).
+    // 옛 폴백은 클라 가격·클라 P&L로 settlements를 직접 insert + positions를 delete했다 —
+    // 서버가 가격을 모르는 순간에 "클라 추측"으로 돈을 옮기던 마지막 경로. 이제 fx_close가
+    // 거절하면 정직하게 실패를 알리고 행을 되살린다 (서버 행은 그대로 open — 돈은 안 움직였다).
+    function closeFailed(sub){
+      try{ delete (window.__fxClosing||{})[String(id)]; }catch(e){}
+      setLiveOrders(prev=> prev.some(o=>String(o.id)===String(id)) ? prev : [order,...prev]);   // UI 원복
+      setToast({error:true,icon:'warning',msg:'Close failed — '+order.sym,sub:sub});
+      setTimeout(()=>setToast(null),4000);
     }
     if(window.AlpexaSync&&AlpexaSync.db&&me&&me.accts&&me.accts.fx){
       // SERVER-AUTHORITATIVE close: fx_close picks the SERVER price, computes P&L,
@@ -3949,10 +3940,11 @@ function App(){
           bankLocal(px, realized);   // server already wrote settlement+balance; do NOT settle again
           done(px, realized);
         } else {
-          clientClose();   // no price / no spec / stale → safe client fallback
+          var err=String((d&&d.error)||'');
+          closeFailed(/stale|price/i.test(err)?'Price unavailable right now — try again in a moment':(err||'Server rejected the close — try again'));
         }
-      }, function(){ clientClose(); });   // network error → fallback
-    } else { clientClose(); }   // offline / single device
+      }, function(){ closeFailed('Connection issue — position is untouched, try again'); });
+    } else { closeFailed('No server connection — sign in to close positions'); }
   }
   // Expose force-close so the back-office command reader can liquidate a position.
   window.__alpexaFXClose=(lid)=>{ try{ const o=liveOrders.find(x=>String(x.id)===String(lid)); if(o)closeOrder(o.id); }catch(e){} };
@@ -4188,33 +4180,25 @@ document.body.appendChild(b);setTimeout(function(){b.style.transition='opacity .
     },function(){});
   }catch(e){} }
   setTimeout(refreshMe,800);
-  // Record one finished trade (close/settle) on the server for company P&L.
-  window.__alpexaSettle=function(rec){ try{ if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m)return;
-    AlpexaSync.db.from('settlements').insert({cust_id:m.custId,acct_no:(m.accts&&m.accts[rec.server])||'',server:rec.server||'',kind:rec.kind||'',local_id:String(rec.local_id||''),ticket:String(rec.ticket||''),symbol:rec.symbol||'',stake:Math.round((+rec.stake||0)*100)/100,pnl:Math.round((+rec.pnl||0)*100)/100,detail:rec.detail||''}).then(function(){},function(){});
-  }catch(e){} };
+  /* (__alpexaSettle 제거 — 2026-07-23 "1번 고". 클라가 자기 계산 P&L로 settlements를 직접
+     insert하던 경로 — FX 정산은 fx_close/fx_sltp/fx_stopout 서버 3형제만 쓴다. 돈은 서버만 #5.) */
   function push(){
     if(!window.AlpexaSync||!AlpexaSync.db)return;
     var m=meX(); if(!m||!m.accts.fx)return; var cust=m.custId, acct=m.accts.fx;
     AlpexaSync.db.from('players').update({last_seen:new Date().toISOString(),last_app:'fx'}).eq('cust_id',cust).then(function(){},function(){});
     var live=[]; try{ live=window.__fxLive||[]; }catch(e){}
-    // Positions are CREATED by fx_open and CLOSED by fx_close/__fxSyncDelete. Here we
-    // only keep each open position's pnl fresh for the back office — via UPDATE (never
-    // delete+insert), so the server row never momentarily vanishes (the delete→insert
-    // gap was making positions flicker/disappear on screen). If a row doesn't exist yet
-    // (rare client-fallback open of an unpriced symbol), insert it once.
+    // Positions are CREATED by fx_open and CLOSED by fx_close/fx_sltp/fx_stopout (전부 서버).
+    // 여기선 백오피스 화면용 pnl "숫자"만 신선하게 UPDATE한다 — status='open' 조건 필수.
+    // ⚠️ 옛 upsert(status:'open' 통째 재기록)는 서버가 방금 청산한 행을 경합 창(≤4s)에서
+    // 도로 open으로 되살릴 수 있었다 → 재청산 시 이중 정산 위험 (2026-07-23 "1번 고" 폐쇄).
+    // UPDATE+eq(status,'open')은 닫힌 행을 절대 못 건드린다 — 부활 불가능이 구조가 됐다.
     live.forEach(function(o){ if(!o||!(+o.vol>0))return;
       var lid=String(o.id||''); if(!lid) return;
-      // UPSERT by (acct_no,server,local_id) — NEVER update-then-insert. The old path
-      // re-INSERTed whenever the UPDATE's RETURNING came back empty (RLS can hide the
-      // returned row even though the row exists), spawning a duplicate every 3s →
-      // dozens of phantom positions. Upsert collapses to a single row per position.
-      // Requires the unique index in supabase/sql/positions_dedupe.sql.
-      AlpexaSync.db.from('positions').upsert({cust_id:cust,acct_no:acct,server:'fx',kind:'position',local_id:lid,symbol:o.sym||'',side:o.side||'',size:+o.vol||0,open_price:Math.round((+o.open||0)*1e5)/1e5,pnl:Math.round((+o.pnl||0)*100)/100,status:'open'},{onConflict:'acct_no,server,local_id'}).then(function(){},function(){});
+      AlpexaSync.db.from('positions').update({pnl:Math.round((+o.pnl||0)*100)/100})
+        .eq('acct_no',acct).eq('server','fx').eq('local_id',lid).eq('status','open').then(function(){},function(){});
     });
   }
-  // Closed on this device → remove from server so other devices drop it too.
-  window.__fxSyncDelete=function(lid){ try{ if(!window.AlpexaSync||!AlpexaSync.db)return; var m=meX(); if(!m||!m.accts||!m.accts.fx)return;
-    AlpexaSync.db.from('positions').delete().eq('acct_no',m.accts.fx).eq('server','fx').eq('local_id',String(lid)).then(function(){},function(){}); }catch(e){} };
+  /* (__fxSyncDelete 제거 — 호출처 0(broadcastPositionClose는 no-op). 클라 positions delete 경로 폐쇄.) */
   setTimeout(push,2000); setInterval(function(){ if(!document.hidden){ push(); } else { window.__bgPosPush=window.__bgPosPush||0; if(Date.now()-window.__bgPosPush>9000){ window.__bgPosPush=Date.now(); push(); } } },3000);
   // Instant: when a position opens/closes (id list changes), push right away
   // instead of waiting for the next tick. PnL drift rides the 3s interval.
