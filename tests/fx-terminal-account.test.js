@@ -109,8 +109,9 @@ function installStub(mode) {
   ok('login → real position row (EURUSD buy 0.10 @1.10000, ticket FXP-77001)',
      live.authed === true && live.cells[0] === 'EURUSD' && live.cells[1] === 'FXP-77001' &&
      live.cells[3] === 'buy' && live.cells[4] === '0.10' && live.cells[5] === '1.10000', JSON.stringify(live.cells));
-  ok('LIVE view = real account ONLY (no practice/demo section, no bare pending)',
-     live.liveTag === true && live.practiceHd === '');
+  // LIVE 칩은 2026-07-23 사장님 지시로 제거 — 실계좌 표기는 잔고·주문창 배지가 담당 (liveTag 항상 false)
+  ok('LIVE view = real account ONLY (no practice/demo section, no LIVE chip)',
+     live.liveTag === false && live.practiceHd === '');
   const expPl = 1 * (live.bid - 1.10) * 0.10 * 100000;                       // dir*(bid-open)*lots*contract
   ok('floating P/L = server formula (dir*(bid-open)*lots*100000 = ' + expPl.toFixed(2) + ')',
      Math.abs(+live.cells[11] - expPl) < 0.01 && Math.abs(+live.total - expPl) < 0.01, live.cells[11] + ' / ' + live.total);
