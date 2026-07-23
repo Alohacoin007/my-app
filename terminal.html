@@ -433,11 +433,16 @@ body.light #toast{box-shadow:0 8px 24px rgba(15,23,40,.18)}
 .stg .kv2 .l{color:var(--lgd-dim)} .stg .kv2 .v{margin-left:auto; font-weight:600}
 
 /* ── 라이트 테마 (legend-ui.css 무변경, 토큰 오버라이드) ── */
-/* 라이트 톤 조임 (2026-07-23 사장님 "흐릿한 느낌… 색깔톤이") — 배경을 반 톤 눌러 흰 위젯이 뜨게,
-   헤어라인 10%→16%로 또렷하게, 잉크·보조텍스트 진하게. 흐릿함의 원인 = 회색끼 저대비였음. */
-body.light{ --lgd-bg:#EAEDF2; --lgd-surface:#FFFFFF; --lgd-surface2:#F4F6F9;
-  --lgd-pill:#E7EAF0; --lgd-pill-hi:#DBE0E8; --lgd-hair:rgba(10,18,34,.16);
-  --lgd-ink:#0A1220; --lgd-dim:#525C6B; }
+/* 라이트 = "민트 모던" 시안 A (2026-07-23 사장님 "A 고") — 로빈후드식: 경계선 대신 여백+그림자,
+   상승 민트틸 #00B386 / 하락 코랄 #FF4D4F (흰 배경 색약 검증 통과 — 구 브랜드 페어는 흰 바탕 ΔE 3.6 실패).
+   다크 모드는 무변경(브랜드 초록 유지). */
+body.light{ --lgd-bg:#F5F7FA; --lgd-surface:#FFFFFF; --lgd-surface2:#F7F9FB;
+  --lgd-pill:#EDF1F5; --lgd-pill-hi:#E2E8EF; --lgd-hair:rgba(16,24,40,.09);
+  --lgd-ink:#111827; --lgd-dim:#5C6572;
+  --lgd-green:#00B386; --lgd-up:#00B386; --lgd-down:#FF4D4F; }
+body.light .widget{border:none; border-radius:12px; box-shadow:0 1px 2px rgba(16,24,40,.05),0 4px 16px rgba(16,24,40,.08); overflow:hidden}
+body.light #dock{border-radius:12px 12px 0 0; box-shadow:0 -2px 12px rgba(16,24,40,.06)}
+body.light .hdr{box-shadow:0 1px 0 rgba(16,24,40,.05)}
 body.light .hdr{background:#fff; border-bottom:1px solid var(--lgd-hair)}
 body.light .dots{background-image:radial-gradient(circle, rgba(15,23,40,.16) 1.2px, transparent 1.6px)}
 body.light .widget.drag{box-shadow:0 12px 32px rgba(15,23,40,.22)}
@@ -757,7 +762,11 @@ const TF_MS={M1:60e3,M5:300e3,M15:900e3,M30:1800e3,H1:3600e3,H4:14400e3,D1:864e5
 let AUTO_SCROLL=localStorage.getItem('alpexa.fxdash.autoscroll')!=='0';
 let CHART_SHIFT=localStorage.getItem('alpexa.fxdash.chartshift')==='1';
 const CHART_BASE={XAUUSD:2400};
-const CH_UP='#00C805', CH_DN='#FF5000', CH_LINE='#00C805';   // 레전드 시그니처 (2026-07-23 사장님 "a로 해봐" — 시안 A: 브랜드 초록 + RH 주황빨강, 적록색약 대비 확보)
+/* 캔들 팔레트 = 테마 연동 (2026-07-23 "A 고") — 다크: 브랜드 #00C805/#FF5000 · 라이트(민트 모던):
+   #00B386/#FF4D4F (흰 배경 색약 검증 통과 페어). applyThemeFX가 전환 시 재대입 + 차트 재도장. */
+let CH_UP='#00C805', CH_DN='#FF5000', CH_LINE='#00C805';
+function applyChartPalette(){ const light=document.body.classList.contains('light');
+  CH_UP=light?'#00B386':'#00C805'; CH_DN=light?'#FF4D4F':'#FF5000'; CH_LINE=CH_UP; }
 const chartSeries={};                              // sym -> {tf, c:[{t,o,h,l,c}]}
 /* ── 차트 조작 상태 — 차트별 독립(각 창이 자기 타입·TF·줌·그리드·지표). 툴바/☰/TF는 활성 차트에만 적용 ── */
 let crossOn=false;                                 // 크로스헤어 모드(커서 모드라 전역 — 그리기는 창별 스케일)
@@ -2487,7 +2496,8 @@ function applyThemeFX(){ const light=localStorage.getItem(FX_TKEY)!=='dark';
   const mo=document.getElementById('thMoon'), su=document.getElementById('thSun');
   if(mo) mo.style.display=light?'none':''; if(su) su.style.display=light?'':'none';
   const dk=document.getElementById('sgDark'), lt=document.getElementById('sgLight');
-  if(dk) dk.classList.toggle('on',!light); if(lt) lt.classList.toggle('on',light); }
+  if(dk) dk.classList.toggle('on',!light); if(lt) lt.classList.toggle('on',light);
+  try{ applyChartPalette(); if(typeof renderAllCharts==='function') renderAllCharts(false); }catch(e){} }
 document.getElementById('btnTheme').onclick=()=>{ localStorage.setItem(FX_TKEY,
   localStorage.getItem(FX_TKEY)!=='dark'?'dark':'light'); applyThemeFX(); };   // 기본 라이트와 대칭 (미저장=라이트 → 첫 클릭=다크)
 document.getElementById('sgDark').onclick=()=>{ localStorage.setItem(FX_TKEY,'dark'); applyThemeFX(); };
