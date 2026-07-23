@@ -1791,7 +1791,7 @@ function acctSpans(live){
     '<span>'+t('Margin')+':<b>'+mt5n(st.margin)+'</b></span><span>'+t('Free Margin')+':<b>'+mt5n(st.free)+'</b></span>'+
     '<span>'+t('Margin Level')+':<b>'+(st.margin>0?mt5n(st.level)+'%':'—')+'</b></span>';
   if(!live) return spans(demoStats());   // DEMO도 실시간 계산 — 마진(500:1)·스왑·플로팅 (2026-07-19 사장님)
-  return '<span class="acctlive" title="Real account (read-only) — execution lands in M5">LIVE</span>'+spans(fxAcct.stats()); }
+  return spans(fxAcct.stats()); }   /* LIVE 칩 제거 (2026-07-23 사장님 지시 — 실계좌 여부는 주문창 배지·잔고로 충분) */
 
 function renderToolbox(tab){ const body=document.getElementById('tbxBody'); if(!body) return; curTbxTab=tab;
   const emptyIC={News:['📰','News feed — connects in M6'], Mailbox:['✉️','No messages (Mailbox empty)'],
@@ -2462,16 +2462,17 @@ document.getElementById('goCrypto').onclick=()=>{ location.href='/dev/crypto-das
 document.getElementById('btnFull').onclick=()=>{ try{ if(!document.fullscreenElement)
   document.documentElement.requestFullscreen().catch(()=>{}); else document.exitFullscreen(); }catch(e){} };
 
-/* 테마 (FX 전용 키, 기본 다크) */
+/* 테마 (FX 전용 키) — 기본 = 라이트(화이트) (2026-07-23 사장님 "전환했을시 기본셋팅").
+   다크로 저장한 사용자만 다크 유지 — 미저장(첫 진입·레전드 1에서 전환)은 화이트. */
 const FX_TKEY='alpexa.fxdash.theme';
-function applyThemeFX(){ const light=localStorage.getItem(FX_TKEY)==='light';
+function applyThemeFX(){ const light=localStorage.getItem(FX_TKEY)!=='dark';
   document.body.classList.toggle('light', light);
   const mo=document.getElementById('thMoon'), su=document.getElementById('thSun');
   if(mo) mo.style.display=light?'none':''; if(su) su.style.display=light?'':'none';
   const dk=document.getElementById('sgDark'), lt=document.getElementById('sgLight');
   if(dk) dk.classList.toggle('on',!light); if(lt) lt.classList.toggle('on',light); }
 document.getElementById('btnTheme').onclick=()=>{ localStorage.setItem(FX_TKEY,
-  localStorage.getItem(FX_TKEY)==='light'?'dark':'light'); applyThemeFX(); };
+  localStorage.getItem(FX_TKEY)!=='dark'?'dark':'light'); applyThemeFX(); };   // 기본 라이트와 대칭 (미저장=라이트 → 첫 클릭=다크)
 document.getElementById('sgDark').onclick=()=>{ localStorage.setItem(FX_TKEY,'dark'); applyThemeFX(); };
 document.getElementById('sgLight').onclick=()=>{ localStorage.setItem(FX_TKEY,'light'); applyThemeFX(); };
 document.getElementById('sgLangs').addEventListener('click',e=>{ const b=e.target.closest('[data-lang]'); if(!b) return; setLang(b.dataset.lang); });
