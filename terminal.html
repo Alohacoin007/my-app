@@ -1279,13 +1279,24 @@ function mountCharts(){ chartIds().sort((a,b)=>(+a.slice(5))-(+b.slice(5))).forE
    M2: 읽기 전용 표시. 시세 소스는 아직 DEV 시뮬레이터(정직 표기 'SIM') — 실피드(prices 테이블)는 다음 단계.
    ⚠ 실피드 붙일 때 halfPx/pip/digits/sprText를 webtrade와 반드시 동일 유지(플로팅≠실현 방지). markup=0(dev). */
 const MW_SYMBOLS={ Forex:['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCAD','USDCHF','NZDUSD','GBPJPY','AUDJPY','EURJPY'],
-  Stocks:['AAPL','MSFT','NVDA','TSLA','AMZN','GOOGL','META'], Crypto:['BTCUSD','ETHUSD','SOLUSD','XRPUSD','DOGEUSD'] };
+  /* 주식 확장 (2026-07-23 사장님 "스페이스엑스 포함 AI·반도체·나스닥100 잘나가는") — 서버 피드·fx_specs 기배포 36종 전량.
+     순서: 메가캡 → SPACEX → 반도체 → AI 소프트웨어 → 퀀텀 → 금융. 전부 실시세 확인(1m 신선) 후 등재. */
+  Stocks:['AAPL','MSFT','NVDA','TSLA','AMZN','GOOGL','META','SPACEX',
+    'AMD','AVGO','TSM','ASML','ARM','MU','QCOM','INTC','TXN','AMAT','LRCX','KLAC','SMCI','ANET',
+    'PLTR','CRWD','ORCL','NOW','CRM','SNOW','ADBE','NFLX',
+    'IONQ','RGTI','QBTS','QUBT','ARQQ','JPM'],
+  Crypto:['BTCUSD','ETHUSD','SOLUSD','XRPUSD','DOGEUSD'] };
 const MW_CAT={}; Object.keys(MW_SYMBOLS).forEach(c=>MW_SYMBOLS[c].forEach(s=>MW_CAT[s]=c));
 const MW_WATCH=[...MW_SYMBOLS.Forex,...MW_SYMBOLS.Stocks,...MW_SYMBOLS.Crypto];
 const mwCat=s=>MW_CAT[s]||(/USD$/.test(s)?'Crypto':(s.length===6?'Forex':'Stocks'));
 /* Details 탭 심볼 풀네임(MT5식) — "USDJPY.FX, US Dollar vs Japanese Yen" */
 const CCY_NAME={USD:'US Dollar',EUR:'Euro',JPY:'Japanese Yen',GBP:'British Pound',AUD:'Australian Dollar',CAD:'Canadian Dollar',CHF:'Swiss Franc',NZD:'New Zealand Dollar'};
-const STOCK_NAME={AAPL:'Apple Inc',MSFT:'Microsoft Corp',NVDA:'NVIDIA Corp',TSLA:'Tesla Inc',AMZN:'Amazon.com Inc',GOOGL:'Alphabet Inc',META:'Meta Platforms Inc'};
+const STOCK_NAME={AAPL:'Apple Inc',MSFT:'Microsoft Corp',NVDA:'NVIDIA Corp',TSLA:'Tesla Inc',AMZN:'Amazon.com Inc',GOOGL:'Alphabet Inc',META:'Meta Platforms Inc',
+  SPACEX:'SpaceX',AMD:'Advanced Micro Devices',AVGO:'Broadcom Inc',TSM:'Taiwan Semiconductor (ADR)',ASML:'ASML Holding (ADR)',ARM:'Arm Holdings (ADR)',
+  MU:'Micron Technology',QCOM:'Qualcomm Inc',INTC:'Intel Corp',TXN:'Texas Instruments',AMAT:'Applied Materials',LRCX:'Lam Research',KLAC:'KLA Corp',
+  SMCI:'Super Micro Computer',ANET:'Arista Networks',PLTR:'Palantir Technologies',CRWD:'CrowdStrike Holdings',ORCL:'Oracle Corp',NOW:'ServiceNow Inc',
+  CRM:'Salesforce Inc',SNOW:'Snowflake Inc',ADBE:'Adobe Inc',NFLX:'Netflix Inc',
+  IONQ:'IonQ Inc',RGTI:'Rigetti Computing',QBTS:'D-Wave Quantum',QUBT:'Quantum Computing Inc',ARQQ:'Arqit Quantum',JPM:'JPMorgan Chase & Co'};
 const CRYPTO_NAME={BTC:'Bitcoin',ETH:'Ethereum',SOL:'Solana',XRP:'XRP',DOGE:'Dogecoin'};
 const mwSuffix=s=>({Forex:'.FX',Crypto:'.XC',Stocks:'.EQ'}[mwCat(s)]||'');
 function mwFullName(s){ const cat=mwCat(s);
@@ -1307,7 +1318,11 @@ const mwHalf=(s,mid,spr)=>mwCat(s)==='Forex'?Math.max(0.1,(+spr||0)+((mwStore.ma
   :mid*Math.max(MW_FLOOR_BPS[mwCat(s)]||0,+spr||0)/10000/2;
 const MW_BASE={ EURUSD:1.143,GBPUSD:1.3417,USDJPY:162.36,AUDUSD:0.694,USDCAD:1.417,USDCHF:0.8068,NZDUSD:0.5758,
   GBPJPY:217.8,AUDJPY:112.7,EURJPY:185.6, AAPL:229.5,MSFT:465.2,NVDA:128.4,TSLA:248.6,AMZN:198.3,GOOGL:178.9,
-  META:562.1, BTCUSD:64250,ETHUSD:3420,SOLUSD:148.5,XRPUSD:0.612,DOGEUSD:0.145 };
+  META:562.1, BTCUSD:64250,ETHUSD:3420,SOLUSD:148.5,XRPUSD:0.612,DOGEUSD:0.145,
+  /* 확장 주식 시드 = 2026-07-23 서버 실측가 (실피드 오기 전 초기 표시용 — 라이브가 즉시 덮음) */
+  SPACEX:115.3,AMD:552.3,AVGO:396.8,TSM:421.2,ASML:1801.9,ARM:283.4,MU:959.5,QCOM:175.6,INTC:102.6,
+  TXN:294.2,AMAT:553.9,LRCX:319.3,KLAC:214.7,SMCI:30.6,ANET:174.9,PLTR:124.6,CRWD:188.4,ORCL:125.8,
+  NOW:95.5,CRM:163,SNOW:267.8,ADBE:218.4,NFLX:68.5,IONQ:34.7,RGTI:15.2,QBTS:17.4,QUBT:7.9,ARQQ:18.1,JPM:348.2 };
 const mwStore={ rows:{}, ticks:{}, live:false, marks:{},
   /* FX markup_pts(pips) — webtrade loadMarks 락스텝([0,50] 클램프). 실패=markup 0 유지(서버는 청산 때 그대로 부과). */
   async loadMarks(){ try{ if(!(window.AlpexaSync&&AlpexaSync.db)) return;

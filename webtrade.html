@@ -852,7 +852,7 @@ if(typeof document!=='undefined'){ ['touchstart','pointerdown','click','keydown'
 // terminal (WT_DEMO) — stocks/crypto get a BASE seed + random walk like FX, honest for a demo.
 const SYMBOLS = {
   Forex:  ['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCAD','USDCHF','NZDUSD','GBPJPY','AUDJPY','EURJPY'],   // 7 FX majors first (canonical order), then JPY crosses
-  Stocks: ['AAPL','MSFT','NVDA','TSLA','AMZN','GOOGL','META'],
+  Stocks: ['AAPL','MSFT','NVDA','TSLA','AMZN','GOOGL','META','SPACEX','AMD','AVGO','TSM','ASML','ARM','MU','QCOM','PLTR','SMCI','NFLX'],   // 부팅 기본 — TOP20 주식과 동일 (2026-07-23 확장)
   Crypto: ['BTCUSD','ETHUSD','SOLUSD','XRPUSD','DOGEUSD'],
 };
 const SYM_CAT = {}; Object.keys(SYMBOLS).forEach(cat=> SYMBOLS[cat].forEach(s=> SYM_CAT[s]=cat));
@@ -867,7 +867,8 @@ const GRID  = ['EURUSD','USDJPY','GBPUSD','USDCHF'];   // the default 2×2 (TL·
 // and surfaces only when the user searches or switches the asset-class tab. Order = display order.
 const TOP20 = ['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCAD','USDCHF','NZDUSD',   // FX grouped first
   'BTCUSD','ETHUSD','SOLUSD','XRPUSD','DOGEUSD',                               // crypto
-  'AAPL','MSFT','NVDA','TSLA','AMZN','GOOGL','META','SPACEX'];                 // stocks
+  'AAPL','MSFT','NVDA','TSLA','AMZN','GOOGL','META','SPACEX',                  // stocks — mega caps + SpaceX
+  'AMD','AVGO','TSM','ASML','ARM','MU','QCOM','PLTR','SMCI','NFLX'];           // + AI·반도체 리더 (2026-07-23 사장님 — 전체 풀은 Stocks 탭/검색)
 // The 7 classic FX majors — pinned to the TOP of the Market Watch in this exact order, ahead of every
 // crypto/stock/cross, in EVERY view (default Top-20, class filter, search) via the symbolStore sort.
 const MAJORS = ['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCAD','USDCHF','NZDUSD'];
@@ -985,6 +986,11 @@ async function feedPrices(){
 const BASE = { EURUSD:1.143, AUDUSD:0.694, USDJPY:162.36, GBPUSD:1.3417, USDCAD:1.417,
   NZDUSD:0.5758, USDCHF:0.8068, GBPJPY:217.8, AUDJPY:112.7, EURJPY:185.6,
   AAPL:229.5, MSFT:465.2, NVDA:128.4, TSLA:248.6, AMZN:198.3, GOOGL:178.9, META:562.1,   // stocks
+  // 확장 주식 시드 = 2026-07-23 서버 실측가 (부팅 초기 표시용 — 라이브 피드가 즉시 덮음)
+  SPACEX:115.3, AMD:552.3, AVGO:396.8, TSM:421.2, ASML:1801.9, ARM:283.4, MU:959.5, QCOM:175.6,
+  INTC:102.6, TXN:294.2, AMAT:553.9, LRCX:319.3, KLAC:214.7, SMCI:30.6, ANET:174.9, PLTR:124.6,
+  CRWD:188.4, ORCL:125.8, NOW:95.5, CRM:163, SNOW:267.8, ADBE:218.4, NFLX:68.5,
+  IONQ:34.7, RGTI:15.2, QBTS:17.4, QUBT:7.9, ARQQ:18.1, JPM:348.2,
   BTCUSD:64250, ETHUSD:3420, SOLUSD:148.5, XRPUSD:0.612, DOGEUSD:0.145 };                 // crypto
 
 const priceStore = {
@@ -3283,6 +3289,11 @@ const SYM_NAME={ EURUSD:'Euro vs US Dollar', AUDUSD:'Australian Dollar vs US Dol
   GBPUSD:'Great Britain Pound vs US Dollar', USDCAD:'US Dollar vs Canadian Dollar', NZDUSD:'New Zealand Dollar vs US Dollar',
   USDCHF:'US Dollar vs Swiss Franc', GBPJPY:'Great Britain Pound vs Japanese Yen', AUDJPY:'Australian Dollar vs Japanese Yen', EURJPY:'Euro vs Japanese Yen',
   AAPL:'Apple Inc.', MSFT:'Microsoft Corp.', NVDA:'NVIDIA Corp.', TSLA:'Tesla Inc.', AMZN:'Amazon.com Inc.', GOOGL:'Alphabet Inc.', META:'Meta Platforms Inc.',
+  SPACEX:'SpaceX', AMD:'Advanced Micro Devices', AVGO:'Broadcom Inc.', TSM:'Taiwan Semiconductor (ADR)', ASML:'ASML Holding (ADR)', ARM:'Arm Holdings (ADR)',
+  MU:'Micron Technology', QCOM:'Qualcomm Inc.', INTC:'Intel Corp.', TXN:'Texas Instruments', AMAT:'Applied Materials', LRCX:'Lam Research', KLAC:'KLA Corp.',
+  SMCI:'Super Micro Computer', ANET:'Arista Networks', PLTR:'Palantir Technologies', CRWD:'CrowdStrike Holdings', ORCL:'Oracle Corp.', NOW:'ServiceNow Inc.',
+  CRM:'Salesforce Inc.', SNOW:'Snowflake Inc.', ADBE:'Adobe Inc.', NFLX:'Netflix Inc.',
+  IONQ:'IonQ Inc.', RGTI:'Rigetti Computing', QBTS:'D-Wave Quantum', QUBT:'Quantum Computing Inc.', ARQQ:'Arqit Quantum', JPM:'JPMorgan Chase & Co.',
   BTCUSD:'Bitcoin vs US Dollar', ETHUSD:'Ethereum vs US Dollar', SOLUSD:'Solana vs US Dollar', XRPUSD:'XRP vs US Dollar', DOGEUSD:'Dogecoin vs US Dollar' };
 // order-dialog left menu icons (MT5-style thin line-chart + arrow marks)
 const OIC = {

@@ -57,7 +57,8 @@ const ROWS = [
   await page.goto(`http://localhost:${PORT}/terminal.html`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(700);
   ok('no feed → honest SIM badge shown', (await page.$eval('#mwLive', el => el.textContent)) === 'SIM');
-  ok('SIM rows render (22 symbols)', (await page.$$eval('#w-marketwatch .mwrow', r => r.length)) === 22);
+  ok('SIM rows render (전 심볼 = MW_WATCH 길이 — 2026-07-23 주식 36종 확장 후 고정 22 폐지)',
+     (await page.$$eval('#w-marketwatch .mwrow', r => r.length)) === (await page.evaluate(() => MW_WATCH.length)));
 
   // ── ① 실피드 주입 → 실가격 + 매핑 ──
   await page.evaluate((rows) => {
