@@ -47,7 +47,7 @@ const ok = (n, c, d) => { if (c) { pass++; console.log('  ✅ ' + n); } else { f
   const browser = await chromium.launch({ executablePath: exe, headless: true, args: ['--no-sandbox'] });
   console.log('fx-terminal demo SL/TP — 로컬 자동 청산 게이트');
   const page = await browser.newPage({ viewport: { width: 1900, height: 904 } });
-  await page.goto(`http://localhost:${PORT}/dev/fx-terminal.html`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`http://localhost:${PORT}/terminal.html`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(800);
 
   // 헬퍼: 포지션 생성 + SL/TP 설정 (전역 lexical — window. 접두 없이)

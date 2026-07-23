@@ -42,7 +42,7 @@ function serverOpen(cls, at) {
   return min >= 13 * 60 + 30 && min < 20 * 60;
 }
 // 터미널 fxMarketOpen 추출 (mwCat 스텁으로 평가)
-const html = fs.readFileSync(path.join(REPO, 'dev/fx-terminal.html'), 'utf8');
+const html = fs.readFileSync(path.join(REPO, 'terminal.html'), 'utf8');
 const fnSrc = (html.match(/function fxMarketOpen\(sym, at\)\{[\s\S]*?return min>=13\*60\+30 && min<20\*60; \}/) || [''])[0];
 const holSrc = (html.match(/const FX_US_HOLIDAYS=new Set\(\[[\s\S]*?\]\);/) || [''])[0];
 ok('터미널 fxMarketOpen·휴일 셋 소스 추출', fnSrc.length > 0 && holSrc.length > 0);

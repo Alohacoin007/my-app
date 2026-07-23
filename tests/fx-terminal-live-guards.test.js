@@ -66,7 +66,7 @@ const STUB = `(() => {
   const browser = await chromium.launch({ executablePath: exe, headless: true, args: ['--no-sandbox'] });
   console.log('fx-terminal live guards — 차이감사 톱5 게이트');
   const page = await browser.newPage({ viewport: { width: 1900, height: 904 } });
-  await page.goto(`http://localhost:${PORT}/dev/fx-terminal.html`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`http://localhost:${PORT}/terminal.html`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(800);
   await page.evaluate(STUB);
   await page.evaluate(() => fxAcct.load());

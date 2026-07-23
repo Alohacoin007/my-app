@@ -46,7 +46,7 @@ const ok = (n, c, d) => { if (c) { pass++; console.log('  ✅ ' + n); } else { f
   const browser = await chromium.launch({ executablePath: exe, headless: true, args: ['--no-sandbox'] });
   console.log('fx-terminal real candles — behavior gate');
   const page = await browser.newPage({ viewport: { width: 1900, height: 904 } });
-  await page.goto(`http://localhost:${PORT}/dev/fx-terminal.html`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`http://localhost:${PORT}/terminal.html`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(700);
 
   // 스텁 fetch 설치 + 요청 로그 — 이후의 모든 시리즈 생성이 이 스텁을 침
@@ -115,7 +115,7 @@ const ok = (n, c, d) => { if (c) { pass++; console.log('  ✅ ' + n); } else { f
   ok('fx: v=0(폴리곤) → 틱볼륨 근사 채움 (v>0)', c2.v > 0, String(c2.v));
 
   // ── ②b 깊은 이력 (2026-07-22 "고고" — webtrade HIST_N 락스텝, 1,000→15,000봉) ──
-  const src = fs.readFileSync(path.join(REPO, 'dev/fx-terminal.html'), 'utf8');
+  const src = fs.readFileSync(path.join(REPO, 'terminal.html'), 'utf8');
   const wsrc = fs.readFileSync(path.join(REPO, 'webtrade.html'), 'utf8');
   const histOf = s => (s.match(/const HIST_N=\{[^}]*\}/) || [''])[0];
   ok('deep: HIST_N 자구 락스텝 (터미널 == webtrade, H1/H4 15000)',

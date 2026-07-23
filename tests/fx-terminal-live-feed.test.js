@@ -54,7 +54,7 @@ const ROWS = [
 
   // ── ④ 스텁 없이 로드 = SIM 그대로 (배지 없음, 기존 스모크와 동일 전제) ──
   let page = await browser.newPage({ viewport: { width: 1900, height: 904 } });
-  await page.goto(`http://localhost:${PORT}/dev/fx-terminal.html`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`http://localhost:${PORT}/terminal.html`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(700);
   ok('no feed → honest SIM badge shown', (await page.$eval('#mwLive', el => el.textContent)) === 'SIM');
   ok('SIM rows render (22 symbols)', (await page.$$eval('#w-marketwatch .mwrow', r => r.length)) === 22);

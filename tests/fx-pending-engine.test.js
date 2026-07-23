@@ -157,7 +157,7 @@ const STUB = `(() => {
   const PORT = 8891, server = await serve(PORT);
   const browser = await chromium.launch({ executablePath: exe, headless: true, args: ['--no-sandbox'] });
   const page = await browser.newPage({ viewport: { width: 1900, height: 904 } });
-  await page.goto(`http://localhost:${PORT}/dev/fx-terminal.html`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`http://localhost:${PORT}/terminal.html`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(800);
   await page.evaluate(() => { fxMarketOpen = () => true; });
   await page.evaluate(STUB);

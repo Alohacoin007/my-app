@@ -43,7 +43,7 @@ const ok = (n, c, d) => { if (c) { pass++; console.log('  ✅ ' + n); } else { f
   const browser = await chromium.launch({ executablePath: exe, headless: true, args: ['--no-sandbox'] });
   console.log('fx-terminal i18n — 다국어 행위 게이트');
   const page = await browser.newPage({ viewport: { width: 1900, height: 904 } });
-  await page.goto(`http://localhost:${PORT}/dev/fx-terminal.html`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`http://localhost:${PORT}/terminal.html`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(800);
 
   // ① 기본 en

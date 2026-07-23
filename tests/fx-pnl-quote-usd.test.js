@@ -76,7 +76,7 @@ ok('크로스 환율 부재 → 환산 0 (가짜 금지)', clientQuoteUsd('EURNO
 
 // ── 소스 핀: 세 화면에서 0.0067 제거 + 신 헬퍼 존재 ──
 const wt = fs.readFileSync(path.join(__dirname, '..', 'webtrade.html'), 'utf8');
-const fxt = fs.readFileSync(path.join(__dirname, '..', 'dev', 'fx-terminal.html'), 'utf8');
+const fxt = fs.readFileSync(path.join(__dirname, '..', 'terminal.html'), 'utf8');
 const tr = fs.readFileSync(path.join(__dirname, '..', 'trading.html'), 'utf8');
 ok('webtrade: 0.0067 고정값 제거 + quoteUsd 라이브 환산', !/\?0\.0067:1/.test(wt) && /function quoteUsd\(/.test(wt) && /quoteUsd\(p\.symbol, cur\)/.test(wt));
 ok('터미널: 0.0067 고정값 제거 + fxQuoteUsd 라이브 환산', !/\?0\.0067:1/.test(fxt) && /function fxQuoteUsd\(/.test(fxt) && (fxt.match(/fxQuoteUsd\(/g)||[]).length >= 3);

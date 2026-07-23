@@ -99,8 +99,11 @@ if (/\.oc-sell\{background:linear-gradient|\.oc-buy\{background:linear-gradient/
 if (!/\.obox\{[^}]*border:1px solid #3c4049;box-shadow/.test(src)) bad('the .obox one-shell card must exist (forced in both themes)');
 
 // (4) UI label renamed to Legend (no "Light / Dark" left)
-if (/Color Theme — Light \/ Dark/.test(src)) bad('the menu label must be renamed away from "Light / Dark"');
-if (!/\{l:'Color Theme — Legend \/ Dark', cmd:'theme\.toggle'/.test(src)) bad('View menu must read "Color Theme — Legend / Dark"');
+// 2026-07-23 버전 스위처: 테마 토글 폐지 → View 메뉴는 Legend 1(여기·체크)/Legend 2(터미널 이동).
+if (/cmd:'theme\.toggle'/.test(src)) bad('theme.toggle must be gone — the dark/legend toggle was replaced by the Legend 1/2 version switcher');
+if (!/\{l:'Legend 1 — Classic', cmd:'ver\.set', arg:'legend1', ver:'legend1'/.test(src)) bad("View menu must offer 'Legend 1 — Classic' (checked via ver:'legend1')");
+if (!/\{l:'Legend 2 — Terminal', cmd:'ver\.set', arg:'legend2'/.test(src)) bad("View menu must offer 'Legend 2 — Terminal'");
+if (!/cmd==='ver\.set'/.test(src) || !/alpexa\.fx\.version/.test(src) || !/location\.href='terminal\.html'/.test(src)) bad('ver.set must persist alpexa.fx.version and navigate to terminal.html for legend2');
 
 // (5) integrity: the order-popup pipette accel timer + spread box + 7-arg slippage are still present
 if (!/p_requested_price/.test(src) || !/p_max_slippage/.test(src)) bad('order pipette/7-arg slippage binding must remain intact');

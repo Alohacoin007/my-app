@@ -70,7 +70,7 @@ const STUB = (rpcMode) => `(() => {
   const browser = await chromium.launch({ executablePath: exe, headless: true, args: ['--no-sandbox'] });
   console.log('fx-terminal trade — M4 real-execution gate (stub RPC)');
   const page = await browser.newPage({ viewport: { width: 1900, height: 904 } });
-  await page.goto(`http://localhost:${PORT}/dev/fx-terminal.html`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`http://localhost:${PORT}/terminal.html`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(700);
   await page.evaluate(() => { fxMarketOpen = () => true; });   // 세션 게이트 개방 — 주말에 돌아도 주문 핀 불변(게이트 자체는 live-guards 테스트가 검증)
 

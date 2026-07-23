@@ -735,7 +735,12 @@ const CANDLE_THEME = {
 // No param → fall back to the saved UI setting. UI setting only, no money involved.
 const WT_URL_THEME = (()=>{ try{ const p=(new URLSearchParams(location.search).get('theme')||'').toLowerCase();
   if(p==='legend'||p==='light') return 'light'; if(p==='dark'||p==='mt5') return 'dark'; }catch(e){} return null; })();
-const themeBus = { theme: WT_URL_THEME || 'dark', listeners:new Set(),
+/* Legend 1/2 체제 (2026-07-23 사장님 "고고"): webtrade 기본 = 레전드 고정(다크는 ?theme=dark 백도어만),
+   마지막으로 레전드 2(터미널)를 쓰던 고객은 여기 진입 시 바로 terminal.html로. ?stay=1 = 개발용 탈출구. */
+try{ if(localStorage.getItem('alpexa.fx.version')==='legend2' && !/[?&]stay=1/.test(location.search)){ location.replace('terminal.html'); }
+     else { localStorage.setItem('alpexa.fx.version','legend1'); }   // 리다이렉트 안 됐으면 = 지금 쓰는 버전은 Legend 1 (replace 후에도 다음 줄이 실행되므로 else 필수)
+}catch(e){}
+const themeBus = { theme: WT_URL_THEME || 'light', listeners:new Set(),
   set(t){ this.theme=(t==='light'?'light':'dark'); this.listeners.forEach(fn=>{ try{fn(this.theme);}catch(e){} }); },
   subscribe(fn){ this.listeners.add(fn); return ()=>this.listeners.delete(fn); } };
 
@@ -2888,7 +2893,8 @@ const MENU_DEF = {
            {l:'Market Watch', v:'marketwatch', k:'Ctrl+M', keep:1},
            {l:'Navigator', v:'navigator', k:'Ctrl+N', keep:1},
            {l:'Toolbox', v:'toolbox', k:'Ctrl+T', keep:1}, {sep:1},
-           {l:'Color Theme — Legend / Dark', cmd:'theme.toggle', keep:1}, {sep:1},
+           {l:'Legend 1 — Classic', cmd:'ver.set', arg:'legend1', ver:'legend1', keep:1},
+           {l:'Legend 2 — Terminal', cmd:'ver.set', arg:'legend2', keep:1}, {sep:1},
            {l:'Full Screen', k:'F11', cmd:'view.fullscreen'} ],
   Insert:[ {l:'Indicators', indicators:1}, {sep:1},
            {l:'Lines', children:[ {l:'Trend Line', tool:'trend'}, {l:'Horizontal Line', tool:'hline'}, {l:'Vertical Line', tool:'vline'} ]},
@@ -2930,7 +2936,7 @@ function MenuBar({ indicators, view, tool }){
     return (
       <div key={i} className={"row"+(it.dis?' dis':'')+(kids?' has':'')} onMouseEnter={()=>setSub(kids?i:null)}
            onClick={()=>{ if(!kids) run(it); }}>
-        <span className="ck">{(it.v && view[it.v]) || (it.lang && it.lang===LANG.cur) ? '✓' : ''}</span>{t(it.l)}
+        <span className="ck">{(it.v && view[it.v]) || (it.lang && it.lang===LANG.cur) || it.ver==='legend1' ? '✓' : ''}</span>{t(it.l)}
         {kids ? <span className="ar">▸</span> : it.k ? <span className="sc">{it.k}</span> : null}
         {kids && sub===i && (
           <div className="mdrop sub" onClick={e=>e.stopPropagation()}>
@@ -3454,7 +3460,7 @@ function App(){
   const [bottomh,setBottomh]=React.useState((cfg.bottomh && cfg.bottomh>188) ? cfg.bottomh : 126);   // dock 150px (126+24) → taller charts; keep only an intentionally-enlarged saved value (>188), else new slim default
   const [navh,setNavh]=React.useState(cfg.navh||186);
   const [termTab,setTermTab]=React.useState('Trade');   // terminal tab bar lives full-width at screen bottom
-  const [theme,setTheme]=React.useState(WT_URL_THEME || (cfg.theme==='light'?'light':'dark'));   // ?theme= deep-link wins, else saved View → Color Theme
+  const [theme,setTheme]=React.useState(WT_URL_THEME || 'light');   // 레전드 고정(2026-07-23) — ?theme=dark는 개발 백도어만, 저장 설정으로 다크 복귀 불가
   React.useEffect(()=>{ themeBus.set(theme); }, [theme]);   // broadcast to live chart canvases
   const [lang,setLang]=React.useState(['ko','ja','zh'].indexOf(cfg.lang)>=0?cfg.lang:'en');   // View → Languages (UI setting)
   LANG.cur=lang;   // set during render so every child's t() reads the current language immediately
@@ -3519,7 +3525,9 @@ function App(){
     else if(cmd==='chart.new') addChart();
     else if(cmd==='chart.tool') setTool(arg);
     else if(cmd==='view.toggle') setView(v=>({ ...v, [arg]: !v[arg] }));
-    else if(cmd==='theme.toggle') setTheme(t=> t==='light'?'dark':'light');   // View → Color Theme (Light ⇄ Dark)
+    else if(cmd==='ver.set'){   // View → Legend 1(여기)/Legend 2(터미널로 이동) — 다크 토글은 폐지(2026-07-23)
+      try{ localStorage.setItem('alpexa.fx.version', arg==='legend2'?'legend2':'legend1'); }catch(e){}
+      if(arg==='legend2') location.href='terminal.html'; }
     else if(cmd==='lang.set'){ LANG.cur=arg; setLang(arg); }                  // View → Languages (en/ko/ja/zh)
     else if(cmd==='view.fullscreen'){ try{ if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }catch(e){} }
     else if(cmd==='chart.indicator'){   // PER-CHART: apply to the ACTIVE chart only (not all 4)

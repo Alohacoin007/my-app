@@ -68,7 +68,7 @@ function installStub(mode) {
   console.log('fx-terminal account — M3 behavior gate');
 
   const page = await browser.newPage({ viewport: { width: 1900, height: 904 } });
-  await page.goto(`http://localhost:${PORT}/dev/fx-terminal.html`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`http://localhost:${PORT}/terminal.html`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(700);
 
   // ── 기준선: 미로그인 = 클린 슬레이트(시드 0) + 연습 체결은 가능 ──

@@ -126,11 +126,11 @@ const AGENT_INIT = `
 
 const PAGES = ['index.html', 'login.html', 'signup.html', 'statement.html',
                'crypto-live.html', 'trading.html', 'sports-live.html', 'manager-mobile.html', 'webtrade.html',
-               'fx.html', 'agent.html'];
+               'fx.html', 'agent.html', 'terminal.html'];
 
 // console errors that are environment noise (blocked CDN / failed resource), NOT our bug.
 function isNoise(t) {
-  return /net::ERR|Failed to load resource|ERR_|CORS|Access-Control|favicon|status of 4|status of 5|net err|Loading (?:CSS )?chunk|Babel|Could not load|supabase|CDN fail|React(?:DOM)?\b|jsdelivr|unpkg|cdnjs|transpile|chart libs/i.test(t);
+  return /net::ERR|Failed to load resource|ERR_|CORS|Access-Control|favicon|status of 4|status of 5|net err|Loading (?:CSS )?chunk|Babel|Could not load|supabase|CDN fail|React(?:DOM)?\b|jsdelivr|unpkg|cdnjs|transpile|chart libs|WebSocket connection to/i.test(t);
 }
 
 (async () => {

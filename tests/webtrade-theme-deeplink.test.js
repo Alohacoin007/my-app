@@ -31,8 +31,11 @@ else {
 }
 
 // 2) themeBus + App initial theme both prefer the deep-link
-if (!/const themeBus = \{ theme: WT_URL_THEME \|\| 'dark'/.test(src)) bad('themeBus must initialise from WT_URL_THEME so charts start in the linked theme (no flash)');
-if (!/React\.useState\(WT_URL_THEME \|\| \(cfg\.theme==='light'\?'light':'dark'\)\)/.test(src)) bad('App theme state must prefer WT_URL_THEME over the saved cfg');
+// 2026-07-23 레전드 고정: 기본 = 'light'(레전드). ?theme=dark는 개발 백도어로만 남고,
+// 저장 설정(cfg.theme)으로는 다크가 절대 복귀하지 못한다 (다크 UI 토글 폐지).
+if (!/const themeBus = \{ theme: WT_URL_THEME \|\| 'light'/.test(src)) bad("themeBus must default to 'light' (Legend locked) while still honouring the deep-link");
+if (!/React\.useState\(WT_URL_THEME \|\| 'light'\)/.test(src)) bad("App theme state must be WT_URL_THEME || 'light' — saved cfg must NOT resurrect dark");
+if (/cfg\.theme==='light'\?'light':'dark'/.test(src)) bad('saved-cfg dark fallback must be gone (Legend locked)');
 
 // 3) footers link to the Legend WebTrader
 for (const f of ['fx.html', 'ib.html', 'about.html']) {

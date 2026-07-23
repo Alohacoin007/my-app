@@ -15,7 +15,7 @@ const ok = (n, c, d) => { if (c) { pass++; console.log('  ✅ ' + n); } else { f
 console.log('trading pending server-only — 이중 경로 폐쇄 게이트');
 
 const src = fs.readFileSync(path.join(REPO, 'trading.html'), 'utf8');
-const term = fs.readFileSync(path.join(REPO, 'dev/fx-terminal.html'), 'utf8');
+const term = fs.readFileSync(path.join(REPO, 'terminal.html'), 'utf8');
 
 // ① 직접 테이블 쓰기 0건 (SELECT는 표시용으로 허용)
 ok('① trading: fx_pending 직접 쓰기(upsert/delete/insert/update) 0건',
