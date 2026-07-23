@@ -1,7 +1,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Alpexa · FX Terminal (Legend)</title>
-<link rel="stylesheet" href="../legend-ui.css">
+<link rel="stylesheet" href="legend-ui.css">
 <!-- M2 실시세: 서버 prices 읽기 전용(공개 키). CDN/AlpexaSync 실패 시 SIM 폴백 유지 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../alpexa-sync.js?v=16"></script>
@@ -16,6 +16,11 @@ body{color:var(--lgd-ink,#F5F6F7); overflow:hidden; font-family:var(--lgd-font,s
   --lgd-r-widget:2px; --lgd-r-btn:2px; --lgd-r-pop:2px; display:flex; flex-direction:column; height:100vh}
 /* 컨셉 초록 → MT5 블루 (.lgd 특이도 이겨야 함). 차트 색 별도, --lgd-down 빨강 유지 */
 body.lgd{ --lgd-up:#2E90FA; --lgd-link2:#2E90FA }
+/* 로빈후드 레전드 정통 (2026-07-23 사장님) — webtrade Legend 테마 락스텝: 제트블랙 #000 ·
+   표면 #0E1015 · 헤어 #1D212A · 네온그린 #00C805 · 하락 #FF453A. 다크(기본)에만 적용, 라이트 무변경. */
+body.lgd:not(.light){ --lgd-bg:#000000; --lgd-surface:#0E1015; --lgd-surface2:#161A22;
+  --lgd-pill:#1D212A; --lgd-pill-hi:#252B36; --lgd-hair:#1D212A;
+  --lgd-green:#00C805; --lgd-up:#00C805; --lgd-link2:#00C805; --lgd-down:#FF453A; }
 body{ --lgd-green:#00C805 }   /* 시세창(Market Watch) = 레전드 초록 상승 / 빨강 하락 */
 button:active:not(:disabled),.htab:active,.hic:active,.avatar:active{ transform:scale(.97); filter:brightness(1.15) }
 
@@ -764,9 +769,9 @@ let CHART_SHIFT=localStorage.getItem('alpexa.fxdash.chartshift')==='1';
 const CHART_BASE={XAUUSD:2400};
 /* 캔들 팔레트 = 진한 네온 파랑/빨강 (2026-07-23 사장님 "진한 네온 파랑") — 상승 파랑·하락 빨강.
    라이트 #0052FF (검증 전 항목 통과 — 흰 배경에서도 안 죽는 최심 네온) · 다크 #2E7DFF (검정 위 발광 톤). */
-let CH_UP='#2E7DFF', CH_DN='#FF4D4F', CH_LINE='#2E7DFF';
+let CH_UP='#00FF55', CH_DN='#FF453A', CH_LINE='#00FF55';
 function applyChartPalette(){ const light=document.body.classList.contains('light');
-  CH_UP=light?'#0052FF':'#2E7DFF'; CH_DN=light?'#F04443':'#FF4D4F'; CH_LINE=CH_UP; }
+  CH_UP=light?'#0052FF':'#00FF55'; CH_DN=light?'#F04443':'#FF453A'; CH_LINE=CH_UP; }
 const chartSeries={};                              // sym -> {tf, c:[{t,o,h,l,c}]}
 /* ── 차트 조작 상태 — 차트별 독립(각 창이 자기 타입·TF·줌·그리드·지표). 툴바/☰/TF는 활성 차트에만 적용 ── */
 let crossOn=false;                                 // 크로스헤어 모드(커서 모드라 전역 — 그리기는 창별 스케일)
@@ -2491,7 +2496,7 @@ document.getElementById('btnFull').onclick=()=>{ try{ if(!document.fullscreenEle
 /* 테마 (FX 전용 키) — 기본 = 라이트(화이트) (2026-07-23 사장님 "전환했을시 기본셋팅").
    다크로 저장한 사용자만 다크 유지 — 미저장(첫 진입·레전드 1에서 전환)은 화이트. */
 const FX_TKEY='alpexa.fxdash.theme';
-function applyThemeFX(){ const light=localStorage.getItem(FX_TKEY)!=='dark';
+function applyThemeFX(){ const light=localStorage.getItem(FX_TKEY)==='light';   // 기본 다크(RH 레전드) — 2026-07-23
   document.body.classList.toggle('light', light);
   const mo=document.getElementById('thMoon'), su=document.getElementById('thSun');
   if(mo) mo.style.display=light?'none':''; if(su) su.style.display=light?'':'none';
@@ -2499,7 +2504,7 @@ function applyThemeFX(){ const light=localStorage.getItem(FX_TKEY)!=='dark';
   if(dk) dk.classList.toggle('on',!light); if(lt) lt.classList.toggle('on',light);
   try{ applyChartPalette(); if(typeof renderAllCharts==='function') renderAllCharts(false); }catch(e){} }
 document.getElementById('btnTheme').onclick=()=>{ localStorage.setItem(FX_TKEY,
-  localStorage.getItem(FX_TKEY)!=='dark'?'dark':'light'); applyThemeFX(); };   // 기본 라이트와 대칭 (미저장=라이트 → 첫 클릭=다크)
+  localStorage.getItem(FX_TKEY)==='light'?'dark':'light'); applyThemeFX(); };   // 기본 다크와 대칭 (미저장=다크 → 첫 클릭=라이트)
 document.getElementById('sgDark').onclick=()=>{ localStorage.setItem(FX_TKEY,'dark'); applyThemeFX(); };
 document.getElementById('sgLight').onclick=()=>{ localStorage.setItem(FX_TKEY,'light'); applyThemeFX(); };
 document.getElementById('sgLangs').addEventListener('click',e=>{ const b=e.target.closest('[data-lang]'); if(!b) return; setLang(b.dataset.lang); });
