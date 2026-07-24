@@ -1070,6 +1070,11 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
       const y=yOf(v);
       out+='<line x1="0" y1="'+y.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="'+col+'" stroke-width="0.9" stroke-dasharray="'+(dash?'4 3':'8 4')+'" opacity=".85"/>'+
         '<text x="4" y="'+((below?y+11:y-3)).toFixed(1)+'" fill="'+col+'" font-size="8.5" font-weight="700">'+lab+'</text>';   // 진입 라벨은 라인 아래(본래 위치 — 2026-07-23 사장님)
+      /* MT5식 축 태그 (2026-07-24 사장님 "이렇게" 스샷) — 진입가를 우측 가격축에 색 박스로 */
+      if(below){ const tx=(h=>{ const n=parseInt(h.slice(1),16);
+          return (0.2126*((n>>16)&255)+0.7152*((n>>8)&255)+0.0722*(n&255))>128?'#06130A':'#fff'; })(col);
+        out+='<rect x="'+plotW.toFixed(1)+'" y="'+(y-8).toFixed(1)+'" width="'+RA+'" height="16" fill="'+col+'"/>'+
+          '<text x="'+(W-4)+'" y="'+(y+3.5).toFixed(1)+'" text-anchor="end" fill="'+tx+'" font-size="10" font-weight="800" font-family="inherit">'+v.toFixed(dg)+'</text>'; }
       if(hit) TL.push(Object.assign({}, hit, {y, price:v})); };
     (isLive?acct.rows():DEMO_POS).forEach(p=>{ if(p.sym!==dsym&&p.sym!==sym) return;
       const col=p.type==='buy'?'#00C805':'#F23645';   // BUY 초록 · SELL 빨강 (2026-07-19 사장님, 캔들색과 구분)
