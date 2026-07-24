@@ -1099,10 +1099,13 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
   const lk=vis[vis.length-1], lc=lk.c, ly=yOf(lc);
   const _r0=mwStore.rows[sym], _tickUp=(_r0&&_r0.bDir!=null&&_r0.bDir!==0)?_r0.bDir>0:(lc>=lk.o);
   const lcol=c.type==='line'?CH_LINE:(_tickUp?CH_UP:CH_DN);
+  /* 태그 글자색 = 배경 밝기 자동 (2026-07-23 사장님 "초록박스 안에 시세가 안보여" — 네온 초록 위 흰 글씨
+     대비 1.4:1로 실독 불가였음 → 밝은 배경(네온 초록)은 검정, 어두운 배경(빨강·파랑)은 흰색) */
+  const _tagTx=(h=>{ const n=parseInt(h.slice(1),16); return (0.2126*((n>>16)&255)+0.7152*((n>>8)&255)+0.0722*(n&255))>150?'#06130A':'#fff'; })(lcol);
   if(off===0)   // 과거 스크롤 중엔 현재가 라인 미표시(마지막 보이는 봉 ≠ 현재가 — 오독 방지)
   out+='<line x1="0" y1="'+ly.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+ly.toFixed(1)+'" stroke="'+lcol+'" stroke-width="1" stroke-dasharray="3 3" opacity=".9"/>'+
     '<rect x="'+plotW.toFixed(1)+'" y="'+(ly-8).toFixed(1)+'" width="'+RA+'" height="16" fill="'+lcol+'"/>'+
-    '<text x="'+(W-4)+'" y="'+(ly+3.5).toFixed(1)+'" text-anchor="end" fill="#fff" font-size="9.5" font-weight="700" font-family="inherit">'+lc.toFixed(dg)+'</text>';
+    '<text x="'+(W-4)+'" y="'+(ly+3.5).toFixed(1)+'" text-anchor="end" fill="'+_tagTx+'" font-size="10" font-weight="800" font-family="inherit">'+lc.toFixed(dg)+'</text>';
   /* OHLCV 리드아웃은 상단 원클릭 바로 이동(아래 updateOcbar) */
   /* ── Volume 히스토그램(최하단 서브창) ── */
   if(showVol){ let maxV=1; vis.forEach(k=>{ if((k.v||0)>maxV) maxV=k.v||0; }); const vbase=volTop+volH;
