@@ -52,6 +52,12 @@ begin
   -- 3) basic stake
   if p_stake is null or p_stake <= 0 then return jsonb_build_object('ok',false,'error','bad stake'); end if;
 
+  -- 3b) SERVER-SIDE HALT GATE (Phase 3, 2026-07-24): trading_halt was client-checked only —
+  --     a modified client could bet through a halt. The switch is flipped by
+  --     sbdesk_set_control / back office; reject here so the halt actually holds.
+  if exists (select 1 from controls where key='trading_halt' and val='1') then
+    return jsonb_build_object('ok',false,'error','betting is paused'); end if;
+
   -- 4) RE-PRICE from the server lines (client odds ignored). Fail safe: any leg that
   --    can't be matched to a current server line aborts the whole bet.
   select data into v_games from live_games where id='all';
@@ -83,6 +89,9 @@ begin
     end if;
     select g.value into v_game from jsonb_array_elements(v_games) g where g.value->>'gid' = v_gid limit 1;
     if v_game is null then return jsonb_build_object('ok',false,'error','game not available'); end if;
+    -- PER-GAME LOCK GATE (Phase 3): desk 🔒 (sbdesk_set_game_lock) — any locked leg rejects the bet.
+    if exists (select 1 from game_locks where gid = v_gid) then
+      return jsonb_build_object('ok',false,'error','game locked by risk desk'); end if;
     -- ⛳ IN-PLAY FRESHNESS GATE: during a live tournament the outright board moves with
     -- every hole — accepting a stale board price is arbitrage against the house. A live
     -- outright leg needs an oddsTs stamped within 15 min (sports-odds polls live golf

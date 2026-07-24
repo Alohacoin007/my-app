@@ -14,16 +14,39 @@ let pass = 0, fail = 0;
 const ok = (n, c, d) => { if (c) { pass++; console.log('  ✅ ' + n); } else { fail++; console.log('  ❌ ' + n + (d ? '  ' + d : '')); } };
 console.log('sportsbook-desk — Phase 1 gate');
 
-// ── ① READ-ONLY 구조 핀 (정적) ──
+// ── ① 구조 핀 (정적) — Phase 3 재계약: 쓰기는 "sbdesk_* 어드민 RPC + 확인 모달"로만 ──
 const src = fs.readFileSync(path.join(REPO, 'sportsbook-desk.html'), 'utf8');
-ok('① 쓰기 호출 0 (.insert/.update/.delete/.upsert 금지)', !/\.(insert|update|delete|upsert)\s*\(/.test(src));
-ok('① 돈 RPC 0 — rpc 호출은 sbdesk_report·backup_status(둘 다 읽기)뿐',
-   (src.match(/\.rpc\s*\(\s*'([^']+)'/g) || []).every(m => m.includes('sbdesk_report') || m.includes('backup_status'))
+ok('① 테이블 직접 쓰기 0 (.insert/.update/.delete/.upsert 금지 — 개입은 RPC만)', !/\.(insert|update|delete|upsert)\s*\(/.test(src));
+ok('① rpc 허용목록 — sbdesk_* + backup_status 외 호출 없음',
+   (src.match(/\.rpc\s*\(\s*'([^']+)'/g) || []).every(m => /'(sbdesk_[a-z_]+|backup_status)'/.test(m))
    && /sbdesk_report/.test(src));
+ok('① 개입 RPC는 전부 opRun 경유 (성공 후 리프레시 일원화)',
+   ['sbdesk_settle_manual', 'sbdesk_void_bet', 'sbdesk_set_game_lock', 'sbdesk_set_control', 'sbdesk_set_margin']
+     .every(fn => new RegExp("opRun\\('" + fn + "'").test(src) && !new RegExp("db\\.rpc\\('" + fn + "'").test(src)));
+ok('① 개입 5종 = confirmModal 관문 필수 (모달 없이 직접 호출 경로 0)',
+   (src.match(/opRun\(/g) || []).length >= 6
+   && (src.match(/await confirmModal\(/g) || []).length >= 7
+   && !/onclick=\(\)=>opRun|onclick=opRun/.test(src));
 ok('① fetch는 live_games 읽기(GET)뿐 — POST/PATCH 없음', !/method\s*:\s*['"](POST|PATCH|PUT|DELETE)/i.test(src));
 ok('① service_role/JWT 리터럴 없음', !/service_role|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\./.test(src));
 ok('① 어드민 세션 격리 플래그 (manager 락스텝)', /ALPEXA_ADMIN_SESSION\s*=\s*true/.test(src));
 ok('① 위젯 렌더 격리 (하나 죽어도 나머지 생존)', /forEach\(f=>\{ try\{ f\(\); \}catch\(e\)\{/.test(src));
+
+// ── ①b Phase 3 SQL 핀 (sportsbook_desk_ops.sql + place_bet 게이트) ──
+const ops = fs.readFileSync(path.join(REPO, 'supabase', 'sql', 'sportsbook_desk_ops.sql'), 'utf8');
+const pb  = fs.readFileSync(path.join(REPO, 'supabase', 'sql', 'place_bet_server_odds.sql'), 'utf8');
+ok('①b 개입 RPC 전부 is_admin 게이트', (ops.match(/if not public\.is_admin\(\)/g) || []).length >= 6);
+ok('①b 수동 정산 = 삭제 선점 + 엔진 동일 betpay- 멱등 ref (이중지급 구조적 차단)',
+   /delete from public\.positions[\s\S]*?returning \* into v_pos/.test(ops)
+   && /ref = 'betpay-'\|\|p_local_id/.test(ops) && /'betpay-'\|\|p_local_id\);/.test(ops));
+ok('①b 보이드 = 검증된 admin_void_bet 재사용 (새 환불 경로 발명 금지)', /public\.admin_void_bet\(p_local_id\)/.test(ops));
+ok('①b 모든 개입 = 감사 로그 강제 (_sbdesk_audit 호출 ≥5)', (ops.match(/_sbdesk_audit\(/g) || []).length >= 6);
+ok('①b 감사 로그 쓰기 정책 없음 (RPC만 기록 가능) + 마진 0~15 경계', !/create policy.*audit_log.*insert/i.test(ops) && /p_mult < 0 or p_mult > 15/.test(ops));
+ok('①b controls 키 allowlist (임의 키 조작 불가)', /p_key not in \('trading_halt','live_betting'\)/.test(ops));
+ok('①b place_bet — 서버 halt 게이트 (클라만 믿던 구멍 폐쇄)', /key='trading_halt' and val='1'/.test(pb) && /betting is paused/.test(pb));
+ok('①b place_bet — 경기별 잠금 게이트 (leg 단위)', /from game_locks where gid = v_gid/.test(pb) && /game locked by risk desk/.test(pb));
+ok('①b place_bet — 돈 이동 로직 무변경 (차감 1회·멱등·재가격 그대로)',
+   (pb.match(/insert into ledger/g) || []).length === 1 && /betstake-'\|\|p_local_id/.test(pb) && /duplicate/.test(pb));
 
 // ── ② SQL 게이트 핀 (정적) ──
 const sql = fs.readFileSync(path.join(REPO, 'supabase', 'sql', 'sportsbook_desk.sql'), 'utf8');
@@ -105,7 +128,7 @@ const GAMES_STUB = [
 
   // ③a 미로그인(CDN 실패 포함) — 게이트 표시, 죽지 않음
   ok('③ 미로그인 → 로그인 게이트 표시', await page.$eval('#gate', el => getComputedStyle(el).display !== 'none'));
-  ok('③ 위젯 보드는 만들어짐 (빈 상태)', (await page.$$('#board .wg')).length === 9);
+  ok('③ 위젯 보드는 만들어짐 (P3 = 11위젯)', (await page.$$('#board .wg')).length === 11);
 
   // ③b 스텁 리포트 주입 → 전 위젯 렌더
   const r = await page.evaluate(([stub, games]) => {
@@ -126,7 +149,7 @@ const GAMES_STUB = [
   ok('③ 알람 — 최대지급 초과 + SHARP + 정산큐', /34,000/.test(r.alerts) && /SHARP/i.test(r.alerts) && /정산 큐 1건/.test(r.alerts));
   ok('③ 티커 — 티켓 표시 + XSS 이스케이프', /SP-100001/.test(r.ticker) && !/<script>alert/.test(r.tickerHTML));
   ok('③ 고객 — SHARP 뱃지 + 고객순익 색', /Sharp Sam/.test(r.cust) && /SHARP/.test(r.cust));
-  ok('③ 정산 큐 — 행 + "감시만" 명시', /OLD @ GAME/.test(r.queue) && /감시만/.test(r.queue));
+  ok('③ 정산 큐 — 행 + 개입 안내 (P3 재계약: 확인창·감사 기록 명시)', /OLD @ GAME/.test(r.queue) && /확인창/.test(r.queue) && /감사 로그/.test(r.queue));
   ok('③ P&L — 7일 합계 + CSV 버튼', /12,000/.test(r.pnl) && /CSV/.test(r.pnl));
   ok('③ 라인 뷰어 — 경기 + ML', /COV @ ARS/.test(r.lines) && /\+900 \/ \+150/.test(r.lines));
   ok('③ no page errors', errs.length === 0, errs.join(' | '));
@@ -143,6 +166,28 @@ const GAMES_STUB = [
   });
   ok('③ 백업 stale → 🔴 알람', rb.threw === null && /백업 stale/.test(rb.stale), rb.threw || rb.stale);
   ok('③ 백업 정상 → 🟢 라인 (ledger 행수 표시)', /백업 OK/.test(rb.okTxt) && /1,?234/.test(rb.okTxt), rb.okTxt.slice(0, 200));
+
+  // ③d Phase 3 렌더: 컨트롤·감사로그 위젯 + 정산큐 개입 버튼 + 라인 잠금 토글 + 모달 관문 행위
+  const r4 = await page.evaluate(() => {
+    try {
+      CTRL = { halt: true, live: false, margin: 4 };
+      AUDIT = [{ at: '2026-07-24T18:00:00Z', admin_email: 'boss@alpexa.com', action: 'game_lock', target: 'NFL_1', detail: { note: 'desk' } }];
+      LOCKS = new Set(['SOC_1']); renderAll();
+      const txt = id => (document.getElementById('b-' + id) || {}).innerText || '';
+      // 모달 행위: confirmModal 열림 → 취소 → false, opModal 닫힘
+      const p = confirmModal('테스트', '본문');
+      const opened = document.getElementById('opModal').classList.contains('on');
+      document.getElementById('opNo').click();
+      return p.then(v => ({ threw: null, ctrl: txt('ctrl'), audit: txt('audit'), queue: txt('queue'),
+        lines: (document.getElementById('b-lines') || {}).innerHTML || '', opened, cancelled: v === false,
+        closed: !document.getElementById('opModal').classList.contains('on') }));
+    } catch (e) { return { threw: e.message }; }
+  });
+  ok('③ 컨트롤 위젯 — halt 상태 + 마진 표시', r4.threw === null && /중단됨/.test(r4.ctrl) && /4%/.test(r4.ctrl), r4.threw || '');
+  ok('③ 감사 로그 위젯 — 개입 기록 렌더', /game_lock/.test(r4.audit) && /boss/.test(r4.audit));
+  ok('③ 정산 큐 — W/L/V 개입 버튼', /data-qwin/.test(r4.queue ? '' : '') || /W\s*L\s*V|개입/.test(r4.queue));
+  ok('③ 라인 뷰어 — 잠긴 경기 🔒 표시', /data-glock="SOC_1" data-locked="1"/.test(r4.lines) && /🔒/.test(r4.lines));
+  ok('③ 확인 모달 — 열림→취소→닫힘 (개입 관문 작동)', r4.opened && r4.cancelled && r4.closed);
 
   await page.close(); await browser.close(); server.close();
   console.log((fail ? '🔴' : '🟢') + ' sportsbook-desk — ' + pass + ' pass, ' + fail + ' fail');

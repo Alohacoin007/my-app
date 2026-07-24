@@ -69,6 +69,21 @@ td{padding:4px 6px;border-bottom:1px solid rgba(29,33,42,.55);white-space:nowrap
 .srch{width:100%;background:var(--lgd-pill);border:1px solid var(--lgd-hair);border-radius:6px;color:var(--lgd-ink);padding:5px 9px;font-size:12px;margin-bottom:7px}
 .srch:focus{outline:none;border-color:var(--lgd-pill-hi)}
 
+/* ── 개입 확인 모달 (Phase 3 — 모든 돈 개입은 이 관문을 지나야 함) ── */
+#opModal{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:90;display:none;align-items:center;justify-content:center}
+#opModal.on{display:flex}
+.opbox{width:360px;background:var(--lgd-surface);border:1px solid var(--lgd-hair);border-radius:12px;padding:20px}
+.opbox h3{font-size:14.5px;margin-bottom:8px}
+.opbox .opb{font-size:12.5px;color:var(--lgd-dim);margin-bottom:16px;line-height:1.6}
+.opbox .opr{display:flex;gap:8px;justify-content:flex-end}
+.opbox button{font-weight:800;border-radius:7px;padding:8px 16px;font-size:12.5px}
+.opbox .cancel{border:1px solid var(--lgd-hair);color:var(--lgd-dim)}
+.opbox .go{background:var(--lgd-down);color:#fff}
+.opbox .go.safe{background:var(--lgd-green);color:#04130a}
+.abtn{font-size:10px;font-weight:800;border:1px solid var(--lgd-hair);border-radius:4px;padding:1px 6px;margin-left:4px;color:var(--lgd-dim)}
+.abtn:hover{color:var(--lgd-ink);border-color:var(--lgd-pill-hi)}
+.abtn.dn{color:var(--lgd-down);border-color:rgba(255,69,58,.4)}
+.abtn.up{color:var(--lgd-green);border-color:rgba(0,200,5,.4)}
 /* ── 로그인 오버레이 ── */
 #gate{position:fixed;inset:0;background:var(--lgd-bg);z-index:100;display:flex;align-items:center;justify-content:center}
 .gbox{width:330px;background:var(--lgd-surface);border:1px solid var(--lgd-hair);border-radius:12px;padding:26px}
@@ -85,7 +100,7 @@ td{padding:4px 6px;border-bottom:1px solid rgba(29,33,42,.55);white-space:nowrap
 
 <div class="hdr">
   <div class="mark">A</div><span class="hname">Sportsbook Desk</span>
-  <span class="htag">READ-ONLY · PHASE 1</span>
+  <span class="htag">RISK DESK · P3</span>
   <span class="hsp"></span>
   <span class="hdot" id="feedDot" title="data feed"></span>
   <span class="hmail" id="whoami"></span>
@@ -94,6 +109,11 @@ td{padding:4px 6px;border-bottom:1px solid rgba(29,33,42,.55);white-space:nowrap
   <button class="hbtn" id="btnOut" style="display:none">Sign out</button>
 </div>
 <div id="board"></div>
+
+<div id="opModal"><div class="opbox">
+  <h3 id="opTitle"></h3><div class="opb" id="opBody"></div>
+  <div class="opr"><button class="cancel" id="opNo">취소</button><button class="go" id="opYes">실행</button></div>
+</div></div>
 
 <div id="gate">
   <div class="gbox">
@@ -133,7 +153,9 @@ const WIDGETS=[
   {id:'cust',  t:'👤 고객 리스크', d:'노출·전적·sharp',          x:5,y:13,w:4, h:9},
   {id:'queue', t:'⚖️ 정산 큐',     d:'끝났는데 미정산 (조회)',   x:9,y:13,w:3, h:9},
   {id:'pnl',   t:'🧾 P&L 7일',     d:'핸들·GGR·홀드',            x:0,y:22,w:7, h:7},
-  {id:'lines', t:'📈 라인 뷰어',   d:'live_games 배당·신선도',   x:7,y:22,w:5, h:7}];
+  {id:'lines', t:'📈 라인 뷰어',   d:'배당·신선도 + 🔒 잠금',    x:7,y:22,w:5, h:7},
+  {id:'ctrl',  t:'🎛️ 컨트롤',      d:'중단·라이브·마진 (P3)',    x:0,y:29,w:4, h:6},
+  {id:'audit', t:'📜 감사 로그',   d:'모든 개입 기록',           x:4,y:29,w:8, h:6}];
 let layout={}; try{ layout=JSON.parse(localStorage.getItem(LKEY)||'{}')||{}; }catch(e){ layout={}; }
 function colW(){ const b=$('board'); return Math.max(40,((b.clientWidth-16)-GAP*(COLS-1))/COLS); }
 function place(el,g){ const cw=colW();
@@ -175,6 +197,39 @@ const SB='https://grxnbgtfnaayeluenvqh.supabase.co';
 const SBK='sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu';
 const NET_LIAB_ALERT=5000, BIG_PAYOUT_ALERT=10000;   // 알람 임계 (표시용 — 강제는 Phase 2 서버)
 let REPORT=null, GAMES=[], GAMES_AT=0, tickQ='', BACKUP=null;
+let LOCKS=new Set(), CTRL={halt:false,live:false,margin:null}, AUDIT=[];
+
+/* ── Phase 3: 개입 확인 모달 — 모든 돈 개입은 여기를 지나야 실행된다 ── */
+function confirmModal(title, body, safe){
+  return new Promise(res=>{
+    $('opTitle').textContent=title; $('opBody').innerHTML=body;
+    $('opYes').className='go'+(safe?' safe':''); $('opModal').classList.add('on');
+    const done=v=>{ $('opModal').classList.remove('on'); $('opYes').onclick=$('opNo').onclick=null; res(v); };
+    $('opYes').onclick=()=>done(true); $('opNo').onclick=()=>done(false);
+  });
+}
+async function opRun(rpc,args,okMsg){   // 개입 실행 공통 경로 — 성공 시 전체 리프레시
+  try{
+    const r=await AlpexaSync.db.rpc(rpc,args);
+    const d=(r&&r.data)||{};
+    if(!d.ok){ alert('실패: '+(d.error||(r.error&&r.error.message)||'?')); return false; }
+    pullReport(); pullOps();
+    return true;
+  }catch(e){ alert('실패: '+e.message); return false; }
+}
+async function pullOps(){   // 잠금·컨트롤·마진·감사 로그 (전부 읽기)
+  if(!(window.AlpexaSync&&AlpexaSync.db)) return;
+  try{ const r=await AlpexaSync.db.from('game_locks').select('gid');
+    if(r&&r.data) { LOCKS=new Set(r.data.map(x=>x.gid)); renderLines(); } }catch(e){}
+  try{ const r=await AlpexaSync.db.from('controls').select('key,val');
+    if(r&&r.data){ const m={}; r.data.forEach(x=>m[x.key]=x.val);
+      CTRL.halt=(m.trading_halt==='1'); CTRL.live=(m.live_betting==='1'); } }catch(e){}
+  try{ const r=await AlpexaSync.db.from('pricing').select('spread_mult').eq('server','sports').limit(1);
+    if(r&&r.data&&r.data[0]) CTRL.margin=+r.data[0].spread_mult; }catch(e){}
+  try{ const r=await AlpexaSync.db.rpc('sbdesk_audit_log',{p_limit:30});
+    if(r&&r.data&&r.data.ok) AUDIT=r.data.rows||[]; }catch(e){}
+  try{ renderCtrl(); renderAudit(); }catch(e){}
+}
 
 async function pullReport(){
   if(!(window.AlpexaSync&&AlpexaSync.db)) return;
@@ -198,7 +253,7 @@ async function pullGames(){
 }
 
 /* ════════ 렌더 (위젯별 try/catch 격리 — 스포츠 규율 #4) ════════ */
-function renderAll(){ [renderKpi,renderExpo,renderHedge,renderAlerts,renderTicker,renderCust,renderQueue,renderPnl,renderLines]
+function renderAll(){ [renderKpi,renderExpo,renderHedge,renderAlerts,renderTicker,renderCust,renderQueue,renderPnl,renderLines,renderCtrl,renderAudit]
   .forEach(f=>{ try{ f(); }catch(e){ /* 위젯 하나 죽어도 나머지는 산다 */ } }); }
 
 function renderKpi(){ const R=REPORT; if(!R) return;
@@ -290,10 +345,54 @@ function renderCust(){ const R=REPORT; if(!R) return;
 function renderQueue(){ const R=REPORT; if(!R) return;
   const rows=R.settle_queue||[];
   $('b-queue').innerHTML=!rows.length?'<div class="empty">큐 비어있음 🟢</div>'
-    :'<table><tr><th>경기</th><th class="r">스테이크</th><th class="r">경과</th></tr>'
+    :'<table><tr><th>경기</th><th class="r">스테이크</th><th class="r">경과</th><th class="r">개입</th></tr>'
     +rows.map(t=>'<tr><td>'+esc((t.game||'')+(t.pick?' · '+t.pick:''))+(t.approx?' <span class="dim">≈</span>':'')+'</td>'
-      +'<td class="r">'+usd2(t.stake)+'</td><td class="r wr">'+(t.last_kick?ago(t.last_kick):ago(t.created_at))+'</td></tr>').join('')
-    +'</table><div class="dim" style="margin-top:7px">정산 실행은 sports-settle 크론 — 여긴 감시만 (Phase 3에서 수동 버튼)</div>'; }
+      +'<td class="r">'+usd2(t.stake)+'</td><td class="r wr">'+(t.last_kick?ago(t.last_kick):ago(t.created_at))+'</td>'
+      +'<td class="r"><button class="abtn up" data-qwin="'+esc(t.local_id)+'">W</button>'
+      +'<button class="abtn dn" data-qlose="'+esc(t.local_id)+'">L</button>'
+      +'<button class="abtn" data-qvoid="'+esc(t.local_id)+'">V</button></td></tr>').join('')
+    +'</table><div class="dim" style="margin-top:7px">W=승 정산(지급) · L=패 정산 · V=보이드(환불) — 실행 전 확인창, 전부 감사 로그 기록</div>';
+  const info=id=>{ const t=rows.find(x=>x.local_id===id)||{};
+    return '<b>'+esc((t.game||'')+' · '+(t.pick||''))+'</b><br>스테이크 '+usd2(t.stake)+' · 지급시 '+usd2(t.potential)+'<br>티켓 '+esc(t.ticket||t.local_id); };
+  $('b-queue').querySelectorAll('[data-qwin]').forEach(b=>b.onclick=async()=>{ const id=b.dataset.qwin;
+    if(await confirmModal('✅ 승 정산 — 지급 실행',info(id)+'<br><br>이 티켓을 <b>승</b>으로 정산하고 지급합니다. 결과를 직접 확인하셨습니까?',true))
+      opRun('sbdesk_settle_manual',{p_local_id:id,p_won:true}); });
+  $('b-queue').querySelectorAll('[data-qlose]').forEach(b=>b.onclick=async()=>{ const id=b.dataset.qlose;
+    if(await confirmModal('❌ 패 정산',info(id)+'<br><br>이 티켓을 <b>패</b>로 정산합니다 (지급 없음). 결과를 직접 확인하셨습니까?'))
+      opRun('sbdesk_settle_manual',{p_local_id:id,p_won:false}); });
+  $('b-queue').querySelectorAll('[data-qvoid]').forEach(b=>b.onclick=async()=>{ const id=b.dataset.qvoid;
+    if(await confirmModal('↩️ 보이드 — 스테이크 환불',info(id)+'<br><br>베팅을 무효 처리하고 스테이크를 환불합니다.'))
+      opRun('sbdesk_void_bet',{p_local_id:id}); }); }
+
+function renderCtrl(){
+  $('b-ctrl').innerHTML=
+    '<div style="display:flex;flex-direction:column;gap:9px">'
+    +'<div>베팅 전체: '+(CTRL.halt?'<span class="pill red">중단됨</span>':'<span class="pill grn">받는 중</span>')
+    +' <button class="abtn'+(CTRL.halt?' up':' dn')+'" id="cHalt">'+(CTRL.halt?'재개':'전체 중단')+'</button></div>'
+    +'<div>라이브 베팅: '+(CTRL.live?'<span class="pill grn">ON</span>':'<span class="pill yel">OFF</span>')
+    +' <button class="abtn" id="cLive">'+(CTRL.live?'끄기':'켜기')+'</button></div>'
+    +'<div>배당 마진: <b>'+(CTRL.margin!=null?CTRL.margin+'%':'—')+'</b>'
+    +' <input id="cMg" type="number" min="0" max="15" step="0.5" value="'+(CTRL.margin!=null?CTRL.margin:0)+'"'
+    +' style="width:58px;background:var(--lgd-pill);border:1px solid var(--lgd-hair);border-radius:5px;color:var(--lgd-ink);padding:2px 6px;margin-left:6px">'
+    +' <button class="abtn" id="cMgGo">적용</button></div>'
+    +'<div class="dim" style="font-size:10.5px">중단·잠금은 서버 place_bet에서 강제 (조작 클라도 차단) · 전 개입 감사 기록</div></div>';
+  $('cHalt').onclick=async()=>{ const on=!CTRL.halt;
+    if(await confirmModal(on?'🛑 베팅 전체 중단':'▶️ 베팅 재개', on?'모든 신규 베팅이 서버에서 거절됩니다.':'베팅 접수를 다시 시작합니다.', !on))
+      opRun('sbdesk_set_control',{p_key:'trading_halt',p_on:on}); };
+  $('cLive').onclick=async()=>{ const on=!CTRL.live;
+    if(await confirmModal('라이브 베팅 '+(on?'켜기':'끄기'),'라이브(경기 중) 베팅 허용 상태를 바꿉니다.',true))
+      opRun('sbdesk_set_control',{p_key:'live_betting',p_on:on}); };
+  $('cMgGo').onclick=async()=>{ const v=parseFloat($('cMg').value);
+    if(!(v>=0&&v<=15)){ alert('0~15 사이'); return; }
+    if(await confirmModal('배당 마진 변경','스포츠 배당 마진을 <b>'+v+'%</b>로 설정합니다 (전 경기 표시·재가격 적용).',true))
+      opRun('sbdesk_set_margin',{p_mult:v}); }; }
+
+function renderAudit(){
+  $('b-audit').innerHTML=!AUDIT.length?'<div class="empty">개입 기록 없음</div>'
+    :'<table><tr><th>시각</th><th>어드민</th><th>액션</th><th>대상</th><th>상세</th></tr>'
+    +AUDIT.map(a=>'<tr><td class="dim">'+ago(a.at)+'</td><td>'+esc((a.admin_email||'').split('@')[0])+'</td>'
+      +'<td><b>'+esc(a.action)+'</b></td><td class="dim">'+esc(String(a.target).slice(-14))+'</td>'
+      +'<td class="dim" style="max-width:220px;overflow:hidden;text-overflow:ellipsis">'+esc(JSON.stringify(a.detail||{}))+'</td></tr>').join('')+'</table>'; }
 
 function renderPnl(){ const R=REPORT; if(!R) return;
   const days=R.pnl_daily||[], P=R.pnl||{};
@@ -319,8 +418,15 @@ function renderLines(){
     +rows.map(g=>{ const ml=(g.ml&&g.ml.length?g.ml:(g.core&&g.core.ml)||[]);
       const line=ml.length>=2?fmtAm(ml[0].am)+' / '+fmtAm(ml[1].am):'—';
       const st=g.live?'<span class="pill red">LIVE</span>':(g.oddsReal===false?'🔒':'<span class="dim">pre</span>');
+      const lk=LOCKS.has(g.gid);
       return '<tr><td>'+esc(g.lg)+'</td><td>'+esc(((g.away||{}).ab||'')+' @ '+((g.home||{}).ab||''))+'</td>'
-        +'<td class="dim">'+esc(g.live?(g.time||'Live'):kick(g.iso))+'</td><td class="r">'+esc(line)+'</td><td class="r">'+st+'</td></tr>'; }).join('')+'</table>'); }
+        +'<td class="dim">'+esc(g.live?(g.time||'Live'):kick(g.iso))+'</td><td class="r">'+esc(line)+'</td><td class="r">'+st
+        +'<button class="abtn'+(lk?' dn':'')+'" data-glock="'+esc(g.gid)+'" data-locked="'+(lk?1:0)+'">'+(lk?'🔒':'🔓')+'</button></td></tr>'; }).join('')+'</table>');
+  $('b-lines').querySelectorAll('[data-glock]').forEach(b=>b.onclick=async()=>{
+    const gid=b.dataset.glock, on=b.dataset.locked!=='1';
+    if(await confirmModal(on?'🔒 경기 잠금':'🔓 잠금 해제',
+        '<b>'+esc(gid)+'</b><br>'+(on?'이 경기의 모든 신규 베팅이 서버에서 거절됩니다.':'이 경기 베팅을 다시 받습니다.'), !on))
+      opRun('sbdesk_set_game_lock',{p_gid:gid,p_locked:on,p_note:'desk'}); }); }
 
 /* ════════ 인증 게이트 ════════ */
 function gateMsg(m){ const e=$('gErr'); if(e) e.textContent=m||''; }
@@ -335,9 +441,9 @@ async function boot(){
   }catch(e){}
 }
 let timer=null;
-function start(){ pullReport(); pullGames(); pullBackup();
+function start(){ pullReport(); pullGames(); pullBackup(); pullOps();
   if(!timer) timer=setInterval(()=>{ if(!document.hidden){ pullReport(); pullGames(); } },30000);
-  setInterval(()=>{ if(!document.hidden) pullBackup(); },10*60*1000); }   // 백업 상태는 10분마다면 충분
+  setInterval(()=>{ if(!document.hidden){ pullBackup(); pullOps(); } },5*60*1000); }   // 백업·개입상태는 5분(개입 직후엔 즉시 리프레시)
 $('gGo').onclick=async()=>{
   gateMsg(''); $('gGo').disabled=true;
   try{
