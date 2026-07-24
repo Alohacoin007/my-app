@@ -1,29 +1,30 @@
 name: Daily backup
 
-# Runs once a day and on demand. Saves a full JSON snapshot of all Supabase
-# tables as a downloadable artifact (kept 90 days) — data is NOT committed to
-# the repo. Download from the Actions tab → this run → Artifacts.
+# ⚠️ 2026-07-24 재설계: 이 레포는 PUBLIC — 데이터 아티팩트 업로드는 유출이라 제거했다.
+# 실제 백업은 Supabase 안의 pg_cron 스냅샷(supabase/sql/backup_snapshots.sql, backup 스키마 =
+# API 미노출)이 한다. 이 워크플로는 그 백업이 "진짜로 돌고, 진짜 데이터가 들었는지"를
+# 매일 검증만 한다 — 실패하면 빨강 → GitHub이 오너에게 이메일 (침묵 게이트).
+#
+# 필요 시크릿 (Settings → Secrets → Actions):
+#   SUPABASE_URL  = https://<ref>.supabase.co
+#   SUPABASE_KEY  = service_role 키 (절대 코드/채팅에 붙이지 말 것)
+#
+# ⚠️ 스케줄은 main 브랜치의 이 파일 기준으로 돈다 (daily-sports-check와 동일).
 on:
   schedule:
-    - cron: '0 17 * * *'   # 17:00 UTC daily (~02:00 KST)
+    - cron: '30 9 * * *'   # 09:30 UTC 매일 — DB 스냅샷(09:00 UTC)이 돈 30분 뒤 검증
   workflow_dispatch: {}
 
 jobs:
-  backup:
+  verify-backup:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Run backup
+      - name: Verify backup (counts only — no data saved)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: node scripts/backup.mjs
-      - name: Upload backup artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: alpexa-backup
-          path: backup/*.json
-          retention-days: 90

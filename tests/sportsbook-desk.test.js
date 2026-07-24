@@ -17,8 +17,9 @@ console.log('sportsbook-desk — Phase 1 gate');
 // ── ① READ-ONLY 구조 핀 (정적) ──
 const src = fs.readFileSync(path.join(REPO, 'sportsbook-desk.html'), 'utf8');
 ok('① 쓰기 호출 0 (.insert/.update/.delete/.upsert 금지)', !/\.(insert|update|delete|upsert)\s*\(/.test(src));
-ok('① 돈 RPC 0 — rpc 호출은 sbdesk_report 뿐',
-   (src.match(/\.rpc\s*\(\s*'([^']+)'/g) || []).every(m => m.includes('sbdesk_report')) && /sbdesk_report/.test(src));
+ok('① 돈 RPC 0 — rpc 호출은 sbdesk_report·backup_status(둘 다 읽기)뿐',
+   (src.match(/\.rpc\s*\(\s*'([^']+)'/g) || []).every(m => m.includes('sbdesk_report') || m.includes('backup_status'))
+   && /sbdesk_report/.test(src));
 ok('① fetch는 live_games 읽기(GET)뿐 — POST/PATCH 없음', !/method\s*:\s*['"](POST|PATCH|PUT|DELETE)/i.test(src));
 ok('① service_role/JWT 리터럴 없음', !/service_role|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\./.test(src));
 ok('① 어드민 세션 격리 플래그 (manager 락스텝)', /ALPEXA_ADMIN_SESSION\s*=\s*true/.test(src));
@@ -129,6 +130,19 @@ const GAMES_STUB = [
   ok('③ P&L — 7일 합계 + CSV 버튼', /12,000/.test(r.pnl) && /CSV/.test(r.pnl));
   ok('③ 라인 뷰어 — 경기 + ML', /COV @ ARS/.test(r.lines) && /\+900 \/ \+150/.test(r.lines));
   ok('③ no page errors', errs.length === 0, errs.join(' | '));
+
+  // ③c 백업 알람 (2026-07-24 "3주 빈 백업" 재발 방지): stale/ledger0 = 🔴, 정상 = 🟢 라인
+  const rb = await page.evaluate(() => {
+    try {
+      BACKUP = { ok: true, last_day: '2026-07-20', age_hours: 99, stale: true, money_empty: false, tables: { ledger: 0 } };
+      renderAlerts(); const stale = (document.getElementById('b-alerts') || {}).innerText || '';
+      BACKUP = { ok: true, last_day: '2026-07-24', age_hours: 2, stale: false, money_empty: false, tables: { ledger: 1234 } };
+      renderAlerts(); const okTxt = (document.getElementById('b-alerts') || {}).innerText || '';
+      return { threw: null, stale, okTxt };
+    } catch (e) { return { threw: e.message }; }
+  });
+  ok('③ 백업 stale → 🔴 알람', rb.threw === null && /백업 stale/.test(rb.stale), rb.threw || rb.stale);
+  ok('③ 백업 정상 → 🟢 라인 (ledger 행수 표시)', /백업 OK/.test(rb.okTxt) && /1,?234/.test(rb.okTxt), rb.okTxt.slice(0, 200));
 
   await page.close(); await browser.close(); server.close();
   console.log((fail ? '🔴' : '🟢') + ' sportsbook-desk — ' + pass + ' pass, ' + fail + ' fail');

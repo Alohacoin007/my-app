@@ -174,7 +174,7 @@ window.addEventListener('resize',()=>{ WIDGETS.forEach(w=>{const el=$('w-'+w.id)
 const SB='https://grxnbgtfnaayeluenvqh.supabase.co';
 const SBK='sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu';
 const NET_LIAB_ALERT=5000, BIG_PAYOUT_ALERT=10000;   // 알람 임계 (표시용 — 강제는 Phase 2 서버)
-let REPORT=null, GAMES=[], GAMES_AT=0, tickQ='';
+let REPORT=null, GAMES=[], GAMES_AT=0, tickQ='', BACKUP=null;
 
 async function pullReport(){
   if(!(window.AlpexaSync&&AlpexaSync.db)) return;
@@ -184,6 +184,10 @@ async function pullReport(){
     else{ $('feedDot').className='hdot stale';
       if(r&&r.data&&/not admin/i.test(r.data.error||'')) gateMsg('이 계정은 어드민이 아닙니다 (admins 테이블 확인).'); }
   }catch(e){ $('feedDot').className='hdot stale'; }
+}
+async function pullBackup(){   // 백업 스냅샷 신선도 (backup_snapshots.sql — 미배포면 조용히 null)
+  if(!(window.AlpexaSync&&AlpexaSync.db)) return;
+  try{ const r=await AlpexaSync.db.rpc('backup_status'); BACKUP=(r&&r.data)||null; renderAlerts(); }catch(e){}
 }
 async function pullGames(){
   try{
@@ -248,6 +252,12 @@ function renderAlerts(){ const R=REPORT; if(!R) return;
   if((R.settle_queue||[]).length) a.push({s:'yel',t:'정산 큐 '+(R.settle_queue||[]).length+'건 — 결과 확인 필요'});
   (R.customers||[]).filter(c=>c.sharp).slice(0,3).forEach(c=>a.push({s:'yel',t:'SHARP: '+(c.name||c.cust_id)+' 순익 '+usd(c.player_net)}));
   if(GAMES_AT&&(Date.now()-GAMES_AT)>10*60*1000) a.push({s:'red',t:'피드 stale — live_games '+ago(GAMES_AT)+' 전'});
+  if(BACKUP&&BACKUP.ok){
+    if(BACKUP.never_ran) a.push({s:'yel',t:'백업 스냅샷 0회 — backup_snapshots.sql 배포/크론 확인'});
+    else if(BACKUP.stale) a.push({s:'red',t:'백업 stale — 마지막 '+BACKUP.last_day+' ('+BACKUP.age_hours+'h 전)'});
+    else if(BACKUP.money_empty) a.push({s:'red',t:'백업 ledger 0행 — 가짜 백업, 서비스 키/RLS 확인'});
+    else a.push({s:'grn',t:'백업 OK — '+BACKUP.last_day+' 스냅샷 (ledger '+(((BACKUP.tables||{}).ledger)||0)+'행)'});
+  }
   $('b-alerts').innerHTML=!a.length?'<div class="empty">이상무 🟢</div>'
     :a.map(x=>'<div style="margin-bottom:7px"><span class="pill '+x.s+'">'+(x.s==='red'?'🔴':x.s==='yel'?'🟡':'🟢')+'</span> '+esc(x.t)+'</div>').join(''); }
 
@@ -325,8 +335,9 @@ async function boot(){
   }catch(e){}
 }
 let timer=null;
-function start(){ pullReport(); pullGames();
-  if(!timer) timer=setInterval(()=>{ if(!document.hidden){ pullReport(); pullGames(); } },30000); }
+function start(){ pullReport(); pullGames(); pullBackup();
+  if(!timer) timer=setInterval(()=>{ if(!document.hidden){ pullReport(); pullGames(); } },30000);
+  setInterval(()=>{ if(!document.hidden) pullBackup(); },10*60*1000); }   // 백업 상태는 10분마다면 충분
 $('gGo').onclick=async()=>{
   gateMsg(''); $('gGo').disabled=true;
   try{

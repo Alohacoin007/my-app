@@ -1,38 +1,71 @@
-// Alpexa daily backup — fetches every table from Supabase (PostgREST) and writes
-// one JSON file. Run by .github/workflows/daily-backup.yml (or `node scripts/backup.mjs`).
-// Uses the publishable key (works while RLS is permissive). After the M4 lockdown,
-// set SUPABASE_KEY to the service_role key via a GitHub Actions secret instead.
-import { mkdir, writeFile } from 'node:fs/promises';
+// Alpexa daily backup VERIFICATION — no data leaves Supabase (repo is PUBLIC; the old
+// version uploaded table dumps as artifacts = a data leak the moment backups worked).
+//
+// What it does now (read-only, counts only):
+//   1) counts the critical money tables with the service key (RLS-proof)
+//   2) calls backup_status() — the in-database snapshot layer (supabase/sql/backup_snapshots.sql)
+//   3) FAILS (exit 1) when anything is wrong → the workflow goes red → GitHub emails the owner.
+//      (The 2026-07 defect: secrets were empty + RLS blocked everything + the script always
+//       exited 0 → three weeks of empty "green" backups. Fail-closed now.)
+//
+// Env (GitHub Actions secrets): SUPABASE_URL, SUPABASE_KEY (service_role — NEVER the anon key).
+import process from 'node:process';
 
-const URL = process.env.SUPABASE_URL || 'https://grxnbgtfnaayeluenvqh.supabase.co';
-const KEY = process.env.SUPABASE_KEY || 'sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu';
-const TABLES = ['players','accounts','requests','payments','positions','commands','logs','hedges','settlements','agents','agent_links','agent_payouts','pricing','pricing_marks'];
+const URL = process.env.SUPABASE_URL || '';
+const KEY = process.env.SUPABASE_KEY || '';
+const CRITICAL = ['players', 'accounts', 'ledger', 'positions', 'settlements'];   // 돈의 진실
+const NONZERO  = ['players', 'accounts', 'ledger'];   // 라이브 서비스에서 0행이면 무조건 이상
 
-async function pull(table){
-  const out = []; let from = 0; const page = 1000;
-  for(;;){
-    const res = await fetch(`${URL}/rest/v1/${table}?select=*`, {
-      headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, Range: `${from}-${from+page-1}` }
-    });
-    if(!res.ok) throw new Error(`${table}: HTTP ${res.status}`);
-    const rows = await res.json();
-    out.push(...rows);
-    if(rows.length < page) break;
-    from += page;
+let failed = [];
+const fail = (m) => { failed.push(m); console.error('  ❌ ' + m); };
+
+if (!URL || !KEY) {
+  console.error('❌ SUPABASE_URL / SUPABASE_KEY secrets not set — backup verification cannot run.');
+  console.error('   Set them in GitHub → Settings → Secrets → Actions (KEY = service_role).');
+  process.exit(1);
+}
+
+async function countRows(table) {
+  const res = await fetch(`${URL}/rest/v1/${table}?select=*`, {
+    method: 'HEAD',
+    headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, Prefer: 'count=exact', Range: '0-0' },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const cr = res.headers.get('content-range') || '';      // e.g. "0-0/1234"
+  const total = parseInt(cr.split('/')[1], 10);
+  if (Number.isNaN(total)) throw new Error('no count in content-range');
+  return total;
+}
+
+console.log('── ① 핵심 테이블 행수 (서비스 키, RLS 무관) ──');
+for (const t of CRITICAL) {
+  try {
+    const n = await countRows(t);
+    console.log(`  ${t}: ${n} rows`);
+    if (NONZERO.includes(t) && n === 0) fail(`${t} has 0 rows — service key wrong or data gone`);
+  } catch (e) { fail(`${t}: ${e.message}`); }
+}
+
+console.log('── ② DB 내부 스냅샷 상태 (backup_status) ──');
+try {
+  const res = await fetch(`${URL}/rest/v1/rpc/backup_status`, {
+    method: 'POST',
+    headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const st = await res.json();
+  console.log('  ' + JSON.stringify(st));
+  if (!st.ok) fail('backup_status error: ' + (st.error || '?'));
+  else if (st.never_ran) fail('snapshot layer never ran — deploy supabase/sql/backup_snapshots.sql');
+  else {
+    if (st.stale) fail(`snapshot stale — last ${st.last_day}, ${st.age_hours}h ago`);
+    if (st.money_empty) fail('snapshot ledger is EMPTY — fake backup');
   }
-  return out;
-}
+} catch (e) { fail('backup_status call failed: ' + e.message); }
 
-const backup = { _meta: { app: 'Alpexa', taken_at: new Date().toISOString(), tables: {} } };
-let total = 0, failed = 0;
-for(const t of TABLES){
-  try { const rows = await pull(t); backup[t] = rows; backup._meta.tables[t] = rows.length; total += rows.length; console.log(`  ${t}: ${rows.length} rows`); }
-  catch(e){ failed++; backup[t] = []; backup._meta.tables[t] = 'ERROR'; console.error(`  ${t}: ${e.message}`); }
+if (failed.length) {
+  console.error(`\n🔴 backup verification FAILED (${failed.length}): owner action needed.`);
+  process.exit(1);
 }
-
-const d = new Date(), p = n => String(n).padStart(2,'0');
-const stamp = `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
-await mkdir('backup', { recursive: true });
-const file = `backup/alpexa-backup-${stamp}.json`;
-await writeFile(file, JSON.stringify(backup, null, 2));
-console.log(`\nSaved ${total} rows → ${file}` + (failed ? ` (${failed} table(s) failed)` : ''));
+console.log('\n🟢 backup verification OK — snapshots fresh, money tables populated.');
