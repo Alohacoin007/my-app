@@ -80,6 +80,28 @@ const ok = (n, c, d) => { if (c) { pass++; console.log('  ✅ ' + n); } else { f
   });
   ok('empty games list → still renders (no crash)', r2.threw === null && r2.n === 4, JSON.stringify(r2));
 
+  // 먼 경기 날짜 표시 (2026-07-24 SP-100001 오해의 영구핀): 저장 tm이 "Thu 12:20 AM"뿐이어도
+  // kt 또는 현재 피드 iso로 날짜(월·일) 포함 재포맷 — 7주 뒤 경기가 임박/과거처럼 보이면 안 된다.
+  const r3 = await page.evaluate(() => {
+    const now = Date.now(), iso = ms => new Date(now + ms).toISOString();
+    try {
+      const far = iso(49 * 86400e3);                                  // ~7주 뒤 (SP-100001 = 9/10 NFL)
+      gamesStore.games = (gamesStore.games || []).concat([
+        { gid: 'g-far', lg: 'NFL', live: false, iso: far, away: { ab: 'NE' }, home: { ab: 'SEA' }, time: 'Thu 12:20 AM' }]);
+      moneyStore.openBets = [
+        { id: 'b-far-nokt', type: 'Single', placedTs: now, stake: 20, potential: 57,
+          legs: [{ sel: 'FarNoKt', am: 185, gid: 'g-far', tm: 'Thu 12:20 AM' }] },     // kt 없음 → 피드 iso 폴백
+        { id: 'b-far-kt', type: 'Single', placedTs: now, stake: 20, potential: 57,
+          legs: [{ sel: 'FarKt', am: 185, gid: 'gx-none', tm: 'Thu 12:20 AM', kt: far }] } ]; // kt 우선
+      renderBets();
+      const mon = new Date(far).toLocaleDateString('en-US', { month: 'short' });
+      const gms = [...document.querySelectorAll('#mbList .tleg .gm')].map(x => x.textContent);
+      return { threw: null, mon, gms, allDated: gms.length === 2 && gms.every(t => t.includes(mon)) };
+    } catch (e) { return { threw: e.message }; }
+  });
+  ok('먼 경기 leg = 날짜 포함 라벨 (kt·피드 iso 양경로, tm 원문 금지)',
+     r3.threw === null && r3.allDated === true, JSON.stringify(r3));
+
   await page.close(); await browser.close(); server.close();
   console.log((fail ? '🔴' : '🟢') + ' sports-dashboard-bets — ' + pass + ' pass, ' + fail + ' fail');
   process.exit(fail ? 1 : 0);

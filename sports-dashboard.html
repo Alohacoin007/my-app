@@ -1112,6 +1112,15 @@ const moneyStore={
 const ICONS={NBA:'🏀',NCAAB:'🎓',NFL:'🏈',MLB:'⚾',NHL:'🏒',SOC:'⚽',UFC:'🥊'};
 const fmtStamp=ts=>{ if(!ts) return ''; const d=new Date(ts);
   return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+', '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); };
+/* leg 킥오프 라벨 — 앱 legTimeLabel 미러(sports-live:1571). 저장된 tm은 요일+시각뿐이라
+   먼 경기가 임박/과거처럼 보였다(2026-07-24 SP-100001: 9/10 NFL이 "Thu 12:20 AM" → 미정산 오해).
+   kt(베팅 시 저장) → 현재 피드 iso → tm 폴백 순으로 날짜 포함 재포맷. 라이브는 스냅샷 시계 유지. */
+function legKick(l){ if(!l) return '';
+  if(l.live) return l.tm||'';
+  let kt=l.kt; if(!kt){ try{ const g=gamesStore.games.find(x=>x.gid===l.gid); kt=g&&g.iso; }catch(e){} }
+  if(kt){ const d=new Date(kt); if(!isNaN(d.getTime()))
+    return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+' · '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
+  return l.tm||''; }
 
 /* ── 백오피스 컨트롤 (앱 3771-3795 그대로 — 마진·중단·라이브 스위치·min/max) ── */
 function pullControls(){ if(!(window.AlpexaSync&&AlpexaSync.db)) return;
@@ -1298,8 +1307,9 @@ function renderBets(){
       const legsH=b.legs.map((l,i)=>{
         const g=gamesStore.games.find(x=>x.gid===l.gid);
         const icon=ICONS[(g&&g.lg)||l.lg||String(l.gid||'').split('_')[0]]||'';
+        const tl=states[i]==='live'?(l.tm||''):legKick(l);
         const gm=(g&&g.live)?('<span class="sc">'+esc(g.away.ab)+' '+(g.away.sc!=null?g.away.sc:'–')+' — '+(g.home.sc!=null?g.home.sc:'–')+' '+esc(g.home.ab)+'</span> · '+esc(g.time))
-          :esc(l.gm||l.game||'')+(l.tm?' · '+(states[i]==='live'?'🔴 ':'🕒 ')+esc(l.tm):'');
+          :esc(l.gm||l.game||'')+(tl?' · '+(states[i]==='live'?'🔴 ':'🕒 ')+esc(tl):'');
         return '<div class="tleg'+(states[i]==='live'?' live':'')+'"><span class="dot"></span>'+
           '<div><div class="pk">'+esc(l.pk||l.sel||'Selection')+'</div><div class="gm">'+icon+' '+gm+'</div></div>'+
           '<span class="odd">'+fmtAm(+(l.am0!=null?l.am0:l.am)||0)+'</span></div>'; }).join('');
@@ -1614,7 +1624,7 @@ function renderSlip(){
   legsEl.innerHTML=n?slip.legs.map(l=>
     '<div class="sleg"><div class="r1"><span class="pk">'+esc(l.sel)+'</span><span class="odd '+(l.am>0?'pr pos':'')+'">'+fmtAm(l.am)+'</span>'+
     '<span class="x" data-uid="'+esc(l.uid)+'">✕</span></div>'+
-    '<div class="gm">'+esc(l.game)+(l.tm?' · '+(l.live?'🔴 ':'🕒 ')+esc(l.tm):'')+'</div>'+
+    '<div class="gm">'+esc(l.game)+((l.live?l.tm:legKick(l))?' · '+(l.live?'🔴 ':'🕒 ')+esc(l.live?l.tm:legKick(l)):'')+'</div>'+
     (slip.mode==='single'?('<div class="ss"><input type="number" data-stake="'+esc(l.uid)+'" value="'+l.stake+'" min="0" step="5">'+
       '<span class="r">To win<b>'+usd(l.stake*(dec(l.am)-1))+'</b></span></div>'):'')+'</div>').join('')
     :'<div class="wempty">Tap odds to add to your slip</div>';   // 앱 slip_empty 리터럴
