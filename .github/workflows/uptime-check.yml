@@ -30,7 +30,9 @@ jobs:
           [ "$code" = "200" ] || { echo '::error::Supabase REST is DOWN'; exit 1; }
       - name: Supabase Auth health
         run: |
+          # auth/v1/health는 apikey 헤더 필수 — 없으면 401 (2026-07-24 첫 런 오탐의 원인)
           code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 --retry 2 --retry-delay 5 \
+            -H "apikey: sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu" \
             "https://grxnbgtfnaayeluenvqh.supabase.co/auth/v1/health")
           echo "auth HTTP $code"
           [ "$code" = "200" ] || { echo '::error::Supabase Auth is DOWN'; exit 1; }
