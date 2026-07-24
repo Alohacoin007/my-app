@@ -1,0 +1,36 @@
+name: Uptime check
+
+# 다운 감시 (2026-07-24, 실고객 오픈 대비) — 매시간 3층을 찔러본다:
+#   ① 사이트 (GitHub Pages, alpexa-sports.com)  ② Supabase REST (읽기 공개 live_games)
+#   ③ Supabase Auth 헬스. 실패 시 빨강 → GitHub이 오너에게 이메일 (침묵 게이트 —
+# 초록일 땐 아무 소리 없음, daily-sports-check와 동일 패턴).
+#
+# 비밀키 불필요 — 전부 공개(anon) 엔드포인트만 찌른다. 데이터 저장 없음.
+# ⚠️ 스케줄은 main 브랜치 기준. Claude 세션의 시간당 자가검진과 상호 백업.
+on:
+  schedule:
+    - cron: '12 * * * *'   # 매시 :12 (정시 러시 회피)
+  workflow_dispatch: {}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Site (GitHub Pages)
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 --retry 2 --retry-delay 5 https://alpexa-sports.com/)
+          echo "site HTTP $code"
+          [ "$code" = "200" ] || { echo '::error::alpexa-sports.com is DOWN'; exit 1; }
+      - name: Supabase REST (live_games public read)
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 --retry 2 --retry-delay 5 \
+            -H "apikey: sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu" \
+            "https://grxnbgtfnaayeluenvqh.supabase.co/rest/v1/live_games?select=id&limit=1")
+          echo "rest HTTP $code"
+          [ "$code" = "200" ] || { echo '::error::Supabase REST is DOWN'; exit 1; }
+      - name: Supabase Auth health
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 --retry 2 --retry-delay 5 \
+            "https://grxnbgtfnaayeluenvqh.supabase.co/auth/v1/health")
+          echo "auth HTTP $code"
+          [ "$code" = "200" ] || { echo '::error::Supabase Auth is DOWN'; exit 1; }
