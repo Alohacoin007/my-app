@@ -1074,7 +1074,10 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
     (isLive?acct.rows():DEMO_POS).forEach(p=>{ if(p.sym!==dsym&&p.sym!==sym) return;
       const col=p.type==='buy'?'#00C805':'#F23645';   // BUY 초록 · SELL 빨강 (2026-07-19 사장님, 캔들색과 구분)
       const base={ ticket:p.ticket, side:p.type, real:isLive, entry:+p.price, sl:+p.sl||0, tp:+p.tp||0 };
-      tl(p.price, p.type+' '+p.vol+' #'+p.ticket, col, false, Object.assign({kind:'entry'}, base));
+      /* 라인 라벨 티켓 = 짧게 (2026-07-23 사장님 "본래대로" — LIVE local_id(fxt-…) 전체가 노출돼
+         지저분했음 → 데모 시절처럼 끝 6자리만. 내부 식별·수정/청산은 여전히 전체 ticket 사용) */
+      const tkDisp=(t=>{ t=String(t); return t.length>10?t.slice(-6):t; })(p.ticket);
+      tl(p.price, p.type+' '+p.vol+' #'+tkDisp, col, false, Object.assign({kind:'entry'}, base));
       tl(p.sl, 'sl '+p.sl, '#B57BFF', true, Object.assign({kind:'sl'}, base));   // SL 보라(셀 빨강과 구분, 2026-07-19 사장님)
       tl(p.tp, 'tp '+p.tp, '#2E90FA', true, Object.assign({kind:'tp'}, base));   // TP 파랑(사장님 지시)
     });
