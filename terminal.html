@@ -1066,10 +1066,10 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
   { const dsym=demoSym(sym); const TL=[];
     const acct=window.fxAcct;   // renderChart는 fxAcct 선언 전(초기 렌더)에도 돎 — window 경유로 TDZ 회피
     const isLive=!!(acct&&acct.authed);
-    const tl=(price,lab,col,dash,hit)=>{ const v=+price; if(!(v>0)||v<mn||v>mx) return;
+    const tl=(price,lab,col,dash,hit,below)=>{ const v=+price; if(!(v>0)||v<mn||v>mx) return;
       const y=yOf(v);
       out+='<line x1="0" y1="'+y.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="'+col+'" stroke-width="0.9" stroke-dasharray="'+(dash?'4 3':'8 4')+'" opacity=".85"/>'+
-        '<text x="4" y="'+(y-3).toFixed(1)+'" fill="'+col+'" font-size="8.5" font-weight="700">'+lab+'</text>';
+        '<text x="4" y="'+((below?y+11:y-3)).toFixed(1)+'" fill="'+col+'" font-size="8.5" font-weight="700">'+lab+'</text>';   // 진입 라벨은 라인 아래(본래 위치 — 2026-07-23 사장님)
       if(hit) TL.push(Object.assign({}, hit, {y, price:v})); };
     (isLive?acct.rows():DEMO_POS).forEach(p=>{ if(p.sym!==dsym&&p.sym!==sym) return;
       const col=p.type==='buy'?'#00C805':'#F23645';   // BUY 초록 · SELL 빨강 (2026-07-19 사장님, 캔들색과 구분)
@@ -1077,7 +1077,7 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
       /* 라인 라벨 티켓 = 짧게 (2026-07-23 사장님 "본래대로" — LIVE local_id(fxt-…) 전체가 노출돼
          지저분했음 → 데모 시절처럼 끝 6자리만. 내부 식별·수정/청산은 여전히 전체 ticket 사용) */
       const tkDisp=(t=>{ t=String(t); return t.length>10?t.slice(-6):t; })(p.ticket);
-      tl(p.price, p.type+' '+p.vol+' #'+tkDisp, col, false, Object.assign({kind:'entry'}, base));
+      tl(p.price, p.type+' '+p.vol+' #'+tkDisp, col, false, Object.assign({kind:'entry'}, base), true);
       tl(p.sl, 'sl '+p.sl, '#B57BFF', true, Object.assign({kind:'sl'}, base));   // SL 보라(셀 빨강과 구분, 2026-07-19 사장님)
       tl(p.tp, 'tp '+p.tp, '#2E90FA', true, Object.assign({kind:'tp'}, base));   // TP 파랑(사장님 지시)
     });
