@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ALPEXA — Sportsbook Desk</title>
+<link rel="icon" href="favicon-32.png">
+<!--
+  스포츠북 데스크 — Phase 1 (읽기 전용) · 2026-07-24
+  · 리스크 감시/헤징/관리감독 백오피스. 레전드2(RH 정통 다크) 룩 + 위젯 그리드.
+  · 돈 경로 0: 모든 데이터는 어드민 RPC sbdesk_report(is_admin 게이트) + 공개 live_games 조회.
+    이 파일에는 insert/update/delete/RPC(돈) 호출이 없다 — Phase 3(개입 도구) 전까지 유지.
+  · 어드민 세션 = manager와 동일 체계(ALPEXA_ADMIN_SESSION → 격리 localStorage 키).
+-->
+<style>
+:root,body.lgd{ --lgd-bg:#000000; --lgd-surface:#0E1015; --lgd-surface2:#161A22;
+  --lgd-pill:#1D212A; --lgd-pill-hi:#252B36; --lgd-hair:#1D212A;
+  --lgd-ink:#F5F7FA; --lgd-dim:#8B93A1; --lgd-green:#00C805; --lgd-up:#00C805;
+  --lgd-down:#FF453A; --lgd-warn:#FFB020; --lgd-fs-body:12.5px; }
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--lgd-bg);color:var(--lgd-ink);font:400 13px/1.45 Inter,-apple-system,system-ui,sans-serif;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input{font:inherit}
+
+/* ── 헤더 ── */
+.hdr{display:flex;align-items:center;gap:10px;height:40px;padding:0 12px;background:var(--lgd-surface);border-bottom:1px solid var(--lgd-hair);position:relative;z-index:50}
+.mark{width:24px;height:24px;border-radius:3px;background:var(--lgd-up);color:#04130a;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:14px}
+.hname{font-weight:800;letter-spacing:.3px}
+.htag{font-size:10.5px;font-weight:800;color:var(--lgd-warn);border:1px solid var(--lgd-warn);border-radius:4px;padding:1px 6px;letter-spacing:.5px}
+.hsp{flex:1}
+.hdot{width:8px;height:8px;border-radius:50%;background:#555}
+.hdot.ok{background:var(--lgd-green)} .hdot.stale{background:var(--lgd-down)}
+.hmail{font-size:11.5px;color:var(--lgd-dim);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hbtn{font-size:11.5px;font-weight:700;color:var(--lgd-dim);border:1px solid var(--lgd-hair);border-radius:6px;padding:4px 10px}
+.hbtn:hover{color:var(--lgd-ink);border-color:var(--lgd-pill-hi)}
+
+/* ── 위젯 그리드 ── */
+#board{position:relative;height:calc(100% - 40px);overflow:auto;padding:8px}
+.wg{position:absolute;background:var(--lgd-surface);border:1px solid var(--lgd-hair);border-radius:10px;display:flex;flex-direction:column;min-width:180px;min-height:110px;overflow:hidden}
+.wg-h{display:flex;align-items:center;gap:8px;padding:7px 11px;border-bottom:1px solid var(--lgd-hair);cursor:grab;user-select:none;flex:0 0 auto}
+.wg-h b{font-size:12px;font-weight:800}
+.wg-h small{color:var(--lgd-dim);font-size:10.5px}
+.wg-b{flex:1;overflow:auto;padding:9px 11px;font-size:var(--lgd-fs-body)}
+.wg-rs{position:absolute;right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize;opacity:.45}
+.wg-rs::after{content:'';position:absolute;right:3px;bottom:3px;width:7px;height:7px;border-right:2px solid var(--lgd-dim);border-bottom:2px solid var(--lgd-dim)}
+.wg.drag{opacity:.85;z-index:40;cursor:grabbing}
+
+/* ── 공통 표 ── */
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{color:var(--lgd-dim);font-weight:600;text-align:left;padding:3px 6px;border-bottom:1px solid var(--lgd-hair);white-space:nowrap;position:sticky;top:-9px;background:var(--lgd-surface)}
+td{padding:4px 6px;border-bottom:1px solid rgba(29,33,42,.55);white-space:nowrap}
+.r{text-align:right} th.r{text-align:right}
+.up{color:var(--lgd-up)} .dn{color:var(--lgd-down)} .wr{color:var(--lgd-warn)}
+.dim{color:var(--lgd-dim)}
+.pill{display:inline-block;font-size:10px;font-weight:800;border-radius:4px;padding:1px 6px}
+.pill.red{background:rgba(255,69,58,.15);color:var(--lgd-down)}
+.pill.grn{background:rgba(0,200,5,.13);color:var(--lgd-green)}
+.pill.yel{background:rgba(255,176,32,.15);color:var(--lgd-warn)}
+.empty{color:var(--lgd-dim);text-align:center;padding:18px 0}
+
+/* ── KPI 전광판 ── */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px}
+.kpi{background:var(--lgd-surface2);border-radius:8px;padding:8px 10px}
+.kpi .l{font-size:10.5px;color:var(--lgd-dim);font-weight:600}
+.kpi .v{font-size:16.5px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums}
+
+/* ── 검색 ── */
+.srch{width:100%;background:var(--lgd-pill);border:1px solid var(--lgd-hair);border-radius:6px;color:var(--lgd-ink);padding:5px 9px;font-size:12px;margin-bottom:7px}
+.srch:focus{outline:none;border-color:var(--lgd-pill-hi)}
+
+/* ── 로그인 오버레이 ── */
+#gate{position:fixed;inset:0;background:var(--lgd-bg);z-index:100;display:flex;align-items:center;justify-content:center}
+.gbox{width:330px;background:var(--lgd-surface);border:1px solid var(--lgd-hair);border-radius:12px;padding:26px}
+.gbox h2{font-size:17px;margin-bottom:2px}
+.gbox p{font-size:12px;color:var(--lgd-dim);margin-bottom:16px}
+.gbox input{width:100%;background:var(--lgd-pill);border:1px solid var(--lgd-hair);border-radius:7px;color:var(--lgd-ink);padding:9px 11px;font-size:13px;margin-bottom:9px}
+.gbox input:focus{outline:none;border-color:var(--lgd-green)}
+.gbtn{width:100%;background:var(--lgd-green);color:#04130a;font-weight:800;border-radius:7px;padding:10px;font-size:13.5px}
+.gbtn:disabled{opacity:.5}
+.gerr{color:var(--lgd-down);font-size:12px;min-height:16px;margin-top:8px}
+</style>
+</head>
+<body class="lgd">
+
+<div class="hdr">
+  <div class="mark">A</div><span class="hname">Sportsbook Desk</span>
+  <span class="htag">READ-ONLY · PHASE 1</span>
+  <span class="hsp"></span>
+  <span class="hdot" id="feedDot" title="data feed"></span>
+  <span class="hmail" id="whoami"></span>
+  <button class="hbtn" id="btnRefresh">↻ Refresh</button>
+  <button class="hbtn" id="btnLayout">Reset layout</button>
+  <button class="hbtn" id="btnOut" style="display:none">Sign out</button>
+</div>
+<div id="board"></div>
+
+<div id="gate">
+  <div class="gbox">
+    <h2>🏟️ Sportsbook Desk</h2>
+    <p>어드민 전용 — manager 계정으로 로그인 (READ-ONLY)</p>
+    <input id="gEmail" type="email" placeholder="Email" autocomplete="username">
+    <input id="gPass" type="password" placeholder="Password" autocomplete="current-password">
+    <button class="gbtn" id="gGo">Sign in</button>
+    <div class="gerr" id="gErr"></div>
+  </div>
+</div>
+
+<script>window.ALPEXA_ADMIN_SESSION = true;   // manager와 동일: 어드민 세션은 격리 localStorage 키</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="alpexa-sync.js"></script>
+<script>
+'use strict';
+/* ════════ 유틸 ════════ */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const usd=n=>'$'+(+n||0).toLocaleString('en-US',{maximumFractionDigits:0});
+const usd2=n=>'$'+(+n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtAm=a=>{a=+a||0;return (a>0?'+':'')+a;};
+const decOf=a=>{a=+a||0;return a>0?1+a/100:(a<0?1+100/(-a):1);};
+const ago=ts=>{const s=Math.max(0,(Date.now()-new Date(ts).getTime())/1000);
+  if(s<90)return Math.round(s)+'s';if(s<5400)return Math.round(s/60)+'m';if(s<172800)return Math.round(s/3600)+'h';return Math.round(s/86400)+'d';};
+const kick=ts=>{try{const d=new Date(ts);if(isNaN(d))return'';return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+' · '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});}catch(e){return'';}};
+
+/* ════════ 위젯 그리드 엔진 (12컬럼 · 드래그/리사이즈 · 레이아웃 저장) ════════ */
+const COLS=12, RH=30, GAP=8, LKEY='alpexa.sbdesk.layout.v1';   // UI 설정 — 돈 아님, 로컬 OK
+const WIDGETS=[
+  {id:'kpi',   t:'📊 북 전광판',   d:'지금 이 순간의 북',        x:0,y:0, w:12,h:4},
+  {id:'expo',  t:'🔥 노출 매트릭스',d:'픽이 맞으면 얼마 내나',    x:0,y:4, w:5, h:9},
+  {id:'hedge', t:'🎯 헤징 보드',   d:'쏠린 경기 균형 계산',      x:5,y:4, w:3, h:9},
+  {id:'alerts',t:'🚨 알람',        d:'한도·감사·큐 이벤트',      x:8,y:4, w:4, h:9},
+  {id:'ticker',t:'🎫 베팅 티커',   d:'오픈 티켓 + 최근 정산',    x:0,y:13,w:5, h:9},
+  {id:'cust',  t:'👤 고객 리스크', d:'노출·전적·sharp',          x:5,y:13,w:4, h:9},
+  {id:'queue', t:'⚖️ 정산 큐',     d:'끝났는데 미정산 (조회)',   x:9,y:13,w:3, h:9},
+  {id:'pnl',   t:'🧾 P&L 7일',     d:'핸들·GGR·홀드',            x:0,y:22,w:7, h:7},
+  {id:'lines', t:'📈 라인 뷰어',   d:'live_games 배당·신선도',   x:7,y:22,w:5, h:7}];
+let layout={}; try{ layout=JSON.parse(localStorage.getItem(LKEY)||'{}')||{}; }catch(e){ layout={}; }
+function colW(){ const b=$('board'); return Math.max(40,((b.clientWidth-16)-GAP*(COLS-1))/COLS); }
+function place(el,g){ const cw=colW();
+  el.style.left=(8+g.x*(cw+GAP))+'px'; el.style.top=(8+g.y*(RH+GAP/4))+'px';
+  el.style.width=(g.w*cw+(g.w-1)*GAP)+'px'; el.style.height=(g.h*RH)+'px'; }
+function geom(id){ const d=WIDGETS.find(w=>w.id===id); const s=layout[id]||{};
+  return {x:s.x!=null?s.x:d.x, y:s.y!=null?s.y:d.y, w:s.w||d.w, h:s.h||d.h}; }
+function saveGeom(id,g){ layout[id]=g; try{ localStorage.setItem(LKEY,JSON.stringify(layout)); }catch(e){} }
+function buildBoard(){
+  const b=$('board'); b.innerHTML='';
+  WIDGETS.forEach(w=>{
+    const el=document.createElement('div'); el.className='wg'; el.id='w-'+w.id;
+    el.innerHTML='<div class="wg-h"><b>'+w.t+'</b><small>'+w.d+'</small></div>'
+      +'<div class="wg-b" id="b-'+w.id+'"><div class="empty">…</div></div><div class="wg-rs"></div>';
+    b.appendChild(el); place(el,geom(w.id));
+    const h=el.querySelector('.wg-h'), rs=el.querySelector('.wg-rs');
+    h.addEventListener('pointerdown',e=>dragStart(e,el,w.id,false));
+    rs.addEventListener('pointerdown',e=>dragStart(e,el,w.id,true));
+  });
+  fitBoardHeight();
+}
+function fitBoardHeight(){ let maxY=0; WIDGETS.forEach(w=>{const g=geom(w.id); maxY=Math.max(maxY,(g.y+g.h));});
+  const sp=document.createElement('div'); sp.style.cssText='position:absolute;width:1px;height:1px;top:'+(8+maxY*(RH+GAP/4)+20)+'px'; $('board').appendChild(sp); }
+function dragStart(e,el,id,resize){
+  e.preventDefault(); const g=geom(id), cw=colW(), sx=e.clientX, sy=e.clientY;
+  el.classList.add('drag'); el.setPointerCapture&&el.setPointerCapture(e.pointerId);
+  const move=ev=>{ const dx=Math.round((ev.clientX-sx)/(cw+GAP)), dy=Math.round((ev.clientY-sy)/(RH+GAP/4));
+    const ng=resize? {x:g.x,y:g.y,w:Math.min(COLS-g.x,Math.max(2,g.w+dx)),h:Math.max(3,g.h+dy)}
+                   : {x:Math.max(0,Math.min(COLS-g.w,g.x+dx)),y:Math.max(0,g.y+dy),w:g.w,h:g.h};
+    place(el,ng); el.__g=ng; };
+  const upfn=()=>{ el.classList.remove('drag'); if(el.__g){ saveGeom(id,el.__g); el.__g=null; }
+    window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',upfn); };
+  window.addEventListener('pointermove',move); window.addEventListener('pointerup',upfn);
+}
+window.addEventListener('resize',()=>{ WIDGETS.forEach(w=>{const el=$('w-'+w.id); if(el) place(el,geom(w.id));}); });
+
+/* ════════ 데이터 ════════ */
+const SB='https://grxnbgtfnaayeluenvqh.supabase.co';
+const SBK='sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu';
+const NET_LIAB_ALERT=5000, BIG_PAYOUT_ALERT=10000;   // 알람 임계 (표시용 — 강제는 Phase 2 서버)
+let REPORT=null, GAMES=[], GAMES_AT=0, tickQ='';
+
+async function pullReport(){
+  if(!(window.AlpexaSync&&AlpexaSync.db)) return;
+  try{
+    const r=await AlpexaSync.db.rpc('sbdesk_report',{p_days:7});
+    if(r&&r.data&&r.data.ok){ REPORT=r.data; $('feedDot').className='hdot ok'; renderAll(); }
+    else{ $('feedDot').className='hdot stale';
+      if(r&&r.data&&/not admin/i.test(r.data.error||'')) gateMsg('이 계정은 어드민이 아닙니다 (admins 테이블 확인).'); }
+  }catch(e){ $('feedDot').className='hdot stale'; }
+}
+async function pullGames(){
+  try{
+    const r=await fetch(SB+'/rest/v1/live_games?id=eq.all&select=data,updated_at',{headers:{apikey:SBK,Authorization:'Bearer '+SBK}});
+    const j=await r.json();
+    if(Array.isArray(j)&&j[0]&&Array.isArray(j[0].data)){ GAMES=j[0].data; GAMES_AT=Date.parse(j[0].updated_at)||Date.now(); renderHedge(); renderLines(); }
+  }catch(e){}
+}
+
+/* ════════ 렌더 (위젯별 try/catch 격리 — 스포츠 규율 #4) ════════ */
+function renderAll(){ [renderKpi,renderExpo,renderHedge,renderAlerts,renderTicker,renderCust,renderQueue,renderPnl,renderLines]
+  .forEach(f=>{ try{ f(); }catch(e){ /* 위젯 하나 죽어도 나머지는 산다 */ } }); }
+
+function renderKpi(){ const R=REPORT; if(!R) return;
+  const L=R.liability||{}, P=R.pnl||{}, T=R.today||{};
+  const openStake=(R.open_tickets||[]).reduce((s,t)=>s+(+t.stake||0),0);
+  $('b-kpi').innerHTML='<div class="kpis">'
+    +kpi('오픈 티켓',(L.open_bets!=null?L.open_bets:'—'))
+    +kpi('받은 스테이크',usd(openStake))
+    +kpi('총 잠재지급',usd(L.total_payout_if_all_win),+L.total_payout_if_all_win>BIG_PAYOUT_ALERT?'wr':'')
+    +kpi('최대 단건 지급',usd(L.biggest_single_payout),+L.biggest_single_payout>BIG_PAYOUT_ALERT?'dn':'')
+    +kpi('핸들 7일',usd(P.handle))
+    +kpi('GGR 7일',usd(P.ggr),+P.ggr>=0?'up':'dn')
+    +kpi('홀드 7일',(P.hold_pct!=null?P.hold_pct+'%':'—'),+P.hold_pct>=0?'up':'dn')
+    +kpi('오늘 핸들',usd(T.handle))
+    +kpi('오늘 지급',usd(T.payouts))
+    +'</div>';
+  function kpi(l,v,c){ return '<div class="kpi"><div class="l">'+l+'</div><div class="v '+(c||'')+'">'+v+'</div></div>'; } }
+
+function renderExpo(){ const R=REPORT; if(!R) return;
+  const rows=((R.liability||{}).by_event_pick||[]);
+  $('b-expo').innerHTML=!rows.length?'<div class="empty">오픈 노출 없음 🟢</div>'
+    :'<table><tr><th>경기</th><th>픽</th><th class="r">건</th><th class="r">받음</th><th class="r">맞으면 지급</th><th class="r">순노출</th></tr>'
+    +rows.map(e=>{const hot=+e.net_liability>NET_LIAB_ALERT;
+      return '<tr><td>'+esc(e.game||e.gid)+'</td><td>'+esc(e.pick)+'</td><td class="r">'+e.bets+'</td>'
+      +'<td class="r">'+usd(e.stake)+'</td><td class="r">'+usd(e.payout_if_wins)+'</td>'
+      +'<td class="r '+(hot?'dn':'dim')+'">'+(hot?'🔴 ':'')+usd(e.net_liability)+'</td></tr>';}).join('')+'</table>'; }
+
+function findGame(gid){ return GAMES.find(g=>g.gid===gid); }
+function oppositeOdds(gid,pick){ const g=findGame(gid); if(!g) return null;
+  const ml=(g.ml&&g.ml.length?g.ml:(g.core&&g.core.ml)||[]);
+  // 픽이 ML 한쪽과 정확히 일치할 때만 반대편이 정의된다 — 팔레이/프롭은 자동판별 불가(null → 수동 검토).
+  const i=ml.findIndex(o=>o.sel===pick); if(i<0||ml.length<2) return null;
+  const opp=ml[i===0?1:0]; return opp?+opp.am:null; }
+function renderHedge(){ const R=REPORT; if(!R) return;
+  const rows=((R.liability||{}).by_event_pick||[]).filter(e=>+e.net_liability>NET_LIAB_ALERT);
+  $('b-hedge').innerHTML=!rows.length?'<div class="empty">균형 — 헤지 필요 없음 🟢</div>'
+    :rows.map(e=>{ const am=oppositeOdds(e.gid,e.pick); let s='<div style="margin-bottom:10px">'
+      +'<div><b>'+esc(e.game||e.gid)+'</b></div><div class="dim">쏠린 픽: '+esc(e.pick)+' · 순노출 <span class="dn">'+usd(e.net_liability)+'</span></div>';
+      if(am!=null){ const st=(+e.net_liability)/(decOf(am)-1);
+        s+='<div>반대편 '+fmtAm(am)+' 기준 <b class="up">'+usd(Math.ceil(st))+'</b> 받으면 균형</div>'; }
+      else s+='<div class="dim">반대편 자동판별 불가(팔레이/라인없음) — 수동/외부 북 헤지 검토</div>';
+      return s+'</div>'; }).join(''); }
+
+function renderAlerts(){ const R=REPORT; if(!R) return;
+  const a=[], L=R.liability||{}, A=R.audit_last;
+  if(A&&A.verdict) a.push({s:A.verdict==='red'?'red':A.verdict==='yellow'?'yel':'grn',
+    t:'감사 '+A.verdict.toUpperCase()+' (🔴'+(A.red||0)+' 🟡'+(A.yellow||0)+') · '+ago(A.ran_at)+' 전'});
+  if(+L.biggest_single_payout>BIG_PAYOUT_ALERT) a.push({s:'red',t:'최대 단건 지급 '+usd(L.biggest_single_payout)+' — 한도 상한(Phase 2) 필요'});
+  (L.by_event_pick||[]).filter(e=>+e.net_liability>NET_LIAB_ALERT).slice(0,4)
+    .forEach(e=>a.push({s:'yel',t:'쏠림: '+(e.game||e.gid)+' · '+e.pick+' 순노출 '+usd(e.net_liability)}));
+  if((R.settle_queue||[]).length) a.push({s:'yel',t:'정산 큐 '+(R.settle_queue||[]).length+'건 — 결과 확인 필요'});
+  (R.customers||[]).filter(c=>c.sharp).slice(0,3).forEach(c=>a.push({s:'yel',t:'SHARP: '+(c.name||c.cust_id)+' 순익 '+usd(c.player_net)}));
+  if(GAMES_AT&&(Date.now()-GAMES_AT)>10*60*1000) a.push({s:'red',t:'피드 stale — live_games '+ago(GAMES_AT)+' 전'});
+  $('b-alerts').innerHTML=!a.length?'<div class="empty">이상무 🟢</div>'
+    :a.map(x=>'<div style="margin-bottom:7px"><span class="pill '+x.s+'">'+(x.s==='red'?'🔴':x.s==='yel'?'🟡':'🟢')+'</span> '+esc(x.t)+'</div>').join(''); }
+
+function renderTicker(){ const R=REPORT; if(!R) return;
+  const q=tickQ.toLowerCase();
+  const open=(R.open_tickets||[]).filter(t=>!q||JSON.stringify(t).toLowerCase().includes(q));
+  const done=(R.recent_settlements||[]).filter(t=>!q||JSON.stringify(t).toLowerCase().includes(q)).slice(0,15);
+  let h='<input class="srch" id="tkSrch" placeholder="티켓·고객·경기 검색…" value="'+esc(tickQ)+'">';
+  h+=!open.length?'<div class="empty">오픈 티켓 없음</div>'
+    :'<table><tr><th>시각</th><th>티켓</th><th>고객</th><th>경기 / 픽</th><th class="r">스테이크</th><th class="r">지급시</th></tr>'
+    +open.map(t=>'<tr><td class="dim">'+ago(t.created_at)+'</td><td class="dim">'+esc(String(t.ticket||t.local_id).slice(-9))+'</td>'
+      +'<td>'+esc(t.cust_id||'')+'</td><td>'+esc((t.game||'')+(t.pick?' · '+t.pick:''))+'</td>'
+      +'<td class="r">'+usd2(t.stake)+'</td><td class="r">'+usd2(t.potential)+'</td></tr>').join('')+'</table>';
+  if(done.length){ h+='<div class="dim" style="margin:9px 0 4px;font-weight:700">최근 정산</div><table>'
+    +done.map(s=>'<tr><td class="dim">'+ago(s.created_at)+'</td><td>'+esc(String(s.ticket||'').slice(-9))+'</td>'
+      +'<td>'+(s.kind==='bet_won'?'<span class="up">WON</span>':'<span class="dn">LOST</span>')+'</td>'
+      +'<td class="r">'+usd2(s.stake)+'</td><td class="r '+(+s.pnl>0?'dn':'up')+'">'+usd2(s.pnl)+'</td></tr>').join('')+'</table>'; }
+  $('b-ticker').innerHTML=h;
+  const si=$('tkSrch'); if(si){ si.oninput=()=>{ tickQ=si.value; renderTicker(); const s2=$('tkSrch'); if(s2){s2.focus(); s2.setSelectionRange(s2.value.length,s2.value.length);} }; } }
+
+function renderCust(){ const R=REPORT; if(!R) return;
+  const rows=R.customers||[];
+  $('b-cust').innerHTML=!rows.length?'<div class="empty">오픈 노출 고객 없음</div>'
+    :'<table><tr><th>고객</th><th class="r">잔고</th><th class="r">오픈</th><th class="r">지급시</th><th class="r">W-L</th><th class="r">고객순익</th></tr>'
+    +rows.map(c=>'<tr><td>'+esc(c.name||c.cust_id)+(c.sharp?' <span class="pill red">SHARP</span>':'')+'</td>'
+      +'<td class="r">'+usd(c.balance)+'</td><td class="r">'+usd(c.open_stake)+'</td>'
+      +'<td class="r">'+usd(c.open_potential)+'</td><td class="r dim">'+(c.won||0)+'-'+(c.lost||0)+'</td>'
+      +'<td class="r '+(+c.player_net>0?'dn':'up')+'">'+usd(c.player_net)+'</td></tr>').join('')+'</table>'; }
+
+function renderQueue(){ const R=REPORT; if(!R) return;
+  const rows=R.settle_queue||[];
+  $('b-queue').innerHTML=!rows.length?'<div class="empty">큐 비어있음 🟢</div>'
+    :'<table><tr><th>경기</th><th class="r">스테이크</th><th class="r">경과</th></tr>'
+    +rows.map(t=>'<tr><td>'+esc((t.game||'')+(t.pick?' · '+t.pick:''))+(t.approx?' <span class="dim">≈</span>':'')+'</td>'
+      +'<td class="r">'+usd2(t.stake)+'</td><td class="r wr">'+(t.last_kick?ago(t.last_kick):ago(t.created_at))+'</td></tr>').join('')
+    +'</table><div class="dim" style="margin-top:7px">정산 실행은 sports-settle 크론 — 여긴 감시만 (Phase 3에서 수동 버튼)</div>'; }
+
+function renderPnl(){ const R=REPORT; if(!R) return;
+  const days=R.pnl_daily||[], P=R.pnl||{};
+  const mx=Math.max(1,...days.map(d=>Math.max(+d.handle||0,+d.payouts||0)));
+  let bars='<div style="display:flex;align-items:flex-end;gap:6px;height:84px;margin:6px 0 4px">';
+  days.forEach(d=>{ const hh=Math.round((+d.handle||0)/mx*76), gp=+d.ggr>=0;
+    bars+='<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center" title="'+esc(d.day)+' 핸들 '+usd(d.handle)+' · GGR '+usd(d.ggr)+'">'
+      +'<div style="width:70%;height:'+Math.max(2,hh)+'px;background:'+(gp?'var(--lgd-green)':'var(--lgd-down)')+';border-radius:3px 3px 0 0;opacity:.85"></div>'
+      +'<div class="dim" style="font-size:9px;margin-top:3px">'+esc(String(d.day).slice(5))+'</div></div>'; });
+  bars+='</div>';
+  $('b-pnl').innerHTML=bars
+    +'<div>7일 합계 — 핸들 <b>'+usd(P.handle)+'</b> · 지급 '+usd(P.payouts)+' · GGR <b class="'+(+P.ggr>=0?'up':'dn')+'">'+usd(P.ggr)+'</b>'
+    +' · 홀드 <b>'+(P.hold_pct!=null?P.hold_pct+'%':'—')+'</b> <span class="dim">(업계 정상 5~8%)</span>'
+    +' <button class="hbtn" id="csvBtn" style="float:right">CSV</button></div>';
+  const cb=$('csvBtn'); if(cb) cb.onclick=()=>{ const csv='day,handle,payouts,ggr\n'+days.map(d=>[d.day,d.handle,d.payouts,d.ggr].join(',')).join('\n');
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='alpexa-sports-pnl.csv'; a.click(); }; }
+
+function renderLines(){
+  const rows=GAMES.slice().sort((a,b)=>String(a.iso||'').localeCompare(String(b.iso||''))).slice(0,60);
+  $('b-lines').innerHTML=(!rows.length?'<div class="empty">live_games 비어있음</div>'
+    :'<div class="dim" style="margin-bottom:5px">피드 갱신 '+(GAMES_AT?ago(GAMES_AT)+' 전':'—')+' · '+GAMES.length+'경기</div>'
+    +'<table><tr><th>리그</th><th>경기</th><th>시작</th><th class="r">ML</th><th class="r">상태</th></tr>'
+    +rows.map(g=>{ const ml=(g.ml&&g.ml.length?g.ml:(g.core&&g.core.ml)||[]);
+      const line=ml.length>=2?fmtAm(ml[0].am)+' / '+fmtAm(ml[1].am):'—';
+      const st=g.live?'<span class="pill red">LIVE</span>':(g.oddsReal===false?'🔒':'<span class="dim">pre</span>');
+      return '<tr><td>'+esc(g.lg)+'</td><td>'+esc(((g.away||{}).ab||'')+' @ '+((g.home||{}).ab||''))+'</td>'
+        +'<td class="dim">'+esc(g.live?(g.time||'Live'):kick(g.iso))+'</td><td class="r">'+esc(line)+'</td><td class="r">'+st+'</td></tr>'; }).join('')+'</table>'); }
+
+/* ════════ 인증 게이트 ════════ */
+function gateMsg(m){ const e=$('gErr'); if(e) e.textContent=m||''; }
+function showGate(on){ $('gate').style.display=on?'flex':'none'; $('btnOut').style.display=on?'none':''; }
+async function boot(){
+  buildBoard();
+  if(!(window.AlpexaSync&&AlpexaSync.db)){ gateMsg('네트워크/CDN 오류 — supabase 로드 실패'); return; }
+  try{
+    const s=await AlpexaSync.db.auth.getSession();
+    const sess=s&&s.data&&s.data.session;
+    if(sess){ showGate(false); $('whoami').textContent=(sess.user&&sess.user.email)||''; start(); }
+  }catch(e){}
+}
+let timer=null;
+function start(){ pullReport(); pullGames();
+  if(!timer) timer=setInterval(()=>{ if(!document.hidden){ pullReport(); pullGames(); } },30000); }
+$('gGo').onclick=async()=>{
+  gateMsg(''); $('gGo').disabled=true;
+  try{
+    if(!(window.AlpexaSync&&AlpexaSync.db)) throw new Error('supabase 로드 실패');
+    const r=await AlpexaSync.db.auth.signInWithPassword({email:$('gEmail').value.trim(),password:$('gPass').value});
+    if(r.error) throw r.error;
+    showGate(false); $('whoami').textContent=($('gEmail').value.trim()); start();
+  }catch(e){ gateMsg(e.message||'로그인 실패'); }
+  $('gGo').disabled=false; };
+$('gPass').addEventListener('keydown',e=>{ if(e.key==='Enter') $('gGo').click(); });
+$('btnOut').onclick=async()=>{ try{ await AlpexaSync.db.auth.signOut(); }catch(e){} location.reload(); };
+$('btnRefresh').onclick=()=>{ pullReport(); pullGames(); };
+$('btnLayout').onclick=()=>{ layout={}; try{ localStorage.removeItem(LKEY); }catch(e){} buildBoard(); renderAll(); };
+boot();
+</script>
+</body>
+</html>

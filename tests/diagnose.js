@@ -17,7 +17,7 @@ const ROOT = path.resolve(__dirname, '..');
 // Files that actually ship (GitHub Pages) — orphan prototypes are excluded on purpose.
 const DEPLOYED = ['crypto-live.html', 'sports-live.html', 'trading.html', 'webtrade.html', 'fx.html', 'index.html',
                   'login.html', 'signup.html', 'manager-mobile.html', 'agent.html', 'compliance.js',
-                  'alpexa-sync.js'];
+                  'alpexa-sync.js', 'sportsbook-desk.html'];
 const MONEY_EDGE = ['sports-settle', 'stake-accrue'];   // edge fns that MOVE money (must fail-closed)
 // Price/game FEEDS: not payouts, but they WRITE market data settlements read, and a fail-open
 // endpoint is world-callable (abuse → external-API cost, stale/garbage writes). Fail-closed too.
