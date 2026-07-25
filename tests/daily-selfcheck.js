@@ -69,6 +69,20 @@ function oddsStatus(g) {
     flag(!p.ok, `시세(크립토 서버): 신선도 ${p.age.toFixed(1)}s · 4s 내 갱신 ${p.moved ? '확인' : '없음'}` + (!p.ok ? ' — 펌프/크론 확인(재시도 후에도)' : ''));
   } catch (e) { flag(true, '시세 점검 실패: ' + e.message); }
 
+  // ── ④ Odds API 쿼터 (2026-07-25 소진 사고의 사전 경보 — 90% 소진 = 🔴, 70% = ⚠️) ──
+  try {
+    const r = await fetch(`${URL}/rest/v1/api_usage?select=remaining,used,updated_at&provider=eq.odds_api`, { headers: H });
+    const u = (await r.json())[0];
+    if (!u) flag(false, '배당 쿼터: api_usage 행 없음 (크론 첫 보고 대기)');
+    else {
+      const total = (+u.remaining || 0) + (+u.used || 0);
+      const pct = total > 0 ? Math.round((+u.used || 0) / total * 100) : 0;
+      const line = `배당 쿼터(Odds API): 사용 ${pct}% · 잔량 ${(+u.remaining || 0).toLocaleString()}`;
+      if (pct >= 90) flag(true, line + ' — 소진 임박! 플랜/폴링 확인');
+      else flag(false, line + (pct >= 70 ? ' ⚠️ 70% 초과 — 추이 주시' : ''));
+    }
+  } catch (e) { flag(true, '배당 쿼터 점검 실패: ' + e.message); }
+
   console.log(red ? `\n🔴 자가검진: ${red}건 이상 — 원인 추적 후 보고할 것` : '\n🟢 자가검진 전부 정상');
   process.exit(red ? 1 : 0);
 })().catch(e => { console.error('🔴 자가검진 크래시: ' + e.message); process.exit(1); });

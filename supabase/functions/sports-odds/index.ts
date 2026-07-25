@@ -67,7 +67,43 @@ const ESPN_PATH: Record<string, string> = {
   golf_the_open_championship_winner: "golf/pga",
   golf_us_open_winner: "golf/pga",
 };
-const STALE_MS = 9 * 60 * 1000; // refresh an idle league's odds ~every 10 min
+// 폴링 다이어트 (2026-07-25, 쿼터 소진 사후대책 — 사장님 승인):
+//   먼 경기만 있는 리그 = 30분, 임박(킥오프 2시간 전~)·라이브 리그 = 5분.
+//   라이브 매분 폴링(구 동작)이 크레딧 주범이었다 → 5분이면 라인 안전 + ~70% 절감.
+const STALE_MS = 30 * 60 * 1000;     // idle league (no game near): 30 min
+const STALE_HOT_MS = 5 * 60 * 1000;  // imminent (starts ≤2h) or live league: 5 min
+const HOT_BEFORE_MS = 2 * 60 * 60 * 1000;   // "임박" = starts within 2h
+const HOT_AFTER_MS = 6 * 60 * 60 * 1000;    // still hot up to 6h after start (covers live+settling window)
+// Odds-API sport key → live_games lg code (our own DB, free to read).
+const LG_OF: Record<string, string> = {
+  americanfootball_nfl: "NFL", basketball_nba: "NBA", basketball_ncaab: "NCAAB",
+  baseball_mlb: "MLB", icehockey_nhl: "NHL", mma_mixed_martial_arts: "UFC",
+  soccer_fifa_world_cup: "SOC", soccer_epl: "SOC", soccer_usa_mls: "SOC",
+  soccer_uefa_champs_league: "SOC",
+};
+// Which lg codes have a game inside the hot window right now — read from OUR live_games
+// row (zero Odds-API credits, zero ESPN calls).
+async function hotLeagues(SB_URL: string, SB_KEY: string): Promise<Set<string>> {
+  const hot = new Set<string>();
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/live_games?select=data&id=eq.all`, {
+      headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
+    });
+    if (!r.ok) return hot;
+    const rows = await r.json();
+    const games = rows?.[0]?.data;
+    if (!Array.isArray(games)) return hot;
+    const now = Date.now();
+    for (const g of games) {
+      const t = Date.parse(g?.iso || "");
+      if (!Number.isFinite(t)) continue;
+      if (g?.live === true || (t - now <= HOT_BEFORE_MS && now - t <= HOT_AFTER_MS)) {
+        if (g?.lg) hot.add(String(g.lg));
+      }
+    }
+  } catch (_e) { /* fail-open to cold cadence — betting gates stay fail-closed elsewhere */ }
+  return hot;
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -138,14 +174,19 @@ Deno.serve(async (req) => {
 
   // Decide which leagues to actually spend Odds API credits on this run.
   const now = Date.now();
-  const live = (only || force) ? new Set(candidates) : await liveSports(candidates);
+  // ESPN live check is only needed for golf outrights (their hot state can't come from
+  // live_games windows alone); everything else derives "hot" from OUR live_games row.
+  const live = (only || force) ? new Set(candidates)
+    : await liveSports(candidates.filter((sp) => OUTRIGHTS.has(sp)));
+  const hot = (only || force) ? new Set<string>() : await hotLeagues(SB_URL, SB_KEY);
   const updated = (only || force) ? {} : await lastUpdated(SB_URL, SB_KEY);
   const toPoll = candidates.filter((sp) => {
     if (only || force) return true;
     const age = now - (updated[sp] || 0);
-    // Outrights never poll every minute — live tournament: 5 min, idle: 30 min.
+    // Outrights: live tournament 5 min, idle 30 min (unchanged).
     if (OUTRIGHTS.has(sp)) return age >= (live.has(sp) ? STALE_OUTRIGHT_LIVE_MS : STALE_OUTRIGHT_MS);
-    return live.has(sp) || age >= STALE_MS;
+    // Game leagues: imminent/live → 5 min, far-out only → 30 min (폴링 다이어트).
+    return age >= (hot.has(LG_OF[sp] || "") ? STALE_HOT_MS : STALE_MS);
   });
   const skipped = candidates.filter((sp) => !toPoll.includes(sp));
 
@@ -224,5 +265,5 @@ Deno.serve(async (req) => {
     } catch (_e) { /* ignore */ }
   }
 
-  return json({ ok: true, live: [...live], polled: out, skipped, remaining });
+  return json({ ok: true, live: [...live], hot: [...hot], polled: out, skipped, remaining });
 });
