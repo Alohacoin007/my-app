@@ -1,0 +1,24 @@
+name: Hourly selfcheck
+
+# 시간당 무음 감시의 GitHub Actions 이관 (2026-07-25, 사장님 지시 — Claude 사용량 절감).
+# 기존 Claude 세션 루틴(매시 :25)이 하던 것과 동일한 검진을 무료 Actions 크론이 대신 돈다:
+#   node tests/daily-selfcheck.js — ① 스케줄·오즈 ② 돈-상태 감사(C1~C9) ③ 시세 라이브니스 ④ 배당 쿼터
+# 침묵 게이트: 🟢면 조용, 🔴(exit 1)면 워크플로 빨강 → GitHub이 오너에게 이메일.
+# 원인 추적·수정은 Claude 아침 점검(15:00 UTC)·저녁 결산(03:00 UTC)에서 수행.
+# ⚠️ 스케줄은 main 브랜치 기준 (daily-sports-check·uptime-check와 동일).
+# 시크릿 불필요 — 스크립트는 공개(anon) 엔드포인트 + 감사 토큰(교체 예정 항목)만 사용.
+on:
+  schedule:
+    - cron: '25 * * * *'   # 매시 :25 (기존 Claude 루틴과 동일 케이던스)
+  workflow_dispatch: {}
+
+jobs:
+  selfcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run daily-selfcheck (silent gate — red emails owner)
+        run: node tests/daily-selfcheck.js
