@@ -161,10 +161,12 @@ async function main() {
     if (r.ok) odds = await r.json();
   } catch (_e) { /* network — skip the extra report */ }
   if (odds) {
-    // 신선도 기준은 폴링 주기별: 팀 스포츠 ≤9분 주기 → 15분 / ⛳ 골프 outright 30분(대기)
-    // 주기 → 70분 / __sports_list 카탈로그 일 1회 → 26시간. 일괄 15분이면 골프가 매일
-    // 가짜 스테일 경보를 낸다(2026-07-16 사전 차단).
-    const thrOf = (s) => s === '__sports_list' ? 26 * 3600e3 : /^golf/.test(s) ? 70 * 60000 : 15 * 60000;
+    // 신선도 기준은 폴링 주기별 (2026-07-27 폴링 다이어트 재계약 — 유휴 리그 30분 주기가
+    // 정상이 됐으므로 팀 스포츠 임계 15→35분. 안 올리면 오프시즌 리그가 매번 가짜 스테일
+    // 경보를 낸다 = 무시당하는 알람. 임박·라이브 리그 실중단은 daily-selfcheck 쿼터/피드
+    // 게이트 + place_bet 골프 신선도 게이트가 잡는다):
+    //   팀 스포츠 30분 주기 → 35분 / ⛳ 골프 outright 30분(대기) → 70분 / 카탈로그 일 1회 → 26시간.
+    const thrOf = (s) => s === '__sports_list' ? 26 * 3600e3 : /^golf/.test(s) ? 70 * 60000 : 35 * 60000;
     const stale = odds.filter((o) => o.updated_at && (NOW - new Date(o.updated_at).getTime()) > thrOf(o.sport));
     const nLg = odds.filter((o) => o.sport !== '__sports_list').length;
     console.log('\n  오즈 테이블(C7): ' + nLg + '개 리그' + (stale.length ? '  ⚠️ 스테일: ' + stale.map((o) => o.sport).join(', ') + ' — sports-odds 크론 확인' : '  ✅ 전부 신선'));
@@ -177,6 +179,7 @@ async function main() {
       // 기준선(2026-07-16 카탈로그 실측): 여자 대회 키는 축구·크리켓뿐, 골프 없음.
       // 매일 같은 키를 "신규"로 울리면 무시당한다(오탐 poka-yoke) — 기준선 밖 diff만 알림.
       const KNOWN_WOMENS = ['cricket_icc_world_cup_womens', 'cricket_t20_world_cup_womens',
+        'cricket_the_hundred_womens',   // 2026-07-27 등장 — 크리켓(LPGA 아님), 확장 대상 아님
         'soccer_fifa_world_cup_womens', 'soccer_germany_bundesliga_women', 'soccer_uefa_champs_league_women'];
       const golfKeys = cat.data.filter((s) => /^golf/.test(s.key || '')).map((s) => s.key);
       const newGolf = golfKeys.filter((k) => !KNOWN_GOLF.includes(k));
