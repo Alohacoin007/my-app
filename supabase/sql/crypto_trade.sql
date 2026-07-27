@@ -78,7 +78,14 @@ begin
     return jsonb_build_object('ok',false,'error','price unavailable (stale)');
   end if;
 
-  v_mk := least(greatest(coalesce(p_markup,0),0),50);  -- house markup %, cap 50
+  -- 하우스 마크업은 서버가 pricing_marks에서 읽는다 (2026-07-27 전수감사 — 클라 p_markup 무시).
+  -- 종전엔 클라가 수수료율을 보냈다 → 직접 호출 시 0으로 수수료 회피 가능. FX RPC들과 동일 패턴.
+  -- p_markup 파라미터는 하위호환용으로 시그니처에만 남김(무시). 행 없으면 0 = 현행 경제성 유지.
+  begin
+    select greatest(0, least(50, coalesce(markup_pts, 0))) into v_mk
+      from public.pricing_marks where symbol = p_symbol limit 1;
+  exception when others then v_mk := 0; end;
+  v_mk := coalesce(v_mk, 0);
 
   if p_side = 'buy' then
     select coalesce(qty,0) into v_cash from public.crypto_holdings where acct_no = p_acct and asset = 'USDT';

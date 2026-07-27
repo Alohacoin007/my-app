@@ -281,7 +281,10 @@ Deno.serve(async (req) => {
       const meta = (p.meta && typeof p.meta === "object") ? p.meta : {};
       const legs = Array.isArray(meta.legs) ? meta.legs : [];
       if (!legs.length) continue;
-      const stake = +meta.stake || +p.stake || 0;
+      // stake = 서버가 실제 차감한 positions.stake 컬럼만 (2026-07-27 전수감사).
+      // 종전 `+meta.stake || +p.stake`는 클라가 보낸 meta.stake를 우선 신뢰 —
+      // $10 걸고 meta.stake=25000 넣으면 승리 시 25000 기준 지급되는 구멍이었다.
+      const stake = +p.stake || 0;
       let anyLost = false, pending = 0, decMul = 1;
       const legResults: any[] = [];
       for (const l of legs) {
