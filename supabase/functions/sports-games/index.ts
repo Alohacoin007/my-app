@@ -205,11 +205,39 @@ function outrightToCore(ev: any): any[] {
     .slice(0, 60)
     .map((nm) => ({ ln: "", am: best[nm], sel: nm }));
 }
-async function overlayRealOdds(games: any[], SB_URL: string, H: Record<string, string>) {
+// sports_odds 전체 행 1회 로드 — overlay와 배당 지평 계산이 공유 (이중 fetch 금지).
+async function fetchOddsRows(SB_URL: string, H: Record<string, string>): Promise<any[]> {
   try {
     const res = await fetch(`${SB_URL}/rest/v1/sports_odds?select=sport,data,updated_at`, { headers: H });
-    if (!res.ok) return;
-    const rows = await res.json();
+    if (res.ok) return await res.json();
+  } catch (_e) { /* 지평·overlay 없이도 기본 피드는 돈다 */ }
+  return [];
+}
+// ⏱️ 배당 지평 (2026-07-27 사장님 "일관성이 없잖아"): 리그별 경기 목록 창을 "프로바이더가
+// 가격을 낸 가장 먼 경기"까지 자동 확장한다. NFL 개막전이 몇 주 전부터 가격이 나오면 그때부터
+// 목록·베팅 가능, MLB처럼 하루 전에야 나오면 기본 8일 창 — 규칙은 하나: "배당이 있으면 판다".
+// 상한 +60일 (row 비대 방지), 하한 = 기본 8일.
+function oddsHorizons(rows: any[]): Record<string, number> {
+  const hz: Record<string, number> = {};
+  const now = Date.now(), MIN = now + 8 * 86400000, MAX = now + 60 * 86400000;
+  const lgOfKey = (k: string): string | null => {
+    if (k.indexOf("soccer_") === 0) return "SOC";
+    for (const lg of Object.keys(ODDS_SPORT)) if (ODDS_SPORT[lg] === k) return lg;
+    return null;
+  };
+  (rows || []).forEach((row: any) => {
+    const lg = lgOfKey(String(row?.sport || "")); if (!lg) return;
+    (Array.isArray(row.data) ? row.data : []).forEach((e: any) => {
+      const t = Date.parse(e?.commence_time || "");
+      if (!Number.isFinite(t) || t <= now || t > MAX) return;
+      if (!hz[lg] || t > hz[lg]) hz[lg] = t;
+    });
+  });
+  Object.keys(hz).forEach((lg) => { hz[lg] = Math.max(hz[lg], MIN); });
+  return hz;
+}
+async function overlayRealOdds(games: any[], rows: any[]) {
+  try {
     const bySport: Record<string, any[]> = {};
     const byUpd: Record<string, string> = {};
     (rows || []).forEach((row: any) => {
@@ -297,15 +325,65 @@ async function overlayRealOdds(games: any[], SB_URL: string, H: Record<string, s
   } catch (_e) { /* keep ESPN odds if the overlay fails */ }
 }
 
-async function fetchLeague(L: { lg: string; sport: string; path: string }, out: any[]) {
-  // Request a date RANGE (today → +8d) so live_games carries UPCOMING fixtures (e.g.
-  // tomorrow's World Cup match), not only today — ESPN's default scoreboard is today-only.
+// 🧷 STICKY OPEN-BET GAMES (2026-07-27 사장님 지시 "이렇게 되면 안 되잖아"):
+// 열린 베팅이 걸린 "미래" 경기는 ESPN의 기본 창(8일/다음 경기)에서 밀려나도 일정에서
+// 사라지지 않는다 — NFL 개막전(9/10)에 벳을 걸었는데 프리시즌이 다음 경기가 되며 목록에서
+// 증발한 사건. 우선 직전 live_games 행에서 이월(팀 풀네임 유지 → overlay가 실배당 재부착
+// 가능), 거기에도 없으면 베팅 leg 정보로 최소 표시 행을 합성한다(잠금 표시 전용).
+// 이월/합성 행은 배당을 비우고 oddsReal:false로 시작 — 묵은 가격이 살아남지 않는다(오즈
+// 불변식). overlay가 실배당을 찾으면 그때만 다시 열린다. 과거 경기는 제외(정산 엔진 몫).
+async function stickyOpenBetGames(games: any[], SB_URL: string, H: Record<string, string>) {
+  try {
+    const have = new Set(games.map((g: any) => g.gid));
+    const pr = await fetch(`${SB_URL}/rest/v1/positions?server=eq.sports&status=eq.open&select=meta`, { headers: H });
+    if (!pr.ok) return;
+    const pos = await pr.json();
+    const want: Record<string, any> = {};   // gid → 대표 leg (표시 합성용)
+    (pos || []).forEach((p: any) => {
+      const legs = (p.meta && Array.isArray(p.meta.legs)) ? p.meta.legs : [];
+      legs.forEach((l: any) => { if (l && l.gid && !have.has(l.gid) && !want[l.gid]) want[l.gid] = l; });
+    });
+    const gids = Object.keys(want);
+    if (!gids.length) return;
+    // ① 직전 행에서 이월 (팀 이름 온전 → overlay 재부착 가능)
+    let prev: any[] = [];
+    try {
+      const old = await fetch(`${SB_URL}/rest/v1/live_games?select=data&id=eq.all`, { headers: H });
+      if (old.ok) { const rows = await old.json(); prev = (rows?.[0]?.data) || []; }
+    } catch (_e) { /* prev 없이도 ②로 진행 */ }
+    for (const gid of gids) {
+      const l = want[gid];
+      const pg = prev.find((g: any) => g && g.gid === gid);
+      const iso = (pg && pg.iso) || l.kt || "";
+      const t = Date.parse(iso || "");
+      if (!Number.isFinite(t) || t < Date.now()) continue;   // 시작됐거나 시각 미상 → 이월 안 함
+      if (pg) {
+        games.push({ ...pg, live: false, time: fmtTime(iso),
+          ml: [], spread: [], total: [], threeWay: [], outright: [], oddsReal: false });
+      } else {
+        // ② 부트스트랩 합성 — 이미 밀려난 경기 (leg의 "AWAY @ HOME" 문자열로 최소 행)
+        const gm = String(l.gm || l.game || "").split("@").map((x: string) => x.trim());
+        const awayAb = gm[0] || "?", homeAb = gm[1] || "?";
+        games.push({ gid, lg: String(l.lg || gid.split("_")[0] || ""), sport: "",
+          live: false, time: fmtTime(iso), iso,
+          home: { ab: homeAb, nm: homeAb }, away: { ab: awayAb, nm: awayAb },
+          spread: [], total: [], ml: [], threeWay: [], outright: [], oddsReal: false });
+      }
+    }
+  } catch (_e) { /* sticky는 표시 연속성 — 실패해도 본 피드는 그대로 */ }
+}
+
+async function fetchLeague(L: { lg: string; sport: string; path: string }, out: any[], endMs?: number) {
+  // Request a date RANGE (today → +8d, 또는 배당 지평 endMs까지) so live_games carries
+  // UPCOMING fixtures — ESPN's default scoreboard is today-only. 배당 지평(oddsHorizons)이
+  // 더 멀면 거기까지 늘려서 "가격 나온 경기는 전부 목록에" (일관성 규칙, 2026-07-27).
   // BUT if a league has NO games in that window (e.g. an off-season NFL whose next game is
   // weeks out — the +8d range dropped it), fall back to the PLAIN scoreboard so its next
   // scheduled games still show. Order: ranged (+mirror) → plain (+mirror). Never fewer.
   const p2 = (n: number) => String(n).padStart(2, "0");
   const ymd = (x: Date) => "" + x.getUTCFullYear() + p2(x.getUTCMonth() + 1) + p2(x.getUTCDate());
-  const range = ymd(new Date()) + "-" + ymd(new Date(Date.now() + 8 * 86400000));
+  const endTs = Math.max(endMs || 0, Date.now() + 8 * 86400000);
+  const range = ymd(new Date()) + "-" + ymd(new Date(endTs));
   const base = `https://site.api.espn.com/apis/site/v2/sports/${L.path}/scoreboard`;
   const cp = (u: string) => "https://corsproxy.io/?url=" + encodeURIComponent(u);
   const tries = [base + "?dates=" + range, cp(base + "?dates=" + range), base, cp(base)];
@@ -359,12 +437,19 @@ Deno.serve(async (req) => {
   if (!SB_URL || !SB_KEY) return json({ ok: false, error: "Supabase env missing" }, 500);
   const H = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json" };
 
+  // 배당 행 1회 로드 → ① 리그별 목록 지평 계산 ② overlay 재사용
+  const oddsRows = await fetchOddsRows(SB_URL, H);
+  const hz = oddsHorizons(oddsRows);
+
   const games: any[] = [];
-  await Promise.all([...LEAGUES.map((L) => fetchLeague(L, games)), fetchGolf(games)]);
+  await Promise.all([...LEAGUES.map((L) => fetchLeague(L, games, hz[L.lg])), fetchGolf(games)]);
+
+  // 🧷 베팅 걸린 미래 경기 이월 — overlay 전에 넣어야 실배당이 재부착된다.
+  await stickyOpenBetGames(games, SB_URL, H);
 
   // Overlay the REAL odds the app already uses (sports_odds table) so the
   // dashboard's live_games carries the same real moneyline/spread/total.
-  await overlayRealOdds(games, SB_URL, H);
+  await overlayRealOdds(games, oddsRows);
 
   // Upsert the single 'all' row (clients read this).
   const r = await fetch(`${SB_URL}/rest/v1/live_games?on_conflict=id`, {
