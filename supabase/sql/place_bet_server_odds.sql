@@ -35,6 +35,7 @@ declare
   v_combo numeric := 1; v_nlegs int := 0; v_gid0 text; v_all_same boolean := true;
   v_new_legs jsonb := '[]'::jsonb; v_potential numeric;
   v_outright_gids text[] := '{}';   -- ⛳ one winner pick per tournament (industry standard)
+  v_margin numeric := 0;            -- 하우스 마진 (pricing.spread_mult 0~15% — 앱 dec()과 락스텝)
   c_haircut constant numeric := 0.25;
   c_max_liab constant numeric := 25000;   -- max house exposure (payout − stake) per bet
 begin
@@ -57,6 +58,14 @@ begin
   --     sbdesk_set_control / back office; reject here so the halt actually holds.
   if exists (select 1 from controls where key='trading_halt' and val='1') then
     return jsonb_build_object('ok',false,'error','betting is paused'); end if;
+
+  -- 3c) HOUSE MARGIN (2026-07-27): 데스크 마진 노브가 화면에만 적용되고 서버 접수는
+  --     원가로 지급되던 구멍 폐쇄. 앱 dec()와 동일 공식 d' = 1+(d-1)*(1-m) 을 leg별 적용.
+  begin
+    select greatest(0, least(15, coalesce(max(spread_mult), 0))) / 100.0
+      into v_margin from pricing where server = 'sports';
+  exception when others then v_margin := 0; end;
+  v_margin := coalesce(v_margin, 0);
 
   -- 4) RE-PRICE from the server lines (client odds ignored). Fail safe: any leg that
   --    can't be matched to a current server line aborts the whole bet.
@@ -115,10 +124,15 @@ begin
     if v_srv_am is null or v_srv_am = 0 then
       return jsonb_build_object('ok',false,'error','line not offered'); end if;
     v_dec := case when v_srv_am > 0 then 1 + v_srv_am/100.0 else 1 + 100.0/(-v_srv_am) end;
+    v_dec := 1 + (v_dec - 1) * (1 - v_margin);   -- 마진 적용 (앱 dec() 락스텝)
     v_combo := v_combo * v_dec; v_nlegs := v_nlegs + 1;
     if v_gid0 is null then v_gid0 := v_gid; elsif v_gid0 <> v_gid then v_all_same := false; end if;
-    -- stamp SERVER odds into the stored leg (overwrite client am/am0) so settlement is safe
-    v_new_legs := v_new_legs || jsonb_build_array(v_leg || jsonb_build_object('am', v_srv_am, 'am0', v_srv_am));
+    -- stamp SERVER odds AND the server-priced decimal into the stored leg (overwrite client
+    -- am/am0/dec0). ⚠️ dec0 도장이 핵심(2026-07-27 발견): sports-settle의 decOf()는 dec0를
+    -- 우선 신뢰하는데 종전엔 클라이언트가 보낸 dec0가 그대로 저장돼 — 조작 클라가 dec0를
+    -- 부풀리면 정산이 부풀린 배율로 지급하는 구멍이었다. 서버가 덮어쓰면 구조적으로 불가.
+    v_new_legs := v_new_legs || jsonb_build_array(v_leg || jsonb_build_object(
+      'am', v_srv_am, 'am0', v_srv_am, 'dec0', round(v_dec, 6)));
   end loop;
 
   -- SGP correlation haircut when all legs share one game (matches app + settle)
