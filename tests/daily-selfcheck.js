@@ -69,6 +69,21 @@ function oddsStatus(g) {
     flag(!p.ok, `시세(크립토 서버): 신선도 ${p.age.toFixed(1)}s · 4s 내 갱신 ${p.moved ? '확인' : '없음'}` + (!p.ok ? ' — 펌프/크론 확인(재시도 후에도)' : ''));
   } catch (e) { flag(true, '시세 점검 실패: ' + e.message); }
 
+  // ── ③b 주식 시세 라이브니스 (2026-07-27 사장님 지적 "하네스가 못 잡아?" — 크립토만 보던 구멍 폐쇄) ──
+  //     장중(평일 13:35~19:55 UTC, NYSE 09:30~16:00 ET)에만 검사 — 장외 정지는 정상이라 오탐 금지.
+  try {
+    const nowD = new Date(); const dow = nowD.getUTCDay(); const mins = nowD.getUTCHours() * 60 + nowD.getUTCMinutes();
+    const inMarket = dow >= 1 && dow <= 5 && mins >= (13 * 60 + 35) && mins <= (19 * 60 + 55);
+    if (!inMarket) console.log('  ⏭️  주식 시세: 장외 시간 — 검사 생략 (정지가 정상)');
+    else {
+      const r = await fetch(`${URL}/rest/v1/prices?select=symbol,updated_at&symbol=in.(AAPL,NVDA,MSFT)`, { headers: H });
+      const rows = await r.json();
+      const age = Math.min(...rows.map((x) => (Date.now() - Date.parse(x.updated_at)) / 1000));
+      flag(!(rows.length >= 3 && age < 120), `시세(주식 장중): ${rows.length}종 · 최신 ${isFinite(age) ? age.toFixed(0) : '?'}s 전` +
+        ((rows.length >= 3 && age < 120) ? '' : ' — stock-stream/stock-prices 크론 확인'));
+    }
+  } catch (e) { flag(true, '주식 시세 점검 실패: ' + e.message); }
+
   // ── ④ Odds API 쿼터 (2026-07-25 소진 사고의 사전 경보 — 90% 소진 = 🔴, 70% = ⚠️) ──
   try {
     const r = await fetch(`${URL}/rest/v1/api_usage?select=remaining,used,updated_at&provider=eq.odds_api`, { headers: H });
