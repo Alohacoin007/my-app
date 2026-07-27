@@ -28,6 +28,8 @@ function json(body: unknown, status = 200) {
 const LEAGUES = [
   { lg: "NFL", path: "football/nfl" },
   { lg: "NBA", path: "basketball/nba" },
+  // 🎓 NCAAB (2026-07-27) — sports-games와 같은 gid 체계 (NCAAB_<eventId>), NBA와 동일 채점.
+  { lg: "NCAAB", path: "basketball/mens-college-basketball" },
   { lg: "MLB", path: "baseball/mlb" },
   { lg: "NHL", path: "hockey/nhl" },
   // ⚽ Soccer — must mirror the app's LEAGUES (same lg:'SOC' + paths) so the

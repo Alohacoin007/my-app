@@ -21,6 +21,8 @@ function json(body: unknown, status = 200) {
 const LEAGUES = [
   { lg: "NFL", sport: "Football",   path: "football/nfl" },
   { lg: "NBA", sport: "Basketball", path: "basketball/nba" },
+  // 🎓 NCAAB (2026-07-27 서버 이식 — 탭만 있고 피드가 없던 마지막 리그. NBA와 동일 이벤트 구조.)
+  { lg: "NCAAB", sport: "Basketball", path: "basketball/mens-college-basketball" },
   { lg: "MLB", sport: "Baseball",   path: "baseball/mlb" },
   { lg: "NHL", sport: "Hockey",     path: "hockey/nhl" },
   { lg: "SOC", sport: "Soccer",     path: "soccer/eng.1" },
@@ -129,7 +131,7 @@ function fmtTime(iso: string): string {
 // ── Overlay REAL odds from the sports_odds table (already populated by the
 // sports-odds function from The Odds API). No extra Odds API credits — we just
 // read what's stored — so the dashboard shows the SAME real odds as the app.
-const ODDS_SPORT: Record<string, string> = { NFL: "americanfootball_nfl", NBA: "basketball_nba", MLB: "baseball_mlb", NHL: "icehockey_nhl" };
+const ODDS_SPORT: Record<string, string> = { NFL: "americanfootball_nfl", NBA: "basketball_nba", NCAAB: "basketball_ncaab", MLB: "baseball_mlb", NHL: "icehockey_nhl" };
 function nick(name: string): string { return String(name || "").trim().toLowerCase().split(/\s+/).pop() || ""; }
 // Robust team-name match. nick() (last word) breaks on soccer clubs whose feeds differ:
 // ESPN "Vancouver" vs Odds "Vancouver Whitecaps FC" → last words "vancouver" ≠ "fc".
