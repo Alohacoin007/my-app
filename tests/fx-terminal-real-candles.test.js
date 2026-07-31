@@ -162,6 +162,19 @@ const ok = (n, c, d) => { if (c) { pass++; console.log('  ✅ ' + n); } else { f
   });
   ok('stocks/MN: no fetch attempted, synth kept', c5.newReq.length === 0 && c5.aapl === 'synth' && c5.mn === 'synth', JSON.stringify(c5));
 
+  // ── ⑥ 합성 앵커 = 실가 우선 (2026-07-31 SPACEX 가짜절벽): 하드코딩 MW_BASE와 실가가 크게
+  //     다를 때, 합성 이력의 마지막 봉이 실가에 앵커돼야 라이브 틱과 절벽 없이 이어진다.
+  const c6 = await page.evaluate(() => {
+    // 실가(112.23)를 하드코딩 MW_BASE(SPACEX=115.3)와 크게 다르게 주입
+    mwStore.apply([{ symbol: 'SPACEX', mid: 112.23, spr_pts: 0 }]);
+    delete chartSeries['SPACEX|M1'];                  // 새 시드 강제
+    const s = series('SPACEX', 'M1');
+    const lastC = s.c[s.c.length - 1].c;
+    return { base: chBase('SPACEX'), lastC, gap: Math.abs(lastC - 112.23) };
+  });
+  ok('synth anchors to REAL price (no cliff): SPACEX 실가 112.23에 앵커',
+     Math.abs(c6.base - 112.23) < 0.01 && c6.gap < 0.5, JSON.stringify(c6));
+
   await page.close(); await browser.close(); server.close();
   console.log((fail ? '🔴' : '🟢') + ' fx-terminal-real-candles — ' + pass + ' pass, ' + fail + ' fail');
   process.exit(fail ? 1 : 0);

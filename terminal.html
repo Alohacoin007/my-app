@@ -925,7 +925,10 @@ function drawCross(id,e){ const el=document.getElementById('w-'+id); if(!el) ret
     '<line x1="0" y1="'+y.toFixed(1)+'" x2="'+sc.plotW.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="var(--lgd-dim)" stroke-width="1" stroke-dasharray="2 3" opacity=".8"/>'+
     '<rect x="'+sc.plotW.toFixed(1)+'" y="'+(y-8).toFixed(1)+'" width="'+sc.RA+'" height="16" fill="#5b657a"/>'+
     '<text x="'+(sc.W-4)+'" y="'+(y+3.5).toFixed(1)+'" text-anchor="end" fill="#fff" font-size="9.5" font-weight="700" font-family="inherit">'+price.toFixed(dg)+'</text>'; }
-const chBase=sym=>MW_BASE[sym]||CHART_BASE[sym]||(mwStore.rows[sym]&&mwStore.rows[sym].mid)||1;
+/* 차트 앵커가는 실가격(mwStore mid) 우선 — 하드코딩 MW_BASE는 폴백. (2026-07-31 사장님 SPACEX
+   가짜절벽: 실가 112.23인데 합성이 하드코딩 115.3에 앵커돼 마지막 봉이 절벽으로 떨어졌음.
+   합성 이력을 실가에 붙여야 라이브 틱과 매끄럽게 이어진다 — 표시 전용, 돈 무관.) */
+const chBase=sym=>(mwStore.rows[sym]&&+mwStore.rows[sym].mid>0?+mwStore.rows[sym].mid:0)||MW_BASE[sym]||CHART_BASE[sym]||1;
 function seedSeries(sym,tf){ const base=chBase(sym), vol=base*(mwCat(sym)==='Crypto'?0.004:0.0009);
   const n=420, step=TF_MS[tf]||1800e3, now=Date.now(); let px=base*(1+(Math.random()-0.5)*0.006), arr=[];   // 시드 늘림 → 줌아웃 시 볼 히스토리 확보
   for(let i=n;i>=1;i--){ const o=px, c=Math.max(base*0.3, o+(Math.random()-0.5)*vol*2);
