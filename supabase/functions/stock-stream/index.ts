@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
   if (!SB_URL || !SB_KEY) return json({ ok: false, error: "Supabase env missing" }, 500);
 
   const lastWrite: Record<string, number> = {};
-  let wrote = 0, frames = 0;
+  let wrote = 0, frames = 0, logged = 0;   // logged = 진단용 메시지 로깅 카운터(2026-07-31)
 
   const upsert = async (rows: { symbol: string; mid: number; spr_pts: number }[]) => {
     const up = await fetch(`${SB_URL}/rest/v1/prices?on_conflict=symbol`, {
@@ -74,11 +74,15 @@ Deno.serve(async (req) => {
     try {
       ws = new WebSocket(`wss://ws.finnhub.io?token=${KEY}`);
       ws.onopen = () => {
+        console.log("stock-stream: WS OPEN, subscribing " + STOCKS.length + " symbols");   // 진단(2026-07-31)
         for (const s of STOCKS) ws!.send(JSON.stringify({ type: "subscribe", symbol: FINNHUB_TICKER[s] || s }));
       };
       ws.onmessage = (ev) => {
         try {
           const m = JSON.parse(String(ev.data));
+          // 진단(2026-07-31): 첫 5개 메시지 타입을 찍는다 — trade면 정상, error/기타면 원인.
+          //  Finnhub 무료 WS가 trade를 안 주면 여기 trade가 안 뜬다(또는 {"type":"error",...}).
+          if (logged < 6) { logged++; console.log("stock-stream msg: " + String(ev.data).slice(0, 160)); }
           if (m.type !== "trade" || !Array.isArray(m.data)) return;
           frames++;
           const now = Date.now();
@@ -93,7 +97,7 @@ Deno.serve(async (req) => {
           if (rows.length) upsert(rows);
         } catch (_e) { /* junk frame */ }
       };
-      ws.onerror = () => { clearTimeout(timer); done(); };
+      ws.onerror = (e) => { console.log("stock-stream: WS ERROR " + (String((e as any)?.message||e).slice(0,120))); clearTimeout(timer); done(); };   // 진단(2026-07-31)
       ws.onclose = () => { clearTimeout(timer); resolve(); };
     } catch (_e) { clearTimeout(timer); resolve(); }
   });
