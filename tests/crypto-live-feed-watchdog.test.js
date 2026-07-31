@@ -4,7 +4,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const html = fs.readFileSync(path.join(__dirname, '..', 'crypto-live.html'), 'utf8');
+const html = (fs.readFileSync(path.join(__dirname, '..', 'crypto-live.html'), 'utf8') + fs.readFileSync(path.join(__dirname, '..', 'src/crypto-live-app.jsx'), 'utf8'));
 
 let pass = 0, fail = 0;
 const ok = (n, c) => { if (c) { pass++; console.log('  ✅ ' + n); } else { fail++; console.log('  ❌ ' + n); } };

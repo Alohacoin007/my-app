@@ -11,7 +11,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const src = fs.readFileSync(path.join(__dirname, '..', 'trading.html'), 'utf8');
+const src = (fs.readFileSync(path.join(__dirname, '..', 'trading.html'), 'utf8') + fs.readFileSync(path.join(__dirname, '..', 'src/trading-app.jsx'), 'utf8'));
 let fail = 0;
 const bad = (m) => { console.error('🔴 ' + m); fail++; };
 

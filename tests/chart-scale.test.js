@@ -17,7 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const SRC = fs.readFileSync(path.join(__dirname, '..', 'crypto-live.html'), 'utf8');
+const SRC = (fs.readFileSync(path.join(__dirname, '..', 'crypto-live.html'), 'utf8') + fs.readFileSync(path.join(__dirname, '..', 'src/crypto-live-app.jsx'), 'utf8'));
 const m = SRC.match(/function chartYScale\(series, baseline, H, padY\)\s*\{[\s\S]*?\n\}/);
 if (!m) { console.log('  🔴 could not find chartYScale() in crypto-live.html'); process.exit(1); }
 // eslint-disable-next-line no-eval

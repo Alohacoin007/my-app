@@ -10,7 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const src = fs.readFileSync(path.join(__dirname, '..', 'trading.html'), 'utf8');
+const src = (fs.readFileSync(path.join(__dirname, '..', 'trading.html'), 'utf8') + fs.readFileSync(path.join(__dirname, '..', 'src/trading-app.jsx'), 'utf8'));
 
 const fallbacks = [
   [/finalize\([^)]*fillPx/, 'market order finalize(fillPx) fallback'],

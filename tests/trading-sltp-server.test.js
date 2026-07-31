@@ -14,7 +14,7 @@ let pass = 0, fail = 0;
 const ok = (n, c, d) => { if (c) { pass++; console.log('  ✅ ' + n); } else { fail++; console.log('  ❌ ' + n + (d ? '  ' + d : '')); } };
 console.log('trading SL/TP server — 모바일 서버 저장·집행 게이트');
 
-const src = fs.readFileSync(path.join(REPO, 'trading.html'), 'utf8');
+const src = (fs.readFileSync(path.join(REPO, 'trading.html'), 'utf8') + fs.readFileSync(path.join(REPO, 'src/trading-app.jsx'), 'utf8'));
 
 // ① 저장 = fx_modify RPC
 ok('① fxModifyReal = rpc(fx_modify, {p_local_id, p_sl, p_tp})',

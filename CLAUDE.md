@@ -111,7 +111,7 @@
 ## 🚚 배포 / 운영
 - GitHub Pages는 브랜치 `claude/wizardly-ritchie-lsRnz`에서 서빙 (CNAME alpexa-sports.com). **푸시는 이 브랜치에만.**
 - 캐시: `Ctrl+Shift+R` 또는 `?v=N`. 빠른 연속 푸시는 Pages 빌드를 취소시킴.
-- Crypto/FX = React + in-browser Babel(JSX). Sports/site = vanilla JS.
+- Crypto/FX(모바일) = React + **사전 컴파일 JSX** (2026-07-31 P1: 인브라우저 Babel 3MB 제거). **편집은 `src/crypto-live-app.jsx`·`src/trading-app.jsx`에서** → `node tools/precompile-jsx.js` → 커밋 (신선도는 `precompiled-fresh.test.js`가 verify 게이트로 강제 — HTML의 JSX 블록 부활·CDN 복귀도 차단). webtrade/terminal(PC)·Sports/site = vanilla JS (인라인 그대로).
 - SQL / Edge 배포는 **사용자가** 실행 (Claude은 못 함). Claude은 검토된 SQL을 제공.
 - 시간대는 **라스베가스/PDT** 기준 (UTC 아님).
 - 모델 식별자를 커밋·코드·PR에 절대 넣지 않는다.

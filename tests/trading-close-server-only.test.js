@@ -13,7 +13,7 @@ let pass = 0, fail = 0;
 const ok = (n, c, d) => { if (c) { pass++; console.log('  ✅ ' + n); } else { fail++; console.log('  ❌ ' + n + (d ? '  ' + d : '')); } };
 console.log('trading close server-only — 클라 청산 잔재 폐쇄 게이트');
 
-const src = fs.readFileSync(path.join(REPO, 'trading.html'), 'utf8');
+const src = (fs.readFileSync(path.join(REPO, 'trading.html'), 'utf8') + fs.readFileSync(path.join(REPO, 'src/trading-app.jsx'), 'utf8'));
 
 // ① 클라 정산 폴백 제거
 ok('① settlements 클라 insert 0건', !/from\(\s*['"]settlements['"]\s*\)\s*\.\s*insert/.test(src));

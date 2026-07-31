@@ -8,7 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const src = fs.readFileSync(path.join(__dirname, '..', 'crypto-live.html'), 'utf8');
+const src = (fs.readFileSync(path.join(__dirname, '..', 'crypto-live.html'), 'utf8') + fs.readFileSync(path.join(__dirname, '..', 'src/crypto-live-app.jsx'), 'utf8'));
 const m = src.match(/const SEND_ASSETS\s*=\s*\{[\s\S]*?\n\};/);
 if (!m) { console.error('🔴 FAIL: SEND_ASSETS block not found in crypto-live.html'); process.exit(1); }
 

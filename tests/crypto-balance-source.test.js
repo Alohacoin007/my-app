@@ -11,7 +11,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const src = fs.readFileSync(path.join(__dirname, '..', 'crypto-live.html'), 'utf8');
+const src = (fs.readFileSync(path.join(__dirname, '..', 'crypto-live.html'), 'utf8') + fs.readFileSync(path.join(__dirname, '..', 'src/crypto-live-app.jsx'), 'utf8'));
 
 // Locate the Account-page balance region: effBalances {...} through baseTotal's memo end.
 const i = src.indexOf('const effBalances');
