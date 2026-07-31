@@ -81,6 +81,16 @@ function oddsStatus(g) {
       const age = Math.min(...rows.map((x) => (Date.now() - Date.parse(x.updated_at)) / 1000));
       flag(!(rows.length >= 3 && age < 120), `시세(주식 장중): ${rows.length}종 · 최신 ${isFinite(age) ? age.toFixed(0) : '?'}s 전` +
         ((rows.length >= 3 && age < 120) ? '' : ' — stock-stream/stock-prices 크론 확인'));
+      // WS 폴백 퇴행 감지 (2026-07-31: stock-stream WS가 9일간 죽어 1분 폴백만 돌았는데 120s
+      // 기준을 통과해 못 잡았음). WS 정상 = AAPL이 장중 수 초마다 갱신 → 20초 뒤에도 같은
+      // updated_at이면 폴백-온리 의심. 경고만(폴백은 설계된 안전망 — 빨강 아님).
+      if (rows.length >= 3 && age < 120) {
+        const t0 = (rows.find((x) => x.symbol === 'AAPL') || {}).updated_at;
+        await new Promise((res) => setTimeout(res, 20000));
+        const r2 = await fetch(`${URL}/rest/v1/prices?select=updated_at&symbol=eq.AAPL`, { headers: H });
+        const t1 = ((await r2.json())[0] || {}).updated_at;
+        if (t0 && t1 && t0 === t1) console.log('  ⚠️  주식 WS 펌프 퇴행 의심 — AAPL 20초간 무갱신 (1분 폴백만 동작?). stock-stream 재배포 검토');
+      }
     }
   } catch (e) { flag(true, '주식 시세 점검 실패: ' + e.message); }
 
