@@ -98,5 +98,8 @@ Deno.serve(async (req) => {
     } catch (_e) { clearTimeout(timer); resolve(); }
   });
 
+  // 진단 로그 (2026-07-31 사장님 "주식 안 움직임") — Logs 탭에서 frames/wrote 실측.
+  // frames=0 → Finnhub 무료 WS가 trade 메시지를 안 줌(플랜 변경). frames>0인데 wrote 적으면 다른 원인.
+  console.log(`stock-stream done — frames:${frames} wrote:${wrote}`);
   return json({ ok: true, frames, wrote });
 });
