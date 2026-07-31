@@ -18,9 +18,18 @@ const bad = (m) => { console.error('🔴 ' + m); fail++; };
 // ① 금액 상한
 const buy = src.match(/const BUY_USD = (\d+(?:\.\d+)?)/);
 const lot = src.match(/const FX_SIZE = (\d+(?:\.\d+)?)/);
+const stk = src.match(/const BET_STAKE = (\d+(?:\.\d+)?)/);
 if (!buy || +buy[1] > 5) bad('BUY_USD must be ≤ 5 (bot must only touch micro amounts)');
 if (!lot || +lot[1] > 0.01) bad('FX_SIZE must be ≤ 0.01 lot');
+if (!stk || +stk[1] > 2) bad('BET_STAKE must be ≤ 2 (daily real bet stays micro)');
 if (!/MAX_ROUNDTRIP_COST = 1(\.0)?/.test(src)) bad('round-trip cost ceiling ($1) must stay pinned');
+
+// ①b 매도 안전장치 — 봇은 "산 만큼만" 판다 (사장님 공용 계정: 기존 보유 불가침, 2026-07-31 지시)
+if (!/have0 <= 0\s*\?[\s\S]*?p_all: true/.test(src)) bad('p_all sell is allowed ONLY when pre-run holdings were 0');
+if (!/boughtQty \* \(\+b1\.body\.price \|\| 0\) \* 0\.995/.test(src)) bad('with pre-existing holdings the bot must sell only the bought qty');
+
+// ①c 스포츠 정산 감시 — 어제 베팅이 36h+ 열려있으면 정산 파이프 막힘 = 🔴
+if (!/36 \* 3600e3/.test(src) || !/정산 파이프 의심/.test(src)) bad('stale synbet (>36h open) must RED as a settlement-pipe alarm');
 
 // ② 시크릿 하드코딩 금지
 if (/service_role|sb_secret/i.test(src)) bad('bot must never contain service_role/sb_secret material');
