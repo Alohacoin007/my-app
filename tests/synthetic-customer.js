@@ -172,12 +172,20 @@ const rest = async (path) => (await fetch(`${URL}/rest/v1/${path}`, { headers: h
     const own = new Set(['crypto', 'fx', 'sports'].map((s) => A[s].acct_no));
     const led = (await rest(`ledger?select=acct_no,amount,ref&created_at=gte.${encodeURIComponent(runStart)}`))
       .filter((x) => own.has(x.acct_no));   // 어드민 RLS로 남의 행도 오므로 내 계정만
+    // FX 실현손익은 설계상 ledger가 아니라 settlements로 기장 (fx_close 주석: ledger에 쓰면
+    // 이중계산 — trg_settlement_balance가 잔고 반영). 2차 실행 오탐 교훈: 불변식의 우변은
+    // Σledger + Σsettlements.pnl 이어야 한다.
+    const setl = (await rest(`settlements?select=acct_no,pnl&created_at=gte.${encodeURIComponent(runStart)}`))
+      .filter((x) => own.has(x.acct_no));
     let tradeCost = 0;
     for (const s of ['crypto', 'fx', 'sports']) {
       const d = Math.round(((+A1[s].balance) - bal0[s]) * 100) / 100;
-      const sum = Math.round(led.filter((x) => x.acct_no === A[s].acct_no).reduce((a, x) => a + (+x.amount || 0), 0) * 100) / 100;
-      if (Math.abs(d - sum) < 0.005) ok(`불변식(${s}): Δ잔고 ${d >= 0 ? '+' : ''}$${d} == Σledger ${sum >= 0 ? '+' : ''}$${sum}`);
-      else bad(`🚨 불변식 위반(${s}): Δ잔고 $${d} ≠ Σledger $${sum} — 원장 밖에서 돈이 움직임!`);
+      const sum = Math.round((
+        led.filter((x) => x.acct_no === A[s].acct_no).reduce((a, x) => a + (+x.amount || 0), 0) +
+        setl.filter((x) => x.acct_no === A[s].acct_no).reduce((a, x) => a + (+x.pnl || 0), 0)
+      ) * 100) / 100;
+      if (Math.abs(d - sum) < 0.005) ok(`불변식(${s}): Δ잔고 ${d >= 0 ? '+' : ''}$${d} == Σ(ledger+settlements) ${sum >= 0 ? '+' : ''}$${sum}`);
+      else bad(`🚨 불변식 위반(${s}): Δ잔고 $${d} ≠ Σ(ledger+settlements) $${sum} — 원장 밖에서 돈이 움직임!`);
       if (s !== 'sports') tradeCost += -d;   // 스포츠 stake는 비용 아님(열린 베팅 자산) — 정산은 ②a가 감시
     }
     if (tradeCost > MAX_ROUNDTRIP_COST) bad(`왕복 비용(크립토+FX) $${tradeCost.toFixed(2)} > $${MAX_ROUNDTRIP_COST} — 스프레드 이상 또는 누수`);
