@@ -151,12 +151,19 @@ const STUB = (rpcMode) => `(() => {
     const sc = chartScale[window.__cid];
     const line = sc.tradeLines.find(t => t.kind === 'entry');
     const box = document.querySelector('#w-' + window.__cid + ' .cgwplot').getBoundingClientRect();
-    return line ? { x: box.x + sc.plotW * 0.5, y: box.y + line.y, entry: line.entry } : null;
+    if (!line) return null;
+    // SL/TP 분류는 진입가가 아니라 "현재 mid" 기준(2026-07-31 MT5 정통 수정) — 시뮬 mid가
+    // 진입가 아래면 진입가-40px 드롭이 TP로 분류돼 플래키였다. 드롭 지점을 mid·진입가
+    // "둘 다"보다 확실히 아래(price→y 선형 환산 +40px)로 계산해 결정적으로 만든다.
+    const mid = (typeof mwStore !== 'undefined' && mwStore.rows && mwStore.rows.EURUSD && +mwStore.rows.EURUSD.mid > 0) ? +mwStore.rows.EURUSD.mid : line.entry;
+    const pxPer = box.height / (sc.mx - sc.mn);                        // 세로 px / 가격
+    const midY = line.y + (line.entry - mid) * pxPer;                  // mid의 화면 y (진입선 기준 상대)
+    return { x: box.x + sc.plotW * 0.5, y: box.y + line.y, dropY: box.y + Math.max(line.y, midY) + 40, entry: line.entry };
   });
   ok('entry trade-line is hit-registered on chart', !!dragGeo, JSON.stringify(dragGeo));
   if (dragGeo) {
     await page.mouse.move(dragGeo.x, dragGeo.y); await page.mouse.down();
-    await page.mouse.move(dragGeo.x, dragGeo.y + 40, { steps: 6 });   // 아래로 = 롱 SL
+    await page.mouse.move(dragGeo.x, dragGeo.dropY, { steps: 6 });   // mid·진입가 둘 다의 아래 = 롱 SL 확정
     const preview = await page.evaluate(() => document.querySelector('#w-' + window.__cid + ' .cgsvg').innerHTML.includes('SL '));
     await page.mouse.up(); await page.waitForTimeout(250);
     const mod2 = await page.evaluate(() => window.__rpcLog.find(x => x.fn === 'fx_modify'));
