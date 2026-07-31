@@ -1100,7 +1100,11 @@ function renderChart(id){ const el=document.getElementById('w-'+id); if(!el) ret
     chartScale[id].tradeLines=TL;
     if(sltpDrag&&sltpDrag.id===id&&sltpDrag.price!=null){   // 드래그 프리뷰
       const py=yOf(Math.max(mn,Math.min(mx,sltpDrag.price)));
-      const isSL=sltpDrag.side==='buy' ? sltpDrag.price<sltpDrag.entry : sltpDrag.price>sltpDrag.entry;
+      /* SL/TP 판별 = 잡은 라인 종류 우선(기존 SL/TP 라인은 그대로 유지), entry 라인으로 새로
+         만들 땐 현재 시장가 기준(2026-07-31 사장님 "가까운 SL 안 걸림": 수익 중 BUY는 현재가가
+         진입가 위라 진입가 기준이면 profit-lock SL이 TP로 오판됐음 — MT5는 현재가 기준). */
+      const drMid=(mwStore.rows[sym]&&+mwStore.rows[sym].mid>0)?+mwStore.rows[sym].mid:sltpDrag.entry;
+      const isSL=sltpDrag.kind==='sl'?true:sltpDrag.kind==='tp'?false:(sltpDrag.side==='buy'?sltpDrag.price<drMid:sltpDrag.price>drMid);
       const pc=isSL?'#B57BFF':'#2E90FA', plab=(isSL?'SL ':'TP ')+sltpDrag.price.toFixed(dg);
       out+='<line x1="0" y1="'+py.toFixed(1)+'" x2="'+plotW.toFixed(1)+'" y2="'+py.toFixed(1)+'" stroke="'+pc+'" stroke-width="1.2" stroke-dasharray="5 3"/>'+
         '<rect x="4" y="'+(py-16).toFixed(1)+'" width="'+(plab.length*6+10)+'" height="13" rx="2" fill="'+pc+'"/>'+
@@ -1860,7 +1864,9 @@ function commitSltpDrag(){ const d=sltpDrag; sltpDrag=null; if(!d) return;
   let sl=d.sl||0, tp=d.tp||0;
   if(d.kind==='sl') sl=d.price;
   else if(d.kind==='tp') tp=d.price;
-  else { const isSL=d.side==='buy' ? d.price<d.entry : d.price>d.entry; if(isSL) sl=d.price; else tp=d.price; }
+  else { /* entry 라인으로 새 레벨 생성 = 현재 시장가 기준 (프리뷰와 락스텝, 2026-07-31 profit-lock SL) */
+    const cm=(mwStore.rows[(layout[d.id]&&layout[d.id].sym)]&&+mwStore.rows[layout[d.id].sym].mid>0)?+mwStore.rows[layout[d.id].sym].mid:d.entry;
+    const isSL=d.side==='buy' ? d.price<cm : d.price>cm; if(isSL) sl=d.price; else tp=d.price; }
   if(d.real) fxModifyReal(d.ticket, sl, tp);
   else modifyPosDemo(d.ticket, sl, tp);
   renderChart(d.id); }

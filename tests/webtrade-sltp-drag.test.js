@@ -27,9 +27,11 @@ if (!/if\(t0&&t0!=='arrow'\) return;/.test(src)) bad('drag must yield to active 
 if (!/if\(!el\|\|WT_DEMO\) return;/.test(src)) bad('drag disabled in WT_DEMO (real positions only)');
 if (!/\[\['entry',\+p\.open_price\],\['sl',meta\.sl!=null\?\+meta\.sl:null\],\['tp',meta\.tp!=null\?\+meta\.tp:null\]\]/.test(src)) bad('hitTest must cover entry + existing sl/tp lines');
 
-// ③ 방향 판정 — 터미널과 자구 동일 의미
-if (!/d\.kind!=='entry' \? d\.kind : \(\(side==='BUY'\)===\(px<entry\)\?'sl':'tp'\)/.test(src)) bad("direction rule must mirror terminal (BUY: below entry=SL, above=TP; SELL inverted; dragging an sl/tp line keeps its kind)");
-if (!/const isSL=d\.side==='buy' \? d\.price<d\.entry : d\.price>d\.entry/.test(term)) bad('terminal reference rule missing/changed — keep both sides in lockstep');
+// ③ 방향 판정 — 현재 시장가 기준(2026-07-31 profit-lock SL 수정), 기존 sl/tp 라인은 종류 유지, 터미널 락스텝
+if (!/d\.kind!=='entry' \? d\.kind : \(\(side==='BUY'\)===\(px<cm\)\?'sl':'tp'\)/.test(src)) bad("direction rule = CURRENT market price (BUY: below mkt=SL, above=TP; SELL inverted; dragging an sl/tp line keeps its kind)");
+if (!/const cm=\(priceStore\.get\(symbol\)&&\+priceStore\.get\(symbol\)\.mid>0\)\?\+priceStore\.get\(symbol\)\.mid:entry;/.test(src)) bad('webtrade must classify new level by current mid, not entry (profit-lock SL)');
+if (!/const isSL=d\.side==='buy' \? d\.price<cm : d\.price>cm;/.test(term)) bad('terminal reference rule = current mid (cm), keep both sides in lockstep');
+if (!/const drMid=\(mwStore\.rows\[sym\]&&\+mwStore\.rows\[sym\]\.mid>0\)\?\+mwStore\.rows\[sym\]\.mid:sltpDrag\.entry;/.test(term)) bad('terminal preview must classify by current mid (drMid)');
 
 // ④ 커밋
 if (!/rpc\('fx_modify',\{ p_local_id:d\.p\.local_id, p_sl:sl, p_tp:tp \}\)/.test(src)) bad('commit must call fx_modify with both levels');

@@ -2189,7 +2189,11 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     const onMove=(e)=>{ const d=drag.cur; if(!d) return;
       const r=el.getBoundingClientRect(); const px=y2p(e.clientY-r.top); if(!(px>0)) return;
       const side=sideUp(d.p.side), entry=+d.p.open_price;
-      d.eff = d.kind!=='entry' ? d.kind : ((side==='BUY')===(px<entry)?'sl':'tp');
+      /* 새 레벨(entry 라인) 판별 = 현재 시장가 기준 (2026-07-31 사장님 "가까운 SL 안 걸림":
+         수익 중 BUY는 현재가가 진입가 위 → 진입가 기준이면 profit-lock SL이 TP로 오판. MT5는 현재가 기준).
+         기존 sl/tp 라인을 잡았으면 그 종류 유지. terminal.html과 락스텝. */
+      const cm=(priceStore.get(symbol)&&+priceStore.get(symbol).mid>0)?+priceStore.get(symbol).mid:entry;
+      d.eff = d.kind!=='entry' ? d.kind : ((side==='BUY')===(px<cm)?'sl':'tp');
       d.price=px;
       clearPreview();
       try{ preview=series.current.createPriceLine({ price:px, color:d.eff==='sl'?'#ff2020':'#00c800',
