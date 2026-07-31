@@ -1,0 +1,31 @@
+# ALPEXA — 합성 고객 봇 (행동 계층 일일 리허설, 2026-07-31)
+#
+# 매일 1회, 봇 전용 계정으로 실제 고객 행동(로그인→크립토 $2 왕복→FX 0.01랏 왕복)을
+# 재현하고 Δ잔고==Σledger 원장 정합까지 대조한다. 데이터 감시(hourly-selfcheck·uptime)가
+# 못 보는 "버튼은 있는데 죽었다 / 체결은 되는데 잔고가 어긋난다"를 잡는 층.
+#
+# 침묵 게이트: 성공 시 조용, 실패 시에만 GitHub 실패 이메일 (daily-sports-check와 동일).
+# 시크릿: SYNTH_EMAIL / SYNTH_PASSWORD (봇 계정 자격증명 — 미설정이면 조용히 생략).
+# 스크립트는 서빙 브랜치에 있음 → ref 체크아웃 (hourly-selfcheck와 동일 패턴).
+name: Synthetic Customer Bot
+on:
+  schedule:
+    - cron: '10 14 * * *'   # 매일 14:10 UTC = 베가스 7:10 AM (평일 FX 장중 — 주말은 봇이 FX만 자동 스킵)
+  workflow_dispatch: {}
+
+jobs:
+  rehearse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/wizardly-ritchie-lsRnz
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run synthetic customer rehearsal
+        env:
+          SYNTH_EMAIL: ${{ secrets.SYNTH_EMAIL }}
+          SYNTH_PASSWORD: ${{ secrets.SYNTH_PASSWORD }}
+        run: node tests/synthetic-customer.js
