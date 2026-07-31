@@ -59,7 +59,14 @@ const rest = async (path) => (await fetch(`${URL}/rest/v1/${path}`, { headers: h
   TOKEN = auj.access_token;
   ok('로그인 성공');
 
-  const accts = await rest('accounts?select=acct_no,server,balance');
+  // ⚠️ 사장님 계정은 어드민 — RLS가 전 고객 행을 돌려주므로 반드시 "내 player"로 필터.
+  //    (1차 실행 실패 원인: 필터 없이 A[server]가 남의 계정을 집어 "not your account")
+  const uid = (auj.user || {}).id;
+  const players = await rest(`players?select=id,cust_id&auth_id=eq.${uid}`);
+  if (!Array.isArray(players) || !players.length) { bad('players 조회 실패: ' + JSON.stringify(players).slice(0, 120)); process.exit(1); }
+  const pids = players.map((p) => p.id).join(',');
+  const custs = players.map((p) => p.cust_id);
+  const accts = await rest(`accounts?select=acct_no,server,balance&player_id=in.(${pids})`);
   const A = {}; for (const a of accts) A[a.server] = a;
   for (const s of ['sports', 'crypto', 'fx']) if (!A[s]) bad(`${s} 계정 없음`);
   if (red) { console.log('\n🔴 봇: 계정 구성부터 실패'); process.exit(1); }
@@ -76,10 +83,14 @@ const rest = async (path) => (await fetch(`${URL}/rest/v1/${path}`, { headers: h
   let betPlaced = false;
   try {
     // ②a 어제까지의 synbet- 이 아직 열려있으면 정산 파이프가 막힌 것 (경기 종료+정산크론 시간 고려 36h)
-    const openBets = await rest(`positions?select=local_id,created_at,stake&server=eq.sports&local_id=like.synbet-%25`);
-    const stale = (openBets || []).filter((p) => Date.now() - Date.parse(p.created_at) > 36 * 3600e3);
-    if (stale.length) bad(`🚨 정산 파이프 의심: synbet ${stale.length}건이 36h+ 미정산 (${stale.map((p) => p.local_id).join(',')})`);
-    else ok(`이전 synbet 정산 상태 정상 (미정산 ${openBets.length}건, 전부 36h 이내)`);
+    //    나이는 local_id의 synbet-<ts> 타임스탬프로 계산 (스키마 컬럼 의존 0 — 1차 실행 실패 교훈)
+    const openBets = await rest(`positions?select=local_id,status&server=eq.sports&status=eq.open&cust_id=in.(${custs.map((c) => '"' + c + '"').join(',')})&local_id=like.synbet-%25`);
+    if (!Array.isArray(openBets)) bad('synbet 조회 실패: ' + JSON.stringify(openBets).slice(0, 120));
+    else {
+      const stale = openBets.filter((p) => { const t = +String(p.local_id).replace('synbet-', ''); return t > 0 && Date.now() - t > 36 * 3600e3; });
+      if (stale.length) bad(`🚨 정산 파이프 의심: synbet ${stale.length}건이 36h+ 미정산 (${stale.map((p) => p.local_id).join(',')})`);
+      else ok(`이전 synbet 정산 상태 정상 (미정산 ${openBets.length}건, 전부 36h 이내)`);
+    }
 
     // ②b 오늘 실배당 경기에 $1 실베팅 — 서버가 재가격·마진·게이트 전부 태우는 실경로
     const lg = await rest('live_games?id=eq.all&select=data');
@@ -126,13 +137,13 @@ const rest = async (path) => (await fetch(`${URL}/rest/v1/${path}`, { headers: h
   // ── ④ FX 왕복 (주말 = 정상 스킵) ──
   try {
     const lid = `synth-${ts}-fx`;
-    const o = await rpc('fx_open', { p_local_id: lid, p_symbol: 'eurusd', p_side: 'BUY', p_size: FX_SIZE });
+    const o = await rpc('fx_open', { p_local_id: lid, p_symbol: 'EURUSD', p_side: 'BUY', p_size: FX_SIZE });
     if (o.body && o.body.ok !== true && o.body.code === 'MARKET_CLOSED') skip('FX 장 닫힘(주말) — FX 왕복 생략');
     else if (!o.body || o.body.ok !== true) bad('FX 오픈 실패: ' + (o.raw || '').slice(0, 140));
     else {
       const c = await rpc('fx_close', { p_local_id: lid });
       if (!c.body || c.body.ok !== true) bad(`FX 클로즈 실패 (포지션 ${lid} 열려있을 수 있음 — 확인 필요!): ` + (c.raw || '').slice(0, 140));
-      else ok(`FX 왕복 eurusd ${FX_SIZE}랏 — 실현손익 $${(+c.body.pnl || 0).toFixed(2)}`);
+      else ok(`FX 왕복 EURUSD ${FX_SIZE}랏 — 실현손익 $${(+c.body.pnl || 0).toFixed(2)}`);
     }
   } catch (e) { bad('FX 왕복 예외: ' + e.message); }
 
@@ -156,9 +167,11 @@ const rest = async (path) => (await fetch(`${URL}/rest/v1/${path}`, { headers: h
   // ── ⑦ 불변식 대조: Δ잔고 == Σ(런 중 새 ledger) — 센트 정확 일치 ──
   try {
     await new Promise((r) => setTimeout(r, 1500));   // 트리거 커밋 여유
-    const accts1 = await rest('accounts?select=acct_no,server,balance');
+    const accts1 = await rest(`accounts?select=acct_no,server,balance&player_id=in.(${pids})`);
     const A1 = {}; for (const a of accts1) A1[a.server] = a;
-    const led = await rest(`ledger?select=acct_no,amount,ref&created_at=gte.${encodeURIComponent(runStart)}`);
+    const own = new Set(['crypto', 'fx', 'sports'].map((s) => A[s].acct_no));
+    const led = (await rest(`ledger?select=acct_no,amount,ref&created_at=gte.${encodeURIComponent(runStart)}`))
+      .filter((x) => own.has(x.acct_no));   // 어드민 RLS로 남의 행도 오므로 내 계정만
     let tradeCost = 0;
     for (const s of ['crypto', 'fx', 'sports']) {
       const d = Math.round(((+A1[s].balance) - bal0[s]) * 100) / 100;
