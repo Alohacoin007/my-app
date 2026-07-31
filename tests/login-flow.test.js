@@ -64,6 +64,7 @@ const initStub = badPw => ({
 
   // ── 해피패스 + dest2 라우팅 ──
   let page = await browser.newPage({ viewport: { width: 500, height: 900 } });
+  await page.route('**/vendor/supabase.min.js*', (r) => r.abort());   // 셀프호스팅 실라이브 차단 → 스텁 유지 (P1 CDN 제거 대응)
   const errs = []; page.on('pageerror', e => errs.push(e.message));
   await page.addInitScript(new Function('return ' + initStub().fn)());
   await page.goto(`http://localhost:${PORT}/login.html`, { waitUntil: 'domcontentloaded' });
@@ -83,6 +84,7 @@ const initStub = badPw => ({
 
   // ── 실패패스: 잘못된 암호 → 에러바 + 버튼 복구 (무한 스피너 금지) ──
   page = await browser.newPage({ viewport: { width: 500, height: 900 } });
+  await page.route('**/vendor/supabase.min.js*', (r) => r.abort());   // 셀프호스팅 실라이브 차단 → 스텁 유지 (P1 CDN 제거 대응)
   await page.addInitScript(new Function('return ' + initStub().fn)());
   await page.goto(`http://localhost:${PORT}/login.html`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(300);

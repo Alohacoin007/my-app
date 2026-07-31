@@ -394,3 +394,34 @@ window.AlpexaSync = (function () {
            loadUserData: loadUserData, saveUserData: saveUserData,
            assertIdentity: assertIdentity, startIdleLogout: startIdleLogout };
 })();
+
+/* ⚡ RUM — 고객 체감속도 실측 비콘 (P2 관측성, 2026-07-31 로빈후드-초월 로드맵).
+   보내는 것: 페이지명·로딩 밀리초·모바일 여부 뿐 (익명, 개인정보·계정정보 0).
+   rum 테이블은 anon INSERT 전용(원시행 SELECT 불가), 읽기는 집계 뷰 rum_stats만.
+   헤드리스 테스트(webdriver)·로컬 파일은 제외 — 실고객 수치만 쌓인다. */
+(function () {
+  try {
+    if (navigator.webdriver || location.protocol === 'file:') return;
+    var RUM_URL = 'https://grxnbgtfnaayeluenvqh.supabase.co/rest/v1/rum?apikey=sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu';
+    var t0 = Date.now(), sent = false;
+    var page = (location.pathname.split('/').pop() || 'index.html').slice(0, 40);
+    function send(appMs) {
+      if (sent) return; sent = true;
+      try {
+        var nav = (performance.getEntriesByType && performance.getEntriesByType('navigation')[0]) || {};
+        var body = JSON.stringify({ page: page, dcl: Math.round(nav.domContentLoadedEventEnd || 0),
+          load_ms: Math.round(nav.loadEventEnd || 0), app_ms: appMs == null ? null : Math.round(appMs),
+          mobile: /Mobi|Android/i.test(navigator.userAgent) });
+        if (!(navigator.sendBeacon && navigator.sendBeacon(RUM_URL, new Blob([body], { type: 'application/json' }))))
+          fetch(RUM_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }).catch(function () {});
+      } catch (_e) { /* 관측은 앱을 절대 방해하지 않는다 */ }
+    }
+    // React 앱(#root)은 "화면에 내용이 뜬 순간"까지, 바닐라는 load 후 — 15s 상한
+    var iv = setInterval(function () {
+      var r = document.getElementById('root');
+      if (r && r.innerHTML.length > 3000) { clearInterval(iv); send(Date.now() - t0); }
+      else if (!r && document.readyState === 'complete') { clearInterval(iv); send(null); }
+    }, 250);
+    setTimeout(function () { clearInterval(iv); send(null); }, 15000);
+  } catch (_e) { /* no-op */ }
+})();

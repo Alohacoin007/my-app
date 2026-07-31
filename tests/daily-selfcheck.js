@@ -108,6 +108,21 @@ function oddsStatus(g) {
     }
   } catch (e) { flag(true, '배당 쿼터 점검 실패: ' + e.message); }
 
+  // ── ⑤ 고객 체감속도 (RUM p95 — P2 관측성. 뷰 미배포면 조용히 생략) ──
+  try {
+    const r = await fetch(`${URL}/rest/v1/rum_stats?select=page,n,p95_app&order=n.desc&limit=5`, { headers: H });
+    if (!r.ok) console.log('  ⏭️  체감속도(RUM): rum_stats 뷰 미배포 — SQL 실행 대기');
+    else {
+      const rows = await r.json();
+      if (!rows.length) console.log('  ⏭️  체감속도(RUM): 아직 수집 데이터 없음');
+      else {
+        const slow = rows.filter((x) => +x.p95_app > 4000);
+        flag(slow.length > 0, '체감속도 p95: ' + rows.map((x) => `${String(x.page).replace('.html', '')} ${x.p95_app ? (x.p95_app / 1000).toFixed(1) + 's' : '—'}(${x.n})`).join(' · ') +
+          (slow.length ? ' — 4s 초과 페이지 있음! 퇴행 추적' : ''));
+      }
+    }
+  } catch (e) { console.log('  ⏭️  체감속도(RUM) 점검 생략: ' + e.message); }
+
   console.log(red ? `\n🔴 자가검진: ${red}건 이상 — 원인 추적 후 보고할 것` : '\n🟢 자가검진 전부 정상');
   process.exit(red ? 1 : 0);
 })().catch(e => { console.error('🔴 자가검진 크래시: ' + e.message); process.exit(1); });
