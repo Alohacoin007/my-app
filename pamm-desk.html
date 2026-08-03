@@ -91,7 +91,7 @@ td{padding:4px 6px;border-bottom:1px solid rgba(29,33,42,.55);white-space:nowrap
 <div class="hdr">
   <div class="mark">A</div><span class="hname">PAMM Desk</span>
   <span class="htag">FUND OPS · v1</span>
-  <select class="hsel" id="fundSel" title="펀드 선택"></select>
+  <select class="hsel" id="fundSel" title="Select fund"></select>
   <span class="hsp"></span>
   <span class="hdot" id="feedDot" title="data feed"></span>
   <span class="hmail" id="whoami"></span>
@@ -103,13 +103,13 @@ td{padding:4px 6px;border-bottom:1px solid rgba(29,33,42,.55);white-space:nowrap
 
 <div id="opModal"><div class="opbox">
   <h3 id="opTitle"></h3><div class="opb" id="opBody"></div>
-  <div class="opr"><button class="cancel" id="opNo">취소</button><button class="go" id="opYes">실행</button></div>
+  <div class="opr"><button class="cancel" id="opNo">Cancel</button><button class="go" id="opYes">Confirm</button></div>
 </div></div>
 
 <div id="gate">
   <div class="gbox">
     <h2>💼 PAMM Desk</h2>
-    <p>펀드 매니저 또는 어드민 계정으로 로그인</p>
+    <p>Sign in as fund manager or admin</p>
     <input id="gEmail" type="email" placeholder="Email" autocomplete="username">
     <input id="gPass" type="password" placeholder="Password" autocomplete="current-password">
     <button class="gbtn" id="gGo">Sign in</button>
@@ -133,12 +133,12 @@ const ago=ts=>{const s=Math.max(0,(Date.now()-new Date(ts).getTime())/1000);
 /* ════════ 위젯 그리드 엔진 (sportsbook-desk 이식 — 12컬럼 · 드래그/리사이즈 · 레이아웃 저장) ════════ */
 const COLS=12, RH=30, GAP=8, LKEY='alpexa.pammdesk.layout.v1';   // UI 설정 — 돈 아님, 로컬 OK
 const WIDGETS=[
-  {id:'kpi',    t:'📊 펀드 전광판', d:'순자산·NAV·수익률',        x:0,y:0, w:12,h:4},
-  {id:'roster', t:'👥 투자자',      d:'지분·원금·손익',            x:0,y:4, w:7, h:10},
-  {id:'nav',    t:'📈 NAV 곡선',    d:'1유닛 가치 추이',           x:7,y:4, w:5, h:10},
-  {id:'ops',    t:'🧾 지분 장부',   d:'참여·회수·성과보수 (멱등)', x:0,y:14,w:7, h:9},
-  {id:'pos',    t:'📌 열린 포지션', d:'펀드 계좌 실시간',          x:7,y:14,w:5, h:9},
-  {id:'admin',  t:'🛠️ 펀드 관리',   d:'개설·정지 (어드민)',        x:0,y:23,w:12,h:7}];
+  {id:'kpi',    t:'📊 Fund Board', d:'Equity · NAV · Return',        x:0,y:0, w:12,h:4},
+  {id:'roster', t:'👥 Investors', d:'Shares · basis · P&L',            x:0,y:4, w:7, h:10},
+  {id:'nav',    t:'📈 NAV Curve', d:'Per-unit value over time',           x:7,y:4, w:5, h:10},
+  {id:'ops',    t:'🧾 Share Ledger', d:'Joins · redemptions · fees', x:0,y:14,w:7, h:9},
+  {id:'pos',    t:'📌 Open Positions', d:'Fund account · live',          x:7,y:14,w:5, h:9},
+  {id:'admin',  t:'🛠️ Fund Admin', d:'Create · pause (admin)',        x:0,y:23,w:12,h:7}];
 let layout={}; try{ layout=JSON.parse(localStorage.getItem(LKEY)||'{}')||{}; }catch(e){ layout={}; }
 function colW(){ const b=$('board'); return Math.max(40,((b.clientWidth-16)-GAP*(COLS-1))/COLS); }
 function place(el,g){ const cw=colW();
@@ -187,9 +187,9 @@ async function opRun(rpc,args){   // 개입 실행 공통 경로 — 성공 시 
   try{
     const r=await AlpexaSync.db.rpc(rpc,args);
     const d=(r&&r.data)||{};
-    if(!d.ok){ alert('실패: '+(d.error||(r.error&&r.error.message)||'?')); return false; }
+    if(!d.ok){ alert('Failed: '+(d.error||(r.error&&r.error.message)||'?')); return false; }
     pullReport(); return true;
-  }catch(e){ alert('실패: '+e.message); return false; }
+  }catch(e){ alert('Failed: '+e.message); return false; }
 }
 
 async function pullReport(){
@@ -201,7 +201,7 @@ async function pullReport(){
     if(!d.ok) return;
     FUNDS=d.funds||[];
     const sel=$('fundSel'); const prev=CUR&&CUR.fund_acct;
-    sel.innerHTML=FUNDS.map(f=>'<option value="'+esc(f.fund_acct)+'">'+esc(f.name)+' ('+esc(f.fund_acct)+')</option>').join('')||'<option>펀드 없음</option>';
+    sel.innerHTML=FUNDS.map(f=>'<option value="'+esc(f.fund_acct)+'">'+esc(f.name)+' ('+esc(f.fund_acct)+')</option>').join('')||'<option>No funds</option>';
     CUR=FUNDS.find(f=>f.fund_acct===prev)||FUNDS[0]||null;
     if(CUR) sel.value=CUR.fund_acct;
     renderAll(); pullPositions();
@@ -220,24 +220,24 @@ async function pullPositions(){   // 펀드 계좌의 열린 포지션 (읽기 �
 /* ════════ 렌더 ════════ */
 function renderAll(){ renderKpi(); renderRoster(); renderNav(); renderOps(); renderAdmin(); }
 function renderKpi(){
-  const b=$('b-kpi'); if(!CUR){ b.innerHTML='<div class="empty">펀드가 없습니다 — 아래 "펀드 관리"에서 개설</div>'; return; }
+  const b=$('b-kpi'); if(!CUR){ b.innerHTML='<div class="empty">No funds yet — create one in “Fund Admin” below</div>'; return; }
   const ret=(+CUR.nav||1)-1;
   b.innerHTML='<div class="kpis">'
-    +'<div class="kpi"><div class="l">순자산 (Equity)</div><div class="v">'+usd2(CUR.equity)+'</div></div>'
-    +'<div class="kpi"><div class="l">NAV (1유닛)</div><div class="v">'+(+CUR.nav||1).toFixed(4)+'</div></div>'
-    +'<div class="kpi"><div class="l">누적 수익률</div><div class="v '+(ret>=0?'up':'dn')+'">'+pct(ret)+'</div></div>'
-    +'<div class="kpi"><div class="l">투자자</div><div class="v">'+(+CUR.members||0)+'명</div></div>'
-    +'<div class="kpi"><div class="l">총 유닛</div><div class="v">'+(+CUR.total_units||0).toLocaleString()+'</div></div>'
-    +'<div class="kpi"><div class="l">성과보수</div><div class="v">'+(+CUR.perf_fee_pct||0)+'%</div></div>'
-    +'<div class="kpi"><div class="l">상태</div><div class="v"><span class="pill '+(CUR.status==='active'?'grn':CUR.status==='paused'?'yel':'red')+'">'+esc(CUR.status)+'</span></div></div>'
+    +'<div class="kpi"><div class="l">Equity</div><div class="v">'+usd2(CUR.equity)+'</div></div>'
+    +'<div class="kpi"><div class="l">NAV (per unit)</div><div class="v">'+(+CUR.nav||1).toFixed(4)+'</div></div>'
+    +'<div class="kpi"><div class="l">Total Return</div><div class="v '+(ret>=0?'up':'dn')+'">'+pct(ret)+'</div></div>'
+    +'<div class="kpi"><div class="l">Investors</div><div class="v">'+(+CUR.members||0)+'</div></div>'
+    +'<div class="kpi"><div class="l">Total Units</div><div class="v">'+(+CUR.total_units||0).toLocaleString()+'</div></div>'
+    +'<div class="kpi"><div class="l">Perf. Fee</div><div class="v">'+(+CUR.perf_fee_pct||0)+'%</div></div>'
+    +'<div class="kpi"><div class="l">Status</div><div class="v"><span class="pill '+(CUR.status==='active'?'grn':CUR.status==='paused'?'yel':'red')+'">'+esc(CUR.status)+'</span></div></div>'
     +'</div>';
 }
 function renderRoster(){
   const b=$('b-roster'); if(!CUR){ b.innerHTML='<div class="empty">—</div>'; return; }
   const rs=CUR.roster;
-  if(!rs){ b.innerHTML='<div class="empty">권한 없음 (매니저/어드민만)</div>'; return; }
-  if(!rs.length){ b.innerHTML='<div class="empty">투자자 없음</div>'; return; }
-  b.innerHTML='<table><tr><th>투자자</th><th class="r">원금</th><th class="r">지분가치</th><th class="r">지분율</th><th class="r">손익</th><th class="r">가입</th></tr>'
+  if(!rs){ b.innerHTML='<div class="empty">No access (manager/admin only)</div>'; return; }
+  if(!rs.length){ b.innerHTML='<div class="empty">No investors yet</div>'; return; }
+  b.innerHTML='<table><tr><th>Investor</th><th class="r">Basis</th><th class="r">Value</th><th class="r">Share</th><th class="r">P&L</th><th class="r">Joined</th></tr>'
     +rs.map(m=>{
       const shr=(+CUR.total_units>0)?(+m.units/+CUR.total_units):0;
       const pnl=(+m.value||0)-(+m.basis||0);
@@ -250,7 +250,7 @@ function renderRoster(){
     }).join('')+'</table>';
 }
 function renderNav(){
-  const b=$('b-nav'); if(!CUR||!CUR.ops||!CUR.ops.length){ b.innerHTML='<div class="empty">장부 데이터 대기</div>'; return; }
+  const b=$('b-nav'); if(!CUR||!CUR.ops||!CUR.ops.length){ b.innerHTML='<div class="empty">Waiting for ledger data</div>'; return; }
   const pts=CUR.ops.slice().reverse().map(o=>+o.nav||1);   // 시간순
   pts.push(+CUR.nav||1);
   const w=Math.max(200,b.clientWidth-8), h=Math.max(90,b.clientHeight-30);
@@ -259,15 +259,15 @@ function renderNav(){
   const up=pts[pts.length-1]>=pts[0];
   b.innerHTML='<svg width="'+w+'" height="'+(h+8)+'" style="display:block">'
     +'<polyline fill="none" stroke="'+(up?'#00C805':'#FF453A')+'" stroke-width="2" points="'+xy+'"/></svg>'
-    +'<div class="dim" style="font-size:10.5px;margin-top:4px">NAV '+pts[0].toFixed(4)+' → '+pts[pts.length-1].toFixed(4)+' · 포인트=지분 이벤트 시점 (틱 곡선은 v2)</div>';
+    +'<div class="dim" style="font-size:10.5px;margin-top:4px">NAV '+pts[0].toFixed(4)+' → '+pts[pts.length-1].toFixed(4)+' · points = share events (tick curve in v2)</div>';
 }
 function renderOps(){
   const b=$('b-ops'); if(!CUR){ b.innerHTML='<div class="empty">—</div>'; return; }
   const ops=CUR.ops;
-  if(!ops){ b.innerHTML='<div class="empty">권한 없음</div>'; return; }
-  if(!ops.length){ b.innerHTML='<div class="empty">기록 없음</div>'; return; }
-  const K={join:['참여','grn'],leave:['회수','red'],fee:['성과보수','yel'],create:['개설','grn']};
-  b.innerHTML='<table><tr><th>시각</th><th>구분</th><th>대상</th><th class="r">금액</th><th class="r">유닛</th><th class="r">NAV</th></tr>'
+  if(!ops){ b.innerHTML='<div class="empty">No access</div>'; return; }
+  if(!ops.length){ b.innerHTML='<div class="empty">No records</div>'; return; }
+  const K={join:['JOIN','grn'],leave:['REDEEM','red'],fee:['FEE','yel'],create:['CREATE','grn']};
+  b.innerHTML='<table><tr><th>Time</th><th>Type</th><th>Account</th><th class="r">Amount</th><th class="r">Units</th><th class="r">NAV</th></tr>'
     +ops.map(o=>{const k=K[o.kind]||[o.kind,'yel'];
       return '<tr><td class="dim">'+ago(o.at)+'</td><td><span class="pill '+k[1]+'">'+k[0]+'</span></td>'
         +'<td>'+esc(o.cust)+'</td><td class="r">'+usd2(o.usd)+'</td><td class="r">'+(+o.units).toFixed(4)+'</td><td class="r">'+(+o.nav).toFixed(4)+'</td></tr>';}).join('')
@@ -275,44 +275,44 @@ function renderOps(){
 }
 function renderPos(){
   const b=$('b-pos'); if(!CUR){ b.innerHTML='<div class="empty">—</div>'; return; }
-  if(!POS.length){ b.innerHTML='<div class="empty">열린 포지션 없음<br><span style="font-size:11px">참여/회수 가능 상태 (롤오버 규칙)</span></div>'; return; }
-  b.innerHTML='<div class="wr" style="font-size:11px;margin-bottom:6px">⚠️ 포지션 열림 — 참여/회수는 청산 후 가능</div>'
-    +'<table><tr><th>심볼</th><th>방향</th><th class="r">랏</th><th class="r">진입가</th><th class="r">경과</th></tr>'
+  if(!POS.length){ b.innerHTML='<div class="empty">No open positions<br><span style="font-size:11px">Joins/redemptions allowed (rollover rule)</span></div>'; return; }
+  b.innerHTML='<div class="wr" style="font-size:11px;margin-bottom:6px">⚠️ Positions open — joins/redemptions after close</div>'
+    +'<table><tr><th>Symbol</th><th>Side</th><th class="r">Lots</th><th class="r">Entry</th><th class="r">Age</th></tr>'
     +POS.map(p=>'<tr><td>'+esc(String(p.symbol).toUpperCase())+'</td><td class="'+(String(p.side).toLowerCase()==='buy'?'up':'dn')+'">'+esc(String(p.side).toUpperCase())+'</td>'
       +'<td class="r">'+(+p.size||0)+'</td><td class="r">'+(+p.open_price||0)+'</td><td class="r dim">'+ago(p.created_at)+'</td></tr>').join('')+'</table>';
 }
 function renderAdmin(){
   const b=$('b-admin');
   b.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'
-    +'<div><div class="dim" style="font-weight:700;margin-bottom:6px">전체 펀드</div>'
-    +(FUNDS.length?'<table><tr><th>펀드</th><th>매니저</th><th class="r">순자산</th><th class="r">NAV</th><th class="r">투자자</th><th>상태</th><th></th></tr>'
+    +'<div><div class="dim" style="font-weight:700;margin-bottom:6px">All Funds</div>'
+    +(FUNDS.length?'<table><tr><th>Fund</th><th>Manager</th><th class="r">Equity</th><th class="r">NAV</th><th class="r">Investors</th><th>Status</th><th></th></tr>'
       +FUNDS.map(f=>'<tr><td>'+esc(f.name)+' <span class="dim">'+esc(f.fund_acct)+'</span></td><td>'+esc(f.manager_cust)+'</td>'
         +'<td class="r">'+usd2(f.equity)+'</td><td class="r">'+(+f.nav).toFixed(4)+'</td><td class="r">'+f.members+'</td>'
         +'<td><span class="pill '+(f.status==='active'?'grn':f.status==='paused'?'yel':'red')+'">'+esc(f.status)+'</span></td>'
         +'<td>'+(f.status==='active'
-          ?'<button class="abtn dn" data-pause="'+esc(f.fund_acct)+'">정지</button>'
-          :'<button class="abtn up" data-resume="'+esc(f.fund_acct)+'">재개</button>')+'</td></tr>').join('')+'</table>'
-      :'<div class="empty">펀드 없음</div>')
+          ?'<button class="abtn dn" data-pause="'+esc(f.fund_acct)+'">Pause</button>'
+          :'<button class="abtn up" data-resume="'+esc(f.fund_acct)+'">Resume</button>')+'</td></tr>').join('')+'</table>'
+      :'<div class="empty">No funds</div>')
     +'</div>'
-    +'<div class="frm"><div class="dim" style="font-weight:700;margin-bottom:6px">새 펀드 개설 (어드민 승인)</div>'
-    +'<input id="nfAcct" placeholder="펀드 전용 FX 계좌번호 (예: FX-123456)">'
-    +'<input id="nfName" placeholder="펀드 이름 (예: Alpha FX Fund)">'
-    +'<input id="nfFee" type="number" min="0" max="50" step="1" placeholder="성과보수 % (기본 20)">'
-    +'<input id="nfMin" type="number" min="0" step="10" placeholder="최소 투자금 $ (기본 100)">'
-    +'<button class="go" id="nfGo">펀드 개설</button>'
-    +'<div class="dim" style="font-size:10.5px;margin-top:6px">개설 시점 잔고 = 매니저 자기자본으로 유닛 발행 (NAV 1.0)</div></div>'
+    +'<div class="frm"><div class="dim" style="font-weight:700;margin-bottom:6px">Create New Fund (admin)</div>'
+    +'<input id="nfAcct" placeholder="Dedicated FX account (e.g. FX-123456)">'
+    +'<input id="nfName" placeholder="Fund name (e.g. Alpha FX Fund)">'
+    +'<input id="nfFee" type="number" min="0" max="50" step="1" placeholder="Performance fee % (default 20)">'
+    +'<input id="nfMin" type="number" min="0" step="10" placeholder="Minimum investment $ (default 100)">'
+    +'<button class="go" id="nfGo">Create Fund</button>'
+    +'<div class="dim" style="font-size:10.5px;margin-top:6px">Balance at creation = manager capital, units minted at NAV 1.0</div></div>'
     +'</div>';
   b.querySelectorAll('[data-pause]').forEach(el=>el.onclick=async()=>{
-    if(await confirmModal('펀드 일시정지','신규 참여가 차단됩니다 (기존 지분·거래는 유지).<br><b>'+esc(el.dataset.pause)+'</b>'))
+    if(await confirmModal('Pause Fund','New joins will be blocked (existing shares & trading unaffected).<br><b>'+esc(el.dataset.pause)+'</b>'))
       opRun('pamm_set_status',{p_fund:el.dataset.pause,p_status:'paused'}); });
   b.querySelectorAll('[data-resume]').forEach(el=>el.onclick=async()=>{
-    if(await confirmModal('펀드 재개','신규 참여를 다시 허용합니다.<br><b>'+esc(el.dataset.resume)+'</b>',true))
+    if(await confirmModal('Resume Fund','New joins will be allowed again.<br><b>'+esc(el.dataset.resume)+'</b>',true))
       opRun('pamm_set_status',{p_fund:el.dataset.resume,p_status:'active'}); });
   const go=$('nfGo'); if(go) go.onclick=async()=>{
     const acct=($('nfAcct').value||'').trim(), name=($('nfName').value||'').trim();
     const fee=+($('nfFee').value||20), min=+($('nfMin').value||100);
-    if(!acct||!name){ alert('계좌번호와 이름을 입력하세요'); return; }
-    if(await confirmModal('펀드 개설','계좌 <b>'+esc(acct)+'</b> 를 펀드 <b>'+esc(name)+'</b> 로 등록합니다.<br>성과보수 '+fee+'% · 최소 '+usd2(min)+'<br>개설 후 이 계좌의 일반 출금/이체는 차단됩니다 (PAMM 경로만).',true))
+    if(!acct||!name){ alert('Enter the account number and fund name'); return; }
+    if(await confirmModal('Create Fund','Register account <b>'+esc(acct)+'</b> as fund <b>'+esc(name)+'</b>.<br>Performance fee '+fee+'% · minimum '+usd2(min)+'<br>After creation, regular withdrawals/transfers from this account are blocked (PAMM ops only).',true))
       opRun('pamm_create_fund',{p_ref:'pamm-create-'+acct+'-'+Date.now(),p_acct:acct,p_name:name,p_fee_pct:fee,p_min:min});
   };
 }
