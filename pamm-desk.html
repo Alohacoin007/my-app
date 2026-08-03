@@ -283,6 +283,10 @@ function renderPos(){
 }
 function renderAdmin(){
   const b=$('b-admin');
+  // 30초 자동 새로고침이 입력 중인 개설 폼을 지우던 버그(8/3 사장님 "자꾸 내용이 없어져") —
+  // 다시 그리기 전에 입력값·포커스를 붙잡아 두고, 그린 뒤 그대로 복원한다.
+  const keep={}; ['nfAcct','nfName','nfFee','nfMin'].forEach(id=>{const el=$(id); if(el) keep[id]=el.value;});
+  const hadFocus=document.activeElement&&document.activeElement.id&&/^nf/.test(document.activeElement.id)?document.activeElement.id:null;
   b.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'
     +'<div><div class="dim" style="font-weight:700;margin-bottom:6px">All Funds</div>'
     +(FUNDS.length?'<table><tr><th>Fund</th><th>Manager</th><th class="r">Equity</th><th class="r">NAV</th><th class="r">Investors</th><th>Status</th><th></th></tr>'
@@ -308,6 +312,8 @@ function renderAdmin(){
   b.querySelectorAll('[data-resume]').forEach(el=>el.onclick=async()=>{
     if(await confirmModal('Resume Fund','New joins will be allowed again.<br><b>'+esc(el.dataset.resume)+'</b>',true))
       opRun('pamm_set_status',{p_fund:el.dataset.resume,p_status:'active'}); });
+  Object.keys(keep).forEach(id=>{const el=$(id); if(el&&keep[id]!=null&&keep[id]!=='') el.value=keep[id];});
+  if(hadFocus){const el=$(hadFocus); if(el){el.focus(); try{el.setSelectionRange(el.value.length,el.value.length);}catch(e){}}}
   const go=$('nfGo'); if(go) go.onclick=async()=>{
     const acct=($('nfAcct').value||'').trim(), name=($('nfName').value||'').trim();
     const fee=+($('nfFee').value||20), min=+($('nfMin').value||100);
