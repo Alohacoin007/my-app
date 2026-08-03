@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ALPEXA — PAMM Desk</title>
+<link rel="icon" href="favicon-32.png">
+<!--
+  PAMM 데스크 — v1 (2026-08-03 사장님 "레전드 기반으로 팜을 만들어 보자")
+  · 펀드 운용 백오피스. 레전드2(RH 정통 다크) 룩 + 위젯 그리드 (sportsbook-desk 프레임 이식).
+  · 돈 경로 = 서버 RPC만: pamm_desk_report(읽기) · pamm_create_fund/pamm_set_status(어드민 개입,
+    confirmModal 관문). 참여/회수는 고객 앱 몫 — 이 데스크는 개설·감독·운용 현황.
+  · 매니저(펀드 계좌 주인)와 어드민 둘 다 로그인 가능 — 서버가 권한별로 데이터를 줄인다.
+  · 어드민 세션 = manager와 동일 체계(ALPEXA_ADMIN_SESSION → 격리 localStorage 키).
+-->
+<style>
+:root,body.lgd{ --lgd-bg:#000000; --lgd-surface:#0E1015; --lgd-surface2:#161A22;
+  --lgd-pill:#1D212A; --lgd-pill-hi:#252B36; --lgd-hair:#1D212A;
+  --lgd-ink:#F5F7FA; --lgd-dim:#8B93A1; --lgd-green:#00C805; --lgd-up:#00C805;
+  --lgd-down:#FF453A; --lgd-warn:#FFB020; --lgd-fs-body:12.5px; }
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--lgd-bg);color:var(--lgd-ink);font:400 13px/1.45 Inter,-apple-system,system-ui,sans-serif;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input,select{font:inherit}
+.hdr{display:flex;align-items:center;gap:10px;height:40px;padding:0 12px;background:var(--lgd-surface);border-bottom:1px solid var(--lgd-hair);position:relative;z-index:50}
+.mark{width:24px;height:24px;border-radius:3px;background:var(--lgd-up);color:#04130a;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:14px}
+.hname{font-weight:800;letter-spacing:.3px}
+.htag{font-size:10.5px;font-weight:800;color:var(--lgd-warn);border:1px solid var(--lgd-warn);border-radius:4px;padding:1px 6px;letter-spacing:.5px}
+.hsp{flex:1}
+.hsel{background:var(--lgd-pill);border:1px solid var(--lgd-hair);border-radius:6px;color:var(--lgd-ink);padding:4px 8px;font-size:12px;max-width:230px}
+.hdot{width:8px;height:8px;border-radius:50%;background:#555}
+.hdot.ok{background:var(--lgd-green)} .hdot.stale{background:var(--lgd-down)}
+.hmail{font-size:11.5px;color:var(--lgd-dim);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hbtn{font-size:11.5px;font-weight:700;color:var(--lgd-dim);border:1px solid var(--lgd-hair);border-radius:6px;padding:4px 10px}
+.hbtn:hover{color:var(--lgd-ink);border-color:var(--lgd-pill-hi)}
+#board{position:relative;height:calc(100% - 40px);overflow:auto;padding:8px}
+.wg{position:absolute;background:var(--lgd-surface);border:1px solid var(--lgd-hair);border-radius:10px;display:flex;flex-direction:column;min-width:180px;min-height:110px;overflow:hidden}
+.wg-h{display:flex;align-items:center;gap:8px;padding:7px 11px;border-bottom:1px solid var(--lgd-hair);cursor:grab;user-select:none;flex:0 0 auto}
+.wg-h b{font-size:12px;font-weight:800}
+.wg-h small{color:var(--lgd-dim);font-size:10.5px}
+.wg-b{flex:1;overflow:auto;padding:9px 11px;font-size:var(--lgd-fs-body)}
+.wg-rs{position:absolute;right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize;opacity:.45}
+.wg-rs::after{content:'';position:absolute;right:3px;bottom:3px;width:7px;height:7px;border-right:2px solid var(--lgd-dim);border-bottom:2px solid var(--lgd-dim)}
+.wg.drag{opacity:.85;z-index:40;cursor:grabbing}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{color:var(--lgd-dim);font-weight:600;text-align:left;padding:3px 6px;border-bottom:1px solid var(--lgd-hair);white-space:nowrap;position:sticky;top:-9px;background:var(--lgd-surface)}
+td{padding:4px 6px;border-bottom:1px solid rgba(29,33,42,.55);white-space:nowrap}
+.r{text-align:right} th.r{text-align:right}
+.up{color:var(--lgd-up)} .dn{color:var(--lgd-down)} .wr{color:var(--lgd-warn)}
+.dim{color:var(--lgd-dim)}
+.pill{display:inline-block;font-size:10px;font-weight:800;border-radius:4px;padding:1px 6px}
+.pill.red{background:rgba(255,69,58,.15);color:var(--lgd-down)}
+.pill.grn{background:rgba(0,200,5,.13);color:var(--lgd-green)}
+.pill.yel{background:rgba(255,176,32,.15);color:var(--lgd-warn)}
+.empty{color:var(--lgd-dim);text-align:center;padding:18px 0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px}
+.kpi{background:var(--lgd-surface2);border-radius:8px;padding:8px 10px}
+.kpi .l{font-size:10.5px;color:var(--lgd-dim);font-weight:600}
+.kpi .v{font-size:16.5px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums}
+.frm input{width:100%;background:var(--lgd-pill);border:1px solid var(--lgd-hair);border-radius:6px;color:var(--lgd-ink);padding:6px 9px;font-size:12px;margin-bottom:7px}
+.frm input:focus{outline:none;border-color:var(--lgd-green)}
+.frm .go{width:100%;background:var(--lgd-green);color:#04130a;font-weight:800;border-radius:6px;padding:8px;font-size:12.5px}
+.abtn{font-size:10px;font-weight:800;border:1px solid var(--lgd-hair);border-radius:4px;padding:1px 6px;margin-left:4px;color:var(--lgd-dim)}
+.abtn:hover{color:var(--lgd-ink);border-color:var(--lgd-pill-hi)}
+.abtn.dn{color:var(--lgd-down);border-color:rgba(255,69,58,.4)}
+.abtn.up{color:var(--lgd-green);border-color:rgba(0,200,5,.4)}
+#opModal{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:90;display:none;align-items:center;justify-content:center}
+#opModal.on{display:flex}
+.opbox{width:360px;background:var(--lgd-surface);border:1px solid var(--lgd-hair);border-radius:12px;padding:20px}
+.opbox h3{font-size:14.5px;margin-bottom:8px}
+.opbox .opb{font-size:12.5px;color:var(--lgd-dim);margin-bottom:16px;line-height:1.6}
+.opbox .opr{display:flex;gap:8px;justify-content:flex-end}
+.opbox button{font-weight:800;border-radius:7px;padding:8px 16px;font-size:12.5px}
+.opbox .cancel{border:1px solid var(--lgd-hair);color:var(--lgd-dim)}
+.opbox .go{background:var(--lgd-down);color:#fff}
+.opbox .go.safe{background:var(--lgd-green);color:#04130a}
+#gate{position:fixed;inset:0;background:var(--lgd-bg);z-index:100;display:flex;align-items:center;justify-content:center}
+.gbox{width:330px;background:var(--lgd-surface);border:1px solid var(--lgd-hair);border-radius:12px;padding:26px}
+.gbox h2{font-size:17px;margin-bottom:2px}
+.gbox p{font-size:12px;color:var(--lgd-dim);margin-bottom:16px}
+.gbox input{width:100%;background:var(--lgd-pill);border:1px solid var(--lgd-hair);border-radius:7px;color:var(--lgd-ink);padding:9px 11px;font-size:13px;margin-bottom:9px}
+.gbox input:focus{outline:none;border-color:var(--lgd-green)}
+.gbtn{width:100%;background:var(--lgd-green);color:#04130a;font-weight:800;border-radius:7px;padding:10px;font-size:13.5px}
+.gbtn:disabled{opacity:.5}
+.gerr{color:var(--lgd-down);font-size:12px;min-height:16px;margin-top:8px}
+</style>
+</head>
+<body class="lgd">
+
+<div class="hdr">
+  <div class="mark">A</div><span class="hname">PAMM Desk</span>
+  <span class="htag">FUND OPS · v1</span>
+  <select class="hsel" id="fundSel" title="펀드 선택"></select>
+  <span class="hsp"></span>
+  <span class="hdot" id="feedDot" title="data feed"></span>
+  <span class="hmail" id="whoami"></span>
+  <button class="hbtn" id="btnRefresh">↻ Refresh</button>
+  <button class="hbtn" id="btnLayout">Reset layout</button>
+  <button class="hbtn" id="btnOut" style="display:none">Sign out</button>
+</div>
+<div id="board"></div>
+
+<div id="opModal"><div class="opbox">
+  <h3 id="opTitle"></h3><div class="opb" id="opBody"></div>
+  <div class="opr"><button class="cancel" id="opNo">취소</button><button class="go" id="opYes">실행</button></div>
+</div></div>
+
+<div id="gate">
+  <div class="gbox">
+    <h2>💼 PAMM Desk</h2>
+    <p>펀드 매니저 또는 어드민 계정으로 로그인</p>
+    <input id="gEmail" type="email" placeholder="Email" autocomplete="username">
+    <input id="gPass" type="password" placeholder="Password" autocomplete="current-password">
+    <button class="gbtn" id="gGo">Sign in</button>
+    <div class="gerr" id="gErr"></div>
+  </div>
+</div>
+
+<script>window.ALPEXA_ADMIN_SESSION = true;   // manager/sbdesk와 동일: 어드민 세션 격리 localStorage 키</script>
+<script src="vendor/supabase.min.js?v=2"></script>
+<script src="alpexa-sync.js"></script>
+<script>
+'use strict';
+/* ════════ 유틸 ════════ */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const usd2=n=>'$'+(+n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const pct=n=>{n=+n||0;return (n>=0?'+':'')+(n*100).toFixed(2)+'%';};
+const ago=ts=>{const s=Math.max(0,(Date.now()-new Date(ts).getTime())/1000);
+  if(s<90)return Math.round(s)+'s';if(s<5400)return Math.round(s/60)+'m';if(s<172800)return Math.round(s/3600)+'h';return Math.round(s/86400)+'d';};
+
+/* ════════ 위젯 그리드 엔진 (sportsbook-desk 이식 — 12컬럼 · 드래그/리사이즈 · 레이아웃 저장) ════════ */
+const COLS=12, RH=30, GAP=8, LKEY='alpexa.pammdesk.layout.v1';   // UI 설정 — 돈 아님, 로컬 OK
+const WIDGETS=[
+  {id:'kpi',    t:'📊 펀드 전광판', d:'순자산·NAV·수익률',        x:0,y:0, w:12,h:4},
+  {id:'roster', t:'👥 투자자',      d:'지분·원금·손익',            x:0,y:4, w:7, h:10},
+  {id:'nav',    t:'📈 NAV 곡선',    d:'1유닛 가치 추이',           x:7,y:4, w:5, h:10},
+  {id:'ops',    t:'🧾 지분 장부',   d:'참여·회수·성과보수 (멱등)', x:0,y:14,w:7, h:9},
+  {id:'pos',    t:'📌 열린 포지션', d:'펀드 계좌 실시간',          x:7,y:14,w:5, h:9},
+  {id:'admin',  t:'🛠️ 펀드 관리',   d:'개설·정지 (어드민)',        x:0,y:23,w:12,h:7}];
+let layout={}; try{ layout=JSON.parse(localStorage.getItem(LKEY)||'{}')||{}; }catch(e){ layout={}; }
+function colW(){ const b=$('board'); return Math.max(40,((b.clientWidth-16)-GAP*(COLS-1))/COLS); }
+function place(el,g){ const cw=colW();
+  el.style.left=(8+g.x*(cw+GAP))+'px'; el.style.top=(8+g.y*(RH+GAP/4))+'px';
+  el.style.width=(g.w*cw+(g.w-1)*GAP)+'px'; el.style.height=(g.h*RH)+'px'; }
+function geom(id){ const d=WIDGETS.find(w=>w.id===id); const s=layout[id]||{};
+  return {x:s.x!=null?s.x:d.x, y:s.y!=null?s.y:d.y, w:s.w||d.w, h:s.h||d.h}; }
+function saveGeom(id,g){ layout[id]=g; try{ localStorage.setItem(LKEY,JSON.stringify(layout)); }catch(e){} }
+function buildBoard(){
+  const b=$('board'); b.innerHTML='';
+  WIDGETS.forEach(w=>{
+    const el=document.createElement('div'); el.className='wg'; el.id='w-'+w.id;
+    el.innerHTML='<div class="wg-h"><b>'+w.t+'</b><small>'+w.d+'</small></div>'
+      +'<div class="wg-b" id="b-'+w.id+'"><div class="empty">…</div></div><div class="wg-rs"></div>';
+    b.appendChild(el); place(el,geom(w.id));
+    const h=el.querySelector('.wg-h'), rs=el.querySelector('.wg-rs');
+    h.addEventListener('pointerdown',e=>dragStart(e,el,w.id,false));
+    rs.addEventListener('pointerdown',e=>dragStart(e,el,w.id,true));
+  });
+}
+function dragStart(e,el,id,resize){
+  e.preventDefault(); const g=geom(id), cw=colW(), sx=e.clientX, sy=e.clientY;
+  el.classList.add('drag'); el.setPointerCapture&&el.setPointerCapture(e.pointerId);
+  const move=ev=>{ const dx=Math.round((ev.clientX-sx)/(cw+GAP)), dy=Math.round((ev.clientY-sy)/(RH+GAP/4));
+    const ng=resize? {x:g.x,y:g.y,w:Math.min(COLS-g.x,Math.max(2,g.w+dx)),h:Math.max(3,g.h+dy)}
+                   : {x:Math.max(0,Math.min(COLS-g.w,g.x+dx)),y:Math.max(0,g.y+dy),w:g.w,h:g.h};
+    place(el,ng); el.__g=ng; };
+  const upfn=()=>{ el.classList.remove('drag'); if(el.__g){ saveGeom(id,el.__g); el.__g=null; }
+    window.removeEventListener('pointermove',move); window.removeEventListener('pointerup',upfn); };
+  window.addEventListener('pointermove',move); window.addEventListener('pointerup',upfn);
+}
+window.addEventListener('resize',()=>{ WIDGETS.forEach(w=>{const el=$('w-'+w.id); if(el) place(el,geom(w.id));}); });
+
+/* ════════ 데이터 — 단일 소스: pamm_desk_report RPC ════════ */
+let FUNDS=[], CUR=null, POS=[];
+
+function confirmModal(title, body, safe){
+  return new Promise(res=>{
+    $('opTitle').textContent=title; $('opBody').innerHTML=body;
+    $('opYes').className='go'+(safe?' safe':''); $('opModal').classList.add('on');
+    const done=v=>{ $('opModal').classList.remove('on'); $('opYes').onclick=$('opNo').onclick=null; res(v); };
+    $('opYes').onclick=()=>done(true); $('opNo').onclick=()=>done(false);
+  });
+}
+async function opRun(rpc,args){   // 개입 실행 공통 경로 — 성공 시 전체 리프레시
+  try{
+    const r=await AlpexaSync.db.rpc(rpc,args);
+    const d=(r&&r.data)||{};
+    if(!d.ok){ alert('실패: '+(d.error||(r.error&&r.error.message)||'?')); return false; }
+    pullReport(); return true;
+  }catch(e){ alert('실패: '+e.message); return false; }
+}
+
+async function pullReport(){
+  if(!(window.AlpexaSync&&AlpexaSync.db)) return;
+  try{
+    const r=await AlpexaSync.db.rpc('pamm_desk_report',{});
+    const d=(r&&r.data)||{};
+    $('feedDot').className='hdot '+(d.ok?'ok':'stale');
+    if(!d.ok) return;
+    FUNDS=d.funds||[];
+    const sel=$('fundSel'); const prev=CUR&&CUR.fund_acct;
+    sel.innerHTML=FUNDS.map(f=>'<option value="'+esc(f.fund_acct)+'">'+esc(f.name)+' ('+esc(f.fund_acct)+')</option>').join('')||'<option>펀드 없음</option>';
+    CUR=FUNDS.find(f=>f.fund_acct===prev)||FUNDS[0]||null;
+    if(CUR) sel.value=CUR.fund_acct;
+    renderAll(); pullPositions();
+  }catch(e){ $('feedDot').className='hdot stale'; }
+}
+async function pullPositions(){   // 펀드 계좌의 열린 포지션 (읽기 전용 — RLS: 매니저 본인/어드민)
+  POS=[]; if(!CUR){ renderPos(); return; }
+  try{
+    const r=await AlpexaSync.db.from('positions').select('local_id,symbol,side,size,open_price,meta,created_at')
+      .eq('acct_no',CUR.fund_acct).eq('server','fx').eq('status','open').limit(50);
+    if(r&&Array.isArray(r.data)) POS=r.data;
+  }catch(e){}
+  renderPos();
+}
+
+/* ════════ 렌더 ════════ */
+function renderAll(){ renderKpi(); renderRoster(); renderNav(); renderOps(); renderAdmin(); }
+function renderKpi(){
+  const b=$('b-kpi'); if(!CUR){ b.innerHTML='<div class="empty">펀드가 없습니다 — 아래 "펀드 관리"에서 개설</div>'; return; }
+  const ret=(+CUR.nav||1)-1;
+  b.innerHTML='<div class="kpis">'
+    +'<div class="kpi"><div class="l">순자산 (Equity)</div><div class="v">'+usd2(CUR.equity)+'</div></div>'
+    +'<div class="kpi"><div class="l">NAV (1유닛)</div><div class="v">'+(+CUR.nav||1).toFixed(4)+'</div></div>'
+    +'<div class="kpi"><div class="l">누적 수익률</div><div class="v '+(ret>=0?'up':'dn')+'">'+pct(ret)+'</div></div>'
+    +'<div class="kpi"><div class="l">투자자</div><div class="v">'+(+CUR.members||0)+'명</div></div>'
+    +'<div class="kpi"><div class="l">총 유닛</div><div class="v">'+(+CUR.total_units||0).toLocaleString()+'</div></div>'
+    +'<div class="kpi"><div class="l">성과보수</div><div class="v">'+(+CUR.perf_fee_pct||0)+'%</div></div>'
+    +'<div class="kpi"><div class="l">상태</div><div class="v"><span class="pill '+(CUR.status==='active'?'grn':CUR.status==='paused'?'yel':'red')+'">'+esc(CUR.status)+'</span></div></div>'
+    +'</div>';
+}
+function renderRoster(){
+  const b=$('b-roster'); if(!CUR){ b.innerHTML='<div class="empty">—</div>'; return; }
+  const rs=CUR.roster;
+  if(!rs){ b.innerHTML='<div class="empty">권한 없음 (매니저/어드민만)</div>'; return; }
+  if(!rs.length){ b.innerHTML='<div class="empty">투자자 없음</div>'; return; }
+  b.innerHTML='<table><tr><th>투자자</th><th class="r">원금</th><th class="r">지분가치</th><th class="r">지분율</th><th class="r">손익</th><th class="r">가입</th></tr>'
+    +rs.map(m=>{
+      const shr=(+CUR.total_units>0)?(+m.units/+CUR.total_units):0;
+      const pnl=(+m.value||0)-(+m.basis||0);
+      const isMgr=m.cust===CUR.manager_cust;
+      return '<tr><td>'+esc(m.name||m.cust)+(isMgr?' <span class="pill yel">MGR</span>':'')+'</td>'
+        +'<td class="r">'+usd2(m.basis)+'</td><td class="r">'+usd2(m.value)+'</td>'
+        +'<td class="r">'+(shr*100).toFixed(1)+'%</td>'
+        +'<td class="r '+(pnl>=0?'up':'dn')+'">'+(pnl>=0?'+':'−')+usd2(Math.abs(pnl))+'</td>'
+        +'<td class="r dim">'+ago(m.joined)+'</td></tr>';
+    }).join('')+'</table>';
+}
+function renderNav(){
+  const b=$('b-nav'); if(!CUR||!CUR.ops||!CUR.ops.length){ b.innerHTML='<div class="empty">장부 데이터 대기</div>'; return; }
+  const pts=CUR.ops.slice().reverse().map(o=>+o.nav||1);   // 시간순
+  pts.push(+CUR.nav||1);
+  const w=Math.max(200,b.clientWidth-8), h=Math.max(90,b.clientHeight-30);
+  const mn=Math.min.apply(null,pts)*0.999, mx=Math.max.apply(null,pts)*1.001;
+  const xy=pts.map((p,i)=>((i/(pts.length-1||1))*w).toFixed(1)+','+((h-(p-mn)/(mx-mn||1)*h)+4).toFixed(1)).join(' ');
+  const up=pts[pts.length-1]>=pts[0];
+  b.innerHTML='<svg width="'+w+'" height="'+(h+8)+'" style="display:block">'
+    +'<polyline fill="none" stroke="'+(up?'#00C805':'#FF453A')+'" stroke-width="2" points="'+xy+'"/></svg>'
+    +'<div class="dim" style="font-size:10.5px;margin-top:4px">NAV '+pts[0].toFixed(4)+' → '+pts[pts.length-1].toFixed(4)+' · 포인트=지분 이벤트 시점 (틱 곡선은 v2)</div>';
+}
+function renderOps(){
+  const b=$('b-ops'); if(!CUR){ b.innerHTML='<div class="empty">—</div>'; return; }
+  const ops=CUR.ops;
+  if(!ops){ b.innerHTML='<div class="empty">권한 없음</div>'; return; }
+  if(!ops.length){ b.innerHTML='<div class="empty">기록 없음</div>'; return; }
+  const K={join:['참여','grn'],leave:['회수','red'],fee:['성과보수','yel'],create:['개설','grn']};
+  b.innerHTML='<table><tr><th>시각</th><th>구분</th><th>대상</th><th class="r">금액</th><th class="r">유닛</th><th class="r">NAV</th></tr>'
+    +ops.map(o=>{const k=K[o.kind]||[o.kind,'yel'];
+      return '<tr><td class="dim">'+ago(o.at)+'</td><td><span class="pill '+k[1]+'">'+k[0]+'</span></td>'
+        +'<td>'+esc(o.cust)+'</td><td class="r">'+usd2(o.usd)+'</td><td class="r">'+(+o.units).toFixed(4)+'</td><td class="r">'+(+o.nav).toFixed(4)+'</td></tr>';}).join('')
+    +'</table>';
+}
+function renderPos(){
+  const b=$('b-pos'); if(!CUR){ b.innerHTML='<div class="empty">—</div>'; return; }
+  if(!POS.length){ b.innerHTML='<div class="empty">열린 포지션 없음<br><span style="font-size:11px">참여/회수 가능 상태 (롤오버 규칙)</span></div>'; return; }
+  b.innerHTML='<div class="wr" style="font-size:11px;margin-bottom:6px">⚠️ 포지션 열림 — 참여/회수는 청산 후 가능</div>'
+    +'<table><tr><th>심볼</th><th>방향</th><th class="r">랏</th><th class="r">진입가</th><th class="r">경과</th></tr>'
+    +POS.map(p=>'<tr><td>'+esc(String(p.symbol).toUpperCase())+'</td><td class="'+(String(p.side).toLowerCase()==='buy'?'up':'dn')+'">'+esc(String(p.side).toUpperCase())+'</td>'
+      +'<td class="r">'+(+p.size||0)+'</td><td class="r">'+(+p.open_price||0)+'</td><td class="r dim">'+ago(p.created_at)+'</td></tr>').join('')+'</table>';
+}
+function renderAdmin(){
+  const b=$('b-admin');
+  b.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'
+    +'<div><div class="dim" style="font-weight:700;margin-bottom:6px">전체 펀드</div>'
+    +(FUNDS.length?'<table><tr><th>펀드</th><th>매니저</th><th class="r">순자산</th><th class="r">NAV</th><th class="r">투자자</th><th>상태</th><th></th></tr>'
+      +FUNDS.map(f=>'<tr><td>'+esc(f.name)+' <span class="dim">'+esc(f.fund_acct)+'</span></td><td>'+esc(f.manager_cust)+'</td>'
+        +'<td class="r">'+usd2(f.equity)+'</td><td class="r">'+(+f.nav).toFixed(4)+'</td><td class="r">'+f.members+'</td>'
+        +'<td><span class="pill '+(f.status==='active'?'grn':f.status==='paused'?'yel':'red')+'">'+esc(f.status)+'</span></td>'
+        +'<td>'+(f.status==='active'
+          ?'<button class="abtn dn" data-pause="'+esc(f.fund_acct)+'">정지</button>'
+          :'<button class="abtn up" data-resume="'+esc(f.fund_acct)+'">재개</button>')+'</td></tr>').join('')+'</table>'
+      :'<div class="empty">펀드 없음</div>')
+    +'</div>'
+    +'<div class="frm"><div class="dim" style="font-weight:700;margin-bottom:6px">새 펀드 개설 (어드민 승인)</div>'
+    +'<input id="nfAcct" placeholder="펀드 전용 FX 계좌번호 (예: FX-123456)">'
+    +'<input id="nfName" placeholder="펀드 이름 (예: Alpha FX Fund)">'
+    +'<input id="nfFee" type="number" min="0" max="50" step="1" placeholder="성과보수 % (기본 20)">'
+    +'<input id="nfMin" type="number" min="0" step="10" placeholder="최소 투자금 $ (기본 100)">'
+    +'<button class="go" id="nfGo">펀드 개설</button>'
+    +'<div class="dim" style="font-size:10.5px;margin-top:6px">개설 시점 잔고 = 매니저 자기자본으로 유닛 발행 (NAV 1.0)</div></div>'
+    +'</div>';
+  b.querySelectorAll('[data-pause]').forEach(el=>el.onclick=async()=>{
+    if(await confirmModal('펀드 일시정지','신규 참여가 차단됩니다 (기존 지분·거래는 유지).<br><b>'+esc(el.dataset.pause)+'</b>'))
+      opRun('pamm_set_status',{p_fund:el.dataset.pause,p_status:'paused'}); });
+  b.querySelectorAll('[data-resume]').forEach(el=>el.onclick=async()=>{
+    if(await confirmModal('펀드 재개','신규 참여를 다시 허용합니다.<br><b>'+esc(el.dataset.resume)+'</b>',true))
+      opRun('pamm_set_status',{p_fund:el.dataset.resume,p_status:'active'}); });
+  const go=$('nfGo'); if(go) go.onclick=async()=>{
+    const acct=($('nfAcct').value||'').trim(), name=($('nfName').value||'').trim();
+    const fee=+($('nfFee').value||20), min=+($('nfMin').value||100);
+    if(!acct||!name){ alert('계좌번호와 이름을 입력하세요'); return; }
+    if(await confirmModal('펀드 개설','계좌 <b>'+esc(acct)+'</b> 를 펀드 <b>'+esc(name)+'</b> 로 등록합니다.<br>성과보수 '+fee+'% · 최소 '+usd2(min)+'<br>개설 후 이 계좌의 일반 출금/이체는 차단됩니다 (PAMM 경로만).',true))
+      opRun('pamm_create_fund',{p_ref:'pamm-create-'+acct+'-'+Date.now(),p_acct:acct,p_name:name,p_fee_pct:fee,p_min:min});
+  };
+}
+
+/* ════════ 로그인 게이트 (sbdesk 동일) ════════ */
+async function boot(){
+  buildBoard();
+  $('fundSel').onchange=()=>{ CUR=FUNDS.find(f=>f.fund_acct===$('fundSel').value)||null; renderAll(); pullPositions(); };
+  $('btnRefresh').onclick=pullReport;
+  $('btnLayout').onclick=()=>{ layout={}; try{localStorage.removeItem(LKEY);}catch(e){} buildBoard(); renderAll(); renderPos(); };
+  $('btnOut').onclick=async()=>{ try{ await AlpexaSync.db.auth.signOut(); }catch(e){} location.reload(); };
+  try{
+    const s=await AlpexaSync.db.auth.getSession();
+    const em=s&&s.data&&s.data.session&&s.data.session.user&&s.data.session.user.email;
+    if(em){ enter(em); return; }
+  }catch(e){}
+  $('gGo').onclick=async()=>{
+    $('gGo').disabled=true; $('gErr').textContent='';
+    try{
+      const r=await AlpexaSync.db.auth.signInWithPassword({email:$('gEmail').value.trim(),password:$('gPass').value});
+      if(r&&r.error){ $('gErr').textContent=r.error.message; $('gGo').disabled=false; return; }
+      enter($('gEmail').value.trim());
+    }catch(e){ $('gErr').textContent=String(e.message||e); $('gGo').disabled=false; }
+  };
+}
+function enter(email){
+  $('gate').style.display='none'; $('btnOut').style.display='';
+  $('whoami').textContent=email;
+  pullReport(); setInterval(pullReport,30000);
+}
+document.addEventListener('DOMContentLoaded',boot);
+</script>
+</body>
+</html>
