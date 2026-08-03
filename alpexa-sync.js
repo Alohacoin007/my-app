@@ -418,7 +418,7 @@ window.AlpexaSync = (function () {
     }
     // React 앱(#root)은 "화면에 내용이 뜬 순간"까지, 바닐라는 load 후 — 15s 상한
     var iv = setInterval(function () {
-      var r = document.getElementById('root');
+      var r = document.getElementById('root') || document.getElementById('phone');   // crypto-live는 #phone에 마운트 (8/3 결산에서 발견)
       if (r && r.innerHTML.length > 3000) { clearInterval(iv); send(Date.now() - t0); }
       else if (!r && document.readyState === 'complete') { clearInterval(iv); send(null); }
     }, 250);
