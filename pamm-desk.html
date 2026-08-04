@@ -173,7 +173,20 @@ function dragStart(e,el,id,resize){
 window.addEventListener('resize',()=>{ WIDGETS.forEach(w=>{const el=$('w-'+w.id); if(el) place(el,geom(w.id));}); });
 
 /* ════════ 데이터 — 단일 소스: pamm_desk_report RPC ════════ */
-let FUNDS=[], CUR=null, POS=[];
+let FUNDS=[], CUR=null, POS=[], FXACCTS=[], pickAcct=null;
+async function pullFxAccounts(){   // 개설 피커용 — 어드민 RLS 읽기 (실패=비어드민, 피커 대신 안내)
+  try{
+    const a=await AlpexaSync.db.from('accounts').select('acct_no,balance,player_id').eq('server','fx');
+    const pl=await AlpexaSync.db.from('players').select('id,name,email');
+    if(a&&Array.isArray(a.data)&&pl&&Array.isArray(pl.data)){
+      const pm={}; pl.data.forEach(x=>pm[x.id]=x);
+      FXACCTS=a.data.map(x=>({acct:x.acct_no,bal:+x.balance||0,name:(pm[x.player_id]||{}).name||'',email:(pm[x.player_id]||{}).email||''}))
+        .filter(x=>!FUNDS.some(f=>f.fund_acct===x.acct))
+        .sort((x,y)=>y.bal-x.bal);
+    }
+  }catch(e){ FXACCTS=[]; }
+  renderAdmin();
+}
 
 function confirmModal(title, body, safe){
   return new Promise(res=>{
@@ -204,7 +217,7 @@ async function pullReport(){
     sel.innerHTML=FUNDS.map(f=>'<option value="'+esc(f.fund_acct)+'">'+esc(f.name)+' ('+esc(f.fund_acct)+')</option>').join('')||'<option>No funds</option>';
     CUR=FUNDS.find(f=>f.fund_acct===prev)||FUNDS[0]||null;
     if(CUR) sel.value=CUR.fund_acct;
-    renderAll(); pullPositions();
+    renderAll(); pullPositions(); pullFxAccounts();
   }catch(e){ $('feedDot').className='hdot stale'; }
 }
 async function pullPositions(){   // 펀드 계좌의 열린 포지션 (읽기 전용 — RLS: 매니저 본인/어드민)
@@ -281,11 +294,26 @@ function renderPos(){
     +POS.map(p=>'<tr><td>'+esc(String(p.symbol).toUpperCase())+'</td><td class="'+(String(p.side).toLowerCase()==='buy'?'up':'dn')+'">'+esc(String(p.side).toUpperCase())+'</td>'
       +'<td class="r">'+(+p.size||0)+'</td><td class="r">'+(+p.open_price||0)+'</td><td class="r dim">'+ago(p.created_at)+'</td></tr>').join('')+'</table>';
 }
+function pickList(q){
+  q=(q||'').toLowerCase();
+  const rows=FXACCTS.filter(x=>!q||String(x.name).toLowerCase().includes(q)||String(x.email).toLowerCase().includes(q)||String(x.acct).toLowerCase().includes(q)).slice(0,30);
+  if(!rows.length) return '<div class="empty" style="padding:10px 0">'+(FXACCTS.length?'No match':'No accounts (admin only)')+'</div>';
+  return rows.map(x=>'<div class="pkrow" data-acct="'+esc(x.acct)+'" style="display:flex;gap:8px;align-items:center;padding:6px 9px;cursor:pointer;border-bottom:1px solid rgba(29,33,42,.55);'+(pickAcct&&pickAcct.acct===x.acct?'background:rgba(0,200,5,.10)':'')+'">'
+    +'<div style="flex:1;min-width:0"><b style="font-size:12px">'+esc(x.name||'(no name)')+'</b> <span class="dim" style="font-size:10.5px">'+esc(x.email)+'</span></div>'
+    +'<span class="dim" style="font-size:11px">'+esc(x.acct)+'</span><b style="font-size:11.5px">'+usd2(x.bal)+'</b></div>').join('');
+}
+function wireList(){
+  document.querySelectorAll('#nfList .pkrow').forEach(el=>el.onclick=()=>{
+    pickAcct=FXACCTS.find(x=>x.acct===el.dataset.acct)||null;
+    const nm=$('nfName'); if(nm&&!nm.value&&pickAcct&&pickAcct.name) nm.value=pickAcct.name+' Fund';
+    renderAdmin();
+  });
+}
 function renderAdmin(){
   const b=$('b-admin');
   // 30초 자동 새로고침이 입력 중인 개설 폼을 지우던 버그(8/3 사장님 "자꾸 내용이 없어져") —
   // 다시 그리기 전에 입력값·포커스를 붙잡아 두고, 그린 뒤 그대로 복원한다.
-  const keep={}; ['nfAcct','nfName','nfFee','nfMin'].forEach(id=>{const el=$(id); if(el) keep[id]=el.value;});
+  const keep={}; ['nfSearch','nfName','nfFee','nfMin'].forEach(id=>{const el=$(id); if(el) keep[id]=el.value;});
   const hadFocus=document.activeElement&&document.activeElement.id&&/^nf/.test(document.activeElement.id)?document.activeElement.id:null;
   b.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'
     +'<div><div class="dim" style="font-weight:700;margin-bottom:6px">All Funds</div>'
@@ -298,13 +326,14 @@ function renderAdmin(){
           :'<button class="abtn up" data-resume="'+esc(f.fund_acct)+'">Resume</button>')+'</td></tr>').join('')+'</table>'
       :'<div class="empty">No funds</div>')
     +'</div>'
-    +'<div class="frm"><div class="dim" style="font-weight:700;margin-bottom:6px">Create New Fund (admin)</div>'
-    +'<input id="nfAcct" placeholder="Dedicated FX account (e.g. FX-123456)">'
+    +'<div class="frm"><div class="dim" style="font-weight:700;margin-bottom:6px">Create New Fund — pick a customer (admin)</div>'
+    +'<input id="nfSearch" placeholder="Search name / email / account…">'
+    +'<div id="nfList" style="max-height:150px;overflow:auto;border:1px solid var(--lgd-hair);border-radius:6px;margin-bottom:7px">'+pickList()+'</div>'
     +'<input id="nfName" placeholder="Fund name (e.g. Alpha FX Fund)">'
-    +'<input id="nfFee" type="number" min="0" max="50" step="1" placeholder="Performance fee % (default 20)">'
-    +'<input id="nfMin" type="number" min="0" step="10" placeholder="Minimum investment $ (default 100)">'
-    +'<button class="go" id="nfGo">Create Fund</button>'
-    +'<div class="dim" style="font-size:10.5px;margin-top:6px">Balance at creation = manager capital, units minted at NAV 1.0</div></div>'
+    +'<div style="display:flex;gap:7px"><input id="nfFee" type="number" min="0" max="50" step="1" placeholder="Fee % (20)" style="flex:1">'
+    +'<input id="nfMin" type="number" min="0" step="10" placeholder="Min $ (100)" style="flex:1"></div>'
+    +'<button class="go" id="nfGo">'+(pickAcct?'Create Fund on '+esc(pickAcct.acct):'Create Fund — pick an account above')+'</button>'
+    +'<div class="dim" style="font-size:10.5px;margin-top:6px">Balance at creation = manager capital, units minted at NAV 1.0. Regular withdrawals lock while investors hold units.</div></div>'
     +'</div>';
   b.querySelectorAll('[data-pause]').forEach(el=>el.onclick=async()=>{
     if(await confirmModal('Pause Fund','New joins will be blocked (existing shares & trading unaffected).<br><b>'+esc(el.dataset.pause)+'</b>'))
@@ -314,12 +343,14 @@ function renderAdmin(){
       opRun('pamm_set_status',{p_fund:el.dataset.resume,p_status:'active'}); });
   Object.keys(keep).forEach(id=>{const el=$(id); if(el&&keep[id]!=null&&keep[id]!=='') el.value=keep[id];});
   if(hadFocus){const el=$(hadFocus); if(el){el.focus(); try{el.setSelectionRange(el.value.length,el.value.length);}catch(e){}}}
+  const se=$('nfSearch'); if(se){ se.oninput=()=>{ $('nfList').innerHTML=pickList(se.value); wireList(); }; }
+  wireList();
   const go=$('nfGo'); if(go) go.onclick=async()=>{
-    const acct=($('nfAcct').value||'').trim(), name=($('nfName').value||'').trim();
+    if(!pickAcct){ alert('Pick a customer account from the list first'); return; }
+    const name=($('nfName').value||'').trim()||((pickAcct.name||'Fund')+' Fund');
     const fee=+($('nfFee').value||20), min=+($('nfMin').value||100);
-    if(!acct||!name){ alert('Enter the account number and fund name'); return; }
-    if(await confirmModal('Create Fund','Register account <b>'+esc(acct)+'</b> as fund <b>'+esc(name)+'</b>.<br>Performance fee '+fee+'% · minimum '+usd2(min)+'<br>After creation, regular withdrawals/transfers from this account are blocked (PAMM ops only).',true))
-      opRun('pamm_create_fund',{p_ref:'pamm-create-'+acct+'-'+Date.now(),p_acct:acct,p_name:name,p_fee_pct:fee,p_min:min});
+    if(await confirmModal('Create Fund','<b>'+esc(pickAcct.name||pickAcct.acct)+'</b> ('+esc(pickAcct.acct)+' · '+usd2(pickAcct.bal)+')<br>→ fund <b>'+esc(name)+'</b> · fee '+fee+'% · min '+usd2(min)+'<br>Regular withdrawals from this account lock while investors hold units.',true))
+      opRun('pamm_create_fund',{p_ref:'pamm-create-'+pickAcct.acct+'-'+Date.now(),p_acct:pickAcct.acct,p_name:name,p_fee_pct:fee,p_min:min});
   };
 }
 
