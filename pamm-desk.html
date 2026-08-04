@@ -131,14 +131,12 @@ const ago=ts=>{const s=Math.max(0,(Date.now()-new Date(ts).getTime())/1000);
   if(s<90)return Math.round(s)+'s';if(s<5400)return Math.round(s/60)+'m';if(s<172800)return Math.round(s/3600)+'h';return Math.round(s/86400)+'d';};
 
 /* ════════ 위젯 그리드 엔진 (sportsbook-desk 이식 — 12컬럼 · 드래그/리사이즈 · 레이아웃 저장) ════════ */
-const COLS=12, RH=30, GAP=8, LKEY='alpexa.pammdesk.layout.v1';   // UI 설정 — 돈 아님, 로컬 OK
+const COLS=12, RH=30, GAP=8, LKEY='alpexa.pammdesk.layout.v2';   // UI 설정 — 돈 아님, 로컬 OK
 const WIDGETS=[
-  {id:'kpi',    t:'📊 Fund Board', d:'Equity · NAV · Return',        x:0,y:0, w:12,h:4},
-  {id:'roster', t:'👥 Investors', d:'Shares · basis · P&L',            x:0,y:4, w:7, h:10},
-  {id:'nav',    t:'📈 NAV Curve', d:'Per-unit value over time',           x:7,y:4, w:5, h:10},
-  {id:'ops',    t:'🧾 Share Ledger', d:'Joins · redemptions · fees', x:0,y:14,w:7, h:9},
-  {id:'pos',    t:'📌 Open Positions', d:'Fund account · live',          x:7,y:14,w:5, h:9},
-  {id:'admin',  t:'🛠️ Fund Admin', d:'Create · pause (admin)',        x:0,y:23,w:12,h:7}];
+  {id:'kpi',    t:'📊 Fund Board', d:'Equity · NAV · Return',      x:0,y:0, w:12,h:4},
+  {id:'roster', t:'👥 Investors', d:'Shares · basis · P&L',        x:0,y:4, w:7, h:11},
+  {id:'pos',    t:'📌 Open Positions', d:'Fund account · live',    x:7,y:4, w:5, h:11},
+  {id:'admin',  t:'🛠️ Fund Admin', d:'Create · pause (admin)',     x:0,y:15,w:12,h:8}];
 let layout={}; try{ layout=JSON.parse(localStorage.getItem(LKEY)||'{}')||{}; }catch(e){ layout={}; }
 function colW(){ const b=$('board'); return Math.max(40,((b.clientWidth-16)-GAP*(COLS-1))/COLS); }
 function place(el,g){ const cw=colW();
@@ -231,7 +229,7 @@ async function pullPositions(){   // 펀드 계좌의 열린 포지션 (읽기 �
 }
 
 /* ════════ 렌더 ════════ */
-function renderAll(){ renderKpi(); renderRoster(); renderNav(); renderOps(); renderAdmin(); }
+function renderAll(){ renderKpi(); renderRoster(); renderAdmin(); }
 function renderKpi(){
   const b=$('b-kpi'); if(!CUR){ b.innerHTML='<div class="empty">No funds yet — create one in “Fund Admin” below</div>'; return; }
   const ret=(+CUR.nav||1)-1;
@@ -261,30 +259,6 @@ function renderRoster(){
         +'<td class="r '+(pnl>=0?'up':'dn')+'">'+(pnl>=0?'+':'−')+usd2(Math.abs(pnl))+'</td>'
         +'<td class="r dim">'+ago(m.joined)+'</td></tr>';
     }).join('')+'</table>';
-}
-function renderNav(){
-  const b=$('b-nav'); if(!CUR||!CUR.ops||!CUR.ops.length){ b.innerHTML='<div class="empty">Waiting for ledger data</div>'; return; }
-  const pts=CUR.ops.slice().reverse().map(o=>+o.nav||1);   // 시간순
-  pts.push(+CUR.nav||1);
-  const w=Math.max(200,b.clientWidth-8), h=Math.max(90,b.clientHeight-30);
-  const mn=Math.min.apply(null,pts)*0.999, mx=Math.max.apply(null,pts)*1.001;
-  const xy=pts.map((p,i)=>((i/(pts.length-1||1))*w).toFixed(1)+','+((h-(p-mn)/(mx-mn||1)*h)+4).toFixed(1)).join(' ');
-  const up=pts[pts.length-1]>=pts[0];
-  b.innerHTML='<svg width="'+w+'" height="'+(h+8)+'" style="display:block">'
-    +'<polyline fill="none" stroke="'+(up?'#00C805':'#FF453A')+'" stroke-width="2" points="'+xy+'"/></svg>'
-    +'<div class="dim" style="font-size:10.5px;margin-top:4px">NAV '+pts[0].toFixed(4)+' → '+pts[pts.length-1].toFixed(4)+' · points = share events (tick curve in v2)</div>';
-}
-function renderOps(){
-  const b=$('b-ops'); if(!CUR){ b.innerHTML='<div class="empty">—</div>'; return; }
-  const ops=CUR.ops;
-  if(!ops){ b.innerHTML='<div class="empty">No access</div>'; return; }
-  if(!ops.length){ b.innerHTML='<div class="empty">No records</div>'; return; }
-  const K={join:['JOIN','grn'],leave:['REDEEM','red'],fee:['FEE','yel'],create:['CREATE','grn']};
-  b.innerHTML='<table><tr><th>Time</th><th>Type</th><th>Account</th><th class="r">Amount</th><th class="r">Units</th><th class="r">NAV</th></tr>'
-    +ops.map(o=>{const k=K[o.kind]||[o.kind,'yel'];
-      return '<tr><td class="dim">'+ago(o.at)+'</td><td><span class="pill '+k[1]+'">'+k[0]+'</span></td>'
-        +'<td>'+esc(o.cust)+'</td><td class="r">'+usd2(o.usd)+'</td><td class="r">'+(+o.units).toFixed(4)+'</td><td class="r">'+(+o.nav).toFixed(4)+'</td></tr>';}).join('')
-    +'</table>';
 }
 function renderPos(){
   const b=$('b-pos'); if(!CUR){ b.innerHTML='<div class="empty">—</div>'; return; }
