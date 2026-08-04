@@ -95,6 +95,8 @@ td{padding:4px 6px;border-bottom:1px solid rgba(29,33,42,.55);white-space:nowrap
   <span class="hsp"></span>
   <span class="hdot" id="feedDot" title="data feed"></span>
   <span class="hmail" id="whoami"></span>
+  <button class="hbtn" id="btnFundCtl" style="display:none" title="Pause / resume this fund">⚙</button>
+  <button class="hbtn" id="btnNew" style="display:none;color:var(--lgd-green);border-color:rgba(0,200,5,.4)">+ New fund</button>
   <button class="hbtn" id="btnRefresh">↻ Refresh</button>
   <button class="hbtn" id="btnLayout">Reset layout</button>
   <button class="hbtn" id="btnOut" style="display:none">Sign out</button>
@@ -105,6 +107,18 @@ td{padding:4px 6px;border-bottom:1px solid rgba(29,33,42,.55);white-space:nowrap
   <h3 id="opTitle"></h3><div class="opb" id="opBody"></div>
   <div class="opr"><button class="cancel" id="opNo">Cancel</button><button class="go" id="opYes">Confirm</button></div>
 </div></div>
+
+<div id="nfModal" style="position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:80;display:none;align-items:center;justify-content:center">
+  <div class="opbox frm" style="width:430px">
+    <h3 style="margin-bottom:10px">Create New Fund</h3>
+    <input id="nfSearch" placeholder="Search name / email / account…">
+    <div id="nfList" style="max-height:170px;overflow:auto;border:1px solid var(--lgd-hair);border-radius:6px;margin-bottom:7px"></div>
+    <input id="nfName" placeholder="Fund name (e.g. Alpha FX Fund)">
+    <div style="display:flex;gap:7px"><input id="nfFee" type="number" min="0" max="50" step="1" placeholder="Fee % (20)" style="flex:1"><input id="nfMin" type="number" min="0" step="10" placeholder="Min $ (100)" style="flex:1"></div>
+    <div class="opr" style="margin-top:4px"><button class="cancel" id="nfClose">Cancel</button><button class="go safe" id="nfGo">Create Fund</button></div>
+    <div class="dim" style="font-size:10.5px;margin-top:8px">Balance at creation = manager capital (NAV 1.0). Regular withdrawals lock while investors hold units.</div>
+  </div>
+</div>
 
 <div id="gate">
   <div class="gbox">
@@ -131,12 +145,11 @@ const ago=ts=>{const s=Math.max(0,(Date.now()-new Date(ts).getTime())/1000);
   if(s<90)return Math.round(s)+'s';if(s<5400)return Math.round(s/60)+'m';if(s<172800)return Math.round(s/3600)+'h';return Math.round(s/86400)+'d';};
 
 /* ════════ 위젯 그리드 엔진 (sportsbook-desk 이식 — 12컬럼 · 드래그/리사이즈 · 레이아웃 저장) ════════ */
-const COLS=12, RH=30, GAP=8, LKEY='alpexa.pammdesk.layout.v3';   // UI 설정 — 돈 아님, 로컬 OK
+const COLS=12, RH=30, GAP=8, LKEY='alpexa.pammdesk.layout.v4';   // UI 설정 — 돈 아님, 로컬 OK
 const WIDGETS=[
   {id:'kpi',    t:'', d:'', noHead:true,                          x:0,y:0, w:12,h:2},
-  {id:'roster', t:'👥 Investors', d:'Shares · basis · P&L',        x:0,y:2, w:7, h:12},
-  {id:'pos',    t:'📌 Open Positions', d:'Fund account · live',    x:7,y:2, w:5, h:12},
-  {id:'admin',  t:'🛠️ Fund Admin', d:'Create · pause (admin)',     x:0,y:14,w:12,h:8}];
+  {id:'roster', t:'👥 Investors', d:'Shares · basis · P&L',        x:0,y:2, w:7, h:13},
+  {id:'pos',    t:'📌 Open Positions', d:'Fund account · live',    x:7,y:2, w:5, h:13}];
 let layout={}; try{ layout=JSON.parse(localStorage.getItem(LKEY)||'{}')||{}; }catch(e){ layout={}; }
 function colW(){ const b=$('board'); return Math.max(40,((b.clientWidth-16)-GAP*(COLS-1))/COLS); }
 function place(el,g){ const cw=colW();
@@ -183,7 +196,9 @@ async function pullFxAccounts(){   // 개설 피커용 — 어드민 RLS 읽기 
         .sort((x,y)=>y.bal-x.bal);
     }
   }catch(e){ FXACCTS=[]; }
-  renderAdmin();
+  const adm=FXACCTS.length>0;
+  $('btnNew').style.display=adm?'':'none';
+  $('btnFundCtl').style.display=(adm&&CUR)?'':'none';
 }
 
 function confirmModal(title, body, safe){
@@ -229,7 +244,7 @@ async function pullPositions(){   // 펀드 계좌의 열린 포지션 (읽기 �
 }
 
 /* ════════ 렌더 ════════ */
-function renderAll(){ renderKpi(); renderRoster(); renderAdmin(); }
+function renderAll(){ renderKpi(); renderRoster(); }
 function renderKpi(){
   const b=$('b-kpi');
   if(!CUR){ b.innerHTML='<span class="dim" style="font-size:12.5px">No funds yet — create one in Fund Admin below</span>'; return; }
@@ -280,51 +295,32 @@ function wireList(){
   document.querySelectorAll('#nfList .pkrow').forEach(el=>el.onclick=()=>{
     pickAcct=FXACCTS.find(x=>x.acct===el.dataset.acct)||null;
     const nm=$('nfName'); if(nm&&!nm.value&&pickAcct&&pickAcct.name) nm.value=pickAcct.name+' Fund';
-    renderAdmin();
+    $('nfList').innerHTML=pickList($('nfSearch').value); wireList();
   });
 }
-function renderAdmin(){
-  const b=$('b-admin');
-  // 30초 자동 새로고침이 입력 중인 개설 폼을 지우던 버그(8/3 사장님 "자꾸 내용이 없어져") —
-  // 다시 그리기 전에 입력값·포커스를 붙잡아 두고, 그린 뒤 그대로 복원한다.
-  const keep={}; ['nfSearch','nfName','nfFee','nfMin'].forEach(id=>{const el=$(id); if(el) keep[id]=el.value;});
-  const hadFocus=document.activeElement&&document.activeElement.id&&/^nf/.test(document.activeElement.id)?document.activeElement.id:null;
-  b.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'
-    +'<div><div class="dim" style="font-weight:700;margin-bottom:6px">All Funds</div>'
-    +(FUNDS.length?'<table><tr><th>Fund</th><th>Manager</th><th class="r">Equity</th><th class="r">NAV</th><th class="r">Investors</th><th>Status</th><th></th></tr>'
-      +FUNDS.map(f=>'<tr><td>'+esc(f.name)+' <span class="dim">'+esc(f.fund_acct)+'</span></td><td>'+esc(f.manager_cust)+'</td>'
-        +'<td class="r">'+usd2(f.equity)+'</td><td class="r">'+(+f.nav).toFixed(4)+'</td><td class="r">'+f.members+'</td>'
-        +'<td><span class="pill '+(f.status==='active'?'grn':f.status==='paused'?'yel':'red')+'">'+esc(f.status)+'</span></td>'
-        +'<td>'+(f.status==='active'
-          ?'<button class="abtn dn" data-pause="'+esc(f.fund_acct)+'">Pause</button>'
-          :'<button class="abtn up" data-resume="'+esc(f.fund_acct)+'">Resume</button>')+'</td></tr>').join('')+'</table>'
-      :'<div class="empty">No funds</div>')
-    +'</div>'
-    +'<div class="frm"><div class="dim" style="font-weight:700;margin-bottom:6px">Create New Fund — pick a customer (admin)</div>'
-    +'<input id="nfSearch" placeholder="Search name / email / account…">'
-    +'<div id="nfList" style="max-height:150px;overflow:auto;border:1px solid var(--lgd-hair);border-radius:6px;margin-bottom:7px">'+pickList()+'</div>'
-    +'<input id="nfName" placeholder="Fund name (e.g. Alpha FX Fund)">'
-    +'<div style="display:flex;gap:7px"><input id="nfFee" type="number" min="0" max="50" step="1" placeholder="Fee % (20)" style="flex:1">'
-    +'<input id="nfMin" type="number" min="0" step="10" placeholder="Min $ (100)" style="flex:1"></div>'
-    +'<button class="go" id="nfGo">'+(pickAcct?'Create Fund on '+esc(pickAcct.acct):'Create Fund — pick an account above')+'</button>'
-    +'<div class="dim" style="font-size:10.5px;margin-top:6px">Balance at creation = manager capital, units minted at NAV 1.0. Regular withdrawals lock while investors hold units.</div></div>'
-    +'</div>';
-  b.querySelectorAll('[data-pause]').forEach(el=>el.onclick=async()=>{
-    if(await confirmModal('Pause Fund','New joins will be blocked (existing shares & trading unaffected).<br><b>'+esc(el.dataset.pause)+'</b>'))
-      opRun('pamm_set_status',{p_fund:el.dataset.pause,p_status:'paused'}); });
-  b.querySelectorAll('[data-resume]').forEach(el=>el.onclick=async()=>{
-    if(await confirmModal('Resume Fund','New joins will be allowed again.<br><b>'+esc(el.dataset.resume)+'</b>',true))
-      opRun('pamm_set_status',{p_fund:el.dataset.resume,p_status:'active'}); });
-  Object.keys(keep).forEach(id=>{const el=$(id); if(el&&keep[id]!=null&&keep[id]!=='') el.value=keep[id];});
-  if(hadFocus){const el=$(hadFocus); if(el){el.focus(); try{el.setSelectionRange(el.value.length,el.value.length);}catch(e){}}}
-  const se=$('nfSearch'); if(se){ se.oninput=()=>{ $('nfList').innerHTML=pickList(se.value); wireList(); }; }
-  wireList();
-  const go=$('nfGo'); if(go) go.onclick=async()=>{
+function openNewFund(){
+  pickAcct=null; $('nfName').value=''; $('nfSearch').value='';
+  $('nfList').innerHTML=pickList(); wireList();
+  $('nfModal').style.display='flex';
+}
+function wireNewFund(){
+  $('btnNew').onclick=openNewFund;
+  $('nfClose').onclick=()=>{ $('nfModal').style.display='none'; };
+  $('nfSearch').oninput=()=>{ $('nfList').innerHTML=pickList($('nfSearch').value); wireList(); };
+  $('nfGo').onclick=async()=>{
     if(!pickAcct){ alert('Pick a customer account from the list first'); return; }
     const name=($('nfName').value||'').trim()||((pickAcct.name||'Fund')+' Fund');
     const fee=+($('nfFee').value||20), min=+($('nfMin').value||100);
+    $('nfModal').style.display='none';
     if(await confirmModal('Create Fund','<b>'+esc(pickAcct.name||pickAcct.acct)+'</b> ('+esc(pickAcct.acct)+' · '+usd2(pickAcct.bal)+')<br>→ fund <b>'+esc(name)+'</b> · fee '+fee+'% · min '+usd2(min)+'<br>Regular withdrawals from this account lock while investors hold units.',true))
       opRun('pamm_create_fund',{p_ref:'pamm-create-'+pickAcct.acct+'-'+Date.now(),p_acct:pickAcct.acct,p_name:name,p_fee_pct:fee,p_min:min});
+  };
+  $('btnFundCtl').onclick=async()=>{
+    if(!CUR) return;
+    const toPause=CUR.status==='active';
+    if(await confirmModal(toPause?'Pause Fund':'Resume Fund',
+        '<b>'+esc(CUR.name)+'</b> ('+esc(CUR.fund_acct)+')<br>'+(toPause?'New joins will be blocked (existing shares & trading unaffected).':'New joins will be allowed again.'),!toPause))
+      opRun('pamm_set_status',{p_fund:CUR.fund_acct,p_status:toPause?'paused':'active'});
   };
 }
 
@@ -332,7 +328,7 @@ function renderAdmin(){
 async function boot(){
   buildBoard();
   $('fundSel').onchange=()=>{ CUR=FUNDS.find(f=>f.fund_acct===$('fundSel').value)||null; renderAll(); pullPositions(); };
-  $('btnRefresh').onclick=pullReport;
+  $('btnRefresh').onclick=pullReport; wireNewFund();
   $('btnLayout').onclick=()=>{ layout={}; try{localStorage.removeItem(LKEY);}catch(e){} buildBoard(); renderAll(); renderPos(); };
   $('btnOut').onclick=async()=>{ try{ await AlpexaSync.db.auth.signOut(); }catch(e){} location.reload(); };
   try{
