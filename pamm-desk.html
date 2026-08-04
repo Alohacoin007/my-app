@@ -35,7 +35,7 @@ input,select{font:inherit}
 .hbtn{font-size:11.5px;font-weight:700;color:var(--lgd-dim);border:1px solid var(--lgd-hair);border-radius:6px;padding:4px 10px}
 .hbtn:hover{color:var(--lgd-ink);border-color:var(--lgd-pill-hi)}
 #board{position:relative;height:calc(100% - 40px);overflow:auto;padding:8px}
-.wg{position:absolute;background:var(--lgd-surface);border:1px solid var(--lgd-hair);border-radius:10px;display:flex;flex-direction:column;min-width:180px;min-height:110px;overflow:hidden}
+.wg{position:absolute;background:var(--lgd-surface);border:1px solid var(--lgd-hair);border-radius:10px;display:flex;flex-direction:column;min-width:180px;min-height:52px;overflow:hidden}
 .wg-h{display:flex;align-items:center;gap:8px;padding:7px 11px;border-bottom:1px solid var(--lgd-hair);cursor:grab;user-select:none;flex:0 0 auto}
 .wg-h b{font-size:12px;font-weight:800}
 .wg-h small{color:var(--lgd-dim);font-size:10.5px}
@@ -131,12 +131,12 @@ const ago=ts=>{const s=Math.max(0,(Date.now()-new Date(ts).getTime())/1000);
   if(s<90)return Math.round(s)+'s';if(s<5400)return Math.round(s/60)+'m';if(s<172800)return Math.round(s/3600)+'h';return Math.round(s/86400)+'d';};
 
 /* ════════ 위젯 그리드 엔진 (sportsbook-desk 이식 — 12컬럼 · 드래그/리사이즈 · 레이아웃 저장) ════════ */
-const COLS=12, RH=30, GAP=8, LKEY='alpexa.pammdesk.layout.v2';   // UI 설정 — 돈 아님, 로컬 OK
+const COLS=12, RH=30, GAP=8, LKEY='alpexa.pammdesk.layout.v3';   // UI 설정 — 돈 아님, 로컬 OK
 const WIDGETS=[
-  {id:'kpi',    t:'📊 Fund Board', d:'Equity · NAV · Return',      x:0,y:0, w:12,h:4},
-  {id:'roster', t:'👥 Investors', d:'Shares · basis · P&L',        x:0,y:4, w:7, h:11},
-  {id:'pos',    t:'📌 Open Positions', d:'Fund account · live',    x:7,y:4, w:5, h:11},
-  {id:'admin',  t:'🛠️ Fund Admin', d:'Create · pause (admin)',     x:0,y:15,w:12,h:8}];
+  {id:'kpi',    t:'', d:'', noHead:true,                          x:0,y:0, w:12,h:2},
+  {id:'roster', t:'👥 Investors', d:'Shares · basis · P&L',        x:0,y:2, w:7, h:12},
+  {id:'pos',    t:'📌 Open Positions', d:'Fund account · live',    x:7,y:2, w:5, h:12},
+  {id:'admin',  t:'🛠️ Fund Admin', d:'Create · pause (admin)',     x:0,y:14,w:12,h:8}];
 let layout={}; try{ layout=JSON.parse(localStorage.getItem(LKEY)||'{}')||{}; }catch(e){ layout={}; }
 function colW(){ const b=$('board'); return Math.max(40,((b.clientWidth-16)-GAP*(COLS-1))/COLS); }
 function place(el,g){ const cw=colW();
@@ -149,11 +149,11 @@ function buildBoard(){
   const b=$('board'); b.innerHTML='';
   WIDGETS.forEach(w=>{
     const el=document.createElement('div'); el.className='wg'; el.id='w-'+w.id;
-    el.innerHTML='<div class="wg-h"><b>'+w.t+'</b><small>'+w.d+'</small></div>'
-      +'<div class="wg-b" id="b-'+w.id+'"><div class="empty">…</div></div><div class="wg-rs"></div>';
+    el.innerHTML=(w.noHead?'':'<div class="wg-h"><b>'+w.t+'</b><small>'+w.d+'</small></div>')
+      +'<div class="wg-b" id="b-'+w.id+'"'+(w.noHead?' style="padding:0 14px;display:flex;align-items:center;overflow:hidden"':'')+'><div class="empty">…</div></div><div class="wg-rs"></div>';
     b.appendChild(el); place(el,geom(w.id));
-    const h=el.querySelector('.wg-h'), rs=el.querySelector('.wg-rs');
-    h.addEventListener('pointerdown',e=>dragStart(e,el,w.id,false));
+    const h=el.querySelector('.wg-h')||el, rs=el.querySelector('.wg-rs');
+    h.addEventListener('pointerdown',e=>{ if(e.target.closest('input,button,select,.wg-rs')) return; dragStart(e,el,w.id,false); });
     rs.addEventListener('pointerdown',e=>dragStart(e,el,w.id,true));
   });
 }
@@ -231,16 +231,16 @@ async function pullPositions(){   // 펀드 계좌의 열린 포지션 (읽기 �
 /* ════════ 렌더 ════════ */
 function renderAll(){ renderKpi(); renderRoster(); renderAdmin(); }
 function renderKpi(){
-  const b=$('b-kpi'); if(!CUR){ b.innerHTML='<div class="empty">No funds yet — create one in “Fund Admin” below</div>'; return; }
+  const b=$('b-kpi');
+  if(!CUR){ b.innerHTML='<span class="dim" style="font-size:12.5px">No funds yet — create one in Fund Admin below</span>'; return; }
   const ret=(+CUR.nav||1)-1;
-  b.innerHTML='<div class="kpis">'
-    +'<div class="kpi"><div class="l">Equity</div><div class="v">'+usd2(CUR.equity)+'</div></div>'
-    +'<div class="kpi"><div class="l">NAV (per unit)</div><div class="v">'+(+CUR.nav||1).toFixed(4)+'</div></div>'
-    +'<div class="kpi"><div class="l">Total Return</div><div class="v '+(ret>=0?'up':'dn')+'">'+pct(ret)+'</div></div>'
-    +'<div class="kpi"><div class="l">Investors</div><div class="v">'+(+CUR.members||0)+'</div></div>'
-    +'<div class="kpi"><div class="l">Total Units</div><div class="v">'+(+CUR.total_units||0).toLocaleString()+'</div></div>'
-    +'<div class="kpi"><div class="l">Perf. Fee</div><div class="v">'+(+CUR.perf_fee_pct||0)+'%</div></div>'
-    +'<div class="kpi"><div class="l">Status</div><div class="v"><span class="pill '+(CUR.status==='active'?'grn':CUR.status==='paused'?'yel':'red')+'">'+esc(CUR.status)+'</span></div></div>'
+  b.innerHTML='<div style="display:flex;align-items:baseline;gap:16px;white-space:nowrap;overflow:auto;width:100%">'
+    +'<b style="font-size:19px;font-variant-numeric:tabular-nums">'+usd2(CUR.equity)+'</b>'
+    +'<span class="'+(ret>=0?'up':'dn')+'" style="font-weight:800;font-size:13.5px">'+pct(ret)+'</span>'
+    +'<span class="dim" style="font-size:12px">NAV '+(+CUR.nav||1).toFixed(4)+'</span>'
+    +'<span class="dim" style="font-size:12px">'+(+CUR.members||0)+' investor'+((+CUR.members||0)===1?'':'s')+'</span>'
+    +'<span class="dim" style="font-size:12px">fee '+(+CUR.perf_fee_pct||0)+'%</span>'
+    +'<span class="pill '+(CUR.status==='active'?'grn':CUR.status==='paused'?'yel':'red')+'">'+esc(CUR.status)+'</span>'
     +'</div>';
 }
 function renderRoster(){
