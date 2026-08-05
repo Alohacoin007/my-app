@@ -267,3 +267,15 @@ grant execute on function public.pamm_join(text,text,numeric) to authenticated;
 grant execute on function public.pamm_leave(text,text,numeric) to authenticated;
 grant execute on function public.pamm_desk_report(text) to authenticated;
 grant execute on function public.pamm_set_status(text,text) to authenticated;
+
+-- ⑨ 어드민: 성과보수 변경 (2026-08-05 사장님 "커스텀 가능하게") — 테이블 CHECK(0~50)가 백스톱
+create or replace function public.pamm_set_fee(p_fund text, p_fee numeric)
+returns jsonb language plpgsql security definer set search_path to 'public' as $$
+begin
+  if not public.is_admin() then return jsonb_build_object('ok',false,'error','not admin'); end if;
+  if p_fee is null or p_fee < 0 or p_fee > 50 then return jsonb_build_object('ok',false,'error','fee must be 0~50%'); end if;
+  update pamm_funds set perf_fee_pct = p_fee where fund_acct = p_fund;
+  if not found then return jsonb_build_object('ok',false,'error','fund not found'); end if;
+  return jsonb_build_object('ok',true,'fund',p_fund,'fee',p_fee);
+end;$$;
+grant execute on function public.pamm_set_fee(text, numeric) to authenticated;

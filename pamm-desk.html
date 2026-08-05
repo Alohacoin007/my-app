@@ -120,6 +120,19 @@ td{padding:4px 6px;border-bottom:1px solid rgba(29,33,42,.55);white-space:nowrap
   </div>
 </div>
 
+<div id="fsModal" style="position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:80;display:none;align-items:center;justify-content:center">
+  <div class="opbox frm" style="width:360px">
+    <h3 id="fsTitle" style="margin-bottom:10px">Fund settings</h3>
+    <div class="dim" style="font-size:11px;margin-bottom:4px">Performance fee % (0–50)</div>
+    <input id="fsFee" type="number" min="0" max="50" step="1">
+    <div class="opr" style="margin-top:6px">
+      <button class="cancel" id="fsClose">Close</button>
+      <button class="cancel" id="fsPause" style="color:var(--lgd-warn);border-color:rgba(255,176,32,.4)"></button>
+      <button class="go safe" id="fsSave">Save fee</button>
+    </div>
+  </div>
+</div>
+
 <div id="gate">
   <div class="gbox">
     <h2>💼 PAMM Desk</h2>
@@ -315,9 +328,23 @@ function wireNewFund(){
     if(await confirmModal('Create Fund','<b>'+esc(pickAcct.name||pickAcct.acct)+'</b> ('+esc(pickAcct.acct)+' · '+usd2(pickAcct.bal)+')<br>→ fund <b>'+esc(name)+'</b> · fee '+fee+'% · min '+usd2(min)+'<br>Regular withdrawals from this account lock while investors hold units.',true))
       opRun('pamm_create_fund',{p_ref:'pamm-create-'+pickAcct.acct+'-'+Date.now(),p_acct:pickAcct.acct,p_name:name,p_fee_pct:fee,p_min:min});
   };
-  $('btnFundCtl').onclick=async()=>{
+  $('btnFundCtl').onclick=()=>{
     if(!CUR) return;
+    $('fsTitle').textContent='Fund settings — '+CUR.name;
+    $('fsFee').value=+CUR.perf_fee_pct||20;
+    $('fsPause').textContent=CUR.status==='active'?'Pause fund':'Resume fund';
+    $('fsModal').style.display='flex';
+  };
+  $('fsClose').onclick=()=>{ $('fsModal').style.display='none'; };
+  $('fsSave').onclick=async()=>{
+    const fee=+($('fsFee').value||0);
+    $('fsModal').style.display='none';
+    if(await confirmModal('Change performance fee','<b>'+esc(CUR.name)+'</b>: fee '+(+CUR.perf_fee_pct||0)+'% → <b>'+fee+'%</b><br>Applies to future redemptions only (already-redeemed fees unchanged).',true))
+      opRun('pamm_set_fee',{p_fund:CUR.fund_acct,p_fee:fee});
+  };
+  $('fsPause').onclick=async()=>{
     const toPause=CUR.status==='active';
+    $('fsModal').style.display='none';
     if(await confirmModal(toPause?'Pause Fund':'Resume Fund',
         '<b>'+esc(CUR.name)+'</b> ('+esc(CUR.fund_acct)+')<br>'+(toPause?'New joins will be blocked (existing shares & trading unaffected).':'New joins will be allowed again.'),!toPause))
       opRun('pamm_set_status',{p_fund:CUR.fund_acct,p_status:toPause?'paused':'active'});
