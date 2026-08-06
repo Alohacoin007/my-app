@@ -54,6 +54,11 @@ if (/from\('pamm_(funds|members|ops)'\)\s*\.\s*(insert|update|delete)/.test(desk
 if (!/confirmModal/.test(desk) || !/opRun/.test(desk)) bad('desk interventions must pass confirmModal + opRun');
 if (!/ALPEXA_ADMIN_SESSION/.test(desk)) bad('desk must use the isolated admin session key');
 if (!/vendor\/supabase\.min\.js/.test(desk)) bad('desk must use self-hosted supabase (no CDN)');
+// [P8] Open Positions 플로팅 = 서버 실시간 마크(fx_realized_pnl), 스테일 p.pnl 컬럼 금지 (플로팅==서버 실현 불변식)
+if (!/'pnl',\s*case when public\.fx_realized_pnl\(p\.symbol,p\.side,p\.open_price,p\.size\) is null/.test(sql))
+  bad('desk positions floating P&L must be a live fx_realized_pnl mark, never the stale positions.pnl column');
+if (/'open_price',p\.open_price,'pnl',p\.pnl\)/.test(sql))
+  bad('desk positions must NOT emit the stale stored p.pnl for OPEN positions (floating would diverge from realized)');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} PAMM contract problem(s).`); process.exit(1); }
 console.log('🟢 PASS: PAMM core contracts (unit/NAV ledger, fund-account guard, rollover gate, HWM fee, admin gates).');

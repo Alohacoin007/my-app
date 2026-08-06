@@ -244,7 +244,12 @@ begin
                 from (select * from pamm_ops where fund_acct = fd.fund_acct order by created_at desc limit 50) o)
            else null end as ops,
            case when public.is_admin() or fd.manager_cust = v_cust then
-             (select jsonb_agg(jsonb_build_object('local_id',p.local_id,'symbol',p.symbol,'side',p.side,'size',p.size,'open_price',p.open_price,'pnl',p.pnl))
+             -- 플로팅 P&L = 서버 실시간 mid 마크(fx_realized_pnl) + 적립 스왑 — stop-out 엔진과 동일 함수.
+             -- ⚠️ 저장된 p.pnl 컬럼은 청산 시점에만 기록되는 스테일값 → 열린 포지션엔 쓰지 않는다.
+             --    이래야 "플로팅==서버 실현" 불변식 유지(가짜 ± 금지). 미가격 심볼은 null → UI '—'.
+             (select jsonb_agg(jsonb_build_object('local_id',p.local_id,'symbol',p.symbol,'side',p.side,'size',p.size,'open_price',p.open_price,
+                     'pnl', case when public.fx_realized_pnl(p.symbol,p.side,p.open_price,p.size) is null then null
+                                 else round(public.fx_realized_pnl(p.symbol,p.side,p.open_price,p.size) + coalesce((p.meta->>'swap')::numeric,0),2) end))
                 from positions p where p.acct_no = fd.fund_acct and p.server = 'fx' and p.status = 'open')
            else null end as positions
       from pamm_funds fd join accounts a on a.acct_no = fd.fund_acct

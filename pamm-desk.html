@@ -286,10 +286,19 @@ function renderRoster(){
 function renderPos(){
   const b=$('b-pos'); if(!CUR){ b.innerHTML='<div class="empty">—</div>'; return; }
   if(!POS.length){ b.innerHTML='<div class="empty">No open positions<br><span style="font-size:11px">Joins/redemptions allowed (rollover rule)</span></div>'; return; }
+  let flTot=0, anyPr=false;
+  const rows=POS.map(p=>{
+    const pr=(p.pnl===null||p.pnl===undefined||p.pnl==='');   // 미가격(unpriced) → '—'
+    const fl=pr?null:(+p.pnl||0); if(!pr){flTot+=fl; anyPr=true;}
+    return '<tr><td>'+esc(String(p.symbol).toUpperCase())+'</td><td class="'+(String(p.side).toLowerCase()==='buy'?'up':'dn')+'">'+esc(String(p.side).toUpperCase())+'</td>'
+      +'<td class="r">'+(+p.size||0)+'</td><td class="r">'+(+p.open_price||0)+'</td>'
+      +'<td class="r '+(pr?'dim':(fl>=0?'up':'dn'))+'">'+(pr?'—':((fl>=0?'+':'−')+usd2(Math.abs(fl))))+'</td></tr>';
+  }).join('');
+  const tot=anyPr?('<tr style="border-top:1px solid rgba(60,66,80,.6)"><td class="dim" colspan="4" style="font-size:11px">Floating P&L · live mid mark</td>'
+      +'<td class="r '+(flTot>=0?'up':'dn')+'" style="font-weight:700">'+(flTot>=0?'+':'−')+usd2(Math.abs(flTot))+'</td></tr>'):'';
   b.innerHTML='<div class="wr" style="font-size:11px;margin-bottom:6px">⚠️ Positions open — joins/redemptions after close</div>'
-    +'<table><tr><th>Symbol</th><th>Side</th><th class="r">Lots</th><th class="r">Entry</th></tr>'
-    +POS.map(p=>'<tr><td>'+esc(String(p.symbol).toUpperCase())+'</td><td class="'+(String(p.side).toLowerCase()==='buy'?'up':'dn')+'">'+esc(String(p.side).toUpperCase())+'</td>'
-      +'<td class="r">'+(+p.size||0)+'</td><td class="r">'+(+p.open_price||0)+'</td></tr>').join('')+'</table>';
+    +'<table><tr><th>Symbol</th><th>Side</th><th class="r">Lots</th><th class="r">Entry</th><th class="r">Floating</th></tr>'
+    +rows+tot+'</table>';
 }
 function pickList(q){
   q=(q||'').toLowerCase();
