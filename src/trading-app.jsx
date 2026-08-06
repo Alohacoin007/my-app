@@ -1527,6 +1527,60 @@ function NewsScreen(){
 }
 
 // ── Account helper components ──
+// ── Managed Funds (PAMM) — 투자자 화면 (2026-08-06). 단일 소스 = pamm_investor_report RPC.
+//    참여/회수는 서버 RPC(pamm_join/pamm_leave, pamm-* 멱등 ref)만. 성공 후 서버 진실 재적재.
+function PammFunds(){
+  const [rep,setRep]=useState(null);
+  const [busy,setBusy]=useState('');
+  const num=n=>(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const load=React.useCallback(function(){
+    if(!(window.AlpexaSync&&AlpexaSync.db)){ setRep({ok:false}); return; }
+    AlpexaSync.db.rpc('pamm_investor_report').then(function(r){ setRep((r&&r.data)||{ok:false}); },function(){ setRep({ok:false}); });
+  },[]);
+  useEffect(function(){ load(); var iv=setInterval(load,15000); return function(){clearInterval(iv);}; },[load]);
+  var reloadTruth=function(){ try{ AlpexaSync.pullBalances&&AlpexaSync.pullBalances().then(function(b){ if(!b)return; try{var o=window.__fxSrvBal||{}; if(b.fx!=null)o.fx=b.fx; window.__fxSrvBal=o; window.dispatchEvent(new Event('alpexa-balance-change')); }catch(e){} }); }catch(e){} load(); };
+  var act=async function(kind,f){
+    if(kind==='join'||kind==='add'){
+      var v=+prompt('Amount to invest in '+f.name+' (USD)'+(f.min_join?'\nMinimum: $'+num(f.min_join):''),''); if(!(v>0)) return;
+      setBusy(f.fund_acct);
+      var r=await AlpexaSync.db.rpc('pamm_join',{p_ref:'pamm-'+f.fund_acct+'-'+Date.now(),p_fund:f.fund_acct,p_usd:v});
+      setBusy(''); var d=(r&&r.data)||{}; if(!d.ok){ alert('Join failed: '+(d.error||'try again')); return; }
+      reloadTruth(); alert('Invested $'+num(v)+' in '+f.name+' \u2713');
+    } else if(kind==='redeem'){
+      var m=f.mine; if(!m) return;
+      var all=confirm('Redeem your full stake in '+f.name+'?\nCurrent value: $'+num(m.value)+'\n\nOK = redeem all \u00b7 Cancel = choose amount');
+      var units=m.units;
+      if(!all){ var vv=+prompt('Amount to redeem (USD), max $'+num(m.value),''); if(!(vv>0)) return; units=Math.min(m.units, vv/(+f.nav||1)); }
+      setBusy(f.fund_acct);
+      var r2=await AlpexaSync.db.rpc('pamm_leave',{p_ref:'pamm-'+f.fund_acct+'-out-'+Date.now(),p_fund:f.fund_acct,p_units:units});
+      setBusy(''); var d2=(r2&&r2.data)||{}; if(!d2.ok){ alert('Redeem failed: '+(d2.error||'try again')); return; }
+      reloadTruth(); alert('Redeemed $'+num(d2.net||0)+(d2.fee?' (perf fee $'+num(d2.fee)+')':'')+' \u2192 your FX balance \u2713');
+    }
+  };
+  if(!rep) return null;
+  var funds=(rep.ok&&rep.funds)||[];
+  if(rep.ok&&!funds.length) return null;   // 펀드 없으면 섹션 숨김
+  return(<Section title="Managed Funds (PAMM)">
+    {!rep.ok ? <Row label="Sign in to view managed funds"/> :
+     funds.map(function(f){ var m=f.mine, ret=+f.ret||0, pnl=m?+m.pnl||0:0, b=busy===f.fund_acct;
+       return(<div key={f.fund_acct} style={{padding:'11px 14px',borderBottom:'1px solid var(--line-2)'}}>
+         <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
+           <div style={{fontSize:13.5,fontWeight:700,color:'var(--ink)'}}>{f.name}{f.is_manager?<span style={{color:'#c9a227',fontSize:9.5,marginLeft:6}}>MANAGER</span>:null}</div>
+           <div style={{fontSize:12,fontWeight:700,color:ret>=0?'var(--buy-2)':'var(--sell-2)'}}>{(ret>=0?'+':'')+(ret*100).toFixed(2)+'%'}</div>
+         </div>
+         {m ? <div style={{fontSize:12.5,color:'var(--text-2)',marginTop:3}}>My investment <b style={{color:'var(--ink)'}}>${num(m.basis)}</b> \u2192 now <b style={{color:'var(--ink)'}}>${num(m.value)}</b> <span style={{color:pnl>=0?'var(--buy-2)':'var(--sell-2)',fontWeight:700}}>({pnl>=0?'+':''}${num(Math.abs(pnl))})</span></div>
+             : <div style={{fontSize:11.5,color:'var(--text-3)',marginTop:3}}>Perf. fee {(+f.perf_fee_pct||0)}% \u00b7 min ${num(f.min_join)}{f.status!=='active'?' \u00b7 '+f.status:''}</div>}
+         <div style={{display:'flex',gap:7,marginTop:8}}>
+           {f.is_manager ? <span style={{fontSize:11,color:'var(--text-3)'}}>You manage this fund</span>
+            : b ? <span style={{fontSize:11,color:'var(--text-3)'}}>Processing\u2026</span>
+            : <>{m ? <button onClick={function(){act('add',f);}} style={{fontSize:12,fontWeight:700,padding:'6px 16px',borderRadius:6,background:'var(--bg-2)',color:'var(--ink)',border:'1px solid var(--line-2)'}}>Add</button>
+                    : (f.status==='active'?<button onClick={function(){act('join',f);}} style={{fontSize:12,fontWeight:700,padding:'6px 18px',borderRadius:6,background:'var(--buy-2)',color:'#fff',border:'none'}}>Join</button>:null)}
+                 {m ? <button onClick={function(){act('redeem',f);}} style={{fontSize:12,fontWeight:700,padding:'6px 16px',borderRadius:6,background:'transparent',color:'var(--sell-2)',border:'1px solid var(--sell-2)'}}>Redeem</button> : null}</>}
+         </div>
+       </div>);
+     })}
+  </Section>);
+}
 function Section({title,children}){return(<><div style={{fontSize:10,fontWeight:700,color:'var(--text-3)',letterSpacing:0.6,padding:'14px 14px 6px'}}>{title}</div><div style={{background:'var(--surface)'}}>{children}</div></>);}
 function Row({label,val,chev,toggle,mono,onClick,onToggle}){
   const [on,setOn]=useState(toggle);
@@ -2347,6 +2401,7 @@ function Account({openPositions=0,onNavigate}){
         <Row label="Currency" val={getPrefs().currency||'USD'} chev onClick={()=>setSheet('currency')}/>
         <Row label={tr("Language")} val={window.getLanguageLabel?window.getLanguageLabel(getPrefs().language||'en'):'🇬🇧 English'} chev onClick={()=>setSheet('language')}/>
       </Section>
+      <PammFunds/>
       <Section title="Trading">
         <Row label="One-click Trading" toggle={getPrefs().oneClick} onToggle={v=>{setPref('oneClick',v);force(x=>x+1);}}/>
         <Row label="Sound Effects" toggle={!getPrefs().soundMuted} onToggle={v=>{setPref('soundMuted',!v);if(v&&window.ALPEXA_SFX)window.ALPEXA_SFX.tick();force(x=>x+1);}}/>

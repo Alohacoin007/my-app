@@ -62,6 +62,9 @@
   .statusbar .grow{margin-left:auto}
   /* ── toolbox non-Trade tab content (News/Mailbox/…): themed empty panels ── */
   .tbxbody{flex:1;overflow:auto;padding:0}
+  .pammbtn{font-size:11px;font-weight:700;padding:3px 10px;margin-left:5px;border-radius:5px;border:1px solid #2a2e34;background:#20242a;color:#c6cdd9;cursor:pointer}
+  .pammbtn.join{background:#00c805;border-color:#00c805;color:#04130a}
+  .pammbtn.out{border-color:rgba(255,69,58,.4);color:#ff453a}
   .tbxempty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#6a7078;gap:6px;font-size:12px}
   .tbxempty .ic{font-size:22px;opacity:.5}
   table.jrnl{width:100%;border-collapse:collapse;font:11px Consolas,monospace}
@@ -2551,7 +2554,7 @@ function MarketWatch({ onPick }){
 }
 
 /* ── Bottom Toolbox: MT5 tab strip + positions grid + account line, from positionsStore ── */
-const TBX_TABS=['Trade','Exposure','History','News','Mailbox','Calendar','Company','Alerts','Articles','Code Base','Experts','Journal'];
+const TBX_TABS=['Trade','Exposure','History','PAMM','News','Mailbox','Calendar','Company','Alerts','Articles','Code Base','Experts','Journal'];
 // themed empty panel for tabs with no live data source yet (News/Mailbox/Calendar/Company)
 const TAB_EMPTY={ News:['📰','News feed not connected'], Mailbox:['✉️','Mailbox is empty'],
   Calendar:['📅','Economic calendar not connected'], Company:['🏛️','Alpexa Ltd · account & company info'],
@@ -2626,6 +2629,71 @@ const alertsStore={
       if(hit){ playSnd(sndClose); this.save(); }
     },1000)); },
 };
+function PammTab({ acct }){
+  const [rep,setRep]=React.useState(null);
+  const [busy,setBusy]=React.useState('');
+  const num=(n)=>(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const load=React.useCallback(async()=>{
+    if(!(window.AlpexaSync&&AlpexaSync.db)) return;
+    try{ const r=await AlpexaSync.db.rpc('pamm_investor_report'); setRep((r&&r.data)||{ok:false}); }catch(e){ setRep({ok:false}); }
+  },[]);
+  React.useEffect(()=>{ load(); const iv=setInterval(load,15000); return ()=>clearInterval(iv); },[load]);
+  const bal=acct?+acct.balance||0:0;
+  const act=async(kind,f)=>{
+    const mine=f.mine;
+    if(kind==='join'||kind==='add'){
+      const v=+prompt('Amount to invest in '+f.name+' (USD)\nYour FX balance: $'+num(bal)+(f.min_join?'\nMinimum: $'+num(f.min_join):''),'');
+      if(!(v>0)) return;
+      setBusy(f.fund_acct);
+      const r=await AlpexaSync.db.rpc('pamm_join',{p_ref:'pamm-'+f.fund_acct+'-'+Date.now(),p_fund:f.fund_acct,p_usd:v});
+      setBusy(''); const d=(r&&r.data)||{};
+      if(!d.ok){ alert('Join failed: '+(d.error||'try again')); return; }
+      if(window.positionsStore) positionsStore.load(); load();
+      alert('Invested $'+num(v)+' in '+f.name+' ✓');
+    } else if(kind==='redeem'){
+      if(!mine) return;
+      const all=confirm('Redeem your full stake in '+f.name+'?\nCurrent value: $'+num(mine.value)+'\n\nOK = redeem all · Cancel = choose amount');
+      let units=mine.units;
+      if(!all){ const v=+prompt('Amount to redeem (USD), max $'+num(mine.value),''); if(!(v>0)) return; units=Math.min(mine.units, v/(+f.nav||1)); }
+      setBusy(f.fund_acct);
+      const r=await AlpexaSync.db.rpc('pamm_leave',{p_ref:'pamm-'+f.fund_acct+'-out-'+Date.now(),p_fund:f.fund_acct,p_units:units});
+      setBusy(''); const d=(r&&r.data)||{};
+      if(!d.ok){ alert('Redeem failed: '+(d.error||'try again')); return; }
+      if(window.positionsStore) positionsStore.load(); load();
+      alert('Redeemed $'+num(d.net||0)+(d.fee?' (perf fee $'+num(d.fee)+')':'')+' → your FX balance ✓');
+    }
+  };
+  if(!rep) return <div className="tbxbody"><div className="tbxempty"><div className="ic">💼</div>Loading…</div></div>;
+  if(!rep.ok) return <div className="tbxbody"><div className="tbxempty"><div className="ic">💼</div>Sign in to view managed funds (PAMM)</div></div>;
+  const funds=rep.funds||[];
+  if(!funds.length) return <div className="tbxbody"><div className="tbxempty"><div className="ic">💼</div>No managed funds available yet</div></div>;
+  return (
+    <div className="tbxbody" style={{padding:'8px 10px'}}>
+      <table className="postbl" style={{width:'100%'}}>
+        <thead><tr style={{color:'#8890a0',fontSize:11,textAlign:'left'}}>
+          <th style={{padding:'4px 6px'}}>Fund</th><th style={{textAlign:'right'}}>Return</th>
+          <th style={{textAlign:'right'}}>My investment</th><th style={{textAlign:'right'}}>Value now</th>
+          <th style={{textAlign:'right'}}>P&amp;L</th><th style={{textAlign:'right'}}>Fee</th><th></th></tr></thead>
+        <tbody>{funds.map(f=>{ const m=f.mine, ret=+f.ret||0, pnl=m?+m.pnl||0:0; const busyF=busy===f.fund_acct;
+          return (<tr key={f.fund_acct} style={{borderTop:'1px solid #2a2e34'}}>
+            <td style={{padding:'6px'}}>{f.name}{f.is_manager?<span style={{color:'#c9a227',fontSize:10,marginLeft:5}}>MGR</span>:null}{f.status!=='active'?<span style={{color:'#e0a020',fontSize:10,marginLeft:5}}>{f.status}</span>:null}</td>
+            <td style={{textAlign:'right',color:ret>=0?'#00c805':'#ff453a'}}>{(ret>=0?'+':'')+(ret*100).toFixed(2)+'%'}</td>
+            <td style={{textAlign:'right'}}>{m?'$'+num(m.basis):'—'}</td>
+            <td style={{textAlign:'right',fontWeight:700}}>{m?'$'+num(m.value):'—'}</td>
+            <td style={{textAlign:'right',color:pnl>=0?'#00c805':'#ff453a'}}>{m?(pnl>=0?'+':'')+'$'+num(Math.abs(pnl)):'—'}</td>
+            <td style={{textAlign:'right',color:'#8890a0'}}>{(+f.perf_fee_pct||0)+'%'}</td>
+            <td style={{textAlign:'right',whiteSpace:'nowrap'}}>
+              {f.is_manager ? <span style={{color:'#8890a0',fontSize:11}}>you manage</span>
+               : busyF ? <span style={{color:'#8890a0',fontSize:11}}>…</span>
+               : <>{m ? <button className="pammbtn" onClick={()=>act('add',f)}>Add</button> : (f.status==='active'?<button className="pammbtn join" onClick={()=>act('join',f)}>Join</button>:null)}
+                    {m ? <button className="pammbtn out" onClick={()=>act('redeem',f)}>Redeem</button> : null}</>}
+            </td></tr>);
+        })}</tbody>
+      </table>
+      <div style={{color:'#6a7078',fontSize:10.5,marginTop:8,padding:'0 6px'}}>Value updates when the manager closes trades. Joins/redemptions apply when the fund has no open positions (rollover). Performance fee applies only to profit above your high-water mark.</div>
+    </div>
+  );
+}
 function AlertsTab(){
   const [list,setList]=React.useState(alertsStore.list);
   const [sym,setSym]=React.useState(WATCH[0]);
@@ -2865,6 +2933,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
       {modifyP && <ModifyPos p={modifyP} onClose={()=>setModifyP(null)} />}
       <BottomResizer onDone={onResize} />
       {tab==='Exposure' ? <ExposureTab pos={pos} mids={mids} equity={equity} leverage={leverage} />
+       : tab==='PAMM' ? <PammTab acct={acct} />
        : tab==='Journal' ? <JournalTab />
        : tab==='Mailbox' ? <MailboxTab />
        : tab==='Alerts' ? <AlertsTab />

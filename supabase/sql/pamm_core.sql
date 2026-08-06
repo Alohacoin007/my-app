@@ -279,3 +279,34 @@ begin
   return jsonb_build_object('ok',true,'fund',p_fund,'fee',p_fee);
 end;$$;
 grant execute on function public.pamm_set_fee(text, numeric) to authenticated;
+
+-- ⑩ 투자자 리포트 (2026-08-06 사장님 "투자자가 자기 잔고 보는 화면") — 앱/웹트레이더 PAMM 탭 단일 소스.
+--    active 펀드 목록 + 호출자 본인 지분(mine). roster/ops 없음(투자자는 남의 것 못 봄).
+create or replace function public.pamm_investor_report()
+returns jsonb language plpgsql security definer set search_path to 'public' as $$
+declare v_uid uuid := auth.uid(); v_cust text; v_out jsonb;
+begin
+  if v_uid is null then return jsonb_build_object('ok',false,'error','not authenticated'); end if;
+  select cust_id into v_cust from players where auth_id = v_uid limit 1;
+  select jsonb_build_object('ok',true,'cust',v_cust,'funds', coalesce(jsonb_agg(f order by f->>'name'), '[]'::jsonb)) into v_out
+  from (
+    select jsonb_build_object(
+      'fund_acct', fd.fund_acct, 'name', fd.name, 'perf_fee_pct', fd.perf_fee_pct,
+      'min_join', fd.min_join, 'status', fd.status,
+      'nav', public.pamm_nav(fd.fund_acct),
+      'ret', round(public.pamm_nav(fd.fund_acct) - 1, 6),          -- 개설 이후 누적 수익률(NAV−1)
+      'is_manager', (fd.manager_cust = v_cust),
+      'mine', (select case when m.units > 0 then jsonb_build_object(
+                 'units', m.units, 'basis', m.cost_basis,
+                 'value', round(m.units * public.pamm_nav(fd.fund_acct), 2),
+                 'pnl', round(m.units * public.pamm_nav(fd.fund_acct) - m.cost_basis, 2),
+                 'hwm', m.hwm_nav) else null end
+               from pamm_members m where m.fund_acct = fd.fund_acct and m.cust_id = v_cust)
+    ) as f
+    from pamm_funds fd
+    where fd.status <> 'closed'
+       or exists (select 1 from pamm_members m where m.fund_acct = fd.fund_acct and m.cust_id = v_cust and m.units > 0)
+  ) g;
+  return v_out;
+end;$$;
+grant execute on function public.pamm_investor_report() to authenticated;

@@ -5033,6 +5033,222 @@ function NewsScreen() {
 }
 
 // ── Account helper components ──
+// ── Managed Funds (PAMM) — 투자자 화면 (2026-08-06). 단일 소스 = pamm_investor_report RPC.
+//    참여/회수는 서버 RPC(pamm_join/pamm_leave, pamm-* 멱등 ref)만. 성공 후 서버 진실 재적재.
+function PammFunds() {
+  const [rep, setRep] = useState(null);
+  const [busy, setBusy] = useState('');
+  const num = n => (Number(n) || 0).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+  const load = React.useCallback(function () {
+    if (!(window.AlpexaSync && AlpexaSync.db)) {
+      setRep({
+        ok: false
+      });
+      return;
+    }
+    AlpexaSync.db.rpc('pamm_investor_report').then(function (r) {
+      setRep(r && r.data || {
+        ok: false
+      });
+    }, function () {
+      setRep({
+        ok: false
+      });
+    });
+  }, []);
+  useEffect(function () {
+    load();
+    var iv = setInterval(load, 15000);
+    return function () {
+      clearInterval(iv);
+    };
+  }, [load]);
+  var reloadTruth = function () {
+    try {
+      AlpexaSync.pullBalances && AlpexaSync.pullBalances().then(function (b) {
+        if (!b) return;
+        try {
+          var o = window.__fxSrvBal || {};
+          if (b.fx != null) o.fx = b.fx;
+          window.__fxSrvBal = o;
+          window.dispatchEvent(new Event('alpexa-balance-change'));
+        } catch (e) {}
+      });
+    } catch (e) {}
+    load();
+  };
+  var act = async function (kind, f) {
+    if (kind === 'join' || kind === 'add') {
+      var v = +prompt('Amount to invest in ' + f.name + ' (USD)' + (f.min_join ? '\nMinimum: $' + num(f.min_join) : ''), '');
+      if (!(v > 0)) return;
+      setBusy(f.fund_acct);
+      var r = await AlpexaSync.db.rpc('pamm_join', {
+        p_ref: 'pamm-' + f.fund_acct + '-' + Date.now(),
+        p_fund: f.fund_acct,
+        p_usd: v
+      });
+      setBusy('');
+      var d = r && r.data || {};
+      if (!d.ok) {
+        alert('Join failed: ' + (d.error || 'try again'));
+        return;
+      }
+      reloadTruth();
+      alert('Invested $' + num(v) + ' in ' + f.name + ' \u2713');
+    } else if (kind === 'redeem') {
+      var m = f.mine;
+      if (!m) return;
+      var all = confirm('Redeem your full stake in ' + f.name + '?\nCurrent value: $' + num(m.value) + '\n\nOK = redeem all \u00b7 Cancel = choose amount');
+      var units = m.units;
+      if (!all) {
+        var vv = +prompt('Amount to redeem (USD), max $' + num(m.value), '');
+        if (!(vv > 0)) return;
+        units = Math.min(m.units, vv / (+f.nav || 1));
+      }
+      setBusy(f.fund_acct);
+      var r2 = await AlpexaSync.db.rpc('pamm_leave', {
+        p_ref: 'pamm-' + f.fund_acct + '-out-' + Date.now(),
+        p_fund: f.fund_acct,
+        p_units: units
+      });
+      setBusy('');
+      var d2 = r2 && r2.data || {};
+      if (!d2.ok) {
+        alert('Redeem failed: ' + (d2.error || 'try again'));
+        return;
+      }
+      reloadTruth();
+      alert('Redeemed $' + num(d2.net || 0) + (d2.fee ? ' (perf fee $' + num(d2.fee) + ')' : '') + ' \u2192 your FX balance \u2713');
+    }
+  };
+  if (!rep) return null;
+  var funds = rep.ok && rep.funds || [];
+  if (rep.ok && !funds.length) return null; // 펀드 없으면 섹션 숨김
+  return /*#__PURE__*/React.createElement(Section, {
+    title: "Managed Funds (PAMM)"
+  }, !rep.ok ? /*#__PURE__*/React.createElement(Row, {
+    label: "Sign in to view managed funds"
+  }) : funds.map(function (f) {
+    var m = f.mine,
+      ret = +f.ret || 0,
+      pnl = m ? +m.pnl || 0 : 0,
+      b = busy === f.fund_acct;
+    return /*#__PURE__*/React.createElement("div", {
+      key: f.fund_acct,
+      style: {
+        padding: '11px 14px',
+        borderBottom: '1px solid var(--line-2)'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'baseline'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13.5,
+        fontWeight: 700,
+        color: 'var(--ink)'
+      }
+    }, f.name, f.is_manager ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: '#c9a227',
+        fontSize: 9.5,
+        marginLeft: 6
+      }
+    }, "MANAGER") : null), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        fontWeight: 700,
+        color: ret >= 0 ? 'var(--buy-2)' : 'var(--sell-2)'
+      }
+    }, (ret >= 0 ? '+' : '') + (ret * 100).toFixed(2) + '%')), m ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12.5,
+        color: 'var(--text-2)',
+        marginTop: 3
+      }
+    }, "My investment ", /*#__PURE__*/React.createElement("b", {
+      style: {
+        color: 'var(--ink)'
+      }
+    }, "$", num(m.basis)), " \\u2192 now ", /*#__PURE__*/React.createElement("b", {
+      style: {
+        color: 'var(--ink)'
+      }
+    }, "$", num(m.value)), " ", /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: pnl >= 0 ? 'var(--buy-2)' : 'var(--sell-2)',
+        fontWeight: 700
+      }
+    }, "(", pnl >= 0 ? '+' : '', "$", num(Math.abs(pnl)), ")")) : /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11.5,
+        color: 'var(--text-3)',
+        marginTop: 3
+      }
+    }, "Perf. fee ", +f.perf_fee_pct || 0, "% \\u00b7 min $", num(f.min_join), f.status !== 'active' ? ' \u00b7 ' + f.status : ''), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 7,
+        marginTop: 8
+      }
+    }, f.is_manager ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: 'var(--text-3)'
+      }
+    }, "You manage this fund") : b ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: 'var(--text-3)'
+      }
+    }, "Processing\\u2026") : /*#__PURE__*/React.createElement(React.Fragment, null, m ? /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        act('add', f);
+      },
+      style: {
+        fontSize: 12,
+        fontWeight: 700,
+        padding: '6px 16px',
+        borderRadius: 6,
+        background: 'var(--bg-2)',
+        color: 'var(--ink)',
+        border: '1px solid var(--line-2)'
+      }
+    }, "Add") : f.status === 'active' ? /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        act('join', f);
+      },
+      style: {
+        fontSize: 12,
+        fontWeight: 700,
+        padding: '6px 18px',
+        borderRadius: 6,
+        background: 'var(--buy-2)',
+        color: '#fff',
+        border: 'none'
+      }
+    }, "Join") : null, m ? /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        act('redeem', f);
+      },
+      style: {
+        fontSize: 12,
+        fontWeight: 700,
+        padding: '6px 16px',
+        borderRadius: 6,
+        background: 'transparent',
+        color: 'var(--sell-2)',
+        border: '1px solid var(--sell-2)'
+      }
+    }, "Redeem") : null)));
+  }));
+}
 function Section({
   title,
   children
@@ -9351,7 +9567,7 @@ function Account({
     val: window.getLanguageLabel ? window.getLanguageLabel(getPrefs().language || 'en') : '🇬🇧 English',
     chev: true,
     onClick: () => setSheet('language')
-  })), /*#__PURE__*/React.createElement(Section, {
+  })), /*#__PURE__*/React.createElement(PammFunds, null), /*#__PURE__*/React.createElement(Section, {
     title: "Trading"
   }, /*#__PURE__*/React.createElement(Row, {
     label: "One-click Trading",
