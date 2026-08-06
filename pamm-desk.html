@@ -249,7 +249,7 @@ async function pullReport(){
 async function pullPositions(){   // 펀드 계좌의 열린 포지션 (읽기 전용 — RLS: 매니저 본인/어드민)
   POS=[]; if(!CUR){ renderPos(); return; }
   try{
-    const r=await AlpexaSync.db.from('positions').select('local_id,symbol,side,size,open_price,meta,created_at')
+    const r=await AlpexaSync.db.from('positions').select('local_id,symbol,side,size,open_price,pnl')
       .eq('acct_no',CUR.fund_acct).eq('server','fx').eq('status','open').limit(50);
     if(r&&Array.isArray(r.data)) POS=r.data;
   }catch(e){}
@@ -292,9 +292,9 @@ function renderPos(){
   const b=$('b-pos'); if(!CUR){ b.innerHTML='<div class="empty">—</div>'; return; }
   if(!POS.length){ b.innerHTML='<div class="empty">No open positions<br><span style="font-size:11px">Joins/redemptions allowed (rollover rule)</span></div>'; return; }
   b.innerHTML='<div class="wr" style="font-size:11px;margin-bottom:6px">⚠️ Positions open — joins/redemptions after close</div>'
-    +'<table><tr><th>Symbol</th><th>Side</th><th class="r">Lots</th><th class="r">Entry</th><th class="r">Age</th></tr>'
+    +'<table><tr><th>Symbol</th><th>Side</th><th class="r">Lots</th><th class="r">Entry</th></tr>'
     +POS.map(p=>'<tr><td>'+esc(String(p.symbol).toUpperCase())+'</td><td class="'+(String(p.side).toLowerCase()==='buy'?'up':'dn')+'">'+esc(String(p.side).toUpperCase())+'</td>'
-      +'<td class="r">'+(+p.size||0)+'</td><td class="r">'+(+p.open_price||0)+'</td><td class="r dim">'+ago(p.created_at)+'</td></tr>').join('')+'</table>';
+      +'<td class="r">'+(+p.size||0)+'</td><td class="r">'+(+p.open_price||0)+'</td></tr>').join('')+'</table>';
 }
 function pickList(q){
   q=(q||'').toLowerCase();
