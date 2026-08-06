@@ -3207,7 +3207,7 @@ function Toolbar({ tf, chartType, tool }){
       <div style={{position:'relative',marginLeft:'auto',display:'flex',alignItems:'center',gap:'8px'}}>
         {/* 풀스크린 토글 (2026-07-17 사장님 지시) — 누르면 커지고 다시 누르면 작아짐. F11과 동일 동작 */}
         <div className="tibtn" title="Full screen (F11)" style={{fontSize:'15px',lineHeight:'26px'}}
-          onClick={()=>{ try{ if(!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{}); else document.exitFullscreen(); }catch(e){} }}>⛶</div>
+          onClick={()=>toggleFullscreen()}>⛶</div>
         <div className="tibtn" title="Switch server" style={{fontSize:'15px',lineHeight:'26px'}}
           onClick={(e)=>{e.stopPropagation();setSrvMenu(v=>!v);}}>＋</div>
         {srvMenu && <div className="srvmenu">
@@ -3573,6 +3573,28 @@ function LoginGate({ onClose }){
     </div>
   );
 }
+// 풀스크린 토글 — 표준+webkit 접두사 대응 + Fullscreen API 막힌 환경 CSS 폴백 (2026-08-06 사장님 "저거 안돼").
+//  표준 requestFullscreen만 쓰면 Safari/일부 브라우저에서 함수 부재로 조용히 실패했다.
+function fsElement(){ return document.fullscreenElement||document.webkitFullscreenElement||document.__fsFallback||null; }
+function toggleFullscreen(){
+  const de=document.documentElement;
+  const isFs=document.fullscreenElement||document.webkitFullscreenElement;
+  try{
+    if(isFs){ (document.exitFullscreen||document.webkitExitFullscreen||function(){}).call(document); return; }
+    const req=de.requestFullscreen||de.webkitRequestFullscreen||de.webkitRequestFullScreen;
+    if(req){ const p=req.call(de); if(p&&p.catch) p.catch(()=>cssMaximize(true)); return; }
+  }catch(e){}
+  // Fullscreen API 자체가 없거나 막힘 → CSS 최대화 폴백(뷰포트 꽉 채움, 토글식)
+  cssMaximize(!document.__fsFallback);
+}
+function cssMaximize(on){
+  document.__fsFallback=!!on;
+  const t=document.querySelector('.terminal');
+  if(!t) return;
+  if(on){ t.dataset.fsPrevPos=t.style.position||''; Object.assign(t.style,{position:'fixed',inset:'0',zIndex:'2147483000',width:'100vw',height:'100vh'}); }
+  else{ t.style.position=t.dataset.fsPrevPos||''; t.style.inset=''; t.style.zIndex=''; t.style.width=''; t.style.height=''; }
+  try{ window.dispatchEvent(new Event('resize')); }catch(e){}
+}
 function App(){
   const cfg=React.useRef(wtConfig.load()).current;     // saved layout (persists across reloads)
   // ALWAYS boot to the fixed default 2×2 @ M1 (chart layout is intentionally NOT persisted, so a
@@ -3657,7 +3679,7 @@ function App(){
       else if(e.ctrlKey && k==='t'){ e.preventDefault(); setView(v=>({ ...v, toolbox:!v.toolbox })); }
       else if(e.ctrlKey && k==='g'){ e.preventDefault(); terminalBus.emit('chart.grid'); }   // Grid On/Off on the active chart
       else if(e.key==='F9'){ e.preventDefault(); const ac=chartsRef.current.find(c=>c.id===actRef.current)||chartsRef.current[0]; setOrderSym(s=> s||(ac&&ac.symbol)||WATCH[0]); }
-      else if(e.key==='F11'){ e.preventDefault(); try{ if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }catch(_){} }
+      else if(e.key==='F11'){ e.preventDefault(); toggleFullscreen(); }
     };
     document.addEventListener('keydown',onKey);
     return ()=>document.removeEventListener('keydown',onKey);
@@ -3673,7 +3695,7 @@ function App(){
       try{ localStorage.setItem('alpexa.fx.version', arg==='legend2'?'legend2':'legend1'); }catch(e){}
       if(arg==='legend2') location.href='terminal.html'; }
     else if(cmd==='lang.set'){ LANG.cur=arg; setLang(arg); }                  // View → Languages (en/ko/ja/zh)
-    else if(cmd==='view.fullscreen'){ try{ if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }catch(e){} }
+    else if(cmd==='view.fullscreen'){ toggleFullscreen(); }
     else if(cmd==='chart.indicator'){   // PER-CHART: apply to the ACTIVE chart only (not all 4)
       setCharts(cs=>cs.map(c=>{ if(c.id!==actRef.current) return c;
         const list=c.inds||[];
