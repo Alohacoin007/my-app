@@ -314,3 +314,66 @@ begin
   return v_out;
 end;$$;
 grant execute on function public.pamm_investor_report() to authenticated;
+
+-- ⑪ PAMM 월간 명세서 지원 (2026-08-06 사장님 "가입 고객에게 월 1회 이메일") — 읽기 전용 리포팅.
+--    기존 스포츠 명세서(server='sports')와 완전 분리: PAMM 투자자(FX계좌+유닛 보유)만 대상.
+--    발송 Edge = pamm-statements (send-statements 패턴 미러). 돈 이동 0 — 순수 스냅샷.
+create table if not exists public.pamm_statement_sends (   -- 멱등: 같은 (cust,month) 재발송 차단
+  cust_id text not null, month text not null, email text, sent_at timestamptz not null default now(),
+  primary key (cust_id, month)
+);
+alter table public.pamm_statement_sends enable row level security;   -- 클라 정책 0 (service_role만)
+
+-- 수신자: 이번 달 기준 유닛>0인 투자자(매니저 제외 — 매니저는 운용자, 투자자 아님)
+create or replace function public.pamm_statement_recipients(p_month text)
+returns table(cust_id text, name text, email text) language plpgsql security definer set search_path = public as $$
+begin
+  if p_month is null or p_month !~ '^\d{4}-\d{2}$' then return; end if;
+  return query
+    select distinct pl.cust_id, pl.name, pl.email
+      from public.pamm_members m
+      join public.pamm_funds f on f.fund_acct = m.fund_acct
+      join public.players pl on pl.cust_id = m.cust_id
+     where m.units > 0 and m.cust_id <> f.manager_cust
+       and pl.email is not null and pl.email <> ''
+       and coalesce(pl.status,'active') <> 'closed';
+end;$$;
+revoke all on function public.pamm_statement_recipients(text) from public, anon, authenticated;
+grant execute on function public.pamm_statement_recipients(text) to service_role;
+
+-- 명세서 본문 데이터: 한 투자자의 모든 펀드 지분 스냅샷 + 이번 달 활동(join/leave/fee).
+create or replace function public.pamm_statement(p_cust text, p_month text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_start timestamptz; v_end timestamptz; v_out jsonb;
+begin
+  if p_month !~ '^\d{4}-\d{2}$' then return jsonb_build_object('ok',false,'error','bad month'); end if;
+  v_start := ((p_month || '-01')::timestamp) at time zone 'America/Los_Angeles';
+  v_end   := (((p_month || '-01')::date + interval '1 month')::timestamp) at time zone 'America/Los_Angeles';
+  select jsonb_build_object('ok',true,'cust',p_cust,'month',p_month,
+    'total_value', coalesce(sum(round(m.units * public.pamm_nav(m.fund_acct),2)),0),
+    'total_basis', coalesce(sum(m.cost_basis),0),
+    'funds', coalesce(jsonb_agg(jsonb_build_object(
+       'name', f.name, 'nav', public.pamm_nav(m.fund_acct),
+       'ret', round(public.pamm_nav(m.fund_acct) - 1, 6),
+       'basis', m.cost_basis, 'value', round(m.units * public.pamm_nav(m.fund_acct),2),
+       'pnl', round(m.units * public.pamm_nav(m.fund_acct) - m.cost_basis, 2),
+       'month_ops', (select coalesce(jsonb_agg(jsonb_build_object('kind',o.kind,'usd',o.usd,'at',o.created_at) order by o.created_at),'[]'::jsonb)
+                       from pamm_ops o where o.fund_acct = m.fund_acct and o.cust_id = p_cust
+                        and o.created_at >= v_start and o.created_at < v_end and o.kind in ('join','leave'))
+     ) order by f.name), '[]'::jsonb))
+    into v_out
+    from pamm_members m join pamm_funds f on f.fund_acct = m.fund_acct
+   where m.cust_id = p_cust and m.units > 0;
+  return coalesce(v_out, jsonb_build_object('ok',true,'cust',p_cust,'month',p_month,'funds','[]'::jsonb));
+end;$$;
+revoke all on function public.pamm_statement(text,text) from public, anon, authenticated;
+grant execute on function public.pamm_statement(text,text) to service_role, authenticated;   -- authenticated=본인 확인은 Edge/앱 몫; 여기선 조회만
+
+create or replace function public.mark_pamm_statement_sent(p_cust text, p_month text, p_email text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.pamm_statement_sends(cust_id, month, email) values (p_cust, p_month, p_email)
+  on conflict (cust_id, month) do nothing;
+end;$$;
+revoke all on function public.mark_pamm_statement_sent(text,text,text) from public, anon, authenticated;
+grant execute on function public.mark_pamm_statement_sent(text,text,text) to service_role;
