@@ -246,13 +246,8 @@ async function pullReport(){
     renderAll(); pullPositions(); pullFxAccounts();
   }catch(e){ $('feedDot').className='hdot stale'; }
 }
-async function pullPositions(){   // 펀드 계좌의 열린 포지션 (읽기 전용 — RLS: 매니저 본인/어드민)
-  POS=[]; if(!CUR){ renderPos(); return; }
-  try{
-    const r=await AlpexaSync.db.from('positions').select('local_id,symbol,side,size,open_price,pnl')
-      .eq('acct_no',CUR.fund_acct).eq('server','fx').eq('status','open').limit(50);
-    if(r&&Array.isArray(r.data)) POS=r.data;
-  }catch(e){}
+function pullPositions(){   // 포지션은 desk report(SECURITY DEFINER)에 포함 — 직접 테이블 조회 폐기
+  POS=(CUR&&Array.isArray(CUR.positions))?CUR.positions:[];   // RLS(어드민전용)에 막히던 매니저 뷰 수정
   renderPos();
 }
 

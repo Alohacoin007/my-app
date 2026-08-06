@@ -242,7 +242,11 @@ begin
            case when public.is_admin() or fd.manager_cust = v_cust then
              (select jsonb_agg(jsonb_build_object('ref',o.ref,'cust',o.cust_id,'kind',o.kind,'usd',o.usd,'units',o.units,'nav',o.nav,'at',o.created_at) order by o.created_at desc)
                 from (select * from pamm_ops where fund_acct = fd.fund_acct order by created_at desc limit 50) o)
-           else null end as ops
+           else null end as ops,
+           case when public.is_admin() or fd.manager_cust = v_cust then
+             (select jsonb_agg(jsonb_build_object('local_id',p.local_id,'symbol',p.symbol,'side',p.side,'size',p.size,'open_price',p.open_price,'pnl',p.pnl))
+                from positions p where p.acct_no = fd.fund_acct and p.server = 'fx' and p.status = 'open')
+           else null end as positions
       from pamm_funds fd join accounts a on a.acct_no = fd.fund_acct
      where (p_fund is null or fd.fund_acct = p_fund)
        and (public.is_admin() or fd.manager_cust = v_cust or fd.status = 'active')
