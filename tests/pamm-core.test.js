@@ -59,6 +59,16 @@ if (!/'pnl',\s*case when public\.fx_realized_pnl\(p\.symbol,p\.side,p\.open_pric
   bad('desk positions floating P&L must be a live fx_realized_pnl mark, never the stale positions.pnl column');
 if (/'open_price',p\.open_price,'pnl',p\.pnl\)/.test(sql))
   bad('desk positions must NOT emit the stale stored p.pnl for OPEN positions (floating would diverge from realized)');
+// [P9] MT5: 펀드 Equity = Balance + Σ플로팅. 라이브 NAV는 표시 전용 — 거래용 pamm_nav(잔고)는 join/leave가 그대로 쓴다.
+if (!/coalesce\(a\.balance,0\) \+ fl\.flt as equity/.test(sql))
+  bad('desk equity must be Balance + total floating (MT5 Equity), sourced server-side');
+if (!/cross join lateral[\s\S]{0,260}fx_realized_pnl\(p\.symbol,p\.side,p\.open_price,p\.size\)[\s\S]{0,120}as flt/.test(sql))
+  bad('total floating (fl.flt) must be a server sum of fx_realized_pnl over open positions');
+if (!/round\(m\.units \/ nullif\(fd\.total_units,0\) \* \(coalesce\(a\.balance,0\) \+ fl\.flt\),2\)/.test(sql))
+  bad('investor value must be share × fund Equity (floating pro-rata), not units×balance-NAV');
+// 거래용 pamm_nav 함수 본체는 무변경 — 유닛 산수는 잔고 기반 NAV만 (플로팅 오염 금지)
+if (!/create or replace function public\.pamm_nav\(p_fund text\)[\s\S]{0,400}balance[\s\S]{0,200}total_units/.test(sql))
+  bad('transactional pamm_nav must stay balance-based (floating must NOT leak into unit minting/burning)');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} PAMM contract problem(s).`); process.exit(1); }
 console.log('🟢 PASS: PAMM core contracts (unit/NAV ledger, fund-account guard, rollover gate, HWM fee, admin gates).');

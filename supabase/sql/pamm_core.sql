@@ -230,12 +230,21 @@ begin
   select jsonb_build_object('ok',true,'funds', coalesce(jsonb_agg(f), '[]'::jsonb)) into v_out
   from (
     select fd.fund_acct, fd.name, fd.manager_cust, fd.perf_fee_pct, fd.min_join, fd.status,
-           fd.total_units, public.pamm_nav(fd.fund_acct) as nav,
-           coalesce(a.balance,0) as equity,
+           fd.total_units,
+           -- MT5: Equity = Balance(실현) + Σ플로팅. 라이브 NAV=Equity/units (표시 전용).
+           --   거래용 public.pamm_nav(잔고 기반)는 무변경 — join/leave는 P3 롤오버 게이트로 플로팅=0일 때만.
+           coalesce(a.balance,0) as balance,
+           fl.flt as float,
+           coalesce(a.balance,0) + fl.flt as equity,
+           case when fd.total_units > 0 then round((coalesce(a.balance,0) + fl.flt) / fd.total_units, 6)
+                else public.pamm_nav(fd.fund_acct) end as nav,
            (select count(*) from pamm_members m where m.fund_acct = fd.fund_acct and m.units > 0) as members,
            case when public.is_admin() or fd.manager_cust = v_cust then
+             -- 투자자 value = share × 펀드 Equity (플로팅 pro-rata 반영). 플로팅=0이면 units×pamm_nav와 동일.
              (select jsonb_agg(jsonb_build_object('cust',m.cust_id,'name',pl.name,'units',m.units,
-                     'basis',m.cost_basis,'value',round(m.units * public.pamm_nav(fd.fund_acct),2),'hwm',m.hwm_nav,'joined',m.joined_at))
+                     'basis',m.cost_basis,
+                     'value',round(m.units / nullif(fd.total_units,0) * (coalesce(a.balance,0) + fl.flt),2),
+                     'hwm',m.hwm_nav,'joined',m.joined_at))
                 from pamm_members m left join players pl on pl.cust_id = m.cust_id
                where m.fund_acct = fd.fund_acct and m.units > 0)
            else null end as roster,
@@ -252,7 +261,14 @@ begin
                                  else round(public.fx_realized_pnl(p.symbol,p.side,p.open_price,p.size) + coalesce((p.meta->>'swap')::numeric,0),2) end))
                 from positions p where p.acct_no = fd.fund_acct and p.server = 'fx' and p.status = 'open')
            else null end as positions
-      from pamm_funds fd join accounts a on a.acct_no = fd.fund_acct
+      from pamm_funds fd
+      join accounts a on a.acct_no = fd.fund_acct
+      -- 총 플로팅 = 열린 포지션 fx_realized_pnl(+swap) 합 (미가격 심볼은 0 기여). stop-out 엔진과 동일 함수.
+      cross join lateral (
+        select coalesce(sum(case when public.fx_realized_pnl(p.symbol,p.side,p.open_price,p.size) is null then 0
+                  else public.fx_realized_pnl(p.symbol,p.side,p.open_price,p.size) + coalesce((p.meta->>'swap')::numeric,0) end),0) as flt
+          from positions p where p.acct_no = fd.fund_acct and p.server = 'fx' and p.status = 'open'
+      ) fl
      where (p_fund is null or fd.fund_acct = p_fund)
        and (public.is_admin() or fd.manager_cust = v_cust or fd.status = 'active')
   ) f;
