@@ -20,9 +20,12 @@ const bad = (m) => { console.error('🔴 ' + m); fail++; };
 if (!/create or replace function public\.pamm_investor_report\(\)/.test(sql)) bad('pamm_investor_report RPC missing');
 if (!/pamm_investor_report[\s\S]{0,600}security definer/.test(sql)) bad('investor report must be SECURITY DEFINER');
 if (!/grant execute on function public\.pamm_investor_report\(\) to authenticated/.test(sql)) bad('investor report must be granted to authenticated');
-// [I2] value·pnl은 서버가 units×NAV로 산출
-if (!/'value', round\(m\.units \* public\.pamm_nav\(fd\.fund_acct\), 2\)/.test(sql)) bad('mine.value must be server-computed units×NAV');
-if (!/'pnl', round\(m\.units \* public\.pamm_nav\(fd\.fund_acct\) - m\.cost_basis, 2\)/.test(sql)) bad('mine.pnl must be server-computed');
+// [I2] value·pnl은 서버가 units×라이브NAV로 산출 (라이브 NAV=(잔고+Σ플로팅)/units — 데스크와 동일 소스)
+if (!/'value', round\(m\.units \* fl\.lnav, 2\)/.test(sql)) bad('mine.value must be server-computed units×live-NAV');
+if (!/'pnl', round\(m\.units \* fl\.lnav - m\.cost_basis, 2\)/.test(sql)) bad('mine.pnl must be server-computed');
+// [I2b] 라이브 NAV = (잔고 + 서버 플로팅합)/units — 투자자 화면이 데스크와 같은 플로팅을 본다
+if (!/round\(\(coalesce\(a\.balance,0\) \+ fx\.flt\) \/ fd\.total_units, 8\)/.test(sql)) bad('investor live NAV must be (balance + total floating)/units');
+if (!/fx_realized_pnl\(p\.symbol,p\.side,p\.open_price,p\.size\)[\s\S]{0,120}as flt/.test(sql)) bad('investor floating must be a server sum of fx_realized_pnl over open positions');
 // [I5] 남의 지분 미노출: 리포트에 roster/ops 없음, mine은 caller cust로 한정
 if (/pamm_investor_report[\s\S]{0,1200}'roster'/.test(sql)) bad('investor report must NOT expose other members (roster)');
 if (!/m\.cust_id = v_cust/.test(sql)) bad('mine must be scoped to the calling customer only');

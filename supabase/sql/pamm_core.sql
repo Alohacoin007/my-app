@@ -318,17 +318,31 @@ begin
     select jsonb_build_object(
       'fund_acct', fd.fund_acct, 'name', fd.name, 'perf_fee_pct', fd.perf_fee_pct,
       'min_join', fd.min_join, 'status', fd.status,
-      'nav', public.pamm_nav(fd.fund_acct),
-      'ret', round(public.pamm_nav(fd.fund_acct) - 1, 6),          -- 개설 이후 누적 수익률(NAV−1)
+      -- 라이브 NAV = (잔고 + Σ플로팅)/units. 데스크와 동일 소스 — 매니저 열린 포지션 손익이
+      --   투자자 value/pnl에 실시간 pro-rata 반영. 거래용 public.pamm_nav(잔고)는 무변경 —
+      --   join/leave는 P3 롤오버 게이트로 플로팅=0일 때만 → 유닛 산수에 플로팅 안 섞임(표시 전용).
+      'nav', fl.lnav,
+      'ret', round(fl.lnav - 1, 6),                                -- 개설 이후 누적 수익률(라이브 NAV−1)
+      'float', fl.flt,
       'is_manager', (fd.manager_cust = v_cust),
       'mine', (select case when m.units > 0 then jsonb_build_object(
                  'units', m.units, 'basis', m.cost_basis,
-                 'value', round(m.units * public.pamm_nav(fd.fund_acct), 2),
-                 'pnl', round(m.units * public.pamm_nav(fd.fund_acct) - m.cost_basis, 2),
+                 'value', round(m.units * fl.lnav, 2),
+                 'pnl', round(m.units * fl.lnav - m.cost_basis, 2),
                  'hwm', m.hwm_nav) else null end
                from pamm_members m where m.fund_acct = fd.fund_acct and m.cust_id = v_cust)
     ) as f
     from pamm_funds fd
+    join accounts a on a.acct_no = fd.fund_acct
+    -- 총 플로팅 + 라이브 NAV (표시 전용). fx_realized_pnl = stop-out 엔진과 동일 마크 함수.
+    cross join lateral (
+      select fx.flt,
+             case when fd.total_units > 0 then round((coalesce(a.balance,0) + fx.flt) / fd.total_units, 8)
+                  else public.pamm_nav(fd.fund_acct) end as lnav
+      from (select coalesce(sum(case when public.fx_realized_pnl(p.symbol,p.side,p.open_price,p.size) is null then 0
+                     else public.fx_realized_pnl(p.symbol,p.side,p.open_price,p.size) + coalesce((p.meta->>'swap')::numeric,0) end),0) as flt
+              from positions p where p.acct_no = fd.fund_acct and p.server = 'fx' and p.status = 'open') fx
+    ) fl
     where fd.status <> 'closed'
        or exists (select 1 from pamm_members m where m.fund_acct = fd.fund_acct and m.cust_id = v_cust and m.units > 0)
   ) g;
