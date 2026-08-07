@@ -1872,7 +1872,7 @@ document.getElementById('sList').addEventListener('click', e=>{ const r=e.target
 sPop.addEventListener('click', e=>e.stopPropagation());
 document.addEventListener('click', ()=>closeSearch());
 document.addEventListener('keydown', e=>{
-  if(e.key==='Escape'){ try{ fxEsc(); }catch(err){} closeSearch(); }
+  if(e.key==='Escape'){ closeSearch(); }   // FX 터미널은 ESC로 안 닫음(브로커 표준) — ESC=풀스크린 해제만
   else if(e.key==='/'&&!/INPUT|TEXTAREA/.test((document.activeElement||{}).tagName||'')){ e.preventDefault(); openSearch(); }
 });
 
@@ -1941,11 +1941,10 @@ function ensureFxOv(){
   // 크롬 없음 (사용자 확정 2026-07-15: 상단 바 삭제 — 허가 없는 디자인 추가 금지).
   // 조작은 기존 것만: ESC = 닫고 대시보드 복귀, 헤더 Alpexa FX 탭 = 닫기/열기.
   fxOv=document.createElement('div'); fxOv.className='fxov';
-  fxOv.innerHTML='<iframe id="fxFrame" title="Alpexa FX WebTrade terminal"></iframe>';
+  // allowfullscreen — 터미널 안 ⛶ 버튼(자식 iframe)이 브라우저 풀스크린을 걸 수 있게 (없으면 막힘).
+  fxOv.innerHTML='<iframe id="fxFrame" title="Alpexa FX WebTrade terminal" allowfullscreen allow="fullscreen"></iframe>';
   document.body.appendChild(fxOv);
-  const fr=document.getElementById('fxFrame');
-  fr.addEventListener('load', ()=>{ try{   // 같은 출처 — iframe 안에서 눌러도 ESC가 통하게
-    fr.contentDocument.addEventListener('keydown', e=>{ if(e.key==='Escape') fxEsc(); }); }catch(e){} });
+  // ESC는 브라우저 네이티브(풀스크린 해제만) — 앱을 닫지 않는다(브로커 표준). 스포츠 복귀 = 터미널 헤더 'Alpexa Sports'.
   return fxOv;
 }
 function openFx(){
@@ -1954,24 +1953,16 @@ function openFx(){
   if(!fr.src) fr.src='webtrade.html';   // 첫 오픈에만 로드 (대시보드 부팅 무영향)
   fxOv.classList.add('open');
   fxTab.style.display='flex'; fxTab.classList.add('on');
-  // 네이티브 풀스크린 (사용자 확정 2026-07-15): 서버 전환 = 화면 위까지 꽉 채움.
-  // ESC는 브라우저가 직접 처리 — iframe 어디에 포커스가 있어도 무조건 동작
-  // (라이브에서 keydown 바인딩 ESC가 안 먹히던 문제의 근본 해결).
-  try{ if(fxOv.requestFullscreen) fxOv.requestFullscreen().catch(()=>{}); }catch(e){}
+  // 오버레이는 CSS로 이미 전체 뷰포트(position:fixed;inset:0). 진짜 풀스크린(브라우저 크롬까지 덮기)은
+  // 터미널 헤더의 ⛶ 버튼으로 사용자가 원할 때만 (브로커 표준, 2026-08-07 사장님). 자동 풀스크린 제거 —
+  // 자동 풀스크린 + ESC=닫기 결합이 "⛶ 안 먹힘 + ESC로 스포츠 복귀" 버그의 근본이었다.
 }
 function closeFx(){
   if(document.fullscreenElement){ try{ document.exitFullscreen(); }catch(e){} }
   if(fxOv) fxOv.classList.remove('open'); fxTab.classList.remove('on');
 }
-// 브라우저 ESC로 풀스크린이 풀리면 → 오버레이 완전 닫고 대시보드 복귀
-// (2026-07-15 사용자: 미니 잔상이 대시보드 위에 어중간하게 남는 문제 폐기)
-document.addEventListener('fullscreenchange', ()=>{
-  if(!document.fullscreenElement && fxOv && fxOv.classList.contains('open')) closeFx();
-});
-function fxEsc(){   // 폴백 (풀스크린 API 거부/미지원 환경): ESC = 닫기
-  if(!(fxOv&&fxOv.classList.contains('open'))) return;
-  closeFx();
-}
+// (2026-08-07) 풀스크린 해제=앱 닫기 결합 제거 — ESC로 풀스크린만 풀리고 터미널은 그대로 유지(브로커 표준).
+// 앱 닫기는 명시적 경로만: 헤더 Alpexa FX 탭(fxTab) 또는 터미널 헤더 'Alpexa Sports' 버튼.
 fxTab.addEventListener('click', ()=>{ (fxOv&&fxOv.classList.contains('open'))?closeFx():openFx(); });
 // 헤더 화살표 = 풀스크린 토글 (2026-07-15 사용자 확정 — 구 Open app 링크 대체)
 document.getElementById('btnFull').addEventListener('click', ()=>{
