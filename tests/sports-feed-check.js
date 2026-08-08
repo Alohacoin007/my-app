@@ -67,6 +67,22 @@ function structOK(g) {
   if (g.lg === 'SOC') return (g.threeWay || []).length >= 3 || (g.ml || []).length >= 2;
   return (g.spread || []).length >= 2 && (g.total || []).length >= 2 && (g.ml || []).length >= 2;
 }
+// 스프레드/토탈은 상호보완 쌍이어야 한다 (결함-로그 #26, 2026-08-08). 크로스북 mismatch =
+//   런라인 둘다 -1.5 / 토탈 Over 9.5·Under 9 같은 malformed 마켓. 실배당 팀스포츠만 대상.
+function pairOK(g) {
+  if (g.oddsReal === false || g.lg === 'GOLF' || g.lg === 'SOC') return true;
+  const sp = g.spread || [];
+  if (sp.length === 2) {
+    const p = sp.map((o) => parseFloat(String(o.ln).replace('+', '')));
+    if (!p.some(isNaN) && Math.abs(p[0] + p[1]) > 0.01) return false;   // 비상보 런라인
+  }
+  const tt = g.total || [];
+  if (tt.length === 2) {
+    const b = tt.map((o) => parseFloat(String(o.ln).replace(/[^0-9.]/g, '')));
+    if (!b.some(isNaN) && Math.abs(b[0] - b[1]) > 0.01) return false;   // 토탈 기준 불일치
+  }
+  return true;
+}
 
 async function fetchFeed() {
   const r = await fetch(`${URL}/rest/v1/live_games?id=eq.all&select=data,updated_at`, {
@@ -121,7 +137,7 @@ async function main() {
   const byLg = {};
   for (const g of win) {
     const lg = g.lg || '?';
-    const s = (byLg[lg] = byLg[lg] || { n: 0, real: 0, ph: 0, miss: 0, tbd: 0, bad: 0, days: new Set(), locked: 0, leak: 0, immBad: 0 });
+    const s = (byLg[lg] = byLg[lg] || { n: 0, real: 0, ph: 0, miss: 0, tbd: 0, bad: 0, days: new Set(), locked: 0, leak: 0, immBad: 0, pair: 0 });
     s.n++;
     const o = oddsStatus(g);
     if (o === 'REAL') s.real++; else if (o === 'PLACEHOLDER') s.ph++; else s.miss++;
@@ -131,6 +147,7 @@ async function main() {
     if (o !== 'REAL') { if (g.oddsReal === false) s.locked++; else s.leak++; }
     if (isTBD(g)) s.tbd++;
     if (!structOK(g)) { s.bad++; }
+    if (!pairOK(g)) { s.pair++; }
     const t = Date.parse(g.iso || ''); if (!isNaN(t)) s.days.add(ymd(t));
     // imminent (≤48h) game still lacking a real line — informational once it's locked
     // (we can't force the provider to post a line; we just must not offer a fake one).
@@ -147,6 +164,7 @@ async function main() {
     if (s.locked) warn.push(`잠금${s.locked}`);
     if (s.tbd) warn.push(`TBD${s.tbd}`);
     if (s.bad) { warn.push(`broken${s.bad}`); fails.push(`${lg}: broken 항목 ${s.bad}`); }
+    if (s.pair) { warn.push(`페어링${s.pair}`); fails.push(`${lg}: 스프레드/토탈 비상보 라인 ${s.pair}건 — 크로스북 mismatch(결함#26). sports-games bestPair 배포 확인`); }
     if (s.immBad) warn.push(`임박무배당${s.immBad}${s.leak ? '' : '(잠금)'}`);   // info once locked
     console.log(
       `  ${lg.padEnd(6)} ${String(s.n).padStart(4)} ${String(s.days.size).padStart(4)}일 ${String(s.real).padStart(5)} ${String(s.ph).padStart(4)} ${String(s.locked).padStart(4)} ${String(s.leak).padStart(4)} ${String(s.miss).padStart(4)} ${String(s.tbd).padStart(3)} ${String(s.bad).padStart(6)} ${String(s.immBad).padStart(8)}` +

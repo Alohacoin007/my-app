@@ -158,6 +158,26 @@ function bestOutcome(ev: any, marketKey: string, matchFn: (o: any) => boolean): 
   });
   return b;
 }
+// A COMPLEMENTARY PAIR from a SINGLE bookmaker (2026-08-08 fix). spreads/totals are two-sided
+// markets that must share one line: spread home.point === -away.point ; total over.point === under.point.
+// The old per-side bestOutcome picked each side's best price across DIFFERENT books, so pick'em games
+// (books disagree on the runline favorite) produced both sides at -1.5, and totals like Over 9.5/Under 9
+// — non-complementary, malformed, and best-price-both-sides eroded the hold. Here we pick, within one
+// book, the valid complementary pair with the best combined customer price (same generous philosophy,
+// but coherent). No valid pair → return null → the market is OMITTED (never fabricate a line).
+function bestPair(ev: any, marketKey: string, hMatch: (o: any) => boolean, aMatch: (o: any) => boolean, pairOk: (hp: number, ap: number) => boolean): any {
+  let best: any = null, bestVal = -Infinity;
+  (ev.bookmakers || []).forEach((bk: any) => {
+    const m = (bk.markets || []).find((x: any) => x.key === marketKey); if (!m) return;
+    const outs = m.outcomes || [];
+    const h = outs.find(hMatch), a = outs.find(aMatch);
+    if (!h || !a || h.point == null || a.point == null) return;
+    if (!pairOk(h.point, a.point)) return;
+    const val = decP(h.price) + decP(a.price);   // best combined customer value among valid pairs
+    if (val > bestVal) { bestVal = val; best = { h: { price: h.price, point: h.point }, a: { price: a.price, point: a.point } }; }
+  });
+  return best;
+}
 function oddsToCore(ev: any, home: any, away: any): any {
   if (!ev.bookmakers || !ev.bookmakers.length) return null;
   const core: any = {};
@@ -171,10 +191,12 @@ function oddsToCore(ev: any, home: any, away: any): any {
     { ln: "X", am: drawO.price, sel: "Draw" },
     { ln: "2", am: mlA.price, sel: away.nm + " ML" },
   ];
-  const spH = bestOutcome(ev, "spreads", (o) => teamMatch(o.name, home.nm)), spA = bestOutcome(ev, "spreads", (o) => teamMatch(o.name, away.nm));
-  if (spH && spA && spH.point != null && spA.point != null) core.spread = [{ ln: fmtPt(spH.point), am: spH.price, sel: home.nm + " " + fmtPt(spH.point) }, { ln: fmtPt(spA.point), am: spA.price, sel: away.nm + " " + fmtPt(spA.point) }];
-  const ov = bestOutcome(ev, "totals", (o) => /over/i.test(o.name)), un = bestOutcome(ev, "totals", (o) => /under/i.test(o.name));
-  if (ov && un && ov.point != null && un.point != null) core.total = [{ ln: "Over " + ov.point, am: ov.price, sel: "Over " + ov.point }, { ln: "Under " + un.point, am: un.price, sel: "Under " + un.point }];
+  // spreads — one book's complementary runline (home.point === -away.point), else omit (no fabrication)
+  const sp = bestPair(ev, "spreads", (o) => teamMatch(o.name, home.nm), (o) => teamMatch(o.name, away.nm), (hp, ap) => hp === -ap && hp !== 0);
+  if (sp) core.spread = [{ ln: fmtPt(sp.h.point), am: sp.h.price, sel: home.nm + " " + fmtPt(sp.h.point) }, { ln: fmtPt(sp.a.point), am: sp.a.price, sel: away.nm + " " + fmtPt(sp.a.point) }];
+  // totals — one book's Over/Under sharing the same point, else omit
+  const tp = bestPair(ev, "totals", (o) => /over/i.test(o.name), (o) => /under/i.test(o.name), (op, up) => op === up);
+  if (tp) core.total = [{ ln: "Over " + tp.h.point, am: tp.h.price, sel: "Over " + tp.h.point }, { ln: "Under " + tp.a.point, am: tp.a.price, sel: "Under " + tp.a.point }];
   return (core.ml || core.spread || core.total || core.threeWay) ? core : null;
 }
 // ⛳ Which Odds-API golf key prices a given ESPN tournament name. Strict on purpose:
