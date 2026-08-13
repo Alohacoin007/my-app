@@ -34,7 +34,7 @@ else {
 const tbxDark = grab('.tbxtabs .t.on');
 if (!tbxDark || !/color:#2f7fe0/i.test(tbxDark) || !/border-bottom:2px solid #2f7fe0/i.test(tbxDark)) bad('dark active toolbox tab must be window-blue text + underline');
 const tbxLegend = grab('.terminal.light .tbxtabs .t.on');
-if (!tbxLegend || !/color:#00FF55/i.test(tbxLegend) || !/border-bottom:2px solid #00FF55/i.test(tbxLegend)) bad('Legend active toolbox tab must be neon-green text + underline');
+if (!tbxLegend || !/color:#0d47a1/i.test(tbxLegend) || !/border-bottom:2px solid #0d47a1/i.test(tbxLegend)) bad('MT5 active toolbox tab must be navy text + navy underline');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} MW-tab problem(s).`); process.exit(1); }
-console.log('🟢 PASS: active Market Watch + toolbox tabs show GREEN text (no accent line) in both the original and Legend themes.');
+console.log('🟢 PASS: active Market Watch + toolbox tabs show accent text + underline (dark = window-blue, MT5 light = navy #0d47a1).');

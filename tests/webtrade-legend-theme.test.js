@@ -80,7 +80,7 @@ if (!/\.terminal\.light \.tf b\.on,\.terminal\.light \.tibtn\.on\{background:#cf
 // deliberate active-tab underline), which the user explicitly wants as the one green "selected" point.
 const greenBorders = (src.match(/border(?!-top|-bottom)[a-z-]*:\s*[^;{}]*#00FF55/gi) || []);
 if (greenBorders.length) bad('green border(s) remain (only the active-tab top/bottom accent may be green): ' + greenBorders.join(' | '));
-if (!/\.terminal\.light \.tbxtabs \.t\.on\{[^}]*color:#00FF55[^}]*border-bottom:2px solid #00FF55\}/.test(src)) bad('active toolbox tab: neon-green text + underline');
+if (!/\.terminal\.light \.tbxtabs \.t\.on\{[^}]*color:#0d47a1[^}]*border-bottom:2px solid #0d47a1\}/.test(src)) bad('MT5 active toolbox tab: white bg + navy text + navy underline');
 if (!/\.terminal\.light \.charttabs \.ctab\.on\{background:#000000;color:#00FF55\}/.test(src)) bad('active chart tab TEXT must be green');
 // (active chart header text color asserted above — MT5 white on blue)
 // the up-candle LINE (chart) is the one place a green stroke is allowed
@@ -89,12 +89,12 @@ if (!/upLine:'#00FF55'/.test(src)) bad('the Legend up-candle line must stay neon
 if (!/priceLineColor: themeBus\.theme==='light' \? '#5a6472' : ''/.test(src)) bad('Legend current-price line must be muted grey #5a6472 (dark keeps default)');
 if (!/priceLineColor: t==='light' \? '#5a6472' : ''/.test(src)) bad('theme flip must re-mute the current-price line');
 // bottom table: vertical grid gone, horizontal only
-if (!/\.terminal\.light table\.pos td\{border:none;border-bottom:1px solid #1D212A/.test(src)) bad('Legend positions table must drop vertical borders (border-bottom only)');
+if (!/\.terminal\.light table\.pos td\{border:none;border-bottom:1px solid #ececef/.test(src)) bad('MT5 positions table must drop vertical borders (border-bottom only)');
 // toolbar hover = MT5 light-blue box (was dark border-only)
 if (!/\.terminal\.light \.tbtn:hover[^}]*background:#dbe7f6 !important;border:1px solid #9db8dd/.test(src)) bad('MT5 toolbar hover must be light-blue box (#dbe7f6 bg + #9db8dd border)');
-// Balance bar bold pure-white text
-if (!/\.terminal\.light \.acctline\{background:#0E1015;color:#a2aab6;border-top:1px solid #1D212A;border-bottom:1px solid #1D212A;font-weight:normal\}/.test(src)) bad('Legend Balance bar must be #a2aab6 (original size, normal weight)');
-if (!/\.terminal\.light \.acctline \.k\{color:#a2aab6[^}]*\}\.terminal\.light \.acctline b\{color:#a2aab6/.test(src)) bad('Legend Balance bar labels + numbers must be the #a2aab6 tab tone');
+// Balance bar — MT5 light gray strip, dark text
+if (!/\.terminal\.light \.acctline\{background:linear-gradient\(#eef0f3,#e2e4e8\);color:#1a1a1a;border-top:1px solid #d4d6da;border-bottom:1px solid #d4d6da;font-weight:normal\}/.test(src)) bad('MT5 Balance bar must be light-gray strip + dark #1a1a1a text');
+if (!/\.terminal\.light \.acctline \.k\{color:#555[^}]*\}\.terminal\.light \.acctline b\{color:#1a1a1a/.test(src)) bad('MT5 Balance bar labels dim #555, numbers dark #1a1a1a');
 
 // the one-click panel is the ONE-SHELL card in both themes (2026-07-13 B안 — see
 // webtrade-oneclick-neon.test.js): a single bordered .obox, direction skin on the shell,
