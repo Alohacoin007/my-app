@@ -24,8 +24,8 @@ else {
 const legend = grab('.terminal.light .mwtabs .mt.on');
 if (!legend) bad('.terminal.light .mwtabs .mt.on rule missing (Legend theme)');
 else {
-  if (!/color:#00FF55/i.test(legend)) bad('Legend active MW tab must have GREEN text (color:#00FF55)');
-  if (/border-top-color:#00FF55/i.test(legend)) bad('Legend active MW tab must NOT show the green top-accent line — colour goes in the text now');
+  if (!/color:#0d47a1/i.test(legend)) bad('MT5 active MW tab must have BLUE text (color:#0d47a1)');
+  if (/border-top-color:#00FF55/i.test(legend)) bad('active MW tab must NOT show a green top-accent line — colour goes in the text now');
   if (!/border-top-color:transparent/i.test(legend)) bad('Legend active MW tab top border must be transparent (line removed)');
 }
 

@@ -36,11 +36,13 @@ if (CD.light.downBody !== '#FF453A' || CD.light.downLine !== '#FF453A') bad('Leg
 // (3) Legend CSS root vars = Robinhood palette
 if (!/\.terminal\.light\{ --bg:#0E1015; --panel:#000000; --panel2:#000000; --line:#1D212A;[^}]*--up:#00FF55; --down:#FF453A;[^}]*background:#0E1015/.test(src))
   bad('.terminal.light root vars must be the Robinhood palette (#0E1015 master, #000000 boxes, #1D212A line, up #00FF55, down #FF453A)');
-if (!/\.terminal\.light \.mwt \.au\{color:#00FF55 !important\}\.terminal\.light \.mwt \.ad\{color:#FF453A !important\}/.test(src)) bad('Market Watch up/down must be Robinhood green/red in Legend');
-// Market Watch body text uses the toolbox-tab tone (#a2aab6, normal weight) — size untouched
-if (!/\.terminal\.light \.mwt td\{border:none;border-bottom:1px solid #1D212A;color:#a2aab6;font-weight:normal\}/.test(src)) bad('Market Watch cells must use the #a2aab6 tab tone (normal weight)');
-if (!/\.terminal\.light \.mwt td\.sym\{color:#a2aab6;font-weight:normal\}/.test(src)) bad('Market Watch symbols must use the #a2aab6 tab tone');
-if (/\.terminal\.light[^\n]*background:#ffffff/.test(src)) bad('no WHITE background surfaces may remain in the Legend theme (it is jet-black)');
+// Market Watch = MT5 light (2026-08-13): up=파랑 #1560d0, down=빨강 #d02f2f
+if (!/\.terminal\.light \.mwt \.au\{color:#1560d0 !important\}\.terminal\.light \.mwt \.ad\{color:#d02f2f !important\}/.test(src)) bad('Market Watch up/down must be MT5 blue/red');
+// Market Watch body text = MT5 검은 글자, Tahoma 보통 굵기
+if (!/\.terminal\.light \.mwt td\{border:none;border-bottom:1px solid #ececef;color:#1c1c1e;font-weight:400\}/.test(src)) bad('Market Watch cells must be MT5 dark text on light (#1c1c1e, weight 400)');
+if (!/\.terminal\.light \.mwt td\.sym\{color:#1c1c1e;font-weight:400\}/.test(src)) bad('Market Watch symbols must be MT5 dark text (#1c1c1e)');
+// 차트 표면(캔들 영역)은 흰색 금지 — 시세창은 MT5 라이트라 흰색 허용, 차트만 다크 유지
+if (/\.terminal\.light \.(charts|chartstage|win|cell-title|mwtick)\b[^\n]*background:#ffffff/.test(src)) bad('chart surfaces must stay dark (no white) — only the Market Watch is MT5 light');
 // the chart right-click menu (ctxmenu) must be dark in Legend, not the MT5 light-grey #f0f0f0
 if (!/\.terminal\.light \.ctxmenu\{background:#000000;border:1px solid #1D212A/.test(src)) bad('chart right-click menu must be Legend dark (#000000 + #1D212A), not white');
 if (!/\.terminal\.light \.ctxmenu \.ci \.ck\{color:#00FF55\}/.test(src)) bad('right-click menu active checkmark should be green');
@@ -48,10 +50,10 @@ if (!/\.terminal\.light \.ctxmenu \.ci \.ck\{color:#00FF55\}/.test(src)) bad('ri
 if (!/const th=CHART_THEME\[themeBus\.theme\]\|\|CHART_THEME\.dark, legend=themeBus\.theme==='light'/.test(src)) bad('TickChart must follow CHART_THEME (was hardcoded #ffffff)');
 if (!/const ask=mk\(legend\?'#FF453A':'#d13438'\), bid=mk\(legend\?'#00FF55':'#2f6ec0'\)/.test(src)) bad('TickChart ask/bid must be Legend red/green');
 if (/\.mwtick\{[^}]*background:#ffffff/.test(src)) bad('the tick-chart container must not be white');
-// the Trading tab panels are flat black cards (no blue/red 3D gradients) with side-coloured prices
-if (!/\.terminal\.light \.mwtp \.sd\{background:#000000 !important;border:1px solid #1D212A\}/.test(src)) bad('Trading-tab buttons must be flat black cards (no gradient fill)');
-if (!/\.terminal\.light \.mwtp \.sd\.sell \.pr\{color:#FF453A\}/.test(src)) bad('Trading SELL price must be red');
-if (!/\.terminal\.light \.mwtp \.sd\.buy \.pr\{color:#00FF55\}/.test(src)) bad('Trading BUY price must be green');
+// Trading 탭 = MT5 라이트 카드 (SELL 빨강 / BUY 파랑)
+if (!/\.terminal\.light \.mwtp \.sd\{background:#f6f7f9 !important;border:1px solid #d3d5da\}/.test(src)) bad('Trading-tab buttons must be MT5 light cards (#f6f7f9)');
+if (!/\.terminal\.light \.mwtp \.sd\.sell \.pr\{color:#d02f2f\}/.test(src)) bad('Trading SELL price must be red (#d02f2f)');
+if (!/\.terminal\.light \.mwtp \.sd\.buy \.pr\{color:#1560d0\}/.test(src)) bad('Trading BUY price must be blue (MT5, #1560d0)');
 // New Order modal in Legend: green BUY button (was blue), muted hairlines, green focus
 if (!/\.terminal\.light \.om-btns \.om-buy\{background:#00c853 !important\}/.test(src)) bad('New Order BUY button must be green in Legend (was blue #007aff)');
 if (!/\.terminal\.light \.om-btns \.om-sell\{background:#FF453A !important\}/.test(src)) bad('New Order SELL button must be Legend red');
