@@ -791,8 +791,15 @@ const IND_MA_P=20, IND_BB_P=20, IND_BB_K=2, IND_RSI_P=14;
 const CH_MA='#F5A623', CH_BB='#8E9BB3', CH_RSI='#B37FEB';
 /* 차트별 설정 (id -> {type,grid,zoom,tf,ind}). 새 차트는 기본값. localStorage 저장 */
 const chartCfg=(()=>{ try{ return JSON.parse(localStorage.getItem('alpexa.fxdash.chartcfg')||'{}'); }catch(_){ return {}; } })();
-function cfg(id){ let c=chartCfg[id]; if(!c){ c=chartCfg[id]={type:'candles',grid:true,zoom:1,tf:curTF,ind:{},vol:true,scroll:0}; }
-  if(!c.ind) c.ind={}; if(!c.tf) c.tf=curTF; if(c.vol===undefined) c.vol=true; if(c.scroll===undefined) c.scroll=0;
+// 기본 차트 셋팅 (2026-08-13 사장님): 볼륨 숨김 + 시작 시 2클릭 줌아웃(1×0.8×0.8=0.64) — 처음 시작 캔들이 너무 컸음.
+// 1회 마이그레이션: 이미 저장된 차트 설정에도 새 기본을 적용(버전 게이트라 딱 한 번, 이후 수동 토글은 유지).
+try{ if(localStorage.getItem('alpexa.fxdash.chartdefs')!=='voloff-zoom064'){
+  Object.keys(chartCfg).forEach(id=>{ const c=chartCfg[id]; if(c&&typeof c==='object'){ c.vol=false; c.zoom=0.64; } });
+  localStorage.setItem('alpexa.fxdash.chartdefs','voloff-zoom064');
+  localStorage.setItem('alpexa.fxdash.chartcfg', JSON.stringify(chartCfg));
+} }catch(_){}
+function cfg(id){ let c=chartCfg[id]; if(!c){ c=chartCfg[id]={type:'candles',grid:true,zoom:0.64,tf:curTF,ind:{},vol:false,scroll:0}; }
+  if(!c.ind) c.ind={}; if(!c.tf) c.tf=curTF; if(c.vol===undefined) c.vol=false; if(c.scroll===undefined) c.scroll=0;
   if(c.oclot===undefined) c.oclot=0.10; return c; }
 const chVolFmt=v=>{ v=+v||0; return v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(1)+'K':String(Math.round(v)); };
 function saveCfg(){ try{ localStorage.setItem('alpexa.fxdash.chartcfg', JSON.stringify(chartCfg)); }catch(_){} }
