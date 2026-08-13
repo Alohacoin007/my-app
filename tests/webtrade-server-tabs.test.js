@@ -15,16 +15,11 @@ const bad = (m) => { console.error('🔴 ' + m); fail++; };
 const pin = (re, m) => { if (!re.test(wt)) bad(m); };
 const ban = (re, m) => { if (re.test(wt)) bad('[금지] ' + m); };
 
-pin(/Switch server/, '+ 버튼 타이틀 리터럴 Switch server');
-pin(/Alpexa Sports/, '메뉴 항목: Alpexa Sports (웹 대시보드)');
-pin(/sports-dashboard\.html/, '스포츠 착지 = sports-dashboard.html (컴퓨터용)');
-pin(/Alpexa Crypto/, '메뉴 항목: Alpexa Crypto');
-// 2026-07-17 계약 변경(사장님 지시): 크립토 대시보드 출시 — 'Coming this week' 잠금 해제,
-// 서버 메뉴에서 크립토 대시보드로 전환. (활성화 시 경로가 crypto-dashboard.html로 갱신될 예정)
-pin(/goSrv\('\/dev\/crypto-dashboard\.html'\)}>Alpexa Crypto/, '크립토 전환 = 대시보드 경로(goSrv)');
+// 새 설계 (2026-08-13 사장님 "드랍다운 불편"): 드랍다운 폐지 → 크립토·스포츠 직접 이동 버튼 2개(심플 아이콘)
+pin(/title="Alpexa Crypto" onClick=\{\(\)=>goSrv\('\/dev\/crypto-dashboard\.html'\)\}/, '크립토 버튼 → 크립토 대시보드 직접 이동(goSrv)');
+pin(/title="Alpexa Sports" onClick=\{\(\)=>goSrv\('\/sports-dashboard\.html'\)\}/, '스포츠 버튼 → 스포츠 대시보드 직접 이동(goSrv)');
 pin(/window\.top[\s\S]{0,120}location\.href|top\.location\.href/, '이동은 window.top — iframe 중첩 방지');
-pin(/srvmenu/, '메뉴 = 전용 다크 스타일(툴바 팔레트) — ctxmenu는 라이트 고정이라 다크 스킨서 깨짐 (2026-07-15 사용자 보고)');
-pin(/>Alpexa Sports</, '항목 이름 정확히 Alpexa Sports (서버명 3종 규칙)');
+ban(/onClick=\{\(e\)=>\{e\.stopPropagation\(\);setSrvMenu/, '드랍다운 토글 폐지 — 직접 이동 버튼만 (불편한 드랍다운 제거)');
 ban(/iframe[^>]{0,80}sports-dashboard/, '터미널 안에 대시보드 iframe 중첩 — 이동(navigation)만 허용');
 
 if (fail) { console.error('\n🔴 FAIL — webtrade 서버 탭 ' + fail + '건'); process.exit(1); }
