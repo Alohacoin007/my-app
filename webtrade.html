@@ -562,10 +562,10 @@
   .terminal.light .ctxmenu .ci .ck{color:#00FF55}   /* active checkmark = green */
   .terminal.light .ctxsep{background:#1D212A}
   /* TOP TOOLBAR — MT5 light gray strip: flat buttons, DARK glyphs, light-blue hover/selection (2026-08-13 사장님 "MT5처럼") */
-  .terminal.light .tbtn,.terminal.light .tf b,.terminal.light .tibtn{background:transparent !important;border:1px solid transparent !important;border-radius:3px !important;color:#20242a !important;box-shadow:none !important}
+  .terminal.light .tbtn,.terminal.light .tf b,.terminal.light .tibtn{background:transparent !important;border:1px solid transparent !important;border-radius:3px !important;color:#15181d !important;font-weight:400 !important;box-shadow:none !important}
   .terminal.light .tbtn svg,.terminal.light .tibtn svg{color:#2b2f36}
   .terminal.light .tibtn svg [stroke]{stroke:#2b2f36}.terminal.light .tibtn svg [fill]:not([fill="none"]){fill:#2b2f36}
-  .terminal.light .tf b{color:#33383f !important;font-weight:600}
+  .terminal.light .tf b{color:#15181d !important;font-weight:400 !important}
   .terminal.light .tbtn:hover,.terminal.light .tf b:hover,.terminal.light .tibtn:hover{background:#dbe7f6 !important;border:1px solid #9db8dd !important;color:#0d2c4d !important}
   .terminal.light .tbtn:hover svg,.terminal.light .tibtn:hover svg{color:#0d2c4d}
   .terminal.light .tf b.on,.terminal.light .tibtn.on{background:#cfe1f7 !important;border:1px solid #7ba2d6 !important;color:#0d2c4d !important}   /* selected → MT5 light-blue pressed box */
@@ -3180,20 +3180,19 @@ function Toolbar({ tf, chartType, tool }){
   React.useEffect(()=> terminalBus.subscribe((cmd)=>{ if(cmd==='algo.toggle') setAlgo(a=>!a); }), []);
   return (
     <div className="tools">
-      <div className="tbtn" title="New Order (F9)" onClick={()=>terminalBus.emit('order.new')}><span className="ord">{IC.order}</span> {t('New Order')}</div>
-      <div className={"tbtn algo"+(algo?' on':'')} title="Algo Trading" onClick={()=>terminalBus.emit('algo.toggle')}>{algo?<Svg><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></Svg>:<span className="play">{IC.play}</span>} {t('Algo Trading')}</div>
+      {/* MT5 순서: 그리기/커서 도구를 맨 왼쪽에 */}
+      <div className="tigrp">{DRAW_TOOLS.map(([k,ic,t])=>
+        <div key={k} className={"tibtn"+(k===tool?' on':'')} title={t} onClick={()=>terminalBus.emit('chart.tool', k===tool?null:k)}>{ic}</div>)}</div>
       <div className="tsep"></div>
       {/* chart type */}
       <div className="tigrp">{CHART_TYPES.map(([k,ic,t])=>
         <div key={k} className={"tibtn"+(k===chartType?' on':'')} title={t} onClick={()=>terminalBus.emit('chart.type',k)}>{ic}</div>)}</div>
       <div className="tsep"></div>
-      {/* zoom */}
-      <div className="tigrp">
-        <div className="tibtn" title="Zoom In" onClick={()=>terminalBus.emit('chart.zoom','in')}>{IC.zin}</div>
-        <div className="tibtn" title="Zoom Out" onClick={()=>terminalBus.emit('chart.zoom','out')}>{IC.zout}</div>
-      </div>
+      {/* Algo Trading + New Order — MT5는 이 둘을 가운데에 (Algo 먼저, 그다음 New Order) */}
+      <div className={"tbtn algo"+(algo?' on':'')} title="Algo Trading" onClick={()=>terminalBus.emit('algo.toggle')}>{algo?<Svg><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></Svg>:<span className="play">{IC.play}</span>} {t('Algo Trading')}</div>
+      <div className="tbtn" title="New Order (F9)" onClick={()=>terminalBus.emit('order.new')}><span className="ord">{IC.order}</span> {t('New Order')}</div>
       <div className="tsep"></div>
-      {/* MT5 chart-follow toggles: Auto Scroll (tick → snap to live edge) + Chart Shift (right gap) */}
+      {/* MT5 chart-follow toggles: Auto Scroll + Chart Shift (재생/따라가기 그룹) */}
       <div className="tigrp">
         <div className={"tibtn"+(asOn?' on':'')} title="Auto Scroll — 틱마다 최신 봉으로 (과거 보려면 끄기)"
              onClick={()=>{ chartOpts.autoScroll=!chartOpts.autoScroll; setAsOn(chartOpts.autoScroll); terminalBus.emit('chart.opts'); }}>{IC.ascroll}</div>
@@ -3201,13 +3200,14 @@ function Toolbar({ tf, chartType, tool }){
              onClick={()=>{ chartOpts.shift=!chartOpts.shift; setShOn(chartOpts.shift); terminalBus.emit('chart.opts'); }}>{IC.cshift}</div>
       </div>
       <div className="tsep"></div>
-      {/* drawing / analysis tools — click to arm (active state); draw on chart is future */}
-      <div className="tigrp">{DRAW_TOOLS.map(([k,ic,t])=>
-        <div key={k} className={"tibtn"+(k===tool?' on':'')} title={t} onClick={()=>terminalBus.emit('chart.tool', k===tool?null:k)}>{ic}</div>)}</div>
+      {/* zoom */}
+      <div className="tigrp">
+        <div className="tibtn" title="Zoom In" onClick={()=>terminalBus.emit('chart.zoom','in')}>{IC.zin}</div>
+        <div className="tibtn" title="Zoom Out" onClick={()=>terminalBus.emit('chart.zoom','out')}>{IC.zout}</div>
+      </div>
       <div className="tsep"></div>
-      {/* tile windows back to a 2×2 grid */}
+      {/* tile windows + grid */}
       <div className="tibtn" title="Tile Windows (2×2)" onClick={()=>terminalBus.emit('window.tile')}>{IC.tile}</div>
-      {/* Grid On/Off (Ctrl+G) — toggles the active chart's background dotted grid */}
       <div className="tibtn" title="Grid On/Off (Ctrl+G)" onClick={()=>terminalBus.emit('chart.grid')} style={{fontSize:'15px',lineHeight:'26px'}}>▦</div>
       <div className="tsep"></div>
       <div className="tf">{TFS.map(t=><b key={t} className={t===tf?'on':''} onClick={()=>terminalBus.emit('chart.tf',t)}>{t}</b>)}</div>
