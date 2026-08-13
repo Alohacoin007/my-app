@@ -66,9 +66,10 @@ if (/\.terminal\.light \.oc-lbl\{color:#8A94A6/.test(src)) bad('Legend must NOT 
 if (!/\.terminal\.light \.cell-title\{background:#000000;color:#ffffff;border:none;border-top:1px solid #1D212A;border-bottom:1px solid #1D212A;text-shadow:none\}/.test(src)) bad('Legend chart header must stay muted black (no metallic) with calm hairlines');
 if (!/\.terminal\.light \.win\.active \.cell-title\{[^}]*border-top:1px solid #00a2ff/.test(src)) bad('Legend active window header must get the neon-blue top line (thin 1px)');
 if (!/\.terminal\.light \.win\.active\{border-color:#2f3542/.test(src)) bad('active window must be a brighter GREY hairline, not green/glow');
-if (!/\.terminal\.light \.tbtn:hover[^}]*color:#ffffff !important/.test(src)) bad('toolbar hover must be white');
-// selected timeframe/tool button = green TEXT only (no fill, no green border)
-if (!/\.terminal\.light \.tf b\.on,\.terminal\.light \.tibtn\.on,\.terminal\.light \.tbtn\.algo\.on\{background:transparent !important;border:1px solid transparent !important;color:#00FF55/.test(src)) bad('selected timeframe/tool button must be green TEXT only (no fill)');
+// MT5 light toolbar (2026-08-13 사장님 "MT5처럼"): hover = light-blue box, dark-blue text
+if (!/\.terminal\.light \.tbtn:hover[^}]*color:#0d2c4d !important/.test(src)) bad('toolbar hover text must be MT5 dark-blue #0d2c4d');
+// selected timeframe/tool button = MT5 light-blue pressed box (no more green-text-only)
+if (!/\.terminal\.light \.tf b\.on,\.terminal\.light \.tibtn\.on\{background:#cfe1f7 !important;border:1px solid #7ba2d6 !important;color:#0d2c4d/.test(src)) bad('selected timeframe/tool button must be MT5 light-blue pressed box');
 
 // CRITICAL green-restraint: NO green BORDERS anywhere in Legend (eye-strain). Green is text-only,
 // and only on live ticks / profit / P&L / the up-candle line — never a border/background.
@@ -86,8 +87,8 @@ if (!/priceLineColor: themeBus\.theme==='light' \? '#5a6472' : ''/.test(src)) ba
 if (!/priceLineColor: t==='light' \? '#5a6472' : ''/.test(src)) bad('theme flip must re-mute the current-price line');
 // bottom table: vertical grid gone, horizontal only
 if (!/\.terminal\.light table\.pos td\{border:none;border-bottom:1px solid #1D212A/.test(src)) bad('Legend positions table must drop vertical borders (border-bottom only)');
-// toolbar hover = border only (no fill)
-if (!/\.terminal\.light \.tbtn:hover[^}]*background:transparent !important;border:1px solid #1D212A/.test(src)) bad('Legend toolbar hover must be border-only (transparent bg)');
+// toolbar hover = MT5 light-blue box (was dark border-only)
+if (!/\.terminal\.light \.tbtn:hover[^}]*background:#dbe7f6 !important;border:1px solid #9db8dd/.test(src)) bad('MT5 toolbar hover must be light-blue box (#dbe7f6 bg + #9db8dd border)');
 // Balance bar bold pure-white text
 if (!/\.terminal\.light \.acctline\{background:#0E1015;color:#a2aab6;border-top:1px solid #1D212A;border-bottom:1px solid #1D212A;font-weight:normal\}/.test(src)) bad('Legend Balance bar must be #a2aab6 (original size, normal weight)');
 if (!/\.terminal\.light \.acctline \.k\{color:#a2aab6[^}]*\}\.terminal\.light \.acctline b\{color:#a2aab6/.test(src)) bad('Legend Balance bar labels + numbers must be the #a2aab6 tab tone');
