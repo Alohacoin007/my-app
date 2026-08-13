@@ -69,7 +69,7 @@ if (!/\.terminal\.light \.win\.active\{border-color:#2f3542/.test(src)) bad('act
 // MT5 light toolbar (2026-08-13 사장님 "MT5처럼"): hover = light-blue box, dark-blue text
 if (!/\.terminal\.light \.tbtn:hover[^}]*color:#0d2c4d !important/.test(src)) bad('toolbar hover text must be MT5 dark-blue #0d2c4d');
 // selected timeframe/tool button = MT5 light-blue pressed box (no more green-text-only)
-if (!/\.terminal\.light \.tf b\.on,\.terminal\.light \.tibtn\.on\{background:#cfe1f7 !important;border:1px solid #7ba2d6 !important;color:#0d2c4d/.test(src)) bad('selected timeframe/tool button must be MT5 light-blue pressed box');
+if (!/\.terminal\.light \.tf b\.on,\.terminal\.light \.tibtn\.on\{background:#cfe1f7 !important;border:1px solid !important;border-color:#8fb0d6 #e6eef7 #e6eef7 #8fb0d6 !important;color:#0d2c4d/.test(src)) bad('selected button must be MT5 pressed bevel (dark top/left, light right/bottom — no dark right/bottom edge)');
 
 // CRITICAL green-restraint: NO green BORDERS anywhere in Legend (eye-strain). Green is text-only,
 // and only on live ticks / profit / P&L / the up-candle line — never a border/background.
