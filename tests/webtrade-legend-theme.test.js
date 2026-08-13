@@ -65,8 +65,9 @@ if (/\.terminal\.light \.oc-sell|\.terminal\.light \.oc-buy/.test(src)) bad('Leg
 if (/\.terminal\.light \.obox\{background:#000000/.test(src)) bad('Legend must NOT paint the one-click panel matte-black any more (neon forced)');
 if (/\.terminal\.light \.oc-lbl\{color:#8A94A6/.test(src)) bad('Legend must NOT mute the SELL/BUY labels to silver (neon forced)');
 // window header melts, no gray 3D frame; active window = brighter GREY hairline (never green)
-if (!/\.terminal\.light \.cell-title\{background:#000000;color:#ffffff;border:none;border-top:1px solid #1D212A;border-bottom:1px solid #1D212A;text-shadow:none\}/.test(src)) bad('Legend chart header must stay muted black (no metallic) with calm hairlines');
-if (!/\.terminal\.light \.win\.active \.cell-title\{[^}]*border-top:1px solid #00a2ff/.test(src)) bad('Legend active window header must get the neon-blue top line (thin 1px)');
+// MT5 차트창 헤더 (2026-08-13): 비활성 = 회색 그라데이션 + 어두운 글자, 활성 = 파랑 + 흰 글자
+if (!/\.terminal\.light \.cell-title\{background:linear-gradient\(#eaeaec,#d6d6da\);color:#1a1a1a/.test(src)) bad('MT5 chart header (inactive) must be gray gradient + dark text');
+if (!/\.terminal\.light \.win\.active \.cell-title\{background:linear-gradient\(#4d92d9,#2f74c0\);color:#ffffff/.test(src)) bad('MT5 active chart header must be blue gradient + white text');
 if (!/\.terminal\.light \.win\.active\{border-color:#2f3542/.test(src)) bad('active window must be a brighter GREY hairline, not green/glow');
 // MT5 light toolbar (2026-08-13 사장님 "MT5처럼"): hover = light-blue box, dark-blue text
 if (!/\.terminal\.light \.tbtn:hover[^}]*color:#0d2c4d !important/.test(src)) bad('toolbar hover text must be MT5 dark-blue #0d2c4d');
@@ -81,7 +82,7 @@ const greenBorders = (src.match(/border(?!-top|-bottom)[a-z-]*:\s*[^;{}]*#00FF55
 if (greenBorders.length) bad('green border(s) remain (only the active-tab top/bottom accent may be green): ' + greenBorders.join(' | '));
 if (!/\.terminal\.light \.tbxtabs \.t\.on\{[^}]*color:#00FF55[^}]*border-bottom:2px solid #00FF55\}/.test(src)) bad('active toolbox tab: neon-green text + underline');
 if (!/\.terminal\.light \.charttabs \.ctab\.on\{background:#000000;color:#00FF55\}/.test(src)) bad('active chart tab TEXT must be green');
-if (!/\.terminal\.light \.win\.active \.cell-title\{background:#000000;color:#00FF55/.test(src)) bad('active window title TEXT must be green');
+// (active chart header text color asserted above — MT5 white on blue)
 // the up-candle LINE (chart) is the one place a green stroke is allowed
 if (!/upLine:'#00FF55'/.test(src)) bad('the Legend up-candle line must stay neon green');
 // current-price line muted to grey in Legend (was a loud red), default in dark

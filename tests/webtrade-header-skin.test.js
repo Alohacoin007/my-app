@@ -32,7 +32,7 @@ if (!wch || !/background:#3a3f4d/.test(wch)) bad('control hover must be a dark-s
 
 // ACTIVE window header top line — dark = royal-blue neon, Legend = green neon; inactive = calm
 if (!/\.win\.active \.cell-title\{border-top:1px solid #1b46e6\}/.test(src)) bad('active header (dark) must be a 1px royal-blue neon top line (thin)');
-if (!/\.terminal\.light \.win\.active \.cell-title\{[^}]*border-top:1px solid #00a2ff/.test(src)) bad('active header (Legend) must be a 1px neon-blue top line (thin)');
+if (!/\.terminal\.light \.win\.active \.cell-title\{background:linear-gradient\(#4d92d9,#2f74c0\)/.test(src)) bad('MT5 active chart header (light) must be the blue gradient title bar');
 // Legend stays muted (no metallic gradient on its headers)
 const legendHdr = grab('.terminal.light .cell-title');
 if (!legendHdr || GRAD.test(legendHdr)) bad('Legend header must stay muted black (no metallic gradient)');
