@@ -36,7 +36,7 @@ if (CD.light.downBody !== '#FF453A' || CD.light.downLine !== '#FF453A') bad('Leg
 // (3) Legend CSS root vars = Robinhood palette
 if (!/\.terminal\.light\{ --bg:#0E1015; --panel:#000000; --panel2:#000000; --line:#1D212A;[^}]*--up:#00FF55; --down:#FF453A;[^}]*background:#0E1015/.test(src))
   bad('.terminal.light root vars must be the Robinhood palette (#0E1015 master, #000000 boxes, #1D212A line, up #00FF55, down #FF453A)');
-// Market Watch = MT5 light (2026-08-13): up=파랑 #1e5fd8, down=빨강 #d51111
+// Market Watch = MT5 light (2026-08-13): up=파랑 #1d63b4, down=빨강 #d51111
 if (!/\.terminal\.light \.mwt \.au\{color:#1c9e2e !important\}\.terminal\.light \.mwt \.ad\{color:#d51111 !important\}/.test(src)) bad('Market Watch up/down must be MT5 blue/red');
 // Market Watch body text = MT5 검은 글자, Tahoma 보통 굵기
 if (!/\.terminal\.light \.mwt td\{border:none;border-bottom:1px solid #ececef;color:#000000;font-weight:400\}/.test(src)) bad('Market Watch cells must be MT5 dark text on light (#1c1c1e, weight 400)');
@@ -53,7 +53,7 @@ if (/\.mwtick\{[^}]*background:#ffffff/.test(src)) bad('the tick-chart container
 // Trading 탭 = MT5 라이트 카드 (SELL 빨강 / BUY 파랑)
 if (!/\.terminal\.light \.mwtp \.sd\{background:#f6f7f9 !important;border:1px solid #d3d5da\}/.test(src)) bad('Trading-tab buttons must be MT5 light cards (#f6f7f9)');
 if (!/\.terminal\.light \.mwtp \.sd\.sell \.pr\{color:#d51111\}/.test(src)) bad('Trading SELL price must be red (#d51111)');
-if (!/\.terminal\.light \.mwtp \.sd\.buy \.pr\{color:#1e5fd8\}/.test(src)) bad('Trading BUY price must be blue (MT5, #1e5fd8)');
+if (!/\.terminal\.light \.mwtp \.sd\.buy \.pr\{color:#1d63b4\}/.test(src)) bad('Trading BUY price must be blue (MT5, #1d63b4)');
 // New Order modal in Legend: green BUY button (was blue), muted hairlines, green focus
 if (!/\.terminal\.light \.om-btns \.om-buy\{background:#00c853 !important\}/.test(src)) bad('New Order BUY button must be green in Legend (was blue #007aff)');
 if (!/\.terminal\.light \.om-btns \.om-sell\{background:#FF453A !important\}/.test(src)) bad('New Order SELL button must be Legend red');
