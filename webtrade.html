@@ -580,12 +580,23 @@
   .terminal.light .tbtn,.terminal.light .tf b,.terminal.light .tibtn{background:transparent !important;border:1px solid transparent !important;border-radius:3px !important;color:#15181d !important;font-weight:400 !important;box-shadow:none !important}
   /* 아이콘은 가늘게(1.6) + 진한색 → 뭉툭하지 않고 정밀·선명하게 (2026-08-13 사장님 "더 얇게 더 선명하게") */
   .terminal.light .tbtn svg,.terminal.light .tibtn svg{color:#15181d;stroke-width:1.4px;shape-rendering:geometricPrecision}
-  .terminal.light .tibtn svg [stroke]{stroke:#15181d}.terminal.light .tibtn svg [fill]:not([fill="none"]){fill:#15181d}
+  .terminal.light .tibtn svg:not(.mtc) [stroke]{stroke:#15181d}.terminal.light .tibtn svg:not(.mtc) [fill]:not([fill="none"]){fill:#15181d}
   .terminal.light .tf b{color:#15181d !important;font-weight:400 !important}
+  /* ── MT5 툴바 아이콘 색 (2026-08-14 사장님 "mt5처럼 색깔 넣어") — 파랑=커서·그리기·줌·창,
+     초록=차트따라가기·알고, 캔들=초록/빨강, 금색=시세($), 검정=텍스트 도구·타임프레임 ── */
+  .terminal.light .tibtn.ic-arrow svg,.terminal.light .tibtn.ic-cross svg,
+  .terminal.light .tibtn.ic-vline svg,.terminal.light .tibtn.ic-hline svg,
+  .terminal.light .tibtn.ic-trend svg,.terminal.light .tibtn.ic-fib svg,
+  .terminal.light .tibtn.ic-line svg,.terminal.light .tibtn.ic-zoom svg,
+  .terminal.light .tibtn.ic-tile svg,.terminal.light .tibtn.ic-crypto svg,
+  .terminal.light .tibtn.ic-sports svg{color:#1668b8}
+  .terminal.light .tibtn.ic-grid{color:#1668b8 !important}
+  .terminal.light .tibtn.ic-ascroll svg,.terminal.light .tibtn.ic-cshift svg{color:#2e9b3a}
+  .terminal.light .tbtn .ord{color:#1668b8}                      /* New Order = MT5 파랑 */
+  .terminal.light .tibtn.ic-text svg,.terminal.light .tibtn.ic-bar svg{color:#15181d}
   .terminal.light .tbtn:hover,.terminal.light .tf b:hover,.terminal.light .tibtn:hover{background:#dbe7f6 !important;border:1px solid #9db8dd !important;color:#0d2c4d !important}
-  .terminal.light .tbtn:hover svg,.terminal.light .tibtn:hover svg{color:#0d2c4d}
   .terminal.light .tf b.on,.terminal.light .tibtn.on{background:#cfe1f7 !important;border:1px solid !important;border-color:#8fb0d6 #e6eef7 #e6eef7 #8fb0d6 !important;color:#0d2c4d !important;box-shadow:inset 1px 1px 0 rgba(0,0,0,.06) !important}   /* selected → MT5 눌림 베벨: 위/왼=어둡게, 오른/아래=밝게 (오른쪽·하단 어두운선 제거) */
-  .terminal.light .tf b.on svg,.terminal.light .tibtn.on svg{color:#0d2c4d !important}
+  /* (선택된 도구는 MT5처럼 제 색을 유지 — 눌림은 베벨 배경으로만 표시. 예전의 색 덮어쓰기 제거) */
   .terminal.light .tbtn.algo.on{background:#dff0df !important;border:1px solid !important;border-color:#9cc79c #e6f2e6 #e6f2e6 #9cc79c !important;color:#1e5a26 !important;box-shadow:inset 1px 1px 0 rgba(0,0,0,.06) !important}
   .terminal.light .tbtn.algo .play{color:#2f9e2f}.terminal.light .tbtn.algo.on .play{color:#1e5a26}
   .terminal.light .tsep{background:#c3c6cc !important;width:1px;height:16px;margin:0 6px}
@@ -3157,10 +3168,11 @@ function MenuBar({ indicators, view, tool }){
 const TFS=['M1','M5','M15','M30','H1','H4','D1','W1','MN'];
 /* ── inline SVG icon set (Lucide-style, MIT). Inlined instead of a CDN icon font so the
    terminal carries no extra network dependency / FOUT. 14px, currentColor stroke. ── */
-const Svg = ({children})=>(
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{children}</svg>);
+const Svg = ({children, cls})=>(
+  <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{children}</svg>);
 const IC = {
-  candle: <Svg><path d="M8 3v4"/><path d="M8 15v6"/><rect x="6" y="7" width="4" height="8" rx="1"/><path d="M16 2v6"/><path d="M16 16v6"/><rect x="14" y="8" width="4" height="8" rx="1"/></Svg>,
+  /* MT5는 캔들 아이콘을 실제 캔들 색(상승 초록 / 하락 빨강)으로 칠한다 — cls="mtc" = 툴바 단색 강제에서 제외 */
+  candle: <Svg cls="mtc"><path d="M8 3v4" stroke="#2e9b3a"/><path d="M8 15v6" stroke="#2e9b3a"/><rect x="6" y="7" width="4" height="8" rx="1" stroke="#2e9b3a" fill="#2e9b3a"/><path d="M16 2v6" stroke="#d02020"/><path d="M16 16v6" stroke="#d02020"/><rect x="14" y="8" width="4" height="8" rx="1" stroke="#d02020" fill="none"/></Svg>,
   bar:    <Svg><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="7" width="3" height="11"/><rect x="17" y="14" width="3" height="4"/></Svg>,
   line:   <Svg><path d="M3 3v18h18"/><path d="m7 14 3-4 4 3 5-6"/></Svg>,
   zin:    <Svg><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/><path d="M11 8v6M8 11h6"/></Svg>,
@@ -3207,11 +3219,11 @@ function Toolbar({ tf, chartType, tool }){
     <div className="tools">
       {/* MT5 순서: 그리기/커서 도구를 맨 왼쪽에 */}
       <div className="tigrp">{DRAW_TOOLS.map(([k,ic,t])=>
-        <div key={k} className={"tibtn"+(k===tool?' on':'')} title={t} onClick={()=>terminalBus.emit('chart.tool', k===tool?null:k)}>{ic}</div>)}</div>
+        <div key={k} className={"tibtn ic-"+k+(k===tool?' on':'')} title={t} onClick={()=>terminalBus.emit('chart.tool', k===tool?null:k)}>{ic}</div>)}</div>
       <div className="tsep"></div>
       {/* chart type */}
       <div className="tigrp">{CHART_TYPES.map(([k,ic,t])=>
-        <div key={k} className={"tibtn"+(k===chartType?' on':'')} title={t} onClick={()=>terminalBus.emit('chart.type',k)}>{ic}</div>)}</div>
+        <div key={k} className={"tibtn ic-"+k+(k===chartType?' on':'')} title={t} onClick={()=>terminalBus.emit('chart.type',k)}>{ic}</div>)}</div>
       <div className="tsep"></div>
       {/* Algo Trading + New Order — MT5는 이 둘을 가운데에 (Algo 먼저, 그다음 New Order) */}
       <div className={"tbtn algo"+(algo?' on':'')} title="Algo Trading" onClick={()=>terminalBus.emit('algo.toggle')}>{algo?<Svg><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></Svg>:<span className="play">{IC.play}</span>} {t('Algo Trading')}</div>
@@ -3219,21 +3231,21 @@ function Toolbar({ tf, chartType, tool }){
       <div className="tsep"></div>
       {/* MT5 chart-follow toggles: Auto Scroll + Chart Shift (재생/따라가기 그룹) */}
       <div className="tigrp">
-        <div className={"tibtn"+(asOn?' on':'')} title="Auto Scroll — 틱마다 최신 봉으로 (과거 보려면 끄기)"
+        <div className={"tibtn ic-ascroll"+(asOn?' on':'')} title="Auto Scroll — 틱마다 최신 봉으로 (과거 보려면 끄기)"
              onClick={()=>{ chartOpts.autoScroll=!chartOpts.autoScroll; setAsOn(chartOpts.autoScroll); terminalBus.emit('chart.opts'); }}>{IC.ascroll}</div>
-        <div className={"tibtn"+(shOn?' on':'')} title="Chart Shift — 우측 15칸 여백 on/off"
+        <div className={"tibtn ic-cshift"+(shOn?' on':'')} title="Chart Shift — 우측 15칸 여백 on/off"
              onClick={()=>{ chartOpts.shift=!chartOpts.shift; setShOn(chartOpts.shift); terminalBus.emit('chart.opts'); }}>{IC.cshift}</div>
       </div>
       <div className="tsep"></div>
       {/* zoom */}
       <div className="tigrp">
-        <div className="tibtn" title="Zoom In" onClick={()=>terminalBus.emit('chart.zoom','in')}>{IC.zin}</div>
-        <div className="tibtn" title="Zoom Out" onClick={()=>terminalBus.emit('chart.zoom','out')}>{IC.zout}</div>
+        <div className="tibtn ic-zoom" title="Zoom In" onClick={()=>terminalBus.emit('chart.zoom','in')}>{IC.zin}</div>
+        <div className="tibtn ic-zoom" title="Zoom Out" onClick={()=>terminalBus.emit('chart.zoom','out')}>{IC.zout}</div>
       </div>
       <div className="tsep"></div>
       {/* tile windows + grid */}
-      <div className="tibtn" title="Tile Windows (2×2)" onClick={()=>terminalBus.emit('window.tile')}>{IC.tile}</div>
-      <div className="tibtn" title="Grid On/Off (Ctrl+G)" onClick={()=>terminalBus.emit('chart.grid')} style={{fontSize:'15px',lineHeight:'26px'}}>▦</div>
+      <div className="tibtn ic-tile" title="Tile Windows (2×2)" onClick={()=>terminalBus.emit('window.tile')}>{IC.tile}</div>
+      <div className="tibtn ic-grid" title="Grid On/Off (Ctrl+G)" onClick={()=>terminalBus.emit('chart.grid')} style={{fontSize:'15px',lineHeight:'26px'}}>▦</div>
       <div className="tsep"></div>
       <div className="tf">{TFS.map(t=><b key={t} className={t===tf?'on':''} onClick={()=>terminalBus.emit('chart.tf',t)}>{t}</b>)}</div>
       {/* 서버 전환 + — 브랜드 앞, 툴바 아이콘 크기 그대로. 메뉴는 MT5 ctxmenu 문법 재사용 */}
@@ -3242,9 +3254,9 @@ function Toolbar({ tf, chartType, tool }){
         <div className="tibtn" title="Full screen (F11)" style={{fontSize:'15px',lineHeight:'26px'}}
           onClick={()=>toggleFullscreen()}>⛶</div>
         {/* 서버 전환 = 드랍다운 폐지, 직접 이동 버튼 2개 (2026-08-13 사장님). 심플 단색 라인 아이콘 */}
-        <div className="tibtn" title="Alpexa Crypto" onClick={()=>goSrv('/dev/crypto-dashboard.html')}>
+        <div className="tibtn ic-crypto" title="Alpexa Crypto" onClick={()=>goSrv('/dev/crypto-dashboard.html')}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="9.3" cy="9.3" r="5.2"/><circle cx="14.7" cy="14.7" r="5.2"/></svg></div>
-        <div className="tibtn" title="Alpexa Sports" onClick={()=>goSrv('/sports-dashboard.html')}>
+        <div className="tibtn ic-sports" title="Alpexa Sports" onClick={()=>goSrv('/sports-dashboard.html')}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 8.4l2.9 2.1-1.1 3.5h-3.6L9 10.5z"/><path d="M12 8.4V4.4M14.9 10.5l3.3-1.1M13.8 14l1.9 2.9M10.2 14l-1.9 2.9M9 10.5 5.7 9.4"/></svg></div>
         <div className="tbrand" style={{marginLeft:0}}>ALPEXA <span>WebTrade</span></div>
       </div>
