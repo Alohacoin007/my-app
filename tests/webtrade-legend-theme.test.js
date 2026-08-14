@@ -93,7 +93,7 @@ if (!/\.terminal\.light table\.pos td\{border:none;border-bottom:1px solid #ecec
 // toolbar hover = MT5 light-blue box (was dark border-only)
 if (!/\.terminal\.light \.tbtn:hover[^}]*background:#dbe7f6 !important;border:1px solid #9db8dd/.test(src)) bad('MT5 toolbar hover must be light-blue box (#dbe7f6 bg + #9db8dd border)');
 // Balance bar — MT5 light gray strip, dark text
-if (!/\.terminal\.light \.acctline\{background:linear-gradient\(#eef0f3,#e2e4e8\);color:#1a1a1a;border-top:1px solid #d4d6da;border-bottom:1px solid #d4d6da;font-weight:700\}/.test(src)) bad('MT5 Balance bar must be light-gray strip + BLACK BOLD text');
+if (!/\.terminal\.light \.acctline\{background:linear-gradient\(#dcdee2,#cfd1d6\);color:#1a1a1a;border-top:1px solid #c4c6cb;border-bottom:1px solid #c4c6cb;font-weight:700\}/.test(src)) bad('MT5 Balance bar must be a deeper-gray strip + BLACK BOLD text');
 if (!/\.terminal\.light \.acctline \.k\{color:#1a1a1a;font-weight:700\}\.terminal\.light \.acctline b\{color:#1a1a1a;font-weight:700\}/.test(src)) bad('MT5 Balance bar labels + numbers all black bold #1a1a1a');
 
 // the one-click panel is the ONE-SHELL card in both themes (2026-07-13 B안 — see
