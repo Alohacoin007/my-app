@@ -36,9 +36,9 @@ if (CD.light.downBody !== '#FF453A' || CD.light.downLine !== '#FF453A') bad('Leg
 // (3) Legend CSS root vars = Robinhood palette
 if (!/\.terminal\.light\{ --bg:#0E1015; --panel:#000000; --panel2:#000000; --line:#1D212A;[^}]*--up:#00FF55; --down:#FF453A;[^}]*background:#0E1015/.test(src))
   bad('.terminal.light root vars must be the Robinhood palette (#0E1015 master, #000000 boxes, #1D212A line, up #00FF55, down #FF453A)');
-// Market Watch = MT5 light: up=네온 남색 #1330f0, down=네온 주황(빨강 쪽) #e63200 (2026-08-14 사장님 실관찰)
-if (!/\.terminal\.light \.mwt \.au\{color:#1c9e2e !important\}\.terminal\.light \.mwt \.ad\{color:#e63200 !important\}/.test(src)) bad('Market Watch arrows must be green up / neon red-orange down');
-if (!/\.terminal\.light \.mwt td\.tick-down\{color:#e63200 !important\}/.test(src)) bad('MT5 falling tick must be neon red-orange #e63200 (not pure red)');
+// Market Watch = MT5 light: up=네온 남색 #1330f0, down=네온 주황(빨강 쪽) #f0300c (2026-08-14 사장님 실관찰)
+if (!/\.terminal\.light \.mwt \.au\{color:#1c9e2e !important\}\.terminal\.light \.mwt \.ad\{color:#f0300c !important\}/.test(src)) bad('Market Watch arrows must be green up / neon red-orange down');
+if (!/\.terminal\.light \.mwt td\.tick-down\{color:#f0300c !important\}/.test(src)) bad('MT5 falling tick must be neon red-orange #f0300c (not pure red)');
 if (!/\.terminal\.light \.mwt td\.tick-up\{color:#1330f0 !important\}/.test(src)) bad('MT5 rising tick must be neon indigo-blue #1330f0');
 // Market Watch body text = MT5 검은 글자, Tahoma 보통 굵기
 if (!/\.terminal\.light \.mwt td\{border:none;border-bottom:1px solid #d9dbdf;border-right:1px solid #d9dbdf;color:#000000;font-weight:400\}/.test(src)) bad('Market Watch cells must be MT5 black text + Excel-style grid (가로+세로 #d9dbdf)');
@@ -54,7 +54,7 @@ if (!/const ask=mk\(legend\?'#FF453A':'#d13438'\), bid=mk\(legend\?'#00FF55':'#2
 if (/\.mwtick\{[^}]*background:#ffffff/.test(src)) bad('the tick-chart container must not be white');
 // Trading 탭 = MT5 라이트 카드 (SELL 빨강 / BUY 파랑)
 if (!/\.terminal\.light \.mwtp \.sd\{background:#f6f7f9 !important;border:1px solid #d3d5da\}/.test(src)) bad('Trading-tab buttons must be MT5 light cards (#f6f7f9)');
-if (!/\.terminal\.light \.mwtp \.sd\.sell \.pr\{color:#e63200\}/.test(src)) bad('Trading SELL price must match the Market Watch falling colour (#e63200)');
+if (!/\.terminal\.light \.mwtp \.sd\.sell \.pr\{color:#f0300c\}/.test(src)) bad('Trading SELL price must match the Market Watch falling colour (#f0300c)');
 if (!/\.terminal\.light \.mwtp \.sd\.buy \.pr\{color:#1330f0\}/.test(src)) bad('Trading BUY price must be blue (MT5, #1330f0)');
 // New Order modal in Legend: green BUY button (was blue), muted hairlines, green focus
 if (!/\.terminal\.light \.om-btns \.om-buy\{background:#00c853 !important\}/.test(src)) bad('New Order BUY button must be green in Legend (was blue #007aff)');
