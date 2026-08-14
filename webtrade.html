@@ -2072,7 +2072,10 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       const bs=(ts.options&&ts.options().barSpacing)||5;
       ts.applyOptions({ barSpacing: Math.max(2, Math.min(60, bs*(arg==='in'?1.25:0.8))) }); }catch(e){} }
     else if(cmd==='window.tile'){ const el=win.current, par=el&&el.parentElement; if(!par) return;
-      const W=par.clientWidth||800, H=par.clientHeight||500, f=initial||{fx:0.02,fy:0.02,fw:0.48,fh:0.48};
+      const W=par.clientWidth||800, H=par.clientHeight||500;
+      // arg = {chartId: {fx,fy,fw,fh}} — 현재 열린 차트 수로 계산된 격자. 없으면 마운트 시 기하로 폴백.
+      const f=(arg&&arg[idx])||initial||{fx:0.02,fy:0.02,fw:0.48,fh:0.48};
+      frac.current={ fx:f.fx, fy:f.fy, fw:f.fw, fh:f.fh };   // ★ 분수도 갱신 — 안 하면 다음 스테이지 리사이즈에 옛 배치로 되돌아간다
       geo.current={ x:Math.round(f.fx*W), y:Math.round(f.fy*H), w:Math.max(WIN_MINW,Math.round(f.fw*W)), h:Math.max(WIN_MINH,Math.round(f.fh*H)) };
       applyGeo(); resizeChart(); winMode.current='normal'; reportGeo(); }
     else if(cmd==='chart.grid' && (arg===idx || (arg==null && activeRef.current)) && chart.current){ gridOn.current=!gridOn.current;   // Grid toggle: right-click (this chart) OR toolbar/Ctrl+G (arg-less → the ACTIVE chart)
@@ -3599,6 +3602,16 @@ function OrderModal({ symbol:sym0, onClose }){
 const DEFAULT_VIEW={ toolbars:true, statusbar:true, marketwatch:true, navigator:true, toolbox:true };
 // initial floating geometry (fractions of the stage) — first four lay out as a clean 2×2 of
 // INDEPENDENT windows; extras cascade down-right so a new chart never lands exactly on another.
+/* 차트 N개를 스테이지에 빈틈 없이 깔는 격자 기하 (MT5 Tile). 마지막 줄이 덜 찼으면 그 줄의 칸을
+   넓혀 가로를 꽉 채운다 → fx+fw==1, fy+fh==1 이 항상 성립 = '가운데 검은 공간' 구조적 제거.
+   (2026-08-14 사장님: 차트를 열거나 닫을 때 자동으로 이 배치를 적용) */
+function tileGeo(n,i){
+  const cols=Math.max(1,Math.ceil(Math.sqrt(n))), rows=Math.ceil(n/cols);
+  const r=Math.floor(i/cols), c=i%cols;
+  const inRow=(r===rows-1)?(n-r*cols):cols;   // 이 줄에 실제로 놓인 창 수
+  const fw=1/inRow, fh=1/rows;
+  return { fx:c*fw, fy:r*fh, fw, fh };
+}
 function floatGeo(i){
   // edge-to-edge 2×2: bottom row fy:.5+fh:.5 reaches y=1.0, right col fx:.5+fw:.5 reaches x=1.0 → the
   // four charts fill the WHOLE stage with ZERO bottom/side gap (no black hole under the time axis).
@@ -3702,6 +3715,16 @@ function App(){
   const closeChart=React.useCallback((id)=>{ setCharts(cs=>cs.filter(c=>c.id!==id));   // unmount → ChartCell cleanup unsubscribes + chart.remove (no leak)
     delete geos.current[id]; setActiveId(a=> a===id ? null : a); }, []);
   const changeSymbol=React.useCallback((id,sym)=>{ setCharts(cs=>cs.map(c=> c.id===id ? {...c, symbol:sym} : c)); }, []);   // MW drag-drop → this window's chart switches symbol
+  // ── 차트를 열거나 닫으면 남은 창을 스테이지에 꽉 차게 자동 재배치 (사장님 2026-08-14 "가운데 검은 공간
+  //    없게"). 열린 개수(length)만 감시 → 심볼 변경·지표 추가로는 배치를 건드리지 않는다. 첫 마운트는
+  //    건너뛴다 (저장된 워크스페이스 배치를 부팅마다 밀어버리면 안 되므로).
+  const tiledOnce=React.useRef(false);
+  React.useEffect(()=>{
+    const cs=chartsRef.current; if(!cs.length) return;
+    if(!tiledOnce.current){ tiledOnce.current=true; return; }   // 부팅 = 저장된 배치 존중
+    const map={}; cs.forEach((c,i)=>{ map[c.id]=tileGeo(cs.length,i); });
+    terminalBus.emit('window.tile', map);
+  }, [charts.length]);
   React.useEffect(()=>{ priceStore.start(); positionsStore.start(); symbolStore.load();   // pull the LIVE symbol set from the server (prices + fx_specs class)
     journalStore.log('Alpexa WebTrade terminal started', 1);
     journalStore.log('Chart engine (Lightweight Charts) initialised', 1);
