@@ -365,10 +365,10 @@
     background:#141414;border-right:1px solid var(--cellbd)}
   .tbxside .tbxx{cursor:pointer;font-size:10px;line-height:1;color:#8890a0;width:15px;text-align:center;border-radius:2px}
   .tbxside .tbxx:hover{background:#e81123;color:#fff}
-  .tbxside .tbxvlabel{writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;color:#8890a0;letter-spacing:.4px;user-select:none}
+  .tbxside .tbxvlabel{writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;color:#8890a0;letter-spacing:.4px;user-select:none;margin-top:auto;padding-bottom:2px}   /* margin-top:auto → label pushed to the BOTTOM (MT5: ✕ top, Toolbox down near tabs) */
   .tbxmain{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
   .terminal.light .tbxside{background:linear-gradient(#f1f1f3,#e4e5e8);border-right:1px solid #c4c7cd}
-  .terminal.light .tbxside .tbxx{color:#555}.terminal.light .tbxside .tbxvlabel{color:#0d3f9e;font-weight:700}   /* 사장님 "툴박스 헤더 진한 파랑" */
+  .terminal.light .tbxside .tbxx{color:#555}.terminal.light .tbxside .tbxvlabel{color:#000000;font-weight:700}   /* 사장님 "툴박스 헤더 검정" */
   /* MT5 symbol icon — small notepad/notebook (white page, blue binding, gray lines) before the symbol */
   .symico{display:inline-block;width:12px;height:12px;margin-right:5px;vertical-align:-2px;
     background:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><rect x='1.6' y='0.6' width='8.8' height='10.8' rx='1.1' fill='%23ffffff' stroke='%239aa0a8' stroke-width='0.8'/><rect x='1.6' y='0.6' width='2.1' height='10.8' fill='%232f6bbf'/><line x1='4.7' y1='3.1' x2='9' y2='3.1' stroke='%238a9099' stroke-width='0.8'/><line x1='4.7' y1='5.6' x2='9' y2='5.6' stroke='%238a9099' stroke-width='0.8'/><line x1='4.7' y1='8.1' x2='9' y2='8.1' stroke='%238a9099' stroke-width='0.8'/></svg>") no-repeat center/contain}
@@ -672,12 +672,13 @@
   /* BOTTOM terminal toolbox — MT5 light: white rows, gray headers, blue profit / red loss (2026-08-13 사장님 "mt5 툴 박스처럼") */
   .terminal.light .bottom{background:#ffffff;border-top:1px solid #c4c7cd;color:#1a1a1a}
   .terminal.light table.pos{color:#1a1a1a}
-  .terminal.light table.pos th{background:linear-gradient(#f6f6f7,#e8e8ea);color:#333;border:none;border-right:1px solid #d9dbdf;border-bottom:1px solid #c6c8cc;font-weight:400}   /* MT5 header: gray strip + vertical column separators */
+  .terminal.light table.pos th{background:linear-gradient(#fafafb,#f0f0f2);color:#000000;border:none;border-right:1px solid #dcdde1;border-bottom:1px solid #cccdd1;font-weight:400}   /* MT5 header: 연한 회색 바탕 + 세로 칸막이 + 진한 검정 글자 */
   .terminal.light table.pos th:last-child{border-right:none}
   .terminal.light table.pos td{border:none;border-bottom:1px solid #ececef;color:#1a1a1a}
   .terminal.light table.pos tbody td{border-right:1px solid #e6e7ea}   /* MT5: per-column vertical dividers on data rows too (사장님 "칸마다 칸막이") */
   .terminal.light table.pos tbody td:last-child{border-right:none}
   .terminal.light table.pos td.up{color:#1330f0}.terminal.light table.pos td.down{color:#d51111}
+  .terminal.light table.pos td.typ{color:#000000 !important}   /* Type 칸 buy/sell = 검정 (MT5: Type 흑색, Profit만 색상) */
   /* ⊕ Balance bar — MT5 light gray strip, thin rules, dark text */
   .terminal.light table.pos tr.acctrow td{background:linear-gradient(#eef0f3,#e2e4e8);border-top:1px solid #d4d6da;border-bottom:1px solid #d4d6da}   /* P/L cell shares the bar shade + rules */
   .terminal.light .acctline{background:linear-gradient(#eef0f3,#e2e4e8);color:#1a1a1a;border-top:1px solid #d4d6da;border-bottom:1px solid #d4d6da;font-weight:700}   /* Balance/Equity 라인 검은 볼드 (사장님) */
@@ -2994,7 +2995,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
             {tab==='History' && histShown.slice(histV.start,histV.end).map(h=>(
               <tr key={h.local_id+'-'+h.close_time}>
                 <td><i className="symico"></i>{h.symbol.toLowerCase()}.fx</td><td>{String(h.local_id||'').replace(/\D/g,'').slice(-8)||h.local_id}</td>
-                <td>{h.close_time}</td><td className={h.side==='SELL'?'down':'up'}>{h.side.toLowerCase()}</td>
+                <td>{h.close_time}</td><td className={"typ "+(h.side==='SELL'?'down':'up')}>{h.side.toLowerCase()}</td>
                 <td>{(+h.volume||0).toFixed(2)}</td><td>{fmtPx(h.symbol,h.open_price)}</td><td>—</td><td>—</td>
                 <td>{fmtPx(h.symbol,h.close_price)}</td><td className={h.profit>=0?'up':'down'}>{num(h.profit)}</td>
                 <td></td>
@@ -3006,7 +3007,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
               const tkt=String(p.local_id||'').replace(/\D/g,'').slice(-8)||p.local_id;
               const _tt=p.updated_at||p.created_at; const tm=_tt?String(_tt).slice(0,19).replace('T',' ').replace(/-/g,'.'):'—';  // real positions carry updated_at (no created_at col); demo seed carries created_at. MT5: 2026.07.09 20:17:40
               return (<tr key={p.local_id}>
-                <td><i className="symico"></i>{p.symbol.toLowerCase()}{sfx(p.symbol).toLowerCase()}</td><td>{tkt}</td><td>{tm}</td><td className={sideUp(p.side)==='SELL'?'down':'up'}>{sideUp(p.side).toLowerCase()}</td>
+                <td><i className="symico"></i>{p.symbol.toLowerCase()}{sfx(p.symbol).toLowerCase()}</td><td>{tkt}</td><td>{tm}</td><td className={"typ "+(sideUp(p.side)==='SELL'?'down':'up')}>{sideUp(p.side).toLowerCase()}</td>
                 <td>{lotsOf(p).toFixed(2)}</td><td>{fmtPx(p.symbol,+p.open_price)}</td>
                 <td className="sltp" onDoubleClick={()=>setModifyP(p)} title="더블클릭: SL/TP 수정 (Modify)">{(p.meta&&p.meta.sl!=null)?fmtPx(p.symbol,+p.meta.sl):'—'}</td>
                 <td className="sltp" onDoubleClick={()=>setModifyP(p)} title="더블클릭: SL/TP 수정 (Modify)">{(p.meta&&p.meta.tp!=null)?fmtPx(p.symbol,+p.meta.tp):'—'}</td>
