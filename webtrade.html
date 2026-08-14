@@ -358,8 +358,20 @@
   /* ── Bottom: KPI strip + Excel-grid positions table ── */
   /* GLOBAL floating toolbox — pinned to the whole-window bottom, full width, above everything.
      Pulling it up covers the chart Y-axis AND the left navigator's bottom tabs (opaque overlay). */
-  .toolbox{position:absolute;left:0;bottom:0;width:100%;z-index:9999;display:flex;flex-direction:column;
+  .toolbox{position:absolute;left:0;bottom:0;width:100%;z-index:9999;display:flex;flex-direction:row;
     background:#0d0d0d;box-shadow:0 -2px 10px rgba(0,0,0,.7)}
+  /* MT5 left edge label — vertical "Toolbox" caption + ✕ close, spans the whole panel height */
+  .tbxside{flex:none;width:17px;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0;
+    background:#141414;border-right:1px solid var(--cellbd)}
+  .tbxside .tbxx{cursor:pointer;font-size:10px;line-height:1;color:#8890a0;width:15px;text-align:center;border-radius:2px}
+  .tbxside .tbxx:hover{background:#e81123;color:#fff}
+  .tbxside .tbxvlabel{writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;color:#8890a0;letter-spacing:.4px;user-select:none}
+  .tbxmain{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+  .terminal.light .tbxside{background:linear-gradient(#f1f1f3,#e4e5e8);border-right:1px solid #c4c7cd}
+  .terminal.light .tbxside .tbxx{color:#555}.terminal.light .tbxside .tbxvlabel{color:#555}
+  /* MT5 symbol chip — small blue rounded square before the symbol name */
+  .symico{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px;vertical-align:-1px;
+    background:linear-gradient(#3f86d6,#2d68bd);box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
   .bottom{flex:none;height:var(--bottomh,126px);background:#0d0d0d;border-top:1px solid var(--cellbd);display:flex;flex-direction:column;overflow:hidden;
     font-family:"Segoe UI",Tahoma,sans-serif;font-size:11px}
   /* terminal menu tab bar — glued to the BOTTOM of the floating toolbox (integral, always bottom) */
@@ -659,8 +671,9 @@
   /* BOTTOM terminal toolbox — MT5 light: white rows, gray headers, blue profit / red loss (2026-08-13 사장님 "mt5 툴 박스처럼") */
   .terminal.light .bottom{background:#ffffff;border-top:1px solid #c4c7cd;color:#1a1a1a}
   .terminal.light table.pos{color:#1a1a1a}
-  .terminal.light table.pos th{background:linear-gradient(#f4f4f5,#e8e8ea);color:#444;border:none;border-bottom:1px solid #d4d6da;font-weight:400}
-  .terminal.light table.pos td{border:none;border-bottom:1px solid #ececef;color:#1a1a1a}   /* horizontal separators only — no boxy vertical grid */
+  .terminal.light table.pos th{background:linear-gradient(#f6f6f7,#e8e8ea);color:#333;border:none;border-right:1px solid #d9dbdf;border-bottom:1px solid #c6c8cc;font-weight:400}   /* MT5 header: gray strip + vertical column separators */
+  .terminal.light table.pos th:last-child{border-right:none}
+  .terminal.light table.pos td{border:none;border-bottom:1px solid #ececef;color:#1a1a1a}   /* rows: horizontal separators only — no vertical grid (MT5) */
   .terminal.light table.pos td.up{color:#1330f0}.terminal.light table.pos td.down{color:#d51111}
   /* ⊕ Balance bar — MT5 light gray strip, thin rules, dark text */
   .terminal.light table.pos tr.acctrow td{background:linear-gradient(#eef0f3,#e2e4e8);border-top:1px solid #d4d6da;border-bottom:1px solid #d4d6da}   /* P/L cell shares the bar shade + rules */
@@ -2592,7 +2605,7 @@ function ExposureTab({ pos, mids, equity, leverage }){
       <tbody>
         {!rows.length && <tr><td className="empty" colSpan="6">No open exposure</td></tr>}
         {rows.map(s=>{ const v=net(s), mg=marg(s), flat=Math.abs(v)<1e-9, cls=flat?'':(v>0?'up':'down');
-          return (<tr key={s}><td>{s.toLowerCase()}{sfx(s).toLowerCase()}</td><td className={cls}>{v.toFixed(2)}</td>
+          return (<tr key={s}><td><i className="symico"></i>{s.toLowerCase()}{sfx(s).toLowerCase()}</td><td className={cls}>{v.toFixed(2)}</td>
             <td className={cls}>{flat?'Flat (hedged)':(v>0?'Long':'Short')}</td>
             <td>{num(notl(s))}</td><td>{num(mg)}</td><td>{eq>0?(mg/eq*100).toFixed(2)+' %':'—'}</td></tr>); })}
       </tbody>
@@ -2977,7 +2990,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
             {tab==='History' && histV.topH>0 && <tr aria-hidden="true" style={{height:histV.topH}}><td colSpan="11"></td></tr>}
             {tab==='History' && histShown.slice(histV.start,histV.end).map(h=>(
               <tr key={h.local_id+'-'+h.close_time}>
-                <td>{h.symbol.toLowerCase()}.fx</td><td>{String(h.local_id||'').replace(/\D/g,'').slice(-8)||h.local_id}</td>
+                <td><i className="symico"></i>{h.symbol.toLowerCase()}.fx</td><td>{String(h.local_id||'').replace(/\D/g,'').slice(-8)||h.local_id}</td>
                 <td>{h.close_time}</td><td className={h.side==='SELL'?'down':'up'}>{h.side.toLowerCase()}</td>
                 <td>{(+h.volume||0).toFixed(2)}</td><td>{fmtPx(h.symbol,h.open_price)}</td><td>—</td><td>—</td>
                 <td>{fmtPx(h.symbol,h.close_price)}</td><td className={h.profit>=0?'up':'down'}>{num(h.profit)}</td>
@@ -2990,7 +3003,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
               const tkt=String(p.local_id||'').replace(/\D/g,'').slice(-8)||p.local_id;
               const _tt=p.updated_at||p.created_at; const tm=_tt?String(_tt).slice(0,19).replace('T',' ').replace(/-/g,'.'):'—';  // real positions carry updated_at (no created_at col); demo seed carries created_at. MT5: 2026.07.09 20:17:40
               return (<tr key={p.local_id}>
-                <td>{p.symbol.toLowerCase()}{sfx(p.symbol).toLowerCase()}</td><td>{tkt}</td><td>{tm}</td><td className={sideUp(p.side)==='SELL'?'down':'up'}>{sideUp(p.side).toLowerCase()}</td>
+                <td><i className="symico"></i>{p.symbol.toLowerCase()}{sfx(p.symbol).toLowerCase()}</td><td>{tkt}</td><td>{tm}</td><td className={sideUp(p.side)==='SELL'?'down':'up'}>{sideUp(p.side).toLowerCase()}</td>
                 <td>{lotsOf(p).toFixed(2)}</td><td>{fmtPx(p.symbol,+p.open_price)}</td>
                 <td className="sltp" onDoubleClick={()=>setModifyP(p)} title="더블클릭: SL/TP 수정 (Modify)">{(p.meta&&p.meta.sl!=null)?fmtPx(p.symbol,+p.meta.sl):'—'}</td>
                 <td className="sltp" onDoubleClick={()=>setModifyP(p)} title="더블클릭: SL/TP 수정 (Modify)">{(p.meta&&p.meta.tp!=null)?fmtPx(p.symbol,+p.meta.tp):'—'}</td>
@@ -3766,8 +3779,14 @@ function App(){
       {/* GLOBAL floating toolbox overlay — pinned to window bottom (absolute, z-9999), covers the
           chart + left navigator when pulled up. Terminal history on top, menu tab bar glued at its bottom. */}
       {view.toolbox && <div className="toolbox">
-        <BottomBar onResize={setBottomh} tab={termTab} />
-        <div className="tbxtabs">{TBX_TABS.map(tb=><div key={tb} className={"t"+(tb===termTab?' on':'')} onClick={()=>setTermTab(tb)}>{t(tb)}</div>)}</div>
+        <div className="tbxside">
+          <span className="tbxx" title="Close (Ctrl+T)" onClick={()=>terminalBus.emit('view.toggle','toolbox')}>✕</span>
+          <span className="tbxvlabel">{t('Toolbox')}</span>
+        </div>
+        <div className="tbxmain">
+          <BottomBar onResize={setBottomh} tab={termTab} />
+          <div className="tbxtabs">{TBX_TABS.map(tb=><div key={tb} className={"t"+(tb===termTab?' on':'')} onClick={()=>setTermTab(tb)}>{t(tb)}</div>)}</div>
+        </div>
       </div>}
       {orderSym && <OrderModal symbol={orderSym} onClose={()=>setOrderSym(null)} />}
     </div>
