@@ -68,7 +68,7 @@ if (/\.terminal\.light \.obox\{background:#000000/.test(src)) bad('Legend must N
 if (/\.terminal\.light \.oc-lbl\{color:#8A94A6/.test(src)) bad('Legend must NOT mute the SELL/BUY labels to silver (neon forced)');
 // window header melts, no gray 3D frame; active window = brighter GREY hairline (never green)
 // MT5 차트창 헤더 (2026-08-13): 비활성 = 회색 그라데이션 + 어두운 글자, 활성 = 파랑 + 흰 글자
-if (!/\.terminal\.light \.cell-title\{background:linear-gradient\(#eaeaec,#d6d6da\);color:#1a1a1a/.test(src)) bad('MT5 chart header (inactive) must be gray gradient + dark text');
+if (!/\.terminal\.light \.cell-title\{background:#e2e2e5;color:#1a1a1a/.test(src)) bad('MT5 chart header (inactive) must be FLAT gray + dark text (그라데이션 금지 — 사장님)');
 if (!/\.terminal\.light \.win\.active \.cell-title\{background:linear-gradient\(#4d92d9,#2f74c0\);color:#ffffff/.test(src)) bad('MT5 active chart header must be blue gradient + white text');
 if (!/\.terminal\.light \.win\.active\{border-color:#2f3542/.test(src)) bad('active window must be a brighter GREY hairline, not green/glow');
 // MT5 light toolbar (2026-08-13 사장님 "MT5처럼"): hover = light-blue box, dark-blue text
@@ -96,7 +96,7 @@ if (!/\.terminal\.light table\.pos tbody td\{border-right:1px solid #d9dbdf\}/.t
 // toolbar hover = MT5 light-blue box (was dark border-only)
 if (!/\.terminal\.light \.tbtn:hover[^}]*background:#dbe7f6 !important;border:1px solid #9db8dd/.test(src)) bad('MT5 toolbar hover must be light-blue box (#dbe7f6 bg + #9db8dd border)');
 // Balance bar — MT5 light gray strip, dark text
-if (!/\.terminal\.light \.acctline\{background:linear-gradient\(#dcdee2,#cfd1d6\);color:#1a1a1a;border-top:1px solid #c4c6cb;border-bottom:1px solid #c4c6cb;font-weight:700\}/.test(src)) bad('MT5 Balance bar must be a deeper-gray strip + BLACK BOLD text');
+if (!/\.terminal\.light \.acctline\{background:#d6d8dc;color:#1a1a1a;border-top:1px solid #c4c6cb;border-bottom:1px solid #c4c6cb;font-weight:700\}/.test(src)) bad('MT5 Balance bar must be a FLAT deeper-gray strip + BLACK BOLD text');
 if (!/\.terminal\.light \.acctline \.k\{color:#1a1a1a;font-weight:700\}\.terminal\.light \.acctline b\{color:#1a1a1a;font-weight:700\}/.test(src)) bad('MT5 Balance bar labels + numbers all black bold #1a1a1a');
 
 // the one-click panel is the ONE-SHELL card in both themes (2026-07-13 B안 — see
@@ -114,6 +114,18 @@ if (!/cmd==='ver\.set'/.test(src) || !/alpexa\.fx\.version/.test(src) || !/locat
 
 // (5) integrity: the order-popup pipette accel timer + spread box + 7-arg slippage are still present
 if (!/p_requested_price/.test(src) || !/p_max_slippage/.test(src)) bad('order pipette/7-arg slippage binding must remain intact');
+
+// ── MT5 라이트 크롬은 PLAT(평면)이다 (2026-08-14 사장님 "밑부분이 더 진하게 보이지...이렇게 하지 말라고").
+// 회색 그라데이션은 아랫단이 어두워져 '입체 띠'로 읽힌다 → 라이트 테마에서 금지.
+// 유일한 예외: MT5 정품 파랑 타이틀 바 2개 (Market Watch 캡션 · 활성 차트창 헤더).
+{
+  const ALLOW = ['.terminal.light .mwhead{', '.terminal.light .win.active .cell-title{'];
+  const rules = src.match(/\.terminal\.light [^{}\n]*\{[^}]*linear-gradient\([^)]*\)[^}]*\}/g) || [];
+  for (const r of rules) {
+    if (ALLOW.some(a => r.startsWith(a))) continue;
+    bad('light-theme chrome must be FLAT (no gradient): ' + r.slice(0, 70));
+  }
+}
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} legend-theme problem(s).`); process.exit(1); }
 console.log('🟢 PASS: MT5 dark candle theme untouched; Legend = Robinhood jet-black (#0E1015/#000000/#1D212A, up #00FF55 / down #FF453A); label renamed to Legend.');
