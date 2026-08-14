@@ -39,7 +39,7 @@ if (!/\.terminal\.light\{ --bg:#0E1015; --panel:#000000; --panel2:#000000; --lin
 // Market Watch = MT5 light (2026-08-13): up=파랑 #1330f0, down=빨강 #d51111
 if (!/\.terminal\.light \.mwt \.au\{color:#1c9e2e !important\}\.terminal\.light \.mwt \.ad\{color:#d51111 !important\}/.test(src)) bad('Market Watch up/down must be MT5 blue/red');
 // Market Watch body text = MT5 검은 글자, Tahoma 보통 굵기
-if (!/\.terminal\.light \.mwt td\{border:none;border-bottom:1px solid #ececef;color:#000000;font-weight:400\}/.test(src)) bad('Market Watch cells must be MT5 dark text on light (#1c1c1e, weight 400)');
+if (!/\.terminal\.light \.mwt td\{border:none;border-bottom:1px solid #d9dbdf;border-right:1px solid #d9dbdf;color:#000000;font-weight:400\}/.test(src)) bad('Market Watch cells must be MT5 black text + Excel-style grid (가로+세로 #d9dbdf)');
 if (!/\.terminal\.light \.mwt td\.sym\{color:#000000;font-weight:400\}/.test(src)) bad('Market Watch symbols must be MT5 dark text (#1c1c1e)');
 // 차트 표면(캔들 영역)은 흰색 금지 — 시세창은 MT5 라이트라 흰색 허용, 차트만 다크 유지
 if (/\.terminal\.light \.(charts|chartstage|win|cell-title|mwtick)\b[^\n]*background:#ffffff/.test(src)) bad('chart surfaces must stay dark (no white) — only the Market Watch is MT5 light');
@@ -89,7 +89,8 @@ if (!/upLine:'#00FF55'/.test(src)) bad('the Legend up-candle line must stay neon
 if (!/priceLineColor: themeBus\.theme==='light' \? '#5a6472' : ''/.test(src)) bad('Legend current-price line must be muted grey #5a6472 (dark keeps default)');
 if (!/priceLineColor: t==='light' \? '#5a6472' : ''/.test(src)) bad('theme flip must re-mute the current-price line');
 // bottom table: vertical grid gone, horizontal only
-if (!/\.terminal\.light table\.pos td\{border:none;border-bottom:1px solid #ececef/.test(src)) bad('MT5 positions table must drop vertical borders (border-bottom only)');
+if (!/\.terminal\.light table\.pos td\{border:none;border-bottom:1px solid #d9dbdf/.test(src)) bad('MT5 positions table rows must carry the Excel-style grid line (#d9dbdf)');
+if (!/\.terminal\.light table\.pos tbody td\{border-right:1px solid #d9dbdf\}/.test(src)) bad('MT5 positions table must keep per-column vertical dividers (same grid colour as Market Watch)');
 // toolbar hover = MT5 light-blue box (was dark border-only)
 if (!/\.terminal\.light \.tbtn:hover[^}]*background:#dbe7f6 !important;border:1px solid #9db8dd/.test(src)) bad('MT5 toolbar hover must be light-blue box (#dbe7f6 bg + #9db8dd border)');
 // Balance bar — MT5 light gray strip, dark text
