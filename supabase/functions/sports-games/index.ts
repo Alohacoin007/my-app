@@ -132,6 +132,10 @@ function fmtTime(iso: string): string {
 // sports-odds function from The Odds API). No extra Odds API credits — we just
 // read what's stored — so the dashboard shows the SAME real odds as the app.
 const ODDS_SPORT: Record<string, string> = { NFL: "americanfootball_nfl", NBA: "basketball_nba", NCAAB: "basketball_ncaab", MLB: "baseball_mlb", NHL: "icehockey_nhl" };
+// 한 리그가 배당 키를 여러 개 갖는 경우 (축구가 이미 그렇다). NFL = 정규시즌 + **프리시즌 별도 키**
+// (2026-08-14: 프리시즌 라인이 americanfootball_nfl 에 없어 12경기 전부 잠겼었다). 축구와 동일하게
+// 풀을 합쳐 매칭한다 — 팀명이 유일하므로 오매칭 위험은 없고, 킥오프 6h 게이트도 그대로 걸린다.
+const ODDS_EXTRA: Record<string, string[]> = { NFL: ["americanfootball_nfl_preseason"] };
 function nick(name: string): string { return String(name || "").trim().toLowerCase().split(/\s+/).pop() || ""; }
 // Robust team-name match. nick() (last word) breaks on soccer clubs whose feeds differ:
 // ESPN "Vancouver" vs Odds "Vancouver Whitecaps FC" → last words "vancouver" ≠ "fc".
@@ -245,6 +249,7 @@ function oddsHorizons(rows: any[]): Record<string, number> {
   const lgOfKey = (k: string): string | null => {
     if (k.indexOf("soccer_") === 0) return "SOC";
     for (const lg of Object.keys(ODDS_SPORT)) if (ODDS_SPORT[lg] === k) return lg;
+    for (const lg of Object.keys(ODDS_EXTRA)) if (ODDS_EXTRA[lg].indexOf(k) >= 0) return lg;   // 보조 키도 자기 리그로
     return null;
   };
   (rows || []).forEach((row: any) => {
@@ -300,6 +305,7 @@ async function overlayRealOdds(games: any[], rows: any[]) {
       } else {
         const sk = ODDS_SPORT[g.lg]; if (!sk) return;
         data = bySport[sk] || [];
+        for (const ek of (ODDS_EXTRA[g.lg] || [])) data = data.concat(bySport[ek] || []);   // NFL 프리시즌 등 보조 키 병합
       }
       if (!data.length) return;
       // Match by robust team tokens + kickoff proximity. 판정 규칙 (2026-07-22 더블헤더 사건):

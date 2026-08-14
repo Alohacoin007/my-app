@@ -211,13 +211,15 @@ async function main() {
       console.log('  골프 키 감시: 카탈로그(__sports_list) 미적재 — sports-odds 최신 버전 배포 후 하루 내 적재됨');
     }
     const bySport = {}; odds.forEach((o) => { if (o.sport !== '__sports_list') bySport[o.sport] = Array.isArray(o.data) ? o.data : []; });
-    const OK = { NFL: 'americanfootball_nfl', NBA: 'basketball_nba', MLB: 'baseball_mlb', NHL: 'icehockey_nhl' };
+    // NFL은 정규시즌+프리시즌 두 키 (2026-08-14) — 한쪽만 보면 잠금 원인을 오분류한다.
+    const OK = { NFL: ['americanfootball_nfl', 'americanfootball_nfl_preseason'], NBA: 'basketball_nba', MLB: 'baseball_mlb', NHL: 'icehockey_nhl' };
+    const poolOf = (lg) => [].concat(OK[lg] || []).flatMap((k) => bySport[k] || []);
     const socAll = Object.keys(bySport).filter((k) => k.indexOf('soccer_') === 0).flatMap((k) => bySport[k]);
     const cls = {};
     for (const g of win) {
       if (g.oddsReal !== false) continue;
       const c = (cls[g.lg || '?'] = cls[g.lg || '?'] || { rec: 0, abs: 0 });
-      const pool = g.lg === 'SOC' ? socAll : (bySport[OK[g.lg]] || []);
+      const pool = g.lg === 'SOC' ? socAll : poolOf(g.lg);
       const gt = Date.parse(g.iso || '');
       const hit = pool.find((e) => {
         const ok = (teamMatch(e.home_team, g.home && g.home.nm) && teamMatch(e.away_team, g.away && g.away.nm)) ||

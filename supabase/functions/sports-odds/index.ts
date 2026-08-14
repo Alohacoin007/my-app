@@ -29,6 +29,10 @@ const cors = {
 // Leagues to poll, with the matching ESPN scoreboard path used to detect live games.
 const SPORTS = [
   "americanfootball_nfl", "basketball_nba", "basketball_ncaab", "baseball_mlb", "icehockey_nhl",
+  // NFL 프리시즌은 The Odds API에서 **별도 키**다 (2026-08-14 아침점검 실측: americanfootball_nfl 의
+  // 가장 이른 경기가 9/10 정규시즌 = 프리시즌 라인 0). ESPN 일정으로 경기는 뜨는데 붙일 라인이 없어
+  // 12경기 전부 잠금이었다. 오프시즌엔 404라 크레딧 안 태움(골프 키와 동일 성질).
+  "americanfootball_nfl_preseason",
   // UFC/MMA 제거 (2026-07-27 사장님 결정 "빼" — 서버 피드에 UFC 경기가 없어 배당만
   // 크레딧을 태우던 상태. 재개하려면 이 목록+ESPN_PATH+LG_OF 복원 + sports-games에 UFC 이식):
   // Soccer — incl. the FIFA World Cup (in season). Real odds so the app/board no longer
@@ -53,6 +57,7 @@ const STALE_OUTRIGHT_MS = 30 * 60 * 1000;
 const STALE_OUTRIGHT_LIVE_MS = 5 * 60 * 1000;
 const ESPN_PATH: Record<string, string> = {
   americanfootball_nfl: "football/nfl",
+  americanfootball_nfl_preseason: "football/nfl",   // 프리시즌도 같은 ESPN 스코어보드 (라이브 감지·정산 동일 경로)
   basketball_nba: "basketball/nba",
   basketball_ncaab: "basketball/mens-college-basketball",
   baseball_mlb: "baseball/mlb",
@@ -76,7 +81,7 @@ const HOT_BEFORE_MS = 2 * 60 * 60 * 1000;   // "임박" = starts within 2h
 const HOT_AFTER_MS = 6 * 60 * 60 * 1000;    // still hot up to 6h after start (covers live+settling window)
 // Odds-API sport key → live_games lg code (our own DB, free to read).
 const LG_OF: Record<string, string> = {
-  americanfootball_nfl: "NFL", basketball_nba: "NBA", basketball_ncaab: "NCAAB",
+  americanfootball_nfl: "NFL", americanfootball_nfl_preseason: "NFL", basketball_nba: "NBA", basketball_ncaab: "NCAAB",
   baseball_mlb: "MLB", icehockey_nhl: "NHL",
   soccer_fifa_world_cup: "SOC", soccer_epl: "SOC", soccer_usa_mls: "SOC",
   soccer_uefa_champs_league: "SOC",
