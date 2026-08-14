@@ -1053,7 +1053,8 @@
   function numOf(s){var m=String(s||'').match(/([\d.]+)/);return m?parseFloat(m[1]):0;}
   var LBPAL=['#e31837','#06452a','#552583','#007a33','#6cabdd','#c8102e','#1d4ed8','#ea580c','#0891b2','#7c3aed'];
   function lbCol(s){var h=0;for(var i=0;i<(s||'').length;i++)h=(h*31+s.charCodeAt(i))|0;return LBPAL[Math.abs(h)%LBPAL.length];}
-  function fmtShort(iso){try{var d=new Date(iso);if(isNaN(d.getTime()))return'';return d.toLocaleDateString('en-US',{weekday:'short'})+' · '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});}catch(e){return'';}}
+  // 요일만 쓰면 몇 주 뒤 경기가 이번 주처럼 보인다 (NFL 개막전 9/9 → "Wed"만 표시). 월·일 포함.
+  function fmtShort(iso){try{var d=new Date(iso);if(isNaN(d.getTime()))return'';return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+' · '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});}catch(e){return'';}}
   function toLB(g){
     var sp=g.spread||[],to=g.total||[],ml=g.ml||[]; if(sp.length<2||to.length<2||ml.length<2) return null;
     return {league:g.lg,live:!!g.live,iso:(g.iso||''),time:g.live?(g.time||'Live'):fmtShort(g.iso),

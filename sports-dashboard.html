@@ -863,7 +863,7 @@ function renderSchedule(games){
   const list=games.filter(g=>g.lg===selLg).slice().sort(sortByPin).slice(0,40);
   if(!list.length){ el.innerHTML='<tr><td colspan="4" style="color:var(--lgd-dim);font-weight:400">No games</td></tr>'; return; }
   el.innerHTML=list.map(g=>{
-    const st=g.live?'<span class="st live">● '+esc(g.time)+'</span>':'<span class="st">'+esc(g.time)+'</span>';
+    const st=g.live?'<span class="st live">● '+esc(gameKick(g))+'</span>':'<span class="st">'+esc(gameKick(g))+'</span>';
     const locked=!oddsReal(g);
     // ⛳ 골프 = 대회명 + 우승배당 1위(페이버릿) 표시 — 2팀 ML 칸이 없음
     if(g.lg==='GOLF'){
@@ -912,7 +912,7 @@ function gameRowHTML(g){
       const pinBtn='<button class="pin-btn'+(isPinned?' pinned':'')+'" data-pin="'+esc(g.gid)+'" title="'+(isPinned?'Unpin':'Pin to top')+'">★</button>';
       // 행 규약 (앱:1664): 원정팀 윗줄=index 1, 홈팀 아랫줄=index 0
       const row=(t,i)=>'<div class="obg-row" style="display:contents">'+
-        '<div class="obg">'+(i===1?('<div class="st'+(g.live?' live':'')+'">'+(g.live?'● ':'')+esc(g.time)+'</div>'):'<div class="st">'+pinBtn+'</div>')+
+        '<div class="obg">'+(i===1?('<div class="st'+(g.live?' live':'')+'">'+(g.live?'● ':'')+esc(gameKick(g))+'</div>'):'<div class="st">'+pinBtn+'</div>')+
         '<div class="tm">'+esc(t.ab)+'<small>'+esc(t.nm)+'</small>'+(t.sc!==undefined?'<span class="sc">'+esc(t.sc)+'</span>':'')+'</div></div>'+
         cell(g.spread,'Spread',i)+cell(g.total,'Total',i)+cell(g.ml,'Moneyline',i)+'</div>';
       // ⛳ 골프 = OUTRIGHT (대회 우승자): 대회 헤더 + 선수별 우승배당 행 (앱 golfHTML 계약:
@@ -921,7 +921,7 @@ function gameRowHTML(g){
       if(g.lg==='GOLF'){
         const oc=g.outright||[];
         const hdr='<div class="soc-hdr"><span>⛳</span><span class="soc-nm">'+esc(g.name||g.home.nm||'Tournament')+'</span>'+
-          '<span class="st'+(g.live?' live':'')+'">'+(g.live?'● ':'')+esc(g.time)+'</span>'+pinBtn+'</div>';
+          '<span class="st'+(g.live?' live':'')+'">'+(g.live?'● ':'')+esc(gameKick(g))+'</span>'+pinBtn+'</div>';
         if(!oddsReal(g)||!oc.length)
           return '<div class="obrow" data-gid="'+esc(g.gid)+'">'+hdr+
             '<div class="golf-list"><div class="bet sus" title="Odds unavailable — no market"><span class="ln">Winner odds</span><span class="pr">🔒</span></div></div></div>';
@@ -1121,6 +1121,15 @@ function legKick(l){ if(!l) return '';
   if(kt){ const d=new Date(kt); if(!isNaN(d.getTime()))
     return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+' · '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
   return l.tm||''; }
+
+/* 경기 카드 킥오프 라벨 — legKick(위)의 **경기 카드판**. 서버가 보내는 g.time 은 sports-games
+   fmtTime()이 만든 "요일 + 시각"뿐이고(날짜 없음) 게다가 **서버(UTC) 기준**이라, 몇 주 뒤 경기가
+   임박한 것처럼 보였다. 2026-07-24에 똑같은 버그를 베팅슬립(legKick)에서만 고치고 카드 렌더는
+   놓쳤다 — 같은 결함 클래스의 나머지 사용처. 라이브는 경기 시계(g.time)를 그대로 쓴다. */
+function gameKick(g){ if(!g) return '';
+  if(g.live) return g.time||'';
+  const d=new Date(g.iso||''); if(isNaN(d.getTime())) return g.time||'';
+  return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+' · '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
 
 /* ── 백오피스 컨트롤 (앱 3771-3795 그대로 — 마진·중단·라이브 스위치·min/max) ── */
 function pullControls(){ if(!(window.AlpexaSync&&AlpexaSync.db)) return;
@@ -1745,7 +1754,7 @@ function openQuickBet(gid, market, sel, anchor){
   qbState.gid=gid; qbState.market=market; qbState.opts=qbBuildOpts(g,market,sel);
   qbState.sel=Math.max(0, qbState.opts.findIndex(o=>o.b.sel===sel));
   document.getElementById('qbTitle').innerHTML=esc(g.away.ab)+' @ '+esc(g.home.ab)+
-    '<small>'+(ICONS[g.lg]||'')+' '+(g.live?'● LIVE · ':'')+esc(g.time)+'</small>';
+    '<small>'+(ICONS[g.lg]||'')+' '+(g.live?'● LIVE · ':'')+esc(gameKick(g))+'</small>';
   document.getElementById('qbMkt').textContent=market;
   renderQb();
   qb.classList.add('open');
@@ -1845,7 +1854,7 @@ function renderSearch(){
     '<span class="ab">'+esc(g.away.ab)+' @ '+esc(g.home.ab)+'</span>'+
     '<span class="ic">'+(ICONS[g.lg]||'')+'</span>'+
     '<span class="nm">'+esc(g.away.nm)+' @ '+esc(g.home.nm)+'</span>'+
-    '<span class="st'+(g.live?' live':'')+'">'+(g.live?'● ':'')+esc(g.time)+'</span></div>').join('')
+    '<span class="st'+(g.live?' live':'')+'">'+(g.live?'● ':'')+esc(gameKick(g))+'</span></div>').join('')
     :'<div class="none">No matches</div>';
 }
 document.getElementById('sIn').addEventListener('input', ()=>{
