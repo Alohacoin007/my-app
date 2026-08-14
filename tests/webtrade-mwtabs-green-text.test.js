@@ -24,17 +24,18 @@ else {
 const legend = grab('.terminal.light .mwtabs .mt.on');
 if (!legend) bad('.terminal.light .mwtabs .mt.on rule missing (Legend theme)');
 else {
-  if (!/color:#0d47a1/i.test(legend)) bad('MT5 active MW tab must have BLUE text (color:#0d47a1)');
-  if (/border-top-color:#00FF55/i.test(legend)) bad('active MW tab must NOT show a green top-accent line — colour goes in the text now');
+  if (!/color:#000000/i.test(legend)) bad('MT5 active MW tab must have BLACK text (color:#000000) — no colour accent');
+  if (/color:#0d47a1/i.test(legend)) bad('MT5 active MW tab must NOT be navy anymore (사장님: 색 악센트 제거)');
   if (!/border-top-color:transparent/i.test(legend)) bad('Legend active MW tab top border must be transparent (line removed)');
 }
 
 // toolbox tabs (Trade/Exposure/History…) — same treatment
-// toolbox (terminal) tabs — DARK = window blue + underline, LEGEND = muted neon-green + underline
+// toolbox (terminal) tabs — DARK = window blue + underline, MT5 LIGHT = white raised + BLACK text, no colour underline
 const tbxDark = grab('.tbxtabs .t.on');
 if (!tbxDark || !/color:#2f7fe0/i.test(tbxDark) || !/border-bottom:2px solid #2f7fe0/i.test(tbxDark)) bad('dark active toolbox tab must be window-blue text + underline');
 const tbxLegend = grab('.terminal.light .tbxtabs .t.on');
-if (!tbxLegend || !/color:#0d47a1/i.test(tbxLegend) || !/border-bottom:2px solid #0d47a1/i.test(tbxLegend)) bad('MT5 active toolbox tab must be navy text + navy underline');
+if (!tbxLegend || !/color:#000000/i.test(tbxLegend)) bad('MT5 active toolbox tab must be BLACK text (raised white)');
+if (tbxLegend && /border-bottom:2px solid #0d47a1/i.test(tbxLegend)) bad('MT5 active toolbox tab must NOT show a navy underline (사장님: 밑부분 색 제거)');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} MW-tab problem(s).`); process.exit(1); }
-console.log('🟢 PASS: active Market Watch + toolbox tabs show accent text + underline (dark = window-blue, MT5 light = navy #0d47a1).');
+console.log('🟢 PASS: active Market Watch + toolbox tabs = white raised + BLACK text, no colour underline (MT5 light); dark theme keeps its accent.');

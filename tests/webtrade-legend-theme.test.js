@@ -80,8 +80,8 @@ if (!/\.terminal\.light \.tf b\.on,\.terminal\.light \.tibtn\.on\{background:#cf
 // deliberate active-tab underline), which the user explicitly wants as the one green "selected" point.
 const greenBorders = (src.match(/border(?!-top|-bottom)[a-z-]*:\s*[^;{}]*#00FF55/gi) || []);
 if (greenBorders.length) bad('green border(s) remain (only the active-tab top/bottom accent may be green): ' + greenBorders.join(' | '));
-if (!/\.terminal\.light \.tbxtabs \.t\.on\{[^}]*color:#0d47a1[^}]*border-bottom:2px solid #0d47a1\}/.test(src)) bad('MT5 active toolbox tab: white bg + navy text + navy underline');
-if (!/\.terminal\.light \.charttabs \.ctab\.on\{background:#ffffff;color:#0d47a1\}/.test(src)) bad('MT5 active chart tab must be white + navy (matches toolbox tabs)');
+if (!/\.terminal\.light \.tbxtabs \.t\.on\{[^}]*color:#000000[^}]*border-bottom:2px solid transparent\}/.test(src)) bad('MT5 active toolbox tab: white raised + black text, no colour underline');
+if (!/\.terminal\.light \.charttabs \.ctab\.on\{background:#ffffff;color:#000000\}/.test(src)) bad('MT5 active chart tab must be white raised + black text (no colour accent)');
 // (active chart header text color asserted above — MT5 white on blue)
 // the up-candle LINE (chart) is the one place a green stroke is allowed
 if (!/upLine:'#00FF55'/.test(src)) bad('the Legend up-candle line must stay neon green');
