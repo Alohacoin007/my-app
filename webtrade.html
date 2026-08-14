@@ -331,6 +331,7 @@
   .mwtp .lh b{color:#c4c8d0;font-weight:600}
   /* Ticks tab chart */
   .mwtick{flex:1;min-height:0;position:relative;background:#000000}
+  .terminal.light .mwtick{background:#ffffff}   /* Ticks 탭 = MT5 흰 배경 (사장님 2026-08-14) */
   .watch{display:flex;flex-direction:column;overflow:hidden}
   .watch .mwscroll{flex:1;overflow-x:hidden;overflow-y:auto;min-height:0;scrollbar-width:none;-ms-overflow-style:none}
   .watch .mwscroll::-webkit-scrollbar{width:0;height:0}   /* 시세창 스크롤바 숨김 — 스크롤/휠은 그대로 동작 (사장님 2026-08-14) */
@@ -416,7 +417,9 @@
   /* balance bar + P/L are ONE row: P/L is a right-aligned cell sitting under the Profit column, on the bar itself */
   table.pos tr.acctrow td{background:#0d0d0d;border-top:1px solid #222;vertical-align:middle}
   table.pos .acctline.pl-bar{overflow:visible}   /* no scroll-collapse → the sibling P/L cell stays aligned under its column */
-  table.pos td.pl-total{padding:4px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700}   /* grand total under the P/L column */
+  /* grand total under the P/L column — 잔고바(.acctline)와 **같은 글자 크기 11.5px**. 기본 12px를
+     상속하면 밸런스보다 커 보인다 (사장님 2026-08-14). */
+  table.pos td.pl-total{padding:4px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:11.5px}
   table.pos tfoot .acctline{border-top:0}
   /* bare ✕ — no card behind it (2026-07-13/14 user request); silver glyph, hover → white */
   .xclose{width:18px;height:18px;line-height:1;padding:0;border:none;border-radius:0;
@@ -602,6 +605,9 @@
   .terminal.light .tibtn.ic-text svg,.terminal.light .tibtn.ic-bar svg{color:#15181d}
   .terminal.light .tbtn:hover,.terminal.light .tf b:hover,.terminal.light .tibtn:hover{background:#dbe7f6 !important;border:1px solid #9db8dd !important;color:#0d2c4d !important}
   .terminal.light .tf b.on,.terminal.light .tibtn.on{background:#cfe1f7 !important;border:1px solid !important;border-color:#8fb0d6 #e6eef7 #e6eef7 #8fb0d6 !important;color:#0d2c4d !important;box-shadow:inset 1px 1px 0 rgba(0,0,0,.06) !important}   /* selected → MT5 눌림 베벨: 위/왼=어둡게, 오른/아래=밝게 (오른쪽·하단 어두운선 제거) */
+  /* 타임프레임 = MT5 파랑 통일 (2026-08-14 사장님) — 평상시·hover·선택 전부 파랑 유지.
+     hover/선택 규칙(위 두 줄)이 색을 덮으므로 그 뒤에 와야 한다. */
+  .terminal.light .tf b,.terminal.light .tf b:hover,.terminal.light .tf b.on{color:#1668b8 !important}
   /* (선택된 도구는 MT5처럼 제 색을 유지 — 눌림은 베벨 배경으로만 표시. 예전의 색 덮어쓰기 제거) */
   .terminal.light .tbtn.algo.on{background:#dff0df !important;border:1px solid !important;border-color:#9cc79c #e6f2e6 #e6f2e6 #9cc79c !important;color:#1e5a26 !important;box-shadow:inset 1px 1px 0 rgba(0,0,0,.06) !important}
   .terminal.light .tbtn.algo .play{color:#2f9e2f}.terminal.light .tbtn.algo.on .play{color:#1e5a26}
@@ -663,12 +669,17 @@
   .terminal.light .om-margin{color:#7a828e}.terminal.light .om-margin b{color:#ffffff}
   .terminal.light .om-btns .om-sell{background:#FF453A !important}
   .terminal.light .om-btns .om-buy{background:#00c853 !important}   /* Robinhood BUY green (was blue) */
-  /* Details tab */
-  .terminal.light .mwdet .sh{color:#ffffff;border-bottom-color:#1D212A}
-  .terminal.light .mwdet td{border-bottom-color:#1D212A}
-  .terminal.light .mwdet td.k{color:#e6e9ee;font-weight:600}
-  .terminal.light .mwdet td .ar.up{color:#00FF55}.terminal.light .mwdet td .ar.dn{color:#FF453A}.terminal.light .mwdet td .ar.nu{color:#7a828e}
-  .terminal.light .mwdet td.v.up{color:#00FF55}.terminal.light .mwdet td.v.dn{color:#FF453A}.terminal.light .mwdet td.v.nu{color:#e6e9ee}
+  /* Details tab = MT5 화이트 (2026-08-14 사장님 MT5 스샷 대조). 이전엔 다크 테마 색을 그대로 써서
+     흰 배경에 흰 글자(라벨 #e6e9ee·제목 #ffffff)라 글자가 안 보였다.
+     MT5 문법: 파란 심볼 제목 · 검은 라벨(보통굵기) · 값 열은 옅은 회색 배경 + 우측정렬 ·
+     상승 파랑 / 하락 빨강 / Open·Close 검정 · ↗초록 ↘빨강 ·회색 화살표. */
+  .terminal.light .mwdet{background:#ffffff}
+  .terminal.light .mwdet .sh{color:#1668b8;background:#ffffff;font-weight:400;border-bottom-color:#d9dce1}
+  .terminal.light .mwdet td{border-bottom-color:#e3e5e9;color:#1c1c1e}
+  .terminal.light .mwdet td.k{color:#1c1c1e;font-weight:400;background:#ffffff;border-right:1px solid #e3e5e9}
+  .terminal.light .mwdet td.v{background:#f2f2f2}
+  .terminal.light .mwdet td .ar.up{color:#1a9e3f}.terminal.light .mwdet td .ar.dn{color:#d13438}.terminal.light .mwdet td .ar.nu{color:#9aa0a8}
+  .terminal.light .mwdet td.v.up{color:#1668b8}.terminal.light .mwdet td.v.dn{color:#d13438}.terminal.light .mwdet td.v.nu{color:#1c1c1e}
   /* CHART workspace — master-black stage, real-black windows, thin #1D212A borders */
   .terminal.light .charts,.terminal.light .chartstage{background:#0E1015}
   .terminal.light .win{background:#000000;border:1px solid #1D212A;box-shadow:none}
@@ -706,6 +717,7 @@
   .terminal.light table.pos td.typ{color:#000000 !important}   /* Type 칸 buy/sell = 검정 (MT5: Type 흑색, Profit만 색상) */
   /* ⊕ Balance bar — MT5 light gray strip, thin rules, dark text */
   .terminal.light table.pos tr.acctrow td{background:#d6d8dc;border-top:1px solid #c4c6cb;border-bottom:1px solid #c4c6cb}   /* P/L cell shares the bar shade + rules */
+  .terminal.light table.pos td.pl-total{color:#1a1a1a}   /* 합계 손익 = 잔고바와 같은 검정 (빨강/파랑 없음) */
   .terminal.light .acctline{background:#d6d8dc;color:#1a1a1a;border-top:1px solid #c4c6cb;border-bottom:1px solid #c4c6cb;font-weight:700}   /* Balance/Equity 라인 검은 볼드 + 진한 그레이 바탕 (사장님) */
   .terminal.light .acctline .k{color:#1a1a1a;font-weight:700}.terminal.light .acctline b{color:#1a1a1a;font-weight:700}   /* labels + numbers all black bold (Profit keeps up/down colour) */
   .terminal.light .acctline .up{color:#1330f0}.terminal.light .acctline .down{color:#d51111}
@@ -2461,7 +2473,11 @@ function TickChart({ symbol }){
   React.useEffect(()=>{
     if(!window.LightweightCharts || !box.current) return;
     const DOT=(window.LightweightCharts&&LightweightCharts.LineStyle&&LightweightCharts.LineStyle.Dotted)!=null?LightweightCharts.LineStyle.Dotted:1;
-    const th=CHART_THEME[themeBus.theme]||CHART_THEME.dark, legend=themeBus.theme==='light';   // follow the terminal theme
+    const legend=themeBus.theme==='light';
+    // MT5 Market Watch → Ticks 탭은 **흰 배경**이다 (사장님 2026-08-14 "화이트 버젼으로").
+    // 메인 차트 창의 제트블랙(CHART_THEME.light)과는 별개 — 여기만 라이트 팔레트를 쓴다.
+    const th= legend ? { bg:'#ffffff', text:'#3a3f46', grid:'#e6e8ec', border:'#c8ccd2', cross:'#9aa0a8' }
+                     : (CHART_THEME[themeBus.theme]||CHART_THEME.dark);
     const c=LightweightCharts.createChart(box.current, {
       layout:{ background:{color:th.bg}, textColor:th.text, fontSize:10, fontFamily:"Consolas,'Courier New',monospace" },
       grid:{ vertLines:{color:th.grid, style:DOT}, horzLines:{color:th.grid, style:DOT} },
@@ -2471,7 +2487,7 @@ function TickChart({ symbol }){
     const STEP=(window.LightweightCharts&&LightweightCharts.LineType&&LightweightCharts.LineType.WithSteps)!=null?LightweightCharts.LineType.WithSteps:0;
     const mk=(color)=> c.addLineSeries ? c.addLineSeries({color,lineWidth:1,lineType:STEP,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false})
                                        : c.addSeries(LightweightCharts.LineSeries,{color,lineWidth:1,lineType:STEP,priceLineVisible:false,lastValueVisible:true});
-    const ask=mk(legend?'#FF453A':'#d13438'), bid=mk(legend?'#00FF55':'#2f6ec0');   // Legend: ask red / bid green
+    const ask=mk('#d13438'), bid=mk(legend?'#1a9e3f':'#2f6ec0');   // 흰 배경에선 형광 초록(#00FF55)이 안 보인다 → 진한 초록
     const N=220, STEPT=2, q0=priceStore.get(symbol)||{}, pv=pip(symbol);
     let m0=q0.mid||((q0.ask+q0.bid)/2)||BASE[symbol]||1; const half=Math.max(pv/2,((q0.ask-q0.bid)/2)||pv/2);
     const t0=Math.floor(Date.now()/1000)-N*STEPT, seedA=[],seedB=[]; let m=m0-(Math.random()*pv*10);
@@ -3076,7 +3092,9 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
                 {marginUsed>0&&level<100&&level>=30 && <b style={{color:'#e0a020',marginLeft:6}}>⚠ Margin Call</b>}
                 {marginUsed>0&&level<30 && <b style={{color:'#ff5252',marginLeft:6}}>⛔ Stop Out &lt;30%</b>}</span>
             </div></td>
-            <td className={"pl-total "+(floating>=0?'up':'down')}><span className="k" style={{marginRight:5}}>P/L</span>{num(floating)}</td>
+            {/* MT5: 합계 손익은 라벨 없이 숫자만, 잔고바와 같은 색·크기 (사장님 2026-08-14
+                "P/L 지우고 검은색으로, 폰트 사이즈는 밸런스랑 동일하게") — up/down 색 클래스도 뺀다 */}
+            <td className="pl-total">{num(floating)}</td>
             <td></td>
             </tr>
           </tfoot>}

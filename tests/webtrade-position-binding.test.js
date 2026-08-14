@@ -72,7 +72,10 @@ if (!/\{p\.symbol\.toLowerCase\(\)\}\{sfx\(p\.symbol\)\.toLowerCase\(\)\}/.test(
 // ── Profit is a CLEAN 2 decimals everywhere (no messy decimal expansion) ──
 if (/const pnl=\(n\)=>/.test(src)) bad('the decimal-expanding pnl() formatter must be removed (Profit = 2 decimals uniformly)');
 if (!/<td className=\{pl>=0\?'up':'down'\}>\{num\(pl\)\}<\/td>/.test(src)) bad('per-row Profit must use num() (2 decimals)');
-if (!/<td className=\{"pl-total "\+\(floating>=0\?'up':'down'\)\}><span className="k" style=\{\{marginRight:5\}\}>P\/L<\/span>\{num\(floating\)\}<\/td>/.test(src)) bad('account P/L total must carry the "P/L" label (user clarity) and use num() (2 decimals)');
+// 2026-08-14 사장님 지시로 계약 변경: 합계 손익은 **라벨 없이 숫자만**, 색 클래스도 없이 검정
+// (MT5 문법 — 이전의 "'P/L' 라벨 필수" 계약을 대체). num() 2자리는 그대로 유지.
+if (!/<td className="pl-total">\{num\(floating\)\}<\/td>/.test(src)) bad('account P/L total must be the bare num() value (no "P/L" label, no up/down class) — MT5 style');
+if (/<span className="k"[^>]*>P\/L<\/span>/.test(src)) bad("the 'P/L' label must be gone from the total cell");
 
 // ── production: NO P&L scale — both margin and P&L use the true contractSize ──
 if (/pnlContract|CRYPTO_PNL_SCALE/.test(src)) bad('the demo P&L visibility scale must be removed in production');

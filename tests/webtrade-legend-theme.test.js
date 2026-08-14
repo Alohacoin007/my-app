@@ -43,15 +43,19 @@ if (!/\.terminal\.light \.mwt td\.tick-up\{color:#1330f0 !important\}/.test(src)
 // Market Watch body text = MT5 검은 글자, Tahoma 보통 굵기
 if (!/\.terminal\.light \.mwt td\{border:none;border-bottom:1px solid #d9dbdf;border-right:1px solid #d9dbdf;color:#000000;font-weight:400\}/.test(src)) bad('Market Watch cells must be MT5 black text + Excel-style grid (가로+세로 #d9dbdf)');
 if (!/\.terminal\.light \.mwt td\.sym\{color:#000000;font-weight:400\}/.test(src)) bad('Market Watch symbols must be MT5 dark text (#1c1c1e)');
-// 차트 표면(캔들 영역)은 흰색 금지 — 시세창은 MT5 라이트라 흰색 허용, 차트만 다크 유지
-if (/\.terminal\.light \.(charts|chartstage|win|cell-title|mwtick)\b[^\n]*background:#ffffff/.test(src)) bad('chart surfaces must stay dark (no white) — only the Market Watch is MT5 light');
+// 차트 표면(캔들 영역)은 흰색 금지 — 시세창은 MT5 라이트라 흰색 허용, 차트만 다크 유지.
+// ⚠️ .mwtick(Market Watch → Ticks 탭)은 2026-08-14 사장님 "화이트 버젼으로" 지시로 **제외** —
+//    MT5 실물도 Ticks 탭은 흰 배경이다. 메인 차트(charts/chartstage/win)는 그대로 제트블랙.
+if (/\.terminal\.light \.(charts|chartstage|win|cell-title)\b[^\n]*background:#ffffff/.test(src)) bad('chart surfaces must stay dark (no white) — only the Market Watch is MT5 light');
 // the chart right-click menu (ctxmenu) must be dark in Legend, not the MT5 light-grey #f0f0f0
 if (!/\.terminal\.light \.ctxmenu\{background:#000000;border:1px solid #1D212A/.test(src)) bad('chart right-click menu must be Legend dark (#000000 + #1D212A), not white');
 if (!/\.terminal\.light \.ctxmenu \.ci \.ck\{color:#00FF55\}/.test(src)) bad('right-click menu active checkmark should be green');
-// the Market Watch tick chart follows the theme (was hardcoded white)
-if (!/const th=CHART_THEME\[themeBus\.theme\]\|\|CHART_THEME\.dark, legend=themeBus\.theme==='light'/.test(src)) bad('TickChart must follow CHART_THEME (was hardcoded #ffffff)');
-if (!/const ask=mk\(legend\?'#FF453A':'#d13438'\), bid=mk\(legend\?'#00FF55':'#2f6ec0'\)/.test(src)) bad('TickChart ask/bid must be Legend red/green');
-if (/\.mwtick\{[^}]*background:#ffffff/.test(src)) bad('the tick-chart container must not be white');
+// Market Watch → Ticks 탭 = **흰 배경** (2026-08-14 사장님 "화이트 버젼으로"). 이전 계약(테마를 따라
+// 제트블랙)에서 뒤집혔다. 메인 차트는 여전히 CHART_THEME 을 따르므로 여기서만 라이트 팔레트.
+if (!/const th= legend \? \{ bg:'#ffffff'/.test(src)) bad('TickChart must use the WHITE palette in light theme (MT5 Ticks tab is white)');
+if (!/const ask=mk\('#d13438'\), bid=mk\(legend\?'#1a9e3f':'#2f6ec0'\)/.test(src)) bad('TickChart ask=red / bid=green(#1a9e3f on white, #2f6ec0 on dark)');
+if (/bid=mk\(legend\?'#00FF55'/.test(src)) bad('neon green (#00FF55) is invisible on the white Ticks background');
+if (!/\.terminal\.light \.mwtick\{background:#ffffff\}/.test(src)) bad('the light-theme tick-chart container must be white');
 // Trading 탭 = MT5 라이트 카드 (SELL 빨강 / BUY 파랑)
 if (!/\.terminal\.light \.mwtp \.sd\{background:#f6f7f9 !important;border:1px solid #d3d5da\}/.test(src)) bad('Trading-tab buttons must be MT5 light cards (#f6f7f9)');
 if (!/\.terminal\.light \.mwtp \.sd\.sell \.pr\{color:#ff4d00\}/.test(src)) bad('Trading SELL price must match the Market Watch falling colour (#ff4d00)');
