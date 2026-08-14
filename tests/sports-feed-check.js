@@ -198,6 +198,7 @@ async function main() {
       // 매일 같은 키를 "신규"로 울리면 무시당한다(오탐 poka-yoke) — 기준선 밖 diff만 알림.
       const KNOWN_WOMENS = ['cricket_icc_world_cup_womens', 'cricket_t20_world_cup_womens',
         'cricket_the_hundred_womens',   // 2026-07-27 등장 — 크리켓(LPGA 아님), 확장 대상 아님
+        'aussierules_aflw',             // 2026-08-14 등장 — 호주풋볼 여자리그(LPGA 아님), 확장 대상 아님
         'soccer_fifa_world_cup_womens', 'soccer_germany_bundesliga_women', 'soccer_uefa_champs_league_women'];
       const golfKeys = cat.data.filter((s) => /^golf/.test(s.key || '')).map((s) => s.key);
       const newGolf = golfKeys.filter((k) => !KNOWN_GOLF.includes(k));
