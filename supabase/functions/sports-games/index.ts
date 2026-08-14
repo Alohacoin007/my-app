@@ -123,9 +123,18 @@ function mkCore(home: any, away: any, ev: any, lg: string) {
   return { spread, total: total2, ml, real: true };
 }
 
+// 사람이 읽는 킥오프 문자열. 클라는 원본 `iso` 로 자기 시간대에 맞춰 다시 만들지만(그게 정답),
+// 서비스워커 캐시 때문에 **옛 클라가 한동안 이 문자열을 폴백으로** 쓴다. 그래서 여기도
+//   ① 월·일 포함 (요일만 있으면 몇 주 뒤 경기가 이번 주처럼 보인다 — 2026-07-24 / 08-14 사고)
+//   ② timeZone 명시 (미지정이면 서버=UTC 기준이라 손님 시간과 어긋난다) → 베가스 기준
+// 문자열이 길어질 뿐이라 옛 클라도 그대로 렌더된다(하위호환).
 function fmtTime(iso: string): string {
-  try { return new Date(iso).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" }); }
-  catch (_e) { return ""; }
+  try {
+    return new Date(iso).toLocaleString("en-US", {
+      weekday: "short", month: "short", day: "numeric",
+      hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles",
+    });
+  } catch (_e) { return ""; }
 }
 
 // ── Overlay REAL odds from the sports_odds table (already populated by the

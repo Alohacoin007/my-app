@@ -55,5 +55,19 @@ else {
   if (/padding:\s*[^;]*\d+px\s+\d+px/.test(tabBase[1])) bad('탭바 ✕ 의 좌우 padding 은 폭을 흔든다 — 고정 width 로 대체할 것');
 }
 
+// ── ③ 주문/포지션·알림 행의 ✕ (.xclose) — 라이트에서 hover 시 사라지면 주문을 못 지운다 ──
+// 원인 클래스: 라이트 전용 규칙이 없어 다크용 `hover{color:#ffffff}` 가 흰 배경에 그대로 걸렸다
+// (Details 탭과 동일 — 다크 색 재사용). 실측: 수정 전 rgb(255,255,255) → 수정 후 rgb(0,0,0).
+const xcLight = hoverBg('.terminal.light .xclose:hover');   // 규칙 존재 여부
+if (xcLight === null)
+  bad('.terminal.light .xclose:hover 규칙이 없다 — 다크용 흰색 hover 가 흰 배경에 걸려 ✕ 가 사라진다');
+const bodyOfRule = (sel) => { const m = src.match(new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\{([^}]*)\\}')); return m ? m[1] : null; };
+const xcHoverColor = (bodyOfRule('.terminal.light .xclose:hover') || '').match(/color\s*:\s*([^;]+)/);
+if (!xcHoverColor) bad('.terminal.light .xclose:hover 에 color 가 없다');
+else if (!/#000000|#000\b|rgb\(0,\s*0,\s*0\)/.test(xcHoverColor[1]))
+  bad(`라이트 .xclose hover 색이 '${xcHoverColor[1].trim()}' — 사장님 지시는 진한 검정(#000000)`);
+const xcBase = (bodyOfRule('.terminal.light .xclose') || '').match(/color\s*:\s*([^;]+)/);
+if (!xcBase) bad('.terminal.light .xclose 기본 색 규칙이 없다 (다크 실버가 흰 배경에 흐리게 남는다)');
+
 if (fail) { console.error(`\n🔴 FAIL — ${fail} 개의 ✕ hover 문제.`); process.exit(1); }
-console.log('🟢 PASS: ✕ hover 는 두 종류(탭바 · 창 타이틀바) 모두 박스 없이 글리프만 — 다크/라이트/활성창 전부, 탭 밀림 없음.');
+console.log('🟢 PASS: ✕ hover — 탭바·창 타이틀바는 박스 없이 글리프만(다크/라이트/활성창), 주문행 ✕(.xclose)는 라이트에서 진한 검정으로 보인다.');
