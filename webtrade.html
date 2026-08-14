@@ -1827,8 +1827,14 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
     const el=win.current, par=el&&el.parentElement; if(!par) return;
     const W=par.clientWidth||800, H=par.clientHeight||500;
     if(savedGeo && savedGeo.w>0){   // restore the remembered window box (clamped into view)
-      geo.current={ x:Math.max(0,Math.min(savedGeo.x, W-60)), y:Math.max(0,Math.min(savedGeo.y, H-24)),
-        w:Math.max(WIN_MINW,savedGeo.w), h:Math.max(WIN_MINH,savedGeo.h) };
+      let gx=Math.max(0,Math.min(savedGeo.x, W-60)), gy=Math.max(0,Math.min(savedGeo.y, H-24));
+      let gw=Math.max(WIN_MINW,savedGeo.w), gh=Math.max(WIN_MINH,savedGeo.h);
+      const SNAP=10;   // 저장된 픽셀 박스가 옛 스테이지 끝에 붙어 있었다면 새 스테이지 끝에 다시 붙인다.
+      // (창 위치는 px로 저장되는데 크롬 높이가 바뀌면 스테이지 크기가 달라진다 → 옛 px을 새 높이로
+      //  나눈 분수가 1.0에 못 미쳐 바닥에 검은 띠가 영구히 남았다. 2026-08-14 탭바 24→20px 사고.)
+      if(gx+gw >= W-SNAP) gw = W-gx;
+      if(gy+gh >= H-SNAP) gh = H-gy;
+      geo.current={ x:gx, y:gy, w:gw, h:gh };
       const g=geo.current; frac.current={ fx:g.x/W, fy:g.y/H, fw:g.w/W, fh:g.h/H };
     } else {
       const f=initial||{fx:0.02,fy:0.02,fw:0.48,fh:0.48};
