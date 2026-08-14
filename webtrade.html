@@ -331,7 +331,8 @@
   /* Ticks tab chart */
   .mwtick{flex:1;min-height:0;position:relative;background:#000000}
   .watch{display:flex;flex-direction:column;overflow:hidden}
-  .watch .mwscroll{flex:1;overflow-x:hidden;overflow-y:auto;min-height:0}
+  .watch .mwscroll{flex:1;overflow-x:hidden;overflow-y:auto;min-height:0;scrollbar-width:none;-ms-overflow-style:none}
+  .watch .mwscroll::-webkit-scrollbar{width:0;height:0}   /* 시세창 스크롤바 숨김 — 스크롤/휠은 그대로 동작 (사장님 2026-08-14) */
   .ctxmenu{position:fixed;z-index:1200;min-width:216px;background:#f0f0f0;border:1px solid #9a9a9a;
     box-shadow:2px 2px 5px rgba(0,0,0,.2);padding:2px;font:12px 'Segoe UI',Tahoma,sans-serif;color:#1c1c1c}
   .ctxmenu .ci{display:flex;align-items:center;gap:8px;height:24px;padding:0 10px 0 8px;cursor:default;border-radius:2px}
@@ -436,8 +437,9 @@
   .charttabs .ctab:hover{color:#dfe3ea;background:#0f141c}
   .charttabs .ctab.on{background:#000;color:#fff}
   .charttabs .ctab.on::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:#2f7fe0}  /* 활성탭 왼쪽 파란 인디케이터 */
-  .charttabs .ctab .tclose{margin-left:9px;color:#8890a0;font-size:10px;line-height:1;border-radius:0}
-  .charttabs .ctab .tclose:hover{color:#fff;background:#e81123;padding:0 3px}
+  /* ✕: 고정폭 + padding 불변 → hover 시 탭이 옆으로 밀리지 않는다. 빨간 박스 폐지, 색만 진해짐 (사장님 2026-08-14) */
+  .charttabs .ctab .tclose{margin-left:9px;width:11px;text-align:center;flex:none;color:#8890a0;font-size:10px;line-height:1;border-radius:0}
+  .charttabs .ctab .tclose:hover{color:#fff;background:transparent}
   .noch{margin:auto;color:#6a7078;font-size:12px;text-align:center;padding:20px}
   /* ── order form spinner steppers (Volume / SL / TP) ── */
   .orow .in.step input{border-right:none;border-top-right-radius:0;border-bottom-right-radius:0}
@@ -684,6 +686,8 @@
   .terminal.light .charttabs .ctab:hover{background:#eef4fc;color:#000000}
   .terminal.light .charttabs .ctab.on{background:#ffffff;color:#000000}   /* active chart tab = white raised + 검정 글자, 색 인디케이터 없음 (사장님) */
   .terminal.light .charttabs .ctab.on::before{display:none}   /* 왼쪽 파란 바 제거 */
+  .terminal.light .charttabs .ctab .tclose{color:#000000}
+  .terminal.light .charttabs .ctab .tclose:hover{color:#000000;background:transparent}   /* ✕ = 진한 검정, hover에도 박스 없음 */
   .terminal.light .noch{color:#7a828e}
   /* BOTTOM terminal toolbox — MT5 light: white rows, gray headers, blue profit / red loss (2026-08-13 사장님 "mt5 툴 박스처럼") */
   .terminal.light .bottom{background:#ffffff;border-top:1px solid #c4c7cd;color:#1a1a1a}
