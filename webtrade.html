@@ -62,6 +62,22 @@
   .statusbar .grow{margin-left:auto}
   /* ── toolbox non-Trade tab content (News/Mailbox/…): themed empty panels ── */
   .tbxbody{flex:1;overflow:auto;padding:0}
+  /* PAMM 표 — 색을 인라인이 아니라 클래스로 (인라인은 테마가 못 덮는다. 이게 이 표만 다크 색을
+     달고 다니던 이유다). 상승/하락 규약은 앱 전체와 동일: 다크=초록/빨강, **라이트=파랑/빨강**
+     (MT5 시세창·Details·잔고바와 같은 규약. 2026-08-15 사장님 "초록을 다른 색깔로"). */
+  table.pammtbl{width:100%;border-collapse:collapse;font-size:11.5px}
+  table.pammtbl tr.hd{color:#8890a0;font-size:11;text-align:left}
+  table.pammtbl tr.hd th{padding:4px 6px;text-align:right;font-weight:600}
+  table.pammtbl tr.hd th:first-child{text-align:left}
+  table.pammtbl td{padding:6px;border-top:1px solid #2a2e34;color:#c8ccd2}
+  table.pammtbl td.r{text-align:right}
+  table.pammtbl td.b{font-weight:700}
+  table.pammtbl td.nw{white-space:nowrap}
+  table.pammtbl td.pos{color:#00c805}
+  table.pammtbl td.neg{color:#ff453a}
+  table.pammtbl .dim{color:#8890a0}
+  table.pammtbl .sm{font-size:11px}
+  .pamm-note{color:#6a7078;font-size:10.5px;margin-top:8px;padding:0 6px;line-height:1.5}
   /* PAMM 액션 버튼 = MT5 툴바 버튼 문법 (2026-08-15 사장님 "컨셉에 맞게 mt5 스타일로"):
      각진 2px 모서리 · 얇은 세로 그라디언트 · 1px 테두리 · 누르면 안쪽 베벨.
      이전엔 라운드 5px + 로빈후드 형광초록(#00c805)이라 MT5 크롬과 이질적이었다.
@@ -128,6 +144,14 @@
   .terminal.light .alert-add button{background:#1668b8;border:1px solid #1668b8;color:#ffffff;
     border-radius:2px;padding:3px 12px;font-size:11px;font-weight:600;cursor:pointer}
   .terminal.light .alert-add button:hover{background:#1a7ad4;border-color:#1a7ad4}
+  /* PAMM 표 라이트 — 글자는 진한 검정, 상승은 **파랑**(초록 폐기: 이 앱 라이트 규약은 파랑=상승),
+     하락은 빨강. 선은 회색. (2026-08-15 사장님 "좀더 진한 검은색 / 초록을 다른 색깔로") */
+  .terminal.light table.pammtbl td{color:#1c1c1e;border-top:1px solid #e3e5e9}
+  .terminal.light table.pammtbl tr.hd{color:#5a6270}
+  .terminal.light table.pammtbl td.pos{color:#1330f0}
+  .terminal.light table.pammtbl td.neg{color:#c0392b}
+  .terminal.light table.pammtbl .dim{color:#5a6270}
+  .terminal.light .pamm-note{color:#5a6270}
   /* PAMM 버튼 — MT5 라이트 툴바 버튼과 같은 문법(평평한 채움 + 얇은 테두리 + 눌림 베벨) */
   .terminal.light .pammbtn{background:#f5f6f8;border:1px solid #c3c6cc;color:#15181d}
   .terminal.light .pammbtn:hover{background:#dbe7f6;border-color:#9db8dd;color:#0d2c4d}
@@ -2812,28 +2836,28 @@ function PammTab({ acct }){
   if(!funds.length) return <div className="tbxbody"><div className="tbxempty"><div className="ic">💼</div>No managed funds available yet</div></div>;
   return (
     <div className="tbxbody" style={{padding:'8px 10px'}}>
-      <table className="postbl" style={{width:'100%'}}>
-        <thead><tr style={{color:'#8890a0',fontSize:11,textAlign:'left'}}>
+      <table className="postbl pammtbl" style={{width:'100%'}}>
+        <thead><tr className="hd">
           <th style={{padding:'4px 6px'}}>Fund</th><th style={{textAlign:'right'}}>Return</th>
           <th style={{textAlign:'right'}}>My investment</th><th style={{textAlign:'right'}}>Value now</th>
           <th style={{textAlign:'right'}}>P&amp;L</th><th style={{textAlign:'right'}}>Fee</th><th></th></tr></thead>
         <tbody>{funds.map(f=>{ const m=f.mine, ret=+f.ret||0, pnl=m?+m.pnl||0:0; const busyF=busy===f.fund_acct;
-          return (<tr key={f.fund_acct} style={{borderTop:'1px solid #2a2e34'}}>
+          return (<tr key={f.fund_acct}>
             <td style={{padding:'6px'}}>{f.name}{f.is_manager?<span style={{color:'#c9a227',fontSize:10,marginLeft:5}}>MGR</span>:null}{f.status!=='active'?<span style={{color:'#e0a020',fontSize:10,marginLeft:5}}>{f.status}</span>:null}</td>
-            <td style={{textAlign:'right',color:ret>=0?'#00c805':'#ff453a'}}>{(ret>=0?'+':'')+(ret*100).toFixed(2)+'%'}</td>
-            <td style={{textAlign:'right'}}>{m?'$'+num(m.basis):'—'}</td>
-            <td style={{textAlign:'right',fontWeight:700}}>{m?'$'+num(m.value):'—'}</td>
-            <td style={{textAlign:'right',color:pnl>=0?'#00c805':'#ff453a'}}>{m?(pnl>=0?'+':'')+'$'+num(Math.abs(pnl)):'—'}</td>
-            <td style={{textAlign:'right',color:'#8890a0'}}>{(+f.perf_fee_pct||0)+'%'}</td>
-            <td style={{textAlign:'right',whiteSpace:'nowrap'}}>
-              {f.is_manager ? <span style={{color:'#8890a0',fontSize:11}}>you manage</span>
-               : busyF ? <span style={{color:'#8890a0',fontSize:11}}>…</span>
+            <td className={'r '+(ret>=0?'pos':'neg')}>{(ret>=0?'+':'')+(ret*100).toFixed(2)+'%'}</td>
+            <td className="r">{m?'$'+num(m.basis):'—'}</td>
+            <td className="r b">{m?'$'+num(m.value):'—'}</td>
+            <td className={'r '+(pnl>=0?'pos':'neg')}>{m?(pnl>=0?'+':'')+'$'+num(Math.abs(pnl)):'—'}</td>
+            <td className="r dim">{(+f.perf_fee_pct||0)+'%'}</td>
+            <td className="r nw">
+              {f.is_manager ? <span className="dim sm">you manage</span>
+               : busyF ? <span className="dim sm">…</span>
                : <>{m ? <button className="pammbtn" onClick={()=>act('add',f)}>Add</button> : (f.status==='active'?<button className="pammbtn join" onClick={()=>act('join',f)}>Join</button>:null)}
                     {m ? <button className="pammbtn out" onClick={()=>act('redeem',f)}>Redeem</button> : null}</>}
             </td></tr>);
         })}</tbody>
       </table>
-      <div style={{color:'#6a7078',fontSize:10.5,marginTop:8,padding:'0 6px'}}>Value updates when the manager closes trades. Joins/redemptions apply when the fund has no open positions (rollover). Performance fee applies only to profit above your high-water mark.</div>
+      <div className="pamm-note">Value updates when the manager closes trades. Joins/redemptions apply when the fund has no open positions (rollover). Performance fee applies only to profit above your high-water mark.</div>
     </div>
   );
 }
