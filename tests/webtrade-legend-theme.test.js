@@ -53,6 +53,12 @@ if (/\.terminal\.light \.(charts|chartstage|win|cell-title)\b[^\n]*background:#f
 if (/\.terminal\.light \.ctxmenu\{background:#000000/.test(src)) bad('right-click menu is dark again in light theme — the MT5 white base must apply (no dark override)');
 if (!/\.ctxmenu\{[^}]*background:#f0f0f0/.test(src)) bad('the .ctxmenu base must stay MT5 light-grey (#f0f0f0)');
 if (!/\.terminal\.light \.mdrop\{background:#f0f0f0/.test(src)) bad('menu-bar dropdowns must share the same MT5 white as the right-click menu');
+// ⚠️ 이 터미널엔 메뉴가 **세 종류**다: .mdrop(메뉴바) · .ctxmenu(차트 우클릭) · .mt5-context-menu(시세창
+// 우클릭). 2026-08-15 에 앞의 둘만 화이트로 바꾸고 시세창을 놓쳐 사장님이 다시 지적했다 — 셋을 함께 못 박는다.
+if (!/\.terminal\.light \.mt5-context-menu\{background:#f0f0f0/.test(src)) bad('Market Watch right-click menu must be MT5 white too (all three menus share one palette)');
+if (/\.terminal\.light \.mt5-context-menu\{background:#000000/.test(src)) bad('Market Watch right-click menu is dark again');
+for (const [sel, what] of [['\\.terminal\\.light \\.mdrop', '메뉴바'], ['\\.terminal\\.light \\.mt5-context-menu', '시세창 메뉴']])
+  if (!new RegExp(sel + '[^}]*font:12px Tahoma').test(src)) bad(`${what} 가 정해둔 메뉴 폰트(Tahoma)를 안 쓴다`);
 // Market Watch → Ticks 탭 = **흰 배경** (2026-08-14 사장님 "화이트 버젼으로"). 이전 계약(테마를 따라
 // 제트블랙)에서 뒤집혔다. 메인 차트는 여전히 CHART_THEME 을 따르므로 여기서만 라이트 팔레트.
 if (!/const th= legend \? \{ bg:'#ffffff'/.test(src)) bad('TickChart must use the WHITE palette in light theme (MT5 Ticks tab is white)');
