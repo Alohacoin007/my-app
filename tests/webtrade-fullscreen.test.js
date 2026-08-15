@@ -32,8 +32,12 @@ if(/fxEsc/.test(d)) bad('ESC must not close the FX overlay (fxEsc close-path mus
 //   로그인   첫클릭 1회 → 둘째클릭 1회(중복 없음) · 미로그인 첫클릭 0회
 if(!/function armDefaultFullscreen\(\)/.test(s)) bad('기본값 풀스크린 무장 함수(armDefaultFullscreen)가 없다');
 if(!/armDefaultFullscreen\(\);\s*\/\/ 기본값 풀스크린/.test(s)) bad('armDefaultFullscreen 이 앱 마운트에서 호출되지 않는다');
-if(!/if\(!\(window\.AlpexaSync && AlpexaSync\.me\)\) return;/.test(s))
-  bad('기본값 풀스크린은 **로그인 상태에서만** 걸려야 한다 (읽기전용 둘러보기까지 강제 금지)');
+// 로그인 가드·opt-out 복귀는 **문구가 아니라 동작**으로 검증한다 → tests/webtrade-fullscreen-default.test.js.
+// (이 자리에 있던 `AlpexaSync.me` 문구 검사는 2026-08-15 에 제거했다: 그 문구는 존재했지만
+//  AlpexaSync.me 가 **함수**라 항상 truthy = 가드가 죽어 있었고, 정적 핀은 그걸 통과시켰다.
+//  "문구가 있다"와 "동작한다"는 다르다.)
+if(/if\(!\(window\.AlpexaSync && AlpexaSync\.me\)\) return;/.test(s))
+  bad('죽은 로그인 가드(AlpexaSync.me = 함수라 항상 truthy)가 되살아났다 — alpexa.me 로 판정할 것');
 if(!/addEventListener\('pointerdown',fire,true\)/.test(s) || !/addEventListener\('keydown',fire,true\)/.test(s))
   bad('첫 상호작용(클릭·키)을 제스처로 잡아야 한다 — 로드 직후 요청은 브라우저가 거부한다');
 if(!/const off=\(\)=>\{ document\.removeEventListener\('pointerdown',fire,true\)/.test(s))
