@@ -47,9 +47,12 @@ if (!/\.terminal\.light \.mwt td\.sym\{color:#000000;font-weight:400\}/.test(src
 // ⚠️ .mwtick(Market Watch → Ticks 탭)은 2026-08-14 사장님 "화이트 버젼으로" 지시로 **제외** —
 //    MT5 실물도 Ticks 탭은 흰 배경이다. 메인 차트(charts/chartstage/win)는 그대로 제트블랙.
 if (/\.terminal\.light \.(charts|chartstage|win|cell-title)\b[^\n]*background:#ffffff/.test(src)) bad('chart surfaces must stay dark (no white) — only the Market Watch is MT5 light');
-// the chart right-click menu (ctxmenu) must be dark in Legend, not the MT5 light-grey #f0f0f0
-if (!/\.terminal\.light \.ctxmenu\{background:#000000;border:1px solid #1D212A/.test(src)) bad('chart right-click menu must be Legend dark (#000000 + #1D212A), not white');
-if (!/\.terminal\.light \.ctxmenu \.ci \.ck\{color:#00FF55\}/.test(src)) bad('right-click menu active checkmark should be green');
+// 우클릭 메뉴 = **MT5 화이트** (2026-08-15 사장님 승인으로 계약 뒤집힘). 예전 계약은 "Legend 다크"
+// 였지만, 터미널이 MT5 화이트로 통일되면서 검은 메뉴만 튀었다. 이제 다크 오버라이드가 **없어야**
+// 기본값(#f0f0f0)이 두 테마에 모두 적용된다 — 메뉴바 드롭다운(.mdrop)과 같은 팔레트.
+if (/\.terminal\.light \.ctxmenu\{background:#000000/.test(src)) bad('right-click menu is dark again in light theme — the MT5 white base must apply (no dark override)');
+if (!/\.ctxmenu\{[^}]*background:#f0f0f0/.test(src)) bad('the .ctxmenu base must stay MT5 light-grey (#f0f0f0)');
+if (!/\.terminal\.light \.mdrop\{background:#f0f0f0/.test(src)) bad('menu-bar dropdowns must share the same MT5 white as the right-click menu');
 // Market Watch → Ticks 탭 = **흰 배경** (2026-08-14 사장님 "화이트 버젼으로"). 이전 계약(테마를 따라
 // 제트블랙)에서 뒤집혔다. 메인 차트는 여전히 CHART_THEME 을 따르므로 여기서만 라이트 팔레트.
 if (!/const th= legend \? \{ bg:'#ffffff'/.test(src)) bad('TickChart must use the WHITE palette in light theme (MT5 Ticks tab is white)');
