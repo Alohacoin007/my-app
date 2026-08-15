@@ -2419,6 +2419,10 @@ async function fxPlaceReal(sym, side, vol){
   }catch(e){ fxSnd('timeout.wav'); toast('❌ Order failed: '+String(e&&e.message||e)); return false; } }
 async function fxCloseReal(localId){
   try{
+    // 장 마감 심볼은 청산 불가 (2026-08-15) — 서버 fx_close 가 진짜 관문, 여기는 UX.
+    const _p=(typeof FXPOS!=='undefined'?FXPOS:[]).find(x=>String(x.local_id)===String(localId));
+    if(_p && typeof fxMarketOpen==='function' && !fxMarketOpen(_p.symbol)){
+      fxSnd('timeout.wav'); toast('❌ Market closed'); return false; }
     const r=await AlpexaSync.db.rpc('fx_close', { p_local_id:localId });
     const d=r&&r.data;
     if(r&&!r.error&&d&&d.ok){

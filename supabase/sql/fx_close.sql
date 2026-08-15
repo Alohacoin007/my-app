@@ -75,6 +75,19 @@ begin
   select cls into v_cls from public.fx_specs where symbol = v_sym;
   if v_cls is null then return jsonb_build_object('ok',false,'error','no spec for '||v_sym); end if;
 
+  -- ── 세션 게이트 (2026-08-15 사장님 "마켓이 클로즈 됐는데 포지션을 닫을 수 있게 되있지..막아야") ──
+  -- 열기(fx_open)는 2026-07-22부터 서버에서 막혔는데 **닫기는 뚫려 있었다.** 장이 닫히면 가격이
+  -- 종가에 얼어붙는데, 그 정지가로 청산하면 다음 개장 갭을 보고 유리한 쪽만 확정할 수 있다
+  -- (하우스 대상 차익거래). 실제 규제 브로커·MT5 모두 마감 중 청산을 거절한다.
+  --   · 판정은 fx_open 과 **같은 함수** `fx_market_open(cls, at)` 재사용 → 열기/닫기 자동 락스텝.
+  --     새 캘린더를 만들면 둘이 어긋난다(그게 이 코드베이스의 반복된 사고 패턴).
+  --   · 이 게이트는 **고객이 직접 부르는 이 RPC 에만** 걸린다. 서버 리스크 엔진(fx_modify 의 SL/TP
+  --     집행, fx_stopout)은 이 RPC 를 호출하지 않고 자체적으로 settlements 를 기록하므로 영향 없다
+  --     — 마감 중에도 리스크 관리는 계속 돌아야 한다.
+  if not public.fx_market_open(v_cls, now()) then
+    return jsonb_build_object('ok',false,'error','Market closed','code','MARKET_CLOSED');
+  end if;
+
   -- SERVER close price + freshness (reject if missing/stale -> client fallback)
   select mid, updated_at into v_mid, v_pts from public.prices where symbol = v_sym limit 1;
   if v_mid is null or v_mid <= 0 then return jsonb_build_object('ok',false,'error','no price for '||v_sym); end if;

@@ -13059,6 +13059,20 @@ function App() {
       (window.__fxClosing = window.__fxClosing || {})[String(id)] = Date.now();
     } catch (e) {} // 이 기기발 청산 표식(Realtime 중복 토스트 방지)
     const m = marketRef.current.state.find(s => s.sym === order.sym);
+    // 장 마감 심볼은 청산 불가 (2026-08-15). 열기(위 symOpen 게이트)와 같은 규칙 — 정지가로
+    // 손익을 확정하면 다음 개장 갭 차익거래가 된다. 진짜 관문은 서버 fx_close 세션 게이트.
+    if (m && !symOpen(m)) {
+      const TT = window.alpexaTR || (x => x);
+      if (window.ALPEXA_SFX && ALPEXA_SFX.error) ALPEXA_SFX.error();
+      setToast({
+        error: true,
+        icon: 'lock',
+        msg: TT('Market closed'),
+        sub: order.sym + ' · ' + TT('Position can be closed when the market reopens')
+      });
+      setTimeout(() => setToast(null), 4000);
+      return;
+    }
     const closePrice = m ? ALPEXA_MARKET.fxClosePx(m, order.side) : order.open; // server-mirror (matches realized)
     const pnl = order.pnl || 0,
       acct = accountRef.current;

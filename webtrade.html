@@ -3097,6 +3097,9 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
   const closePos=async(p)=>{
     if(p._demo){ const m=mids[p.symbol]||{}; positionsStore.recordClose(p, closePx(p,m)||m.mid, plOf(p));   // log the closed deal (per-side close px) → History tab
       positionsStore.removeDemo(p.local_id); playSnd(sndClose); return; }   // demo row → drop it (+청산음)
+    // 장 마감 심볼은 청산 불가 (2026-08-15). 진짜 관문은 서버 fx_close 의 세션 게이트 —
+    // 여기서 막는 건 헛걸음/오해 방지용 UX 다 (클라 체크는 우회 가능, CLAUDE.md #5).
+    if(!marketOpen(p.symbol)){ playSnd(sndError); alert(t('Market closed')); return; }
     const m=mids[p.symbol]||{}; const pl=plOf(p);
     const r=await eng.closeOrder(p.local_id);                            // real → fx_close banks P&L server-side
     if(!r.ok){ alert('Close failed: '+(r.reason||'unknown')); return; }
