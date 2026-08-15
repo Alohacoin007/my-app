@@ -409,15 +409,35 @@ function alpexaHasFeed(s){ if(!s)return false; if(s.real)return true; var f=(typ
 function alpexaTradable(list){ return (list&&alpexaFeedReady())? list.filter(alpexaHasFeed) : list; }
 if(typeof window!=='undefined'){ window.alpexaFeedReady=alpexaFeedReady; window.alpexaHasFeed=alpexaHasFeed; window.alpexaTradable=alpexaTradable; }
 // Market hours (so closed markets hold their price instead of drifting).
-function fxOpenUTC(){ // Forex week: Sun 17:00 ET open → Fri 17:00 ET close (DST-aware via NY tz)
-  try{var d=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'})),day=d.getDay(),t=d.getHours()*60+d.getMinutes();
-    if(day===6)return false; if(day===0)return t>=1020; if(day===5)return t<1020; return true;
-  }catch(e){var u=new Date(),wd=u.getUTCDay(),m=u.getUTCHours()*60+u.getUTCMinutes();
-    if(wd===6)return false; if(wd===0)return m>=1320; if(wd===5)return m<1320; return true;}}
-function stockOpenET(){try{var d=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'})),day=d.getDay();
-  if(day===0||day===6)return false; var t=d.getHours()*60+d.getMinutes(); return t>=570&&t<960;}catch(e){return true;}}
-function symOpen(s){ if(s.cls==='CRYPTO')return true; if(typeof s.marketOpen==='boolean')return s.marketOpen;
-  if(s.cls==='STOCK'||s.cls==='INDEX')return stockOpenET(); return fxOpenUTC(); }
+/* ══ SESSION-CALENDAR — 서버 fx_market_open() 미러. tests/fx-session-gate.test.js 가 이 블록을
+   통째로 뽑아 SQL·webtrade·terminal 과 15분 간격 전수 대조한다. 마커를 지우면 핀이 🔴.
+   원래 여기만 ET 앵커였고(맞음) 서버·PC 둘이 UTC 고정이라 어긋나 있었다 — 2026-08-15 전원 ET 로 통일.
+   추가된 것: 주식의 **미 공휴일·반일(13:00 ET)** 처리. 없으면 독립기념일에 앱은 열렸다는데
+   서버는 MARKET_CLOSED 로 거절한다. ══ */
+const TR_US_HOLIDAYS=new Set(['2026-01-01','2026-01-19','2026-02-16','2026-04-03','2026-05-25',
+  '2026-06-19','2026-07-03','2026-09-07','2026-11-26','2026-12-25','2027-01-01']);
+const TR_US_HALF_DAYS=new Set(['2026-11-27','2026-12-24']);
+const TR_ET_DOW={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6};
+function trEtWall(d){
+  var p=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hour12:false,
+    year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',weekday:'short'})
+    .formatToParts(d).reduce(function(o,x){o[x.type]=x.value;return o;},{});
+  var h=p.hour==='24'?0:+p.hour;
+  return {ymd:p.year+'-'+p.month+'-'+p.day,dow:TR_ET_DOW[p.weekday],min:h*60+(+p.minute)}; }
+function fxOpenUTC(at){ // Forex week: Sun 17:00 ET open → Fri 17:00 ET close
+  var e=trEtWall(at!=null?new Date(at):new Date());
+  if(e.dow===6)return false; if(e.dow===0)return e.min>=17*60; if(e.dow===5)return e.min<17*60; return true; }
+function stockOpenET(at){ // US cash session 09:30–16:00 ET (반일 13:00), 주말·미 공휴일 휴장
+  var e=trEtWall(at!=null?new Date(at):new Date());
+  if(e.dow===0||e.dow===6)return false;
+  if(TR_US_HOLIDAYS.has(e.ymd))return false;
+  return e.min>=9*60+30 && e.min<(TR_US_HALF_DAYS.has(e.ymd)?13*60:16*60); }
+// 구버전엔 `if(typeof s.marketOpen==='boolean') return s.marketOpen;` 우회로가 있었는데 **그 필드를
+// 채우는 곳이 전 코드베이스에 없었다**(2026-08-15 grep 확인) = 죽은 분기. 살려두면 나중에 누가
+// 채우는 순간 락스텝 밖으로 새므로 제거한다. 판정 경로는 아래 하나뿐.
+function symOpen(s, at){ if(s.cls==='CRYPTO')return true;
+  if(s.cls==='STOCK'||s.cls==='INDEX')return stockOpenET(at); return fxOpenUTC(at); }
+/* ══ /SESSION-CALENDAR ══ */
 function genSeries(base,n){
   let p=base*(1-0.008);const arr=[];
   for(let i=0;i<n;i++){

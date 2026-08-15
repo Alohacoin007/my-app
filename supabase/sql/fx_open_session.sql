@@ -7,8 +7,8 @@
 -- 터미널 fxMarketOpen)는 표시용일 뿐 — 서버가 진짜 관문(CLAUDE.md #5). 장 닫힌 심볼의 주문은
 -- 여기서 거절된다(주말 동결가 체결 구멍 폐쇄). 자산군은 심볼 목록 이중화 없이 fx_specs.cls
 -- (서버의 진실)로 판정. 캘린더는 클라와 락스텝 — tests/fx-session-gate.test.js가 2주 전수 대조.
--- 세션(UTC): CRYPTO 24/7 · FX 일 22:00→금 22:00 · STOCK/INDEX 월–금 13:30–20:00 − 미 휴일.
--- NOTE: 주식 창은 EDT 고정(13:30–20:00 UTC) — EST 겨울엔 +1h 규칙 추가 필요(클라 동일 한계).
+-- 세션(뉴욕 현지시각): CRYPTO 24/7 · FX 일 17:00 ET → 금 17:00 ET ·
+--                     STOCK/INDEX 월–금 09:30–16:00 ET (반일 13:00) − 미 휴일.
 -- 배포: 이 파일 전체 1회 실행 (fx_open 교체는 재실행 안전).
 -- ============================================================================
 
@@ -22,28 +22,51 @@ returns boolean language sql immutable as $$
   );
 $$;
 
--- 2) 자산군(fx_specs.cls) 기준 세션 판정 — 순수 UTC 계산 (p_at 주입 가능 = 테스트 용이)
+-- 1b) 미국 증시 조기폐장일 = 13:00 ET 마감 (추수감사절 다음날 · 크리스마스이브).
+-- 없으면 그날 13:00~16:00 ET 세 시간 동안 **장은 닫혔는데 우리는 열려 있다** = 정지가 차익거래.
+-- 휴일 목록과 같은 창(2027-01-01)까지만 채워져 있다 — 매년 같이 연장할 것.
+create or replace function public.fx_is_us_half_day(p_day date)
+returns boolean language sql immutable as $$
+  select p_day in (date '2026-11-27', date '2026-12-24');
+$$;
+
+-- 2) 자산군(fx_specs.cls) 기준 세션 판정.
+--
+-- ⚠️ 경계는 **UTC 고정 시각이 아니라 뉴욕 현지시각**에 붙어 있다 (2026-08-15 사장님 지적으로 교체).
+--   구버전은 주식 13:30–20:00 UTC · FX 22:00 UTC 로 박혀 있었다. 그건 각각 EDT·EST **한 계절
+--   전용 값**이라 1년 내내 둘 중 하나가 틀렸다:
+--     · 겨울 13:30–14:30 UTC — 미장 개장 전인데 거래 허용 → 정지가 차익거래(세션 게이트의 존재 이유)
+--     · 겨울 20:00–21:00 UTC — 장중인데 거절 → 정상 고객 차단
+--     · 여름 금 21:00–22:00 UTC — FX 주간 마감(NY 17:00) 후인데 열어둠
+--   실제 브로커(MT5)는 서버시간을 GMT+2/+3 로 두어 경계가 NY 17:00 에 고정되게 한다 — 같은 규율.
+--   그래서 여기서는 `at time zone 'America/New_York'` 로 벽시계를 뽑고 ET 로 판정한다.
+--   → 네임드 타임존 변환은 IMMUTABLE 이 아니므로 volatility 는 **stable**. (immutable 로 두면
+--     플랜 캐싱이 굳은 값을 재사용할 수 있다.)
+--   클라 3종(webtrade·terminal·모바일)과 tests/fx-session-gate.test.js 가 DST 전환주까지 전수 대조.
+--
 -- 구 DRAFT(fx_market_open(p_symbol,…)·fx_symbol_class)가 배포돼 있으면 파라미터명 변경 불가(42P13) → 먼저 제거
 drop function if exists public.fx_market_open(text, timestamptz);
 drop function if exists public.fx_symbol_class(text);
 create or replace function public.fx_market_open(p_cls text, p_at timestamptz default now())
-returns boolean language plpgsql immutable as $$
+returns boolean language plpgsql stable as $$
 declare
-  v_at  timestamp := p_at at time zone 'UTC';
-  v_dow int := extract(dow from v_at);                       -- 0=일 … 6=토
-  v_min int := extract(hour from v_at)*60 + extract(minute from v_at);
+  v_et  timestamp := p_at at time zone 'America/New_York';   -- 뉴욕 벽시계 (DST 자동 반영)
+  v_day date := v_et::date;
+  v_dow int := extract(dow from v_et);                       -- 0=일 … 6=토
+  v_min int := extract(hour from v_et)*60 + extract(minute from v_et);
 begin
   if upper(coalesce(p_cls,'')) = 'CRYPTO' then
     return true;                                             -- 24/7
   elsif upper(p_cls) = 'FX' then
     if v_dow = 6 then return false; end if;                  -- 토 휴장
-    if v_dow = 0 then return v_min >= 22*60; end if;         -- 일 22:00 UTC 개장
-    if v_dow = 5 then return v_min <  22*60; end if;         -- 금 22:00 UTC 폐장
+    if v_dow = 0 then return v_min >= 17*60; end if;         -- 일 17:00 ET 개장
+    if v_dow = 5 then return v_min <  17*60; end if;         -- 금 17:00 ET 폐장
     return true;                                             -- 월–목
   else                                                       -- STOCK / INDEX
     if v_dow = 0 or v_dow = 6 then return false; end if;
-    if public.fx_is_us_holiday(v_at::date) then return false; end if;
-    return v_min >= 13*60+30 and v_min < 20*60;              -- 13:30–20:00 UTC (ET 09:30–16:00 EDT)
+    if public.fx_is_us_holiday(v_day) then return false; end if;
+    return v_min >= 9*60+30
+       and v_min <  (case when public.fx_is_us_half_day(v_day) then 13*60 else 16*60 end);
   end if;
 end;
 $$;

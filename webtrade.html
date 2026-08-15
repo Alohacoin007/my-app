@@ -1131,26 +1131,42 @@ const fmtMt5Tick = (t)=>{ const d=new Date((typeof t==='number'?t:0)*1000), p=n=
 //    path; when WT_DEMO flips to real B-Book the fx_open RPC must ALSO enforce sessions (server = the
 //    real gate, client = show only). NOTE: the stock window is fixed to EDT (13:30–20:00 UTC); EST
 //    winter shifts it +1h — add a DST rule when needed.
+/* ══ SESSION-CALENDAR — 서버 fx_market_open() 미러. tests/fx-session-gate.test.js 가 이 블록을
+   통째로 뽑아 SQL·terminal·모바일과 15분 간격 전수 대조한다. 마커를 지우면 핀이 🔴.
+   경계는 UTC 고정 시각이 아니라 **뉴욕 현지시각**에 붙는다 (서머타임 따라 이동) — 이유는
+   supabase/sql/fx_open_session.sql 의 fx_market_open 주석 참조. ══ */
 const US_MARKET_HOLIDAYS = new Set(['2026-01-01','2026-01-19','2026-02-16','2026-04-03','2026-05-25',
   '2026-06-19','2026-07-03','2026-09-07','2026-11-26','2026-12-25','2027-01-01']);
+const US_HALF_DAYS = new Set(['2026-11-27','2026-12-24']);         // 13:00 ET 조기폐장 (서버 fx_is_us_half_day 와 락스텝)
+const ET_DOW = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 };
+// UTC 시각 → 뉴욕 벽시계. toLocaleString 파싱보다 formatToParts 가 로케일 흔들림에 안전하다.
+function etWall(d){
+  const p = new Intl.DateTimeFormat('en-US',{ timeZone:'America/New_York', hour12:false,
+    year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', weekday:'short' })
+    .formatToParts(d).reduce((o,x)=>(o[x.type]=x.value,o),{});
+  const h = p.hour==='24' ? 0 : +p.hour;                           // en-US hour12:false 는 자정을 "24"로 낼 수 있다
+  return { ymd:p.year+'-'+p.month+'-'+p.day, dow:ET_DOW[p.weekday], min:h*60+(+p.minute) };
+}
 function marketOpen(symbol, at){
-  const cat=catOf(symbol);   // classify via catOf (server class + inference), NOT SYM_CAT-default-Forex — so a
+  let cat=catOf(symbol);   // classify via catOf (server class + inference), NOT SYM_CAT-default-Forex — so a
   //   dynamic stock like SPACEX (absent from SYM_CAT) is session-gated as a STOCK (weekend '—'), not Forex.
-  const d = at!=null ? new Date(at) : new Date();
+  // 금·은은 fx_specs.cls='FX'. catOf 가 fx_specs 를 못 읽으면 휴리스틱 /USD$/ 가 XAUUSD 를
+  // Crypto(24/7)로 오분류해 주말에도 열린 것처럼 보인다 → 심볼로 직접 교정한다.
+  if(/^X(AU|AG|PT|PD)/.test(symbol)) cat='Forex';
   if(cat==='Crypto') return true;                                  // 24/7 — never closed
-  const day=d.getUTCDay();                                         // 0=Sun … 6=Sat
-  const min=d.getUTCHours()*60+d.getUTCMinutes();                  // minutes past 00:00 UTC
+  const e = etWall(at!=null ? new Date(at) : new Date());
   if(cat==='Forex'){
-    if(day===6) return false;                                      // Sat: closed
-    if(day===0) return min>=22*60;                                 // Sun: opens 22:00 UTC
-    if(day===5) return min< 22*60;                                 // Fri: closes 22:00 UTC
+    if(e.dow===6) return false;                                    // Sat: closed
+    if(e.dow===0) return e.min>=17*60;                             // Sun: opens 17:00 ET
+    if(e.dow===5) return e.min< 17*60;                             // Fri: closes 17:00 ET
     return true;                                                   // Mon–Thu: open
   }
   // US Stocks
-  if(day===0||day===6) return false;                               // weekend
-  if(US_MARKET_HOLIDAYS.has(d.toISOString().slice(0,10))) return false;  // US market holiday
-  return min>=13*60+30 && min<20*60;                               // 13:30–20:00 UTC regular session
+  if(e.dow===0||e.dow===6) return false;                           // weekend
+  if(US_MARKET_HOLIDAYS.has(e.ymd)) return false;                  // US market holiday
+  return e.min>=9*60+30 && e.min<(US_HALF_DAYS.has(e.ymd)?13*60:16*60);   // 09:30–16:00 ET (반일 13:00)
 }
+/* ══ /SESSION-CALENDAR ══ */
 // Max ADVERSE slippage (in pips) the trader will accept between click and server fill — passed to
 // fx_open's slippage guard. Wide by default (only a violent spike trips it); operator-overridable.
 const SLIP_PIPS = (typeof window!=='undefined' && +window.ALPEXA_MAX_SLIP_PIPS) || 15;

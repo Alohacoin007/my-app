@@ -20,12 +20,13 @@ if (!/if\(!marketOpen\(sym\)\)\{ if\(!this\.mids\[sym\]\) this\._set\(sym, cur, 
   bad('[3] _simulate must freeze (not random-walk) a closed symbol');
 
 // ── behavioural: marketOpen is correct (crypto 24/7, FX weekend closed, stock weekend closed) ──
-const mo_src = grab(/function marketOpen\(symbol, at\)\{[\s\S]*?\n\}/, 'marketOpen');
+// 2026-08-15: marketOpen 이 ET 벽시계 헬퍼(etWall)·반일 셋과 한 몸이 됐다 → 함수만 뽑으면
+// ReferenceError. SESSION-CALENDAR 마커 블록을 통째로 뽑는다 (fx-session-gate.test.js 와 동일 방식).
+const mo_src = grab(/\/\* ══ SESSION-CALENDAR[\s\S]*?══ \*\/[\s\S]*?\/\* ══ \/SESSION-CALENDAR ══ \*\//, 'SESSION-CALENDAR 블록');
 if (!fail) {
   // marketOpen classifies via catOf now (so dynamic stocks like SPACEX gate as stocks, not Forex)
   const catOf = (s)=> ({BTCUSD:'Crypto',EURUSD:'Forex',AAPL:'Stocks',SPACEX:'Stocks'}[s]||'Forex');
-  const marketOpen = new Function('catOf','US_MARKET_HOLIDAYS',
-    mo_src + '\nreturn marketOpen;')(catOf, new Set());
+  const marketOpen = new Function('catOf', mo_src + '\nreturn marketOpen;')(catOf);
   const SAT = Date.UTC(2026,6,11,12,0), WED = Date.UTC(2026,6,8,12,0);   // 2026-07-11 Sat, 2026-07-08 Wed
   if (marketOpen('BTCUSD', SAT) !== true) bad('crypto must be OPEN 24/7 (Saturday)');
   if (marketOpen('BTCUSD', WED) !== true) bad('crypto must be OPEN 24/7 (Wednesday)');
