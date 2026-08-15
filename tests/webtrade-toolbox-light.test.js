@@ -75,8 +75,12 @@ else {
   if (!/^#2f9bff$/.test(c)) bad(`TP 라인 색이 '${c}' — 사장님 지시는 파랑(#2f9bff)`);
 }
 // 드래그 프리뷰도 같은 색이어야 한다 (드래그 중에만 색이 튀면 안 된다)
-if (!/d\.eff==='sl'\?'#ff2020':'#2f9bff'/.test(src))
-  bad('SL/TP 드래그 프리뷰의 tp 색이 확정 라인(#2f9bff)과 다르다');
+if (!/d\.eff==='sl'\?'#e8b23a':'#2f9bff'/.test(src))
+  bad('SL/TP 드래그 프리뷰 색이 확정 라인(sl #e8b23a · tp #2f9bff)과 다르다');
+// 주문 레벨은 방향색(포지션 초록/빨강)과 겹치면 안 된다
+const slLine = src.match(/meta\.sl[^\n]*createPriceLine\(\{[^}]*color:'([^']+)'/);
+if (slLine && ['#ff2020', '#ff453a'].includes(slLine[1].toLowerCase()))
+  bad(`SL 라인이 SELL 포지션과 같은 빨강('${slLine[1]}') — 진입가와 손절가가 구분되지 않는다`);
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail}건.`); process.exit(1); }
 console.log('🟢 PASS: 툴박스 5개 영역이 MT5 라이트 스킨으로 읽히고(PAMM·회사·알림·메일박스·저널), PAMM 버튼은 MT5 각진 문법, TP 라인은 포지션과 구분되는 파랑.');

@@ -2324,10 +2324,11 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
           lineStyle:DOT, axisLabelVisible:true, title:'' })); }catch(e){}   // price-only tag (no "BUY 0.01") so it doesn't cover the candles
         // 서버 저장 SL/TP 라인 (positions.meta — fx_modify 저장분). MT5처럼 점선 + sl/tp 태그, 드래그로 이동 가능.
         const meta=p.meta||{};
-        if(meta.sl!=null&&+meta.sl>0){ try{ lines.current.push(s.createPriceLine({ price:+meta.sl, color:'#ff2020', lineWidth:1, lineStyle:DASH, axisLabelVisible:true, title:'sl' })); }catch(e){} }
-        // TP = 파랑 (2026-08-15 사장님): 예전 #00c800 은 BUY 포지션 라인 #00ff00 과 사실상 같은 초록이라
-        // 차트에서 "내 진입가"와 "목표가"가 구분되지 않았다. 목표/주문 레벨은 방향색(초록/빨강)과 다른
-        // 계열로 빼야 한 눈에 갈린다. (⚠️ SL #ff2020 은 아직 SELL 포지션 라인과 동일 — 사장님 확인 대기)
+        if(meta.sl!=null&&+meta.sl>0){ try{ lines.current.push(s.createPriceLine({ price:+meta.sl, color:'#e8b23a', lineWidth:1, lineStyle:DASH, axisLabelVisible:true, title:'sl' })); }catch(e){} }
+        // 주문 레벨은 **방향색(초록/빨강)과 다른 계열**로 뺀다 (2026-08-15 사장님):
+        //   TP #2f9bff 파랑  ← 예전 #00c800 은 BUY 포지션 라인 #00ff00 과 사실상 같은 초록
+        //   SL #e8b23a 주황  ← 예전 #ff2020 은 SELL 포지션 라인과 **완전히 동일한 빨강**
+        // 이제 차트에서 진입가(초록/빨강) · 목표가(파랑) · 손절가(주황)가 한 눈에 갈린다.
         if(meta.tp!=null&&+meta.tp>0){ try{ lines.current.push(s.createPriceLine({ price:+meta.tp, color:'#2f9bff', lineWidth:1, lineStyle:DASH, axisLabelVisible:true, title:'tp' })); }catch(e){} }
       });
       setPosLbl(mine.map(p=>({ side:sideUp(p.side), lots:lotsOf(p), price:+p.open_price })));
@@ -2370,7 +2371,7 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       d.price=px;
       clearPreview();
       // 드래그 프리뷰도 확정 라인과 **같은 색**이어야 한다 (tp 파랑) — 안 그러면 드래그 중에만 색이 바뀐다
-      try{ preview=series.current.createPriceLine({ price:px, color:d.eff==='sl'?'#ff2020':'#2f9bff',
+      try{ preview=series.current.createPriceLine({ price:px, color:d.eff==='sl'?'#e8b23a':'#2f9bff',
         lineWidth:1, lineStyle:2, axisLabelVisible:true, title:d.eff }); }catch(e){}
     };
     const onUp=async ()=>{ const d=drag.cur; drag.cur=null; if(!d) return; clearPreview();

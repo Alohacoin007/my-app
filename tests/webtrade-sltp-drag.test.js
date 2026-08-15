@@ -18,7 +18,10 @@ const bad = (m) => { console.error('🔴 ' + m); fail++; };
 
 // ① SL/TP 라인 표시
 if (!/title:'sl'/.test(src) || !/title:'tp'/.test(src)) bad('position-lines effect must draw meta.sl/tp as dashed lines (title sl/tp)');
-if (!/meta\.sl!=null&&\+meta\.sl>0.*createPriceLine.*'#ff2020'.*lineStyle:DASH/.test(src)) bad('SL line: red dashed from meta.sl');
+// 2026-08-15 계약 변경(사장님): SL = **주황**. 예전 빨강(#ff2020)은 SELL 포지션 라인과 글자 그대로
+// 같은 색이라 진입가와 손절가가 구분되지 않았다. 주문 레벨(TP 파랑 / SL 주황)은 방향색과 다른 계열.
+if (!/meta\.sl!=null&&\+meta\.sl>0.*createPriceLine.*'#e8b23a'.*lineStyle:DASH/.test(src)) bad('SL line: ORANGE dashed from meta.sl (was red — collided with the SELL position line)');
+if (/meta\.sl!=null&&\+meta\.sl>0.*createPriceLine.*'#ff2020'/.test(src)) bad('SL line is still the old red (#ff2020)');
 // 2026-08-15 계약 변경(사장님): TP = **파랑**. 예전 초록(#00c800)은 BUY 포지션 라인(#00ff00)과
 // 사실상 같은 색이라 차트에서 진입가와 목표가가 구분되지 않았다.
 if (!/meta\.tp!=null&&\+meta\.tp>0.*createPriceLine.*'#2f9bff'.*lineStyle:DASH/.test(src)) bad('TP line: BLUE dashed from meta.tp (was green — collided with the BUY position line)');
