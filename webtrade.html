@@ -62,9 +62,18 @@
   .statusbar .grow{margin-left:auto}
   /* ── toolbox non-Trade tab content (News/Mailbox/…): themed empty panels ── */
   .tbxbody{flex:1;overflow:auto;padding:0}
-  .pammbtn{font-size:11px;font-weight:700;padding:3px 10px;margin-left:5px;border-radius:5px;border:1px solid #2a2e34;background:#20242a;color:#c6cdd9;cursor:pointer}
-  .pammbtn.join{background:#00c805;border-color:#00c805;color:#04130a}
-  .pammbtn.out{border-color:rgba(255,69,58,.4);color:#ff453a}
+  /* PAMM 액션 버튼 = MT5 툴바 버튼 문법 (2026-08-15 사장님 "컨셉에 맞게 mt5 스타일로"):
+     각진 2px 모서리 · 얇은 세로 그라디언트 · 1px 테두리 · 누르면 안쪽 베벨.
+     이전엔 라운드 5px + 로빈후드 형광초록(#00c805)이라 MT5 크롬과 이질적이었다.
+     주 액션(Join)은 MT5 파랑, 보조(Add)는 중립 회색, 회수(Redeem)는 붉은 계열. */
+  .pammbtn{font-size:11px;font-weight:600;padding:3px 12px;margin-left:5px;border-radius:2px;line-height:16px;
+    border:1px solid #383d45;background:linear-gradient(#2b3037,#22262c);color:#c6cdd9;cursor:pointer}
+  .pammbtn:hover{background:linear-gradient(#3b414a,#2c3138);border-color:#5a636e;color:#fff}
+  .pammbtn:active{box-shadow:inset 0 1px 3px rgba(0,0,0,.4)}
+  .pammbtn.join{background:linear-gradient(#3f7fc0,#2f6ea8);border-color:#2f6ea8;color:#fff}
+  .pammbtn.join:hover{background:linear-gradient(#4a8bcd,#3576b0);border-color:#3576b0}
+  .pammbtn.out{background:linear-gradient(#2e2626,#241e1e);border-color:#5a3a38;color:#ff6b62}
+  .pammbtn.out:hover{background:linear-gradient(#8c2f2a,#742621);border-color:#8c2f2a;color:#fff}
   .tbxempty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#6a7078;gap:6px;font-size:12px}
   .tbxempty .ic{font-size:22px;opacity:.5}
   table.jrnl{width:100%;border-collapse:collapse;font:11px Consolas,monospace}
@@ -88,9 +97,45 @@
   table.mbx td:first-child,table.mbx td:nth-child(2){text-align:left}
   table.mbx tr.mbx-row{cursor:pointer}table.mbx tr.mbx-row:hover td{background:#0d1420}
   table.mbx tr.mbx-detail td{background:#0a0d12;color:#9aa2b0;font-size:11px;white-space:normal;text-align:left;padding:6px 12px}
-  .terminal.light table.mbx th{background:#0E1015;color:#7a828e;border-bottom:1px solid #1D212A}
-  .terminal.light table.mbx td{border-bottom:1px solid #1D212A;color:#e6e9ee}
-  .terminal.light table.mbx tr.mbx-detail td{background:#000000;color:#a2aab6}
+  /* ── 툴박스 MT5 라이트 스킨 (2026-08-15 사장님 지시 5건: PAMM 버튼 · 회사정보 · 알림추가 ·
+     메일박스 · 저널). 근본 원인은 **툴박스 전체에 라이트 커버리지가 없던 것** — 규칙이 아예 없거나
+     (pammbtn·cinfo·alert-add·tbxempty) 있어도 값이 다크였다(mbx: 흰 배경에 #0E1015 헤더·#e6e9ee 글자).
+     기준색은 위 MT5 라이트 크롬과 동일: 글자 #15181d · 라벨 #5a6270 · 선 #d9dbdf · 헤더 #eff0f2 ·
+     hover #eef4fc · 강조 #1668b8. */
+  .terminal.light table.mbx th{background:#eff0f2;color:#333333;border-bottom:1px solid #d3d5da}
+  .terminal.light table.mbx td{border-bottom:1px solid #e3e5e9;color:#1c1c1e}
+  .terminal.light table.mbx tr.mbx-row:hover td{background:#eef4fc}
+  .terminal.light table.mbx tr.mbx-detail td{background:#f7f8fa;color:#3a3f46}
+  /* 저널 — 글자 검정, 선 회색 (사장님 "글짜는 검은색으로..선은 회색으로"). 성공/실패 색은 유지하되
+     흰 배경에서 읽히도록 진하게 (형광 초록 #59c26a → #1a7f37). */
+  .terminal.light table.jrnl td{color:#1c1c1e;border-bottom:1px solid #e3e5e9}
+  .terminal.light table.jrnl td.t{color:#5a6270}
+  .terminal.light table.jrnl td.ok{color:#1c1c1e}   /* 성공 로그도 검정 — 실제 MT5 저널은 초록을 안 쓴다 (사장님 "글짜는 검은색으로") */
+  .terminal.light table.jrnl td.err{color:#c0392b}
+  /* 회사 & 라이선스 — 라벨/값이 흰 배경에 흐렸다 */
+  .terminal.light .cinfo-hd{color:#15181d}
+  .terminal.light table.cinfo-tbl td{border-bottom:1px solid #e3e5e9}
+  .terminal.light table.cinfo-tbl td.ck{color:#5a6270}
+  .terminal.light table.cinfo-tbl td.cv{color:#1c1c1e}
+  .terminal.light .cinfo-note{color:#5a6270}
+  .terminal.light .tbxempty{color:#5a6270}
+  /* 알림 추가 행 — 다크 셀렉트/입력이 밝은 툴박스 위에 그대로 얹혀 있었다 */
+  .terminal.light .alert-add .k{color:#5a6270 !important}
+  .terminal.light .alert-add select,.terminal.light .alert-add input{
+    background:#ffffff;color:#15181d;border:1px solid #c3c6cc;border-radius:2px;padding:2px 6px;font-size:11px}
+  .terminal.light .alert-add input::placeholder{color:#9aa0a8}
+  .terminal.light .alert-add select:focus,.terminal.light .alert-add input:focus{border-color:#1668b8;outline:none}
+  .terminal.light .alert-add button{background:#1668b8;border:1px solid #1668b8;color:#ffffff;
+    border-radius:2px;padding:3px 12px;font-size:11px;font-weight:600;cursor:pointer}
+  .terminal.light .alert-add button:hover{background:#1a7ad4;border-color:#1a7ad4}
+  /* PAMM 버튼 — MT5 라이트 툴바 버튼과 같은 문법(평평한 채움 + 얇은 테두리 + 눌림 베벨) */
+  .terminal.light .pammbtn{background:#f5f6f8;border:1px solid #c3c6cc;color:#15181d}
+  .terminal.light .pammbtn:hover{background:#dbe7f6;border-color:#9db8dd;color:#0d2c4d}
+  .terminal.light .pammbtn:active{box-shadow:inset 1px 1px 0 rgba(0,0,0,.10)}
+  .terminal.light .pammbtn.join{background:#1668b8;border-color:#1668b8;color:#ffffff}
+  .terminal.light .pammbtn.join:hover{background:#1a7ad4;border-color:#1a7ad4;color:#ffffff}
+  .terminal.light .pammbtn.out{background:#fdf3f2;border-color:#d9a7a3;color:#c0392b}
+  .terminal.light .pammbtn.out:hover{background:#c0392b;border-color:#c0392b;color:#ffffff}
   .menu .conn{margin-left:auto;color:#9aa2b0;display:flex;align-items:center;gap:6px;padding-right:6px;font-family:Tahoma,'Segoe UI','Malgun Gothic',Arial,sans-serif}
   .menu .conn-out{cursor:pointer;color:#8a93a3;font-size:12px;font-weight:700;line-height:1;padding:1px 6px;border-radius:3px;transition:color .12s,background .12s}   /* X = log out → website */
   .menu .conn-out:hover{color:#fff;background:#c0392b}
@@ -2249,7 +2294,10 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
         // 서버 저장 SL/TP 라인 (positions.meta — fx_modify 저장분). MT5처럼 점선 + sl/tp 태그, 드래그로 이동 가능.
         const meta=p.meta||{};
         if(meta.sl!=null&&+meta.sl>0){ try{ lines.current.push(s.createPriceLine({ price:+meta.sl, color:'#ff2020', lineWidth:1, lineStyle:DASH, axisLabelVisible:true, title:'sl' })); }catch(e){} }
-        if(meta.tp!=null&&+meta.tp>0){ try{ lines.current.push(s.createPriceLine({ price:+meta.tp, color:'#00c800', lineWidth:1, lineStyle:DASH, axisLabelVisible:true, title:'tp' })); }catch(e){} }
+        // TP = 파랑 (2026-08-15 사장님): 예전 #00c800 은 BUY 포지션 라인 #00ff00 과 사실상 같은 초록이라
+        // 차트에서 "내 진입가"와 "목표가"가 구분되지 않았다. 목표/주문 레벨은 방향색(초록/빨강)과 다른
+        // 계열로 빼야 한 눈에 갈린다. (⚠️ SL #ff2020 은 아직 SELL 포지션 라인과 동일 — 사장님 확인 대기)
+        if(meta.tp!=null&&+meta.tp>0){ try{ lines.current.push(s.createPriceLine({ price:+meta.tp, color:'#2f9bff', lineWidth:1, lineStyle:DASH, axisLabelVisible:true, title:'tp' })); }catch(e){} }
       });
       setPosLbl(mine.map(p=>({ side:sideUp(p.side), lots:lotsOf(p), price:+p.open_price })));
     };
@@ -2290,7 +2338,8 @@ function ChartCell({ symbol, tf, indicators, chartType, tool, initial, idx, isAc
       d.eff = d.kind!=='entry' ? d.kind : ((side==='BUY')===(px<cm)?'sl':'tp');
       d.price=px;
       clearPreview();
-      try{ preview=series.current.createPriceLine({ price:px, color:d.eff==='sl'?'#ff2020':'#00c800',
+      // 드래그 프리뷰도 확정 라인과 **같은 색**이어야 한다 (tp 파랑) — 안 그러면 드래그 중에만 색이 바뀐다
+      try{ preview=series.current.createPriceLine({ price:px, color:d.eff==='sl'?'#ff2020':'#2f9bff',
         lineWidth:1, lineStyle:2, axisLabelVisible:true, title:d.eff }); }catch(e){}
     };
     const onUp=async ()=>{ const d=drag.cur; drag.cur=null; if(!d) return; clearPreview();

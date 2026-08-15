@@ -19,7 +19,10 @@ const bad = (m) => { console.error('🔴 ' + m); fail++; };
 // ① SL/TP 라인 표시
 if (!/title:'sl'/.test(src) || !/title:'tp'/.test(src)) bad('position-lines effect must draw meta.sl/tp as dashed lines (title sl/tp)');
 if (!/meta\.sl!=null&&\+meta\.sl>0.*createPriceLine.*'#ff2020'.*lineStyle:DASH/.test(src)) bad('SL line: red dashed from meta.sl');
-if (!/meta\.tp!=null&&\+meta\.tp>0.*createPriceLine.*'#00c800'.*lineStyle:DASH/.test(src)) bad('TP line: green dashed from meta.tp');
+// 2026-08-15 계약 변경(사장님): TP = **파랑**. 예전 초록(#00c800)은 BUY 포지션 라인(#00ff00)과
+// 사실상 같은 색이라 차트에서 진입가와 목표가가 구분되지 않았다.
+if (!/meta\.tp!=null&&\+meta\.tp>0.*createPriceLine.*'#2f9bff'.*lineStyle:DASH/.test(src)) bad('TP line: BLUE dashed from meta.tp (was green — collided with the BUY position line)');
+if (/meta\.tp!=null&&\+meta\.tp>0.*createPriceLine.*'#00c800'/.test(src)) bad('TP line is still the old green (#00c800)');
 
 // ② 드래그 시작 게이트
 if (!/const hitTest=\(y\)=>/.test(src) || !/d0<=6/.test(src)) bad('hitTest: 6px proximity to entry/sl/tp lines');
