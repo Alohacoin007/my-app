@@ -106,9 +106,19 @@ begin
     if v>0 then yel := yel+1; end if;
   exception when others then rep := rep || jsonb_build_object('C6', jsonb_build_object('label','델타 누수','sev','error','count',0,'err',SQLERRM)); end;
 
-  -- C7 · 오즈 신선도 (15분+ 스테일) 🟡
+  -- C7 · 오즈 신선도 🟡 — 임계값은 sports-odds 의 **실제 폴링 계약과 락스텝**이어야 한다.
+  --   2026-07-25 폴링 다이어트(사장님 승인): 유휴 리그 30분 · 임박/라이브 5분 · outright 30분 ·
+  --   카탈로그(__sports_list) 하루 1회. 그런데 여기만 **15분 일괄**로 남아, 정상 운영에서도
+  --   매일 🟡 + 이메일을 쐈다 (2026-08-14 저녁점검 실측: 카탈로그 939분 · NBA/NCAAB 23분 ·
+  --   EPL 20분 — 전부 설계대로인데 스테일 판정). 오탐 알람은 무시당해 더 해롭다 → 돈 알람
+  --   채널의 신뢰를 지키려면 기준을 계약에 맞춘다. tests/sports-feed-check.js 의 thrOf 와 동일:
+  --   카탈로그 26h · 골프 70m · 팀스포츠 35m (각 주기 + 여유). 진짜 중단은 여전히 잡힌다.
   begin
-    select count(*) into v from public.sports_odds where updated_at < now() - interval '15 minutes';
+    select count(*) into v from public.sports_odds
+     where updated_at < now() - (case
+             when sport = '__sports_list' then interval '26 hours'
+             when sport like 'golf%'      then interval '70 minutes'
+             else                              interval '35 minutes' end);
     rep := rep || jsonb_build_object('C7', jsonb_build_object('label','오즈 신선도','sev', case when v>0 then 'yellow' else 'green' end,'count',v));
     if v>0 then yel := yel+1; end if;
   exception when others then rep := rep || jsonb_build_object('C7', jsonb_build_object('label','오즈 신선도','sev','error','count',0,'err',SQLERRM)); end;
