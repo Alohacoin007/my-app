@@ -3793,12 +3793,39 @@ function toggleFullscreen(){
   const de=document.documentElement;
   const isFs=document.fullscreenElement||document.webkitFullscreenElement;
   try{
-    if(isFs){ (document.exitFullscreen||document.webkitExitFullscreen||function(){}).call(document); return; }
+    // 사용자가 직접 나가면 이 탭에서는 자동 풀스크린을 다시 걸지 않는다 (기본값과 싸우지 않게)
+    if(isFs){ try{ sessionStorage.setItem(FS_OPTOUT,'1'); }catch(e){}
+      (document.exitFullscreen||document.webkitExitFullscreen||function(){}).call(document); return; }
     const req=de.requestFullscreen||de.webkitRequestFullscreen||de.webkitRequestFullScreen;
     if(req){ const p=req.call(de); if(p&&p.catch) p.catch(()=>cssMaximize(true)); return; }
   }catch(e){}
   // Fullscreen API 자체가 없거나 막힘 → CSS 최대화 폴백(뷰포트 꽉 채움, 토글식)
   cssMaximize(!document.__fsFallback);
+}
+// ── 기본값 = 풀스크린 (사장님 2026-08-15 "기본값을 풀스크린으로..버튼 누르면 다시 브라우져가 보이게") ──
+// 브라우저는 **사용자 제스처 없이는 풀스크린을 거부**한다. 로그인은 login.html 에서 일어나고
+// 돌아올 때 이 페이지엔 제스처가 없다 → 그래서 **이 페이지의 첫 상호작용**(클릭/키)을 제스처로
+// 삼아 딱 한 번 요청한다. 조건:
+//   · 로그인 상태에서만 (읽기전용 둘러보기는 강제하지 않는다 — 사장님 "로그인하면")
+//   · ⛶ / F11 로 사용자가 직접 빠져나오면 **그 탭에서는 다시 걸지 않는다** (사용자 의사 우선,
+//     안 그러면 나가자마자 다시 들어가 싸운다)
+const FS_OPTOUT = 'wt.fs.optout';
+function armDefaultFullscreen(){
+  try{
+    if(sessionStorage.getItem(FS_OPTOUT)) return;          // 이 탭에서 이미 사용자가 해제함
+    if(!(window.AlpexaSync && AlpexaSync.me)) return;      // 로그인 상태에서만
+    if(fsElement()) return;                                // 이미 전체화면
+    const fire=()=>{ off();
+      try{ if(sessionStorage.getItem(FS_OPTOUT)) return; }catch(e){}
+      const de=document.documentElement;
+      const req=de.requestFullscreen||de.webkitRequestFullscreen||de.webkitRequestFullScreen;
+      try{ if(req){ const p=req.call(de); if(p&&p.catch) p.catch(()=>{}); } }catch(e){}
+    };
+    const off=()=>{ document.removeEventListener('pointerdown',fire,true);
+                    document.removeEventListener('keydown',fire,true); };
+    document.addEventListener('pointerdown',fire,true);
+    document.addEventListener('keydown',fire,true);
+  }catch(e){}
 }
 function cssMaximize(on){
   document.__fsFallback=!!on;
@@ -3864,7 +3891,8 @@ function App(){
     const map={}; cs.forEach((c,i)=>{ map[c.id]=tileGeo(cs.length,i); });
     terminalBus.emit('window.tile', map);
   }, [charts.length]);
-  React.useEffect(()=>{ priceStore.start(); positionsStore.start(); symbolStore.load();   // pull the LIVE symbol set from the server (prices + fx_specs class)
+  React.useEffect(()=>{ armDefaultFullscreen();   // 기본값 풀스크린 — 첫 상호작용을 제스처로 1회 요청 (로그인 상태에서만)
+    priceStore.start(); positionsStore.start(); symbolStore.load();   // pull the LIVE symbol set from the server (prices + fx_specs class)
     journalStore.log('Alpexa WebTrade terminal started', 1);
     journalStore.log('Chart engine (Lightweight Charts) initialised', 1);
     const un=priceStore.subscribe(()=>{ if(priceStore.live && !journalStore._feed){ journalStore._feed=1; journalStore.log('Price feed connected (1s cache)', 1); } });
