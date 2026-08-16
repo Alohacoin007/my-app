@@ -8,20 +8,17 @@
 -- ============================================================================
 
 -- ① Track the non-withdrawable welcome bonus per account.
+-- 신규 가입 보너스는 2026-08-16 에 폐지됐지만(welcome_bonus.sql), 이 컬럼과 아래 규칙은
+-- **기존 고객 때문에 그대로 남는다** — 이미 받은 $100 은 계속 출금 불가여야 한다.
 alter table public.accounts add column if not exists bonus numeric not null default 0;
--- Backfill existing accounts: sports/fx welcome = $100; crypto cash bonus = $0 (it's the stake).
-update public.accounts set bonus = 100 where server in ('sports','fx') and coalesce(bonus,0) = 0;
+-- ⚠️ 예전 백필(`update accounts set bonus=100 where server in ('sports','fx') and coalesce(bonus,0)=0`)
+--    은 **제거했다.** 보너스 폐지 후 그 조건은 정확히 **신규 계정**(bonus 0)을 골라 100 을 붙인다
+--    → 잔고 0 인데 비출금액 100 = 나중에 입금해도 출금가능이 그만큼 깎인다. 재실행 시 터지는
+--    지뢰라 파일에서 뺐다. 기존 고객의 bonus 값은 이미 DB 에 들어가 있어 백필이 필요 없다.
 
--- ② Set bonus on signup alongside the forced opening balance (non-admin only).
-create or replace function public.force_opening_balance()
-returns trigger language plpgsql security definer set search_path to 'public' as $$
-begin
-  if not public.is_admin() then
-    new.balance := case new.server when 'sports' then 100 when 'crypto' then 0 when 'fx' then 100 else 0 end;
-    new.bonus   := case new.server when 'sports' then 100 when 'fx' then 100 else 0 end;
-  end if;
-  return new;
-end;$$;
+-- ② 신규 가입 오프닝은 welcome_bonus.sql 의 force_opening_balance() 가 **단독으로** 정한다
+--    (거기서 balance 0 · bonus 0). 예전엔 이 파일에도 같은 함수를 정의해 둬서, 한쪽만 고치면
+--    다른 쪽 재실행에 보너스가 부활하는 "같은 일 두 경로"(CLAUDE.md #3) 였다 → 여기선 제거.
 
 -- ③ Withdrawable amount for an account.
 create or replace function public.withdrawable_for(p_acct text)

@@ -6804,7 +6804,7 @@ const HELP_ARTICLES = {
     { q: 'Can I unstake early?',
       a: `Flexible positions can be unstaked anytime. Locked terms (90 days / 1 year) cannot be unstaked before they end — they unlock automatically at maturity and return your full principal plus all accrued rewards.` },
     { q: 'What is ALPXS?',
-      a: `ALPXS is Alpexa's native loyalty token. Hold ALPXS to earn reduced trading fees, boost staking APY on other assets, and qualify for tier upgrades.\n\nALPXS stakes from 7% APY (flexible) up to 18% APY (1-year lock). New users receive 100 ALPXS as a welcome bonus.` },
+      a: `ALPXS is Alpexa's native loyalty token. Hold ALPXS to earn reduced trading fees, boost staking APY on other assets, and qualify for tier upgrades.\n\nALPXS stakes from 7% APY (flexible) up to 18% APY (1-year lock).` },
     { q: 'Are staking rewards taxable?',
       a: `In the US, staking rewards are generally taxed as ordinary income at the fair market value on the day they're received. Alpexa issues a 1099-MISC for total staking rewards $600 or more per year (Account → Tax documents).\n\nConsult a tax professional for guidance specific to your situation.` },
   ],
@@ -8426,7 +8426,7 @@ function RedeemCodePanel({ onRedeemed }) {
               maxWidth: 280, margin: '6px auto 0',
             }}>
               <span style={{ fontFamily: 'Geist Mono, monospace' }}>{redemptionInfo.code}</span>
-              {' '}was applied {new Date(redemptionInfo.ts).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}. Your 100 ALPXS welcome bonus is in your wallet.
+              {' '}was applied {new Date(redemptionInfo.ts).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}. Your 100 ALPXS referral reward is in your wallet.
             </div>
           ) : null}
         </div>
@@ -8469,7 +8469,7 @@ function RedeemCodePanel({ onRedeemed }) {
       </AcctSection>
 
       <AcctSection title="What you'll get">
-        <AcctRow label="Welcome bonus"   value="100 ALPXS" sub="Credited to your wallet"      chevron={false}/>
+        <AcctRow label="Referral reward" value="100 ALPXS" sub="Credited when you apply a code" chevron={false}/>
         <AcctDivider/>
         <AcctRow label="Reward to friend" value="100 ALPXS" sub="Credited when your code is applied" chevron={false}/>
         <AcctDivider/>
@@ -8843,8 +8843,8 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
     'rewards-link':       { title: 'Referral link', intro: 'Share this link with friends to earn ALPXS together.' },
     'rewards-share':      { title: 'Share with friends', intro: 'Pick how you want to invite your friends.' },
     'rewards-my':         { title: 'My referrals', intro: 'People who joined Alpexa with your link.' },
-    'rewards-redeem':     { title: 'Redeem a code', intro: 'Got a code from a friend? Enter it to claim your welcome bonus.' },
-    'rewards-bonus':      { title: 'New user bonus', intro: 'Welcome ALPXS for completing onboarding.' },
+    'rewards-redeem':     { title: 'Redeem a code', intro: 'Got a code from a friend? Enter it to claim your referral reward.' },
+    'rewards-bonus':      { title: 'Referral reward', intro: 'ALPXS credited when you apply a friend\'s code.' },
     'rewards-stake':      { title: 'Stake & earn 2X', intro: 'Get double APY on your first 90 days of staking. Ends Jun 30, 2026.' },
     'rewards-tier':       { title: 'Loyalty tier', intro: 'Tier benefits scale with your 30-day volume and stake balance.' },
     // Alerts
@@ -9670,7 +9670,7 @@ function AccountSubPageContent({ subPage, setSubSub, transactions = [], setTrans
           <AcctDivider/>
           <AcctRow label="My referrals" value="0 joined" onClick={go('rewards-my')}/>
           <AcctDivider/>
-          <AcctRow label="Redeem a code" sub="Apply a friend's code to claim your welcome bonus" onClick={go('rewards-redeem')}/>
+          <AcctRow label="Redeem a code" sub="Apply a friend's code to claim your referral reward" onClick={go('rewards-redeem')}/>
         </AcctSection>
         )}
         {/* Fabricated promos removed (Loyalty tier "Silver", "Stake & earn 2X · Active",
@@ -9678,7 +9678,7 @@ function AccountSubPageContent({ subPage, setSubSub, transactions = [], setTrans
             reward that actually works instead: Redeem a code (was trapped in the hidden
             referral block above → unreachable). Honest + functional, not an empty page. */}
         <AcctSection title="Rewards">
-          <AcctRow label="Redeem a code" sub="Apply a friend's code to claim your welcome bonus" onClick={go('rewards-redeem')}/>
+          <AcctRow label="Redeem a code" sub="Apply a friend's code to claim your referral reward" onClick={go('rewards-redeem')}/>
         </AcctSection>
       </>
     );

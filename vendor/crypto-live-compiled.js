@@ -12809,7 +12809,7 @@ const HELP_ARTICLES = {
     a: `Flexible positions can be unstaked anytime. Locked terms (90 days / 1 year) cannot be unstaked before they end — they unlock automatically at maturity and return your full principal plus all accrued rewards.`
   }, {
     q: 'What is ALPXS?',
-    a: `ALPXS is Alpexa's native loyalty token. Hold ALPXS to earn reduced trading fees, boost staking APY on other assets, and qualify for tier upgrades.\n\nALPXS stakes from 7% APY (flexible) up to 18% APY (1-year lock). New users receive 100 ALPXS as a welcome bonus.`
+    a: `ALPXS is Alpexa's native loyalty token. Hold ALPXS to earn reduced trading fees, boost staking APY on other assets, and qualify for tier upgrades.\n\nALPXS stakes from 7% APY (flexible) up to 18% APY (1-year lock).`
   }, {
     q: 'Are staking rewards taxable?',
     a: `In the US, staking rewards are generally taxed as ordinary income at the fair market value on the day they're received. Alpexa issues a 1099-MISC for total staking rewards $600 or more per year (Account → Tax documents).\n\nConsult a tax professional for guidance specific to your situation.`
@@ -15405,7 +15405,7 @@ function RedeemCodePanel({
       year: 'numeric',
       month: 'short',
       day: 'numeric'
-    }), ". Your 100 ALPXS welcome bonus is in your wallet.") : null));
+    }), ". Your 100 ALPXS referral reward is in your wallet.") : null));
   }
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(AcctSection, {
     title: "Friend's code"
@@ -15470,9 +15470,9 @@ function RedeemCodePanel({
   }, "JR2025"), " or the trailing part of a friend's link."))), /*#__PURE__*/React.createElement(AcctSection, {
     title: "What you'll get"
   }, /*#__PURE__*/React.createElement(AcctRow, {
-    label: "Welcome bonus",
+    label: "Referral reward",
     value: "100 ALPXS",
-    sub: "Credited to your wallet",
+    sub: "Credited when you apply a code",
     chevron: false
   }), /*#__PURE__*/React.createElement(AcctDivider, null), /*#__PURE__*/React.createElement(AcctRow, {
     label: "Reward to friend",
@@ -16179,11 +16179,11 @@ function SubSubDetail({
     },
     'rewards-redeem': {
       title: 'Redeem a code',
-      intro: 'Got a code from a friend? Enter it to claim your welcome bonus.'
+      intro: 'Got a code from a friend? Enter it to claim your referral reward.'
     },
     'rewards-bonus': {
-      title: 'New user bonus',
-      intro: 'Welcome ALPXS for completing onboarding.'
+      title: 'Referral reward',
+      intro: 'ALPXS credited when you apply a friend\'s code.'
     },
     'rewards-stake': {
       title: 'Stake & earn 2X',
@@ -17500,13 +17500,13 @@ function AccountSubPageContent({
       onClick: go('rewards-my')
     }), /*#__PURE__*/React.createElement(AcctDivider, null), /*#__PURE__*/React.createElement(AcctRow, {
       label: "Redeem a code",
-      sub: "Apply a friend's code to claim your welcome bonus",
+      sub: "Apply a friend's code to claim your referral reward",
       onClick: go('rewards-redeem')
     })), /*#__PURE__*/React.createElement(AcctSection, {
       title: "Rewards"
     }, /*#__PURE__*/React.createElement(AcctRow, {
       label: "Redeem a code",
-      sub: "Apply a friend's code to claim your welcome bonus",
+      sub: "Apply a friend's code to claim your referral reward",
       onClick: go('rewards-redeem')
     })));
   }

@@ -297,7 +297,7 @@ var _db=null; try{ var _ss=null; try{ if(window.sessionStorage){ window.sessionS
 // connected" bar at the top — not for customers. Signup still uses window._db.)
 let cur = 0;
 let data = {
-  server: 'demo',   // default = Alpexa Sports (new users land in Sports with the $100 welcome bonus)
+  server: 'demo',   // default = Alpexa Sports (new users land in Sports; opening balance $0)
   leverage: '1:100',
   currency: 'USD',
   firstName: '',
@@ -828,7 +828,9 @@ async function createOnServer(){
     // Fallback: if extended columns aren't there yet, save the core fields.
     if(r1&&r1.error){ r1=await window._db.from('players').insert({cust_id:cust,name:fullName,email:data.email,auth_id:authId}).select().single(); }
     if(r1.error) throw r1.error;
-    var rows=[{player_id:r1.data.id,server:'sports',acct_no:data.accts.sports,balance:100},{player_id:r1.data.id,server:'crypto',acct_no:data.accts.crypto,balance:0},{player_id:r1.data.id,server:'fx',acct_no:data.accts.fx,balance:0}];
+    // 신규 가입 오프닝은 전부 0 (2026-08-16 가입 보너스 폐지). 어차피 서버 트리거
+    // force_opening_balance 가 값을 덮지만, 클라에도 의도를 남기지 않는다.
+    var rows=[{player_id:r1.data.id,server:'sports',acct_no:data.accts.sports,balance:0},{player_id:r1.data.id,server:'crypto',acct_no:data.accts.crypto,balance:0},{player_id:r1.data.id,server:'fx',acct_no:data.accts.fx,balance:0}];
     var r2=await window._db.from('accounts').insert(rows);
     if(r2.error) throw r2.error;
   }
@@ -852,9 +854,9 @@ async function createOnServer(){
   // A new signup is always a fresh account — clear any previous account's cached money
   // data on this device so balances/positions don't carry over.
   try{ ['alpexa.serverBalances','alpexa.balances','alpexa.cryptoHoldings','alpexa.staked','alpexa.sportsBalance','alpexa.cryptoBalance','alpexa.fxLive','alpexa.openBets','alpexa.settledBets','alpexa.positions','alpexa.cacheOwner','alpexa.withdrawals','alpexa.transactions','alpexa.funding','alpexa.txns','alpexa.appliedTransfers','alpexa.customer','alpexa.openDeposit','alpexa.ownerFunded'].forEach(function(k){ try{localStorage.removeItem(k);}catch(e){} }); }catch(e){}
-  // #5: the welcome bonus (Sports $100, FX $100, Crypto $100 as a 1-year ALPXS stake) is
-  // created SERVER-SIDE (signup RPC + trg_seed_crypto_welcome). We do NOT seed it into
-  // localStorage — the apps fetch the real opening balances from the server on load.
+  // #5: 가입 보너스는 2026-08-16 폐지 — 신규 계정은 세 서버 모두 $0 으로 열린다.
+  // 오프닝은 서버 트리거(force_opening_balance)가 정하고, 클라는 매 로드마다 서버에서
+  // 실제 잔고를 받아 표시만 한다 (돈을 localStorage 에 심지 않는다).
   // Remember who this is on the device so the apps can tag their transactions.
   try{ localStorage.setItem('alpexa.me', JSON.stringify({
     custId:cust, name:fullName, email:data.email, authId:authId,
