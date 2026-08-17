@@ -69,10 +69,21 @@ if (!/\.terminal\.light \.mwtick\{background:#ffffff\}/.test(src)) bad('the ligh
 if (!/\.terminal\.light \.mwtp \.sd\{background:#f6f7f9 !important;border:1px solid #d3d5da\}/.test(src)) bad('Trading-tab buttons must be MT5 light cards (#f6f7f9)');
 if (!/\.terminal\.light \.mwtp \.sd\.sell \.pr\{color:#ff4d00\}/.test(src)) bad('Trading SELL price must match the Market Watch falling colour (#ff4d00)');
 if (!/\.terminal\.light \.mwtp \.sd\.buy \.pr\{color:#1330f0\}/.test(src)) bad('Trading BUY price must be blue (MT5, #1330f0)');
-// New Order modal in Legend: green BUY button (was blue), muted hairlines, green focus
-if (!/\.terminal\.light \.om-btns \.om-buy\{background:#00c853 !important\}/.test(src)) bad('New Order BUY button must be green in Legend (was blue #007aff)');
-if (!/\.terminal\.light \.om-btns \.om-sell\{background:#FF453A !important\}/.test(src)) bad('New Order SELL button must be Legend red');
-if (!/\.terminal\.light \.omodal\{background:#0E1015;border:1px solid #1D212A\}/.test(src)) bad('New Order modal must use the Legend dark palette');
+// New Order 모달 = **MT5 화이트** (2026-08-17 사장님 "화이트 버젼으로..색깔도 우리 컨셉에 맞게").
+// 여기 '라이트' 블록은 실제로는 다크(#0E1015 + 로빈후드 초록 #00c853)였다 — 라이트 테마인데
+// 주문창만 새까맣게 떴다. 이번 세션에 반복해 잡은 "라이트가 다크 색을 재사용" 클래스.
+if (!/\.terminal\.light \.omodal\{background:#f0f0f0;border:1px solid #c4c7cd/.test(src))
+  bad('New Order 모달 바탕이 MT5 화이트(#f0f0f0)가 아니다');
+if (!/\.terminal\.light \.om-btns \.om-buy\{background:#1668b8 !important\}/.test(src))
+  bad('매수 버튼은 MT5 파랑(#1668b8)이어야 한다');
+if (!/\.terminal\.light \.om-btns \.om-sell\{background:#d51111 !important\}/.test(src))
+  bad('매도 버튼은 빨강(#d51111)이어야 한다 — 툴박스 표 down 색과 같은 계열');
+// 되살아남 감지: 검정 바탕·로빈후드 초록이 다시 들어오면 🔴
+if (/\.terminal\.light \.omodal\{background:#0E1015/.test(src)) bad('주문창 라이트 스킨에 다크 바탕(#0E1015)이 되살아났다');
+if (/\.terminal\.light \.om-btns \.om-buy\{background:#00c853/.test(src)) bad('매수 버튼에 로빈후드 초록(#00c853)이 되살아났다');
+// 흰 카드 위 큰 호가 숫자가 흰색으로 남으면 안 보인다 (이 모달에서 실제로 겪은 형태)
+if (!/\.terminal\.light \.om-px \.bf[^\n]*color:#000000/.test(src))
+  bad('흰 호가 카드 위 숫자가 검정이어야 한다 (흰 글자면 안 보인다)');
 
 // (3b) ONE-CLICK PANEL: the neon skin is now FORCED in BOTH themes (Legend muting removed on request).
 // Legend must NOT re-mute the panel to matte-black/silver — no .terminal.light override on the halves.
