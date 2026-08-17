@@ -361,11 +361,16 @@
   .dov{position:absolute;pointer-events:none;z-index:4}
   .dov.vline{top:0;bottom:0;width:0;border-left:1px solid #e8b23a}
   .dov.text{transform:translate(0,-50%);color:#e6c14a;font:600 11px Tahoma,sans-serif;white-space:nowrap;text-shadow:0 0 3px #000,0 0 3px #000}
-  .dov.pt{width:9px;height:9px;margin:-5px 0 0 -5px;background:#ffffff;border:1px solid #000;box-shadow:0 0 2px #000;pointer-events:auto;cursor:move}   /* draggable selected-line handle */
+  /* 선택된 선의 앵커 = **MT5식 작은 동그란 점** (2026-08-17 사장님 실물 MT5 대조 "우리꺼는 네모야").
+     예전엔 9×9 흰 네모라 캔들 위에 큼직하게 얹혀 MT5 와 확연히 달랐다. MT5 는 훨씬 작고 둥근 점.
+     크기는 7px 로 줄이되 그 이하로는 내리지 않는다 — 이 요소의 박스가 곧 드래그 히트영역이라
+     더 작으면 잡기 어려워진다. 흰 채움 + 검은 1px 테두리는 유지: 밝은 캔들·어두운 배경 양쪽에서
+     보이게 하는 장치라 색까지 MT5(선 색)로 바꾸면 빨간 선 위에서 앵커가 사라진다. */
+  .dov.pt{width:7px;height:7px;border-radius:50%;margin:-4px 0 0 -4px;background:#ffffff;border:1px solid #000;box-shadow:0 0 2px #000;pointer-events:auto;cursor:move}   /* draggable selected-line handle */
   .dov.pt:hover{background:#ffe14d}
   /* selected horizontal-line grab strip — full width, drag up/down to move the line (white center knob) */
   .dov.hgrab{left:0;right:0;height:11px;margin-top:-6px;background:transparent;pointer-events:auto;cursor:ns-resize}
-  .dov.hgrab::after{content:'';position:absolute;left:50%;top:50%;width:9px;height:9px;transform:translate(-50%,-50%);background:#fff;border:1px solid #000;box-shadow:0 0 2px #000}
+  .dov.hgrab::after{content:'';position:absolute;left:50%;top:50%;width:7px;height:7px;border-radius:50%;transform:translate(-50%,-50%);background:#fff;border:1px solid #000;box-shadow:0 0 2px #000}   /* 수평선 손잡이도 같은 원형 점 (트렌드선과 한 벌) */
   /* crosshair MEASURE ruler (MT5): drag with the Crosshair tool → bars / pips / price delta */
   .measure{position:absolute;inset:0;pointer-events:none;z-index:5}
   .measure svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
@@ -868,13 +873,11 @@
   /* 한 줄로 (2026-08-17 사장님 "2줄로 보이는 현상..한줄로"). 측정 결과 구간에 가로선이 둘이었다:
        y=750.0  .bottom border-top #c4c7cd   ← 차트↔툴박스 구조 경계 (남긴다)
        y=754.5  .hsplit::before  #dcdee1     ← 손잡이 표시 (4.5px 아래 나란히 = 2줄)
-     구조 경계가 이미 경계 역할을 하므로 손잡이 선을 **평상시엔 지운다**. 대신 hover/드래그에서
-     파란 선이 뜨게 해 손잡이를 여전히 찾을 수 있게 한다 (MT5 도 스플리터는 평소 안 보이고
-     커서가 ↕ 로 바뀐다 — title 툴팁도 그대로).
-     ⚠️ 위 861행의 `.terminal.light .hsplit::before` 가 일반 hover 규칙(.hsplit:hover::before)보다
-        구체성이 높아 라이트에선 hover 파란선이 **원래도 안 나왔다** — 여기서 같이 살린다. */
+     구조 경계가 이미 경계 역할을 하므로 손잡이 선을 **항상 지운다**. hover/드래그의 파란 선도
+     빼고(사장님 2026-08-17 "드래그 할때 파란선 빼"), 손잡이는 **커서가 ↕ 로 바뀌는 것으로만**
+     알린다 — 실물 MT5 스플리터와 같은 방식. 아래 transparent 규칙이 일반 hover 규칙
+     (.hsplit:hover::before)보다 구체성이 높아 hover 에서도 파란선이 뜨지 않는다. */
   .terminal.light .hsplit::before{background:transparent}
-  .terminal.light .hsplit:hover::before,.terminal.light .hsplit.drag::before{background:#3a6ea5}
   /* 스플리터 몸통(6px)은 기본이 transparent 라, 라이트 테마에선 뒤의 어두운 .terminal 배경
      (#0e1015)이 비쳐 **검은 세로 막대**로 보였다 (사장님 2026-08-14 스샷). 헤어라인만 밝게
      칠하고 몸통을 안 칠한 게 원인 — 라이트에선 몸통도 크롬 회색으로 채운다. */
@@ -3587,7 +3590,7 @@ function BottomResizer({ onDone }){
     document.addEventListener('mousemove',onMove); document.addEventListener('mouseup',onUp);
     return ()=>{ el.removeEventListener('mousedown',onDown); document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); if(raf)cancelAnimationFrame(raf); };
   }, []);
-  return <div className="hsplit" ref={self} title="드래그해서 거래창 높이 조절"></div>;
+  return <div className="hsplit" ref={self}></div>;   /* 툴팁 없음 — 사장님 2026-08-17 "툴팁도 제거". 손잡이는 커서(↕)로만 알린다 (MT5 동일) */
 }
 
 /* ── Left-panel internal row-resizer between Market Watch and Navigator. Also pure
