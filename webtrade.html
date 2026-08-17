@@ -614,6 +614,8 @@
   /* advanced settings — slide down when One-Click is OFF */
   .om-adv{display:flex;flex-direction:column;gap:13px}   /* precision settings — always visible (toggle removed) */
   .om-margin{font-size:11.5px;color:#8890a0}
+  .om-margin b{color:#ffffff;font-weight:700}          /* 금액 강조 — 인라인이 아니라 여기서 (테마가 덮을 수 있게) */
+  .om-margin.bad{color:#ff5252}                        /* 증거금 부족 */
   /* bottom Sell/Buy — MATTE FLAT (Binance/TradingView pro), no gradient/gloss */
   .om-btns{display:flex;gap:10px;margin-top:auto}
   .om-btns button{flex:1;height:52px;border:none;color:#fff;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px;
@@ -802,6 +804,7 @@
   .terminal.light .om-px .bf,.terminal.light .om-px .bf .sm,.terminal.light .om-px .bf .bg,.terminal.light .om-px .bf .fr{color:#000000}   /* 큰 호가 숫자 — 흰 카드 위 검정 */
   .terminal.light .om-spread{background:#ffffff;border:1px solid #c4c7cd}.terminal.light .om-spread .om-sp-l{color:#5a6270}.terminal.light .om-spread b{color:#000000}   /* 스프레드도 검정 (초록 형광 제거) */
   .terminal.light .om-margin{color:#5a6270}.terminal.light .om-margin b{color:#000000}
+  .terminal.light .om-margin.bad{color:#d51111}
   .terminal.light .om-btns .om-sell{background:#d51111 !important}
   .terminal.light .om-btns .om-buy{background:#1668b8 !important}   /* MT5 매수 = 파랑 (로빈후드 초록 폐기) */
   /* Details tab = MT5 화이트 (2026-08-14 사장님 MT5 스샷 대조). 이전엔 다크 테마 색을 그대로 써서
@@ -3789,8 +3792,10 @@ function OrderModal({ symbol:sym0, onClose }){
                 </span></div></div>
           </div>
           {/* Margin */}
-          <div className="om-margin" style={{color:canAfford?'#8890a0':'#ff5252'}}>
-            {t('Margin')} <b style={{color:'#fff'}}>{usd(need)}</b> &nbsp;·&nbsp; {t('Free')} <b style={{color:'#fff'}}>{usd(eng.freeMargin)}</b>
+          {/* 인라인 색 금지 (2026-08-17 사장님 "흰색 글씨가 안보여"). 예전엔 style={{color:'#fff'}} 가
+              박혀 있어 라이트 테마 CSS 로는 이길 수 없었다 — 흰 바탕에 흰 숫자. 색은 테마 CSS 가 정한다. */}
+          <div className={'om-margin'+(canAfford?'':' bad')}>
+            {t('Margin')} <b>{usd(need)}</b> &nbsp;·&nbsp; {t('Free')} <b>{usd(eng.freeMargin)}</b>
             {!canAfford && <span> &nbsp;·&nbsp; ⚠ insufficient</span>}
           </div>
           {!open && <div className="om-closed">🔒 {t('Market closed')}</div>}

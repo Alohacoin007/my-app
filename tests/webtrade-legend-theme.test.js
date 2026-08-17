@@ -84,6 +84,17 @@ if (/\.terminal\.light \.om-btns \.om-buy\{background:#00c853/.test(src)) bad('�
 // 흰 카드 위 큰 호가 숫자가 흰색으로 남으면 안 보인다 (이 모달에서 실제로 겪은 형태)
 if (!/\.terminal\.light \.om-px \.bf[^\n]*color:#000000/.test(src))
   bad('흰 호가 카드 위 숫자가 검정이어야 한다 (흰 글자면 안 보인다)');
+// ⚠️ 메커니즘 핀 (2026-08-17): 주문창을 화이트로 바꾼 **뒤에도** Margin/Free 금액이 안 보였다.
+// 원인은 CSS 가 아니라 마크업의 **인라인** style={{color:'#fff'}} — 인라인은 클래스보다 세서
+// 어떤 테마 CSS 로도 못 이긴다. 위의 색 검사들은 CSS 만 보므로 이걸 통과시킨다.
+// → 하드코딩된 흰 글자 인라인 자체를 금지한다. 색은 테마 CSS 가 정해야 테마 전환이 성립한다.
+{
+  const inl = src.split('\n')
+    .map((l, i) => [i + 1, l])
+    .filter(([, l]) => /style=\{\{[^}]*color:\s*['"]#(fff|ffffff)['"]/i.test(l) && !/^\s*(\/\*|\*|\{\/\*)/.test(l));
+  for (const [ln] of inl)
+    bad(`webtrade.html:${ln} 인라인 흰 글자(style color #fff) — 테마 CSS 가 못 덮는다. 클래스로 뺄 것`);
+}
 
 // (3b) ONE-CLICK PANEL: the neon skin is now FORCED in BOTH themes (Legend muting removed on request).
 // Legend must NOT re-mute the panel to matte-black/silver — no .terminal.light override on the halves.
