@@ -249,11 +249,17 @@
   .oc-lbl{flex:1;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:normal;letter-spacing:.5px;
     cursor:pointer;font-family:Tahoma,'Segoe UI',Arial,sans-serif}
   .oc-lbl:hover{filter:brightness(1.13)}
-  .oc-vol{width:58px;flex:none;position:relative;background:rgba(0,0,0,.35) !important;display:flex;align-items:center;justify-content:center;border-left:1px solid rgba(255,255,255,.18) !important;border-right:1px solid rgba(255,255,255,.18) !important}
-  .oc-vol b{position:absolute;top:50%;transform:translateY(-50%);cursor:pointer;color:#8a94a6 !important;font-size:9px;width:14px;text-align:center;user-select:none;line-height:1}
+  /* 볼륨 필드 = **MT5 콤보박스 문법** (2026-08-17 사장님 "mt5 처럼 이렇게 바꿔줘" + 실물 캡처).
+     실물 MT5 는 이 칸만 **흰 입력 필드**로 파여 있고 숫자는 검정 regular, 화살표도 어두운 색이다.
+     우리는 어두운 반투명(rgba(0,0,0,.35))에 흰 볼드라 셸과 한 덩어리로 뭉개져 "입력칸"으로
+     안 읽혔다. 배치(▾ 왼쪽 · 숫자 · ▴ 오른쪽)·폭 58px·높이 20px 은 이미 MT5 와 같아 그대로 두고
+     색만 뒤집는다. 필드 경계는 흰 바탕 자체가 만들고, 셸과 닿는 좌우 seam 은 어두운 선으로
+     바꿔야 흰 필드가 파여 보인다(기존 반투명 흰 선은 흰 바탕 위에서 사라진다). */
+  .oc-vol{width:58px;flex:none;position:relative;background:#ffffff !important;display:flex;align-items:center;justify-content:center;border-left:1px solid rgba(0,0,0,.45) !important;border-right:1px solid rgba(0,0,0,.45) !important}
+  .oc-vol b{position:absolute;top:50%;transform:translateY(-50%);cursor:pointer;color:#3c4049 !important;font-size:9px;width:14px;text-align:center;user-select:none;line-height:1}
   .oc-vol b.dn{left:0}.oc-vol b.up{right:0}
-  .oc-vol b:hover{color:#ffffff !important}
-  .oc-vol input{width:30px;height:16px;text-align:center;padding:0;border:none;background:transparent !important;color:#ffffff !important;font-weight:bold;font-size:12px;outline:none}
+  .oc-vol b:hover{color:#000000 !important}
+  .oc-vol input{width:30px;height:16px;text-align:center;padding:0;border:none;background:transparent !important;color:#000000 !important;font-weight:normal;font-size:12px;outline:none}
   /* bottom layer (44px) — SELL | BUY big quotes, 50:50 */
   .oc-bot{flex:1;display:flex;align-items:stretch}
   .oc-price{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;margin:0;
@@ -853,6 +859,12 @@
      겹쳐 '2줄 입체'로 보였다 → 잡이영역을 크롬 회색으로 칠해 캡션바와 이어지게, 선은 하나만 (2026-08-14 사장님) */
   .terminal.light .hsplit,.terminal.light .lhsplit{background:#eceef0}   /* 플랫 — 그라데이션+진한 선의 입체감 제거, MT5는 평평 (사장님 2026-08-14) */
   .terminal.light .hsplit::before,.terminal.light .lhsplit::before{background:#dcdee1}
+  /* 툴박스 높이 손잡이(.hsplit)는 **몸통만 흰색** (2026-08-17 사장님 B안). Trade 탭 헤더를 흰색으로
+     바꾸자 바로 위 7px 회색 띠(#eceef0)가 도드라져 "이건 뭐지" 가 됐다. 몸통을 헤더와 같은 흰색으로
+     맞추면 가운데 1px 선(#dcdee1) 하나만 남아 MT5 의 도킹 구분선처럼 보인다. 선을 지우지 않는 이유는
+     그게 유일한 드래그 손잡이 표시라서 — 없으면 높이 조절이 가능한 줄 모른다.
+     왼쪽 패널의 같은 손잡이(.lhsplit, 시세창↔네비게이터)는 주변이 회색이라 그대로 둔다. */
+  .terminal.light .hsplit{background:#ffffff}
   /* 스플리터 몸통(6px)은 기본이 transparent 라, 라이트 테마에선 뒤의 어두운 .terminal 배경
      (#0e1015)이 비쳐 **검은 세로 막대**로 보였다 (사장님 2026-08-14 스샷). 헤어라인만 밝게
      칠하고 몸통을 안 칠한 게 원인 — 라이트에선 몸통도 크롬 회색으로 채운다. */

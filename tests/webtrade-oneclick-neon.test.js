@@ -40,11 +40,15 @@ if (!/\.oc-top\{[^}]*border-bottom:1px solid rgba\(255,255,255,\.18\)[^}]*\}/.te
 if (!/\.oc-price:first-child\{border-right:1px solid rgba\(255,255,255,\.18\)\}/.test(src))
   bad('SELL/BUY prices must be split by a translucent centre divider');
 
-// ── volume cell: sunken translucent layer, transparent input, translucent rails ──
-if (!/\.oc-vol\{[^}]*background:rgba\(0,0,0,\.35\) !important[^}]*border-left:1px solid rgba\(255,255,255,\.18\) !important;border-right:1px solid rgba\(255,255,255,\.18\) !important\}/.test(src))
-  bad('volume cell must be the sunken translucent layer with translucent rails');
-if (!/\.oc-vol input\{[^}]*background:transparent !important;color:#ffffff !important;font-weight:bold/.test(src))
-  bad('volume input must be transparent with white bold text');
+// ── volume cell = MT5 콤보박스: **흰 입력 필드 + 검정 숫자** (2026-08-17 사장님 실물 캡처) ──
+// 예전 계약(어두운 반투명 + 흰 볼드)은 셸과 뭉개져 "입력칸"으로 안 읽혔다. 흰 바탕에서는
+// 좌우 seam 도 반투명 흰선이면 사라지므로 어두운 선이어야 필드가 파여 보인다.
+if (!/\.oc-vol\{[^}]*background:#ffffff !important[^}]*border-left:1px solid rgba\(0,0,0,\.45\) !important;border-right:1px solid rgba\(0,0,0,\.45\) !important\}/.test(src))
+  bad('볼륨 칸은 흰 입력 필드 + 어두운 좌우 seam 이어야 한다 (MT5 콤보박스)');
+if (!/\.oc-vol input\{[^}]*background:transparent !important;color:#000000 !important;font-weight:normal/.test(src))
+  bad('볼륨 숫자는 검정 regular 여야 한다 (MT5)');
+if (/\.oc-vol\{[^}]*background:rgba\(0,0,0,\.35\)/.test(src))
+  bad('볼륨 칸에 예전 어두운 반투명 배경이 되살아났다');
 
 // ── spread tag: RECTANGLE centred BETWEEN the two prices (2026-07-13 user request) ──
 if (/border-radius:9px/.test(src))
