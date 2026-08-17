@@ -116,7 +116,8 @@ if (!/\.terminal\.light \.acctline \.k\{color:#1a1a1a;font-weight:700\}\.termina
 // webtrade-oneclick-neon.test.js): a single bordered .obox, direction skin on the shell,
 // and NO per-side neon card skins (they were retired with the five-box look).
 if (/\.oc-sell\{background:linear-gradient|\.oc-buy\{background:linear-gradient/.test(src)) bad('per-side neon card skins must stay retired (one-shell design)');
-if (!/\.obox\{[^}]*border:1px solid #3c4049;box-shadow/.test(src)) bad('the .obox one-shell card must exist (forced in both themes)');
+// 바깥 테두리는 2026-08-17 에 제거됨 (사장님 지시) — 카드는 box-shadow 로만 떠 보인다.
+if (!/\.obox\{[^}]*border:none;box-shadow/.test(src)) bad('the .obox one-shell card must exist borderless (box-shadow only, both themes)');
 
 // (4) UI label renamed to Legend (no "Light / Dark" left)
 // 2026-07-23 버전 스위처: 테마 토글 폐지 → View 메뉴는 Legend 1(여기·체크)/Legend 2(터미널 이동).

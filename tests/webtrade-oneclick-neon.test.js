@@ -17,8 +17,12 @@ let fail = 0;
 const bad = (m) => { console.error('🔴 ' + m); fail++; };
 
 // ── ONE shell: rounded single border + neutral default fill on .obox ──
-if (!/\.obox\{[^}]*border:1px solid #3c4049;box-shadow[^}]*\}/.test(src))
-  bad('.obox must be the ONE shell — single #3c4049 border');
+// 2026-08-17 사장님 "원클릭 박스에 테두리 있는거 삭제" — 바깥 테두리를 없애고 카드 경계는
+// box-shadow 가 잡는다. 예전 계약(#3c4049 1px)이 되살아나면 잡는 역방향 검사로 교체.
+if (!/\.obox\{[^}]*border:none;box-shadow[^}]*\}/.test(src))
+  bad('.obox 의 바깥 테두리는 없어야 한다 (border:none) — 경계는 box-shadow 로만');
+if (/\.obox\{[^}]*border:1px solid #3c4049/.test(src))
+  bad('.obox 에 예전 #3c4049 테두리가 되살아났다');
 if (/\.obox\{[^}]*border-radius/.test(src))
   bad('.obox must be RECTANGULAR (2026-07-13 user request — no rounding anywhere on the panel)');
 if (!/\.obox\{[^}]*background:linear-gradient\(to bottom,#15171c 0%,#0b0d11 100%\)[^}]*\}/.test(src))
