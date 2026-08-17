@@ -865,6 +865,16 @@
      그게 유일한 드래그 손잡이 표시라서 — 없으면 높이 조절이 가능한 줄 모른다.
      왼쪽 패널의 같은 손잡이(.lhsplit, 시세창↔네비게이터)는 주변이 회색이라 그대로 둔다. */
   .terminal.light .hsplit{background:#ffffff}
+  /* 한 줄로 (2026-08-17 사장님 "2줄로 보이는 현상..한줄로"). 측정 결과 구간에 가로선이 둘이었다:
+       y=750.0  .bottom border-top #c4c7cd   ← 차트↔툴박스 구조 경계 (남긴다)
+       y=754.5  .hsplit::before  #dcdee1     ← 손잡이 표시 (4.5px 아래 나란히 = 2줄)
+     구조 경계가 이미 경계 역할을 하므로 손잡이 선을 **평상시엔 지운다**. 대신 hover/드래그에서
+     파란 선이 뜨게 해 손잡이를 여전히 찾을 수 있게 한다 (MT5 도 스플리터는 평소 안 보이고
+     커서가 ↕ 로 바뀐다 — title 툴팁도 그대로).
+     ⚠️ 위 861행의 `.terminal.light .hsplit::before` 가 일반 hover 규칙(.hsplit:hover::before)보다
+        구체성이 높아 라이트에선 hover 파란선이 **원래도 안 나왔다** — 여기서 같이 살린다. */
+  .terminal.light .hsplit::before{background:transparent}
+  .terminal.light .hsplit:hover::before,.terminal.light .hsplit.drag::before{background:#3a6ea5}
   /* 스플리터 몸통(6px)은 기본이 transparent 라, 라이트 테마에선 뒤의 어두운 .terminal 배경
      (#0e1015)이 비쳐 **검은 세로 막대**로 보였다 (사장님 2026-08-14 스샷). 헤어라인만 밝게
      칠하고 몸통을 안 칠한 게 원인 — 라이트에선 몸통도 크롬 회색으로 채운다. */
