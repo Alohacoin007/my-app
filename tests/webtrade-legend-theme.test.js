@@ -131,8 +131,9 @@ if (!/\.terminal\.light table\.pos tbody td\{border-right:1px solid #d9dbdf\}/.t
 // toolbar hover = MT5 light-blue box (was dark border-only)
 if (!/\.terminal\.light \.tbtn:hover[^}]*background:#dbe7f6 !important;border:1px solid #9db8dd/.test(src)) bad('MT5 toolbar hover must be light-blue box (#dbe7f6 bg + #9db8dd border)');
 // Balance bar — MT5 light gray strip, dark text
-if (!/\.terminal\.light \.acctline\{background:#d6d8dc;color:#1a1a1a;border-top:1px solid #c4c6cb;border-bottom:1px solid #c4c6cb;font-weight:700\}/.test(src)) bad('MT5 Balance bar must be a FLAT deeper-gray strip + BLACK BOLD text');
-if (!/\.terminal\.light \.acctline \.k\{color:#1a1a1a;font-weight:700\}\.terminal\.light \.acctline b\{color:#1a1a1a;font-weight:700\}/.test(src)) bad('MT5 Balance bar labels + numbers all black bold #1a1a1a');
+// 2026-08-17 사장님 "순수 검정으로" — 툴박스 글자를 #1a1a1a → #000000 으로 통일 (Profit 색만 예외).
+if (!/\.terminal\.light \.acctline\{background:#d6d8dc;color:#000000;border-top:1px solid #c4c6cb;border-bottom:1px solid #c4c6cb;font-weight:700\}/.test(src)) bad('MT5 Balance bar must be a FLAT deeper-gray strip + PURE BLACK BOLD text');
+if (!/\.terminal\.light \.acctline \.k\{color:#000000;font-weight:700\}\.terminal\.light \.acctline b\{color:#000000;font-weight:700\}/.test(src)) bad('MT5 Balance bar labels + numbers all PURE BLACK bold (#000000)');
 
 // the one-click panel is the ONE-SHELL card in both themes (2026-07-13 B안 — see
 // webtrade-oneclick-neon.test.js): a single bordered .obox, direction skin on the shell,

@@ -74,8 +74,8 @@ if (plSize !== '11.5px')
   bad(`합계 손익 글자 크기가 '${plSize}' — 잔고바(.acctline 11.5px)와 같아야 한다`);
 if (propOf('.acctline', 'font-size') !== '11.5px')
   bad('.acctline 글자 크기가 11.5px 가 아니다 — 손익 셀과 락스텝이 깨졌으니 둘 다 맞출 것');
-if (!/#1a1a1a/i.test(propOf('.terminal.light table.pos td.pl-total', 'color') || ''))
-  bad('라이트 테마 합계 손익이 검정(#1a1a1a)이 아니다');
+if (!/#000000/i.test(propOf('.terminal.light table.pos td.pl-total', 'color') || ''))
+  bad('라이트 테마 합계 손익이 순수 검정(#000000)이 아니다 — 2026-08-17 툴박스 글자 통일');
 if (/className=\{"pl-total "\+\(floating>=0\?'up':'down'\)\}/.test(src))
   bad("합계 손익에 up/down 색 클래스가 남아 있다 — 사장님 지시는 '검은색으로'");
 
