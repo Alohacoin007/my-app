@@ -590,6 +590,14 @@
   /* 로그인 게이트 = MT5 화이트 (2026-08-17 전수조사). 검은 카드 + 로빈후드 초록 버튼이 남아
      있었다 — 라이트 테마에서 처음 만나는 화면인데 혼자 다크였다. 버튼은 터미널의 다른 주요
      동작(주문 매수·History 활성 기간·Add Alert)과 같은 MT5 파랑으로 통일. */
+  /* 설치 버튼 — 아이콘만 있는 다른 툴바 버튼과 달리 **글자를 같이** 둔다. 고객이 처음 보는
+     기능이라 아이콘만으론 무슨 버튼인지 모른다 (이 버튼의 목적 자체가 '쉽게 찾기'다). */
+  .tibtn-install{width:auto !important;padding:0 8px;gap:5px;display:inline-flex;align-items:center;
+    font-size:11px;font-weight:600;letter-spacing:.2px;border:1px solid currentColor;opacity:.9}
+  .tibtn-install svg{width:14px;height:14px;flex:none}
+  .tibtn-install:hover{opacity:1}
+  .terminal.light .tibtn-install{color:#1668b8;border-color:#1668b8}
+  .terminal.light .tibtn-install:hover{background:#1668b8;color:#ffffff}
   .terminal.light .logingate .lg-card{background:#f0f0f0;border:1px solid #c4c7cd;box-shadow:0 12px 40px rgba(0,0,0,.25)}
   .terminal.light .logingate .lg-logo{color:#3c4049}.terminal.light .logingate .lg-logo b{color:#000000}
   .terminal.light .logingate .lg-sub{color:#5a6270}
@@ -3466,6 +3474,22 @@ const CHART_TYPES=[['candle',IC.candle,'Candlesticks'],['bar',IC.bar,'Bars (OHLC
 const DRAW_TOOLS=[['arrow',IC.arrow,'Cursor'],['cross',IC.cross,'Crosshair'],['vline',IC.vline,'Vertical Line'],['hline',IC.hline,'Horizontal Line'],
   ['trend',IC.trend,'Trend Line'],['fib',IC.fib,'Fibonacci Retracement'],['text',IC.text,'Text']];
 function Toolbar({ tf, chartType, tool }){
+  // ── 앱 설치 버튼 상태 ── 전역에서 잡아둔 프롬프트가 있으면 버튼을 띄운다.
+  // 이벤트가 마운트보다 먼저 왔을 수 있으므로 **현재 값도 즉시 읽고**, 이후 변화는 이벤트로 받는다.
+  const [canInstall,setCanInstall]=React.useState(()=>!!window.__wtInstall);
+  React.useEffect(()=>{
+    const sync=()=>setCanInstall(!!window.__wtInstall);
+    sync();
+    window.addEventListener('wt-installable',sync);
+    return ()=>window.removeEventListener('wt-installable',sync);
+  },[]);
+  const doInstall=React.useCallback(async()=>{
+    const p=window.__wtInstall; if(!p) return;
+    window.__wtInstall=null; setCanInstall(false);      // 프롬프트는 1회용 — 눌렀으면 버튼을 내린다
+    try{ p.prompt(); await p.userChoice; }catch(e){}
+    // 취소했으면 다음 방문에 브라우저가 다시 beforeinstallprompt 를 준다 (여기서 되살리지 않는다)
+  },[]);
+
   const [algo,setAlgo]=React.useState(false);
   // MT5 chart-follow toggles — local mirror of the chartOpts global for the pressed look
   const [asOn,setAsOn]=React.useState(chartOpts.autoScroll);
@@ -3516,6 +3540,12 @@ function Toolbar({ tf, chartType, tool }){
       {/* 서버 전환 + — 브랜드 앞, 툴바 아이콘 크기 그대로. 메뉴는 MT5 ctxmenu 문법 재사용 */}
       <div style={{position:'relative',marginLeft:'auto',display:'flex',alignItems:'center',gap:'8px'}}>
         {/* 풀스크린 토글 (2026-07-17 사장님 지시) — 누르면 커지고 다시 누르면 작아짐. F11과 동일 동작 */}
+        {/* 앱 설치 — 설치 가능할 때만 나타난다(이미 설치했거나 미지원 브라우저면 숨김).
+            고객이 주소창 구석의 크롬 아이콘을 찾을 필요가 없다. */}
+        {canInstall && <div className="tibtn tibtn-install" title="Install as an app (desktop shortcut)"
+          onClick={doInstall}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v10"/><path d="M8.5 9.5 12 13l3.5-3.5"/><path d="M4 15v3.5h16V15"/></svg>
+          <span>Install</span></div>}
         <div className="tibtn" title="Full screen (F11)" style={{fontSize:'15px',lineHeight:'26px'}}
           onClick={()=>toggleFullscreen()}>⛶</div>
         {/* 서버 전환 = 드랍다운 폐지, 직접 이동 버튼 2개 (2026-08-13 사장님). 심플 단색 라인 아이콘 */}
@@ -3916,6 +3946,23 @@ function toggleFullscreen(){
 //   · 로그인 상태에서만 (읽기전용 둘러보기는 강제하지 않는다 — 사장님 "로그인하면")
 //   · ⛶ / F11 로 사용자가 직접 빠져나오면 **그 탭에서는 다시 걸지 않는다** (사용자 의사 우선,
 //     안 그러면 나가자마자 다시 들어가 싸운다)
+/* ── 앱 설치(PWA) — 고객이 쉽게 (2026-08-18 사장님 "고객들이 쉽게 설치하게 해야지") ──
+   크롬의 설치 아이콘은 주소창 구석에 숨어 있어 고객이 못 찾는다. 표준 해법은
+   `beforeinstallprompt` 를 가로채 **우리 UI 의 버튼**으로 띄우는 것.
+   ⚠️ 이 이벤트는 **React 마운트보다 먼저** 올 수 있어 전역에서 잡아둬야 한다 — 컴포넌트
+      안에서만 듣다가는 조용히 놓쳐 버튼이 영영 안 나온다. */
+window.__wtInstall = null;
+try{
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();                       // 크롬 기본 미니바 대신 우리 버튼으로
+    window.__wtInstall = e;
+    try{ window.dispatchEvent(new Event('wt-installable')); }catch(_){}
+  });
+  window.addEventListener('appinstalled', function(){
+    window.__wtInstall = null;
+    try{ window.dispatchEvent(new Event('wt-installable')); }catch(_){}
+  });
+}catch(e){}
 const FS_OPTOUT = 'wt.fs.optout';
 function armDefaultFullscreen(){
   try{

@@ -32,6 +32,7 @@ const ACCEPTED = new Map([
   ['.terminal.light .om-btns .om-buy', '주문 매수 버튼 (MT5 파랑)'],
   ['.terminal.light .omodal .obar .wb.x:hover', '주문창 닫기 hover (빨강 채움)'],
   ['.terminal.light .mpos .obar .x:hover', 'Modify 창 닫기 hover (빨강 채움)'],
+  ['.terminal.light .tibtn-install:hover', '앱 설치 버튼 hover (MT5 파랑 채움 + 흰 글자)'],
   // MT5 실물 하락색 — 흰 배경에서도 이 주황빨강을 쓴다 (webtrade-legend-theme 이 값을 고정)
   ['.terminal.light .mwt td.tick-down', 'MT5 하락 틱 색 #ff4d00'],
   ['.terminal.light .mwt td.text-down', '同'],

@@ -130,6 +130,30 @@ for (const [label, opts, want, why] of CASES) {
     bad('모바일 manifest.json 이 바뀌었다 — PC 작업이 모바일 앱 설치를 건드리면 안 된다');
 }
 
+// ── 앱 설치 버튼 (2026-08-18 사장님 "고객들이 쉽게 설치하게 해야지") ──
+// 크롬 설치 아이콘은 주소창 구석에 숨어 고객이 못 찾는다 → beforeinstallprompt 를 가로채
+// 우리 툴바 버튼으로 띄운다.
+{
+  if (!/addEventListener\('beforeinstallprompt'/.test(src))
+    bad('beforeinstallprompt 를 가로채지 않는다 — 고객은 주소창 구석 아이콘을 찾아야 한다');
+  // ⚠️ 이 이벤트는 **React 마운트보다 먼저** 올 수 있다. 컴포넌트가 이벤트만 듣고 있으면 그 한 번을
+  //    놓쳐 버튼이 영영 안 뜬다 → 프롬프트를 **전역에 저장**하고, 컴포넌트는 마운트 시 그 값을
+  //    **즉시 읽어야** 한다. (소스상의 위치가 아니라 이 저장/읽기 구조가 실제 계약이다.)
+  if (!/window\.__wtInstall = e;/.test(src))
+    bad('가로챈 프롬프트를 전역에 저장하지 않는다 — 마운트 전에 온 이벤트를 놓친다');
+  if (!/React\.useState\(\(\)=>!!window\.__wtInstall\)/.test(src))
+    bad('컴포넌트가 마운트 시 전역 프롬프트를 즉시 읽지 않는다 — 이벤트만 듣다가 놓친다');
+  if (!/beforeinstallprompt[\s\S]{0,160}preventDefault\(\)/.test(src))
+    bad('beforeinstallprompt 에서 preventDefault 를 안 한다 — 크롬 기본 미니바와 우리 버튼이 겹친다');
+  if (!/addEventListener\('appinstalled'/.test(src))
+    bad('appinstalled 을 안 듣는다 — 설치한 뒤에도 설치 버튼이 남는다');
+  if (!/canInstall && <div className="tibtn tibtn-install"/.test(src))
+    bad('툴바에 설치 버튼이 없다 (설치 가능할 때만 보여야 한다)');
+  if (!/window\.__wtInstall=null; setCanInstall\(false\)/.test(src))
+    bad('설치 프롬프트는 1회용 — 누른 뒤 버튼을 내려야 한다');
+  if (!/p\.prompt\(\)/.test(src)) bad('설치 버튼이 실제로 prompt() 를 부르지 않는다');
+}
+
 // ── 죽은 가드 재발 방지: 로그인 판정을 **함수 존재**로 하면 안 된다 ──
 if (/if\(!\(window\.AlpexaSync && AlpexaSync\.me\)\) return;/.test(src))
   bad('로그인 판정이 `AlpexaSync.me` (함수) 의 존재 여부다 — 항상 truthy 라 아무것도 안 막는다. alpexa.me 를 봐야 한다');
