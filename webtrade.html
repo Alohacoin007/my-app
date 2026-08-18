@@ -3925,10 +3925,20 @@ function armDefaultFullscreen(){
     //    계측: 새탭 1회 / 나간탭 0회 / 나간탭+재로그인 0회). 플래그는 읽기만 한다(소비는 로그인 차임이).
     try{ if(sessionStorage.getItem('alpexa.loginChime')) sessionStorage.removeItem(FS_OPTOUT); }catch(e){}
     if(sessionStorage.getItem(FS_OPTOUT)) return;          // 이 탭에서 이미 사용자가 해제함
-    // 설치형 앱(manifest display:fullscreen/standalone)으로 열렸으면 **창 자체가 이미 전체화면**이라
-    // Fullscreen API 를 또 부를 이유가 없다. 안 걸러내면 첫 클릭마다 불필요한 요청이 한 번 더 간다.
-    try{ if(window.matchMedia && (matchMedia('(display-mode: fullscreen)').matches
-                               || matchMedia('(display-mode: standalone)').matches)) return; }catch(e){}
+    // 창이 **진짜로 이미 전체화면**일 때만 건너뛴다.
+    // ⚠️ standalone 을 같이 걸러내면 안 된다 (2026-08-17 사장님 실화면): manifest 에 display:"fullscreen"
+    //    을 줘도 **Windows 크롬은 설치형 앱을 standalone 창(제목표시줄 있음)으로 연다**. 그걸 "이미
+    //    전체화면"으로 오해하고 건너뛰면 설치형에서만 자동 전체화면이 통째로 죽는다 — 실제로 그랬다.
+    try{ if(window.matchMedia && matchMedia('(display-mode: fullscreen)').matches) return; }catch(e){}
+    // 설치형(standalone) 창이면 **제스처 없이 한 번 시도**한다. 브라우저가 거부하면 조용히 실패하고
+    // 아래 첫-상호작용 폴백이 그대로 받는다 — 되면 클릭 없이 바로 전체화면(사장님이 원한 동작).
+    try{
+      if(window.matchMedia && matchMedia('(display-mode: standalone)').matches){
+        const de0=document.documentElement;
+        const req0=de0.requestFullscreen||de0.webkitRequestFullscreen||de0.webkitRequestFullScreen;
+        if(req0){ const p0=req0.call(de0); if(p0&&p0.catch) p0.catch(()=>{}); }
+      }
+    }catch(e){}
     // ② 로그인 판정은 **alpexa.me(진짜 신원)** 로. 예전엔 `AlpexaSync.me` 를 봤는데 그건 값이 아니라
     //    **함수**라 항상 truthy = 가드가 죽어 있었고, 미로그인 둘러보기에도 전체화면이 걸렸다(실측 1회).
     var signedIn=false; try{ signedIn=!!JSON.parse(localStorage.getItem('alpexa.me')||'null'); }catch(e){}
@@ -3936,6 +3946,7 @@ function armDefaultFullscreen(){
     if(fsElement()) return;                                // 이미 전체화면
     const fire=()=>{ off();
       try{ if(sessionStorage.getItem(FS_OPTOUT)) return; }catch(e){}
+      try{ if(fsElement()) return; }catch(e){}          // 위 즉시 시도가 이미 성공했으면 중복 요청 금지
       const de=document.documentElement;
       const req=de.requestFullscreen||de.webkitRequestFullscreen||de.webkitRequestFullScreen;
       try{ if(req){ const p=req.call(de); if(p&&p.catch) p.catch(()=>{}); } }catch(e){}
