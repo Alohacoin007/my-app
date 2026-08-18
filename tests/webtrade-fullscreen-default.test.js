@@ -99,6 +99,12 @@ for (const [label, opts, want, why] of CASES) {
 {
   if (!/<link rel="manifest" href="manifest-terminal\.json/.test(src))
     bad('webtrade 에 PC 터미널 매니페스트가 연결돼 있지 않다 — 설치해도 전체화면으로 안 열린다');
+  // 크롬은 매니페스트만으론 설치를 제안하지 않는다: fetch 핸들러가 있는 SW 가 페이지를 제어해야 한다.
+  // webtrade 만 이 등록이 빠져 있어 설치 아이콘이 안 보였다 (2026-08-17).
+  if (!/navigator\.serviceWorker\.register\('sw\.js'\)/.test(src))
+    bad('webtrade 가 서비스워커를 등록하지 않는다 — 크롬 설치 아이콘이 아예 안 뜬다');
+  if (!/self\.addEventListener\('fetch'/.test(fs.readFileSync(path.join(ROOT_DIR, 'sw.js'), 'utf8')))
+    bad('sw.js 에 fetch 핸들러가 없다 — 설치 조건 미충족');
   if (/<link rel="manifest" href="manifest\.json/.test(src))
     bad('webtrade 가 **모바일** manifest.json 을 물었다 — standalone·portrait 이라 PC 가 세로 고정 앱이 된다');
   const tm = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'manifest-terminal.json'), 'utf8'));
