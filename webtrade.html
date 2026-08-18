@@ -1269,11 +1269,17 @@ function marketOpen(symbol, at){
 const SLIP_PIPS = (typeof window!=='undefined' && +window.ALPEXA_MAX_SLIP_PIPS) || 15;
 
 // ── read prices via the cache proxy (feed-first → direct DB fallback → dev simulator) ──
+// ⚠️ feed 가 죽어 있어도 **매 틱마다 두들기지 않는다** (2026-08-18 실측: Edge `feed` 가 배포돼
+//    있지 않아 404 → 프리플라이트 404 → 브라우저 CORS 에러. 콘솔에 264개가 쌓여 있었다).
+//    폴백(DB 직접 읽기)이 시세를 계속 대주고 있어 화면은 멀쩡했지만, 매 폴링마다 실패 왕복이
+//    한 번씩 더 갔다. 한 번 실패하면 5분간 건너뛰고, 그 뒤 다시 시도해 **배포되면 자동 복귀**한다.
+let feedOffUntil = 0;
 async function feedPrices(){
-  try{ if(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.functions){
+  try{ if(Date.now()>=feedOffUntil && window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.db.functions){
     const x=await AlpexaSync.db.functions.invoke('feed',{body:{t:'prices'}});
-    if(x&&!x.error&&Array.isArray(x.data)) return x.data;
-  } }catch(e){}
+    if(x&&!x.error&&Array.isArray(x.data)){ feedOffUntil=0; return x.data; }
+    if(x&&x.error) feedOffUntil=Date.now()+5*60000;
+  } }catch(e){ feedOffUntil=Date.now()+5*60000; }
   try{ if(window.AlpexaSync&&AlpexaSync.db){
     const r=await AlpexaSync.db.from('prices').select('symbol,mid,spr_pts');
     if(r&&r.data) return r.data;
