@@ -19,7 +19,8 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const src = fs.readFileSync(path.join(__dirname, '..', 'webtrade.html'), 'utf8');
+const ROOT_DIR = path.join(__dirname, '..');
+const src = fs.readFileSync(path.join(ROOT_DIR, 'webtrade.html'), 'utf8');
 let fail = 0;
 const bad = (m) => { console.error('🔴 ' + m); fail++; };
 
@@ -30,7 +31,7 @@ if (!/function armDefaultFullscreen\(\)/.test(block)) {
   console.error('\n🔴 FAIL — 1건.'); process.exit(1);
 }
 
-function makeEnv({ loggedIn, optout, freshLogin }) {
+function makeEnv({ loggedIn, optout, freshLogin, installed }) {
   const store = (init) => { const m = Object.assign({}, init); return {
     getItem: (k) => (k in m ? m[k] : null),
     setItem: (k, v) => { m[k] = String(v); },
@@ -54,7 +55,11 @@ function makeEnv({ loggedIn, optout, freshLogin }) {
     },
   };
   // me() 는 로그인 안 돼 있어도 임시 Guest 객체를 만들어 준다 = 값으로 로그인 판정 불가
-  env.window = { AlpexaSync: { me: () => JSON.parse(ls.getItem('alpexa.me') || 'null') || { custId: 'P-0000', name: 'Guest' } } };
+  env.window = {
+    AlpexaSync: { me: () => JSON.parse(ls.getItem('alpexa.me') || 'null') || { custId: 'P-0000', name: 'Guest' } },
+    // 설치형 PWA(manifest display:fullscreen)면 창 자체가 이미 전체화면 → API 를 또 부르면 안 된다
+    matchMedia: (q) => ({ matches: !!installed && /display-mode:\s*(fullscreen|standalone)/.test(q) }),
+  };
   return env;
 }
 
@@ -65,8 +70,8 @@ function run(opts) {
     // 코드가 `window.AlpexaSync` 가 아니라 **맨 이름 `AlpexaSync`** 도 참조한다 → 둘 다 주입.
     // (브라우저에선 전역이라 같지만, 없으면 ReferenceError 가 바깥 try/catch 에 조용히 먹혀
     //  기능이 통째로 사라진다 — 이 침묵도 이 버그가 오래 안 보인 이유 중 하나다.)
-    arm = new Function('document', 'window', 'sessionStorage', 'localStorage', 'fsElement', 'AlpexaSync',
-      block + '\nreturn armDefaultFullscreen;')(env.document, env.window, env.ss, env.ls, () => null, env.window.AlpexaSync);
+    arm = new Function('document', 'window', 'sessionStorage', 'localStorage', 'fsElement', 'AlpexaSync', 'matchMedia',
+      block + '\nreturn armDefaultFullscreen;')(env.document, env.window, env.ss, env.ls, () => null, env.window.AlpexaSync, env.window.matchMedia);
   } catch (e) { bad('armDefaultFullscreen 평가 실패: ' + e.message); return { calls: 0, again: 0 }; }
   arm();
   env.interact(); const first = env.calls;
@@ -79,11 +84,30 @@ const CASES = [
   ['B. ⛶ 로 직접 나간 탭',         { loggedIn: true,  optout: true,  freshLogin: false }, 0, '사용자가 나갔으면 그 탭에선 다시 걸지 않는다'],
   ['C. 나간 탭에서 새로 로그인',    { loggedIn: true,  optout: true,  freshLogin: true  }, 1, '새 로그인 = 기본값 복귀 (이게 안 돼서 "로그인해도 풀스크린 안 됨")'],
   ['D. 미로그인 둘러보기',          { loggedIn: false, optout: false, freshLogin: false }, 0, '읽기전용 방문자에게 전체화면을 강요하면 안 된다'],
+  // E. 설치형 앱(PWA) — 창이 이미 전체화면이라 API 요청은 군더더기. A(브라우저 탭 폴백)와 공존해야 한다.
+  ['E. 설치형 앱으로 실행',        { loggedIn: true,  optout: false, freshLogin: false, installed: true }, 0, '설치형은 창 자체가 전체화면 — 첫 클릭마다 불필요한 요청이 또 가면 안 된다'],
 ];
 for (const [label, opts, want, why] of CASES) {
   const r = run(opts);
   if (r.calls !== want) bad(`${label}: 첫 상호작용 ${r.calls}회 (기대 ${want}회) — ${why}`);
   else if (want === 1 && r.again !== 0) bad(`${label}: 두 번째 상호작용에도 ${r.again}회 — 1회성이어야 한다 (사용자가 나갈 때마다 다시 들어간다)`);
+}
+
+// ── 설치형(PWA) 배선: PC 터미널 전용 매니페스트가 붙어 있고, 모바일 것과 섞이지 않는가 ──
+// 2026-08-17 사장님 "로그인하면 풀스크린으로 보이게 안돼?" → 브라우저 탭에선 규격상 제스처가
+// 필수(실측: 로그인 페이지에서 얻은 전체화면은 이동하며 해제됨). 설치형 앱만이 클릭 없이 된다.
+{
+  if (!/<link rel="manifest" href="manifest-terminal\.json/.test(src))
+    bad('webtrade 에 PC 터미널 매니페스트가 연결돼 있지 않다 — 설치해도 전체화면으로 안 열린다');
+  if (/<link rel="manifest" href="manifest\.json/.test(src))
+    bad('webtrade 가 **모바일** manifest.json 을 물었다 — standalone·portrait 이라 PC 가 세로 고정 앱이 된다');
+  const tm = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'manifest-terminal.json'), 'utf8'));
+  if (tm.display !== 'fullscreen') bad(`manifest-terminal.json 의 display 가 '${tm.display}' — 'fullscreen' 이어야 클릭 없이 전체화면`);
+  if (!/webtrade/.test(tm.start_url || '')) bad('manifest-terminal.json 의 start_url 이 터미널이 아니다');
+  if (tm.orientation) bad(`PC 매니페스트에 orientation('${tm.orientation}') 이 있다 — 데스크톱은 고정하지 않는다`);
+  const mob = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'manifest.json'), 'utf8'));
+  if (mob.display !== 'standalone' || mob.orientation !== 'portrait')
+    bad('모바일 manifest.json 이 바뀌었다 — PC 작업이 모바일 앱 설치를 건드리면 안 된다');
 }
 
 // ── 죽은 가드 재발 방지: 로그인 판정을 **함수 존재**로 하면 안 된다 ──

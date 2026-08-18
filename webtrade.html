@@ -6,6 +6,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Alpexa WebTrade — FX Terminal</title>
 <meta name="robots" content="noindex">
+<!-- PC 터미널 전용 매니페스트 (2026-08-17). display:"fullscreen" 이라 **설치해서 아이콘으로 열면
+     주소창·탭 없이 처음부터 전체화면** = 제스처 불필요. 브라우저 탭으로 열면 이 파일은 무시되고
+     기존 폴백(첫 클릭에 전체화면)이 그대로 동작한다 — A·B 가 같이 산다.
+     ⚠️ 모바일 앱용 manifest.json(standalone·portrait·start_url=login.html)은 **건드리지 않는다**.
+        그걸 여기 링크하면 PC 가 세로 고정 앱이 되고 모바일 설치까지 흔들린다. -->
+<link rel="manifest" href="manifest-terminal.json?v=1">
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
 <link rel="preconnect" href="https://unpkg.com">
 <style>
@@ -3914,6 +3920,10 @@ function armDefaultFullscreen(){
     //    계측: 새탭 1회 / 나간탭 0회 / 나간탭+재로그인 0회). 플래그는 읽기만 한다(소비는 로그인 차임이).
     try{ if(sessionStorage.getItem('alpexa.loginChime')) sessionStorage.removeItem(FS_OPTOUT); }catch(e){}
     if(sessionStorage.getItem(FS_OPTOUT)) return;          // 이 탭에서 이미 사용자가 해제함
+    // 설치형 앱(manifest display:fullscreen/standalone)으로 열렸으면 **창 자체가 이미 전체화면**이라
+    // Fullscreen API 를 또 부를 이유가 없다. 안 걸러내면 첫 클릭마다 불필요한 요청이 한 번 더 간다.
+    try{ if(window.matchMedia && (matchMedia('(display-mode: fullscreen)').matches
+                               || matchMedia('(display-mode: standalone)').matches)) return; }catch(e){}
     // ② 로그인 판정은 **alpexa.me(진짜 신원)** 로. 예전엔 `AlpexaSync.me` 를 봤는데 그건 값이 아니라
     //    **함수**라 항상 truthy = 가드가 죽어 있었고, 미로그인 둘러보기에도 전체화면이 걸렸다(실측 1회).
     var signedIn=false; try{ signedIn=!!JSON.parse(localStorage.getItem('alpexa.me')||'null'); }catch(e){}
