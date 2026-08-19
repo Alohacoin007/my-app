@@ -12,7 +12,29 @@
 //     AlpexaSync.db.from('prices').select('symbol,mid,spr_pts')        →  fetch(FEED+'?t=prices')
 // Layered HTTP cache header (max-age=1) lets Supabase's CDN absorb even more.
 // ============================================================================
-import { TTLCache } from "../_shared/ttl-cache.ts";
+// ⚠️ 캐시를 **이 파일 안에** 둔다 (2026-08-18). 예전엔 `../_shared/ttl-cache.ts` 를 임포트했는데,
+//    Supabase 대시보드 편집기는 함수 폴더 **밖의 상대 임포트를 못 읽는다** → 대시보드로 배포하면
+//    실패한다. 실제로 이 함수는 배포돼 있지 않았고(실측 404 NOT_FOUND), 클라 5종이 매 폴링마다
+//    404 를 두들겨 콘솔에 CORS 에러가 쌓였다. 붙여넣는 코드 == 리포 코드가 되도록 한 파일로 합친다.
+//
+// TTL 메모리 캐시 + single-flight: 같은 1초 안에 몇 명이 물어도 DB 는 **한 번만** 읽는다.
+// Deno Deploy 가 웜 아이솔레이트를 재사용하므로 모듈 레벨 인스턴스가 요청들 사이에서 공유된다.
+class TTLCache<T> {
+  private store = new Map<string, { v: T; exp: number }>();
+  private inflight = new Map<string, Promise<T>>();
+  constructor(private ttlMs = 1000) {}
+  async get(key: string, fetcher: () => Promise<T>, now: number = Date.now()): Promise<T> {
+    const hit = this.store.get(key);
+    if (hit && hit.exp > now) return hit.v;                    // 신선 → DB 0회
+    const flying = this.inflight.get(key);
+    if (flying) return flying;                                 // single-flight: 진행 중인 fetch 에 합류
+    const p = fetcher()
+      .then((v) => { this.store.set(key, { v, exp: now + this.ttlMs }); this.inflight.delete(key); return v; })
+      .catch((e) => { this.inflight.delete(key); throw e; });
+    this.inflight.set(key, p);
+    return p;
+  }
+}
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
