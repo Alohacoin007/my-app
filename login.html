@@ -8,6 +8,20 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>ALPEXA SUISSE — Login</title>
 <link rel="manifest" href="manifest.json">
+<!-- PC 에서는 **터미널 매니페스트**로 바꿔 단다 (2026-08-18 사장님 승인).
+     로그인 페이지는 모바일 앱(manifest.json: standalone·portrait·start_url=login.html)을 물고
+     있어서, PC 에서 주소창 설치 아이콘을 누르면 **세로 고정 모바일 앱**이 깔린다 — 고객이
+     잘못된 앱을 설치하게 되는 실질적 위험. PC 판정이면 manifest-terminal.json(가로 자유·
+     start_url=webtrade.html)로 교체한다. 모바일/태블릿은 손대지 않는다.
+     ⚠️ 브라우저가 매니페스트를 읽기 전에 바꿔야 하므로 link 바로 다음에서 즉시 실행한다. -->
+<script>(function(){try{
+  var mobileUA=/Android|iPhone|iPad|iPod|Mobile|Silk|Kindle/i.test(navigator.userAgent||'');
+  var fine=window.matchMedia&&matchMedia('(pointer: fine)').matches;
+  var touchOnly=(navigator.maxTouchPoints||0)>0&&!fine;
+  if(mobileUA||touchOnly||!fine) return;             // 모바일·터치 전용이면 기존(모바일) 매니페스트 유지
+  var l=document.querySelector('link[rel="manifest"]');
+  if(l) l.setAttribute('href','manifest-terminal.json?v=1');
+}catch(e){}})();</script>
 <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script>
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=5">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=5">

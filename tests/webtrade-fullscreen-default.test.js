@@ -128,6 +128,15 @@ for (const [label, opts, want, why] of CASES) {
   const mob = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'manifest.json'), 'utf8'));
   if (mob.display !== 'standalone' || mob.orientation !== 'portrait')
     bad('모바일 manifest.json 이 바뀌었다 — PC 작업이 모바일 앱 설치를 건드리면 안 된다');
+  // 로그인 페이지: PC 에서는 터미널 매니페스트로 바꿔 달아야 한다. 안 그러면 PC 고객이
+  // 주소창 설치 아이콘으로 **세로 고정 모바일 앱**을 깔게 된다 (2026-08-18 사장님 실화면).
+  const lg = fs.readFileSync(path.join(ROOT_DIR, 'login.html'), 'utf8');
+  if (!/setAttribute\('href','manifest-terminal\.json/.test(lg))
+    bad('login.html 이 PC 에서 터미널 매니페스트로 교체하지 않는다 — PC 에 모바일 앱이 설치된다');
+  if (!/pointer: fine/.test(lg))
+    bad('login.html 의 PC 판정 기준이 없다 (pointer: fine) — 모바일까지 터미널 앱으로 바뀔 수 있다');
+  if (!/mobileUA\|\|touchOnly\|\|!fine\) return;/.test(lg))
+    bad('모바일·터치 기기에서는 기존 모바일 매니페스트를 그대로 둬야 한다');
 }
 
 // ── 앱 설치 버튼 (2026-08-18 사장님 "고객들이 쉽게 설치하게 해야지") ──
