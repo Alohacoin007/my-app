@@ -412,8 +412,14 @@ window.AlpexaSync = (function () {
         var body = JSON.stringify({ page: page, dcl: Math.round(nav.domContentLoadedEventEnd || 0),
           load_ms: Math.round(nav.loadEventEnd || 0), app_ms: appMs == null ? null : Math.round(appMs),
           mobile: /Mobi|Android/i.test(navigator.userAgent) });
-        if (!(navigator.sendBeacon && navigator.sendBeacon(RUM_URL, new Blob([body], { type: 'application/json' }))))
-          fetch(RUM_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }).catch(function () {});
+        // ⚠️ sendBeacon 을 쓰지 않는다 (2026-08-18 실측). sendBeacon 은 크로스 오리진에서 **항상**
+        //    credentials 를 포함해 보내는데, Supabase REST 는 Access-Control-Allow-Origin:'*' 를
+        //    돌려준다. 규격상 이 둘은 함께 못 쓴다 → 프리플라이트가 거절되고 콘솔에 CORS 에러가
+        //    남는다("must not be the wildcard '*' when the request's credentials mode is 'include'").
+        //    게다가 sendBeacon 이 true 를 돌려주면 아래 fetch 폴백도 건너뛰어 **기록이 통째로 유실**된다.
+        //    keepalive:true 는 sendBeacon 과 같은 "페이지가 닫혀도 전송" 성질을 주므로 기능 손실 없음.
+        fetch(RUM_URL, { method: 'POST', credentials: 'omit',
+          headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }).catch(function () {});
       } catch (_e) { /* 관측은 앱을 절대 방해하지 않는다 */ }
     }
     // React 앱(#root)은 "화면에 내용이 뜬 순간"까지, 바닐라는 load 후 — 15s 상한
