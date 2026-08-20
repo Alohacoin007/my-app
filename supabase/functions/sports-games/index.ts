@@ -8,17 +8,21 @@
 //
 // Required env (auto): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. Optional CRON_SECRET.
 
-// 🌐 ESPN 요청 헤더 (2026-08-19 블랙아웃 진단). 사장님 브라우저에서는 같은 URL 이 정상 JSON 을
-//    주는데 서버(Deno/Supabase Edge)에서만 전 리그 0경기였다 = ESPN 이 **헤더 없는 데이터센터
-//    요청을 막는** 전형적 패턴. 예전 코드는 fetch(u,{cache:"no-store"}) 로 **헤더를 하나도 안
-//    보냈다.** 브라우저와 같은 UA/Accept 를 붙인다 — 크롤링 우회가 아니라 공개 API 를 정상적인
-//    클라이언트로 호출하는 것이고, ESPN 이 이미 브라우저에 그대로 내주는 데이터다.
-const ESPN_HEADERS: Record<string, string> = {
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36",
-  "Accept": "application/json, text/plain, */*",
-  "Accept-Language": "en-US,en;q=0.9",
-  "Referer": "https://www.espn.com/",
-};
+// 🚫 ESPN 에 **브라우저 위장 헤더를 붙이지 않는다** (2026-08-20 실측으로 확정).
+//    2026-08-19 블랙아웃 때 "데이터센터 IP 차단이겠지"라는 *가설*로 UA/Referer 위장 헤더를
+//    붙였는데, 그게 오히려 403 을 만들었다. 같은 러너·같은 IP·같은 URL 을 ms 차이로 비교한
+//    실측 (`tests/espn-transport-probe.js`, GitHub Actions 로그):
+//        헤더 없음  → 200, events=632 / 111 / 50   (MLB / NFL / EPL)
+//        위장 헤더  → 403, 403, 403
+//    ESPN(Akamai)은 헤더 없는 요청은 그냥 내주고, `Referer: espn.com` + 크롬 UA 인데 TLS
+//    지문은 크롬이 아닌 요청을 봇으로 보고 막는다. 위장은 통과가 아니라 **탐지 신호**다.
+//    ⚠️ 다시 붙이지 말 것 — `tests/diagnose.js` 가 이 패턴을 정적으로 막는다.
+//    아래 fetch 는 헤더 없이, 타임아웃만 걸어서 호출한다.
+const FETCH_TIMEOUT_MS = 8000;
+function espnFetch(u: string): Promise<Response> {
+  // 미러가 20초씩 매달려 전체 갱신을 잡아먹지 않게 (실측: allorigins/codetabs 19.7초 행).
+  return fetch(u, { cache: "no-store", signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+}
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -58,7 +62,7 @@ async function fetchGolf(out: any[]) {
   const before = out.length;
   for (const u of tries) {
     try {
-      const res = await fetch(u, { cache: "no-store", headers: ESPN_HEADERS });
+      const res = await espnFetch(u);
       if (!res.ok) continue;
       const d = await res.json();
       for (const ev of (d.events || [])) {
@@ -447,7 +451,7 @@ async function fetchLeague(L: { lg: string; sport: string; path: string }, out: 
   const before = out.length;
   for (const u of tries) {
     try {
-      const res = await fetch(u, { cache: "no-store", headers: ESPN_HEADERS });
+      const res = await espnFetch(u);
       if (!res.ok) { DIAG.push({ lg: L.lg, url: u.slice(0, 60), status: res.status }); continue; }
       const d = await res.json();
       DIAG.push({ lg: L.lg, url: u.slice(0, 60), status: 200, events: (d.events || []).length });
