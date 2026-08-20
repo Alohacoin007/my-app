@@ -530,6 +530,17 @@ Deno.serve(async (req) => {
       diag: DIAG.slice(0, 40) }, 500);
   }
 
+  // 🔎 진단을 **DB 에 남긴다** (2026-08-20). 응답에만 실으면 크론이 받아가고 끝이라 사람이
+  //    대시보드를 뒤져야 했다 — 그 사이 원인 파악이 하루 늦었다. live_games 에 id='diag' 행으로
+  //    적어두면 누구든(운영 스크립트 포함) 바로 읽는다. 클라는 id='all' 만 읽으므로 무해하다.
+  try {
+    await fetch(`${SB_URL}/rest/v1/live_games?on_conflict=id`, {
+      method: "POST",
+      headers: { ...H, "Prefer": "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({ id: "diag", data: DIAG.slice(0, 60), updated_at: new Date().toISOString() }),
+    });
+  } catch (_e) { /* 진단 기록 실패가 본 피드를 막으면 안 된다 */ }
+
   // Upsert the single 'all' row (clients read this).
   const r = await fetch(`${SB_URL}/rest/v1/live_games?on_conflict=id`, {
     method: "POST",

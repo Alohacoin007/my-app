@@ -41,6 +41,10 @@ if (!/if \(!res\.ok\) \{ DIAG\.push\(/.test(src) || !/status: res\.status/.test(
   bad('ESPN 응답이 !ok 일 때 조용히 건너뛴다 — 왜 0경기인지 알 수 없다. 시도별 상태를 남길 것');
 if (!/diag: DIAG\.slice/.test(src))
   bad('진단을 응답에 싣지 않는다 — 한 번 호출로 원인을 못 본다');
+// 응답에만 실으면 크론이 받아가고 끝 → 사람이 대시보드를 뒤져야 한다(원인 파악이 하루 늦었다).
+// DB(id='diag')에도 남겨 운영 스크립트가 직접 읽게 한다.
+if (!/id: "diag"/.test(src))
+  bad('진단을 DB(live_games id=diag)에 안 남긴다 — 매번 사람이 대시보드를 뒤져야 한다');
 if (!/api\.allorigins\.win/.test(src))
   bad('미러가 corsproxy 하나뿐이다 — 그 프록시가 죽으면 보드가 통째로 빈다');
 
