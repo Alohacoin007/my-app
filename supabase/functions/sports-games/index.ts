@@ -488,6 +488,26 @@ Deno.serve(async (req) => {
   // dashboard's live_games carries the same real moneyline/spread/total.
   await overlayRealOdds(games, oddsRows);
 
+  // 🛡️ 붕괴 가드 (2026-08-19 실사고). 상류(ESPN)가 빈 값을 주면 games 에는 sticky 이월분만
+  //    남는데, 예전엔 그걸로 **멀쩡한 441경기 행을 그대로 덮어썼다** → 고객 스포츠북이 2경기로
+  //    비었다. 크론은 계속 돌아 updated_at 이 갱신되니 신선도 감시는 내내 초록이었다.
+  //    규칙: 직전 행이 건강(20경기+)하고 **최근(2h 이내)** 인데 새 목록이 그 절반 미만이면
+  //    **덮어쓰지 않고 실패로 보고**한다. 옛 데이터가 잠시 남는 게 빈 화면보다 낫다.
+  //    자가치유: 진짜로 경기가 줄어든 경우(시즌 종료 등)엔 2시간 뒤 직전 행이 낡아 가드가 풀려
+  //    정상적으로 축소분이 반영된다 — 상태 저장 없이 스스로 빠져나온다.
+  let prevCount = 0, prevAgeMs = Number.POSITIVE_INFINITY;
+  try {
+    const pr = await fetch(`${SB_URL}/rest/v1/live_games?select=data,updated_at&id=eq.all`, { headers: H });
+    if (pr.ok) { const rows = await pr.json(); const row = rows?.[0];
+      if (row) { prevCount = Array.isArray(row.data) ? row.data.length : 0;
+                 prevAgeMs = Date.now() - Date.parse(row.updated_at || 0); } }
+  } catch (_e) { /* 직전 행을 못 읽으면 가드 없이 진행 (첫 배포·빈 테이블) */ }
+  const floor = Math.max(10, Math.floor(prevCount * 0.5));
+  if (prevCount >= 20 && games.length < floor && prevAgeMs < 2 * 3600 * 1000) {
+    return json({ ok: false, error: "collapse-guard: refused to overwrite a healthy feed",
+      got: games.length, prev: prevCount, floor, prev_age_min: Math.round(prevAgeMs / 60000) }, 500);
+  }
+
   // Upsert the single 'all' row (clients read this).
   const r = await fetch(`${SB_URL}/rest/v1/live_games?on_conflict=id`, {
     method: "POST",

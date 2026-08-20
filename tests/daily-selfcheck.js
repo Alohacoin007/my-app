@@ -32,7 +32,16 @@ function oddsStatus(g) {
     const r = await fetch(`${URL}/rest/v1/live_games?id=eq.all&select=data,updated_at`, { headers: H });
     const row = (await r.json())[0]; const all = row.data || [];
     const ageMin = Math.round((Date.now() - Date.parse(row.updated_at)) / 60000);
+    // ⚠️ 나이만 보면 **빈 피드를 못 잡는다** (2026-08-19 실측 사고): sports-games 가 상류(ESPN)
+    //    실패 후 sticky 이월분 2경기만으로 441경기 행을 덮어썼는데, 크론은 계속 돌아 updated_at 은
+    //    1분 전이었다 → 신선도 검사는 내내 🟢. 고객 스포츠북은 비어 있었는데 우리는 몰랐다.
+    //    **내용(경기 수)까지** 본다. 4개 리그 7일 창에서 20경기 미만이면 시즌 무관하게 붕괴다.
+    const BLACKOUT_FLOOR = 20;
     flag(ageMin > 10, `피드 신선도: live_games ${all.length}경기 · ${ageMin}분 전 갱신` + (ageMin > 10 ? ' — 크론 확인 필요' : ''));
+    flag(all.length < BLACKOUT_FLOOR,
+      `피드 내용: ${all.length}경기` + (all.length < BLACKOUT_FLOOR
+        ? ` — 🚨 블랙아웃 (기준 ${BLACKOUT_FLOOR}경기 미만). 크론은 돌지만 빈 목록을 쓰고 있다 → sports-games 상류(ESPN) 확인`
+        : ' (블랙아웃 아님)'));
     const today = vegasYMD(Date.now()), tomorrow = vegasYMD(Date.now() + 86400e3);
     for (const dk of [today, tomorrow]) {
       const day = all.filter(g => { const t = Date.parse(g.iso || ''); return !isNaN(t) && vegasYMD(t) === dk; });
