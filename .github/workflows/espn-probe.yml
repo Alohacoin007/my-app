@@ -1,0 +1,23 @@
+# Alpexa — ESPN 전송 프로브 (일회성 진단)
+# GitHub 러너 IP 에서 ESPN 이 닿는지 실측한다. Supabase Edge 에서는 전 리그 403 이라
+# (live_games id='diag' 증거) 릴레이를 설계하기 전에 "러너는 볼 수 있는가"를 먼저 본다.
+# push 트리거라 기본 브랜치가 아니어도 돈다 — 진단용, 부작용 0(읽기만).
+name: espn transport probe
+
+on:
+  push:
+    paths:
+      - "tests/espn-transport-probe.js"
+      - ".github/workflows/espn-probe.yml"
+  workflow_dispatch: {}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Probe ESPN from this runner
+        run: node tests/espn-transport-probe.js
