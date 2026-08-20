@@ -1,0 +1,126 @@
+# Alpexa — Edge 함수 게이트 자동 배포 (2026-08-20)
+# ============================================================================
+# 왜 생겼나: 2026-08-19 스포츠 블랙아웃 때 수정 코드는 몇 시간 만에 준비됐는데,
+# Edge 배포를 사람만 할 수 있어서 고객 화면은 하루 더 어두웠다. 웹/앱 파일은
+# deploy.yml 이 verify 초록일 때 자동으로 나가는데 Edge 만 그 길이 없었다.
+#
+# 규율 (CLAUDE.md #1 을 자동화가 우회하지 않게):
+#   · **허용목록 방식.** 아래 AUTO 에 적힌 함수만 나간다. 목록에 없으면 배포 안 함.
+#     차단목록이 아니라 허용목록인 이유 — 새 함수가 생겼을 때 **기본값이 "배포 안 함"**
+#     이어야 안전하다. 차단목록이면 깜빡 잊은 새 돈 함수가 자동으로 나간다.
+#   · **돈은 영원히 수동.** sports-settle · stake-accrue · 모든 SQL 은 사장님 승인 후
+#     직접 배포. 여기 목록에 절대 넣지 않는다 (tests/edge-autodeploy-guard.test.js 가 강제).
+#   · **verify 초록이 선행 조건.** 🔴면 배포 자체를 안 한다 (deploy.yml 과 동일 규율).
+#   · **바뀐 함수만.** 매번 전체를 밀지 않는다 — 손 안 댄 함수가 배포로 흔들리면 안 된다.
+#
+# 필요한 시크릿: SUPABASE_ACCESS_TOKEN (Supabase → Account → Access Tokens 에서 발급).
+#   미설정이면 이 워크플로는 **조용히 건너뛴다** — 토큰 없이 실패해서 매 푸시마다
+#   빨간 메일이 가는 게 더 해롭다. 설정 여부는 워크플로 로그에 한 줄로 남는다.
+# ============================================================================
+name: deploy edge
+
+on:
+  push:
+    branches: [ claude/wizardly-ritchie-lsRnz ]
+    paths: [ "supabase/functions/**" ]
+  workflow_dispatch:
+    inputs:
+      fn:
+        description: "수동 배포할 함수 이름 (허용목록 안에 있어야 함). 비우면 아무것도 안 함."
+        required: false
+        default: ""
+
+concurrency: { group: deploy-edge, cancel-in-progress: false }
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_REF: grxnbgtfnaayeluenvqh
+      # 🔒 허용목록 — 돈을 옮기지 않는 시세·목록 피드만. 변경 시 반드시
+      #    tests/edge-autodeploy-guard.test.js 도 같이 볼 것 (핀이 돈 함수 혼입을 막는다).
+      AUTO: "sports-games sports-odds crypto-prices fx-prices stock-prices"
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }   # 변경 함수 계산에 이전 커밋이 필요
+
+      - name: 토큰 있나 확인 (없으면 조용히 종료)
+        id: gate
+        env: { TOKEN: "${{ secrets.SUPABASE_ACCESS_TOKEN }}" }
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::notice::SUPABASE_ACCESS_TOKEN 미설정 — Edge 자동 배포를 건너뜁니다(사장님 수동 배포 유지)."
+            echo "go=no" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=yes" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.go == 'yes'
+        with: { node-version: "22" }
+
+      - name: Install parser (for verify's JSX parse arm)
+        if: steps.gate.outputs.go == 'yes'
+        run: npm i @babel/parser --no-save || true
+
+      # 🚦 배포 전 게이트 — 🔴면 여기서 멈춘다. Pages 배포와 같은 규율.
+      - name: Verify gate
+        if: steps.gate.outputs.go == 'yes'
+        run: node tests/verify.js
+
+      - name: 배포할 함수 결정 (바뀐 것 ∩ 허용목록)
+        if: steps.gate.outputs.go == 'yes'
+        id: pick
+        run: |
+          set -euo pipefail
+          MANUAL="${{ github.event.inputs.fn }}"
+          if [ -n "$MANUAL" ]; then
+            CHANGED="$MANUAL"
+            echo "수동 지정: $MANUAL"
+          else
+            BEFORE="${{ github.event.before }}"
+            # 최초 푸시·강제푸시로 이전 커밋을 모르면 **아무것도 배포하지 않는다**.
+            # 모르면 전부 미는 게 아니라 멈추는 쪽이 안전하다(수동 dispatch 로 처리).
+            if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
+               || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+              echo "::notice::이전 커밋을 알 수 없어 자동 배포를 건너뜁니다. 필요하면 workflow_dispatch 로 함수를 지정하세요."
+              echo "list=" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            CHANGED=$(git diff --name-only "$BEFORE" "${{ github.sha }}" -- supabase/functions/ \
+              | awk -F/ 'NF>=3 {print $3}' | sort -u)
+          fi
+          PICK=""; SKIP=""
+          for f in $CHANGED; do
+            case " $AUTO " in
+              *" $f "*) PICK="$PICK $f" ;;
+              *)        SKIP="$SKIP $f" ;;
+            esac
+          done
+          [ -n "$SKIP" ] && echo "::notice::허용목록 밖이라 배포하지 않음(사장님 수동):$SKIP"
+          echo "배포 대상:${PICK:- (없음)}"
+          echo "list=$(echo $PICK)" >> "$GITHUB_OUTPUT"
+
+      - uses: supabase/setup-cli@v1
+        if: steps.gate.outputs.go == 'yes' && steps.pick.outputs.list != ''
+        with: { version: latest }
+
+      - name: Deploy
+        if: steps.gate.outputs.go == 'yes' && steps.pick.outputs.list != ''
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          for f in ${{ steps.pick.outputs.list }}; do
+            echo "── deploying $f ──"
+            # verify_jwt 는 supabase/config.toml 이 함수별로 고정한다 (전부 false).
+            # 크론이 Authorization 헤더 없이 부르므로 켜지면 401 로 전 피드가 죽는다.
+            supabase functions deploy "$f" --project-ref "$PROJECT_REF"
+          done
+
+      - name: 배포 후 피드 생존 확인
+        if: steps.gate.outputs.go == 'yes' && steps.pick.outputs.list != ''
+        run: |
+          # 크론이 한 바퀴 돌 시간을 준 뒤, live_games 가 여전히 살아 있는지 실측한다.
+          # 배포가 함수를 깨뜨렸다면(예: JWT 401) 여기서 빨간불 → 사장님께 메일.
+          sleep 90
+          node tests/daily-selfcheck.js

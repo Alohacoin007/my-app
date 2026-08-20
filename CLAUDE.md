@@ -114,6 +114,10 @@
 - GitHub Pages는 브랜치 `claude/wizardly-ritchie-lsRnz`에서 서빙 (CNAME alpexa-sports.com). **푸시는 이 브랜치에만.**
 - 캐시: `Ctrl+Shift+R` 또는 `?v=N`. 빠른 연속 푸시는 Pages 빌드를 취소시킴.
 - Crypto/FX(모바일) = React + **사전 컴파일 JSX** (2026-07-31 P1: 인브라우저 Babel 3MB 제거). **편집은 `src/crypto-live-app.jsx`·`src/trading-app.jsx`에서** → `node tools/precompile-jsx.js` → 커밋 (신선도는 `precompiled-fresh.test.js`가 verify 게이트로 강제 — HTML의 JSX 블록 부활·CDN 복귀도 차단). webtrade/terminal(PC)·Sports/site = vanilla JS (인라인 그대로).
-- SQL / Edge 배포는 **사용자가** 실행 (Claude은 못 함). Claude은 검토된 SQL을 제공.
+- **Edge 자동 배포 (2026-08-20, 사장님 승인).** 서빙 브랜치에 `supabase/functions/**` 를 푸시하면 `deploy-edge.yml` 이 **verify 초록일 때만** 바뀐 함수를 배포하고 90초 뒤 `daily-selfcheck` 로 생존까지 확인한다. **허용목록 5종만**: `sports-games`·`sports-odds`·`crypto-prices`·`fx-prices`·`stock-prices` (돈을 안 옮기는 시세·목록 피드). 목록 밖은 배포 안 됨 — 새 함수의 기본값은 "배포 안 함".
+  - 🚫 **`sports-settle`·`stake-accrue`·모든 SQL 은 영구 수동** — 사장님 승인 후 직접 배포 (#1 원칙을 자동화가 우회하면 안 된다). Claude은 검토된 SQL/코드를 통째로 제공만.
+  - ⚠️ `supabase/config.toml` 이 함수별 `verify_jwt = false` 를 고정한다. CLI 배포 기본값은 검증 ON 인데 **크론은 Authorization 헤더 없이 부른다** → 고정을 빠뜨리면 배포 즉시 전 피드가 401. 관문은 함수 안의 CRON_SECRET(fail-closed).
+  - 핀: `tests/edge-autodeploy-guard.test.js` (돈 함수 혼입·차단목록 전환·verify 미선행·verify_jwt 누락·일괄배포 = 🔴). 시크릿 `SUPABASE_ACCESS_TOKEN` 미설정이면 워크플로는 조용히 생략.
+- 배포 전 게이트: 웹/앱은 `deploy.yml`(verify 🔴면 Pages 배포 중단), Edge 는 위 `deploy-edge.yml`.
 - 시간대는 **라스베가스/PDT** 기준 (UTC 아님).
 - 모델 식별자를 커밋·코드·PR에 절대 넣지 않는다.
