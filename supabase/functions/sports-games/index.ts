@@ -8,6 +8,18 @@
 //
 // Required env (auto): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. Optional CRON_SECRET.
 
+// 🌐 ESPN 요청 헤더 (2026-08-19 블랙아웃 진단). 사장님 브라우저에서는 같은 URL 이 정상 JSON 을
+//    주는데 서버(Deno/Supabase Edge)에서만 전 리그 0경기였다 = ESPN 이 **헤더 없는 데이터센터
+//    요청을 막는** 전형적 패턴. 예전 코드는 fetch(u,{cache:"no-store"}) 로 **헤더를 하나도 안
+//    보냈다.** 브라우저와 같은 UA/Accept 를 붙인다 — 크롤링 우회가 아니라 공개 API 를 정상적인
+//    클라이언트로 호출하는 것이고, ESPN 이 이미 브라우저에 그대로 내주는 데이터다.
+const ESPN_HEADERS: Record<string, string> = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36",
+  "Accept": "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Referer": "https://www.espn.com/",
+};
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -46,7 +58,7 @@ async function fetchGolf(out: any[]) {
   const before = out.length;
   for (const u of tries) {
     try {
-      const res = await fetch(u, { cache: "no-store" });
+      const res = await fetch(u, { cache: "no-store", headers: ESPN_HEADERS });
       if (!res.ok) continue;
       const d = await res.json();
       for (const ev of (d.events || [])) {
@@ -435,7 +447,7 @@ async function fetchLeague(L: { lg: string; sport: string; path: string }, out: 
   const before = out.length;
   for (const u of tries) {
     try {
-      const res = await fetch(u, { cache: "no-store" });
+      const res = await fetch(u, { cache: "no-store", headers: ESPN_HEADERS });
       if (!res.ok) { DIAG.push({ lg: L.lg, url: u.slice(0, 60), status: res.status }); continue; }
       const d = await res.json();
       DIAG.push({ lg: L.lg, url: u.slice(0, 60), status: 200, events: (d.events || []).length });

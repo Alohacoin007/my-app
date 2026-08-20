@@ -44,6 +44,16 @@ if (!/diag: DIAG\.slice/.test(src))
 if (!/api\.allorigins\.win/.test(src))
   bad('미러가 corsproxy 하나뿐이다 — 그 프록시가 죽으면 보드가 통째로 빈다');
 
+// ── P5 · ESPN 요청은 브라우저형 헤더를 보낸다 (2026-08-19 블랙아웃의 실제 원인 후보) ──
+// 사장님 브라우저에서는 같은 URL 이 정상 JSON, 서버에서만 전 리그 0경기 → 헤더 없는 데이터센터
+// 요청 차단. 예전 코드는 fetch(u,{cache:"no-store"}) 로 헤더를 하나도 안 보냈다.
+if (!/ESPN_HEADERS/.test(src)) bad('ESPN 요청에 헤더 상수가 없다 — 헤더 없는 요청은 차단당한다');
+if (/await fetch\(u, \{ cache: "no-store" \}\)/.test(src))
+  bad('헤더 없는 ESPN fetch 가 남아 있다 (fetch(u,{cache:"no-store"}))');
+if ((src.match(/headers: ESPN_HEADERS/g) || []).length < 2)
+  bad('ESPN fetch 두 곳(리그·골프) 모두에 헤더를 붙여야 한다');
+if (!/"User-Agent"/.test(src)) bad('User-Agent 가 없다 — ESPN 차단의 가장 흔한 원인');
+
 // ── P3 · 감시가 내용까지 본다 ──
 const chk = fs.readFileSync(path.join(ROOT, 'tests/daily-selfcheck.js'), 'utf8');
 if (!/BLACKOUT_FLOOR/.test(chk)) bad('daily-selfcheck 가 경기 수 바닥을 안 본다 — 빈 피드가 신선하면 🟢로 통과한다');
