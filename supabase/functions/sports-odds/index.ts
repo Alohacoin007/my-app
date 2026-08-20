@@ -20,6 +20,15 @@
 //   SUPABASE_URL  (auto) + SUPABASE_SERVICE_ROLE_KEY / SUPABASE_ANON_KEY (auto)
 // Optional: CRON_SECRET (require ?token=… to stop public abuse)
 
+// 🪪 ESPN 요청은 **정직한 자기 식별 UA** 로 (2026-08-20 실측). ESPN 은 Deno 가 자동으로 붙이는
+//    `User-Agent: Deno/x.x` 를 403 으로 막는다 — sports-games 의 UA 매트릭스 실측에서
+//    deno-default 403 ×11 / 빈 UA 403 ×11 / "alpexa-feed/1.0" 200 전 리그. 여기 403 이면
+//    라이브 판정(경기 진행중 여부)이 죽어 배당 갱신 주기가 어긋난다. sports-games·
+//    sports-settle 과 **같은 값**을 쓴다 — 한쪽만 바꾸면 한쪽이 조용히 죽는다.
+//    ⚠️ 브라우저 위장(크롬 UA / Referer: espn.com)은 금지 — 그게 오히려 403 을 부른다.
+const ESPN_UA = "alpexa-feed/1.0";
+const ESPN_INIT: RequestInit = { cache: "no-store", headers: { "User-Agent": ESPN_UA } };
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -125,7 +134,7 @@ async function liveSports(keys: string[]): Promise<Set<string>> {
     const tries = [direct, "https://corsproxy.io/?url=" + encodeURIComponent(direct)];
     for (const u of tries) {
       try {
-        const r = await fetch(u, { cache: "no-store" });
+        const r = await fetch(u, ESPN_INIT);
         if (!r.ok) continue;
         const d = await r.json();
         const anyLive = (d.events || []).some((ev: any) => {

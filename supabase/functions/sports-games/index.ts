@@ -24,10 +24,18 @@
 //    UA 변형을 차례로 시도한다 — 되는 게 있으면 그 자리에서 피드가 살아나고(자가치유),
 //    전부 막히면 DIAG 에 전 변형의 403 이 남아 IP 차단이 확정된다. 진단과 수정이 한 배포.
 //    ⚠️ 여기 UA 는 **정직한 식별자이거나 빈 값**이다. 브라우저인 척하지 않는다.
+// ✅ 확정 (2026-08-20 04:16, live_games diag 실측):
+//        deno-default (Deno 자동 UA)  → 403 ×11
+//        ua-empty (빈 UA)             → 403 ×11
+//        ua-alpexa ("alpexa-feed/1.0") → 200, 전 리그 정상 (449경기 복구)
+//    ESPN 이 막던 건 IP 가 아니라 **`User-Agent: Deno/x.x`** 였다. 정직한 자기 식별 UA 는
+//    그대로 통과한다. 그래서 그걸 **맨 앞**에 둔다 — 뒤에 두면 매 분 403 을 22번 두들긴다.
+//    나머지 둘은 남겨둔다: ESPN 이 정책을 또 바꿔 우리 UA 를 막으면 자동으로 다음을 시도한다.
+export const ESPN_UA = "alpexa-feed/1.0";
 const UA_TRIES: Array<[string, Record<string, string>]> = [
-  ["deno-default", {}],                                 // Deno 가 자동으로 UA 를 붙임
-  ["ua-empty", { "User-Agent": "" }],                   // Node 처럼 UA 를 안 보내는 쪽에 가장 가깝다
-  ["ua-alpexa", { "User-Agent": "alpexa-feed/1.0" }],   // 정직한 자기 식별 (봇 위장 아님)
+  ["ua-alpexa", { "User-Agent": ESPN_UA }],             // ✅ 유일하게 통하는 경로 (실측)
+  ["deno-default", {}],                                 // Deno 자동 UA — 현재 403, 정책 변경 대비 폴백
+  ["ua-empty", { "User-Agent": "" }],                   // 빈 UA — 현재 403, 폴백
 ];
 const FETCH_TIMEOUT_MS = 8000;
 function espnFetch(u: string, headers: Record<string, string>): Promise<Response> {

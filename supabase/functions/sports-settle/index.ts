@@ -16,6 +16,18 @@
 // Trigger on a schedule (every ~3–5 min) via pg_cron, like sports-odds.
 // Required env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (auto). Optional CRON_SECRET.
 
+// 🪪 ESPN 요청은 **정직한 자기 식별 UA** 로 나간다 (2026-08-20 실측으로 확정).
+//    ESPN 은 `User-Agent: Deno/x.x`(Deno 가 자동으로 붙이는 값)를 403 으로 막는다.
+//    sports-games 의 UA 매트릭스 실측(live_games diag 04:16):
+//        deno-default → 403 ×11 · 빈 UA → 403 ×11 · "alpexa-feed/1.0" → 200 전 리그
+//    ⚠️ 정산에서 이게 왜 돈 문제인가: 여기 403 이면 최종 스코어가 안 들어와 **끝난 경기의
+//    베팅이 영원히 열린 채로 남는다**(고객 돈이 묶임). 2026-08-19~20 블랙아웃 동안 실제로
+//    그 상태였다. 표시 피드(sports-games)만 고치면 화면은 살아나도 정산은 계속 죽어 있다.
+//    ⚠️ 브라우저인 척(크롬 UA / Referer: espn.com)은 금지 — 그건 오히려 403 을 부른다.
+//       sports-games 와 **같은 값**을 쓴다. 한쪽만 바꾸면 한쪽이 다시 조용히 죽는다.
+const ESPN_UA = "alpexa-feed/1.0";
+const ESPN_INIT: RequestInit = { cache: "no-store", headers: { "User-Agent": ESPN_UA } };
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -57,7 +69,7 @@ async function fetchLeagueResults(L: { lg: string; path: string }, out: Record<s
   const tries = [direct, "https://corsproxy.io/?url=" + encodeURIComponent(direct)];
   for (const u of tries) {
     try {
-      const res = await fetch(u, { cache: "no-store" });
+      const res = await fetch(u, ESPN_INIT);
       if (!res.ok) continue;
       const d = await res.json();
       for (const ev of (d.events || [])) {
@@ -104,7 +116,7 @@ async function fetchUFCResults(out: Record<string, Result>) {
   const tries = [direct, "https://corsproxy.io/?url=" + encodeURIComponent(direct)];
   for (const u of tries) {
     try {
-      const res = await fetch(u, { cache: "no-store" });
+      const res = await fetch(u, ESPN_INIT);
       if (!res.ok) continue;
       const d = await res.json();
       for (const ev of (d.events || [])) {
@@ -139,7 +151,7 @@ async function fetchGolfWinners(out: Record<string, string>) {
   const tries = [direct, "https://corsproxy.io/?url=" + encodeURIComponent(direct)];
   for (const u of tries) {
     try {
-      const res = await fetch(u, { cache: "no-store" });
+      const res = await fetch(u, ESPN_INIT);
       if (!res.ok) continue;
       const d = await res.json();
       for (const ev of (d.events || [])) {
