@@ -35,6 +35,15 @@ if (!/prevAgeMs < 2 \* 3600 \* 1000/.test(src))
 if (!/return json\(\{ ok: false, error: "collapse-guard/.test(src))
   bad('붕괴를 조용히 넘기면 안 된다 — 실패로 보고해야 크론/감시가 본다');
 
+// ── P4 · 실패가 **보여야** 한다 (2026-08-19: 왜 0경기인지 알 길이 없어 진단이 하루 늦었다) ──
+// (정규식 주의: 기록 코드 안에 u.slice(0, 60) 의 괄호가 있어 [^)]* 로는 못 넘는다)
+if (!/if \(!res\.ok\) \{ DIAG\.push\(/.test(src) || !/status: res\.status/.test(src))
+  bad('ESPN 응답이 !ok 일 때 조용히 건너뛴다 — 왜 0경기인지 알 수 없다. 시도별 상태를 남길 것');
+if (!/diag: DIAG\.slice/.test(src))
+  bad('진단을 응답에 싣지 않는다 — 한 번 호출로 원인을 못 본다');
+if (!/api\.allorigins\.win/.test(src))
+  bad('미러가 corsproxy 하나뿐이다 — 그 프록시가 죽으면 보드가 통째로 빈다');
+
 // ── P3 · 감시가 내용까지 본다 ──
 const chk = fs.readFileSync(path.join(ROOT, 'tests/daily-selfcheck.js'), 'utf8');
 if (!/BLACKOUT_FLOOR/.test(chk)) bad('daily-selfcheck 가 경기 수 바닥을 안 본다 — 빈 피드가 신선하면 🟢로 통과한다');

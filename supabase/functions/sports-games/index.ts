@@ -410,6 +410,11 @@ async function stickyOpenBetGames(games: any[], SB_URL: string, H: Record<string
   } catch (_e) { /* sticky는 표시 연속성 — 실패해도 본 피드는 그대로 */ }
 }
 
+// 🔎 진단 (2026-08-19 블랙아웃). 예전엔 `!res.ok` 를 **조용히 건너뛰어** 왜 0경기인지 알 길이 없었다
+//    — 로그에도 안 남아 사장님 화면이 유일한 신호였다. 시도별 결과를 모아 응답에 실어 보낸다.
+//    한 번 호출하면 어느 리그가 어떤 상태로 죽었는지 바로 보인다(부작용 없음, 순수 관측).
+const DIAG: any[] = [];
+
 async function fetchLeague(L: { lg: string; sport: string; path: string }, out: any[], endMs?: number) {
   // Request a date RANGE (today → +8d, 또는 배당 지평 endMs까지) so live_games carries
   // UPCOMING fixtures — ESPN's default scoreboard is today-only. 배당 지평(oddsHorizons)이
@@ -423,13 +428,17 @@ async function fetchLeague(L: { lg: string; sport: string; path: string }, out: 
   const range = ymd(new Date()) + "-" + ymd(new Date(endTs));
   const base = `https://site.api.espn.com/apis/site/v2/sports/${L.path}/scoreboard`;
   const cp = (u: string) => "https://corsproxy.io/?url=" + encodeURIComponent(u);
-  const tries = [base + "?dates=" + range, cp(base + "?dates=" + range), base, cp(base)];
+  // 미러 2종 — 한 프록시가 죽어도 보드가 통째로 비지 않게 (2026-08-19: 전 리그 0경기 사고).
+  const ao = (u: string) => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u);
+  const tries = [base + "?dates=" + range, cp(base + "?dates=" + range), ao(base + "?dates=" + range),
+                 base, cp(base), ao(base)];
   const before = out.length;
   for (const u of tries) {
     try {
       const res = await fetch(u, { cache: "no-store" });
-      if (!res.ok) continue;
+      if (!res.ok) { DIAG.push({ lg: L.lg, url: u.slice(0, 60), status: res.status }); continue; }
       const d = await res.json();
+      DIAG.push({ lg: L.lg, url: u.slice(0, 60), status: 200, events: (d.events || []).length });
       for (const ev of (d.events || [])) {
         try {
           const comp = ev.competitions && ev.competitions[0];
@@ -456,7 +465,7 @@ async function fetchLeague(L: { lg: string; sport: string; path: string }, out: 
       if (out.length > before) return; // got games from this URL → done
       // else: 200 OK but 0 games (an off-season league in the ranged window) → keep going
       // so the plain (default) scoreboard fallback can add its next scheduled games.
-    } catch (_e) { /* try next mirror */ }
+    } catch (e) { DIAG.push({ lg: L.lg, url: u.slice(0, 60), err: String((e as Error).message).slice(0, 90) }); }
   }
 }
 
@@ -505,7 +514,8 @@ Deno.serve(async (req) => {
   const floor = Math.max(10, Math.floor(prevCount * 0.5));
   if (prevCount >= 20 && games.length < floor && prevAgeMs < 2 * 3600 * 1000) {
     return json({ ok: false, error: "collapse-guard: refused to overwrite a healthy feed",
-      got: games.length, prev: prevCount, floor, prev_age_min: Math.round(prevAgeMs / 60000) }, 500);
+      got: games.length, prev: prevCount, floor, prev_age_min: Math.round(prevAgeMs / 60000),
+      diag: DIAG.slice(0, 40) }, 500);
   }
 
   // Upsert the single 'all' row (clients read this).
@@ -515,5 +525,6 @@ Deno.serve(async (req) => {
     body: JSON.stringify({ id: "all", data: games, updated_at: new Date().toISOString() }),
   });
   if (!r.ok) return json({ ok: false, error: "store " + r.status + " " + (await r.text()) }, 500);
-  return json({ ok: true, games: games.length });
+  // 진단은 항상 실어 보낸다 — 0경기일 때 "왜"를 한 번의 호출로 알 수 있어야 한다.
+  return json({ ok: true, games: games.length, diag: DIAG.slice(0, 40) });
 });
