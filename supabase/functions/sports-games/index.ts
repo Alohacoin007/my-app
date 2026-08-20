@@ -8,20 +8,39 @@
 //
 // Required env (auto): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. Optional CRON_SECRET.
 
-// 🚫 ESPN 에 **브라우저 위장 헤더를 붙이지 않는다** (2026-08-20 실측으로 확정).
-//    2026-08-19 블랙아웃 때 "데이터센터 IP 차단이겠지"라는 *가설*로 UA/Referer 위장 헤더를
-//    붙였는데, 그게 오히려 403 을 만들었다. 같은 러너·같은 IP·같은 URL 을 ms 차이로 비교한
-//    실측 (`tests/espn-transport-probe.js`, GitHub Actions 로그):
+// 🚫 ESPN 에 **브라우저 위장 헤더를 붙이지 않는다** (2026-08-20 실측).
+//    2026-08-19 블랙아웃 때 "데이터센터 IP 차단이겠지"라는 *가설*로 크롬 UA + `Referer:
+//    espn.com` 을 붙였는데, 그게 오히려 403 을 만들었다. 같은 러너·같은 IP·같은 URL 을
+//    ms 차이로 비교한 실측 (`tests/espn-transport-probe.js`, GitHub Actions 로그):
 //        헤더 없음  → 200, events=632 / 111 / 50   (MLB / NFL / EPL)
 //        위장 헤더  → 403, 403, 403
-//    ESPN(Akamai)은 헤더 없는 요청은 그냥 내주고, `Referer: espn.com` + 크롬 UA 인데 TLS
-//    지문은 크롬이 아닌 요청을 봇으로 보고 막는다. 위장은 통과가 아니라 **탐지 신호**다.
-//    ⚠️ 다시 붙이지 말 것 — `tests/diagnose.js` 가 이 패턴을 정적으로 막는다.
-//    아래 fetch 는 헤더 없이, 타임아웃만 걸어서 호출한다.
+//    ESPN(Akamai)은 크롬 UA 인데 TLS 지문이 크롬이 아닌 요청을 봇으로 본다 — 위장은
+//    통과가 아니라 **탐지 신호**다. ⚠️ 다시 붙이지 말 것(`tests/diagnose.js` 가 막는다).
+//
+// 🔬 그런데 위장 헤더를 지운 뒤에도 Supabase Edge 는 전 리그 403 이었다(04:00 실측).
+//    두 위치의 차이는 IP 만이 아니다 — **Deno 는 헤더를 안 붙여도 `User-Agent: Deno/x.x`
+//    를 자동으로 보내고**, 200 을 받은 GitHub 러너(Node)는 UA 를 안 보낸다. 그래서 남은
+//    변수는 "Deno 의 자동 UA" 하나다. 별도 진단 함수를 만들지 않고 **폴백 사슬 안에서**
+//    UA 변형을 차례로 시도한다 — 되는 게 있으면 그 자리에서 피드가 살아나고(자가치유),
+//    전부 막히면 DIAG 에 전 변형의 403 이 남아 IP 차단이 확정된다. 진단과 수정이 한 배포.
+//    ⚠️ 여기 UA 는 **정직한 식별자이거나 빈 값**이다. 브라우저인 척하지 않는다.
+const UA_TRIES: Array<[string, Record<string, string>]> = [
+  ["deno-default", {}],                                 // Deno 가 자동으로 UA 를 붙임
+  ["ua-empty", { "User-Agent": "" }],                   // Node 처럼 UA 를 안 보내는 쪽에 가장 가깝다
+  ["ua-alpexa", { "User-Agent": "alpexa-feed/1.0" }],   // 정직한 자기 식별 (봇 위장 아님)
+];
 const FETCH_TIMEOUT_MS = 8000;
-function espnFetch(u: string): Promise<Response> {
+function espnFetch(u: string, headers: Record<string, string>): Promise<Response> {
   // 미러가 20초씩 매달려 전체 갱신을 잡아먹지 않게 (실측: allorigins/codetabs 19.7초 행).
-  return fetch(u, { cache: "no-store", signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+  return fetch(u, { cache: "no-store", headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+}
+// URL 목록 × UA 변형 → 시도 목록. 직접 호출에만 UA 변형을 곱한다(프록시는 자기 UA 로
+// 나가므로 무의미). 성공하면 즉시 끊기니 실제 요청 수는 대부분 1회다.
+function withUAs(direct: string[], viaProxy: string[]): Array<[string, string, Record<string, string>]> {
+  const out: Array<[string, string, Record<string, string>]> = [];
+  for (const u of direct) for (const [nm, h] of UA_TRIES) out.push([nm, u, h]);
+  for (const u of viaProxy) out.push(["proxy", u, {}]);
+  return out;
 }
 
 const cors = {
@@ -58,11 +77,11 @@ async function fetchGolf(out: any[]) {
   const range = ymd(new Date()) + "-" + ymd(new Date(Date.now() + 8 * 86400000));
   const base = "https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard";
   const cp = (u: string) => "https://corsproxy.io/?url=" + encodeURIComponent(u);
-  const tries = [base + "?dates=" + range, cp(base + "?dates=" + range), base, cp(base)];
+  const tries = withUAs([base + "?dates=" + range, base], [cp(base + "?dates=" + range), cp(base)]);
   const before = out.length;
-  for (const u of tries) {
+  for (const [, u, h] of tries) {
     try {
-      const res = await espnFetch(u);
+      const res = await espnFetch(u, h);
       if (!res.ok) continue;
       const d = await res.json();
       for (const ev of (d.events || [])) {
@@ -446,15 +465,16 @@ async function fetchLeague(L: { lg: string; sport: string; path: string }, out: 
   const cp = (u: string) => "https://corsproxy.io/?url=" + encodeURIComponent(u);
   // 미러 2종 — 한 프록시가 죽어도 보드가 통째로 비지 않게 (2026-08-19: 전 리그 0경기 사고).
   const ao = (u: string) => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u);
-  const tries = [base + "?dates=" + range, cp(base + "?dates=" + range), ao(base + "?dates=" + range),
-                 base, cp(base), ao(base)];
+  const tries = withUAs(
+    [base + "?dates=" + range, base],
+    [cp(base + "?dates=" + range), ao(base + "?dates=" + range), cp(base), ao(base)]);
   const before = out.length;
-  for (const u of tries) {
+  for (const [ua, u, h] of tries) {
     try {
-      const res = await espnFetch(u);
-      if (!res.ok) { DIAG.push({ lg: L.lg, url: u.slice(0, 60), status: res.status }); continue; }
+      const res = await espnFetch(u, h);
+      if (!res.ok) { DIAG.push({ lg: L.lg, ua, url: u.slice(0, 50), status: res.status }); continue; }
       const d = await res.json();
-      DIAG.push({ lg: L.lg, url: u.slice(0, 60), status: 200, events: (d.events || []).length });
+      DIAG.push({ lg: L.lg, ua, url: u.slice(0, 50), status: 200, events: (d.events || []).length });
       for (const ev of (d.events || [])) {
         try {
           const comp = ev.competitions && ev.competitions[0];
@@ -481,7 +501,7 @@ async function fetchLeague(L: { lg: string; sport: string; path: string }, out: 
       if (out.length > before) return; // got games from this URL → done
       // else: 200 OK but 0 games (an off-season league in the ranged window) → keep going
       // so the plain (default) scoreboard fallback can add its next scheduled games.
-    } catch (e) { DIAG.push({ lg: L.lg, url: u.slice(0, 60), err: String((e as Error).message).slice(0, 90) }); }
+    } catch (e) { DIAG.push({ lg: L.lg, ua, url: u.slice(0, 50), err: String((e as Error).message).slice(0, 80) }); }
   }
 }
 

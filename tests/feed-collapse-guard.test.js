@@ -56,9 +56,14 @@ if (!/api\.allorigins\.win/.test(src))
 //    ESPN(Akamai)은 헤더 없는 요청은 그냥 내주고, 크롬 UA 인데 TLS 지문이 크롬이 아닌 요청을
 //    봇으로 본다. 위장은 통과가 아니라 탐지 신호다 — 그 헤더가 블랙아웃을 하루 더 끌었다.
 //    👉 교훈: **검증 안 된 가설을 핀으로 만들지 마라.** 핀은 실측한 사실만 굳힌다.
+// 금지 대상은 "UA 를 보내는 것"이 아니라 **브라우저인 척하는 것**이다. 정직한 식별자
+// (alpexa-feed/1.0)나 빈 UA 는 허용 — 실제로 Deno 자동 UA 를 우회하는 정당한 수단이다.
 if (/ESPN_HEADERS/.test(src)) bad('ESPN 위장 헤더 상수가 되살아났다 — 실측상 이게 403 을 만든다');
-if (/["'](?:User-Agent|Referer)["']\s*:/.test(src))
-  bad('ESPN 요청에 User-Agent/Referer 를 붙이고 있다 (403 유발, 2026-08-20 실측)');
+if (/["'](?:User-Agent|Referer)["']\s*:\s*["'](?:Mozilla|https:\/\/(?:www\.)?espn)/i.test(src))
+  bad('ESPN 요청에 브라우저 위장 UA/Referer 를 붙이고 있다 (403 유발, 2026-08-20 실측)');
+// UA 변형 폴백이 살아 있어야 한다 — Deno 자동 UA 가 막히면 이게 유일한 자가치유 경로다.
+if (!/UA_TRIES/.test(src))
+  bad('UA 변형 폴백이 없다 — Deno 자동 UA 하나에만 의존하면 그게 막히는 순간 전 리그 블랙아웃');
 if (!/AbortSignal\.timeout/.test(src))
   bad('ESPN fetch 에 타임아웃이 없다 — 죽은 미러가 20초씩 매달려 갱신을 잡아먹는다(실측 19.7초)');
 
