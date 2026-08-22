@@ -29,6 +29,12 @@
 const ESPN_UA = "alpexa-feed/1.0";
 const ESPN_INIT: RequestInit = { cache: "no-store", headers: { "User-Agent": ESPN_UA } };
 
+// 🚀 배포 경로 검증 (2026-08-22): 이 함수는 GitHub Actions(deploy-edge.yml)가 자동 배포한
+//    첫 Edge 함수다. 허용목록 중 가장 안전해서 첫 타자로 골랐다 — 여기가 죽어도 배당만
+//    멈추고 경기는 잠기는 쪽(fail-safe)이라 돈이 잘못 움직이지 않는다.
+//    ⚠️ verify_jwt 는 supabase/config.toml 이 false 로 고정한다. CLI 기본값(검증 ON)으로
+//    나가면 크론이 Authorization 헤더 없이 부르므로 즉시 401 = 배당 전면 정지.
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
