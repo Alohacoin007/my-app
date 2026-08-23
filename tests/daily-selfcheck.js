@@ -73,8 +73,12 @@ function oddsStatus(g) {
   // 안 보고 있었다 — 2026-08-19 블랙아웃과 똑같은 "조용한 쪽" 구조. 화면에 안 뜨는 곳이
   // 진짜 위험한 곳이다.
   //   🔴 판정: 유령 open 행(정산됐는데 status='open') · 유닛 불변식 깨짐 — 둘 다 돈 문제.
-  //   ⚠️ 경고만: 롤오버 잠김(열린 포지션이 있으면 join/leave 가 막히는 건 **설계된 동작**).
-  //      정상 상태를 빨강으로 울리면 경보가 무시당한다(CLAUDE.md "오탐 체크는 더 해롭다").
+  //   그 외는 **사실만 표시하고 경고하지 않는다** (2026-08-23 사장님 지시 ⓐ).
+  //     첫 버전은 "7일 초과 — 롤오버 계획 확인 권장"을 매 3시간 붙였는데, 펀드 매니저가
+  //     포지션을 18일 들고 있는 건 지극히 정상적인 트레이딩이다. 정상 상태에 경고를 달면
+  //     그 알람은 무시당하고, 그러면 진짜 경보(유령 행·유닛 불일치)까지 같이 묻힌다
+  //     — CLAUDE.md "오탐 체크는 무시당해 더 해롭다". 잠김은 **상태**지 문제가 아니다.
+  //     (참여/회수는 롤오버 창에서 잠깐 플랫으로 만들면 처리된다 — 영구 청산이 아니다.)
   try {
     const r = await fetch(`${URL}/rest/v1/rpc/pamm_health`, {
       method: 'POST', headers: { ...H, 'Content-Type': 'application/json' }, body: '{}',
@@ -89,15 +93,10 @@ function oddsStatus(g) {
         const unitsBad = f.units_ok === false;
         flag(ghost > 0 || unitsBad,
           `PAMM ${f.name}(${f.fund_acct}): ${f.status} · NAV ${f.nav} · 열린 ${f.open_positions}건 ${f.open_lots}랏` +
-          (f.open_positions > 0 ? ` · 플로팅 ${f.float_pct}% · ${f.oldest_open_days}일째` : '') +
+          (f.open_positions > 0 ? ` · 플로팅 ${f.float_pct}% · ${f.oldest_open_days}일째 · 참여/회수 잠김` : '') +
           ` · 투자자 ${f.members}명` +
           (ghost > 0 ? ` — 🚨 유령 행 ${ghost}건 (정산 기록이 있는데 status=open) → Equity·NAV 왜곡 + join/leave 영구 잠김` : '') +
           (unitsBad ? ` — 🚨 유닛 불변식 깨짐: total ${f.total_units} ≠ 회원합 ${f.members_units}` : ''));
-        // 운영 사실 안내(빨강 아님) — 며칠째 고객이 못 들어오고 못 나가는지 사람이 알아야 한다.
-        if (!ghost && !unitsBad && f.join_leave_locked) {
-          console.log(`     ↳ ⚠️ 열린 포지션 때문에 참여·회수 잠김 (${f.oldest_open_days}일째, P3 롤오버 게이트 — 설계된 동작).` +
-            (f.oldest_open_days >= 7 ? ' 7일 초과 — 롤오버 계획 확인 권장.' : ''));
-        }
       }
     }
   } catch (e) { console.log('  ⏭️  PAMM 점검 생략: ' + e.message); }
