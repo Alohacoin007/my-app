@@ -4,6 +4,7 @@
 // 아침·저녁 루틴이 이 한 방으로 돈다. 커버(사장님 지정 4종 + 시세):
 //   ① 스케줄·오즈 — 오늘/내일 경기 수, 실배당/잠금, 가짜라인 노출 여부 (live_games)
 //   ② 주문·결제·미청산 — sports-audit(C1~C9) verdict + 미정산 건수/최대 노출/홀드
+//   ②b PAMM 펀드 — 유령 open 행·유닛 불변식·롤오버 잠김 (pamm_health)
 //   ③ 시세 라이브니스 — 서버 prices 크립토 갱신 주기 실측 (3s 스펙)
 // 원칙: 전부 읽기 전용. 돈/쓰기 0. RED가 하나라도 있으면 exit 1 (루틴이 원인 추적 모드로).
 // 토큰: WELCOME_SECRET(이미 repo 공개·실고객 전 교체 예정 — 리마인드 등록됨). env로 덮어쓰기 가능.
@@ -65,6 +66,41 @@ function oddsStatus(g) {
       if (a.verdict === 'red') console.log('     ↳ 이메일 상세(C1~C9) 확인 + 미청산 나이/원인 추적할 것 (settle 규칙 A/B 배포 여부 포함)');
     }
   } catch (e) { flag(true, '돈-상태 감사 실패: ' + e.message); }
+
+  // ── ②b PAMM 펀드 건전성 (2026-08-23 신설) ──
+  // 왜 생겼나: 사장님이 "PAMM 포지션 다 닫혔어?"라고 물어봐서야 펀드에 EURUSD 8.1랏이
+  // 17일째 열려 있다는 걸 알았다. 그동안 이 검진은 스포츠 미청산만 보고 PAMM 은 아무도
+  // 안 보고 있었다 — 2026-08-19 블랙아웃과 똑같은 "조용한 쪽" 구조. 화면에 안 뜨는 곳이
+  // 진짜 위험한 곳이다.
+  //   🔴 판정: 유령 open 행(정산됐는데 status='open') · 유닛 불변식 깨짐 — 둘 다 돈 문제.
+  //   ⚠️ 경고만: 롤오버 잠김(열린 포지션이 있으면 join/leave 가 막히는 건 **설계된 동작**).
+  //      정상 상태를 빨강으로 울리면 경보가 무시당한다(CLAUDE.md "오탐 체크는 더 해롭다").
+  try {
+    const r = await fetch(`${URL}/rest/v1/rpc/pamm_health`, {
+      method: 'POST', headers: { ...H, 'Content-Type': 'application/json' }, body: '{}',
+    });
+    if (!r.ok) console.log('  ⏭️  PAMM: pamm_health() 미배포 — supabase/sql/pamm_health.sql 실행 대기');
+    else {
+      const h = await r.json();
+      const funds = (h && h.funds) || [];
+      if (!funds.length) console.log('  ⏭️  PAMM: 등록된 펀드 없음');
+      for (const f of funds) {
+        const ghost = +f.ghost_positions || 0;
+        const unitsBad = f.units_ok === false;
+        flag(ghost > 0 || unitsBad,
+          `PAMM ${f.name}(${f.fund_acct}): ${f.status} · NAV ${f.nav} · 열린 ${f.open_positions}건 ${f.open_lots}랏` +
+          (f.open_positions > 0 ? ` · 플로팅 ${f.float_pct}% · ${f.oldest_open_days}일째` : '') +
+          ` · 투자자 ${f.members}명` +
+          (ghost > 0 ? ` — 🚨 유령 행 ${ghost}건 (정산 기록이 있는데 status=open) → Equity·NAV 왜곡 + join/leave 영구 잠김` : '') +
+          (unitsBad ? ` — 🚨 유닛 불변식 깨짐: total ${f.total_units} ≠ 회원합 ${f.members_units}` : ''));
+        // 운영 사실 안내(빨강 아님) — 며칠째 고객이 못 들어오고 못 나가는지 사람이 알아야 한다.
+        if (!ghost && !unitsBad && f.join_leave_locked) {
+          console.log(`     ↳ ⚠️ 열린 포지션 때문에 참여·회수 잠김 (${f.oldest_open_days}일째, P3 롤오버 게이트 — 설계된 동작).` +
+            (f.oldest_open_days >= 7 ? ' 7일 초과 — 롤오버 계획 확인 권장.' : ''));
+        }
+      }
+    }
+  } catch (e) { console.log('  ⏭️  PAMM 점검 생략: ' + e.message); }
 
   // ── ③ 시세 라이브니스 (서버 prices — 크립토는 24/7이라 항상 신선해야) ──
   try {
