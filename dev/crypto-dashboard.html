@@ -1274,23 +1274,57 @@ function mkSave(){ try{ localStorage.setItem(MK_KEY,JSON.stringify(mk.list)); }c
 function mkFmtPx(v){ if(v==null||!isFinite(v)) return '—';
   const d=(v>0&&v<1)?Math.min(10,Math.max(2,2-Math.floor(Math.log10(v)))):2;   // 미세가 확장 (앱 fmtUsd:899)
   return '$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:d}); }
+function mkRowHTML(r,i){
+  const up=(r.chg||0)>=0, f=r._f?(' '+r._f):'';
+  return '<div class="mrow'+f+'" data-sym="'+r.s+'" draggable="true">'+
+    '<span class="idx">'+(i+1)+'</span>'+
+    '<span class="sym">'+r.s+(r.s==='ALPXS'?'<span class="cbadge">A</span>':'<span class="cbadge">₿</span>')+'</span>'+
+    '<span class="chg '+(r.chg==null?'':(up?'up':'down'))+'">'+
+      (r.chg==null?'—':(up?'▲ ':'▼ ')+Math.abs(r.chg).toFixed(2)+'%')+'</span>'+
+    '<span class="px">'+mkFmtPx(r.bid)+'</span>'+
+    '<span class="px">'+mkFmtPx(r.ask)+'</span></div>';
+}
+/* 제자리 갱신 — DOM 노드를 **유지한 채** 숫자만 바꾼다. 아래 mkRender의 서명 가드와 한 쌍. */
+function mkPaintRow(row,r,i){
+  const up=(r.chg||0)>=0;
+  const idx=row.children[0], chg=row.children[2], bid=row.children[3], ask=row.children[4];
+  if(!idx||!chg||!bid||!ask) return false;          // 마크업이 다르면 전체 재생성으로 넘긴다
+  const iTxt=String(i+1); if(idx.textContent!==iTxt) idx.textContent=iTxt;
+  const cTxt=(r.chg==null?'—':(up?'▲ ':'▼ ')+Math.abs(r.chg).toFixed(2)+'%');
+  if(chg.textContent!==cTxt) chg.textContent=cTxt;
+  const cCls='chg '+(r.chg==null?'':(up?'up':'down'));
+  if(chg.className!==cCls) chg.className=cCls;
+  const bTxt=mkFmtPx(r.bid); if(bid.textContent!==bTxt) bid.textContent=bTxt;
+  const aTxt=mkFmtPx(r.ask); if(ask.textContent!==aTxt) ask.textContent=aTxt;
+  // 가격 플래시: 같은 클래스를 다시 붙이면 CSS 애니메이션이 재시작하지 않는다 → 리플로우로 강제.
+  row.classList.remove('fu','fd');
+  if(r._f){ void row.offsetWidth; row.classList.add(r._f); }
+  return true;
+}
+/* ⚠️ 틱마다 innerHTML 을 통째로 갈아끼우지 않는다 (2026-08-26 사장님 신고 "+ Add 가 잘 안 눌려").
+   mkTouch 가 시세 틱마다(최대 150ms 간격 = 초당 6~7회) mkRender 를 부른다. 예전 코드는 그때마다
+   목록 전체를 innerHTML 로 재생성했는데, 브라우저는 **mousedown 과 mouseup 의 대상이 같아야**
+   click 을 발생시킨다 → 누르는 순간 `+ Add` div 와 `.mrow` 가 파괴·재생성되니 클릭이 그냥 씹혔다.
+   (BTC 가 워치리스트에서 빠졌는데 되돌리지도 못한 게 이 버그 때문이다 — 복구 버튼 자체가 안 눌렸다.)
+   규칙: **행 구성·순서가 그대로면 노드를 유지하고 숫자만 칠한다.** 재생성은 목록이 실제로
+   바뀌었을 때(추가·삭제·정렬 변경)만. 클릭 타깃이 사용자 손가락 밑에서 사라지면 안 된다. */
 function mkRender(){
   const el=document.getElementById('mkList'); if(!el) return;
   const rows=mk.list.map(s=>({s,...(mk.q[s]||{})}));
   rows.sort((a,b)=>{ const av=a.chg==null?-1e9*mk.dir:a.chg, bv=b.chg==null?-1e9*mk.dir:b.chg;
     return (av-bv)*mk.dir; });
-  el.innerHTML=rows.map((r,i)=>{
-    const up=(r.chg||0)>=0, f=r._f?(' '+r._f):'';
-    return '<div class="mrow'+f+'" data-sym="'+r.s+'" draggable="true">'+
-      '<span class="idx">'+(i+1)+'</span>'+
-      '<span class="sym">'+r.s+(r.s==='ALPXS'?'<span class="cbadge">A</span>':'<span class="cbadge">₿</span>')+'</span>'+
-      '<span class="chg '+(r.chg==null?'':(up?'up':'down'))+'">'+
-        (r.chg==null?'—':(up?'▲ ':'▼ ')+Math.abs(r.chg).toFixed(2)+'%')+'</span>'+
-      '<span class="px">'+mkFmtPx(r.bid)+'</span>'+
-      '<span class="px">'+mkFmtPx(r.ask)+'</span></div>';
-  }).join('')
-  // + Add는 리스트 "마지막 행 바로 아래" (레전드 문법 — 사용자 스크린샷 2026-07-16)
-  +'<div class="madd" id="mkAdd">+&nbsp; Add</div>';
+  const sig=rows.map(r=>r.s).join(',');
+  const nodes=el.querySelectorAll('.mrow');
+  let painted=false;
+  if(el.dataset.mkSig===sig && nodes.length===rows.length && el.querySelector('.madd')){
+    painted=rows.every((r,i)=>mkPaintRow(nodes[i],r,i));
+  }
+  if(!painted){
+    el.dataset.mkSig=sig;
+    el.innerHTML=rows.map(mkRowHTML).join('')
+      // + Add는 리스트 "마지막 행 바로 아래" (레전드 문법 — 사용자 스크린샷 2026-07-16)
+      +'<div class="madd" id="mkAdd">+&nbsp; Add</div>';
+  }
   rows.forEach(r=>{ if(mk.q[r.s]) mk.q[r.s]._f=''; });
 }
 function mkTouch(s,last,chg,bid,ask,extra){
