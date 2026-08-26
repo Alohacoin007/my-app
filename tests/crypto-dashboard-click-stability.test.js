@@ -122,6 +122,30 @@ const TICK = `(n)=>{ const syms=mk.list.filter(s=>s!=='ALPXS');
   ok('P5 목록이 실제로 바뀌면 재생성된다 (BTC 제거 → 복귀, + Add 유지)',
      relist.gone && relist.back && relist.add, JSON.stringify(relist));
 
+  // ── P6·P7: 코인 추가 팝오버는 **크립토 전용** 카테고리 (2026-08-26 사장님 지시) ──
+  //   주식·퓨쳐스·인덱스는 이 대시보드가 다루지 않는다. 없는 상품을 "Soon"으로 걸어두면
+  //   있는 척이 된다 — "거래 불가한데 가능처럼 보이면 안 된다"는 피드 규율과 같은 원칙.
+  const chips = await page.evaluate(() =>
+    [...document.querySelectorAll('#mkPop .chips .chip')].map(c => (c.dataset.c || '') + ':' + c.textContent.trim()));
+  ok('P6 카테고리 = 크립토 전용 (주식·퓨쳐스·인덱스 없음)',
+     chips.join('|') === 'all:All|crypto:Crypto|memes:Memes|stable:Stablecoins|sto:STO', JSON.stringify(chips));
+
+  const cats = await page.evaluate(`(async()=>{
+    const pick=async(c)=>{ mk.pcat=c; mkRenderPlist(); await new Promise(r=>setTimeout(r,30));
+      return [...document.querySelectorAll('#mkPlist .prow')].map(x=>x.dataset.sym); };
+    const sto=await pick('sto'); const grp=document.getElementById('mkGrp').textContent;
+    return { sto, grp, stable: await pick('stable'), memes: await pick('memes'), crypto: await pick('crypto') };
+  })()`);
+  ok('P7 STO = ALPXS 한 개 (그룹 라벨 "' + cats.grp + '")',
+     cats.sto.join(',') === 'ALPXS', JSON.stringify(cats.sto));
+  ok('P7 Stablecoins = 서버 prices 에 값이 있는 3종만 (USDT·USDC·DAI)',
+     cats.stable.join(',') === 'USDT,USDC,DAI', JSON.stringify(cats.stable));
+  ok('P7 Memes 목록이 채워져 있다 (' + cats.memes.length + '종)',
+     cats.memes.length >= 4 && cats.memes.includes('DOGE') && cats.memes.includes('PEPE'), JSON.stringify(cats.memes));
+  ok('P7 Crypto(메이저)에 밈·스테이블·STO 가 섞이지 않는다',
+     cats.crypto.includes('BTC') && !cats.crypto.includes('DOGE')
+       && !cats.crypto.includes('USDT') && !cats.crypto.includes('ALPXS'), JSON.stringify(cats.crypto));
+
   await browser.close(); server.close();
   console.log(fail ? `\n🔴 FAIL — ${fail}건 (pass ${pass})` : `\n🟢 PASS — ${pass}건: 시세가 흘러도 클릭 타깃이 살아있다.`);
   process.exit(fail ? 1 : 0);
