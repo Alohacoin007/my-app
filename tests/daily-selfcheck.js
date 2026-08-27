@@ -21,8 +21,27 @@ function oddsStatus(g) {
   if (g.lg === 'GOLF') { const oc = g.outright || []; return (g.oddsReal === true && oc.length >= 2) ? 'REAL' : 'LOCK'; }
   if (g.lg === 'SOC') { const tw = g.threeWay || []; if (tw.length < 3) return 'LOCK'; return g.oddsReal === true ? 'REAL' : (+tw[1].am === 230 ? 'FAKE' : 'REAL'); }
   const ml = g.ml || []; if (ml.length < 2) return 'LOCK';
-  const a = +ml[0].am, b = +ml[1].am;
-  return ((a === -140 && b === 120) || (a === 120 && b === -140)) ? 'FAKE' : 'REAL';
+  // 🚨 판정 기준 (2026-08-27 오탐 수정). 예전엔 **머니라인 숫자 두 개만** 보고
+  //    (-140,120)이면 가짜로 몰았다. 그런데 -140/+120 은 실제로 흔한 NFL 라인이라
+  //    진짜 북메이커 가격이 매번 🚨로 잡혔다 (Patriots @ Browns 실측: spread ±2.5 @
+  //    -105/-105, total 34.5 @ -113/-102 — 명백한 실배당인데 빨강). 정상 상태에 울리는
+  //    경보는 무시당하고, 그러면 진짜 가짜라인까지 같이 묻힌다.
+  //  · 권위는 서버의 oddsReal 이다 — place_bet 이 이 플래그로 leg 를 수락/거절한다.
+  //  · 그래도 "서버가 실배당이라 하는데 실은 조작된 기본값"인 경우를 위한 카나리아는 남긴다:
+  //    옛 가짜 라인의 **완전한 지문**(ml -140/120 + spread ±3.5 둘 다 -110 + total 45.5
+  //    둘 다 -110)이 전부 맞을 때만 가짜로 본다. 하나라도 다르면 진짜 북이다.
+  //  · 반대로 oddsReal 이 아닌데 **가격이 노출돼 있으면** 그 자체가 이상 → 🚨.
+  const am = (x) => +((x || {}).am);
+  const pair = (arr, v, j) => Array.isArray(arr) && arr.length >= 2 &&
+    Math.abs(Math.abs(parseFloat(String(arr[0].ln).replace(/[^\d.]/g, ''))) - v) < 1e-9 &&
+    am(arr[0]) === j && am(arr[1]) === j;
+  const a = am(ml[0]), b = am(ml[1]);
+  const mlPlaceholder = (a === -140 && b === 120) || (a === 120 && b === -140);
+  if (g.oddsReal === true) {
+    const full = mlPlaceholder && pair(g.spread, 3.5, -110) && pair(g.total, 45.5, -110);
+    return full ? 'FAKE' : 'REAL';     // 지문이 전부 맞을 때만 가짜 (숫자 두 개로는 판정 안 함)
+  }
+  return 'FAKE';                        // oddsReal 아닌데 가격 노출 = 잠겨야 할 게 안 잠김
 }
 
 (async () => {
