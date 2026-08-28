@@ -194,15 +194,54 @@ function nick(name: string): string { return String(name || "").trim().toLowerCa
 // Instead: strip club suffixes, take significant tokens (len>2), and require every token
 // of the SHORTER name to appear in the longer (subset). Safe for US sports too
 // ("Reds" ⊆ "Cincinnati Reds"); "Red Sox" ⊄ "Chicago White Sox" so no cross-match.
-function normNm(s: string): string {
-  return String(s || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\b(fc|sc|cf|afc|ac|sd|cd)\b/g, " ").replace(/\s+/g, " ").trim();
+// 2026-08-28: 부분집합만으로는 **약어**를 못 넘는다. ESPN 은 줄여 쓰고(The Odds API 는 풀네임)
+// → "Man City"⊄"Manchester City", "Nottm Forest"⊄"Nottingham Forest", "Spurs"⊄"Tottenham Hotspur",
+//   "LAFC"⊄"Los Angeles FC", "NYCFC"⊄"New York City FC", "Red Bull NY"⊄"New York Red Bulls".
+// 그 결과 **간판 경기가 정확히 잠기는** 상태였다(맨시티·리버풀·토트넘 = 손님이 제일 찾는 경기).
+// 악센트도 같은 원인: "Montréal" → [^a-z] 치환이 "montr al" 로 잘라 "montreal" 과 어긋났다.
+//
+// 고치는 방식 = **후보 확장(additive)**. 별칭으로 이름을 *덮어쓰지 않고* 후보를 하나 더 만든다.
+// 덮어쓰면 NBA "Spurs"(=San Antonio Spurs)가 "tottenham hotspur" 로 바뀌어 **농구가 깨진다**.
+// 후보를 더하면 원래 매칭은 100% 보존되고 약어만 추가로 붙는다. 퍼지/접두 매칭은 쓰지 않는다 —
+// 오매칭은 다른 경기 가격을 붙이는 **돈 사고**라, 검토된 명시 별칭만 허용한다.
+// 유일매칭·킥오프 6h 게이트는 그대로 (여기서 완화하는 것 없음).
+const NAME_ALIAS: Array<[RegExp, string]> = [
+  [/\bman city\b/, "manchester city"],
+  [/\bman (?:united|utd)\b/, "manchester united"],
+  [/\bnottm forest\b/, "nottingham forest"],
+  [/\bspurs\b/, "tottenham hotspur"],
+  [/\bwolves\b/, "wolverhampton wanderers"],
+  [/\bsheff (?:utd|united)\b/, "sheffield united"],
+  [/\bsheff wed\b/, "sheffield wednesday"],
+  [/\bwest brom\b/, "west bromwich albion"],
+  [/\blafc\b/, "los angeles"],
+  [/\bnycfc\b/, "new york city"],
+  [/\b(?:red bull ny|ny red bulls?)\b/, "new york red bulls"],
+];
+function normBase(s: string): string {
+  // NFD + 결합문자 제거 = 악센트 폴딩 ("Montréal" → "montreal"). 반드시 [^a-z0-9] 치환 **전에**.
+  return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 }
+function stripClub(s: string): string {
+  return s.replace(/\b(fc|sc|cf|afc|ac|sd|cd)\b/g, " ").replace(/\s+/g, " ").trim();
+}
+function normNm(s: string): string { return stripClub(normBase(s)); }
 function sigToks(s: string): string[] { return normNm(s).split(" ").filter((t) => t.length > 2); }
+// 원래 이름 + 별칭 적용본. 원래 것이 항상 첫 후보라 기존 매칭은 절대 잃지 않는다.
+function nameVariants(s: string): string[][] {
+  const base = normBase(s), out = [stripClub(base)];
+  for (const [re, to] of NAME_ALIAS) {
+    if (re.test(base)) { const v = stripClub(base.replace(re, to)); if (v && !out.includes(v)) out.push(v); }
+  }
+  return out.map((v) => v.split(" ").filter((t) => t.length > 2)).filter((t) => t.length > 0);
+}
 function teamMatch(a: string, b: string): boolean {
-  const A = sigToks(a), B = sigToks(b);
-  if (!A.length || !B.length) return false;
-  const [short, long] = A.length <= B.length ? [A, B] : [B, A];
-  return short.every((t) => long.includes(t));
+  for (const A of nameVariants(a)) for (const B of nameVariants(b)) {
+    const [short, long] = A.length <= B.length ? [A, B] : [B, A];
+    if (short.every((t) => long.includes(t))) return true;
+  }
+  return false;
 }
 function decP(p: number): number { return p > 0 ? 1 + p / 100 : 1 + 100 / (-p); }
 function fmtPt(p: number): string { return (p > 0 ? "+" : "") + p; }
