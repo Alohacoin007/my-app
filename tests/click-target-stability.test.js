@@ -65,8 +65,8 @@ if (!INIT) { console.log('  ⏭️  SKIP click-target-stability — visual-smoke
 const PAGES = [
   { f: 'index.html',                minCtl: 3, drivers: ['render', 'paint', 'renderTicker'] },
   { f: 'sports-live.html',          minCtl: 5, drivers: ['renderGames', 'renderAll', 'render', 'paint'] },
-  { f: 'crypto-live.html',          minCtl: 5, drivers: ['render', 'paint'] },
-  { f: 'trading.html',              minCtl: 5, drivers: ['render', 'paint'] },
+  { f: 'crypto-live.html',          minCtl: 5, drivers: ['__alpexaForceRender'] },   // React — 강제 리렌더
+  { f: 'trading.html',              minCtl: 5, drivers: ['__alpexaForceRender'] },   // React — 강제 리렌더
   { f: 'webtrade.html',             minCtl: 5, drivers: ['renderAll', 'render', 'paint'] },
   { f: 'dev/crypto-dashboard.html', minCtl: 5, drivers: ['mkRender', 'renderAll'] },
   { f: 'sportsbook-desk.html',      minCtl: 3, drivers: ['renderAll', 'renderKpi'] },
@@ -132,6 +132,14 @@ const CHECK = `(tagged) => {
     pg.on('requestfailed', (r) => { if (r.resourceType() === 'script') blockedScripts.push(r.url()); });
     try {
       await pg.addInitScript(INIT);
+      // 🔒 목 클라이언트를 **덮어쓰기 불가**로 잠근다.
+      //    vendor/supabase.min.js 가 나중에 로드되며 window.supabase 를 진짜 라이브러리로
+      //    덮어쓰면, alpexa-sync 가 진짜 클라를 만들고 → 세션이 없어 → login.html 로 튄다.
+      //    실제로 처음엔 이걸 몰라서 sports-live 를 검사한다고 하면서 **로그인 화면을 재고**
+      //    "✅ 6개 조작 요소"라고 보고했다. 검사 대상이 아예 다른 페이지였던 것.
+      await pg.addInitScript(`(function(){ try{ var m = window.supabase;
+        Object.defineProperty(window, 'supabase', { value: m, writable: false, configurable: false });
+      }catch(e){} })();`);
       // 오프라인 샌드박스에서 <head> 의 Google-Fonts / CDN 스크립트가 매달리면 **파싱 자체가
       // 멈춰** body 도 안 생긴다(첫 판에 document.body 가 null 이었던 원인). visual-smoke 가
       // agent.html 에만 쓰던 처리를 여기선 전 페이지에 건다 — 우리는 "그려지나"가 아니라
@@ -145,6 +153,14 @@ const CHECK = `(tagged) => {
       await pg.goto('file://' + fp, { waitUntil: 'commit', timeout: 15000 });
       await pg.waitForTimeout(SETTLE_MS);
       await pg.waitForFunction(() => !!document.body, null, { timeout: 8000 }).catch(() => {});
+
+      // 🚨 리다이렉트 감지 — 인증 게이트가 login.html 로 보냈으면 우리는 **다른 페이지**를
+      //    재고 있는 것이다. 그걸 그 화면의 결과라고 보고하면 거짓말이다.
+      const here = await pg.evaluate('location.pathname');
+      if (!String(here).endsWith('/' + P.f.split('/').pop())) {
+        console.log(`  ⏭️  ${P.f}: ${String(here).split('/').pop()} 로 리다이렉트됨(인증 게이트) — 이 화면은 검사 못 함`);
+        skipped++; await pg.close(); continue;
+      }
 
       const tagged = await pg.evaluate(`(${TAG})()`);
       checked++;

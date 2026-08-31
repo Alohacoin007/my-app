@@ -1788,6 +1788,11 @@
       '<div class="skel-line w40"></div><div class="skel-line w60"></div>'+
       '<div class="skel-row"><div class="skel-line"></div><div class="skel-line"></div><div class="skel-line"></div></div>'+
       '</div>'; } return h; }
+  // 🔬 테스트 손잡이 — tests/click-target-stability.test.js 가 "시세 틱이 왔을 때"를 흉내내려면
+  //    이 렌더 함수를 부를 수 있어야 한다(헤드리스엔 WS 가 없어 스스로는 안 흔들린다).
+  //    함수 선언은 호이스팅되므로 선언 앞에 둬도 동작한다. **노출만 할 뿐 동작은 안 바꾼다.**
+  //    지우면 이 화면이 "검사 불가"로 빠진다 = 배당 버튼이 다시 무방비가 된다.
+  try{ window.renderGames=renderGames; window.renderTickets=renderTickets; }catch(e){}
   function renderGames(){
     // Soccer (1X2) and golf (outright) cards are self-labeled → hide the Spread/Total/ML header.
     try{ var _soc=curSport==='SOC'||curSport==='GOLF'; ['colheadUp','colheadLive'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display=_soc?'none':''; }); }catch(e){}
@@ -3783,6 +3788,7 @@
     // re-render when a suspension lapses so the 🔒 clears on its own
     setInterval(()=>{ if(!document.hidden && window.__alpexaLiveBetting && typeof renderGames==='function'){
       var anyLive=GAMES.some(g=>g.live&&g.suspendUntil); if(anyLive) renderGames(); } }, 4000);
+
   })();
 </script>
 <script>

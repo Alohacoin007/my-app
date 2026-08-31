@@ -23247,6 +23247,15 @@ function AppRoot() {
   })))));
 }
 function App() {
+  // 🔬 테스트 손잡이 — tests/click-target-stability.test.js 가 "시세 틱이 왔을 때"를 흉내내려면
+  //    강제 리렌더를 걸 수 있어야 한다(헤드리스엔 WS 가 없어 스스로는 안 흔들린다).
+  //    React 는 보통 노드를 재사용하지만, key 를 인덱스/난수로 쓰면 매 렌더마다 노드가 갈려
+  //    버튼이 손가락 밑에서 사라진다 — 그 회귀를 이 손잡이로 잡는다.
+  //    **상태 하나만 늘릴 뿐 화면·동작은 바꾸지 않는다.** 지우면 이 앱이 "검사 불가"로 빠진다.
+  const [, __cts] = React.useState(0);
+  React.useEffect(() => {
+    window.__alpexaForceRender = () => __cts(n => n + 1);
+  }, []);
   const [screen, setScreen] = React.useState('dashboard');
   // ── Wallet state (persisted) ─────────────────────────────────────
   // No fake seed — holdings are adopted from the server (crypto_holdings). Starts
