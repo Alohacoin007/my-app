@@ -2388,7 +2388,7 @@ function Watchlist({
     }, formatPrice3(s.last, s.digits).pipette)), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 10,
-        color: 'var(--text-3)',
+        color: 'var(--ink-3)',
         fontWeight: 500
       }
     }, "L ", ALPEXA_MARKET.fmt(s.low, s.digits))), /*#__PURE__*/React.createElement("span", {
@@ -2404,7 +2404,7 @@ function Watchlist({
       style: {
         fontSize: 9.5,
         fontWeight: 600,
-        color: 'var(--text-3)',
+        color: 'var(--ink-3)',
         lineHeight: 1.1
       }
     }, ((ALPEXA_MARKET.fxAskPx(s) - ALPEXA_MARKET.fxBidPx(s)) * Math.pow(10, s.digits)).toFixed(0))), /*#__PURE__*/React.createElement("span", {
@@ -2443,7 +2443,7 @@ function Watchlist({
     }, formatPrice3(ask, s.digits).pipette)), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 10,
-        color: 'var(--text-3)',
+        color: 'var(--ink-3)',
         fontWeight: 500
       }
     }, "H ", ALPEXA_MARKET.fmt(s.high, s.digits))), /*#__PURE__*/React.createElement("span", {

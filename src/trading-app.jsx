@@ -825,10 +825,10 @@ function Watchlist({market,onSelect,current,onDepositCrypto}){
                     <span style={{fontSize:16.5,fontWeight:800}}>{formatPrice3(s.last,s.digits).pips}</span>
                     <span style={{fontSize:10,fontWeight:700,alignSelf:'flex-start'}}>{formatPrice3(s.last,s.digits).pipette}</span>
                   </span>
-                  <span style={{fontSize:10,color:'var(--text-3)',fontWeight:500}}>L {ALPEXA_MARKET.fmt(s.low,s.digits)}</span>
+                  <span style={{fontSize:10,color:'var(--ink-3)',fontWeight:500}}>L {ALPEXA_MARKET.fmt(s.low,s.digits)}</span>
                 </span>
                 <span className="mono" style={{width:42,textAlign:'center',display:'flex',justifyContent:'center',flexShrink:0}}>
-                  <span style={{fontSize:9.5,fontWeight:600,color:'var(--text-3)',lineHeight:1.1}}>{((ALPEXA_MARKET.fxAskPx(s)-ALPEXA_MARKET.fxBidPx(s))*Math.pow(10,s.digits)).toFixed(0)}</span>
+                  <span style={{fontSize:9.5,fontWeight:600,color:'var(--ink-3)',lineHeight:1.1}}>{((ALPEXA_MARKET.fxAskPx(s)-ALPEXA_MARKET.fxBidPx(s))*Math.pow(10,s.digits)).toFixed(0)}</span>
                 </span>
                 <span className="mono" style={{width:88,textAlign:'center',fontWeight:600,color:'#2E6FB0',display:'flex',flexDirection:'column',alignItems:'center',gap:1,flexShrink:0}}>
                   <span style={{display:'flex',alignItems:'baseline'}}>
@@ -836,7 +836,7 @@ function Watchlist({market,onSelect,current,onDepositCrypto}){
                     <span style={{fontSize:16.5,fontWeight:800}}>{formatPrice3(ask,s.digits).pips}</span>
                     <span style={{fontSize:10,fontWeight:700,alignSelf:'flex-start'}}>{formatPrice3(ask,s.digits).pipette}</span>
                   </span>
-                  <span style={{fontSize:10,color:'var(--text-3)',fontWeight:500}}>H {ALPEXA_MARKET.fmt(s.high,s.digits)}</span>
+                  <span style={{fontSize:10,color:'var(--ink-3)',fontWeight:500}}>H {ALPEXA_MARKET.fmt(s.high,s.digits)}</span>
                 </span>
                 <span style={{width:6}}/>
               </button>
