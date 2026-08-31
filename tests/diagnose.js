@@ -30,6 +30,15 @@ const DEMO_FILES = DEPLOYED.concat([
   'site/my-bets.html', 'site/sports.html', 'site/promotions.html',
   'site/introducing-broker.html', 'site/legal.html', 'site/login.html', 'site/signup.html']);
 
+// 돈이 걸린 SQL 전부 (배포 스크립트 = 서버 진실). 파일 목록을 손으로 관리하면 새 파일이
+// 조용히 스캔 밖으로 빠진다 — 디렉터리를 읽어 **기본값이 "검사한다"** 가 되게 한다.
+const MONEY_SQL = (() => {
+  try {
+    return fs.readdirSync(path.join(ROOT, 'supabase', 'sql'))
+      .filter((f) => f.endsWith('.sql')).sort().map((f) => `supabase/sql/${f}`);
+  } catch (_e) { return []; }
+})();
+
 // ── Defect classes (each = a bug we shipped before) ──────────────────────────
 const CHECKS = [
   { id: 'A2-client-ledger-insert', sev: 'CRITICAL', files: DEPLOYED,
@@ -45,6 +54,17 @@ const CHECKS = [
   // tests/settlement-server-only.test.js, not here — it can't be expressed as a precise
   // regex (local display reconciliation, comments and i18n all look the same), and a noisy
   // static check trains you to ignore the scanner. Keep that class in the behavioural test.
+  // 2026-08-30 실사고 — PAMM 플로팅이 −84.23% 에서 **0%** 로, NAV 가 1.0 으로 "회복"했는데
+  // 포지션은 7건 408.5랏 그대로 열려 있었다. `fx_realized_pnl` 은 시세가 120초 넘게 늙으면
+  // null 을 준다(스테일 가격으로 청산하지 않으려는 **옳은** 설계). 그런데 집계 세 곳이 그
+  // null 을 **0 으로 접어서**, 주말마다 물린 펀드가 멀쩡해 보였다 — 투자자 화면 포함.
+  // 돈에서 0 은 "안전·본전"으로 읽힌다. 그래서 이 방향의 fail-open 이 **가장 위험한 쪽으로**
+  // 거짓말한다. "계산 불가"는 0 이 아니라 null 이어야 하고, 화면은 '—' 를 그려야 한다.
+  // 패턴을 좁게 잡은 이유: fx_realized_pnl 의 null 은 **오직** "가격 없음"만 뜻한다 —
+  // 여기에 0 을 넣는 정당한 경우가 없다. (개별 포지션 pnl → null 은 정상이라 안 잡힌다.)
+  { id: 'FAILOPEN-unpriced-as-zero', sev: 'HIGH', files: MONEY_SQL,
+    re: /fx_realized_pnl\s*\([^)]*\)\s*is null then 0|coalesce\s*\(\s*(?:public\.)?fx_realized_pnl\s*\(/i,
+    why: 'A price-mark null ("cannot compute") is folded to 0 ("no P&L"). A stale/closed feed then makes a losing fund read as flat — NAV 1.0 on an 84%-underwater book (2026-08-30). Return NULL and count the unpriced positions instead; the UI must show — , never 0.' },
   { id: 'ADDR-demo-crypto-address', sev: 'HIGH', files: DEPLOYED,
     re: /bc1q[ac-hj-np-z02-9]{25,}|onResult\(\s*['"](bc1|0x|[13])/,
     why: 'Hardcoded/demo crypto address injected into a withdraw/deposit field — funds could go to it.' },

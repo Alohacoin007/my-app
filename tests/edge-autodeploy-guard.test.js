@@ -69,5 +69,23 @@ for (const f of auto) {
 if (/functions deploy\s+(--all|\$\{\{\s*env\.AUTO)/.test(wf))
   bad('전체/일괄 배포가 보인다 — 바뀐 함수만 배포해야 한다(손 안 댄 함수가 흔들리면 안 됨)');
 
+// ── P6 · 배포 경로 카나리아가 살아있어야 한다 (2026-08-31) ──
+// 왜: 8/28~31 에 SUPABASE_ACCESS_TOKEN 이 401 이 됐는데 **3일간 아무도 몰랐다.**
+// deploy-edge 는 supabase/functions/** 푸시 때만 도니까, 고칠 것이 생긴 그 순간에야
+// 통로가 죽은 걸 알았다. 감시가 두꺼워도 고칠 길이 막히면 소용없다 → 통로도 감시한다.
+{
+  const cpath = path.join(__dirname, '..', '.github', 'workflows', 'deploy-canary.yml');
+  if (!fs.existsSync(cpath)) {
+    bad('deploy-canary.yml 이 없다 — 배포 경로가 죽어도 문제가 터진 날에야 알게 된다');
+  } else {
+    const cw = fs.readFileSync(cpath, 'utf8');
+    if (!/schedule:/.test(cw)) bad('카나리아에 schedule 이 없다 — 수동으로만 돌면 감시가 아니다');
+    if (!/functions list/.test(cw)) bad('카나리아가 토큰 유효성을 확인하지 않는다 (functions list 호출 없음)');
+    // 카나리아는 **절대 배포하지 않는다** — 멀쩡한 함수를 주마다 미는 건 P5 규율 위반이다.
+    if (/functions deploy/.test(cw))
+      bad('카나리아가 배포를 한다 — 읽기 전용이어야 한다(손 안 댄 함수가 주기적으로 흔들리면 안 됨)');
+  }
+}
+
 if (fail) { console.error(`\n🔴 FAIL — ${fail}건.`); process.exit(1); }
 console.log(`🟢 PASS: Edge 자동 배포 = 허용목록 ${auto.length}종(${auto.join(', ')}) · 돈 함수 제외 · verify 선행 · verify_jwt 고정 · 일괄배포 없음.`);
