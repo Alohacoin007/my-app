@@ -110,9 +110,18 @@ function oddsStatus(g) {
       for (const f of funds) {
         const ghost = +f.ghost_positions || 0;
         const unitsBad = f.units_ok === false;
+        // 시세가 늙으면 서버가 float_pct·nav 를 **null** 로 준다 (fail-open 폐쇄, 2026-08-30).
+        // 여기서 그대로 찍으면 "NAV null" 이라 오히려 못 읽으니, 왜 모르는지를 쓴다.
+        // 절대 0%/1.0 으로 바꾸지 않는다 — 그게 원래 사고였다(84% 물린 펀드가 정상으로 보임).
+        const noPx = f.priced === false || f.float_pct === null;
+        const navTxt = (f.nav === null || f.nav === undefined)
+          ? `NAV — (거래용 ${f.nav_trade})` : `NAV ${f.nav}`;
+        const fltTxt = noPx
+          ? `플로팅 산출 불가 (시세 없는 포지션 ${f.unpriced_positions ?? '?'}건 — FX 마감/피드 정지)`
+          : `플로팅 ${f.float_pct}%`;
         flag(ghost > 0 || unitsBad,
-          `PAMM ${f.name}(${f.fund_acct}): ${f.status} · NAV ${f.nav} · 열린 ${f.open_positions}건 ${f.open_lots}랏` +
-          (f.open_positions > 0 ? ` · 플로팅 ${f.float_pct}% · ${f.oldest_open_days}일째 · 참여/회수 잠김` : '') +
+          `PAMM ${f.name}(${f.fund_acct}): ${f.status} · ${navTxt} · 열린 ${f.open_positions}건 ${f.open_lots}랏` +
+          (f.open_positions > 0 ? ` · ${fltTxt} · ${f.oldest_open_days}일째 · 참여/회수 잠김` : '') +
           ` · 투자자 ${f.members}명` +
           (ghost > 0 ? ` — 🚨 유령 행 ${ghost}건 (정산 기록이 있는데 status=open) → Equity·NAV 왜곡 + join/leave 영구 잠김` : '') +
           (unitsBad ? ` — 🚨 유닛 불변식 깨짐: total ${f.total_units} ≠ 회원합 ${f.members_units}` : ''));

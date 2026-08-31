@@ -60,12 +60,36 @@ if (!/'pnl',\s*case when public\.fx_realized_pnl\(p\.symbol,p\.side,p\.open_pric
 if (/'open_price',p\.open_price,'pnl',p\.pnl\)/.test(sql))
   bad('desk positions must NOT emit the stale stored p.pnl for OPEN positions (floating would diverge from realized)');
 // [P9] MT5: 펀드 Equity = Balance + Σ플로팅. 라이브 NAV는 표시 전용 — 거래용 pamm_nav(잔고)는 join/leave가 그대로 쓴다.
-if (!/coalesce\(a\.balance,0\) \+ fl\.flt as equity/.test(sql))
+if (!/else coalesce\(a\.balance,0\) \+ fl\.flt end as equity/.test(sql))
   bad('desk equity must be Balance + total floating (MT5 Equity), sourced server-side');
-if (!/cross join lateral[\s\S]{0,260}fx_realized_pnl\(p\.symbol,p\.side,p\.open_price,p\.size\)[\s\S]{0,120}as flt/.test(sql))
-  bad('total floating (fl.flt) must be a server sum of fx_realized_pnl over open positions');
+if (!/cross join lateral[\s\S]{0,400}fx_realized_pnl\(p\.symbol,p\.side,p\.open_price,p\.size\)[\s\S]{0,200}as flt_raw/.test(sql))
+  bad('total floating must be a server sum of fx_realized_pnl over open positions');
 if (!/round\(m\.units \/ nullif\(fd\.total_units,0\) \* \(coalesce\(a\.balance,0\) \+ fl\.flt\),2\)/.test(sql))
   bad('investor value must be share × fund Equity (floating pro-rata), not units×balance-NAV');
+
+// [P10] FAIL-OPEN 금지 — "계산 불가"를 "손익 0"으로 접지 않는다 (2026-08-30 실사고).
+//   fx_realized_pnl 은 시세가 120초 넘게 늙으면 null 을 준다(스테일로 청산 안 하려는 옳은 설계).
+//   그 null 을 0 으로 접으면 Σ플로팅=0 → Equity=잔고 → NAV 1.0 이 되어, **84% 물린 펀드가
+//   주말마다 정상으로 보였다.** 돈에서 0 은 "안전"으로 읽히므로 이 방향의 거짓말이 가장 위험하다.
+//   되돌리면(= `is null then 0` 부활) 즉시 🔴.
+const health = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'sql', 'pamm_health.sql'), 'utf8');
+for (const [nm, src] of [['pamm_core.sql', sql], ['pamm_health.sql', health]]) {
+  // 집계(sum/합계) 안에서 미가격을 0 으로 접는 패턴. 개별 포지션의 'pnl' → null 은 정상이라 잡지 않는다.
+  if (/fx_realized_pnl\([^)]*\)\s*is null then 0/.test(src))
+    bad(`${nm}: fold of "unpriced → 0" is back — a stale feed would make a losing fund read as flat (NAV 1.0). Return null instead.`);
+}
+// 미가격 건수를 세고, 하나라도 있으면 null 을 내보내는 규칙이 살아있어야 한다.
+for (const [nm, src, col] of [['pamm_core.sql', sql, 'unpriced'], ['pamm_health.sql', health, 'unpriced']]) {
+  if (!new RegExp(`count\\(\\*\\) filter \\(\\s*where public\\.fx_realized_pnl`).test(src))
+    bad(`${nm}: must COUNT unpriced open positions (${col}) so the UI can say why it shows —`);
+  if (!/unpriced > 0 then null|is null\) > 0 then null/.test(src))
+    bad(`${nm}: one unpriced position must make total floating NULL (unknown), never 0`);
+}
+// 데스크가 그 null 을 다시 0/1 로 접으면 화면에서 같은 거짓말이 재현된다.
+if (/\+CUR\.nav\s*\|\|\s*1|\+CUR\.float\s*\|\|\s*0/.test(desk))
+  bad('desk coerces null nav/float to 1/0 — the fail-open reappears in the UI. Render — instead.');
+if (!/NO PRICE/.test(desk))
+  bad('desk must show a NO PRICE badge (with the unpriced count) when floating cannot be computed');
 // 거래용 pamm_nav 함수 본체는 무변경 — 유닛 산수는 잔고 기반 NAV만 (플로팅 오염 금지)
 if (!/create or replace function public\.pamm_nav\(p_fund text\)[\s\S]{0,400}balance[\s\S]{0,200}total_units/.test(sql))
   bad('transactional pamm_nav must stay balance-based (floating must NOT leak into unit minting/burning)');

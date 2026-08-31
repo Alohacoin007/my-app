@@ -235,15 +235,23 @@ begin
            --   거래용 public.pamm_nav(잔고 기반)는 무변경 — join/leave는 P3 롤오버 게이트로 플로팅=0일 때만.
            coalesce(a.balance,0) as balance,
            fl.flt as float,
-           coalesce(a.balance,0) + fl.flt as equity,
-           case when fd.total_units > 0 then round((coalesce(a.balance,0) + fl.flt) / fd.total_units, 6)
+           fx.unpriced as unpriced,                       -- 미가격 포지션 수 (>0 이면 float·equity·nav 는 null)
+           (fx.unpriced = 0) as priced,
+           case when fl.flt is null then null
+                else coalesce(a.balance,0) + fl.flt end as equity,
+           -- 플로팅을 모르면 라이브 NAV 도 모른다 → null. 잔고 기반 값으로 대체하지 않는다:
+           -- 그건 "플로팅 0" 과 같은 숫자라 다시 거짓말이 된다 (2026-08-30 fail-open 폐쇄).
+           case when fl.flt is null then null
+                when fd.total_units > 0 then round((coalesce(a.balance,0) + fl.flt) / fd.total_units, 6)
                 else public.pamm_nav(fd.fund_acct) end as nav,
+           public.pamm_nav(fd.fund_acct) as nav_trade,    -- 잔고 기반 — 시세와 무관하게 항상 유효
            (select count(*) from pamm_members m where m.fund_acct = fd.fund_acct and m.units > 0) as members,
            case when public.is_admin() or fd.manager_cust = v_cust then
              -- 투자자 value = share × 펀드 Equity (플로팅 pro-rata 반영). 플로팅=0이면 units×pamm_nav와 동일.
              (select jsonb_agg(jsonb_build_object('cust',m.cust_id,'name',pl.name,'units',m.units,
                      'basis',m.cost_basis,
-                     'value',round(m.units / nullif(fd.total_units,0) * (coalesce(a.balance,0) + fl.flt),2),
+                     'value', case when fl.flt is null then null
+                                   else round(m.units / nullif(fd.total_units,0) * (coalesce(a.balance,0) + fl.flt),2) end,
                      'hwm',m.hwm_nav,'joined',m.joined_at))
                 from pamm_members m left join players pl on pl.cust_id = m.cust_id
                where m.fund_acct = fd.fund_acct and m.units > 0)
@@ -263,11 +271,20 @@ begin
            else null end as positions
       from pamm_funds fd
       join accounts a on a.acct_no = fd.fund_acct
-      -- 총 플로팅 = 열린 포지션 fx_realized_pnl(+swap) 합 (미가격 심볼은 0 기여). stop-out 엔진과 동일 함수.
+      -- 총 플로팅. stop-out 엔진과 동일 함수(fx_realized_pnl)로 마크한다.
+      -- ⚠️ 미가격(시세 120초 초과 → null)을 **0 으로 접지 않는다** (2026-08-30):
+      --    7건 전부 미가격이면 Σ=0 → Equity=잔고 → NAV 1.0 → 84% 물린 펀드가 정상으로 보였다.
+      --    돈에서 0 은 "안전"으로 읽히므로 fail-open 이 가장 위험한 방향으로 거짓말한다.
       cross join lateral (
-        select coalesce(sum(case when public.fx_realized_pnl(p.symbol,p.side,p.open_price,p.size) is null then 0
-                  else public.fx_realized_pnl(p.symbol,p.side,p.open_price,p.size) + coalesce((p.meta->>'swap')::numeric,0) end),0) as flt
+        select count(*) as n,
+               count(*) filter (where public.fx_realized_pnl(p.symbol,p.side,p.open_price,p.size) is null) as unpriced,
+               sum(public.fx_realized_pnl(p.symbol,p.side,p.open_price,p.size)
+                   + coalesce((p.meta->>'swap')::numeric,0)) as flt_raw
           from positions p where p.acct_no = fd.fund_acct and p.server = 'fx' and p.status = 'open'
+      ) fx
+      -- 진실 규칙: 0건 → 0 (진짜로 플로팅 없음) · 하나라도 미가격 → null (모름) · 전부 가격 → 합계
+      cross join lateral (
+        select case when fx.n = 0 then 0 when fx.unpriced > 0 then null else fx.flt_raw end as flt
       ) fl
      where (p_fund is null or fd.fund_acct = p_fund)
        and (public.is_admin() or fd.manager_cust = v_cust or fd.status = 'active')
@@ -322,26 +339,38 @@ begin
       --   투자자 value/pnl에 실시간 pro-rata 반영. 거래용 public.pamm_nav(잔고)는 무변경 —
       --   join/leave는 P3 롤오버 게이트로 플로팅=0일 때만 → 유닛 산수에 플로팅 안 섞임(표시 전용).
       'nav', fl.lnav,
-      'ret', round(fl.lnav - 1, 6),                                -- 개설 이후 누적 수익률(라이브 NAV−1)
+      'nav_trade', public.pamm_nav(fd.fund_acct),                  -- 잔고 기반 — 시세와 무관하게 항상 유효
+      'ret', case when fl.lnav is null then null else round(fl.lnav - 1, 6) end,  -- 누적 수익률(라이브 NAV−1)
       'float', fl.flt,
+      'unpriced', fx.unpriced,                                     -- >0 이면 nav·float·value·pnl 은 null
+      'priced', (fx.unpriced = 0),
       'is_manager', (fd.manager_cust = v_cust),
+      -- 지분 수(units)·원금(basis)은 시세와 무관 → 항상 보여준다. 평가액·손익만 모를 뿐이다.
+      -- 0 으로 채우면 고객 화면에 "원금 전액 손실"로 읽힌다 — 모르면 null 이 정직하다.
       'mine', (select case when m.units > 0 then jsonb_build_object(
                  'units', m.units, 'basis', m.cost_basis,
-                 'value', round(m.units * fl.lnav, 2),
-                 'pnl', round(m.units * fl.lnav - m.cost_basis, 2),
+                 'value', case when fl.lnav is null then null else round(m.units * fl.lnav, 2) end,
+                 'pnl',   case when fl.lnav is null then null else round(m.units * fl.lnav - m.cost_basis, 2) end,
                  'hwm', m.hwm_nav) else null end
                from pamm_members m where m.fund_acct = fd.fund_acct and m.cust_id = v_cust)
     ) as f
     from pamm_funds fd
     join accounts a on a.acct_no = fd.fund_acct
     -- 총 플로팅 + 라이브 NAV (표시 전용). fx_realized_pnl = stop-out 엔진과 동일 마크 함수.
+    -- ⚠️ 미가격을 0 으로 접지 않는다 (2026-08-30 fail-open 폐쇄) — 데스크와 동일 규칙.
     cross join lateral (
-      select fx.flt,
-             case when fd.total_units > 0 then round((coalesce(a.balance,0) + fx.flt) / fd.total_units, 8)
+      select count(*) as n,
+             count(*) filter (where public.fx_realized_pnl(p.symbol,p.side,p.open_price,p.size) is null) as unpriced,
+             sum(public.fx_realized_pnl(p.symbol,p.side,p.open_price,p.size)
+                 + coalesce((p.meta->>'swap')::numeric,0)) as flt_raw
+        from positions p where p.acct_no = fd.fund_acct and p.server = 'fx' and p.status = 'open'
+    ) fx
+    cross join lateral (
+      select fx2.flt,
+             case when fx2.flt is null then null
+                  when fd.total_units > 0 then round((coalesce(a.balance,0) + fx2.flt) / fd.total_units, 8)
                   else public.pamm_nav(fd.fund_acct) end as lnav
-      from (select coalesce(sum(case when public.fx_realized_pnl(p.symbol,p.side,p.open_price,p.size) is null then 0
-                     else public.fx_realized_pnl(p.symbol,p.side,p.open_price,p.size) + coalesce((p.meta->>'swap')::numeric,0) end),0) as flt
-              from positions p where p.acct_no = fd.fund_acct and p.server = 'fx' and p.status = 'open') fx
+      from (select case when fx.n = 0 then 0 when fx.unpriced > 0 then null else fx.flt_raw end as flt) fx2
     ) fl
     where fd.status <> 'closed'
        or exists (select 1 from pamm_members m where m.fund_acct = fd.fund_acct and m.cust_id = v_cust and m.units > 0)

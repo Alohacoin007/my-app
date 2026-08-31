@@ -256,14 +256,29 @@ function renderAll(){ renderKpi(); renderRoster(); }
 function renderKpi(){
   const b=$('b-kpi');
   if(!CUR){ b.innerHTML='<span class="dim" style="font-size:12.5px">No funds yet — create one in Fund Admin below</span>'; return; }
-  const ret=(+CUR.nav||1)-1;
-  const flt=+CUR.float||0, bal=(CUR.balance!==undefined&&CUR.balance!==null)?+CUR.balance:+CUR.equity;
+  // 🚫 미가격일 때 0/1 로 강제 변환하지 않는다 (2026-08-30 fail-open 폐쇄).
+  //    서버는 시세가 늙으면 float·equity·nav 를 **null** 로 준다 — "계산 불가"다.
+  //    여기서 `+x||0` / `+x||1` 로 접으면 84% 물린 펀드가 화면에서 다시 "Float +$0 ·
+  //    NAV 1.0000" 으로 보인다. 돈에서 0 은 "안전"으로 읽히므로 이 거짓말이 가장 위험하다.
+  //    모르면 '—' 라고 쓴다. unpriced 건수로 왜 모르는지도 같이 보여준다.
+  const known = (v) => v !== null && v !== undefined && isFinite(+v);
+  const navOk = known(CUR.nav), fltOk = known(CUR.float), eqOk = known(CUR.equity);
+  const unpr = +CUR.unpriced || 0;
+  const ret = navOk ? (+CUR.nav - 1) : null;
+  const flt = fltOk ? +CUR.float : null;
+  const bal=(CUR.balance!==undefined&&CUR.balance!==null)?+CUR.balance:+CUR.equity;
+  const stale = unpr > 0
+    ? '<span class="pill yel" title="'+unpr+' open position(s) have no fresh price — floating and live NAV cannot be computed">NO PRICE · '+unpr+'</span>'
+    : '';
   b.innerHTML='<div style="display:flex;align-items:baseline;gap:16px;white-space:nowrap;overflow:auto;width:100%">'
-    +'<b style="font-size:19px;font-variant-numeric:tabular-nums" title="Equity = Balance + Floating">'+usd2(CUR.equity)+'</b>'
-    +'<span class="'+(ret>=0?'up':'dn')+'" style="font-weight:800;font-size:13.5px">'+pct(ret)+'</span>'
+    +'<b style="font-size:19px;font-variant-numeric:tabular-nums" title="Equity = Balance + Floating">'+(eqOk?usd2(CUR.equity):'—')+'</b>'
+    +(ret===null?'<span class="dim" style="font-weight:800;font-size:13.5px">—</span>'
+                :'<span class="'+(ret>=0?'up':'dn')+'" style="font-weight:800;font-size:13.5px">'+pct(ret)+'</span>')
     +'<span class="dim" style="font-size:12px">Bal '+usd2(bal)+'</span>'
-    +'<span class="'+(flt>=0?'up':'dn')+'" style="font-size:12px;font-weight:700" title="Total floating P&L · live mid mark">Float '+(flt>=0?'+':'−')+usd2(Math.abs(flt))+'</span>'
-    +'<span class="dim" style="font-size:12px">NAV '+(+CUR.nav||1).toFixed(4)+'</span>'
+    +(flt===null?'<span class="dim" style="font-size:12px;font-weight:700" title="No fresh price — floating cannot be computed">Float —</span>'
+                :'<span class="'+(flt>=0?'up':'dn')+'" style="font-size:12px;font-weight:700" title="Total floating P&L · live mid mark">Float '+(flt>=0?'+':'−')+usd2(Math.abs(flt))+'</span>')
+    +'<span class="dim" style="font-size:12px">NAV '+(navOk?(+CUR.nav).toFixed(4):'—')+'</span>'
+    +stale
     +'<span class="dim" style="font-size:12px">'+(+CUR.members||0)+' investor'+((+CUR.members||0)===1?'':'s')+'</span>'
     +'<span class="dim" style="font-size:12px">fee '+(+CUR.perf_fee_pct||0)+'%</span>'
     +'<span class="pill '+(CUR.status==='active'?'grn':CUR.status==='paused'?'yel':'red')+'">'+esc(CUR.status)+'</span>'
@@ -277,12 +292,16 @@ function renderRoster(){
   b.innerHTML='<table><tr><th>Investor</th><th class="r">Balance</th><th class="r">Equity</th><th class="r">Share</th><th class="r">P&L</th><th class="r">Joined</th></tr>'
     +rs.map(m=>{
       const shr=(+CUR.total_units>0)?(+m.units/+CUR.total_units):0;
-      const pnl=(+m.value||0)-(+m.basis||0);
+      // value 는 펀드 Equity 에서 나온다 → 시세가 없으면 서버가 null 을 준다.
+      // 0 으로 접으면 P&L 이 "원금 전액 손실"로 보인다 — 모를 때는 '—'.
+      const vOk=(m.value!==null&&m.value!==undefined&&isFinite(+m.value));
+      const pnl=vOk?((+m.value)-(+m.basis||0)):null;
       const isMgr=m.cust===CUR.manager_cust;
       return '<tr><td>'+esc(m.name||m.cust)+(isMgr?' <span class="pill yel">MGR</span>':'')+'</td>'
-        +'<td class="r">'+usd2(m.basis)+'</td><td class="r">'+usd2(m.value)+'</td>'
+        +'<td class="r">'+usd2(m.basis)+'</td><td class="r">'+(vOk?usd2(m.value):'—')+'</td>'
         +'<td class="r">'+(shr*100).toFixed(1)+'%</td>'
-        +'<td class="r '+(pnl>=0?'up':'dn')+'">'+(pnl>=0?'+':'−')+usd2(Math.abs(pnl))+'</td>'
+        +(pnl===null?'<td class="r dim">—</td>'
+                    :'<td class="r '+(pnl>=0?'up':'dn')+'">'+(pnl>=0?'+':'−')+usd2(Math.abs(pnl))+'</td>')
         +'<td class="r dim">'+ago(m.joined)+'</td></tr>';
     }).join('')+'</table>';
 }

@@ -21,10 +21,17 @@ if (!/create or replace function public\.pamm_investor_report\(\)/.test(sql)) ba
 if (!/pamm_investor_report[\s\S]{0,600}security definer/.test(sql)) bad('investor report must be SECURITY DEFINER');
 if (!/grant execute on function public\.pamm_investor_report\(\) to authenticated/.test(sql)) bad('investor report must be granted to authenticated');
 // [I2] value·pnl은 서버가 units×라이브NAV로 산출 (라이브 NAV=(잔고+Σ플로팅)/units — 데스크와 동일 소스)
-if (!/'value', round\(m\.units \* fl\.lnav, 2\)/.test(sql)) bad('mine.value must be server-computed units×live-NAV');
-if (!/'pnl', round\(m\.units \* fl\.lnav - m\.cost_basis, 2\)/.test(sql)) bad('mine.pnl must be server-computed');
+if (!/'value',\s*case when fl\.lnav is null then null else round\(m\.units \* fl\.lnav, 2\) end/.test(sql))
+  bad('mine.value must be server-computed units×live-NAV (null when the NAV is unknowable)');
+if (!/'pnl',\s*case when fl\.lnav is null then null else round\(m\.units \* fl\.lnav - m\.cost_basis, 2\) end/.test(sql))
+  bad('mine.pnl must be server-computed (null when the NAV is unknowable)');
 // [I2b] 라이브 NAV = (잔고 + 서버 플로팅합)/units — 투자자 화면이 데스크와 같은 플로팅을 본다
-if (!/round\(\(coalesce\(a\.balance,0\) \+ fx\.flt\) \/ fd\.total_units, 8\)/.test(sql)) bad('investor live NAV must be (balance + total floating)/units');
+if (!/round\(\(coalesce\(a\.balance,0\) \+ fx2\.flt\) \/ fd\.total_units, 8\)/.test(sql)) bad('investor live NAV must be (balance + total floating)/units');
+// [I2c] FAIL-OPEN 금지 (2026-08-30) — 시세가 없으면 고객 화면도 "모른다"고 말해야 한다.
+//   0/1 로 접으면 84% 물린 펀드가 "본전"으로 보이고, 그건 고객에게 하는 거짓말이다.
+if (!/'unpriced', fx\.unpriced/.test(sql)) bad('investor report must expose the unpriced-position count');
+if (!/'ret', case when fl\.lnav is null then null/.test(sql)) bad('investor return must be null (not 0) when the live NAV is unknowable');
+if (/fx_realized_pnl\([^)]*\)\s*is null then 0/.test(sql)) bad('investor floating must not fold "unpriced → 0" (fail-open: a losing fund would read as flat)');
 if (!/fx_realized_pnl\(p\.symbol,p\.side,p\.open_price,p\.size\)[\s\S]{0,120}as flt/.test(sql)) bad('investor floating must be a server sum of fx_realized_pnl over open positions');
 // [I5] 남의 지분 미노출: 리포트에 roster/ops 없음, mine은 caller cust로 한정
 if (/pamm_investor_report[\s\S]{0,1200}'roster'/.test(sql)) bad('investor report must NOT expose other members (roster)');
