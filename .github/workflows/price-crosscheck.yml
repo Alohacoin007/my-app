@@ -1,0 +1,42 @@
+name: price crosscheck
+
+# Alpexa — 시세 교차 출처 검증 (2026-08-31 사장님 지시 ③)
+# ============================================================================
+# 왜: 지금 감시는 시세의 **신선도**만 본다. 값이 **맞는지**는 아무도 안 봤다.
+#   심볼 뒤바뀜 · 소수점 밀림 · 단위 혼동 · "신선한데 틀린 값" 이 전부 초록으로 통과한다.
+#   그런데 이 숫자로 체결가·플로팅·스탑아웃이 계산된다 — 돈에 직접 닿는다.
+#   자기 정합성으로는 못 잡는다(우리 값을 우리 규칙으로 보면 늘 맞다) → **제3자와 대조.**
+#     크립토: 우리 Binance 미러  ↔  Coinbase
+#     FX    : 우리 Polygon       ↔  Frankfurter(ECB 기준환율)
+#
+# ⚠️ Claude 세션 샌드박스는 Supabase·GitHub 외 아웃바운드가 막혀 있어 이 검사를 못 돌린다
+#    (실측: coinbase·kraken·frankfurter 전부 연결 실패). 그래서 **여기서만 실주행**한다.
+#    비교 로직 자체는 `node tests/price-crosscheck.js --selftest` 로 오프라인 증명돼 있다.
+#
+# 침묵 게이트: 🟢면 조용, 🔴면 워크플로 빨강 → GitHub 이 오너에게 이메일
+#   (hourly-selfcheck·deploy-canary 와 같은 방식).
+# ⚠️ 스케줄은 main 브랜치에 있어야 활성화된다.
+# ============================================================================
+
+on:
+  schedule:
+    - cron: '10 17 * * *'   # 매일 17:10 UTC (베가스 10:10 AM) — US 장중, FX·크립토 모두 활발
+  workflow_dispatch: {}
+
+jobs:
+  crosscheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/wizardly-ritchie-lsRnz   # 검사 스크립트는 서빙 브랜치에 있다
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+
+      # ① 비교 로직 자가시험 (네트워크 무관) — 로직이 깨졌으면 실 대조는 볼 필요도 없다
+      - name: 비교 로직 자가시험
+        run: node tests/price-crosscheck.js --selftest
+
+      # ② 실제 대조 — 우리 prices(Supabase) vs 제3자
+      - name: 우리 시세 vs 제3자
+        run: node tests/price-crosscheck.js
