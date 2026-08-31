@@ -1,4 +1,4 @@
-name: price crosscheck
+name: crosscheck (price + settlement)
 
 # Alpexa — 시세 교차 출처 검증 (2026-08-31 사장님 지시 ③)
 # ============================================================================
@@ -40,3 +40,15 @@ jobs:
       # ② 실제 대조 — 우리 prices(Supabase) vs 제3자
       - name: 우리 시세 vs 제3자
         run: node tests/price-crosscheck.js
+
+      # ③ 정산 채점 로직 자가시험 (네트워크 무관)
+      - name: 독립 채점 로직 자가시험
+        run: node tests/settlement-crosscheck.js --selftest
+
+      # ④ 우리 채점 vs ESPN 최종 스코어.
+      #    settlements 는 RLS 로 잠겨 있어 service_role 키가 필요하다(읽기만 한다).
+      #    키가 없으면 스크립트가 조용히 SKIP 한다 — 통과로 세지 않는다.
+      - name: 우리 채점 vs ESPN 최종 스코어
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+        run: node tests/settlement-crosscheck.js
