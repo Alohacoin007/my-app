@@ -26,6 +26,7 @@ const NAME_ALIAS = [
   [/\blafc\b/, 'los angeles'],
   [/\bnycfc\b/, 'new york city'],
   [/\b(?:red bull ny|ny red bulls?)\b/, 'new york red bulls'],
+  [/\bpsg\b/, 'saint germain'],
 ];
 const normBase = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -96,7 +97,21 @@ ok('NYCFC ⇄ New York City FC',          teamMatch('NYCFC', 'New York City FC')
 ok('Red Bull NY ⇄ New York Red Bulls',  teamMatch('Red Bull NY', 'New York Red Bulls'));
 ok('CF Montréal ⇄ CF Montreal (악센트)', teamMatch('CF Montréal', 'CF Montreal'));
 
+// 2026-09-03 — odds-crosscheck 가 실측으로 잡은 첫 건. UEFA 챔피언스리그
+// "S Bratislava @ PSG"(ESPN) 가 시즌 개막전인데 잠겨 있었다. 프로바이더에는
+// "ŠK Slovan Bratislava @ Paris Saint Germain" 라인이 그대로 남아 있었다.
+//   · Bratislava 쪽은 원래 붙었다 (["bratislava"] ⊂ ["slovan","bratislava"])
+//   · 깨진 건 PSG 뿐 — ["psg"] 는 ["paris","saint","germain"] 의 부분집합이 아니다.
+// 8/28 약어 사고와 같은 클래스이고, 이번엔 사람 신고가 아니라 **교차검증이 먼저 잡았다.**
+console.log('\n=== RED→GREEN: PSG 약어 (2026-09-03 crosscheck 실측) ===');
+ok('PSG ⇄ Paris Saint Germain',        teamMatch('PSG', 'Paris Saint Germain'));
+ok('PSG ⇄ Paris Saint-Germain (하이픈)', teamMatch('PSG', 'Paris Saint-Germain'));
+ok('S Bratislava ⇄ ŠK Slovan Bratislava (원래도 붙었음 — 회귀 방지)',
+   teamMatch('S Bratislava', 'ŠK Slovan Bratislava'));
+
 console.log('\n=== SAFETY: 별칭이 다른 팀을 끌어오면 안 된다 ===');
+ok('PSG ⇏ Paris FC (같은 도시 다른 팀)', !teamMatch('PSG', 'Paris FC'));
+ok('PSG ⇏ Saint-Etienne',               !teamMatch('PSG', 'Saint-Etienne'));
 ok('Man City ⇏ Manchester United',      !teamMatch('Man City', 'Manchester United'));
 ok('Nottm Forest ⇏ Nottingham(다른팀 아님) — Forest 토큰 필수',
    !teamMatch('Nottm Forest', 'Nottingham County'));

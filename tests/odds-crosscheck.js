@@ -56,6 +56,7 @@ const NAME_ALIAS = [
   [/\bsheff wed\b/, 'sheffield wednesday'], [/\bwest brom\b/, 'west bromwich albion'],
   [/\blafc\b/, 'los angeles'], [/\bnycfc\b/, 'new york city'],
   [/\b(?:red bull ny|ny red bulls?)\b/, 'new york red bulls'],
+  [/\bpsg\b/, 'saint germain'],
 ];
 const nb = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();

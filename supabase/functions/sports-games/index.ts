@@ -217,6 +217,9 @@ const NAME_ALIAS: Array<[RegExp, string]> = [
   [/\blafc\b/, "los angeles"],
   [/\bnycfc\b/, "new york city"],
   [/\b(?:red bull ny|ny red bulls?)\b/, "new york red bulls"],
+  // 2026-09-03: odds-crosscheck 가 실측으로 잡음 — ESPN "PSG" 는 Odds API
+  // "Paris Saint Germain" 의 부분집합이 아니라 UCL 개막전이 잠겨 있었다.
+  [/\bpsg\b/, "saint germain"],
 ];
 function normBase(s: string): string {
   // NFD + 결합문자 제거 = 악센트 폴딩 ("Montréal" → "montreal"). 반드시 [^a-z0-9] 치환 **전에**.
