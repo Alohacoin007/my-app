@@ -56,10 +56,15 @@ const NAME_ALIAS = [
   [/\bsheff wed\b/, 'sheffield wednesday'], [/\bwest brom\b/, 'west bromwich albion'],
   [/\blafc\b/, 'los angeles'], [/\bnycfc\b/, 'new york city'],
   [/\b(?:red bull ny|ny red bulls?)\b/, 'new york red bulls'],
-  [/\bpsg\b/, 'saint germain'],
+  [/\bpsg\b/, 'saint germain'], [/\bpraha\b/, 'prague'],
 ];
-const nb = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  .toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+// NFD 는 결합 악센트만 분해한다 — ø·æ·ł 같은 독립 글자는 [^a-z0-9] 에 지워져 토큰이 잘린다.
+const LETTER_FOLD = [[/ø/g,'o'],[/æ/g,'ae'],[/œ/g,'oe'],[/ł/g,'l'],[/đ/g,'d'],[/ð/g,'d'],[/þ/g,'th'],[/ß/g,'ss'],[/ı/g,'i']];
+const nb = (s) => {
+  let t = String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  for (const [re, to] of LETTER_FOLD) t = t.replace(re, to);
+  return t.replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+};
 const sc = (s) => s.replace(/\b(fc|sc|cf|afc|ac|sd|cd)\b/g, ' ').replace(/\s+/g, ' ').trim();
 function variants(s) {
   const b = nb(s), out = [sc(b)];

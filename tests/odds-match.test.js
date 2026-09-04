@@ -27,9 +27,20 @@ const NAME_ALIAS = [
   [/\bnycfc\b/, 'new york city'],
   [/\b(?:red bull ny|ny red bulls?)\b/, 'new york red bulls'],
   [/\bpsg\b/, 'saint germain'],
+  [/\bpraha\b/, 'prague'],
 ];
-const normBase = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  .toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+// NFD \ub294 **\uacb0\ud569 \uc545\uc13c\ud2b8**(\u00e9 = e + \u00b4)\ub9cc \ubd84\ud574\ud55c\ub2e4. \u00f8\u00b7\u00e6\u00b7\u0142\u00b7\u0111\u00b7\u00df \ub294 \uadf8 \uc790\uccb4\uac00 \ub3c5\ub9bd \uae00\uc790\ub77c
+// \ubd84\ud574\ub418\uc9c0 \uc54a\uace0 \ub0a8\uc558\ub2e4\uac00 [^a-z0-9] \ud544\ud130\uc5d0 \ud1b5\uc9f8\ub85c \uc9c0\uc6cc\uc9c4\ub2e4 \u2192 "bod\u00f8" \uac00 "bod" \uc774 \ub41c\ub2e4.
+// 8/28 \uc545\uc13c\ud2b8 \uc218\uc815\uc774 \uc808\ubc18\ub9cc \uace0\uce5c \uad6c\uba4d. \uae00\uc790\ub97c \uc9c0\uc6b0\uc9c0 \ub9d0\uace0 **\ubc14\uafd4\uc11c** \ud1a0\ud070\uc744 \uc0b4\ub9b0\ub2e4.
+const LETTER_FOLD = [
+  [/\u00f8/g, 'o'], [/\u00e6/g, 'ae'], [/\u0153/g, 'oe'], [/\u0142/g, 'l'],
+  [/\u0111/g, 'd'], [/\u00f0/g, 'd'], [/\u00fe/g, 'th'], [/\u00df/g, 'ss'], [/\u0131/g, 'i'],
+];
+const normBase = (s) => {
+  let t = String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  for (const [re, to] of LETTER_FOLD) t = t.replace(re, to);
+  return t.replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+};
 const stripClub = (s) => s.replace(/\b(fc|sc|cf|afc|ac|sd|cd)\b/g, ' ').replace(/\s+/g, ' ').trim();
 const normNm = (s) => stripClub(normBase(s));
 const sigToks = (s) => normNm(s).split(' ').filter((t) => t.length > 2);
@@ -109,6 +120,23 @@ ok('PSG ⇄ Paris Saint-Germain (하이픈)', teamMatch('PSG', 'Paris Saint-Germ
 ok('S Bratislava ⇄ ŠK Slovan Bratislava (원래도 붙었음 — 회귀 방지)',
    teamMatch('S Bratislava', 'ŠK Slovan Bratislava'));
 
+// 2026-09-04 — 같은 교차검증이 UCL 2건을 더 잡았다. 원인이 **서로 다르다**:
+//   ① Bodo/Glimt(ESPN) ⇄ Bodø/Glimt(Odds) — NFD 가 ø 를 못 분해해 "bod" 로 잘림.
+//      é 는 결합문자라 분해되지만 ø·æ·ł·đ·ß 는 독립 글자다. 이건 한 팀 문제가 아니라
+//      **북유럽·동유럽 전체에 열려 있던 구멍**이라 글자 폴딩으로 클래스를 닫는다.
+//   ② Slavia Prague(ESPN) ⇄ Slavia Praha(Odds) — 도시명 언어 변형. 별칭으로 해결.
+console.log('\n=== RED→GREEN: 비결합 글자 폴딩 (2026-09-04 crosscheck 실측) ===');
+ok('Bodo/Glimt ⇄ Bodø/Glimt (ø)',      teamMatch('Bodo/Glimt', 'Bodø/Glimt'));
+ok('Bayern ⇄ Bayern Munich (원래 OK)',  teamMatch('Bayern', 'Bayern Munich'));
+ok('Malmo ⇄ Malmö FF (ö 는 원래 NFD 로 됨 — 회귀 방지)', teamMatch('Malmo', 'Malmö FF'));
+ok('Kobenhavn ⇄ FC København (ø)',     teamMatch('Kobenhavn', 'FC København'));
+
+console.log('\n=== RED→GREEN: Praha ⇄ Prague (도시명 언어 변형) ===');
+ok('Slavia Prague ⇄ Slavia Praha',     teamMatch('Slavia Prague', 'Slavia Praha'));
+ok('Lens ⇄ RC Lens (원래 OK)',          teamMatch('Lens', 'RC Lens'));
+ok('Slavia Praha ⇏ Sparta Praha (같은 도시 다른 팀)',
+   !teamMatch('Slavia Praha', 'Sparta Praha'));
+
 console.log('\n=== SAFETY: 별칭이 다른 팀을 끌어오면 안 된다 ===');
 ok('PSG ⇏ Paris FC (같은 도시 다른 팀)', !teamMatch('PSG', 'Paris FC'));
 ok('PSG ⇏ Saint-Etienne',               !teamMatch('PSG', 'Saint-Etienne'));
@@ -137,6 +165,14 @@ for (const [re, to] of NAME_ALIAS) {
 }
 ok('원본이 후보 확장(nameVariants)을 쓴다 — 덮어쓰기 아님', /function nameVariants/.test(SRC));
 ok('원본이 악센트를 폴딩한다 (NFD)', /normalize\("NFD"\)/.test(SRC));
+// 글자 폴딩도 락스텝 — 여기 거울만 고치고 원본을 빠뜨리면 이 테스트가 거짓 초록이 된다.
+ok('원본에 LETTER_FOLD 표가 있다', /const LETTER_FOLD/.test(SRC));
+for (const [re, to] of LETTER_FOLD) {
+  const ch = re.source;
+  ok(`원본이 ${ch} → "${to}" 를 폴딩한다`, new RegExp('\\[/' + ch + '/g,\\s*"' + to + '"\\]').test(SRC));
+}
+ok('원본이 폴딩을 [^a-z0-9] 치환 **전에** 적용한다',
+   /for \(const \[re, to\] of LETTER_FOLD\)[\s\S]{0,120}\[\^a-z0-9 \]/.test(SRC));
 ok('유일매칭 게이트가 살아있다', /hits\.length === 1|length === 1/.test(SRC));
 
 console.log('\n' + (pass ? '🟢 team matching recovers soccer odds without cross-matching' : '🔴 matcher broken') + '\n');

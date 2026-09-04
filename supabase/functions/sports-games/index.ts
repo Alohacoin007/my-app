@@ -220,11 +220,22 @@ const NAME_ALIAS: Array<[RegExp, string]> = [
   // 2026-09-03: odds-crosscheck 가 실측으로 잡음 — ESPN "PSG" 는 Odds API
   // "Paris Saint Germain" 의 부분집합이 아니라 UCL 개막전이 잠겨 있었다.
   [/\bpsg\b/, "saint germain"],
+  // 2026-09-04: 체코어 도시명 — ESPN "Slavia Prague" ⇄ Odds "Slavia Praha".
+  [/\bpraha\b/, "prague"],
+];
+// NFD 는 **결합 악센트**(é = e + ´)만 분해한다. ø·æ·ł·đ·ß 는 그 자체가 독립 코드포인트라
+// 분해되지 않고 남았다가 아래 [^a-z0-9] 치환에 **통째로 지워진다** → "bodø" 가 "bod" 이 되어
+// "bodo" 와 안 맞는다 (2026-09-04 crosscheck 실측: Bodø/Glimt @ Bayern 잠김).
+// 8/28 악센트 수정이 결합문자만 잡고 남긴 구멍 — 지우지 말고 **바꿔서** 토큰을 살린다.
+const LETTER_FOLD: Array<[RegExp, string]> = [
+  [/ø/g, "o"], [/æ/g, "ae"], [/œ/g, "oe"], [/ł/g, "l"],
+  [/đ/g, "d"], [/ð/g, "d"], [/þ/g, "th"], [/ß/g, "ss"], [/ı/g, "i"],
 ];
 function normBase(s: string): string {
   // NFD + 결합문자 제거 = 악센트 폴딩 ("Montréal" → "montreal"). 반드시 [^a-z0-9] 치환 **전에**.
-  return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+  let t = String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  for (const [re, to] of LETTER_FOLD) t = t.replace(re, to);   // 소문자화 후 (Ø → ø → o)
+  return t.replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 }
 function stripClub(s: string): string {
   return s.replace(/\b(fc|sc|cf|afc|ac|sd|cd)\b/g, " ").replace(/\s+/g, " ").trim();
