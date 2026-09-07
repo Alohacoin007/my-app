@@ -142,11 +142,14 @@ function oddsStatus(g) {
   } catch (e) { flag(true, '시세 점검 실패: ' + e.message); }
 
   // ── ③b 주식 시세 라이브니스 (2026-07-27 사장님 지적 "하네스가 못 잡아?" — 크립토만 보던 구멍 폐쇄) ──
-  //     장중(평일 13:35~19:55 UTC, NYSE 09:30~16:00 ET)에만 검사 — 장외 정지는 정상이라 오탐 금지.
+  //     장중에만 검사 — 장외 정지는 정상이라 오탐 금지.
+  //     2026-09-07: "장중" 판정을 UTC 고정 창(13:35~19:55)에서 **뉴욕 현지 달력**으로 바꿈.
+  //     노동절에 "WS 펌프 퇴행 의심"을 두 번 띄웠다 — 값이 완전히 고정된 걸 실측하니 펌프가 아니라
+  //     휴장이었다. 게다가 UTC 고정 창은 서머타임이 끝나는 11~3월엔 한 시간 어긋난다.
+  //     휴장일·조기폐장·서머타임 = tests/nyse-calendar.js (규칙 기반, 핀: nyse-calendar.test.js).
   try {
-    const nowD = new Date(); const dow = nowD.getUTCDay(); const mins = nowD.getUTCHours() * 60 + nowD.getUTCMinutes();
-    const inMarket = dow >= 1 && dow <= 5 && mins >= (13 * 60 + 35) && mins <= (19 * 60 + 55);
-    if (!inMarket) console.log('  ⏭️  주식 시세: 장외 시간 — 검사 생략 (정지가 정상)');
+    const sess = require('./nyse-calendar').nyseSession(new Date());
+    if (!sess.open) console.log(`  ⏭️  주식 시세: ${sess.reason} — 검사 생략 (정지가 정상)`);
     else {
       const r = await fetch(`${URL}/rest/v1/prices?select=symbol,updated_at&symbol=in.(AAPL,NVDA,MSFT)`, { headers: H });
       const rows = await r.json();
