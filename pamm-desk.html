@@ -132,6 +132,27 @@ td{padding:4px 6px;border-bottom:1px solid rgba(29,33,42,.55);white-space:nowrap
     </div>
   </div>
 </div>
+<!-- 포지션 정정 (백오피스 · MT5 Manager "Position Modify" 상당). 기록은 admin_audit_log 한 곳(관리자 전용). -->
+<div id="pcModal" style="position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:80;display:none;align-items:center;justify-content:center">
+  <div class="opbox frm" style="width:400px">
+    <h3 id="pcTitle" style="margin-bottom:4px">Correct position</h3>
+    <div id="pcCur" class="dim" style="font-size:11.5px;margin-bottom:10px;font-variant-numeric:tabular-nums"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      <div><div class="dim" style="font-size:11px;margin-bottom:4px">Side</div>
+        <select id="pcSide" style="width:100%;background:var(--lgd-pill);border:1px solid var(--lgd-hair);border-radius:6px;color:var(--lgd-ink);padding:6px 9px;font-size:12px;margin-bottom:7px"><option>BUY</option><option>SELL</option></select></div>
+      <div><div class="dim" style="font-size:11px;margin-bottom:4px">Entry price</div><input id="pcPrice" type="number" step="any" min="0"></div>
+      <div><div class="dim" style="font-size:11px;margin-bottom:4px">Lots</div><input id="pcSize" type="number" step="0.01" min="0"></div>
+    </div>
+    <div class="dim" style="font-size:11px;margin-bottom:4px">Reason (required · stored in the back-office audit log, admin-only)</div>
+    <input id="pcReason" type="text" maxlength="200" placeholder="e.g. execution error on ticket, corrected per dealing desk">
+    <div id="pcHist" class="dim" style="font-size:11px;max-height:120px;overflow:auto;margin-bottom:8px"></div>
+    <div class="opr" style="margin-top:2px">
+      <button class="cancel" id="pcClose">Close</button>
+      <button class="cancel" id="pcHistBtn" title="Correction history for this position (admin-only)">✎ History</button>
+      <button class="go" id="pcGo">Correct</button>
+    </div>
+  </div>
+</div>
 
 <div id="gate">
   <div class="gbox">
@@ -212,7 +233,9 @@ async function pullFxAccounts(){   // 개설 피커용 — 어드민 RLS 읽기 
   const adm=FXACCTS.length>0;
   $('btnNew').style.display=adm?'':'none';
   $('btnFundCtl').style.display=(adm&&CUR)?'':'none';
+  if(adm!==ADM){ ADM=adm; renderPos(); }   // 정정 버튼은 어드민에게만 — 판정이 바뀌면 포지션 위젯 다시 그림
 }
+let ADM=false;
 
 function confirmModal(title, body, safe){
   return new Promise(res=>{
@@ -314,13 +337,61 @@ function renderPos(){
     const fl=pr?null:(+p.pnl||0); if(!pr){flTot+=fl; anyPr=true;}
     return '<tr><td>'+esc(String(p.symbol).toUpperCase())+'</td><td class="'+(String(p.side).toLowerCase()==='buy'?'up':'dn')+'">'+esc(String(p.side).toUpperCase())+'</td>'
       +'<td class="r">'+(+p.size||0)+'</td><td class="r">'+(+p.open_price||0)+'</td>'
-      +'<td class="r '+(pr?'dim':(fl>=0?'up':'dn'))+'">'+(pr?'—':((fl>=0?'+':'−')+usd2(Math.abs(fl))))+'</td></tr>';
+      +'<td class="r '+(pr?'dim':(fl>=0?'up':'dn'))+'">'+(pr?'—':((fl>=0?'+':'−')+usd2(Math.abs(fl))))+'</td>'
+      +(ADM?'<td class="r"><button class="pcbtn" data-lid="'+esc(String(p.local_id||''))+'" title="Correct side / entry / lots (admin · audited)" style="background:none;border:1px solid var(--lgd-hair);border-radius:5px;color:var(--lgd-dim);font-size:11px;padding:1px 6px;cursor:pointer">✎</button></td>':'')
+      +'</tr>';
   }).join('');
   const tot=anyPr?('<tr style="border-top:1px solid rgba(60,66,80,.6)"><td class="dim" colspan="4" style="font-size:11px">Floating P&L · live mid mark</td>'
-      +'<td class="r '+(flTot>=0?'up':'dn')+'" style="font-weight:700">'+(flTot>=0?'+':'−')+usd2(Math.abs(flTot))+'</td></tr>'):'';
+      +'<td class="r '+(flTot>=0?'up':'dn')+'" style="font-weight:700">'+(flTot>=0?'+':'−')+usd2(Math.abs(flTot))+'</td>'+(ADM?'<td></td>':'')+'</tr>'):'';
   b.innerHTML='<div class="wr" style="font-size:11px;margin-bottom:6px">⚠️ Positions open — joins/redemptions after close</div>'
-    +'<table><tr><th>Symbol</th><th>Side</th><th class="r">Lots</th><th class="r">Entry</th><th class="r">Floating</th></tr>'
+    +'<table><tr><th>Symbol</th><th>Side</th><th class="r">Lots</th><th class="r">Entry</th><th class="r">Floating</th>'+(ADM?'<th></th>':'')+'</tr>'
     +rows+tot+'</table>';
+  b.querySelectorAll('.pcbtn').forEach(el=>el.onclick=()=>{ const p=POS.find(x=>String(x.local_id)===el.dataset.lid); if(p) openCorrect(p); });
+}
+
+/* ════════ 포지션 정정 (백오피스) ════════
+   MT5 Manager "Position Modify" 상당. 서버 RPC fx_admin_correct_position 만 부른다 —
+   잔고·원장은 안 건드리고, 정정 사실은 admin_audit_log(관리자 전용·삭제 불가)에 남는다.
+   포지션 행 자체에는 이력이 없다 (고객이 API 로 읽는 행) — 이력 열람은 ✎ History (관리자). */
+let PCPOS=null;
+function openCorrect(p){
+  PCPOS=p;
+  $('pcTitle').textContent='Correct position — '+String(p.symbol).toUpperCase();
+  $('pcCur').textContent='#'+String(p.local_id)+' · now '+String(p.side).toUpperCase()+' '+(+p.size||0)+' lots @ '+(+p.open_price||0)+' · floating '+(p.pnl===null||p.pnl===undefined?'—':((+p.pnl>=0?'+':'−')+usd2(Math.abs(+p.pnl))));
+  $('pcSide').value=String(p.side).toUpperCase()==='SELL'?'SELL':'BUY';
+  $('pcPrice').value=+p.open_price||0; $('pcSize').value=+p.size||0; $('pcReason').value='';
+  $('pcHist').innerHTML='';
+  $('pcModal').style.display='flex';
+}
+async function pcHistory(){
+  if(!PCPOS) return;
+  $('pcHist').innerHTML='<span class="dim">Loading…</span>';
+  try{
+    const r=await AlpexaSync.db.rpc('fx_admin_correction_log',{p_local_id:String(PCPOS.local_id),p_limit:50});
+    const d=(r&&r.data)||{};
+    if(!d.ok){ $('pcHist').innerHTML='<span class="dim">'+esc(d.error||(r.error&&r.error.message)||'?')+'</span>'; return; }
+    const rows=d.rows||[];
+    if(!rows.length){ $('pcHist').innerHTML='<span class="dim">No corrections on record for this position.</span>'; return; }
+    $('pcHist').innerHTML=rows.map(x=>{ const b=(x.detail||{}).before||{}, a=(x.detail||{}).after||{};
+      return '<div style="padding:4px 0;border-bottom:1px solid rgba(29,33,42,.55)"><b>'+esc(String(x.at).replace('T',' ').slice(0,19))+'</b> · '+esc(x.admin_email||'')+'<br>'
+        +esc((b.side||'')+' '+(b.size||'')+' @ '+(b.open_price||''))+' → <b>'+esc((a.side||'')+' '+(a.size||'')+' @ '+(a.open_price||''))+'</b><br><i>'+esc((x.detail||{}).reason||'')+'</i></div>'; }).join('');
+  }catch(e){ $('pcHist').innerHTML='<span class="dim">'+esc(e.message)+'</span>'; }
+}
+function wireCorrect(){
+  $('pcClose').onclick=()=>{ $('pcModal').style.display='none'; };
+  $('pcHistBtn').onclick=pcHistory;
+  $('pcGo').onclick=async()=>{
+    if(!PCPOS) return;
+    const side=$('pcSide').value, price=+$('pcPrice').value, size=+$('pcSize').value, reason=($('pcReason').value||'').trim();
+    if(reason.length<3){ alert('Reason required (3+ characters) — every correction is written to the audit log.'); $('pcReason').focus(); return; }
+    if(!(price>0)||!(size>0)){ alert('Entry price and lots must be > 0'); return; }
+    const before=String(PCPOS.side).toUpperCase()+' '+(+PCPOS.size||0)+' @ '+(+PCPOS.open_price||0);
+    const after=side+' '+size+' @ '+price;
+    if(before===after){ alert('Nothing changed'); return; }
+    $('pcModal').style.display='none';
+    if(await confirmModal('Correct position','<b>'+esc(String(PCPOS.symbol).toUpperCase())+'</b> #'+esc(String(PCPOS.local_id))+'<br>'+esc(before)+' → <b>'+esc(after)+'</b><br>Reason: <i>'+esc(reason)+'</i><br><br>Floating P&L, margin and fund NAV re-mark from the corrected values immediately. This is written to the admin audit log and cannot be deleted.',false))
+      opRun('fx_admin_correct_position',{p_local_id:String(PCPOS.local_id),p_side:side,p_open_price:price,p_size:size,p_reason:reason});
+  };
 }
 function pickList(q){
   q=(q||'').toLowerCase();
@@ -381,7 +452,7 @@ function wireNewFund(){
 async function boot(){
   buildBoard();
   $('fundSel').onchange=()=>{ CUR=FUNDS.find(f=>f.fund_acct===$('fundSel').value)||null; renderAll(); pullPositions(); };
-  $('btnRefresh').onclick=pullReport; wireNewFund();
+  $('btnRefresh').onclick=pullReport; wireNewFund(); wireCorrect();
   $('btnLayout').onclick=()=>{ layout={}; try{localStorage.removeItem(LKEY);}catch(e){} buildBoard(); renderAll(); renderPos(); };
   $('btnOut').onclick=async()=>{ try{ await AlpexaSync.db.auth.signOut(); }catch(e){} location.reload(); };
   try{
