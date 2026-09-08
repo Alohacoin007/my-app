@@ -37,8 +37,8 @@ if (!/AlpexaSync\.db\.rpc\('fx_close',\{ p_local_id:localId \}\)/.test(wt)) bad(
 if (/CRYPTO_PNL_SCALE/.test(wt)) bad('CRYPTO_PNL_SCALE must be removed in production (P&L == server, no fake ± weight)');
 if (/pnlContract/.test(wt)) bad('pnlContract (scale wrapper) must be removed — positionPnL uses the true contractSize');
 
-// 7) leverage clamped to the house cap (lockstep with fx_open_margin.sql: FX 100, STOCK/CRYPTO 5)
-if (!/const LEV_CAP = \(symbol\)=> catOf\(symbol\)==='Forex' \? 500 : 5;/.test(wt)) bad('LEV_CAP (per-class leverage cap, FX 500:1) missing');
+// 7) leverage clamped to the house cap (lockstep with fx_open_margin.sql: FX 500, STOCK/CRYPTO 10 — 2026-09-08 사장님 승인, 舊5)
+if (!/const LEV_CAP = \(symbol\)=> catOf\(symbol\)==='Forex' \? 500 : 10;/.test(wt)) bad('LEV_CAP (per-class leverage cap, FX 500:1) missing');
 if (!/Math\.min\(\+leverage\|\|500, LEV_CAP\(symbol\)\)/.test(wt)) bad('requiredMargin must clamp leverage to LEV_CAP (server lockstep)');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} production-wiring problem(s).`); process.exit(1); }

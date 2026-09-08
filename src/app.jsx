@@ -1171,7 +1171,7 @@ function App() {
   const usedMargin = liveOrders.reduce((sum, o) => {
     const m = marketRef.current.state.find(s => s.sym === o.sym);
     if (!m) return sum;
-    const lev = (typeof window.getLeverageSettings === 'function' ? window.getLeverageSettings() : { FX:100, INDEX:20, STOCK:5, CRYPTO:5 })[m.cls] || 100;
+    const lev = (typeof window.getLeverageSettings === 'function' ? window.getLeverageSettings() : { FX:100, INDEX:20, STOCK:10, CRYPTO:10 })[m.cls] || 100;
     return sum + ALPEXA_MARKET.getMarginUSD(m, o.vol||0, o.open||0, lev);
   }, 0);
   const prevPnlRef = useRef(livePnl);

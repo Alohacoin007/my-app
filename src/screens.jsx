@@ -1839,7 +1839,7 @@ window.getPrefs = getPrefs;
 window.setPref = setPref;
 
 // Leverage settings — stored in localStorage so user can customize
-const DEFAULT_LEVERAGE = { FX: 100, INDEX: 20, STOCK: 5, CRYPTO: 5 };
+const DEFAULT_LEVERAGE = { FX: 100, INDEX: 20, STOCK: 10, CRYPTO: 10 };   // STOCK/CRYPTO 5→10 (2026-09-08 사장님 승인, 서버 fx_lev_cap 락스텝)
 function getLeverageSettings() {
   try {
     const raw = localStorage.getItem('alpexa.leverage');

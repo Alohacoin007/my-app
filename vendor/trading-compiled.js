@@ -295,9 +295,9 @@ syncMyServerBalance();
 const DEFAULT_LEVERAGE = {
   FX: 500,
   INDEX: 20,
-  STOCK: 5,
-  CRYPTO: 5
-}; // FX 500:1 (2026-07-19 사장님 승인, 서버 fx_lev_cap 락스텝)
+  STOCK: 10,
+  CRYPTO: 10
+}; // FX 500:1 · STOCK/CRYPTO 10:1 (2026-09-08 사장님 승인, 舊5 — 서버 fx_lev_cap 락스텝)
 function getLeverageSettings() {
   try {
     const raw = localStorage.getItem('alpexa.leverage');
@@ -5556,8 +5556,8 @@ function LeverageSheet({
     const d = {
       FX: 100,
       INDEX: 20,
-      STOCK: 5,
-      CRYPTO: 5
+      STOCK: 10,
+      CRYPTO: 10
     };
     setLev(d);
     setLeverageSettings(d);
@@ -12691,8 +12691,8 @@ function App() {
       const levSet = window.getLeverageSettings ? window.getLeverageSettings() : {
         FX: 100,
         INDEX: 20,
-        STOCK: 5,
-        CRYPTO: 5
+        STOCK: 10,
+        CRYPTO: 10
       };
       let floatPnl = 0,
         usedM = 0,
@@ -13183,8 +13183,8 @@ function App() {
     const lev = (typeof window.getLeverageSettings === 'function' ? window.getLeverageSettings() : {
       FX: 100,
       INDEX: 20,
-      STOCK: 5,
-      CRYPTO: 5
+      STOCK: 10,
+      CRYPTO: 10
     })[m.cls] || 100;
     return sum + ALPEXA_MARKET.getMarginUSD(m, o.vol || 0, o.open || 0, lev);
   }, 0);

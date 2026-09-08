@@ -92,7 +92,7 @@ function srvBalById(id){const s=getServerBalances();return id==='live'?s.fx:(id=
 function syncMyServerBalance(){try{const o=getServerBalances();o.fx=getBalances().live;window.__fxSrvBal=o;}catch(e){}}
 window.addEventListener('alpexa-balance-change',syncMyServerBalance);
 syncMyServerBalance();
-const DEFAULT_LEVERAGE={FX:500,INDEX:20,STOCK:5,CRYPTO:5};   // FX 500:1 (2026-07-19 사장님 승인, 서버 fx_lev_cap 락스텝)
+const DEFAULT_LEVERAGE={FX:500,INDEX:20,STOCK:10,CRYPTO:10};   // FX 500:1 · STOCK/CRYPTO 10:1 (2026-09-08 사장님 승인, 舊5 — 서버 fx_lev_cap 락스텝)
 function getLeverageSettings(){try{const raw=localStorage.getItem('alpexa.leverage');if(raw)return{...DEFAULT_LEVERAGE,...JSON.parse(raw)};}catch(e){}return{...DEFAULT_LEVERAGE};}
 function setLeverageSettings(settings){try{localStorage.setItem('alpexa.leverage',JSON.stringify(settings));}catch(e){}window.dispatchEvent(new Event('alpexa-leverage-change'));}
 window.getLeverageSettings=getLeverageSettings;window.setLeverageSettings=setLeverageSettings;
@@ -1651,7 +1651,7 @@ function LeverageSheet({ openPositions, onClose }) {
     CRYPTO: { label:'Crypto',  sub:'BTC, ETH and other crypto CFDs', icon:'currency_bitcoin' },
   };
   function save() { setLeverageSettings(lev); window.dispatchEvent(new Event('alpexa-balance-change')); onClose(); }
-  function reset() { const d={FX:100,INDEX:20,STOCK:5,CRYPTO:5}; setLev(d); setLeverageSettings(d); window.dispatchEvent(new Event('alpexa-balance-change')); }
+  function reset() { const d={FX:100,INDEX:20,STOCK:10,CRYPTO:10}; setLev(d); setLeverageSettings(d); window.dispatchEvent(new Event('alpexa-balance-change')); }
   return (
     <div className="fx-sheet-overlay" onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(10,14,26,0.55)',zIndex:300,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
       <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',borderTopLeftRadius:16,borderTopRightRadius:16,display:'flex',flexDirection:'column',maxHeight:'88%',overflow:'hidden',animation:'slideUp 0.22s cubic-bezier(0.2,0.8,0.2,1)'}}>
@@ -3261,7 +3261,7 @@ function App(){
       /* (클라 SL/TP 자동청산 제거 — 2026-07-22 "고고". SL/TP는 fx_modify로 서버 저장,
          집행은 서버 fx_sltp 단독: 24시간 초단위+워터마크(스침) 판정 + 레벨가 정산 + 원자 선점.
          앱이 꺼져 있어도 터진다. 청산 알림은 positions Realtime status='closed'에서.) */
-      const levSet=(window.getLeverageSettings?window.getLeverageSettings():{FX:100,INDEX:20,STOCK:5,CRYPTO:5});
+      const levSet=(window.getLeverageSettings?window.getLeverageSettings():{FX:100,INDEX:20,STOCK:10,CRYPTO:10});
       let floatPnl=0,usedM=0,worst=null;
       setLiveOrders(prev=>prev.map(o=>{
         if(o.status!=='OPEN')return o;
@@ -3510,7 +3510,7 @@ function App(){
   const usedMargin=[...liveOrders,...ALPEXA_MARKET.POSITIONS].reduce((sum,o)=>{
     const m=marketRef.current.state.find(s=>s.sym===o.sym);
     if(!m)return sum;
-    const lev=(typeof window.getLeverageSettings==='function'?window.getLeverageSettings():{FX:100,INDEX:20,STOCK:5,CRYPTO:5})[m.cls]||100;
+    const lev=(typeof window.getLeverageSettings==='function'?window.getLeverageSettings():{FX:100,INDEX:20,STOCK:10,CRYPTO:10})[m.cls]||100;
     return sum+ALPEXA_MARKET.getMarginUSD(m,o.vol||0,o.open||0,lev);
   },0);
   const prevPnlRef=useRef(livePnl);

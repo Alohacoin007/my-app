@@ -31,12 +31,12 @@ if (!fail) {
   // FX: cap 100 = chosen 100 → unchanged (tens of dollars for 0.01 lot)
   if (!near(rm('EURUSD', 0.01, 100), 11.4))  bad(`FX EURUSD 0.01 @100x margin should be ~$11.40, got ${rm('EURUSD',0.01,100)}`);
   if (!near(rm('USDJPY', 0.01, 100), 10.0))  bad(`FX USDJPY 0.01 @100x margin should be ~$10.00 (USD base), got ${rm('USDJPY',0.01,100)}`);
-  // Crypto/stock: contract size 1 AND leverage clamped to the house cap 5× (server lockstep)
-  if (!near(rm('BTCUSD', 0.01, 100), 128.0, 0.5)) bad(`CRYPTO BTCUSD 0.01 (chosen 100x → capped 5x) margin should be ~$128, got ${rm('BTCUSD',0.01,100)}`);
+  // Crypto/stock: contract size 1 AND leverage clamped to the house cap 10× (server lockstep — 2026-09-08 사장님 승인, 舊5×)
+  if (!near(rm('BTCUSD', 0.01, 100), 64.0, 0.5)) bad(`CRYPTO BTCUSD 0.01 (chosen 100x → capped 10x) margin should be ~$64, got ${rm('BTCUSD',0.01,100)}`);
   if (rm('BTCUSD', 0.01, 100) > 5000)        bad(`CRYPTO margin blew up (contract size not per-asset): ${rm('BTCUSD',0.01,100)}`);
-  if (!near(rm('AAPL', 0.01, 100), 0.63, 0.02)) bad(`STOCK AAPL 0.01 (capped 5x) margin should be ~$0.63, got ${rm('AAPL',0.01,100)}`);
-  // leverage cap is a CLAMP, not a floor: choosing 5x explicitly gives the same crypto margin as 100x
-  if (!near(rm('BTCUSD', 0.01, 5), rm('BTCUSD', 0.01, 100), 1e-6)) bad('crypto leverage must clamp to 5× (100x and 5x must match)');
+  if (!near(rm('AAPL', 0.01, 100), 0.315, 0.01)) bad(`STOCK AAPL 0.01 (capped 10x) margin should be ~$0.315, got ${rm('AAPL',0.01,100)}`);
+  // leverage cap is a CLAMP, not a floor: choosing 10x explicitly gives the same crypto margin as 100x
+  if (!near(rm('BTCUSD', 0.01, 10), rm('BTCUSD', 0.01, 100), 1e-6)) bad('crypto leverage must clamp to 10× (100x and 10x must match)');
   // the reported disaster is gone: two 0.01 crypto positions are hundreds, not $120k
   const two = rm('BTCUSD', 0.01, 100) + rm('SOLUSD', 0.01, 100);
   if (two > 5000) bad(`two 0.01-lot crypto positions lock $${two.toFixed(2)} (blow-up regression)`);

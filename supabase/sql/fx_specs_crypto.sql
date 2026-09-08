@@ -1,5 +1,5 @@
 -- Alpexa — register the FX app's crypto CFDs in fx_specs so fx_open can price + margin-check
--- them (no more client-fallback bypass). cls='CRYPTO' → leverage cap 5x, lot 1 (see
+-- them (no more client-fallback bypass). cls='CRYPTO' → leverage cap 10x (2026-09-08, 舊5x), lot 1 (see
 -- fx_open_margin.sql). The matching USD-pair prices (BTCUSD ...) are written by the
 -- crypto-prices Edge function (now emits both BTC and BTCUSD) + its 5s cron.
 -- ============================================================================

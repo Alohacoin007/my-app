@@ -218,7 +218,7 @@ History 기간필터: All/Today/Last Week/... (histPeriod `2724,2751`). 가상 �
 ### 2-3. 마진 / 레버리지 / contract size
 - **requiredMargin = notional_usd / leverage_cap[cls]** (`fx_open_slippage.sql:101`, `fx_open_margin.sql:120-128`).
 - **notional_usd(fx_notional_usd `fx_open_margin.sql:40-53`)**: lot = XAUUSD 100·XAGUSD 5000·cls FX 100000·else 1. 비FX = size·lot·price. FX quote=USD → size·lot·price. FX base=USD → size·lot. FX cross → size·lot·ccyToUsd(base)(레퍼런스 없으면 null → 거절).
-- **lev cap(fx_lev_cap `fx_open_margin.sql:56-60`)**: FX 100·INDEX 20·STOCK 5·CRYPTO 5·else 1. 클라 leverage는 `least(cap, greatest(1, p_leverage))`로 **클램프**(클라는 더 보수적만 가능 `fx_open_slippage.sql:95`).
+- **lev cap(fx_lev_cap `fx_open_margin.sql:56-60`)**: FX 500·INDEX 20·STOCK 10·CRYPTO 10·else 1 (STOCK/CRYPTO 2026-09-08 5→10). 클라 leverage는 `least(cap, greatest(1, p_leverage))`로 **클램프**(클라는 더 보수적만 가능 `fx_open_slippage.sql:95`).
 - **마진 게이트**: `balance < used_margin + new_margin - 1e-6`면 거절(`fx_open_slippage.sql:109-112`). used = Σ(오픈 포지션 notional/cap)(`102-108`).
 - **클라 락스텝**: contractSize FX=100000 else 1 `webtrade.html:1338-1342`(`CONTRACT=100000`) / 모바일 getLotSize·getNotionalUSD `trading.html:444`·getMarginUSD `445`. LEV_CAP `webtrade.html:1351`(Forex 100 else 5) / DEFAULT_LEVERAGE `trading.html:610`(FX:100,INDEX:20,STOCK:5,CRYPTO:5). requiredMargin `webtrade.html:1395-1396`.
 - **⚠️ DEMO 왜곡(락스텝 예외)**: 크립토 플로팅 표시 가중치(0.01랏 P&L 가시화)는 **마진엔 영향 없음**, 표시/equity만 — WT_DEMO off 전 1로 리셋 필요(`webtrade.html:1343-1347`).
