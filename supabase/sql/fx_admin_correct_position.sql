@@ -1,7 +1,8 @@
 -- Alpexa — FX 포지션 정정 (백오피스 · MT5 Manager "Position Modify" 상당)
 -- ============================================================================
 -- 2026-09-08 사장님 요청. 관리자가 **열린 FX 포지션**의 방향(side)·진입가(open_price)·
--- 수량(size)을 정정한다. 실제 브로커의 매니저 터미널에 있는 기능이고, 계약은 하나다:
+-- 수량(size)·체결 시각(open_time)을 정정한다. 실제 브로커의 매니저 터미널에 있는 기능이고,
+-- 계약은 하나다:
 --
 --   ★ 정정 사실은 지울 수 없게 남고 (admin_audit_log · 관리자만 열람 · 쓰기정책 없음)
 --   ★ 돈은 한 푼도 직접 움직이지 않는다 (잔고·원장·pnl 컬럼 접근 0줄)
@@ -10,31 +11,40 @@
 -- 실시간으로 읽는 기존 엔진(fx_realized_pnl 등)이 새 값으로 다시 계산한다. 이 RPC 가 손익을
 -- "만들지" 않는다 — 포지션 정의를 바꾸고 나머지는 시장이 정한다.
 --
+-- ⏱ 체결 시각 (2차, 2026-09-08): positions 엔 created_at 이 없다. 터미널 Time 열은
+--    **updated_at** 을 그대로 보여준다 (webtrade 3307 · terminal 2365). 그래서 updated_at 이
+--    곧 "체결 시각"이다. 1차 버전은 정정 때 updated_at = now() 로 덮어 고객 화면의 날짜가
+--    정정 시각으로 바뀌는 부작용이 있었다 → 이제 관리자가 p_open_time 을 명시할 때만 바뀐다.
+--    시각은 UTC 로 저장되고 터미널도 UTC 문자열을 그대로 자른다 — 데스크 입력도 UTC 기준.
+--
 -- 기록은 **백오피스 한 곳**(admin_audit_log)에만 남긴다. 포지션 행(meta)에는 이력을 두지 않는다
 -- — 계좌 주인이 API 로 읽는 행이라서. 고객 쪽에 보이는 것은 바뀐 값 자체와 그에 따른 손익뿐
 -- (MT5 매니저가 포지션을 수정했을 때 고객 터미널이 보는 것과 같다).
 --
--- 배포: 영구 수동 (돈 코드). Supabase SQL Editor 에 통째로 실행.
--- 검증:  select public.fx_admin_correct_position('<local_id>', 'SELL', null, null, '테스트');
+-- 배포: 영구 수동 (돈 코드). Supabase SQL Editor 에 통째로 실행 (create or replace — 재실행 안전).
+-- 검증:  select public.fx_admin_position_get('<local_id>');
 --        select * from public.admin_audit_log where action = 'fx_position_correct' order by at desc limit 3;
 -- 핀:    tests/fx-position-correct.test.js (verify 게이트)
 -- ============================================================================
 
 create or replace function public.fx_admin_correct_position(
   p_local_id   text,
-  p_side       text    default null,   -- 'BUY' | 'SELL' | null(유지)
-  p_open_price numeric default null,   -- null = 유지
-  p_size       numeric default null,   -- null = 유지 (랏)
-  p_reason     text    default ''      -- 필수. 빈 사유는 거절 — 무기록 개입 불가
+  p_side       text        default null,   -- 'BUY' | 'SELL' | null(유지)
+  p_open_price numeric     default null,   -- null = 유지
+  p_size       numeric     default null,   -- null = 유지 (랏)
+  p_reason     text        default '',     -- 필수. 빈 사유는 거절 — 무기록 개입 불가
+  p_open_time  timestamptz default null    -- null = 유지. 체결 시각(UTC). 미래 거절
 ) returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   v_pos    public.positions%rowtype;
-  v_side   text; v_price numeric; v_size numeric;
+  v_side   text; v_price numeric; v_size numeric; v_time timestamptz;
   v_before jsonb; v_after jsonb;
 begin
   if not public.is_admin() then return jsonb_build_object('ok',false,'error','not admin'); end if;
   if length(trim(coalesce(p_reason,''))) < 3 then
     return jsonb_build_object('ok',false,'error','reason required (3+ chars)','code','REASON_REQUIRED'); end if;
+  if p_open_time is not null and p_open_time > now() then
+    return jsonb_build_object('ok',false,'error','open time cannot be in the future','code','BAD_TIME'); end if;
 
   -- 대상: 열린 FX 포지션만. FOR UPDATE — 스탑아웃 크론 / 고객 청산 / SL·TP 집행과 같은 행을
   -- 동시에 만지지 못하게 직렬화한다 (fx_close 와 같은 이유).
@@ -53,17 +63,20 @@ begin
   v_size  := coalesce(p_size, v_pos.size);
   if v_size is null or v_size <= 0 then
     return jsonb_build_object('ok',false,'error','size must be > 0','code','BAD_SIZE'); end if;
+  v_time  := coalesce(p_open_time, v_pos.updated_at);
 
-  v_before := jsonb_build_object('side', v_pos.side, 'open_price', v_pos.open_price, 'size', v_pos.size);
-  v_after  := jsonb_build_object('side', v_side,     'open_price', v_price,          'size', v_size);
+  v_before := jsonb_build_object('side', v_pos.side, 'open_price', v_pos.open_price, 'size', v_pos.size, 'open_time', v_pos.updated_at);
+  v_after  := jsonb_build_object('side', v_side,     'open_price', v_price,          'size', v_size,     'open_time', v_time);
 
   -- 멱등: 같은 값으로 두 번 = 한 번. 변화가 없으면 행도 감사 로그도 건드리지 않는다.
   if v_before = v_after then
     return jsonb_build_object('ok',true,'changed',false,'local_id',p_local_id,'acct',v_pos.acct_no,'symbol',v_pos.symbol,'after',v_after);
   end if;
 
+  -- updated_at 은 체결 시각이다 — 관리자가 준 값이 있을 때만 바뀐다 (now() 로 덮지 않는다).
   update public.positions
-     set side = v_side, open_price = v_price, size = v_size, updated_at = now()
+     set side = v_side, open_price = v_price, size = v_size,
+         updated_at = coalesce(p_open_time, v_pos.updated_at)
    where local_id = p_local_id and server = 'fx' and status = 'open';
 
   -- 지울 수 없는 기록 — 기존 백오피스 감사 경로 재사용 (새 로그 테이블 만들지 않는다)
@@ -78,7 +91,22 @@ exception when others then
 end
 $$;
 
--- ── 이력 조회 (데스크 ✎ · 관리자 전용) ──
+-- ── 현재값 읽기 (데스크 모달 프리필 · 관리자 전용) — pamm_desk_report 는 updated_at 을 안 준다 ──
+create or replace function public.fx_admin_position_get(p_local_id text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_pos public.positions%rowtype;
+begin
+  if not public.is_admin() then return jsonb_build_object('ok',false,'error','not admin'); end if;
+  select * into v_pos from public.positions
+   where local_id = p_local_id and server = 'fx' and status = 'open' limit 1;
+  if v_pos.local_id is null then
+    return jsonb_build_object('ok',false,'error','position not found or not open','code','NOT_OPEN'); end if;
+  return jsonb_build_object('ok',true,'local_id',v_pos.local_id,'acct',v_pos.acct_no,'symbol',v_pos.symbol,
+                            'side',v_pos.side,'open_price',v_pos.open_price,'size',v_pos.size,'open_time',v_pos.updated_at);
+exception when others then return jsonb_build_object('ok',false,'error',SQLERRM); end
+$$;
+
+-- ── 이력 조회 (데스크 ✎ History · 관리자 전용) ──
 create or replace function public.fx_admin_correction_log(p_local_id text default null, p_limit int default 50)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v jsonb;
@@ -94,8 +122,13 @@ begin
 exception when others then return jsonb_build_object('ok',false,'error',SQLERRM); end
 $$;
 
+-- ── 1차(5인자) 시그니처 제거 — 같은 이름 두 벌이면 PostgREST 가 호출을 거절한다 ──
+drop function if exists public.fx_admin_correct_position(text,text,numeric,numeric,text);
+
 -- ── 게이트: authenticated 만 호출 가능 + 함수 안 is_admin 이 관문 (sbdesk 와 동일) ──
-revoke all on function public.fx_admin_correct_position(text,text,numeric,numeric,text) from public, anon;
-revoke all on function public.fx_admin_correction_log(text,int)                          from public, anon;
-grant execute on function public.fx_admin_correct_position(text,text,numeric,numeric,text) to authenticated;
-grant execute on function public.fx_admin_correction_log(text,int)                          to authenticated;
+revoke all on function public.fx_admin_correct_position(text,text,numeric,numeric,text,timestamptz) from public, anon;
+revoke all on function public.fx_admin_position_get(text)                                            from public, anon;
+revoke all on function public.fx_admin_correction_log(text,int)                                      from public, anon;
+grant execute on function public.fx_admin_correct_position(text,text,numeric,numeric,text,timestamptz) to authenticated;
+grant execute on function public.fx_admin_position_get(text)                                            to authenticated;
+grant execute on function public.fx_admin_correction_log(text,int)                                      to authenticated;

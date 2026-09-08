@@ -40,6 +40,16 @@ ok('C6 _sbdesk_audit 헬퍼로 기록 (action fx_position_correct)', /perform pu
 ok('C6 감사 detail 에 before/after/reason 전부', /'before'/.test(fn) && /'after'/.test(fn) && /'reason'/.test(fn));
 ok('C7 포지션 행에 이력 없음 (meta 갱신 금지)', !/set[^;]*\bmeta\s*=/.test(fn) && !/corrections/.test(fn));
 ok('C8 변화 없으면 조기 반환 (v_before = v_after)', /v_before\s*=\s*v_after/.test(fn));
+// ── 날짜 정정 (2026-09-08 2차, 사장님 "날짜도 수정할 수 있게") ──
+// positions 엔 created_at 이 없다. 터미널 Time 열 = updated_at (webtrade 3307 · terminal 2365).
+// 그래서 updated_at 이 곧 "체결 시각"이고, 정정 RPC 가 이걸 now() 로 덮으면 고객 화면의
+// 날짜가 정정 시각으로 바뀐다 — 1차 버전의 부작용. 관리자가 명시할 때만 바뀌어야 한다.
+ok('C11 p_open_time 파라미터가 있다', /p_open_time\s+timestamptz/.test(fn));
+ok('C11 updated_at 을 무조건 now() 로 덮지 않는다', !/updated_at\s*=\s*now\(\)/.test(fn));
+ok('C11 updated_at = coalesce(p_open_time, 기존값)', /updated_at\s*=\s*coalesce\(p_open_time,\s*v_pos\.updated_at\)/.test(fn));
+ok('C11 미래 시각 거절', /p_open_time\s*>\s*now\(\)/.test(fn) && /BAD_TIME/.test(fn));
+ok('C11 before/after 에 open_time 포함', (fn.match(/'open_time'/g) || []).length >= 2);
+ok('C11 프리필용 읽기 RPC fx_admin_position_get 도 is_admin 게이트', /function public\.fx_admin_position_get[\s\S]*?if not public\.is_admin\(\)/.test(sql));
 ok('side 는 BUY/SELL 만', /in \('BUY','SELL'\)/.test(fn));
 ok('가격·수량 양수 검증', /v_price\s*<=\s*0/.test(fn) && /v_size\s*<=\s*0/.test(fn));
 ok('SECURITY DEFINER + search_path 고정', /security definer/.test(fn) && /set search_path/.test(fn));
@@ -53,6 +63,10 @@ ok('C9 opRun 경유 (confirmModal 관문 공통 경로)', /opRun\('fx_admin_corr
 ok('C9 사유 비면 호출 전에 막는다', /p_reason/.test(desk) && /reason/i.test(desk) && /Reason required|사유/.test(desk));
 ok("C10 positions 테이블 직접 update 없음", !/from\('positions'\)\s*\.\s*(update|insert|delete|upsert)/.test(desk));
 ok('이력 열람은 fx_admin_correction_log 로', /fx_admin_correction_log/.test(desk));
+ok('C11 데스크에 체결 시각 입력(pcTime, datetime-local)이 있다', /id="pcTime"[^>]*type="datetime-local"/.test(desk));
+ok('C11 데스크가 p_open_time 을 보낸다', /p_open_time/.test(desk));
+ok('C11 데스크가 fx_admin_position_get 으로 현재 시각을 프리필한다', /fx_admin_position_get/.test(desk));
+ok('C11 시각은 UTC 로 보낸다 (터미널 Time 열과 동일 기준)', /UTC/.test(desk) && /\+\s*'Z'|'Z'\)|`Z`|Z'/.test(desk));
 
 console.log('\n' + (pass ? '🟢 FX 포지션 정정: 기록은 지울 수 없고, 돈은 직접 안 움직인다' : '🔴 FX 포지션 정정 계약 깨짐') + '\n');
 process.exit(pass ? 0 : 1);
