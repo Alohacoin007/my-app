@@ -7,7 +7,7 @@
 -- covers (margin already used by open FX positions) + (this position's margin).
 --
 --   margin = notional_usd / leverage_cap[cls]
---   lot:      XAUUSD=100, XAGUSD=5000, cls FX=100000, else 1
+--   lot:      fx_specs.contract via fx_contract() (2026-09-09 단일 출처)
 --   notional: non-FX        → size*lot*price
 --             FX quote=USD   → size*lot*price          (EURUSD, XAUUSD, XAGUSD)
 --             FX base=USD    → size*lot                (USDJPY)
@@ -41,8 +41,7 @@ create or replace function public.fx_notional_usd(p_symbol text, p_cls text, p_s
 returns numeric language plpgsql stable security definer set search_path to 'public' as $$
 declare v_lot numeric; v_base text; v_quote text; v_conv numeric;
 begin
-  v_lot := case when p_symbol='XAUUSD' then 100 when p_symbol='XAGUSD' then 5000
-                when p_cls='FX' then 100000 else 1 end;
+  v_lot := public.fx_contract(p_symbol, p_cls);   -- 계약 크기 진실 = fx_specs.contract (fx_contract_size.sql, 2026-09-09)
   if p_cls <> 'FX' then return p_size * v_lot * p_price; end if;
   v_base := substr(p_symbol,1,3); v_quote := substr(p_symbol,4,3);
   if v_quote = 'USD' then return p_size * v_lot * p_price; end if;

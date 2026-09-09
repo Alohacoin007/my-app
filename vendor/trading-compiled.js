@@ -2477,17 +2477,22 @@ function TradeTicket({
   const setVol = setLots;
   const cryptoUsdRef = useRef(500); // desired USD size for crypto orders
   const prevClsRef = useRef(s ? s.cls : null);
+  const prevLotRef = useRef(s ? ALPEXA_MARKET.getLotSize(s) : 1);
   useEffect(() => {
     if (!s) return;
     const px = s.last || s.bid || 1;
     const classChanged = prevClsRef.current !== s.cls;
     prevClsRef.current = s.cls;
-    // Crypto is sized in USD: keep ~the same dollar amount as you switch coins.
-    if (s.cls === 'CRYPTO') {
+    const cs = ALPEXA_MARKET.getLotSize(s); // 계약 크기 (DOGE·XRP·ADA 10,000 → MT5 랏 모드 · BTC 등 1 → USD 사이징)
+    // Crypto with contract 1 is sized in USD: keep ~the same dollar amount as you switch coins.
+    if (s.cls === 'CRYPTO' && cs === 1) {
       setLots(+(cryptoUsdRef.current / px).toFixed(6));
+    } else if (s.cls === 'CRYPTO') {
+      if (classChanged || prevLotRef.current === 1) setLots(0.10);
     } else if (classChanged) {
       setLots(s.cls === 'STOCK' || s.cls === 'INDEX' ? 1 : 0.10);
     }
+    prevLotRef.current = cs;
   }, [s && s.cls, s && s.sym]);
   const ask = ALPEXA_MARKET.fxAskPx(s);
   const entryPx = side === 'BUY' ? ask : ALPEXA_MARKET.fxBidPx(s); // entry at the DEALT quote (display lockstep)
@@ -2552,7 +2557,9 @@ function TradeTicket({
     if (s.sym === 'XAUUSD') contractLabel = `${(100 * vol).toFixed(2)} oz`;else if (s.sym === 'XAGUSD') contractLabel = `${(5000 * vol).toFixed(0)} oz`;else contractLabel = `${(100000 * vol).toLocaleString('en-US', {
       maximumFractionDigits: 0
     })} ${s.sym.slice(0, 3)}`;
-  } else if (s.cls === 'CRYPTO') contractLabel = `${vol.toFixed(2)} ${s.sym.replace('USD', '')}`;else if (s.cls === 'STOCK') contractLabel = `${vol.toFixed(0)} ${vol === 1 ? 'share' : 'shares'}`;else contractLabel = `${vol.toFixed(2)} units`;
+  } else if (s.cls === 'CRYPTO') contractLabel = lotSize > 1 ? `${(lotSize * vol).toLocaleString('en-US', {
+    maximumFractionDigits: 0
+  })} ${s.sym.replace('USD', '')}` : `${vol.toFixed(2)} ${s.sym.replace('USD', '')}`;else if (s.cls === 'STOCK') contractLabel = `${vol.toFixed(0)} ${vol === 1 ? 'share' : 'shares'}`;else contractLabel = `${vol.toFixed(2)} units`;
   const tagBg = {
     FX: 'var(--acc-3)',
     STOCK: 'var(--buy-tint)',
@@ -2849,7 +2856,7 @@ function TradeTicket({
       padding: '12px 14px',
       border: '1px solid var(--line-2)'
     }
-  }, s.cls === 'CRYPTO' ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, s.cls === 'CRYPTO' && lotSize === 1 ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 9.5,
       fontWeight: 700,
@@ -2948,7 +2955,7 @@ function TradeTicket({
       letterSpacing: 0.7,
       marginBottom: 10
     }
-  }, "VOLUME (", ALPEXA_MARKET.getUnitLabel(s.cls).toUpperCase(), ")"), /*#__PURE__*/React.createElement("div", {
+  }, "VOLUME (", ALPEXA_MARKET.getUnitLabel(s.cls, true, lotSize).toUpperCase(), ")"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
@@ -3565,7 +3572,7 @@ function TradeTicket({
       }
     }, /*#__PURE__*/React.createElement(SumRow, {
       label: "Volume",
-      val: `${ALPEXA_MARKET.fmtVol(s.cls, vol)} ${ALPEXA_MARKET.getUnitLabel(s.cls)}`
+      val: `${ALPEXA_MARKET.fmtVol(s.cls, vol)} ${ALPEXA_MARKET.getUnitLabel(s.cls, true, lotSize)}`
     }), /*#__PURE__*/React.createElement(SumRow, {
       label: "Entry price",
       val: ALPEXA_MARKET.fmt(entryPx, s.digits)
@@ -3742,7 +3749,7 @@ function ModifySheet({
     }
   }, /*#__PURE__*/React.createElement("span", {
     className: "mono"
-  }, position.side, " ", ALPEXA_MARKET.fmtVol(symInfo?.cls || 'FX', position.vol), " ", ALPEXA_MARKET.getUnitLabel(symInfo?.cls || 'FX'), " ", position.sym))), /*#__PURE__*/React.createElement("span", {
+  }, position.side, " ", ALPEXA_MARKET.fmtVol(symInfo?.cls || 'FX', position.vol), " ", ALPEXA_MARKET.getUnitLabel(symInfo?.cls || 'FX', true, lotSize), " ", position.sym))), /*#__PURE__*/React.createElement("span", {
     style: {
       flex: 1
     }
@@ -4086,7 +4093,10 @@ function PosCard({
       fontSize: 11,
       color: 'var(--text-3)'
     }
-  }, ALPEXA_MARKET.fmtVol(cls, p.vol), " ", ALPEXA_MARKET.getUnitLabel(cls)), p.placedAt && /*#__PURE__*/React.createElement("span", {
+  }, ALPEXA_MARKET.fmtVol(cls, p.vol), " ", ALPEXA_MARKET.getUnitLabel(cls, true, ALPEXA_MARKET.getLotSize(ALPEXA_MARKET.SYMBOLS.find(x => x.sym === p.sym) || {
+    sym: p.sym,
+    cls
+  }))), p.placedAt && /*#__PURE__*/React.createElement("span", {
     className: "mono",
     style: {
       fontSize: 9.5,

@@ -1,43 +1,50 @@
--- Alpexa — fx_close RPC (server-centre, safe by construction)
--- Closes an OPEN FX/CFD position at the SERVER price (from `prices`, kept fresh by
--- the fx-prices/stock-prices Edge functions), computes realized P&L server-side
--- (so a frozen/stale CLIENT price can't be used to bank a wrong number), credits
--- the ledger (trigger applies it to accounts.balance), marks the position closed,
--- and records a settlement. The client never sets the fill price or the P&L.
+-- Alpexa — 계약 크기(contract size) 단일 출처 · 2026-09-09 사장님 승인 (DOGE·XRP·ADA 1랏 = 10,000)
+-- ============================================================================
+-- ⚠️ 생성 파일 — 직접 수정 금지. 원본: fx_open_margin.sql · fx_close.sql · fx_stopout.sql
+--    → node tools/build-contract-size-sql.js  (tests/fx-contract-size.test.js S4 가 소스 일치를 강제)
 --
--- Mirrors the client P&L engine exactly:
---   lot   = fx_specs.contract (fx_contract() · 2026-09-09 단일 출처 — 옛 XAU 100/XAG 5000/FX 100000/else 1 은 폴백)
---   distance = (close-open) * (BUY?+1:-1)
---   pnlQuote = distance * lot * size
---   if cls != 'FX': pnl_usd = pnlQuote
---   else (FX): quote=USD -> pnlQuote ; base=USD -> pnlQuote/close ;
---              cross -> pnlQuote * (quote->USD live from prices)
--- Safe by default: missing spec / missing or stale price / cross rate missing ->
--- the RPC REJECTS, and the app falls back to its existing client-side close.
+-- 왜: 계약 크기가 서버 3함수 + 클라 2파일에 CASE 문으로 5벌 복제돼 있었다. 진실을 fx_specs.contract
+-- 한 곳으로 옮긴다. 서버는 fx_contract() 로만 읽고, 클라는 락스텝 표(테스트 강제)로 미러한다.
+--
+-- 배포 순서 (영구 수동 · 돈 코드):
+--   [1단계] 이 파일의 1단계 블록 전체 — 컬럼 추가 + 현재값 백필 + 헬퍼 + 3함수 교체. **동작 변화 0.**
+--           (DOGE 등 크립토 contract=1 그대로 → 마진·손익·플로팅 전부 지금과 동일)
+--   [2단계] 클라 2단계 커밋 배포 **전에** 2단계 블록 실행 — DOGE·XRP·ADA contract 10,000 +
+--           열린 포지션/펜딩 size ÷ 10,000 (코인 수 → 랏) 을 한 트랜잭션으로. 명목가·마진·손익 불변.
+--           옛 클라가 그 사이 코인 수로 주문하면 서버가 랏×10,000 으로 마진을 요구해 거절(fail-closed).
+-- ============================================================================
 
--- 1) Per-symbol class (so the server knows lot size + whether to FX-convert).
-create table if not exists public.fx_specs (symbol text primary key, cls text not null);
-insert into public.fx_specs(symbol,cls) values
-  ('EURUSD','FX'),('GBPUSD','FX'),('USDJPY','FX'),('AUDUSD','FX'),('USDCHF','FX'),
-  ('USDCAD','FX'),('NZDUSD','FX'),('EURJPY','FX'),('EURGBP','FX'),('GBPJPY','FX'),
-  ('EURAUD','FX'),('AUDJPY','FX'),('CHFJPY','FX'),('EURCHF','FX'),('USDKRW','FX'),
-  ('USDCNH','FX'),('USDSGD','FX'),('USDMXN','FX'),('XAUUSD','FX'),('XAGUSD','FX'),
-  ('SPACEX','STOCK'),('AAPL','STOCK'),('TSLA','STOCK'),('NVDA','STOCK'),('MSFT','STOCK'),
-  ('GOOGL','STOCK'),('META','STOCK'),('AMZN','STOCK'),('NFLX','STOCK'),('AMD','STOCK'),
-  ('JPM','STOCK'),('IONQ','STOCK'),('RGTI','STOCK'),('QBTS','STOCK'),('QUBT','STOCK'),
-  ('ARQQ','STOCK'),('TSM','STOCK'),('INTC','STOCK'),('QCOM','STOCK'),('AVGO','STOCK'),
-  ('ASML','STOCK'),('MU','STOCK'),('TXN','STOCK'),('AMAT','STOCK'),('LRCX','STOCK'),
-  ('KLAC','STOCK'),('PLTR','STOCK'),('SMCI','STOCK'),('ANET','STOCK'),('CRWD','STOCK'),
-  ('ARM','STOCK'),('ORCL','STOCK'),('NOW','STOCK'),('CRM','STOCK'),('SNOW','STOCK'),
-  ('ADBE','STOCK'),
-  ('BTCUSD','CRYPTO'),('ETHUSD','CRYPTO'),('SOLUSD','CRYPTO'),('XRPUSD','CRYPTO'),
-  ('ADAUSD','CRYPTO'),('DOGEUSD','CRYPTO'),('BNBUSD','CRYPTO'),('DOTUSD','CRYPTO'),
-  ('AVAXUSD','CRYPTO'),('LINKUSD','CRYPTO'),
-  ('NAS100','INDEX'),('SPX500','INDEX'),('US30','INDEX'),('GER40','INDEX'),('UK100','INDEX'),
-  ('JPN225','INDEX'),('HK50','INDEX'),('AUS200','INDEX'),('EUSTX50','INDEX'),('WTI','INDEX')
-on conflict (symbol) do update set cls = excluded.cls;
+-- ════════ 1단계 — 컬럼 + 백필 + 헬퍼 + 3함수 (동작 변화 0) ════════
+alter table public.fx_specs add column if not exists contract numeric not null default 1;
+update public.fx_specs
+   set contract = case symbol when 'XAUUSD' then 100 when 'XAGUSD' then 5000
+                  else case cls when 'FX' then 100000 else 1 end end
+ where contract = 1;   -- 이미 값이 있는 행은 건드리지 않는다 (재실행 안전)
 
--- 2) The close RPC.
+-- 계약 크기 헬퍼: 스펙 행 우선, 없으면 옛 CASE 폴백 (새 숫자 발명 금지 — 옛 코드와 동일 값)
+create or replace function public.fx_contract(p_symbol text, p_cls text default null)
+returns numeric language sql stable as $$
+  select coalesce((select contract from public.fx_specs where symbol = p_symbol),
+                  case when p_symbol = 'XAUUSD' then 100 when p_symbol = 'XAGUSD' then 5000
+                       when p_cls = 'FX' then 100000 else 1 end)::numeric;
+$$;
+
+-- ── fx_notional_usd (원본 fx_open_margin.sql) ──
+create or replace function public.fx_notional_usd(p_symbol text, p_cls text, p_size numeric, p_price numeric)
+returns numeric language plpgsql stable security definer set search_path to 'public' as $$
+declare v_lot numeric; v_base text; v_quote text; v_conv numeric;
+begin
+  v_lot := public.fx_contract(p_symbol, p_cls);   -- 계약 크기 진실 = fx_specs.contract (fx_contract_size.sql, 2026-09-09)
+  if p_cls <> 'FX' then return p_size * v_lot * p_price; end if;
+  v_base := substr(p_symbol,1,3); v_quote := substr(p_symbol,4,3);
+  if v_quote = 'USD' then return p_size * v_lot * p_price; end if;
+  if v_base = 'USD' then return p_size * v_lot; end if;
+  v_conv := public.fx_ccy_to_usd(v_base);            -- cross pair
+  if v_conv is null then return null; end if;        -- no reference → caller rejects
+  return p_size * v_lot * v_conv;
+end;$$;
+
+-- ── fx_close (원본 fx_close.sql) ──
 create or replace function public.fx_close(p_local_id text)
 returns jsonb language plpgsql security definer set search_path to 'public' as $$
 declare
@@ -170,3 +177,87 @@ begin
 
   return jsonb_build_object('ok',true,'pnl',v_pnl,'close',round(v_close,6),'side',upper(v_side),'size',v_size);
 end;$$;
+
+-- ── fx_realized_pnl (원본 fx_stopout.sql) ──
+create or replace function public.fx_realized_pnl(
+  p_symbol text, p_side text, p_open numeric, p_size numeric,
+  p_close_override numeric default null
+) returns numeric language plpgsql stable security definer set search_path to 'public' as $$
+declare
+  v_cls text; v_mid numeric; v_pts timestamptz;
+  v_spr numeric; v_mk numeric; v_pip numeric; v_half numeric := 0; v_close numeric;
+  v_lot numeric; v_dist numeric; v_pnlq numeric; v_pnl numeric;
+  v_base text; v_quote text; v_qmid numeric; v_q2usd numeric;
+begin
+  select cls into v_cls from public.fx_specs where symbol = p_symbol;
+  if v_cls is null then return null; end if;
+  select mid, updated_at into v_mid, v_pts from public.prices where symbol = p_symbol limit 1;
+  if v_mid is null or v_mid <= 0 then return null; end if;
+  if v_pts is null or (now() - v_pts) > interval '120 seconds' then return null; end if;
+
+  if v_cls = 'FX' then
+    select coalesce(spr_pts,0) into v_spr from public.prices where symbol = p_symbol limit 1;
+    select coalesce(markup_pts,0) into v_mk from public.pricing_marks where symbol = p_symbol limit 1;
+    v_pip := case when p_symbol like '%JPY' then 0.01
+                  when p_symbol = 'XAUUSD' then 0.01
+                  when p_symbol = 'XAGUSD' then 0.001
+                  else 0.0001 end;
+    v_half := greatest(0.1, coalesce(v_spr,0) + coalesce(v_mk,0)) * v_pip / 2.0;
+  else
+    select coalesce(spr_pts,0) into v_spr from public.prices where symbol = p_symbol limit 1;
+    v_half := v_mid * greatest(
+        (case v_cls when 'CRYPTO' then 10 when 'STOCK' then 8 when 'INDEX' then 6 else 0 end),
+        coalesce(v_spr,0)
+      ) / 10000.0 / 2.0;
+  end if;
+  v_close := v_mid + (case when upper(p_side) = 'BUY' then -v_half else v_half end);
+  -- 워터마크 레벨가 정산: 오버라이드가 오면 그 가격이 청산가 (레벨=고객 지정가, 스프레드 기반영 간주)
+  if p_close_override is not null and p_close_override > 0 then v_close := p_close_override; end if;
+
+  v_lot  := public.fx_contract(p_symbol, v_cls);   -- 계약 크기 진실 = fx_specs.contract (fx_contract_size.sql, 2026-09-09)
+  v_dist := (v_close - p_open) * (case when upper(p_side) = 'BUY' then 1 else -1 end);
+  v_pnlq := v_dist * v_lot * p_size;
+  if v_cls <> 'FX' then
+    v_pnl := v_pnlq;
+  else
+    v_base := left(p_symbol,3); v_quote := substr(p_symbol,4,3);
+    if v_quote = 'USD' then
+      v_pnl := v_pnlq;
+    elsif v_base = 'USD' then
+      v_pnl := v_pnlq / v_mid;
+    else
+      select mid into v_qmid from public.prices where symbol = 'USD'||v_quote limit 1;
+      if v_qmid is not null and v_qmid > 0 then v_q2usd := 1.0 / v_qmid;
+      else
+        select mid into v_qmid from public.prices where symbol = v_quote||'USD' limit 1;
+        if v_qmid is not null and v_qmid > 0 then v_q2usd := v_qmid; end if;
+      end if;
+      if v_q2usd is null then return null; end if;
+      v_pnl := v_pnlq * v_q2usd;
+    end if;
+  end if;
+  return round(v_pnl, 2);
+end;$$;
+
+-- 확인 (읽기 전용):
+--   select symbol, cls, contract from public.fx_specs order by cls, symbol;
+--   select public.fx_contract('DOGEUSD','CRYPTO'), public.fx_contract('EURUSD','FX'), public.fx_contract('XAUUSD','FX');
+
+
+-- ════════ 2단계 — DOGE·XRP·ADA 1랏 = 10,000 (클라 2단계 배포 직전에 실행) ════════
+-- 2단계 배포 전에는 이 블록을 실행하지 않는다. 실행 전 열린 포지션 확인:
+--   select symbol, count(*), sum(size) from public.positions
+--    where server='fx' and status='open' and symbol in ('DOGEUSD','XRPUSD','ADAUSD') group by symbol;
+--
+-- begin;
+--   update public.fx_specs set contract = 10000 where symbol in ('DOGEUSD','XRPUSD','ADAUSD');
+--   -- 열린 포지션: 코인 수 → 랏 (명목가·마진·손익 불변 — 계약×size 가 같은 값)
+--   update public.positions set size = round(size / 10000, 6)
+--    where server = 'fx' and status = 'open' and symbol in ('DOGEUSD','XRPUSD','ADAUSD');
+--   -- 펜딩 주문도 같은 단위로
+--   update public.fx_pending set size = round(size / 10000, 6)
+--    where status = 'pending' and symbol in ('DOGEUSD','XRPUSD','ADAUSD');
+--   -- 지울 수 없는 기록 (백오피스 감사 로그)
+--   select public._sbdesk_audit('contract_size_migration', 'DOGEUSD,XRPUSD,ADAUSD',
+--            jsonb_build_object('contract', 10000, 'reason', 'MT5 alignment — 1 lot = 10,000 coins, pip value $1 (owner approval 2026-09-09)'));
+-- commit;

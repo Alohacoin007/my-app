@@ -863,12 +863,16 @@ function TradeTicket({market,sym,setSym,lots,setLots,onPlace}){
   const vol=lots;const setVol=setLots;
   const cryptoUsdRef=useRef(500);            // desired USD size for crypto orders
   const prevClsRef=useRef(s?s.cls:null);
+  const prevLotRef=useRef(s?ALPEXA_MARKET.getLotSize(s):1);
   useEffect(()=>{if(!s)return;
     const px=s.last||s.bid||1;
     const classChanged=prevClsRef.current!==s.cls; prevClsRef.current=s.cls;
-    // Crypto is sized in USD: keep ~the same dollar amount as you switch coins.
-    if(s.cls==='CRYPTO'){ setLots(+(cryptoUsdRef.current/px).toFixed(6)); }
+    const cs=ALPEXA_MARKET.getLotSize(s);   // 계약 크기 (DOGE·XRP·ADA 10,000 → MT5 랏 모드 · BTC 등 1 → USD 사이징)
+    // Crypto with contract 1 is sized in USD: keep ~the same dollar amount as you switch coins.
+    if(s.cls==='CRYPTO'&&cs===1){ setLots(+(cryptoUsdRef.current/px).toFixed(6)); }
+    else if(s.cls==='CRYPTO'){ if(classChanged||prevLotRef.current===1) setLots(0.10); }
     else if(classChanged){ setLots((s.cls==='STOCK'||s.cls==='INDEX')?1:0.10); }
+    prevLotRef.current=cs;
   },[s&&s.cls, s&&s.sym]);
   const ask=ALPEXA_MARKET.fxAskPx(s);const entryPx=side==='BUY'?ask:ALPEXA_MARKET.fxBidPx(s);   // entry at the DEALT quote (display lockstep)
   const notional=ALPEXA_MARKET.getNotionalUSD(s,vol,entryPx);
@@ -909,7 +913,7 @@ function TradeTicket({market,sym,setSym,lots,setLots,onPlace}){
   const slH=sltpHelper(sl,false);const tpH=sltpHelper(tp,true);
   let contractLabel;
   if(s.cls==='FX'){if(s.sym==='XAUUSD')contractLabel=`${(100*vol).toFixed(2)} oz`;else if(s.sym==='XAGUSD')contractLabel=`${(5000*vol).toFixed(0)} oz`;else contractLabel=`${(100000*vol).toLocaleString('en-US',{maximumFractionDigits:0})} ${s.sym.slice(0,3)}`;}
-  else if(s.cls==='CRYPTO')contractLabel=`${vol.toFixed(2)} ${s.sym.replace('USD','')}`;
+  else if(s.cls==='CRYPTO')contractLabel=lotSize>1?`${(lotSize*vol).toLocaleString('en-US',{maximumFractionDigits:0})} ${s.sym.replace('USD','')}`:`${vol.toFixed(2)} ${s.sym.replace('USD','')}`;
   else if(s.cls==='STOCK')contractLabel=`${vol.toFixed(0)} ${vol===1?'share':'shares'}`;
   else contractLabel=`${vol.toFixed(2)} units`;
   const tagBg={FX:'var(--acc-3)',STOCK:'var(--buy-tint)',CRYPTO:'#FCE4EC',INDEX:'#EDE7F6'};
@@ -969,7 +973,7 @@ function TradeTicket({market,sym,setSym,lots,setLots,onPlace}){
           )}
         </div>
         <div style={{background:'var(--surface)',borderRadius:4,padding:'12px 14px',border:'1px solid var(--line-2)'}}>
-          {s.cls==='CRYPTO'?(
+          {s.cls==='CRYPTO'&&lotSize===1?(
           <>
           <div style={{fontSize:9.5,fontWeight:700,color:'var(--text-3)',letterSpacing:0.7,marginBottom:10}}>AMOUNT (USD)</div>
           <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:8}}>
@@ -988,7 +992,7 @@ function TradeTicket({market,sym,setSym,lots,setLots,onPlace}){
           </>
           ):(
           <>
-          <div style={{fontSize:9.5,fontWeight:700,color:'var(--text-3)',letterSpacing:0.7,marginBottom:10}}>VOLUME ({ALPEXA_MARKET.getUnitLabel(s.cls).toUpperCase()})</div>
+          <div style={{fontSize:9.5,fontWeight:700,color:'var(--text-3)',letterSpacing:0.7,marginBottom:10}}>VOLUME ({ALPEXA_MARKET.getUnitLabel(s.cls,true,lotSize).toUpperCase()})</div>
           <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:8}}>
             <button onClick={()=>{const step=s.cls==='STOCK'?(vol<=1?1:vol<=10?1:vol<=100?5:10):s.cls==='INDEX'?1:vol<0.1?0.01:vol<1?0.10:vol<10?1:5;const min=s.cls==='STOCK'||s.cls==='INDEX'?1:0.01;setVol(Math.max(min,+(vol-step).toFixed(2)));}} style={{width:38,height:38,borderRadius:19,background:'var(--bg-2)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--ink)'}}><Mi name="remove" size={20} weight={600}/></button>
             <div style={{flex:1,textAlign:'center'}}>
@@ -1115,7 +1119,7 @@ function TradeTicket({market,sym,setSym,lots,setLots,onPlace}){
             <div style={{padding:'14px 16px 16px'}}>
               <div style={{fontSize:11.5,color:'var(--text-3)',marginBottom:10,fontWeight:600,letterSpacing:0.4,textTransform:'uppercase'}}>Order details</div>
               <div style={{background:'var(--bg)',borderRadius:3,padding:'8px 12px',marginBottom:14,border:'1px solid var(--line-2)'}}>
-                <SumRow label="Volume" val={`${ALPEXA_MARKET.fmtVol(s.cls,vol)} ${ALPEXA_MARKET.getUnitLabel(s.cls)}`}/>
+                <SumRow label="Volume" val={`${ALPEXA_MARKET.fmtVol(s.cls,vol)} ${ALPEXA_MARKET.getUnitLabel(s.cls,true,lotSize)}`}/>
                 <SumRow label="Entry price" val={ALPEXA_MARKET.fmt(entryPx,s.digits)}/>
                 <SumRow label="Stop Loss" val={sl||'—'}/>
                 <SumRow label="Take Profit" val={tp||'—'}/>
@@ -1179,7 +1183,7 @@ function ModifySheet({position,isPending=false,market=[],onSave,onClose}){
         <div style={{padding:'6px 16px 6px',display:'flex',alignItems:'center'}}>
           <div>
             <div style={{fontSize:16,fontWeight:700,color:'var(--ink)'}}>Modify {isPending?'Pending Order':'Position'}</div>
-            <div style={{fontSize:11.5,color:'var(--text-3)',marginTop:2}}><span className="mono">{position.side} {ALPEXA_MARKET.fmtVol(symInfo?.cls||'FX',position.vol)} {ALPEXA_MARKET.getUnitLabel(symInfo?.cls||'FX')} {position.sym}</span></div>
+            <div style={{fontSize:11.5,color:'var(--text-3)',marginTop:2}}><span className="mono">{position.side} {ALPEXA_MARKET.fmtVol(symInfo?.cls||'FX',position.vol)} {ALPEXA_MARKET.getUnitLabel(symInfo?.cls||'FX',true,lotSize)} {position.sym}</span></div>
           </div>
           <span style={{flex:1}}/>
           <button onClick={onClose} style={{width:28,height:28,borderRadius:14,background:'var(--bg-2)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text-2)'}}><Mi name="close" size={14}/></button>
@@ -1250,7 +1254,7 @@ function PosCard({p,onClose,onModify}){
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
         <span style={{fontSize:9,fontWeight:800,padding:'2px 6px',borderRadius:3,background:p.side==='BUY'?'rgba(46,111,176,0.16)':'rgba(224,65,65,0.16)',color:p.side==='BUY'?'#2E6FB0':'#E04141'}}>{p.side}</span>
         <span style={{fontSize:14,fontWeight:700,color:'var(--ink)'}}>{p.sym}</span>
-        <span className="mono" style={{fontSize:11,color:'var(--text-3)'}}>{ALPEXA_MARKET.fmtVol(cls,p.vol)} {ALPEXA_MARKET.getUnitLabel(cls)}</span>
+        <span className="mono" style={{fontSize:11,color:'var(--text-3)'}}>{ALPEXA_MARKET.fmtVol(cls,p.vol)} {ALPEXA_MARKET.getUnitLabel(cls,true,ALPEXA_MARKET.getLotSize(ALPEXA_MARKET.SYMBOLS.find(x=>x.sym===p.sym)||{sym:p.sym,cls}))}</span>
         {p.placedAt&&<span className="mono" style={{fontSize:9.5,color:'var(--text-3)',marginLeft:'auto',marginRight:8}}>{p.placedAt}</span>}
         {!p.placedAt&&<span style={{flex:1}}/>}
         <span className="mono" style={{fontSize:15,fontWeight:700,color:up?'#2E6FB0':'#E04141'}}>{up?'+':''}${p.pnl.toFixed(2)}</span>

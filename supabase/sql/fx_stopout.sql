@@ -58,8 +58,7 @@ begin
   -- 워터마크 레벨가 정산: 오버라이드가 오면 그 가격이 청산가 (레벨=고객 지정가, 스프레드 기반영 간주)
   if p_close_override is not null and p_close_override > 0 then v_close := p_close_override; end if;
 
-  v_lot  := case when p_symbol = 'XAUUSD' then 100 when p_symbol = 'XAGUSD' then 5000
-                 when v_cls = 'FX' then 100000 else 1 end;
+  v_lot  := public.fx_contract(p_symbol, v_cls);   -- 계약 크기 진실 = fx_specs.contract (fx_contract_size.sql, 2026-09-09)
   v_dist := (v_close - p_open) * (case when upper(p_side) = 'BUY' then 1 else -1 end);
   v_pnlq := v_dist * v_lot * p_size;
   if v_cls <> 'FX' then

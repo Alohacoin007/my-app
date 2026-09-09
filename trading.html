@@ -454,7 +454,7 @@ function genSeries(base,n){
 function fmt(n,digits){return n.toLocaleString('en-US',{minimumFractionDigits:digits,maximumFractionDigits:digits});}
 // Sequential ticket / deal number per app (e.g. FX-100237). Stored per device.
 function alpexaTicket(prefix){ try{var k='alpexa.seq.'+prefix.toLowerCase(),n=parseInt(localStorage.getItem(k)||'100000',10)+1;localStorage.setItem(k,String(n));return prefix+'-'+n;}catch(e){return prefix+'-'+Math.floor(100000+Math.random()*900000);} }
-function getLotSize(s){if(s.sym==='XAUUSD')return 100;if(s.sym==='XAGUSD')return 5000;if(s.cls==='FX')return 100000;return 1;}
+function getLotSize(s){if(s&&+s.contract>0)return +s.contract;if(s.sym==='XAUUSD')return 100;if(s.sym==='XAGUSD')return 5000;if(s.cls==='FX')return 100000;return 1;}   // 계약 크기: SYMBOLS.contract 우선 (서버 fx_specs.contract 미러 — fx-contract-size.test.js 락스텝)
 function isUsdBaseFx(s){return s.cls==='FX'&&/^USD/.test(s.sym)&&!/^USD$/.test(s.sym);}
 // USD value of one unit of a currency code. For cross pairs (e.g. EURJPY) the
 // profit/notional comes out in the quote/base currency, so we convert it to USD
@@ -523,7 +523,7 @@ function applySlippage(s,side,px,otype){
   return Math.max(0,fill);
 }
 window.applySlippage=applySlippage;
-function getUnitLabel(cls,plural=true){if(cls==='STOCK')return plural?'shares':'share';if(cls==='CRYPTO')return'units';if(cls==='INDEX')return plural?'contracts':'contract';return'lots';}
+function getUnitLabel(cls,plural=true,contract=1){if(cls==='STOCK')return plural?'shares':'share';if(cls==='CRYPTO')return contract>1?(plural?'lots':'lot'):'units';if(cls==='INDEX')return plural?'contracts':'contract';return'lots';}
 function fmtVol(cls,vol){if(cls==='STOCK'||cls==='INDEX')return Math.round(vol).toString();return vol.toFixed(2);}
 window.getLotSize=getLotSize;window.isUsdBaseFx=isUsdBaseFx;window.getNotionalUSD=getNotionalUSD;window.getMarginUSD=getMarginUSD;window.getPnlUSD=getPnlUSD;window.getUnitLabel=getUnitLabel;window.fmtVol=fmtVol;
 const POSITIONS=[];const PENDING=[];
@@ -535,7 +535,7 @@ const CALENDAR=[];
 window.ALPEXA_MARKET={SYMBOLS,createMarket,fmt,POSITIONS,HISTORY,NEWS,CALENDAR,PENDING,getLotSize,isUsdBaseFx,getNotionalUSD,getMarginUSD,getPnlUSD,fxPip,fxClosePx,fxQuoteMid,fxBidPx,fxAskPx,getUnitLabel,fmtVol};
 </script>
 
-<script src="vendor/trading-compiled.js?v=abc47d53" defer onerror="window.__alpexaCDNFail&&window.__alpexaCDNFail('App')"></script>
+<script src="vendor/trading-compiled.js?v=4ff22ca0" defer onerror="window.__alpexaCDNFail&&window.__alpexaCDNFail('App')"></script>
 <script>
 // Server-authoritative balances: pull the user's real per-server balances on load
 // / focus / every 10s and adopt them, so every device matches without re-login.

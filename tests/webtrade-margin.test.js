@@ -22,10 +22,10 @@ const baseUsdRate_src    = grab(/function baseUsdRate\(symbol\)\{[\s\S]*?\n\}/, 
 const requiredMargin_src = grab(/function requiredMargin\(symbol, volume, leverage\)\{[\s\S]*?\n\}/, 'requiredMargin');
 
 if (!fail) {
-  const SYM_CAT = { EURUSD:'Forex', USDJPY:'Forex', BTCUSD:'Crypto', SOLUSD:'Crypto', AAPL:'Stocks' };
-  const priceStore = { mids:{ EURUSD:{mid:1.14}, USDJPY:{mid:162}, BTCUSD:{mid:64000}, SOLUSD:{mid:148}, AAPL:{mid:315} }, get(s){ return this.mids[s]; } };
+  const SYM_CAT = { EURUSD:'Forex', USDJPY:'Forex', BTCUSD:'Crypto', SOLUSD:'Crypto', DOGEUSD:'Crypto', AAPL:'Stocks' };
+  const priceStore = { mids:{ EURUSD:{mid:1.14}, USDJPY:{mid:162}, BTCUSD:{mid:64000}, SOLUSD:{mid:148}, AAPL:{mid:315}, DOGEUSD:{mid:0.09} }, get(s){ return this.mids[s]; } };
   const rm = new Function('SYM_CAT','priceStore',
-    'const CONTRACT=100000;\n' + ccy_src + '\n' + catOf_src + '\n' + contractSize_src + '\n' + levCap_src + '\n' + baseUsdRate_src + '\n' + requiredMargin_src + '\nreturn requiredMargin;'
+    'const CONTRACT=100000; const SERVER_CONTRACT={DOGEUSD:10000}; const CRYPTO_CONTRACT={};\n' + ccy_src + '\n' + catOf_src + '\n' + contractSize_src + '\n' + levCap_src + '\n' + baseUsdRate_src + '\n' + requiredMargin_src + '\nreturn requiredMargin;'
   )(SYM_CAT, priceStore);
 
   // FX: cap 100 = chosen 100 → unchanged (tens of dollars for 0.01 lot)
@@ -35,6 +35,9 @@ if (!fail) {
   if (!near(rm('BTCUSD', 0.01, 100), 64.0, 0.5)) bad(`CRYPTO BTCUSD 0.01 (chosen 100x → capped 10x) margin should be ~$64, got ${rm('BTCUSD',0.01,100)}`);
   if (rm('BTCUSD', 0.01, 100) > 5000)        bad(`CRYPTO margin blew up (contract size not per-asset): ${rm('BTCUSD',0.01,100)}`);
   if (!near(rm('AAPL', 0.01, 100), 0.315, 0.01)) bad(`STOCK AAPL 0.01 (capped 10x) margin should be ~$0.315, got ${rm('AAPL',0.01,100)}`);
+  // 계약 크기 = 서버 fx_specs.contract (SERVER_CONTRACT) — DOGE 1랏 = 10,000 코인 → 1랏 마진 = 10000×0.09/10 = $90 (2026-09-09)
+  if (!near(rm('DOGEUSD', 1, 100), 90.0, 0.5)) bad(`CRYPTO DOGEUSD 1 lot (contract 10,000 · capped 10x) margin should be ~$90, got ${rm('DOGEUSD',1,100)}`);
+  if (!near(rm('SOLUSD', 1, 100), 14.8, 0.1)) bad(`CRYPTO SOLUSD 1 lot (contract 1 fallback · 10x) margin should be ~$14.80, got ${rm('SOLUSD',1,100)}`);
   // leverage cap is a CLAMP, not a floor: choosing 10x explicitly gives the same crypto margin as 100x
   if (!near(rm('BTCUSD', 0.01, 10), rm('BTCUSD', 0.01, 100), 1e-6)) bad('crypto leverage must clamp to 10× (100x and 10x must match)');
   // the reported disaster is gone: two 0.01 crypto positions are hundreds, not $120k

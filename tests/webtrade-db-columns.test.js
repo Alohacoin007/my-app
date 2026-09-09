@@ -20,7 +20,7 @@ const SCHEMA = {
   accounts:    new Set(['id','cust_id','acct_no','balance','server','player_id']),
   settlements: new Set(['id','cust_id','acct_no','server','kind','local_id','ticket','symbol','stake','pnl','detail','created_at']),
   prices:      new Set(['symbol','mid','spr_pts','updated_at']),
-  fx_specs:    new Set(['symbol','cls']),
+  fx_specs:    new Set(['symbol','cls','contract']),   // contract: fx_contract_size.sql 1단계 (2026-09-09). 컬럼 배포 전엔 webtrade 가 cls-only select 로 폴백
 };
 
 for (const table of Object.keys(SCHEMA)) {

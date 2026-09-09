@@ -26,7 +26,7 @@ const positionPnL_src  = grab(/function positionPnL\(p, q\)\{[\s\S]*?\n\}/, 'pos
 if (!fail) {
   const SYM_CAT = { EURUSD:'Forex', BTCUSD:'Crypto' };
   const scope = new Function('SYM_CAT',
-    'const CONTRACT=100000;\nconst priceStore={get:()=>null};\n' + ccy_src + '\n' + catOf_src + '\n' + lotsOf_src + '\n' + sideUp_src + '\n' + contractSize_src + '\n' +
+    'const CONTRACT=100000; const SERVER_CONTRACT={}; const CRYPTO_CONTRACT={};\nconst priceStore={get:()=>null};\n' + ccy_src + '\n' + catOf_src + '\n' + lotsOf_src + '\n' + sideUp_src + '\n' + contractSize_src + '\n' +
     closePx_src + '\n' + quoteUsd_src + '\n' + positionPnL_src + '\nreturn { positionPnL, closePx };')(SYM_CAT);
   const { positionPnL, closePx } = scope;
 
