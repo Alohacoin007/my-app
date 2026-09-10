@@ -54,22 +54,29 @@ ${realized}
 
 
 -- ════════ 2단계 — DOGE·XRP·ADA 1랏 = 10,000 (클라 2단계 배포 직전에 실행) ════════
--- 2단계 배포 전에는 이 블록을 실행하지 않는다. 실행 전 열린 포지션 확인:
+-- 1단계 실행 + 클라 2단계 커밋 **직전**에 실행 (2026-09-10 사장님 진행 지시). 재실행 금지 — 두 번 돌면
+-- size 가 또 ÷10,000 된다. 실행 전 열린 포지션 확인:
 --   select symbol, count(*), sum(size) from public.positions
 --    where server='fx' and status='open' and symbol in ('DOGEUSD','XRPUSD','ADAUSD') group by symbol;
---
--- begin;
---   update public.fx_specs set contract = 10000 where symbol in ('DOGEUSD','XRPUSD','ADAUSD');
---   -- 열린 포지션: 코인 수 → 랏 (명목가·마진·손익 불변 — 계약×size 가 같은 값)
---   update public.positions set size = round(size / 10000, 6)
---    where server = 'fx' and status = 'open' and symbol in ('DOGEUSD','XRPUSD','ADAUSD');
---   -- 펜딩 주문도 같은 단위로
---   update public.fx_pending set size = round(size / 10000, 6)
---    where status = 'pending' and symbol in ('DOGEUSD','XRPUSD','ADAUSD');
---   -- 지울 수 없는 기록 (백오피스 감사 로그)
---   select public._sbdesk_audit('contract_size_migration', 'DOGEUSD,XRPUSD,ADAUSD',
---            jsonb_build_object('contract', 10000, 'reason', 'MT5 alignment — 1 lot = 10,000 coins, pip value $1 (owner approval 2026-09-09)'));
--- commit;
+begin;
+  -- 멱등 가드: 이미 10000 이면 아무것도 하지 않는다 (두 번 실행해도 size 가 두 번 나뉘지 않게)
+  do $mig$
+  begin
+    if exists (select 1 from public.fx_specs where symbol = 'DOGEUSD' and contract = 10000) then
+      raise exception 'contract_size_migration already applied — skip';
+    end if;
+  end $mig$;
+  update public.fx_specs set contract = 10000 where symbol in ('DOGEUSD','XRPUSD','ADAUSD');
+  -- 열린 포지션: 코인 수 → 랏 (명목가·마진·손익 불변 — 계약×size 가 같은 값)
+  update public.positions set size = round(size / 10000, 6)
+   where server = 'fx' and status = 'open' and symbol in ('DOGEUSD','XRPUSD','ADAUSD');
+  -- 펜딩 주문도 같은 단위로
+  update public.fx_pending set size = round(size / 10000, 6)
+   where status = 'pending' and symbol in ('DOGEUSD','XRPUSD','ADAUSD');
+  -- 지울 수 없는 기록 (백오피스 감사 로그)
+  select public._sbdesk_audit('contract_size_migration', 'DOGEUSD,XRPUSD,ADAUSD',
+           jsonb_build_object('contract', 10000, 'reason', 'MT5 alignment — 1 lot = 10,000 coins, pip value $1 (owner approval 2026-09-09)'));
+commit;
 `;
 fs.writeFileSync(path.join(__dirname, '..', 'supabase/sql/fx_contract_size.sql'), out);
 console.log('🟢 supabase/sql/fx_contract_size.sql 생성 (' + out.length + ' bytes)');
