@@ -68,6 +68,7 @@
 > 손대기 전 자문 한 줄: **"규제받는 진짜 브로커가 이렇게 하나?"** — 아니면 그 자체가 결함(상식 밖 = 하면 안 됨).
 - **모든 상품에 딜링 스프레드** — FX·크립토·주식·지수 전부 스프레드 부과, 하우스 수취(무스프레드 상품 없음). 체결=서버 mid, 청산=`mid∓half`, **플로팅=서버 실현손익과 동일**(가짜 ± 금지). 스프레드 파라미터 서버·클라 **락스텝**: `fx_close.sql` v_half ↔ `trading.html` `ALPEXA_SPREAD_BPS`/`fxHalfSpread`/`fxClosePx` (FX=pip기반 `spr_pts+markup_pts`, 비FX=bps CRYPTO 10·STOCK 8·INDEX 6). **한쪽만 고치면 플로팅이 실현과 어긋난다 — 항상 양쪽.**
 - **체결가=서버 권위** (`fx_open`/`fx_close` RPC만, 클라 위조 불가) · **손익=실시간 피드 mid로 마크**(시뮬 드리프트로 P&L 금지) · **피드 없는 상품은 거래목록에서 제외**(거래불가한데 가능처럼 보이면 안 됨).
+- **계약 크기(contract size)의 진실 = `fx_specs.contract` 한 곳 (2026-09-10).** 서버는 `fx_contract(symbol, cls)` 로만 읽고(fx_notional_usd·fx_close·fx_realized_pnl), 클라는 `trading.html` SYMBOLS.contract · webtrade `SERVER_CONTRACT`(런타임 fx_specs) 미러. 값: FX 100,000 · XAU 100 · XAG 5,000 · **DOGE·XRP·ADA 10,000 (1랏 = 10,000코인, 핍 밸류 $1 — 사장님 확정)** · 나머지 크립토·주식 1. 바꿀 땐 SQL 값 + 클라 표 같이 (핀 `fx-contract-size.test.js` C3 가 3벌 락스텝 강제) + 열린 포지션 size 단위 변환을 한 트랜잭션으로 (`fx_contract_size.sql` 2단계 블록 참고). 레버리지 상한 `fx_lev_cap`: FX 500 · INDEX 20 · **STOCK 10 · CRYPTO 10** (2026-09-08 5→10).
 - 마진/레버리지/스왑/마진콜·스탑아웃은 자산군별 업계 표준. → 마스터 감사 **차원 9** + `tests/fx-floating-spread.test.js`(플로팅==서버 실현).
 
 ## 🧪 테스트
