@@ -257,6 +257,34 @@ function teamMatch(a: string, b: string): boolean {
   }
   return false;
 }
+// ── 아웃컴 → 홈/원정 배정 (2026-09-11 D.C. United 사고에서 나옴) ──
+// teamMatch 는 3글자 미만 토큰을 버린다 ("D.C. United" → ["united"]). 그 한 토큰이 "Atlanta United FC"
+// 에도 부분집합으로 맞아, 홈 D.C. United 가 두 아웃컴 중 더 좋은 가격(원정 +196)을 가져갔다 →
+// 1X2 오버라운드 93% (100% 미만 = 고객 무위험 차익). 이벤트 매칭용 관대함이 아웃컴 배정에선 독이다.
+//   ① 엄격 매칭(모든 토큰 유지, "d c united")을 먼저 시도 → ② 없을 때만 관대 매칭
+//   ③ 두 팀에 모두 맞는 아웃컴은 어느 쪽에도 배정하지 않는다 (상호배제 · fail-closed)
+function allToks(s: string): string[][] {
+  const base = normBase(s), out = [stripClub(base)];
+  for (const [re, to] of NAME_ALIAS) { if (re.test(base)) { const v = stripClub(base.replace(re, to)); if (v && !out.includes(v)) out.push(v); } }
+  return out.map((v) => v.split(" ").filter((t) => t.length > 0)).filter((t) => t.length > 0);
+}
+function teamMatchStrict(a: string, b: string): boolean {
+  for (const A of allToks(a)) for (const B of allToks(b)) {
+    const [short, long] = A.length <= B.length ? [A, B] : [B, A];
+    if (short.every((t) => long.includes(t))) return true;
+  }
+  return false;
+}
+function sideOf(name: string, home: any, away: any): "H" | "A" | null {
+  const sh = teamMatchStrict(name, home.nm), sa = teamMatchStrict(name, away.nm);
+  if (sh !== sa) return sh ? "H" : "A";           // 엄격 매칭이 한쪽만 → 확정
+  if (sh && sa) return null;                       // 엄격으로도 양쪽 → 모호, 배정 안 함
+  const lh = teamMatch(name, home.nm), la = teamMatch(name, away.nm);
+  if (lh !== la) return lh ? "H" : "A";           // 관대 매칭이 한쪽만
+  return null;                                     // 둘 다 / 둘 다 아님
+}
+// 암시확률 합 (1.00 = 100%). 100% 미만 북은 존재할 수 없다 — 배정 오류의 증상이므로 시장을 버린다.
+function impliedSum(prices: number[]): number { return prices.reduce((s, p) => s + 1 / decP(p), 0); }
 function decP(p: number): number { return p > 0 ? 1 + p / 100 : 1 + 100 / (-p); }
 function fmtPt(p: number): string { return (p > 0 ? "+" : "") + p; }
 function bestOutcome(ev: any, marketKey: string, matchFn: (o: any) => boolean): any {
@@ -290,18 +318,31 @@ function bestPair(ev: any, marketKey: string, hMatch: (o: any) => boolean, aMatc
 function oddsToCore(ev: any, home: any, away: any): any {
   if (!ev.bookmakers || !ev.bookmakers.length) return null;
   const core: any = {};
-  const mlH = bestOutcome(ev, "h2h", (o) => teamMatch(o.name, home.nm)), mlA = bestOutcome(ev, "h2h", (o) => teamMatch(o.name, away.nm));
+  // 아웃컴 배정은 sideOf (엄격 우선 · 상호배제) — teamMatch 단독 사용 금지 (2026-09-11 D.C. United)
+  const isH = (o: any) => sideOf(String(o.name || ""), home, away) === "H", isA = (o: any) => sideOf(String(o.name || ""), home, away) === "A";
+  const mlH = bestOutcome(ev, "h2h", isH), mlA = bestOutcome(ev, "h2h", isA);
   if (mlH && mlA) core.ml = [{ ln: "", am: mlH.price, sel: home.nm + " ML" }, { ln: "", am: mlA.price, sel: away.nm + " ML" }];
   // Soccer 1X2: the h2h market has a third "Draw" outcome. Capture it → threeWay
   // [Home, Draw, Away]. sel = "<team> ML" / "Draw"; graded by the 1X2 settler branch.
   const drawO = bestOutcome(ev, "h2h", (o) => /draw/i.test(o.name));
-  if (mlH && mlA && drawO) core.threeWay = [
+  // ── 오버라운드 가드 (배정 오류 백스톱) ──
+  // 임계값은 **추측이 아니라 2026-09-11 프로덕션 363 이벤트 실측 분포**에서 잡았다:
+  //   3-way(축구 1X2)      53건 · 최소 101.7% · 중앙 103.2%
+  //   2-way(무승부 없음)    310건 · 최소  96.1% · 중앙 103.0%   ← 96~100% 12건은 배정 오류가 아니라
+  //     bestOutcome 이 **각 사이드의 최고가를 서로 다른 북에서** 고르는 기존 설계의 효과다(하우스 정책).
+  //   2-way(축구 h2h 중 홈/원정만, 무승부 제외) 53건 · 최소 73.9%  ← 구조상 100% 미만이 정상
+  // → 95% 로 두면 **오늘 삭제 0건**이면서 사고 라인(90.2% · 93.3%)은 잡힌다. 100% 로 하면 정상 NFL/MLB
+  //   12건이 사라진다 — 가드가 고객에게서 진짜 시장을 뺏으면 안 된다.
+  // 가드는 **라인을 고치지 않는다. 버리기만 한다** (가짜 가격 생성 금지 — 오즈 불변식).
+  const OVERROUND_MIN = 0.95, OVERROUND_MIN_2WAY_SOCCER = 0.60;
+  if (core.ml && impliedSum([mlH.price, mlA.price]) < (drawO ? OVERROUND_MIN_2WAY_SOCCER : OVERROUND_MIN)) delete core.ml;
+  if (mlH && mlA && drawO && impliedSum([mlH.price, drawO.price, mlA.price]) >= OVERROUND_MIN) core.threeWay = [
     { ln: "1", am: mlH.price, sel: home.nm + " ML" },
     { ln: "X", am: drawO.price, sel: "Draw" },
     { ln: "2", am: mlA.price, sel: away.nm + " ML" },
   ];
   // spreads — one book's complementary runline (home.point === -away.point), else omit (no fabrication)
-  const sp = bestPair(ev, "spreads", (o) => teamMatch(o.name, home.nm), (o) => teamMatch(o.name, away.nm), (hp, ap) => hp === -ap && hp !== 0);
+  const sp = bestPair(ev, "spreads", isH, isA, (hp, ap) => hp === -ap && hp !== 0);
   if (sp) core.spread = [{ ln: fmtPt(sp.h.point), am: sp.h.price, sel: home.nm + " " + fmtPt(sp.h.point) }, { ln: fmtPt(sp.a.point), am: sp.a.price, sel: away.nm + " " + fmtPt(sp.a.point) }];
   // totals — one book's Over/Under sharing the same point, else omit
   const tp = bestPair(ev, "totals", (o) => /over/i.test(o.name), (o) => /under/i.test(o.name), (op, up) => op === up);
