@@ -553,58 +553,81 @@ async function stickyOpenBetGames(games: any[], SB_URL: string, H: Record<string
 const DIAG: any[] = [];
 
 async function fetchLeague(L: { lg: string; sport: string; path: string }, out: any[], endMs?: number) {
-  // Request a date RANGE (today → +8d, 또는 배당 지평 endMs까지) so live_games carries
-  // UPCOMING fixtures — ESPN's default scoreboard is today-only. 배당 지평(oddsHorizons)이
-  // 더 멀면 거기까지 늘려서 "가격 나온 경기는 전부 목록에" (일관성 규칙, 2026-07-27).
-  // BUT if a league has NO games in that window (e.g. an off-season NFL whose next game is
-  // weeks out — the +8d range dropped it), fall back to the PLAIN scoreboard so its next
-  // scheduled games still show. Order: ranged (+mirror) → plain (+mirror). Never fewer.
+  // Request the window today → +8d (or the odds horizon endMs) so live_games carries UPCOMING
+  // fixtures — ESPN's default scoreboard is today/this-week only. 배당 지평(oddsHorizons)이 더 멀면
+  // 거기까지 (일관성 규칙, 2026-07-27).
+  //
+  // ⚠️ 2026-09-16 — ESPN 이 `?dates=A-B` **범위** 요청을 전 리그 400 ("Failed to get events endpoint.")
+  //    으로 거절하기 시작했다 (22:51Z live_games diag 실측 → 러너 프로브 tests/espn-range-probe.js 로
+  //    6리그×9모양 재확인: +1d 도 400, MLB 도 400). 그 결과 목록이 484→113 으로 줄고 붕괴 가드가 이후
+  //    쓰기를 거부해 피드가 멈췄다. 살아있는 모양은 단일 일자 `dates=YYYYMMDD` 와 **월 `dates=YYYYMM`**
+  //    이고, 월 응답은 `&limit=1000` 이 있어야 100건 상한이 풀린다 (MLB 100→369 실측).
+  //    → 창을 **월 단위**로 나눠 요청해 합친다 (지평 최대 +60일 = 월 쿼리 2~3번). 월 응답엔 지난 경기도
+  //      섞여 있으니 창 밖은 버리고, id 로 중복 제거. 월이 전부 막히면 plain(당일) 폴백 — 절대 더 적어지지 않게.
+  //    범위 URL 은 다시 쓰지 않는다. 골프 엔드포인트는 범위가 아직 200 이라 fetchGolf 는 그대로.
   const p2 = (n: number) => String(n).padStart(2, "0");
-  const ymd = (x: Date) => "" + x.getUTCFullYear() + p2(x.getUTCMonth() + 1) + p2(x.getUTCDate());
+  const ym = (x: Date) => "" + x.getUTCFullYear() + p2(x.getUTCMonth() + 1);
   const endTs = Math.max(endMs || 0, Date.now() + 8 * 86400000);
-  const range = ymd(new Date()) + "-" + ymd(new Date(endTs));
+  const months: string[] = [];
+  { let d = new Date(); d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+    const endD = new Date(endTs);
+    while (d.getTime() <= endD.getTime() && months.length < 4) { months.push(ym(d)); d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)); } }
   const base = `https://site.api.espn.com/apis/site/v2/sports/${L.path}/scoreboard`;
   const cp = (u: string) => "https://corsproxy.io/?url=" + encodeURIComponent(u);
   // 미러 2종 — 한 프록시가 죽어도 보드가 통째로 비지 않게 (2026-08-19: 전 리그 0경기 사고).
   const ao = (u: string) => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u);
-  const tries = withUAs(
-    [base + "?dates=" + range, base],
-    [cp(base + "?dates=" + range), ao(base + "?dates=" + range), cp(base), ao(base)]);
   const before = out.length;
-  for (const [ua, u, h] of tries) {
-    try {
-      const res = await espnFetch(u, h);
-      if (!res.ok) { DIAG.push({ lg: L.lg, ua, url: u.slice(0, 50), status: res.status }); continue; }
-      const d = await res.json();
-      DIAG.push({ lg: L.lg, ua, url: u.slice(0, 50), status: 200, events: (d.events || []).length });
-      for (const ev of (d.events || [])) {
-        try {
-          const comp = ev.competitions && ev.competitions[0];
-          if (!comp || !comp.competitors) continue;
-          const hc = comp.competitors.find((c: any) => c.homeAway === "home");
-          const ac = comp.competitors.find((c: any) => c.homeAway === "away");
-          if (!hc || !ac || !hc.team || !ac.team) continue;
-          const st = (ev.status && ev.status.type) ? ev.status.type : {};
-          const state = st.state; // "pre" | "in" | "post"
-          if (state === "post") continue; // finished games aren't bettable
-          const home: any = { ab: String(hc.team.abbreviation || hc.team.shortDisplayName || "").toUpperCase(), nm: hc.team.shortDisplayName || hc.team.name || hc.team.displayName || "Home" };
-          const away: any = { ab: String(ac.team.abbreviation || ac.team.shortDisplayName || "").toUpperCase(), nm: ac.team.shortDisplayName || ac.team.name || ac.team.displayName || "Away" };
-          if (state === "in") { const hs = parseInt(hc.score, 10), as = parseInt(ac.score, 10); if (!isNaN(hs)) home.sc = hs; if (!isNaN(as)) away.sc = as; }
-          const core = mkCore(home, away, ev, L.lg);
-          out.push({
-            gid: L.lg + "_" + ev.id, lg: L.lg, sport: L.sport,
-            live: state === "in", time: state === "in" ? (st.shortDetail || "Live") : fmtTime(ev.date),
-            iso: ev.date || "", // raw kickoff time — each client renders it in the viewer's local timezone
-            home, away, spread: core.spread, total: core.total, ml: core.ml, threeWay: core.threeWay || [],
-            oddsReal: core.real === true,   // false = fabricated placeholder line → not bettable
-          });
-        } catch (_e) { /* skip one event */ }
-      }
-      if (out.length > before) return; // got games from this URL → done
-      // else: 200 OK but 0 games (an off-season league in the ranged window) → keep going
-      // so the plain (default) scoreboard fallback can add its next scheduled games.
-    } catch (e) { DIAG.push({ lg: L.lg, ua, url: u.slice(0, 50), err: String((e as Error).message).slice(0, 80) }); }
-  }
+  const seen = new Set<string>();
+  const lo = Date.now() - 36 * 3600 * 1000, hi = endTs + 36 * 3600 * 1000;   // 창 밖(지난달 초 등)은 버림
+  const ingest = (d: any) => {
+    for (const ev of (d.events || [])) {
+      try {
+        if (seen.has(String(ev.id))) continue;
+        const t = Date.parse(ev.date || "");
+        if (Number.isFinite(t) && (t < lo || t > hi)) continue;
+        const comp = ev.competitions && ev.competitions[0];
+        if (!comp || !comp.competitors) continue;
+        const hc = comp.competitors.find((c: any) => c.homeAway === "home");
+        const ac = comp.competitors.find((c: any) => c.homeAway === "away");
+        if (!hc || !ac || !hc.team || !ac.team) continue;
+        const st = (ev.status && ev.status.type) ? ev.status.type : {};
+        const state = st.state; // "pre" | "in" | "post"
+        if (state === "post") continue; // finished games aren't bettable
+        seen.add(String(ev.id));
+        const home: any = { ab: String(hc.team.abbreviation || hc.team.shortDisplayName || "").toUpperCase(), nm: hc.team.shortDisplayName || hc.team.name || hc.team.displayName || "Home" };
+        const away: any = { ab: String(ac.team.abbreviation || ac.team.shortDisplayName || "").toUpperCase(), nm: ac.team.shortDisplayName || ac.team.name || ac.team.displayName || "Away" };
+        if (state === "in") { const hs = parseInt(hc.score, 10), as = parseInt(ac.score, 10); if (!isNaN(hs)) home.sc = hs; if (!isNaN(as)) away.sc = as; }
+        const core = mkCore(home, away, ev, L.lg);
+        out.push({
+          gid: L.lg + "_" + ev.id, lg: L.lg, sport: L.sport,
+          live: state === "in", time: state === "in" ? (st.shortDetail || "Live") : fmtTime(ev.date),
+          iso: ev.date || "", // raw kickoff time — each client renders it in the viewer's local timezone
+          home, away, spread: core.spread, total: core.total, ml: core.ml, threeWay: core.threeWay || [],
+          oddsReal: core.real === true,   // false = fabricated placeholder line → not bettable
+        });
+      } catch (_e) { /* skip one event */ }
+    }
+  };
+  // 한 URL 을 UA 변형 → 미러 순으로 시도해 첫 200 을 먹는다. 실패는 전부 DIAG 에.
+  const fetchOne = async (u0: string): Promise<boolean> => {
+    const tries = withUAs([u0], [cp(u0), ao(u0)]);
+    for (const [ua, u, h] of tries) {
+      try {
+        const res = await espnFetch(u, h);
+        if (!res.ok) { DIAG.push({ lg: L.lg, ua, url: u.slice(0, 90), status: res.status }); continue; }
+        const d = await res.json();
+        DIAG.push({ lg: L.lg, ua, url: u.slice(0, 90), status: 200, events: (d.events || []).length });
+        ingest(d);
+        return true;
+      } catch (e) { DIAG.push({ lg: L.lg, ua, url: u.slice(0, 90), err: String((e as Error).message).slice(0, 80) }); }
+    }
+    return false;
+  };
+  // ① 월 단위 (오늘의 달 → 지평의 달)
+  for (const m of months) await fetchOne(base + "?dates=" + m + "&limit=1000");
+  if (out.length > before) return;
+  // ② 폴백: plain 스코어보드 (당일/이번 주) — 월이 전부 막혔을 때도 오늘 경기는 남긴다
+  await fetchOne(base);
 }
 
 Deno.serve(async (req) => {
@@ -651,21 +674,29 @@ Deno.serve(async (req) => {
   } catch (_e) { /* 직전 행을 못 읽으면 가드 없이 진행 (첫 배포·빈 테이블) */ }
   const floor = Math.max(10, Math.floor(prevCount * 0.5));
   if (prevCount >= 20 && games.length < floor && prevAgeMs < 2 * 3600 * 1000) {
+    // 거부할 때도 진단은 남긴다 (writeDiag 는 아래 선언 — 함수 선언은 호이스팅되므로 여기서 호출 가능).
+    await writeDiag({ guard: "collapse-guard refused", got: games.length, prev: prevCount, floor, prev_age_min: Math.round(prevAgeMs / 60000) });
     return json({ ok: false, error: "collapse-guard: refused to overwrite a healthy feed",
       got: games.length, prev: prevCount, floor, prev_age_min: Math.round(prevAgeMs / 60000),
       diag: DIAG.slice(0, 40) }, 500);
   }
-
   // 🔎 진단을 **DB 에 남긴다** (2026-08-20). 응답에만 실으면 크론이 받아가고 끝이라 사람이
   //    대시보드를 뒤져야 했다 — 그 사이 원인 파악이 하루 늦었다. live_games 에 id='diag' 행으로
   //    적어두면 누구든(운영 스크립트 포함) 바로 읽는다. 클라는 id='all' 만 읽으므로 무해하다.
-  try {
-    await fetch(`${SB_URL}/rest/v1/live_games?on_conflict=id`, {
-      method: "POST",
-      headers: { ...H, "Prefer": "resolution=merge-duplicates,return=minimal" },
-      body: JSON.stringify({ id: "diag", data: DIAG.slice(0, 60), updated_at: new Date().toISOString() }),
-    });
-  } catch (_e) { /* 진단 기록 실패가 본 피드를 막으면 안 된다 */ }
+  //    2026-09-16: 붕괴 가드가 거부할 때 **도** 남긴다 — 가드가 거부한 96분 동안 diag 가 멈춰 있어
+  //    "왜 줄었나"를 볼 수 없었다. 거부 사유(got/prev/floor)도 함께 적는다.
+  //    (선언 위치가 가드 **뒤**인 이유: feed-collapse-guard 핀이 "가드가 첫 upsert 보다 앞" 을 강제한다.
+  //     diag 쓰기도 upsert 모양이라 가드 앞에 두면 핀이 🔴 — 호이스팅으로 호출 순서는 그대로.)
+  async function writeDiag(extra: any) {
+    try {
+      await fetch(`${SB_URL}/rest/v1/live_games?on_conflict=id`, {
+        method: "POST",
+        headers: { ...H, "Prefer": "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({ id: "diag", data: [extra, ...DIAG.slice(0, 60)], updated_at: new Date().toISOString() }),
+      });
+    } catch (_e) { /* 진단 기록 실패가 본 피드를 막으면 안 된다 */ }
+  }
+  await writeDiag({ guard: "ok", got: games.length, prev: prevCount });
 
   // Upsert the single 'all' row (clients read this).
   const r = await fetch(`${SB_URL}/rest/v1/live_games?on_conflict=id`, {
