@@ -28,6 +28,24 @@
 const ESPN_UA = "alpexa-feed/1.0";
 const ESPN_INIT: RequestInit = { cache: "no-store", headers: { "User-Agent": ESPN_UA } };
 
+// ── 판정 상수 (모듈 레벨: tests/settle-dual-source.test.js 가 legVerdict 와 함께 추출해 실제 코드로 행위 검증) ──
+// 업계 표준 규칙 2종 (2026-07-19 사장님 승인 — SP-100058 연기경기 무한대기 사고):
+//  A. 조기 패배 확정 — 한 leg라도 확정 패배면 나머지를 기다리지 않고 즉시 LOST (죽은 팔레이는 안 기다린다).
+//  B. 연기 void — 예정 킥오프 +48h에도 최종 결과가 없으면 그 leg는 무효(배당 1.0)로 제외.
+//     단, "안 열렸음"이 6일 결과 조회창 안에서 **증명**될 때만. ⚠️ 2026-09-16 fail-open 폐쇄: 예전엔 "결과 없음"
+//     이면 조회 **실패**(ESPN 400/403)도 같은 취급이라 실제로 열린 경기가 환불될 뻔했다. 이제 void 는 그 리그의
+//     킥오프 날(+전날) 스코어보드를 200 으로 받았다는 커버리지 증명이 있을 때만(legVerdict).
+const VOID_AFTER_MS = 48 * 3600e3;
+const PROVABLE_MS = 6 * 86400000;   // fetchLeagueResults 의 캐치업 창과 반드시 동일
+// 2차 출처(The Odds API scores)의 이벤트를 "같은 경기"로 인정하는 킥오프 허용차 — 오즈 overlay 와 동일 6h.
+const ODDS_KICKOFF_MS = 6 * 3600e3;
+// lg → The Odds API 종목 키 (sports-games ODDS_SPORT/ODDS_EXTRA + 축구 4키와 락스텝). UFC·GOLF 는 2차 출처 없음.
+const ODDS_KEYS: Record<string, string[]> = {
+  NFL: ["americanfootball_nfl", "americanfootball_nfl_preseason"], NBA: ["basketball_nba"], NCAAB: ["basketball_ncaab"],
+  MLB: ["baseball_mlb"], NHL: ["icehockey_nhl"],
+  SOC: ["soccer_epl", "soccer_usa_mls", "soccer_uefa_champs_league", "soccer_fifa_world_cup"],
+};
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -56,7 +74,9 @@ const LEAGUES = [
 type Result = { hs: number; as: number; homeNm: string; awayNm: string; homeAb: string; awayAb: string;
   homeAll?: string[]; awayAll?: string[] };   // 모든 이름 변형(short/display/name/location) — 팀명 매칭용
 
-async function fetchLeagueResults(L: { lg: string; path: string }, out: Record<string, Result>) {
+// cov: `${lg}|${YYYYMMDD}` → 그날 스코어보드를 200 으로 받은 경로 수. SOC 처럼 한 lg 에 경로가 여러 개면 전부
+//      성공해야 "그날을 다 봤다"(covered) — 하나라도 실패한 날은 그 리그 경기가 빠졌을 수 있으니 void 금지.
+async function fetchLeagueResults(L: { lg: string; path: string }, out: Record<string, Result>, cov: Record<string, number>) {
   // CATCH-UP WINDOW (#33): ESPN's default scoreboard returns ONLY the current day. A game that
   // finished but wasn't settled the same day (settle downtime / late finish) fell off the feed
   // → its still-open bet could never settle and was orphaned forever (the daily audit's C1
@@ -104,10 +124,68 @@ async function fetchLeagueResults(L: { lg: string; path: string }, out: Record<s
           };
         } catch (_e) { /* skip event */ }
       }
+      cov[L.lg + "|" + dayStr] = (cov[L.lg + "|" + dayStr] || 0) + 1;   // 이 경로가 그날을 성공적으로 봤다
       break; // got this day → next day
     } catch (_e) { /* try next mirror */ }
     }
   }
+}
+
+// ── 2차 출처: The Odds API `scores` (2026-09-16 사장님 승인 "정산 스코어 이중 출처") ──
+// ESPN 에 결과가 없는 leg 가 있을 때 **그 리그만**, 그 leg 들의 oid 로만 조회한다(on-demand — 평상시 호출 0).
+// 우리가 이미 유료 구독 중인 같은 프로바이더라 키 추가 없음. daysFrom=3 이 API 상한(ESPN 캐치업은 6일).
+// 반환: oid → { completed, commence, home, away, hs, as }. 채점은 legVerdict 가 completed:true + 킥오프 ±6h 일 때만.
+type OddsScore = { completed: boolean; commence: number; home: string; away: string; hs: number | null; as: number | null };
+async function fetchOddsScores(KEY: string, sportKey: string, oids: string[], out: Record<string, OddsScore>, diag: any[]) {
+  if (!oids.length) return;
+  try {
+    const u = `https://api.the-odds-api.com/v4/sports/${sportKey}/scores/?apiKey=${KEY}&daysFrom=3&eventIds=${encodeURIComponent(oids.join(","))}`;
+    // 정직한 자기 식별 UA 그대로 (ESPN 과 같은 값 — 위장 금지 규율 동일)
+    const res = await fetch(u, { cache: "no-store", headers: { "User-Agent": ESPN_UA } });
+    if (!res.ok) { diag.push({ sportKey, status: res.status }); return; }
+    const arr = await res.json();
+    let hit = 0;
+    for (const ev of (Array.isArray(arr) ? arr : [])) {
+      try {
+        const id = String(ev.id || ""); if (!oids.includes(id)) continue;
+        const sc = Array.isArray(ev.scores) ? ev.scores : [];
+        const num = (nm: string) => { const s = sc.find((x: any) => x && x.name === nm); const n = s ? parseInt(String(s.score), 10) : NaN; return Number.isFinite(n) ? n : null; };
+        out[id] = { completed: ev.completed === true, commence: Date.parse(ev.commence_time || ""), home: String(ev.home_team || ""), away: String(ev.away_team || ""), hs: num(ev.home_team), as: num(ev.away_team) };
+        hit++;
+      } catch (_e) { /* skip one */ }
+    }
+    diag.push({ sportKey, status: 200, asked: oids.length, hit });
+  } catch (e) { diag.push({ sportKey, err: String((e as Error).message).slice(0, 80) }); }
+}
+
+// ── leg 판정 (순수 함수 — 돈 규칙의 진실. tests/settle-dual-source.test.js 가 이 코드를 그대로 추출해 9케이스 실행) ──
+// 반환: "won" | "lost" | "push" | "void" | "pending"
+//   ① ESPN 결과가 있으면 ESPN 으로만 채점 (2차 출처는 보지도 않는다 — 한 출처 불변식).
+//   ② ESPN 없음 + leg 에 oid + Odds 결과가 completed:true 이고 킥오프 ±6h 일치 → Odds 로 채점.
+//      팀 이름은 Odds 이름 + place_bet 이 도장한 hn/an 둘 다로 매칭(teamSide 가 못 정하면 보류).
+//   ③ 둘 다 없음 → 규칙 B: 48h 초과 · 6일 증명창 안 · **킥오프 날과 전날을 그 리그가 200 으로 다 봤을 때만** void.
+//      조회 실패한 날은 "경기가 없다"의 증거가 아니다 → 보류. (2026-09-16 fail-open 폐쇄)
+function legVerdict(l: any, espn: Record<string, Result>, odds: Record<string, OddsScore>, covered: (lg: string, ymd: string) => boolean, now: number): string {
+  const r = espn[l.gid];
+  if (r) return gradeLeg(l, r) ?? "pending";
+  const oid = l.oid ? String(l.oid) : "";
+  const kt = Date.parse(l.kt || "");
+  if (oid && odds[oid]) {
+    const o = odds[oid];
+    if (o.completed === true && Number.isFinite(kt) && Number.isFinite(o.commence) && Math.abs(o.commence - kt) <= ODDS_KICKOFF_MS
+        && typeof o.hs === "number" && typeof o.as === "number") {
+      const rr: Result = { hs: o.hs, as: o.as, homeNm: o.home, awayNm: o.away, homeAb: "", awayAb: "",
+        homeAll: [o.home, l.hn].filter((x: any) => typeof x === "string" && x.trim()),
+        awayAll: [o.away, l.an].filter((x: any) => typeof x === "string" && x.trim()) };
+      return gradeLeg(l, rr) ?? "pending";
+    }
+    return "pending";   // 진행중/미완/킥오프 불일치/스코어 결손 → 추측 안 함
+  }
+  const age = Number.isFinite(kt) ? now - kt : NaN;
+  if (!(age > VOID_AFTER_MS && age < PROVABLE_MS)) return "pending";
+  const day = (t: number) => new Date(t).toISOString().slice(0, 10).replace(/-/g, "");
+  if (covered(String(l.lg || ""), day(kt)) && covered(String(l.lg || ""), day(kt - 86400000))) return "void";
+  return "pending";
 }
 
 // 🥊 UFC/MMA — a fight card (event) holds many bouts (ev.competitions[]). The
@@ -281,23 +359,44 @@ Deno.serve(async (req) => {
   // 1) Final scores from ESPN (team leagues + UFC bouts + golf tournament winners).
   const results: Record<string, Result> = {};
   const golfWin: Record<string, string> = {};
-  await Promise.all([...LEAGUES.map((L) => fetchLeagueResults(L, results)), fetchUFCResults(results), fetchGolfWinners(golfWin)]);
+  const cov: Record<string, number> = {};   // `${lg}|${YYYYMMDD}` → 200 받은 경로 수 (void 커버리지 증명)
+  await Promise.all([...LEAGUES.map((L) => fetchLeagueResults(L, results, cov)), fetchUFCResults(results), fetchGolfWinners(golfWin)]);
+  const pathsOf: Record<string, number> = {}; LEAGUES.forEach((L) => { pathsOf[L.lg] = (pathsOf[L.lg] || 0) + 1; });
+  const covered = (lg: string, ymd: string) => (cov[lg + "|" + ymd] || 0) >= (pathsOf[lg] || Infinity);
   // Debug: ?debug=1 returns the final-game results map (gid -> score) so we can
   // craft a controlled test bet on a real finished game.
-  if (url.searchParams.get("debug")) return json({ ok: true, results, golfWin });
+  if (url.searchParams.get("debug")) return json({ ok: true, results, golfWin, cov });
 
   // 2) Open sports bets.
   const posRes = await fetch(`${SB_URL}/rest/v1/positions?server=eq.sports&status=eq.open&select=id,cust_id,acct_no,local_id,stake,meta,symbol`, { headers: H });
   if (!posRes.ok) return json({ ok: false, error: "positions read " + posRes.status }, 500);
   const positions = await posRes.json();
 
-  // 업계 표준 규칙 2종 (2026-07-19 사장님 승인 — SP-100058 연기경기 무한대기 사고):
-  //  A. 조기 패배 확정 — 한 leg라도 확정 패배면 나머지를 기다리지 않고 즉시 LOST (죽은 팔레이는 안 기다린다).
-  //  B. 연기 void — 예정 킥오프 +48h에도 최종 결과가 없으면 그 leg는 무효(배당 1.0)로 제외.
-  //     단, "안 열렸음"이 6일 결과 조회창 안에서 증명될 때만(창 밖이면 계속 보류 — 돈은 추측 금지).
-  const VOID_AFTER_MS = 48 * 3600e3;
-  const PROVABLE_MS = 6 * 86400000;   // fetchLeagueResults의 캐치업 창과 반드시 동일
+  // 2b) 2차 출처 on-demand (2026-09-16): ESPN 에 결과가 없는 팀 종목 leg 중 oid 가 있는 것만 모아 리그별로
+  //     The Odds API scores 를 조회한다. 평상시(ESPN 정상) 호출 0. 키 없으면 조용히 생략 = 종전 ESPN 전용과 동일.
+  const odds: Record<string, OddsScore> = {};
+  const oddsDiag: any[] = [];
+  {
+    const ODDS_KEY = Deno.env.get("ODDS_API_KEY");
+    const want: Record<string, Set<string>> = {};
+    for (const p of positions) {
+      const legs = (p.meta && Array.isArray(p.meta.legs)) ? p.meta.legs : [];
+      for (const l of legs) {
+        if (!l || /outright/i.test(String(l.market || "")) || results[l.gid] || !l.oid) continue;
+        const lg = String(l.lg || String(l.gid || "").split("_")[0] || "");
+        if (!ODDS_KEYS[lg]) continue;
+        (want[lg] || (want[lg] = new Set())).add(String(l.oid));
+      }
+    }
+    const lgs = Object.keys(want);
+    if (lgs.length && !ODDS_KEY) oddsDiag.push({ skipped: "ODDS_API_KEY not set", legs: lgs.map((lg) => lg + ":" + want[lg].size) });
+    if (lgs.length && ODDS_KEY) {
+      await Promise.all(lgs.flatMap((lg) => ODDS_KEYS[lg].map((k) => fetchOddsScores(ODDS_KEY, k, [...want[lg]], odds, oddsDiag))));
+    }
+  }
+
   const settled: any[] = [];
+  const NOW = Date.now();
   for (const p of positions) {
     try {
       const meta = (p.meta && typeof p.meta === "object") ? p.meta : {};
@@ -310,7 +409,7 @@ Deno.serve(async (req) => {
       let anyLost = false, pending = 0, decMul = 1;
       const legResults: any[] = [];
       for (const l of legs) {
-        let g: string | null = null;
+        let g: string;
         const push = (r: string) => legResults.push({ pk: (l.sel || l.pk || ""), gm: (l.gm || l.game || ""), am: (+l.am || 0), gid: (l.gid || ""), lg: (l.lg || ""), r });
         if (/outright/i.test(String(l.market || ""))) {
           // ⛳ OUTRIGHT: graded only against a FINAL tournament's confirmed champion.
@@ -319,17 +418,9 @@ Deno.serve(async (req) => {
           if (!w) { pending++; push("pending"); continue; }
           g = playerMatch(l.sel || l.pk || "", w) ? "won" : "lost"; // cut/WD/runner-up = not the winner = lost
         } else {
-          const r = results[l.gid];
-          if (!r) {
-            // 규칙 B: 결과 부재 — 킥오프 +48h 경과 && 6일 증명창 안 → 연기 확정 = void.
-            const kt = Date.parse(l.kt || "");
-            const age = isNaN(kt) ? NaN : Date.now() - kt;
-            if (!isNaN(age) && age > VOID_AFTER_MS && age < PROVABLE_MS) { g = "void"; }
-            else { pending++; push("pending"); continue; }
-          } else {
-            g = gradeLeg(l, r);
-            if (g === null) { pending++; push("pending"); continue; }
-          }
+          // 팀 종목: ESPN → (없으면) Odds oid → (둘 다 없으면) 규칙 B — 전부 legVerdict 한 곳 (순수 함수, 테스트 추출)
+          g = legVerdict(l, results, odds, covered, NOW);
+          if (g === "pending") { pending++; push("pending"); continue; }
         }
         if (g === "lost") anyLost = true;
         else if (g === "won") decMul *= decOf(l);
@@ -378,5 +469,6 @@ Deno.serve(async (req) => {
     } catch (e) { /* skip this bet */ }
   }
 
-  return json({ ok: true, finalGames: Object.keys(results).length, openBets: positions.length, settled });
+  return json({ ok: true, finalGames: Object.keys(results).length, openBets: positions.length, settled,
+    oddsFallback: { hits: Object.keys(odds).length, diag: oddsDiag.slice(0, 20) } });
 });

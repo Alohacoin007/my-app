@@ -484,6 +484,11 @@ async function overlayRealOdds(games: any[], rows: any[]) {
         return rival ? null : e0;
       })();
       if (!ev) return;
+      // 🧾 정산 2차 출처용 도장 (2026-09-16 사장님 승인 "정산 스코어 이중 출처"): 매칭된 The Odds API
+      //    이벤트 id 와 그쪽 팀 이름을 게임 행에 남긴다. place_bet 이 이 값을 **서버에서** leg 에 복사하고
+      //    (클라 값 무시), sports-settle 은 ESPN 에 결과가 없을 때만 이 oid 로 Odds `scores` 를 조회한다.
+      //    표시엔 안 쓰이는 필드 — 옛 클라는 그냥 무시한다(하위호환).
+      g.oid = String(ev.id || ""); g.hn = String(ev.home_team || ""); g.an = String(ev.away_team || "");
       const core = oddsToCore(ev, g.home, g.away);
       if (core) {
         if (g.lg === "SOC") {

@@ -131,8 +131,13 @@ begin
     -- am/am0/dec0). ⚠️ dec0 도장이 핵심(2026-07-27 발견): sports-settle의 decOf()는 dec0를
     -- 우선 신뢰하는데 종전엔 클라이언트가 보낸 dec0가 그대로 저장돼 — 조작 클라가 dec0를
     -- 부풀리면 정산이 부풀린 배율로 지급하는 구멍이었다. 서버가 덮어쓰면 구조적으로 불가.
+    -- 🧾 정산 2차 출처 키 (2026-09-16 사장님 승인 "정산 스코어 이중 출처"): live_games 행의 oid(The Odds
+    --    API 이벤트 id)·hn·an(그쪽 팀 이름)을 **서버 값으로** leg 에 도장한다. 클라가 보낸 oid 는 여기서
+    --    덮어써져 사라진다 — 클라가 다른 경기의 id 를 넣어 다른 스코어로 채점받는 길을 구조적으로 막는다.
+    --    live_games 에 값이 없으면(골프·옛 행) null 로 남고, sports-settle 은 그 leg 를 ESPN 전용으로 본다.
     v_new_legs := v_new_legs || jsonb_build_array(v_leg || jsonb_build_object(
-      'am', v_srv_am, 'am0', v_srv_am, 'dec0', round(v_dec, 6)));
+      'am', v_srv_am, 'am0', v_srv_am, 'dec0', round(v_dec, 6),
+      'oid', v_game->>'oid', 'hn', v_game->>'hn', 'an', v_game->>'an'));
   end loop;
 
   -- SGP correlation haircut when all legs share one game (matches app + settle)
