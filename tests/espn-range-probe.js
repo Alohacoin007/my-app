@@ -12,7 +12,7 @@ const ymd = (d) => `${d.getUTCFullYear()}${p2(d.getUTCMonth() + 1)}${p2(d.getUTC
 const day = (n) => new Date(Date.now() + n * 86400000);
 const T = ymd(day(0));
 const UA = { 'User-Agent': 'alpexa-feed/1.0' };   // Edge 와 동일 (정직한 식별자)
-const PATHS = ['football/nfl', 'hockey/nhl', 'soccer/eng.1', 'soccer/usa.1', 'basketball/nba', 'baseball/mlb'];
+const PATHS = ['football/nfl', 'hockey/nhl', 'soccer/eng.1', 'soccer/usa.1', 'basketball/nba', 'baseball/mlb', 'golf/pga'];
 const VARIANTS = [
   ['plain',        ''],
   ['dates=T',      `?dates=${T}`],
@@ -24,7 +24,13 @@ const VARIANTS = [
   ['range -6d..T', `?dates=${ymd(day(-6))}-${T}`],          // sports-settle 가 쓰는 모양 (돈 쪽)
   ['+8d&limit',    `?dates=${T}-${ymd(day(8))}&limit=1000`],
   ['month YYYYMM', `?dates=${T.slice(0, 6)}`],
+  // ── 2차 (설계용): 월 쿼리 상한·다음달·일자별 과거/미래 ──
+  ['month&limit',  `?dates=${T.slice(0, 6)}&limit=1000`],
+  ['next month',   `?dates=${ymd(day(31)).slice(0, 6)}&limit=1000`],
+  ['day -1',       `?dates=${ymd(day(-1))}`],
+  ['day +3',       `?dates=${ymd(day(3))}`],
 ];
+const GOLF = 'golf/pga';
 async function hit(url) {
   const t0 = Date.now();
   try {
