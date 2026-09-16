@@ -67,9 +67,11 @@ function oddsStatus(g) {
     //    30경기로 바닥을 넘어 🟢 — 정상의 6% 인 피드가 "이상무" 였다. 프로바이더(sports_odds)가
     //    앞 8일에 가격을 낸 경기 수를 리그별 **기대치**로 삼아 live_games 와 대조한다. 두 출처가
     //    독립이라 우리 피드가 줄면 반드시 벌어진다. 판정: 기대 ≥10 인 리그에서 실제 < 기대의 50%.
-    //    (축구는 키가 우리 미취급 리그까지 포함해 기대치가 부풀므로 제외 — 오탐 방지.)
+    //    (축구는 **우리가 ESPN 에서 실제로 받는 4개 리그 키만** — 다른 soccer_* 키는 미취급이라 기대치가
+    //     부풀어 오탐. 2026-09-16 아침 실측: 프로바이더 MLS 15·EPL 10 vs live_games SOC 2 — 이것도 축소였다.)
     try {
-      const KEY_LG = { americanfootball_nfl: 'NFL', americanfootball_nfl_preseason: 'NFL', basketball_nba: 'NBA', basketball_ncaab: 'NCAAB', baseball_mlb: 'MLB', icehockey_nhl: 'NHL' };
+      const KEY_LG = { americanfootball_nfl: 'NFL', americanfootball_nfl_preseason: 'NFL', basketball_nba: 'NBA', basketball_ncaab: 'NCAAB', baseball_mlb: 'MLB', icehockey_nhl: 'NHL',
+        soccer_epl: 'SOC', soccer_usa_mls: 'SOC', soccer_uefa_champs_league: 'SOC', soccer_fifa_world_cup: 'SOC' };
       const ro = await fetch(`${URL}/rest/v1/sports_odds?select=sport,data`, { headers: H });
       const rows = ro.ok ? await ro.json() : [];
       const now = Date.now(), hi = now + 8 * 86400e3, expect = {}, have = {};
