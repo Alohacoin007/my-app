@@ -64,10 +64,15 @@ async function fetchLeagueResults(L: { lg: string; path: string }, out: Record<s
   // range so recently-finished games are re-included and still settle (self-heal).
   const pad = (n: number) => String(n).padStart(2, "0");
   const ymd = (d: Date) => `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}`;
-  const today = new Date(); const from = new Date(today.getTime() - 6 * 86400000);
-  const direct = `https://site.api.espn.com/apis/site/v2/sports/${L.path}/scoreboard?dates=${ymd(from)}-${ymd(today)}`;
-  const tries = [direct, "https://corsproxy.io/?url=" + encodeURIComponent(direct)];
-  for (const u of tries) {
+  // ⚠️ 2026-09-16: ESPN 이 `?dates=A-B` 범위를 전 리그 400 으로 거절한다 (러너 프로브 실측, 단일 일자
+  //    `dates=YYYYMMDD` 는 200). 같은 7일 catch-up 을 **일자별 7회** 로 받는다. 하루라도 실패하면 그날은
+  //    건너뛰고 나머지는 처리 — 부분 실패가 전체 정산을 막지 않게.
+  const today = new Date();
+  for (let k = 6; k >= 0; k--) {
+    const dayStr = ymd(new Date(today.getTime() - k * 86400000));
+    const direct = `https://site.api.espn.com/apis/site/v2/sports/${L.path}/scoreboard?dates=${dayStr}`;
+    const tries = [direct, "https://corsproxy.io/?url=" + encodeURIComponent(direct)];
+    for (const u of tries) {
     try {
       const res = await fetch(u, ESPN_INIT);
       if (!res.ok) continue;
@@ -99,8 +104,9 @@ async function fetchLeagueResults(L: { lg: string; path: string }, out: Record<s
           };
         } catch (_e) { /* skip event */ }
       }
-      return; // got this league
+      break; // got this day → next day
     } catch (_e) { /* try next mirror */ }
+    }
   }
 }
 
@@ -111,32 +117,36 @@ async function fetchUFCResults(out: Record<string, Result>) {
   // Same catch-up window (#33) — a UFC card a couple days old must still settle.
   const pad = (n: number) => String(n).padStart(2, "0");
   const ymd = (d: Date) => `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}`;
-  const today = new Date(); const from = new Date(today.getTime() - 6 * 86400000);
-  const direct = `https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard?dates=${ymd(from)}-${ymd(today)}`;
-  const tries = [direct, "https://corsproxy.io/?url=" + encodeURIComponent(direct)];
-  for (const u of tries) {
-    try {
-      const res = await fetch(u, ESPN_INIT);
-      if (!res.ok) continue;
-      const d = await res.json();
-      for (const ev of (d.events || [])) {
-        for (const comp of (ev.competitions || [])) {
-          try {
-            const st = (comp.status && comp.status.type) ? comp.status.type : {};
-            if (st.state !== "post") continue; // only finished bouts
-            const cs = comp.competitors || []; if (cs.length < 2) continue;
-            let A = cs.find((c: any) => c.homeAway === "home") || cs[0];
-            let B = cs.find((c: any) => c.homeAway === "away") || cs[1];
-            if (A === B) { A = cs[0]; B = cs[1]; }
-            const nameOf = (c: any) => { const a = c.athlete || c.team || {}; return a.shortName || a.displayName || a.name || ""; };
-            const aw = A.winner === true, bw = B.winner === true;
-            if (!aw && !bw) continue; // no winner recorded (e.g., no contest) → leave ungraded
-            out["UFC_" + comp.id] = { hs: aw ? 1 : 0, as: bw ? 1 : 0, homeNm: nameOf(A), awayNm: nameOf(B), homeAb: "", awayAb: "" };
-          } catch (_e) { /* skip bout */ }
+  // ⚠️ 2026-09-16: 팀 종목과 같은 이유로 `dates=A-B` 범위 대신 **일자별 7회** (ESPN 범위 400).
+  const today = new Date();
+  for (let k = 6; k >= 0; k--) {
+    const dayStr = ymd(new Date(today.getTime() - k * 86400000));
+    const direct = `https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard?dates=${dayStr}`;
+    const tries = [direct, "https://corsproxy.io/?url=" + encodeURIComponent(direct)];
+    for (const u of tries) {
+      try {
+        const res = await fetch(u, ESPN_INIT);
+        if (!res.ok) continue;
+        const d = await res.json();
+        for (const ev of (d.events || [])) {
+          for (const comp of (ev.competitions || [])) {
+            try {
+              const st = (comp.status && comp.status.type) ? comp.status.type : {};
+              if (st.state !== "post") continue; // only finished bouts
+              const cs = comp.competitors || []; if (cs.length < 2) continue;
+              let A = cs.find((c: any) => c.homeAway === "home") || cs[0];
+              let B = cs.find((c: any) => c.homeAway === "away") || cs[1];
+              if (A === B) { A = cs[0]; B = cs[1]; }
+              const nameOf = (c: any) => { const a = c.athlete || c.team || {}; return a.shortName || a.displayName || a.name || ""; };
+              const aw = A.winner === true, bw = B.winner === true;
+              if (!aw && !bw) continue; // no winner recorded (e.g., no contest) → leave ungraded
+              out["UFC_" + comp.id] = { hs: aw ? 1 : 0, as: bw ? 1 : 0, homeNm: nameOf(A), awayNm: nameOf(B), homeAb: "", awayAb: "" };
+            } catch (_e) { /* skip bout */ }
+          }
         }
-      }
-      return;
-    } catch (_e) { /* try next mirror */ }
+        break; // got this day → next day
+      } catch (_e) { /* try next mirror */ }
+    }
   }
 }
 
