@@ -62,6 +62,26 @@ function oddsStatus(g) {
       `피드 내용: ${all.length}경기` + (all.length < BLACKOUT_FLOOR
         ? ` — 🚨 블랙아웃 (기준 ${BLACKOUT_FLOOR}경기 미만). 크론은 돌지만 빈 목록을 쓰고 있다 → sports-games 상류(ESPN) 확인`
         : ' (블랙아웃 아님)'));
+    // 🔀 독립 출처 대조 (2026-09-16 실사고). 20경기 바닥은 **자기 정합성**이라 축소를 못 잡았다:
+    //    ESPN 범위 400 으로 484→113→16 경기까지 줄었는데 UTC 날짜가 바뀌어 오늘 NFL 16 이 들어오자
+    //    30경기로 바닥을 넘어 🟢 — 정상의 6% 인 피드가 "이상무" 였다. 프로바이더(sports_odds)가
+    //    앞 8일에 가격을 낸 경기 수를 리그별 **기대치**로 삼아 live_games 와 대조한다. 두 출처가
+    //    독립이라 우리 피드가 줄면 반드시 벌어진다. 판정: 기대 ≥10 인 리그에서 실제 < 기대의 50%.
+    //    (축구는 키가 우리 미취급 리그까지 포함해 기대치가 부풀므로 제외 — 오탐 방지.)
+    try {
+      const KEY_LG = { americanfootball_nfl: 'NFL', americanfootball_nfl_preseason: 'NFL', basketball_nba: 'NBA', basketball_ncaab: 'NCAAB', baseball_mlb: 'MLB', icehockey_nhl: 'NHL' };
+      const ro = await fetch(`${URL}/rest/v1/sports_odds?select=sport,data`, { headers: H });
+      const rows = ro.ok ? await ro.json() : [];
+      const now = Date.now(), hi = now + 8 * 86400e3, expect = {}, have = {};
+      rows.forEach(r => { const lg = KEY_LG[r.sport]; if (!lg) return;
+        (Array.isArray(r.data) ? r.data : []).forEach(e => { const t = Date.parse(e && e.commence_time || ''); if (t > now && t <= hi) expect[lg] = (expect[lg] || 0) + 1; }); });
+      all.forEach(g => { const t = Date.parse(g.iso || ''); if (expect[g.lg] != null && t > now - 6 * 3600e3 && t <= hi) have[g.lg] = (have[g.lg] || 0) + 1; });
+      const short = Object.keys(expect).filter(lg => expect[lg] >= 10 && (have[lg] || 0) < expect[lg] * 0.5);
+      const parts = Object.keys(expect).sort().map(lg => `${lg} ${have[lg] || 0}/${expect[lg]}`);
+      if (!rows.length) flag(false, '피드 대조: sports_odds 읽기 불가 — 검사 불가 (정상 아님)');
+      else flag(short.length > 0, `피드 대조(live_games/프로바이더 8일): ` + (parts.join(' · ') || '기대치 없음') +
+        (short.length ? ` — 🚨 ${short.join(',')} 가 프로바이더 기대치의 절반 미만 → sports-games 상류(ESPN URL 모양·배포 버전) 확인` : ''));
+    } catch (e) { flag(false, '피드 대조 실패(검사 불가): ' + e.message); }
     const today = vegasYMD(Date.now()), tomorrow = vegasYMD(Date.now() + 86400e3);
     for (const dk of [today, tomorrow]) {
       const day = all.filter(g => { const t = Date.parse(g.iso || ''); return !isNaN(t) && vegasYMD(t) === dk; });
