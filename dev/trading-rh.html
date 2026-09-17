@@ -22,7 +22,8 @@
 <script src="../vendor/supabase.min.js?v=2"></script>
 <script>
 /* Login gate — same rule as trading.html: a logged-in identity (email or authId) is required. */
-(function(){try{var m=JSON.parse(localStorage.getItem("alpexa.me")||"null");if(!(m&&m.accts&&(m.email||m.authId))){location.replace("../login.html");}}catch(e){location.replace("../login.html");}})();
+function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }catch(e){} location.replace("../login.html"+(q||"")); }   /* 복귀 토큰(폐쇄 허용목록) — login.html fxDest 가 1회 소비 → 이 프리뷰로 돌아온다 */
+(function(){try{var m=JSON.parse(localStorage.getItem("alpexa.me")||"null");if(!(m&&m.accts&&(m.email||m.authId))){rhToLogin("");}}catch(e){rhToLogin("");}})();
 /* #5: money is never truth in localStorage — purge any legacy money keys on load. */
 (function(){try{["alpexa.serverBalances","alpexa.balances","alpexa.fxLive","alpexa.positions"].forEach(function(k){localStorage.removeItem(k);});}catch(e){}})();
 </script>
@@ -37,7 +38,7 @@
     if (!(m && m.accts)) return;
     if (sessionStorage.getItem("alpexa.sessChecked")) return;
     AlpexaSync.db.auth.getSession().then(function(r){
-      if (!(r && r.data && r.data.session)) { sessionStorage.setItem("alpexa.sessChecked","1"); location.replace("../login.html?expired=1"); }
+      if (!(r && r.data && r.data.session)) { sessionStorage.setItem("alpexa.sessChecked","1"); rhToLogin("?expired=1"); }
     }).catch(function(){});
     if (AlpexaSync.assertIdentity) AlpexaSync.assertIdentity();
   } catch(e) {}
@@ -539,7 +540,7 @@ function act(a){
   else if(k==='lim'||k==='sl'||k==='tp'){ var pip=fxPip(S.sym), mid=midOf(S.sym); var cur=k==='lim'?(S.limitPx||(S.otype==='LIMIT'?bidOf(S.sym)-8*pip:askOf(S.sym)+8*pip)):k==='sl'?(S.slPx||(mid-80*pip)):(S.tpPx||(mid+52*pip));
     cur=cur+(v==='+'?pip:-pip); if(k==='lim') S.limitPx=cur; else if(k==='sl') S.slPx=cur; else S.tpPx=cur; }
   else if(k==='go'){ location.href=v; return; }
-  else if(k==='logout'){ try{ var d=db(); if(d&&d.auth) d.auth.signOut(); }catch(e){} try{ ['alpexa.me','alpexa.userName','alpexa.userEmail'].forEach(function(x){ localStorage.removeItem(x); }); }catch(e){} location.replace('../login.html?switch=1'); return; }
+  else if(k==='logout'){ try{ var d=db(); if(d&&d.auth) d.auth.signOut(); }catch(e){} try{ ['alpexa.me','alpexa.userName','alpexa.userEmail'].forEach(function(x){ localStorage.removeItem(x); }); }catch(e){} rhToLogin('?switch=1'); return; }
   render();
 }
 document.addEventListener('click', function(e){ var el=e.target.closest('[data-act]'); if(!el) return; var a=el.getAttribute('data-act'); if(a==='sheet:'&&!e.target.closest('.dim, .x, .ghost, .acts')){ /* inner sheet clicks with sheet: only on close targets */ } act(a); });
