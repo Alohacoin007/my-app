@@ -77,9 +77,9 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .srv svg { width: 16px; height: 16px; }
   /* hero */
   .hero { padding: 24px 22px 0; }
-  .hero .lbl { font-size: 12px; color: var(--dim); font-weight: 500; display: flex; align-items: center; gap: 6px; }
-  .hero .eye { width: 20px; height: 20px; border-radius: 50%; background: var(--surface); display: inline-grid; place-items: center; color: var(--mute); cursor: pointer; }
-  .hero .eye svg { width: 12px; height: 12px; }
+  .hero .lbl { font-size: 15px; color: var(--dim); font-weight: 600; display: flex; align-items: center; gap: 8px; }   /* 라벨·눈 키움 (사장님 2026-09-17) */
+  .hero .eye { width: 28px; height: 28px; border-radius: 50%; background: var(--surface); display: inline-grid; place-items: center; color: var(--dim); cursor: pointer; }
+  .hero .eye svg { width: 17px; height: 17px; }
   .hero .big { display: flex; align-items: baseline; margin-top: 4px; font-variant-numeric: tabular-nums; letter-spacing: -1.6px; font-weight: 600; line-height: 1; }
   .hero .big .d { font-size: 32px; font-weight: 500; color: var(--mute); margin-right: 2px; letter-spacing: 0; }
   .hero .big .n { font-size: 44px; } .hero .big .c { font-size: 44px; color: var(--mute); }
@@ -117,6 +117,8 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .tabs { position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; width: 100%; max-width: 430px; border-top: 0.5px solid var(--line); display: grid; grid-template-columns: repeat(4,1fr); padding: 8px 6px calc(14px + env(safe-area-inset-bottom, 0px)); background: var(--bg); z-index: 5; }
   .tab { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; color: var(--mute); cursor: pointer; }
   .tab.on { color: var(--text); } .tab svg { width: 22px; height: 22px; }
+  .tab { position: relative; }
+  .tab .bdg { position: absolute; top: -5px; left: calc(50% + 6px); min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: var(--down); color: #fff; font-size: 10.5px; font-weight: 800; font-family: 'Geist Mono', ui-monospace, monospace; display: grid; place-items: center; line-height: 1; border: 1.5px solid var(--bg); }
   /* detail / trade */
   .det .head { padding: 14px 22px 0; }
   .det .nm { display: inline-flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 700; letter-spacing: -0.2px; cursor: pointer; }
@@ -128,7 +130,7 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .det .chg span.t { color: var(--dim); font-weight: 500; }
   .det .quote { margin-top: 6px; font-family: 'Geist Mono', ui-monospace, monospace; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
   .det .quote b { font-family: 'Geist', sans-serif; font-size: 10px; font-weight: 800; color: var(--mute); letter-spacing: .5px; margin: 0 3px; }
-  .det .chart { padding: 10px 0 0; position: relative; touch-action: pan-y; }
+  .det .chart { padding: 10px 20px 0; position: relative; touch-action: pan-y; }   /* 양옆 여백 — 선이 화면 벽에 붙지 않게 (사장님 2026-09-17) */
   .det .chart svg { display: block; width: 100%; height: 200px; }
   .det .chart .empty { height: 200px; display: grid; place-items: center; color: var(--mute); font-size: 12px; }
   .det .ranges { display: flex; justify-content: space-between; padding: 6px 18px 0; }
@@ -165,7 +167,9 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .grp { padding: 14px 22px 4px; font-size: 11px; font-weight: 800; letter-spacing: .8px; color: var(--mute); text-transform: uppercase; }
   .arow { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 10px; padding: 11px 22px; border-bottom: 0.5px solid var(--line); }
   .arow.px { grid-template-columns: minmax(0,1fr) auto 30px; }
-  .arow .t { font-size: 14px; font-weight: 700; letter-spacing: -0.15px; }
+  .arow .t { font-size: 14px; font-weight: 700; letter-spacing: -0.15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .arow .t .ctag { display: inline-block; font-size: 9.5px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; color: var(--dim); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; margin-left: 4px; vertical-align: 1px; }
+  .arow .amt { white-space: nowrap; }
   .arow .t b.b { color: var(--up); } .arow .t b.s { color: var(--down); }
   .arow .d { font-size: 11px; color: var(--dim); margin-top: 3px; font-variant-numeric: tabular-nums; }
   .arow .d .sw { display: block; margin-top: 2px; color: var(--text); font-weight: 600; }
@@ -254,10 +258,26 @@ var LEVERAGE_FX = 500;                           // fx_lev_cap FX (2026-09-08) �
 var TF = [['1m','M1'],['5m','M5'],['30m','M30'],['1h','H1'],['4h',null],['1D','D1'],['1W',null],['ALL',null]];   // null = stage 2
 // pip — MUST mirror fx_close.sql / fx-prices pip(): JPY 0.01, XAUUSD 0.01, XAGUSD 0.001, else 0.0001
 function fxPip(sym){ return /JPY$/.test(sym)?0.01:sym==='XAUUSD'?0.01:sym==='XAGUSD'?0.001:0.0001; }
-// contract size — fx_specs.contract truth: FX 100,000 · XAU 100 · XAG 5,000 (fx-contract-size pin)
-function contractOf(sym){ return sym==='XAUUSD'?100:sym==='XAGUSD'?5000:100000; }
-// half-spread in price units — EXACT mirror of fx_close.sql v_half (FX): max(0.1, spr_pts+markup_pts)*pip/2
-function halfOf(sym, mid){ var f=S.feed[sym]||{}; var spr=+f.spr||0, mk=+(S.marks[sym]||0); return Math.max(0.1, spr+mk)*fxPip(sym)/2; }
+// ── asset class + contract: the FX account also carries STOCK/CRYPTO/INDEX positions opened in trading.html,
+//    so every money view below must be class-aware or a 2-lot SPACEX shows as a 200,000-share position (2026-09-17 결함).
+//    Truth = fx_specs (symbol, cls, contract) read at runtime (same as webtrade SERVER_CLS/SERVER_CONTRACT); the
+//    fallbacks below mirror fx_contract() in fx_contract_size.sql + trading.html SYMBOLS and only apply when a row is missing.
+var CCY=/^(USD|EUR|GBP|JPY|AUD|NZD|CAD|CHF|XAU|XAG)$/;
+var SPREAD_BPS={CRYPTO:10,STOCK:8,INDEX:6};            // trading.html ALPEXA_SPREAD_BPS ↔ fx_close.sql (lockstep)
+var LEV_CAP={FX:500,INDEX:20,STOCK:10,CRYPTO:10};       // fx_lev_cap (2026-09-08) — display only
+function clsOf(sym){ var sp=S.specs[sym]; if(sp&&sp.cls) return sp.cls;
+  if(PAIRS.some(function(x){return x.sym===sym;})) return 'FX';
+  if(/^[A-Z]{6}$/.test(sym)&&CCY.test(sym.slice(0,3))&&CCY.test(sym.slice(3))) return 'FX';
+  return /USD$/.test(sym)?'CRYPTO':'STOCK'; }
+function contractOf(sym){ var sp=S.specs[sym]; if(sp&&+sp.contract>0) return +sp.contract;
+  if(sym==='XAUUSD') return 100; if(sym==='XAGUSD') return 5000; if(/^(DOGE|XRP|ADA)USD$/.test(sym)) return 10000;
+  return clsOf(sym)==='FX'?100000:1; }
+function levOf(sym){ return LEV_CAP[clsOf(sym)]||LEVERAGE_FX; }
+// half-spread in price units — EXACT mirror of fx_close.sql v_half:
+//   FX     : max(0.1, spr_pts+markup_pts)*pip/2            non-FX : mid*max(floorBps[cls], spr_pts)/10000/2
+function halfOf(sym, mid){ var f=S.feed[sym]||{}; var spr=+f.spr||0, cls=clsOf(sym);
+  if(cls==='FX'){ var mk=+(S.marks[sym]||0); return Math.max(0.1, spr+mk)*fxPip(sym)/2; }
+  return mid*(Math.max(SPREAD_BPS[cls]||0, spr)/10000)/2; }
 function midOf(sym){ var f=S.feed[sym]; return (f&&f.mid>0)?f.mid:0; }
 function bidOf(sym){ var m=midOf(sym); return m?m-halfOf(sym,m):0; }
 function askOf(sym){ var m=midOf(sym); return m?m+halfOf(sym,m):0; }
@@ -266,11 +286,13 @@ function spreadPips(sym){ var m=midOf(sym); if(!m) return null; return (2*halfOf
 function isFresh(sym){ var f=S.feed[sym]; return !!(f&&f.mid>0&&(Date.now()-(f.ts||0))<90000); }
 // USD value of one unit of a currency, from the live feed (cross-pair conversion)
 function ccyToUsd(code){ if(code==='USD') return 1; var p=midOf(code+'USD'); if(p) return p; var q=midOf('USD'+code); if(q) return 1/q; return null; }
-function notionalUSD(sym, vol, price){ var base=sym.slice(0,3), quote=sym.slice(3,6), c=contractOf(sym);
+function notionalUSD(sym, vol, price){ var c=contractOf(sym); if(clsOf(sym)!=='FX') return vol*c*price;   // fx_notional_usd: non-FX = size*lot*price
+  var base=sym.slice(0,3), quote=sym.slice(3,6);
   if(quote==='USD') return vol*c*price; if(base==='USD') return vol*c; var r=ccyToUsd(base); return r?vol*c*r:vol*c*price; }
-function pnlUSD(sym, open, close, side, vol){ var dist=(close-open)*(side==='BUY'?1:-1); var q=dist*contractOf(sym)*vol; var quote=sym.slice(3,6);
-  if(quote==='USD') return q; var r=ccyToUsd(quote); return r?q*r:q; }
-function marginUSD(sym, vol, price){ return notionalUSD(sym, vol, price)/LEVERAGE_FX; }
+function pnlUSD(sym, open, close, side, vol){ var dist=(close-open)*(side==='BUY'?1:-1); var q=dist*contractOf(sym)*vol;
+  if(clsOf(sym)!=='FX') return q;                                   // non-FX are USD-quoted (fx_close v_pnlq)
+  var quote=sym.slice(3,6); if(quote==='USD') return q; var r=ccyToUsd(quote); return r?q*r:q; }
+function marginUSD(sym, vol, price){ return notionalUSD(sym, vol, price)/levOf(sym); }
 function pipValueUSD(sym, vol){ return pnlUSD(sym, 0, fxPip(sym), 'BUY', vol); }
 
 /* ══ state (UI only — money is read from the server on every pull, never stored) ══ */
@@ -279,7 +301,7 @@ var S = {
   tab:'home', sym:'EURUSD', tf:'H1', otype:'MARKET', lots:0.10, sltp:false, sheet:null, sheetSeg:'Majors',
   oneClick: LS.get('rh.oneClick','0')==='1', ack: LS.get('rh.oneClickAck','0')==='1', masked: LS.get('rh.mask','0')==='1',
   theme: LS.get('rh.theme','light'), actTab:'positions',
-  feed:{}, marks:{}, cash:null, positions:[], pending:[], history:[], candles:{}, dayOpen:{}, scrub:null, toast:null, ready:false,
+  feed:{}, marks:{}, specs:{}, cash:null, positions:[], pending:[], history:[], candles:{}, dayOpen:{}, scrub:null, toast:null, ready:false,
 };
 document.documentElement.setAttribute('data-theme', S.theme==='dark'?'dark':'light');
 function me(){ try{ var m=JSON.parse(localStorage.getItem('alpexa.me')||'null'); return (m&&m.accts)?m:null; }catch(e){ return null; } }
@@ -292,6 +314,7 @@ async function pullFeed(){ var d=db(); if(!d) return;
   try{ if(d.functions){ var x=await d.functions.invoke('feed',{body:{t:'prices'}}); if(x&&!x.error&&Array.isArray(x.data)){ applyFeedRows(x.data); return; } } }catch(e){}
   try{ var r=await d.from('prices').select('symbol,mid,spr_pts'); if(r&&r.data) applyFeedRows(r.data); }catch(e){} }
 async function pullMarks(){ var d=db(); if(!d) return; try{ var r=await d.from('pricing_marks').select('symbol,markup_pts'); if(r&&r.data){ var m={}; r.data.forEach(function(p){ m[p.symbol]=Math.max(0,Math.min(50,+p.markup_pts||0)); }); S.marks=m; } }catch(e){} }
+async function pullSpecs(){ var d=db(); if(!d) return; try{ var r=await d.from('fx_specs').select('symbol,cls,contract'); if(r&&r.data){ var m={}; r.data.forEach(function(x){ if(x&&x.symbol) m[x.symbol]={cls:String(x.cls||'').toUpperCase(), contract:+x.contract||0}; }); S.specs=m; } }catch(e){} }
 async function pullCash(){ var d=db(), a=fxAcct(); if(!d||!a) return; try{ var r=await d.from('accounts').select('balance').eq('acct_no',a).limit(1); if(r&&r.data&&r.data.length) S.cash=+r.data[0].balance||0; }catch(e){} }
 async function pullPositions(){ var d=db(), a=fxAcct(); if(!d||!a) return;
   try{ var r=await d.from('positions').select('local_id,symbol,side,size,open_price,pnl,status,meta').eq('acct_no',a).eq('server','fx').eq('status','open');
@@ -321,7 +344,11 @@ function posPnl(p){ return isFresh(p.sym)?pnlUSD(p.sym,p.open,closePx(p.sym,p.si
 /* ══ formatting ══ */
 function fmtMoney(v){ var s=Math.abs(v).toFixed(2); var parts=s.split('.'); return (v<0?'−':'')+'$'+(+parts[0]).toLocaleString('en-US')+'.'+parts[1]; }
 function fmtSigned(v){ return (v>=0?'+':'−')+'$'+Math.abs(v).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
-function digitsOf(sym){ var p=PAIRS.find(function(x){return x.sym===sym;}); return p?p.digits:5; }
+function digitsOf(sym){ var p=PAIRS.find(function(x){return x.sym===sym;}); if(p) return p.digits;
+  var cls=clsOf(sym); if(cls==='FX') return /JPY$/.test(sym)?3:5; if(cls!=='CRYPTO') return 2;   // stocks/indices: cents
+  var m=midOf(sym); return m>=1000?2:m>=1?4:6; }
+function unitOf(sym){ return clsOf(sym)==='FX'?'pips':'pts'; }
+function clsTag(sym){ var c=clsOf(sym); return c==='FX'?'':' <span class="ctag">'+(c==='STOCK'?'Stock':c==='CRYPTO'?'Crypto':'Index')+'</span>'; }
 function fmtPx(v, sym, big){ if(!(v>0)) return '—'; var s=v.toFixed(digitsOf(sym)); if(!big) return s; return s.slice(0,-2)+'<big>'+s.slice(-2)+'</big>'; }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 function nameOf(sym){ var p=PAIRS.find(function(x){return x.sym===sym;}); return p?p.name:sym; }
@@ -363,7 +390,7 @@ function hero(){
   var eq=cash+fl, free=eq-um;
   return '<div class="hero"><div class="lbl">Equity <span class="eye" data-act="toggleMask">'+I.eye+'</span></div>'+
     '<div class="big">'+moneyBig(eq)+'</div>'+
-    '<div class="chg '+(fl>=0?'up':'down')+'">'+(fl>=0?'▲':'▼')+' '+fmtMoney(Math.abs(fl)).replace('−','')+' <span class="t">Open P&amp;L · '+S.positions.length+' position'+(S.positions.length===1?'':'s')+'</span></div>'+
+    '<div class="chg '+(fl>=0?'up':'down')+'">'+(fl>=0?'▲':'▼')+' '+fmtMoney(Math.abs(fl)).replace('−','')+' <span class="t">Open P&amp;L</span></div>'+
     '<div class="stats"><div class="stat"><div class="k">Balance</div><div class="v">'+fmtMoney(cash)+'</div></div>'+
     '<div class="stat"><div class="k">Margin</div><div class="v">'+fmtMoney(um)+'</div></div>'+
     '<div class="stat"><div class="k">Free margin</div><div class="v">'+fmtMoney(free)+'</div></div></div></div>';
@@ -439,7 +466,7 @@ function screenActivity(){
     if(!S.positions.length) body+='<div class="empty">No open positions</div>';
     S.positions.forEach(function(p){ var pnl=posPnl(p); var cur=closePx(p.sym,p.side);
       var d='@ '+fmtPx(p.open,p.sym)+' · '+(p.sl?'SL '+fmtPx(p.sl,p.sym):'')+(p.sl&&p.tp?' · ':'')+(p.tp?'TP '+fmtPx(p.tp,p.sym):'')+(!p.sl&&!p.tp?'no SL/TP':'')+(p.swap!=null?'<span class="sw">Swap '+fmtSigned(p.swap)+'</span>':'');
-      body+=arow('<b class="'+(p.side==='BUY'?'b':'s')+'">'+(p.side==='BUY'?'Buy':'Sell')+'</b> '+p.vol.toFixed(2)+' '+p.sym, d, fmtSigned(pnl), pnl>=0?'pos':'neg', (cur?fmtPx(cur,p.sym):'—')+' now', 'close:'+p.id, 'sheet:pos:'+p.id); });
+      body+=arow('<b class="'+(p.side==='BUY'?'b':'s')+'">'+(p.side==='BUY'?'Buy':'Sell')+'</b> '+p.vol.toFixed(2)+' '+p.sym+clsTag(p.sym), d, fmtSigned(pnl), pnl>=0?'pos':'neg', (cur?fmtPx(cur,p.sym):'—')+' now', 'close:'+p.id, 'sheet:pos:'+p.id); });
   } else if(S.actTab==='orders'){
     body='<div class="sum"><span class="k">Pending · '+S.pending.length+' order'+(S.pending.length===1?'':'s')+'</span><span class="v">—</span></div>';
     if(!S.pending.length) body+='<div class="empty">No pending orders</div>';
@@ -470,7 +497,8 @@ function screenAccount(){
     '</div><div class="out" data-act="logout">Log out</div></div>';
 }
 function tabs(){ var t=[['home',I.home,'Home'],['trade',I.tr,'Trade'],['activity',I.ac,'Activity'],['account',I.me,'Account']];
-  return '<div class="tabs">'+t.map(function(x){ return '<div class="tab'+(S.tab===x[0]?' on':'')+'" data-act="tab:'+x[0]+'">'+x[1]+x[2]+'</div>'; }).join('')+'</div>'; }
+  var n=S.positions.length;   // open-position count lives on the Activity tab badge (사장님 2026-09-17), not in the Home P&L line
+  return '<div class="tabs">'+t.map(function(x){ return '<div class="tab'+(S.tab===x[0]?' on':'')+'" data-act="tab:'+x[0]+'">'+x[1]+x[2]+(x[0]==='activity'&&n>0?'<span class="bdg">'+n+'</span>':'')+'</div>'; }).join('')+'</div>'; }
 function sheetHtml(){
   if(!S.sheet) return '';
   var inner='';
@@ -492,8 +520,8 @@ function sheetHtml(){
   } else if(S.sheet.indexOf('pos:')===0){
     var p=S.positions.find(function(x){return x.id===S.sheet.slice(4);}); if(!p) return '';
     var pnl=posPnl(p), cur=closePx(p.sym,p.side), pv=pipValueUSD(p.sym,p.vol);
-    var slRow=p.sl?fmtPx(p.sl,p.sym)+' <small style="color:var(--mute)">('+(((p.sl-p.open)/fxPip(p.sym))*(p.side==='BUY'?1:-1)).toFixed(0)+' pips)</small>':'—';
-    var tpRow=p.tp?fmtPx(p.tp,p.sym)+' <small style="color:var(--mute)">(+'+(((p.tp-p.open)/fxPip(p.sym))*(p.side==='BUY'?1:-1)).toFixed(0)+' pips)</small>':'—';
+    var slRow=p.sl?fmtPx(p.sl,p.sym)+' <small style="color:var(--mute)">('+(((p.sl-p.open)/fxPip(p.sym))*(p.side==='BUY'?1:-1)).toFixed(0)+' '+unitOf(p.sym)+')</small>':'—';
+    var tpRow=p.tp?fmtPx(p.tp,p.sym)+' <small style="color:var(--mute)">(+'+(((p.tp-p.open)/fxPip(p.sym))*(p.side==='BUY'?1:-1)).toFixed(0)+' '+unitOf(p.sym)+')</small>':'—';
     inner='<div class="sttl">Position<span class="x" data-act="sheet:">✕</span></div>'+
       '<div class="body" style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;color:var(--text)"><span><b class="'+(p.side==='BUY'?'up':'down')+'">'+(p.side==='BUY'?'Buy':'Sell')+'</b> '+p.vol.toFixed(2)+' '+p.sym+' · @ '+fmtPx(p.open,p.sym)+'</span><span class="mono '+(pnl>=0?'up':'down')+'">'+fmtSigned(pnl)+'</span></div>'+
       '<div class="kv" style="padding:0 22px"><div class="r" style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:.5px solid var(--line);font-size:13px"><span style="color:var(--dim)">Stop loss</span><span class="mono">'+slRow+'</span></div>'+
@@ -555,7 +583,7 @@ document.addEventListener('touchend', function(){ if(S.scrub!=null){ S.scrub=nul
 /* ══ boot ══ */
 (async function boot(){
   render();
-  await Promise.all([pullMarks(), pullFeed(), pullCash(), pullPositions()]);
+  await Promise.all([pullSpecs(), pullMarks(), pullFeed(), pullCash(), pullPositions()]);
   S.ready=true; render();
   pullPending(); pullHistory();
   // Realtime: prices UPDATE merges straight into the feed (same shape as the poll)

@@ -21,6 +21,7 @@ ok('M1 소스: .rpc( 호출 없음', !/\.rpc\(/.test(src));
 ok('M1 소스: ledger / positions / fx_pending 에 insert·update·upsert·delete 없음', !/\.from\(['"](ledger|positions|fx_pending|accounts)['"]\)[\s\S]{0,200}\.(insert|update|upsert|delete)\(/.test(src));
 ok('M1 소스: 돈 RPC 호출 없음 (rpc("fx_open"/"fx_close"/"fx_modify"/…) 형태 0건 — settlements kind 필터 "fx_close" 는 읽기)', !/rpc\(\s*['"](fx_open|fx_close|fx_modify|fx_place_pending|fx_cancel_pending|app_transfer|place_bet)['"]/.test(src) && !/functions\.invoke\(\s*['"](fx|broker|withdraw)/.test(src));
 ok('M2 소스: half = max(0.1, spr+mk)*pip/2 (fx_close v_half 미러)', /Math\.max\(0\.1,\s*spr\+mk\)\*fxPip\(sym\)\/2/.test(src));
+ok('M2 소스: 비FX half = mid*max(floorBps[cls], spr)/10000/2 (fx_close v_half else-branch 미러) · 계약/클래스 = fx_specs 런타임', /mid\*\(Math\.max\(SPREAD_BPS\[cls\]\|\|0, spr\)\/10000\)\/2/.test(src) && /from\('fx_specs'\)\.select\('symbol,cls,contract'\)/.test(src) && /SPREAD_BPS=\{CRYPTO:10,STOCK:8,INDEX:6\}/.test(src));
 ok('M2 소스: pip 락스텝 (JPY .01 · XAU .01 · XAG .001 · else .0001)', /JPY\$\/\.test\(sym\)\?0\.01:sym==='XAUUSD'\?0\.01:sym==='XAGUSD'\?0\.001:0\.0001/.test(src));
 ok('M4 소스: localStorage 에 잔고·포지션 저장 없음 (rh.theme/rh.oneClick/rh.oneClickAck/rh.mask 만)', (src.match(/LS\.set\('rh\.[a-zA-Z]+'/g) || []).every(x => /rh\.(theme|oneClick|oneClickAck|mask)'/.test(x)) && !/localStorage\.setItem\(['"]alpexa\.(balances|fxLive|positions)/.test(src));
 ok('세션: trading.html 과 같은 로그인 게이트 + 세션 가드 (login.html 로 회귀)', /localStorage\.getItem\("alpexa\.me"\)/.test(src) && /rhToLogin\("\?expired=1"\)/.test(src) && /alpexa-sync\.js/.test(src));
@@ -45,15 +46,19 @@ function serve(port) { return new Promise(res => { const s = http.createServer((
   rq.writeHead(200, { 'Content-Type': MIME[path.extname(fp)] || 'text/plain' }); rq.end(fs.readFileSync(fp)); }); s.listen(port, () => res(s)); }); }
 
 // 스텁 데이터 — 화면 숫자를 여기서 재계산해 대조한다
-const FEED = { EURUSD: { mid: 1.15979, spr: 0.6 }, GBPUSD: { mid: 1.35216, spr: 0.8 }, USDJPY: { mid: 146.812, spr: 1.0 }, XAUUSD: { mid: 4348.90, spr: 30 }, AUDUSD: { mid: 0.66341, spr: 0.8 }, USDCHF: { mid: 0.79602, spr: 0.8 }, USDCAD: { mid: 1.38115, spr: 1.0 }, NZDUSD: { mid: 0.59873, spr: 1.0 }, EURGBP: { mid: 0.85768, spr: 1.0 }, EURJPY: { mid: 170.258, spr: 1.6 }, GBPJPY: { mid: 198.511, spr: 2.0 }, XAGUSD: { mid: 52.398, spr: 30 } };
+const FEED = { EURUSD: { mid: 1.15979, spr: 0.6 }, GBPUSD: { mid: 1.35216, spr: 0.8 }, USDJPY: { mid: 146.812, spr: 1.0 }, XAUUSD: { mid: 4348.90, spr: 30 }, AUDUSD: { mid: 0.66341, spr: 0.8 }, USDCHF: { mid: 0.79602, spr: 0.8 }, USDCAD: { mid: 1.38115, spr: 1.0 }, NZDUSD: { mid: 0.59873, spr: 1.0 }, EURGBP: { mid: 0.85768, spr: 1.0 }, EURJPY: { mid: 170.258, spr: 1.6 }, GBPJPY: { mid: 198.511, spr: 2.0 }, XAGUSD: { mid: 52.398, spr: 30 }, SPACEX: { mid: 155.11, spr: 0 } };
+// fx_specs (class + contract truth, read at runtime like webtrade) — SPACEX is a STOCK held on the same FX account
+const SPECS = [{ symbol: 'SPACEX', cls: 'STOCK', contract: 1 }, { symbol: 'EURUSD', cls: 'FX', contract: 100000 }, { symbol: 'USDJPY', cls: 'FX', contract: 100000 }, { symbol: 'XAUUSD', cls: 'FX', contract: 100 }];
+const CLS = Object.fromEntries(SPECS.map(x => [x.symbol, x.cls]));
 const MARKS = { EURUSD: 0.2 };
 const CASH = 12341.10;
 const POS = [
   { local_id: 'P1', symbol: 'EURUSD', side: 'BUY', size: 0.10, open_price: 1.15712, pnl: 0, status: 'open', meta: { sl: 1.152, tp: 1.165, swap: -0.42 } },
   { local_id: 'P2', symbol: 'USDJPY', side: 'SELL', size: 0.20, open_price: 147.100, pnl: 0, status: 'open', meta: {} },
+  { local_id: 'P3', symbol: 'SPACEX', side: 'BUY', size: 2.00, open_price: 150.00, pnl: 0, status: 'open', meta: {} },   // 2026-09-17 결함: FX 계약 10만으로 곱해 $1,022,000 로 보였다
 ];
 const stubFn = `() => {
-  const FEED = ${JSON.stringify(FEED)}, MARKS = ${JSON.stringify(MARKS)}, CASH = ${CASH}, POS = ${JSON.stringify(POS)};
+  const FEED = ${JSON.stringify(FEED)}, MARKS = ${JSON.stringify(MARKS)}, CASH = ${CASH}, POS = ${JSON.stringify(POS)}, SPECS = ${JSON.stringify(SPECS)};
   window.__rpcCalls = 0;
   const q = (t) => { const o = { _t: t, select: () => o, eq: () => o, order: () => o, in: () => o, limit: () => o,
     then: (res) => res(o._data()), _data: () => {
@@ -61,6 +66,7 @@ const stubFn = `() => {
       if (t === 'pricing_marks') return { data: Object.keys(MARKS).map(s => ({ symbol: s, markup_pts: MARKS[s] })) };
       if (t === 'accounts') return { data: [{ balance: CASH }] };
       if (t === 'positions') return { data: POS };
+      if (t === 'fx_specs') return { data: SPECS };
       if (t === 'fx_pending') return { data: [{ local_id: 'O1', symbol: 'EURUSD', side: 'BUY', size: 0.1, otype: 'LIMIT', trigger: 1.155, sl: 0, tp: 0, status: 'pending', created_at: new Date().toISOString() }] };
       if (t === 'settlements') return { data: [{ local_id: 'H1', ticket: 'FX-1', symbol: 'GBPUSD', stake: 0.2, pnl: -44, detail: 'BUY 0.20 @ 1.35410 → 1.35190 SL', created_at: new Date().toISOString() }] };
       return { data: [] }; } };
@@ -79,11 +85,12 @@ const stubFn = `() => {
 
 // 기대값 재계산 (앱과 독립 구현 — 같은 규칙, 다른 코드)
 const pip = (s) => /JPY$/.test(s) ? 0.01 : s === 'XAUUSD' ? 0.01 : s === 'XAGUSD' ? 0.001 : 0.0001;
-const contract = (s) => s === 'XAUUSD' ? 100 : s === 'XAGUSD' ? 5000 : 100000;
-const half = (s) => Math.max(0.1, FEED[s].spr + (MARKS[s] || 0)) * pip(s) / 2;
+const contract = (s) => { const r = SPECS.find(x => x.symbol === s); return r ? r.contract : s === 'XAGUSD' ? 5000 : 100000; };
+const BPS = { CRYPTO: 10, STOCK: 8, INDEX: 6 };   // fx_close.sql non-FX floor (bps)
+const half = (s) => (CLS[s] || 'FX') === 'FX' ? Math.max(0.1, FEED[s].spr + (MARKS[s] || 0)) * pip(s) / 2 : FEED[s].mid * Math.max(BPS[CLS[s]], FEED[s].spr) / 10000 / 2;
 const bid = (s) => FEED[s].mid - half(s), ask = (s) => FEED[s].mid + half(s);
 const closePx = (s, side) => side === 'BUY' ? bid(s) : ask(s);
-const pnl = (p) => { const s = p.symbol; const dist = (closePx(s, p.side) - p.open_price) * (p.side === 'BUY' ? 1 : -1); let q = dist * contract(s) * p.size; const quote = s.slice(3); if (quote !== 'USD') q = q / FEED['USD' + quote].mid; return q; };
+const pnl = (p) => { const s = p.symbol; const dist = (closePx(s, p.side) - p.open_price) * (p.side === 'BUY' ? 1 : -1); let q = dist * contract(s) * p.size; if ((CLS[s] || 'FX') !== 'FX') return q; const quote = s.slice(3); if (quote !== 'USD') q = q / FEED['USD' + quote].mid; return q; };
 const floating = POS.reduce((a, p) => a + pnl(p), 0);
 const equity = CASH + floating;
 const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -129,7 +136,11 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   ok('M4 localStorage: rh.* 에 돈 없음 · 1-Click 만 저장', await page.evaluate(() => localStorage.getItem('rh.oneClick') === '1' && !Object.keys(localStorage).some(k => /bal|pos|equity|cash/i.test(k))));
   // Activity
   await page.locator('.tab[data-act="tab:activity"]').click(); await page.waitForTimeout(400);
-  ok('M6 Activity: 포지션 2행 (서버 positions)', (await page.locator('.arow.px').count()) === 2);
+  ok('M6 Activity: 포지션 3행 (서버 positions — FX 2 + STOCK 1)', (await page.locator('.arow.px').count()) === 3);
+  ok('포지션 수 = Activity 탭 배지 (홈 P&L 줄엔 없음)', (await page.locator('.tab[data-act="tab:activity"] .bdg').innerText()) === '3' && !/position/.test(await page.locator('.hero').innerText().catch(() => '')));
+  const p3 = await page.locator('.arow.px').nth(2).innerText();
+  ok('클래스: SPACEX(STOCK) 플로팅 = (mid−8bps/2 − open)×contract 1×2.00 (' + fmt(pnl(POS[2])) + ') — FX 10만 계약 아님', p3.indexOf(pnl(POS[2]).toFixed(2)) >= 0 && !/\d{3},\d{3}/.test(p3), p3.replace(/\n/g, ' '));
+  ok('클래스: SPACEX 행에 Stock 태그 · 가격 2자리', /stock/i.test(p3) && /155\.\d{2}\s*now/.test(p3), p3.replace(/\n/g, ' '));
   const p1 = await page.locator('.arow.px').nth(0).innerText();
   ok('M3 포지션 행 플로팅 = pnlUSD(open→청산가) (' + fmt(pnl(POS[0])).replace('$', '+$') + ')', p1.indexOf(pnl(POS[0]).toFixed(2)) >= 0, p1.replace(/\n/g, ' '));
   ok('스왑 표시 (positions.meta.swap)', /Swap\s*−\$0\.42/.test(p1), p1.replace(/\n/g, ' '));
