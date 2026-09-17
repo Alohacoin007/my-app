@@ -389,15 +389,60 @@ async function fetchOddsRows(SB_URL: string, H: Record<string, string>): Promise
 // 가격을 낸 가장 먼 경기"까지 자동 확장한다. NFL 개막전이 몇 주 전부터 가격이 나오면 그때부터
 // 목록·베팅 가능, MLB처럼 하루 전에야 나오면 기본 8일 창 — 규칙은 하나: "배당이 있으면 판다".
 // 상한 +60일 (row 비대 방지), 하한 = 기본 8일.
+// Odds API 종목 키 → 우리 리그. 축구는 soccer_* 전부 SOC (여러 키가 한 lg). 골프 등 미취급 = null.
+function lgOfKey(k: string): string | null {
+  if (k.indexOf("soccer_") === 0) return "SOC";
+  for (const lg of Object.keys(ODDS_SPORT)) if (ODDS_SPORT[lg] === k) return lg;
+  for (const lg of Object.keys(ODDS_EXTRA)) if (ODDS_EXTRA[lg].indexOf(k) >= 0) return lg;   // 보조 키도 자기 리그로
+  return null;
+}
+const SPORT_OF: Record<string, string> = { NFL: "Football", NBA: "Basketball", NCAAB: "Basketball", MLB: "Baseball", NHL: "Hockey", SOC: "Soccer" };
+// 표시용 3글자 약어 (Odds 이벤트엔 약어가 없다). 풀네임 마지막 단어 앞 3글자 — 표시 전용, 매칭·정산엔 안 쓴다.
+function abOf(name: string): string {
+  const w = String(name || "").trim().split(/\s+/); const last = w[w.length - 1] || "";
+  return (last.replace(/[^A-Za-z]/g, "").slice(0, 3) || "TBD").toUpperCase();
+}
+// ── 🥇 Odds 1차 목록 (2026-09-17 사장님 승인 "경기 목록 1차 출처 전환") ──
+// 목록 = ESPN 경기 ∪ Odds 이벤트. overlay 가 ESPN 경기에 붙이고 **소비한** 이벤트는 제외하고, 남은(ESPN 이 모르는)
+// 이벤트를 `LG_o<oddsId>` 경기로 만든다 — ESPN 이 죽어도 프로바이더가 가격 낸 경기는 전부 목록에 남는다.
+//   · 이미 시작된 이벤트는 안 만든다 (ESPN 없인 라이브 상태·스코어를 모른다 → 인플레이 베팅 금지)
+//   · 지평(hz, 리그별 최소 8일) 밖 제외 — ESPN 경기와 같은 창 규칙
+//   · 가격은 기존 oddsToCore 그대로 (오버라운드 가드·상호배제 배정) — 가드가 버린 시장뿐이면 경기 자체를 안 만든다
+//   · sel = "<Odds 풀네임> ML" 이라 sports-settle teamSide 가 Odds scores 이름과 정확히 맞는다
+//   · oid = 자기 id → 정산은 Odds scores 로만 채점, `_o` gid 는 규칙 B void 금지 (settle legVerdict)
+//   · 골프 키는 outright 라 여기서 제외 (fetchGolf + overlay 몫)
+function oddsOnlyGames(rows: any[], consumed: Set<string>, now: number, hz: Record<string, number>): any[] {
+  const out: any[] = []; const seen = new Set<string>();
+  (rows || []).forEach((row: any) => {
+    const lg = lgOfKey(String(row?.sport || "")); if (!lg) return;
+    (Array.isArray(row.data) ? row.data : []).forEach((ev: any) => {
+      try {
+        const id = String(ev?.id || ""); if (!id || consumed.has(id) || seen.has(id)) return;
+        const t = Date.parse(ev.commence_time || "");
+        if (!Number.isFinite(t) || t <= now) return;                               // 시작됨/시각 미상
+        if (t > (hz[lg] || now + 8 * 86400000)) return;                            // 지평 밖
+        const hn = String(ev.home_team || "").trim(), an = String(ev.away_team || "").trim();
+        if (!hn || !an) return;
+        const home = { ab: abOf(hn), nm: hn }, away = { ab: abOf(an), nm: an };
+        const core = oddsToCore(ev, home, away); if (!core) return;
+        const real = lg === "SOC" ? Array.isArray(core.threeWay) && core.threeWay.length === 3 : Array.isArray(core.ml) && core.ml.length === 2;
+        if (!real) return;                                                           // 머니라인/1X2 없는 시장만 있으면 안 판다
+        seen.add(id);
+        out.push({
+          gid: lg + "_o" + id, lg, sport: SPORT_OF[lg] || "",
+          live: false, time: fmtTime(ev.commence_time), iso: ev.commence_time || "",
+          home, away,
+          spread: core.spread || [], total: core.total || [], ml: core.ml || [], threeWay: core.threeWay || [],
+          oddsReal: true, oid: id, hn, an, src: "odds",
+        });
+      } catch (_e) { /* skip one event */ }
+    });
+  });
+  return out;
+}
 function oddsHorizons(rows: any[]): Record<string, number> {
   const hz: Record<string, number> = {};
   const now = Date.now(), MIN = now + 8 * 86400000, MAX = now + 60 * 86400000;
-  const lgOfKey = (k: string): string | null => {
-    if (k.indexOf("soccer_") === 0) return "SOC";
-    for (const lg of Object.keys(ODDS_SPORT)) if (ODDS_SPORT[lg] === k) return lg;
-    for (const lg of Object.keys(ODDS_EXTRA)) if (ODDS_EXTRA[lg].indexOf(k) >= 0) return lg;   // 보조 키도 자기 리그로
-    return null;
-  };
   (rows || []).forEach((row: any) => {
     const lg = lgOfKey(String(row?.sport || "")); if (!lg) return;
     (Array.isArray(row.data) ? row.data : []).forEach((e: any) => {
@@ -409,7 +454,7 @@ function oddsHorizons(rows: any[]): Record<string, number> {
   Object.keys(hz).forEach((lg) => { hz[lg] = Math.max(hz[lg], MIN); });
   return hz;
 }
-async function overlayRealOdds(games: any[], rows: any[]) {
+async function overlayRealOdds(games: any[], rows: any[], consumed: Set<string> = new Set()) {
   try {
     const bySport: Record<string, any[]> = {};
     const byUpd: Record<string, string> = {};
@@ -489,6 +534,7 @@ async function overlayRealOdds(games: any[], rows: any[]) {
       //    (클라 값 무시), sports-settle 은 ESPN 에 결과가 없을 때만 이 oid 로 Odds `scores` 를 조회한다.
       //    표시엔 안 쓰이는 필드 — 옛 클라는 그냥 무시한다(하위호환).
       g.oid = String(ev.id || ""); g.hn = String(ev.home_team || ""); g.an = String(ev.away_team || "");
+      consumed.add(String(ev.id || ""));   // 이 이벤트는 ESPN 경기에 붙었다 → oddsOnlyGames 가 `_o` 로 중복 생성하지 않는다
       const core = oddsToCore(ev, g.home, g.away);
       if (core) {
         if (g.lg === "SOC") {
@@ -661,7 +707,16 @@ Deno.serve(async (req) => {
 
   // Overlay the REAL odds the app already uses (sports_odds table) so the
   // dashboard's live_games carries the same real moneyline/spread/total.
-  await overlayRealOdds(games, oddsRows);
+  const consumed = new Set<string>();
+  await overlayRealOdds(games, oddsRows, consumed);
+  // 🥇 Odds 1차 목록 (2026-09-17): ESPN 이 모르는 Odds 이벤트를 `_o` 경기로 합친다 — 붕괴 가드 **앞** 이라
+  //    ESPN 이 죽어도 합친 목록이 가드를 통과한다(그게 이 기능의 존재 이유).
+  const oddsOnly = oddsOnlyGames(oddsRows, consumed, Date.now(), hz);
+  //    sticky 가 직전 행에서 이월한 `_o` 행(잠금)과 같은 gid 가 새로 생성되면 새것(실배당)으로 교체 — gid 중복 금지.
+  { const fresh = new Set(oddsOnly.map((g: any) => g.gid));
+    for (let i = games.length - 1; i >= 0; i--) if (fresh.has(games[i].gid)) games.splice(i, 1); }
+  games.push(...oddsOnly);
+  DIAG.unshift({ oddsOnly: oddsOnly.length, espnMatched: consumed.size });
 
   // 🛡️ 붕괴 가드 (2026-08-19 실사고). 상류(ESPN)가 빈 값을 주면 games 에는 sticky 이월분만
   //    남는데, 예전엔 그걸로 **멀쩡한 441경기 행을 그대로 덮어썼다** → 고객 스포츠북이 2경기로

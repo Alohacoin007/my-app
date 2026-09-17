@@ -24,7 +24,7 @@ ok('① 이월·합성 행 = 배당 비움 + oddsReal:false (묵은 가격 생�
    (src.match(/ml: \[\], spread: \[\], total: \[\], threeWay: \[\], outright: \[\], oddsReal: false/g) || []).length >= 1
    && /live: false, time: fmtTime\(iso\),\n          ml: \[\], spread: \[\], total: \[\], threeWay: \[\], outright: \[\], oddsReal: false/.test(src));
 ok('① 과거·시각미상 경기 이월 금지 (정산 엔진 몫)', /if \(!Number\.isFinite\(t\) \|\| t < Date\.now\(\)\) continue;/.test(src));
-ok('① sticky는 overlay보다 먼저 (실배당 재부착 가능)', src.indexOf('stickyOpenBetGames(games') < src.indexOf('overlayRealOdds(games, oddsRows)'));
+ok('① sticky는 overlay보다 먼저 (실배당 재부착 가능)', src.indexOf('stickyOpenBetGames(games') < src.indexOf('overlayRealOdds(games, oddsRows'));   // 2026-09-17: 3번째 인자(consumed) 허용
 
 // ② 배당 지평
 ok('② oddsHorizons — 리그별 최장 commence_time으로 창 확장', /function oddsHorizons\(rows: any\[\]\)/.test(src)
@@ -32,7 +32,7 @@ ok('② oddsHorizons — 리그별 최장 commence_time으로 창 확장', /func
 ok('② 상한 60일 · 하한 8일', /MAX = now \+ 60 \* 86400000/.test(src) && /MIN = now \+ 8 \* 86400000/.test(src)
    && /Math\.max\(hz\[lg\], MIN\)/.test(src) && /Math\.max\(endMs \|\| 0, Date\.now\(\) \+ 8 \* 86400000\)/.test(src));
 ok('② sports_odds 1회 로드 공유 (overlay 이중 fetch 금지)', /const oddsRows = await fetchOddsRows\(SB_URL, H\)/.test(src)
-   && /overlayRealOdds\(games: any\[\], rows: any\[\]\)/.test(src)
+   && /overlayRealOdds\(games: any\[\], rows: any\[\](, consumed: Set<string> = new Set\(\))?\)/.test(src)
    && !/overlayRealOdds[\s\S]{0,200}rest\/v1\/sports_odds/.test(src));
 
 console.log((fail ? '🔴' : '🟢') + ' sports-listing-consistency — ' + pass + ' pass, ' + fail + ' fail');

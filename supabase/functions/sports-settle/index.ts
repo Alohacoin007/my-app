@@ -181,6 +181,9 @@ function legVerdict(l: any, espn: Record<string, Result>, odds: Record<string, O
     }
     return "pending";   // 진행중/미완/킥오프 불일치/스코어 결손 → 추측 안 함
   }
+  // `LG_o<oddsId>` = Odds 1차 목록에서 온 경기 (2026-09-17). ESPN 은 이 경기를 모르므로 ESPN 커버리지는
+  // "경기가 없다"의 증거가 될 수 없다 → 규칙 B void 금지. Odds scores 가 올 때까지 보류 (C1 이 36h 에 잡는다).
+  if (/_o[0-9a-f]{6,}$/i.test(String(l.gid || ""))) return "pending";
   const age = Number.isFinite(kt) ? now - kt : NaN;
   if (!(age > VOID_AFTER_MS && age < PROVABLE_MS)) return "pending";
   const day = (t: number) => new Date(t).toISOString().slice(0, 10).replace(/-/g, "");
