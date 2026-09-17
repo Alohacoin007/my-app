@@ -84,6 +84,14 @@ function oddsStatus(g) {
       else flag(short.length > 0, `피드 대조(live_games/프로바이더 8일): ` + (parts.join(' · ') || '기대치 없음') +
         (short.length ? ` — 🚨 ${short.join(',')} 가 프로바이더 기대치의 절반 미만 → sports-games 상류(ESPN URL 모양·배포 버전) 확인` : ''));
     } catch (e) { flag(false, '피드 대조 실패(검사 불가): ' + e.message); }
+    // 🧾 정산 2차 출처 키 커버리지 (2026-09-17 배포 확인 158/158): 실배당 팀 경기는 매칭된 Odds 이벤트라
+    //    oid 가 반드시 있어야 한다. 없으면 sports-games 가 옛 버전으로 되돌아간 것 = 그 경기 베팅은 ESPN 전용
+    //    (2차 출처 없음). 표시엔 영향 없어 화면으론 절대 안 보인다 — 여기서만 잡힌다.
+    {
+      const real = all.filter(g => g.oddsReal === true && g.lg !== 'GOLF');
+      const oid = real.filter(g => g.oid).length;
+      flag(real.length >= 10 && oid < real.length * 0.9, `정산 2차 출처 키(oid): 실배당 팀경기 ${oid}/${real.length}` + (real.length >= 10 && oid < real.length * 0.9 ? ' — 🚨 sports-games 배포 버전 확인 (oid 도장 누락)' : ''));
+    }
     const today = vegasYMD(Date.now()), tomorrow = vegasYMD(Date.now() + 86400e3);
     for (const dk of [today, tomorrow]) {
       const day = all.filter(g => { const t = Date.parse(g.iso || ''); return !isNaN(t) && vegasYMD(t) === dk; });
