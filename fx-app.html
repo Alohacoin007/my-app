@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
 <meta name="robots" content="noindex">
-<title>Alpexa FX · Preview</title>
+<title>Alpexa FX</title>
 <!--
   ALPEXA FX — Robinhood-style mobile app, STAGE 1 (2026-09-17, 사장님 "시작해").
   ──────────────────────────────────────────────────────────────────────────────
@@ -12,6 +12,8 @@
     fx_modify · fx_close · fx_place_pending · fx_modify_pending · fx_cancel_pending · pamm_join · pamm_leave. 이 파일은 잔고·손익·
     포지션 행을 쓰지 않는다(insert/update 0). 응답 뒤 서버를 다시 읽어 표시만 한다. 부분청산 RPC 없음 → 버튼 없음.
     (1단계 "Stage 2 안내" 토스트는 2단계에서 실제 RPC 호출로 대체됨. 핀: tests/trading-rh.test.js — rpc 허용목록 9개 · 쓰기 0)
+  · 풀 앱 (2026-09-21 사장님 "나머지 안된 부분 다 옮겨서 풀 앱으로"): 차트 4h·1W·ALL(실봉) · 주식/지수 실봉(Twelve Data) · Security(비밀번호 변경·전 기기
+    로그아웃 = auth API) · Support(전화·메일·mailto). **Deposit/Withdraw/Transfer/부분청산은 돈 경로 → 표 승인 전까지 기존 앱(trading.html) 링크 유지.**
   · 기존 trading.html 은 0터치. 같은 세션(alpexa-sync.js, sessionStorage)·같은 서버 데이터를 읽는다.
   · 시세 표시 = 딜링 락스텝: bid/ask = mid ∓ half, half = max(0.1, spr_pts + markup_pts) × pip / 2
     (trading.html fxHalfSpread / fx_close.sql v_half 와 동일). 플로팅 = 그 close 가격으로 계산.
@@ -267,6 +269,14 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .seg3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 4px; margin: 0 22px 14px; padding: 4px; background: var(--surface); border-radius: 14px; }   /* 크기 동일한 3분할 (사장님 2026-09-21 "사이즈가 안 맞아") */
   .seg3 div { text-align: center; padding: 10px 0; border-radius: 11px; font-size: 13px; font-weight: 700; color: var(--dim); cursor: pointer; }
   .seg3 div.on { background: var(--bg); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .sheet .lbl { padding: 10px 22px 6px; font-size: 11px; font-weight: 700; color: var(--mute); text-transform: uppercase; letter-spacing: 0.4px; }
+  .sheet .fld { display: block; width: calc(100% - 44px); margin: 0 22px 8px; box-sizing: border-box; background: var(--surface); border: 0; border-radius: 12px; padding: 12px 14px; font: inherit; font-size: 14px; font-weight: 500; color: var(--text); outline: none; -webkit-appearance: none; }
+  .sheet .fld::placeholder { color: var(--mute); }
+  .sheet textarea.fld { min-height: 96px; resize: none; line-height: 1.45; }
+  .sheet .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 22px 6px; }
+  .sheet .cards > div { border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 13px; cursor: pointer; min-width: 0; }
+  .sheet .cards .k { font-size: 10.5px; font-weight: 700; color: var(--dim); text-transform: uppercase; letter-spacing: 0.3px; }
+  .sheet .cards .v { font-size: 13px; font-weight: 700; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .opt2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 22px 14px; }
   .opt2 div { border: 1.5px solid var(--line); border-radius: 14px; padding: 10px; text-align: center; font-size: 12px; font-weight: 700; cursor: pointer; }
   .opt2 div.on { border-color: var(--up); }
@@ -330,7 +340,7 @@ function liveGroups(){ return GROUPS.filter(function(g){ return instruments(g).l
 function instruments(group){ return CATALOG.filter(function(c){ if(group&&group!=='All'&&groupOf(c)!==group) return false; return CORE_FX.indexOf(c.sym)>=0 || midOf(c.sym)>0; }); }
 var FX_FN_URL = 'https://grxnbgtfnaayeluenvqh.supabase.co/functions/v1/fx-prices';
 var LEVERAGE_FX = 500;                           // fx_lev_cap FX (2026-09-08) — display only
-var TF = [['1m','M1'],['5m','M5'],['30m','M30'],['1h','H1'],['4h',null],['1D','D1'],['1W',null],['ALL',null]];   // null = stage 2
+var TF = [['1m','M1'],['5m','M5'],['30m','M30'],['1h','H1'],['4h','H4'],['1D','D1'],['1W','W1'],['ALL','ALL']];   // ALL = D1 deep history (1000 bars)
 // pip — MUST mirror fx_close.sql / fx-prices pip(): JPY 0.01, XAUUSD 0.01, XAGUSD 0.001, else 0.0001
 function fxPip(sym){ return /JPY$/.test(sym)?0.01:sym==='XAUUSD'?0.01:sym==='XAGUSD'?0.001:0.0001; }
 // ── asset class + contract: the FX account also carries STOCK/CRYPTO/INDEX positions opened in trading.html,
@@ -454,6 +464,19 @@ async function doPamm(kind, fund, usd, units){
     if(!d.ok){ S.sheet=null; toast(errText(d.error,d)); return; }
     S.sheet=null; S.amt=0; toast(kind==='join' ? 'Invested '+fmtMoney(usd) : 'Redeemed '+fmtMoney(+d.net||0)+(d.fee>0?' (perf. fee '+fmtMoney(+d.fee)+')':'')+' → FX balance');
   }catch(e){ toast('Not completed — '+e.message); } finally{ unlock(); pullPamm(); refresh(); } }
+// Security (돈 0): 비밀번호 변경 = Supabase auth.updateUser(현재 세션) · 전 기기 로그아웃 = signOut({scope:'global'}) — 둘 다 auth API, 테이블 쓰기 없음.
+async function doPassword(){
+  var a=document.getElementById('pw1'), b=document.getElementById('pw2'); var p1=a?String(a.value||''):'', p2=b?String(b.value||''):'';
+  if(p1.length<8){ toast('Password must be at least 8 characters'); return; } if(p1!==p2){ toast('Passwords do not match'); return; }
+  if(!lock('pw')) return;
+  try{ var d=db(); if(!d||!d.auth) throw new Error('no server connection'); var r=await d.auth.updateUser({ password:p1 }); if(r&&r.error) throw new Error(r.error.message||'not updated');
+    S.sheet=null; toast('Password updated'); }
+  catch(e){ toast('Not updated — '+e.message); } finally{ unlock(); render(true); } }
+async function doLogoutAll(){
+  if(!lock('out')) return;
+  try{ var d=db(); if(d&&d.auth) await d.auth.signOut({ scope:'global' }); }catch(e){}
+  try{ ['alpexa.me','alpexa.userName','alpexa.userEmail'].forEach(function(x){ localStorage.removeItem(x); }); }catch(e){}
+  rhToLogin('?switch=1'); }
 // Managed funds (PAMM) — 투자자 리포트 RPC 는 **읽기 전용**(jsonb 스냅샷, 돈 이동 0). 참여/회수 = doPamm (pamm_join / pamm_leave).
 async function pullPamm(){ var d=db(); if(!d||!me()){ S.pamm=[]; return; } try{ var r=await d.rpc('pamm_investor_report'); S.pamm=(r&&r.data&&r.data.ok&&Array.isArray(r.data.funds))?r.data.funds:[]; }catch(e){ S.pamm=[]; } render(); }
 function pammFund(acct){ return (S.pamm||[]).find(function(f){ return f.fund_acct===acct; }); }
@@ -472,15 +495,24 @@ async function pullHistory(){ var d=db(), m=me(); if(!d||!m||!m.custId) return;
       return { id:String(s.local_id||s.ticket||''), sym:s.symbol||'', side:mm?mm[1].toUpperCase():'', vol:mm?+mm[2]:(+s.stake||0), open:mm?+mm[3]:0, close:mm?+mm[4]:0, pnl:+s.pnl||0, at:s.created_at||'', slHit:/SL/i.test(String(s.detail||'')) }; }); }catch(e){} }
 async function pullCandles(sym, tf){ var key=sym+'|'+tf; if(S.candles[key]&&S.candles[key].ts>Date.now()-60000) return;
   S.candles[key]=S.candles[key]||{ts:0,rows:[],loading:true};
-  try{ S.candles[key]={ ts:Date.now(), rows:await fetchCandles(sym,tf,200), loading:false }; }catch(e){ S.candles[key]={ts:Date.now(),rows:[],loading:false}; }
+  try{ S.candles[key]={ ts:Date.now(), rows:await fetchCandles(sym,tf,tf==='ALL'?1000:200), loading:false }; }catch(e){ S.candles[key]={ts:Date.now(),rows:[],loading:false}; }
   render(); }
-// 봉 출처: 크립토 = Binance 공개 미러 klines (trading.html/crypto-live 와 동일 · 키 불필요) · 그 외 = fx-prices ?candles (Polygon)
-var BN_TF={M1:'1m',M5:'5m',M30:'30m',H1:'1h',H4:'4h',D1:'1d',W1:'1w'};
+// 봉 출처 (전부 실제 봉 — 합성 없음): 크립토 = Binance 공개 미러 klines (trading.html/crypto-live 와 동일 · 키 불필요) ·
+//   FX/메탈 = fx-prices ?candles (Polygon, 키는 서버) · 주식/지수 = Twelve Data time_series (trading.html 과 동일 차트 키 · 시세/체결과 무관, 차트 표시 전용).
+//   ALL = D1 1000봉. 실봉이 없는 상품은 빈 차트("No chart data") — 가짜 봉을 만들지 않는다.
+var BN_TF={M1:'1m',M5:'5m',M30:'30m',H1:'1h',H4:'4h',D1:'1d',W1:'1w',ALL:'1d'};
+var TD_TF={M1:'1min',M5:'5min',M30:'30min',H1:'1h',H4:'4h',D1:'1day',W1:'1week',ALL:'1day'};
+var TD_KEY_CHART='6fef3bc69c2842a2b4a127969f766eb0';                                    // trading.html TD_KEY_CHART (차트 전용 무료 키)
+var TD_SYM={SPACEX:'SPCX',NAS100:'NDX',SPX500:'SPX',US30:'DJI',GER40:'DAX',UK100:'FTSE',JPN225:'N225',HK50:'HSI',AUS200:'AXJO',EUSTX50:'STOXX50E',WTI:'WTI/USD'};
 async function fetchCandles(sym, tf, n){
-  if(clsOf(sym)==='CRYPTO'){ var base=sym.replace(/USD$/,''); var u='https://data-api.binance.vision/api/v3/klines?symbol='+encodeURIComponent(base+'USDT')+'&interval='+(BN_TF[tf]||'1h')+'&limit='+n;
+  var cls=clsOf(sym);
+  if(cls==='CRYPTO'){ var base=sym.replace(/USD$/,''); var u='https://data-api.binance.vision/api/v3/klines?symbol='+encodeURIComponent(base+'USDT')+'&interval='+(BN_TF[tf]||'1h')+'&limit='+Math.min(n,1000);
     var r=await fetch(u); var a=await r.json(); if(!Array.isArray(a)) return [];
     return a.map(function(k){ return { t:+k[0], o:+k[1], h:+k[2], l:+k[3], c:+k[4], v:+k[5] }; }); }
-  var r2=await fetch(FX_FN_URL+'?candles='+encodeURIComponent(sym)+'&tf='+encodeURIComponent(tf)+'&n='+n); var j=await r2.json();
+  if(cls==='STOCK'||cls==='INDEX'){ var td='https://api.twelvedata.com/time_series?symbol='+encodeURIComponent(TD_SYM[sym]||sym)+'&interval='+(TD_TF[tf]||'1h')+'&outputsize='+Math.min(n,1000)+'&order=ASC&apikey='+TD_KEY_CHART;
+    var r3=await fetch(td); var j3=await r3.json(); if(!j3||!Array.isArray(j3.values)) return [];
+    return j3.values.map(function(v){ return { t:Date.parse(v.datetime), o:+v.open, h:+v.high, l:+v.low, c:+v.close, v:+(v.volume||0) }; }).filter(function(k){ return isFinite(k.c)&&k.c>0; }); }
+  var r2=await fetch(FX_FN_URL+'?candles='+encodeURIComponent(sym)+'&tf='+encodeURIComponent(tf==='ALL'?'D1':tf)+'&n='+n); var j=await r2.json();
   return (j&&j.ok&&Array.isArray(j.candles))?j.candles:[]; }
 async function pullDayOpen(sym){ if(S.dayOpen[sym]&&S.dayOpen[sym].ts>Date.now()-300000) return; S.dayOpen[sym]={ts:Date.now(),v:null};
   try{ var rows=await fetchCandles(sym,'D1',2); if(rows.length) S.dayOpen[sym]={ts:Date.now(), v:+rows[rows.length-1].o||null}; }catch(e){} render(); }
@@ -574,7 +606,7 @@ function lineChart(rows, opts){
   var base=pts[0][1], ex=pts[n-1][0], ey=pts[n-1][1];
   var scrub='';
   if(S.scrub!=null&&S.scrub>=0&&S.scrub<n){ var i=S.scrub, sx=pts[i][0], sy=pts[i][1]; var lx=Math.min(W-70,Math.max(70,sx)).toFixed(1); var t=new Date(+rows[i].t);
-    var tl=(S.tf==='D1')?t.toLocaleDateString('en-US',{month:'short',day:'numeric'}):t.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    var tl=(S.tf==='D1'||S.tf==='W1'||S.tf==='ALL')?t.toLocaleDateString('en-US',{month:'short',day:'numeric',year:(S.tf==='D1'?undefined:'2-digit')}):t.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
     scrub='<line x1="'+sx.toFixed(1)+'" y1="22" x2="'+sx.toFixed(1)+'" y2="'+(H-16)+'" stroke="var(--mute)" stroke-width="1" stroke-dasharray="3 3"/>'+
       '<circle cx="'+sx.toFixed(1)+'" cy="'+sy.toFixed(1)+'" r="5" fill="'+c+'" stroke="var(--bg)" stroke-width="2.5"/>'+
       '<text x="'+lx+'" y="14" text-anchor="middle" font-family="Geist Mono, monospace" font-size="11.5" font-weight="700" fill="var(--text)">'+vals[i].toFixed(digitsOf(S.sym))+'</text>'+
@@ -659,8 +691,8 @@ function screenAccount(){
     srow(I.fund,'Managed funds',(pammMine()!=null?fmtMoney(pammMine())+' ':(S.pamm&&S.pamm.length?S.pamm.length+' fund'+(S.pamm.length===1?'':'s')+' ':''))+chev,'sheet:pamm')+
     srow(I.bolt,'1-Click trading','<span class="tog'+(S.oneClick?' on':'')+'"><i></i></span>','toggleOneClick')+
     srow(I.look,'Appearance',(S.theme==='dark'?'Dark ':S.theme==='system'?'System ':'Light ')+chev,'sheet:appearance')+
-    srow(I.lock,'Security',chev,'toast:Security — coming soon')+
-    srow(I.doc,'Support',chev,'toast:Support — coming soon')+
+    srow(I.lock,'Security',chev,'sheet:security')+
+    srow(I.doc,'Support',chev,'sheet:support')+
     '</div><div class="out" data-act="logout">Log out</div></div>';
 }
 function tabs(){ var t=[['home',I.home,'Home'],['trade',I.tr,'Trade'],['activity',I.ac,'Activity'],['account',I.me,'Account']];
@@ -686,6 +718,27 @@ function sheetHtml(){
       '<div class="ack"><i>'+I.check+'</i>I understand orders execute instantly</div><div class="cta" data-act="ackOn">Turn on 1-Click</div><div class="ghost" data-act="sheet:">Not now</div>';
   } else if(S.sheet==='appearance'){
     inner='<div class="sttl">Appearance<span class="x" data-act="sheet:">✕</span></div><div class="seg3">'+[['light','Light'],['dark','Dark'],['system','System']].map(function(o){ return '<div class="'+(S.theme===o[0]?'on':'')+'" data-act="theme:'+o[0]+'">'+o[1]+'</div>'; }).join('')+'</div><div class="body">System follows your phone setting. Same layout in all — only colors change.</div>';
+  } else if(S.sheet==='security'){
+    // 실제로 동작하는 것만 (옛 앱의 가짜 2FA·가짜 세션 목록은 옮기지 않음): 비밀번호 변경 = Supabase auth.updateUser · 전 기기 로그아웃 = signOut({scope:'global'})
+    var em=(me()||{}).email||'—';
+    inner='<div class="sttl">Security<span class="x" data-act="sheet:">✕</span></div>'+
+      '<div class="kvs"><div class="r"><span class="k">Signed in as</span><span class="v" style="font-family:Geist,sans-serif;font-weight:600">'+esc(em)+'</span></div></div>'+
+      '<div class="lbl">Change password</div>'+
+      '<input class="fld" id="pw1" type="password" placeholder="New password (8+ characters)" autocomplete="new-password">'+
+      '<input class="fld" id="pw2" type="password" placeholder="Repeat new password" autocomplete="new-password">'+
+      '<div class="cta" style="margin-top:4px" data-act="pwsave">'+(S.busy?'Working…':'Update password')+'</div>'+
+      '<div class="body" style="padding-top:4px">Signing out everywhere ends this session too — you will need to sign in again.</div>'+
+      '<div class="acts" style="margin-top:0;grid-template-columns:1fr 1fr"><div style="border-color:var(--down);color:var(--down)" data-act="logoutAll">Sign out everywhere</div><div data-act="sheet:">Close</div></div>';
+  } else if(S.sheet==='support'){
+    // 백엔드 없이 실제로 되는 채널만: 전화·이메일 (trading.html SupportPanel 과 동일). 메시지는 mailto 로 메일 앱에 넘긴다.
+    var topics=[['trade','Trading'],['funds','Deposit / Withdrawal'],['account','Account'],['tech','Technical'],['other','Other']];
+    inner='<div class="sttl">Support<span class="x" data-act="sheet:">✕</span></div>'+
+      '<div class="cards"><div data-act="go:tel:+41225559900"><div class="k">Phone</div><div class="v">+41 22 555 9900</div></div><div data-act="go:mailto:support@alpexa.com"><div class="k">Email</div><div class="v">support@alpexa.com</div></div></div>'+
+      '<div class="lbl">Send a message</div>'+
+      '<div class="chips" style="justify-content:flex-start;padding-top:0">'+topics.map(function(t){ return '<span class="'+(S.supTopic===t[0]?'on':'')+'" data-act="stopic:'+t[0]+'">'+t[1]+'</span>'; }).join('')+'</div>'+
+      '<textarea class="fld" id="smsg" placeholder="Describe your issue…" rows="4"></textarea>'+
+      '<div class="cta" style="margin-top:4px" data-act="ssend">Send message</div>'+
+      '<div class="body" style="text-align:center;padding-top:2px">Opens in your mail app · typical reply within 4 hours · 24/7</div>';
   } else if(S.sheet==='server'){
     inner='<div class="sttl">Switch server<span class="x" data-act="sheet:">✕</span></div>'+
       '<div class="prow" data-act="go:sports-live.html"><span class="chk"></span><div><div class="pn">Sports</div><div class="ds">Sportsbook</div></div><div class="ppx">›</div></div>'+
@@ -831,7 +884,7 @@ function act(a){
     if(v&&v.indexOf('pleave:')===0){ var fl=pammFund(v.slice(7)); S.amt=(fl&&fl.mine&&fl.mine.value!=null)?+fl.mine.value:0; } }
   else if(k==='seg'){ S.sheetSeg=v; S.q=''; instruments(v).slice(0,24).forEach(function(c){ pullDayOpen(c.sym); }); }
   else if(k==='act'){ S.actTab=v; S.keepScroll=false; }
-  else if(k==='tf'){ if(!v){ toast('4h · 1W · ALL — coming soon'); return; } S.tf=v; S.scrub=null; pullCandles(S.sym,v); }
+  else if(k==='tf'){ if(!v) return; S.tf=v; S.scrub=null; pullCandles(S.sym,v); }
   else if(k==='otype'){ S.otype=v; S.limitPx=0; }
   else if(k==='lots'){ S.lots=Math.max(0.01, Math.round((S.lots+(v==='+'?0.01:-0.01))*100)/100); }
   else if(k==='sltp'){ S.sltp=true; }
@@ -839,6 +892,13 @@ function act(a){
     cur=Math.max(tickOf(S.sym), cur+(v==='+'?st:-st)); cur=+cur.toFixed(digitsOf(S.sym)); if(k==='lim') S.limitPx=cur; else if(k==='sl') S.slPx=cur; else S.tpPx=cur; }
   else if(k==='hseg'){ S.homeSeg=v; LS.set('rh.homeSeg',v); S.keepScroll=false; }
   else if(k==='q'){ S.q=v; }
+  else if(k==='stopic'){ S.supTopic=v; }
+  else if(k==='ssend'){ var ta=document.getElementById('smsg'); var msg=ta?String(ta.value||'').trim():'';
+    if(!S.supTopic){ toast('Pick a topic first'); return; } if(!msg){ toast('Write a short message first'); return; }
+    var tl=({trade:'Trading',funds:'Deposit / Withdrawal',account:'Account',tech:'Technical',other:'Other'})[S.supTopic]||S.supTopic;
+    location.href='mailto:support@alpexa.com?subject='+encodeURIComponent('ALPEXA Support — '+tl+(fxAcct()?' ('+fxAcct()+')':''))+'&body='+encodeURIComponent(msg+'\n\n— sent from ALPEXA FX app'); return; }
+  else if(k==='pwsave'){ doPassword(); return; }
+  else if(k==='logoutAll'){ doLogoutAll(); return; }
   else if(k==='go'){ location.href=v; return; }
   else if(k==='logout'){ try{ var d=db(); if(d&&d.auth) d.auth.signOut(); }catch(e){} try{ ['alpexa.me','alpexa.userName','alpexa.userEmail'].forEach(function(x){ localStorage.removeItem(x); }); }catch(e){} rhToLogin('?switch=1'); return; }
   render(true);

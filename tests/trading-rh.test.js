@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Alpexa — FX 로빈후드형 앱 1단계 (dev/trading-rh.html) 행위 게이트 (헤드리스 + supabase 스텁, 네트워크 0)
+// Alpexa — FX 모바일 앱 (fx-app.html) 행위 게이트 (헤드리스 + supabase 스텁, 네트워크 0)
 // ============================================================================
 // 계약 (2026-09-17 사장님 "시작해" · 1단계 = 읽기 전용):
 //   M1. 돈은 서버 RPC 로만 — 허용 RPC 9개(RPC_ALLOW) 외 호출 0 · ledger/positions/accounts 쓰기 0 (소스 + 런타임 스파이).
@@ -29,6 +29,10 @@ const ALLOW = ['pamm_investor_report', 'fx_open', 'fx_modify', 'fx_close', 'fx_p
   ok('M1 소스: 헬퍼가 목록 밖 이름을 거절 (rpc not allowed)', /if\(!RPC_ALLOW\[name\]\) throw/.test(src));
   ok('M2 소스: fx_open 에 슬리피지 가드 인자 (p_requested_price · p_max_slippage) — MT5 deviation', /p_requested_price:px\|\|null, p_max_slippage:px\?slipOf\(sym,px\):null/.test(src) && /3\*fxPip\(sym\)/.test(src));
   ok('M1 소스: 부분청산 없음 (RPC 없음 → 버튼 없음)', !/Close half|fx_close_partial/.test(src));
+  // 풀 앱 (2026-09-21): 남은 비돈 기능 이관 — 차트 TF 전부 실봉 · 주식/지수 실봉 · Security/Support 실동작만
+  ok('풀앱 소스: 차트 TF 8개 전부 활성 (null 0) · "coming soon" 문구 0', /var TF = \[\['1m','M1'\],\['5m','M5'\],\['30m','M30'\],\['1h','H1'\],\['4h','H4'\],\['1D','D1'\],\['1W','W1'\],\['ALL','ALL'\]\]/.test(src) && !/coming soon/i.test(src));
+  ok('풀앱 소스: 봉 출처 3종 전부 실봉 (크립토 Binance · FX Polygon · 주식/지수 Twelve Data) · 합성 봉 생성 0 · ALL = D1 1000봉', /api\.twelvedata\.com\/time_series/.test(src) && /data-api\.binance\.vision\/api\/v3\/klines/.test(src) && /FX_FN_URL\+'\?candles='/.test(src) && !/Math\.random\(\)[^\n]*(candle|bar|ohlc)/i.test(src) && /tf==='ALL'\?1000:200/.test(src));
+  ok('풀앱 소스: Security = auth.updateUser + signOut(global) 만 (테이블 쓰기 0) · Support = tel/mailto 만 (백엔드 0)', /auth\.updateUser\(\{ password:p1 \}\)/.test(src) && /signOut\(\{ scope:'global' \}\)/.test(src) && /mailto:support@alpexa\.com\?subject=/.test(src) && /go:tel:\+41225559900/.test(src) && !/2-Factor|Active Sessions/.test(src));
   ok('M1 소스: 잔고·손익을 클라가 계산해 저장하는 코드 0 (S\.cash 는 서버 pull 에서만 대입)', (src.match(/S\.cash\s*=/g) || []).length === 1 && /S\.cash=\+r\.data\[0\]\.balance/.test(src)); }
 ok('M1 소스: ledger / positions / fx_pending 에 insert·update·upsert·delete 없음', !/\.from\(['"](ledger|positions|fx_pending|accounts)['"]\)[\s\S]{0,200}\.(insert|update|upsert|delete)\(/.test(src));
 ok('M1 소스: 승인 밖 돈 경로 0 (app_transfer · place_bet · functions.invoke fx/broker/withdraw)', !/rpc\(\s*['"](app_transfer|place_bet|fx_open_admin|fx_admin)/.test(src) && !/functions\.invoke\(\s*['"](fx|broker|withdraw)/.test(src));
@@ -91,7 +95,8 @@ const stubFn = `() => {
     o.insert = o.update = o.upsert = o.delete = () => { window.__writeCalls = (window.__writeCalls||0) + 1; return o; };
     return o; };
   window.supabase = { createClient: () => ({
-    auth: { getSession: async () => ({ data: { session: { user: { id: 'auth-1' } } } }), signOut: async () => ({}) },
+    auth: { getSession: async () => ({ data: { session: { user: { id: 'auth-1' } } } }), signOut: async (o) => { try { sessionStorage.setItem('__signOut', JSON.stringify(o || {})); } catch (e) {} return {}; },
+      updateUser: async (a) => { window.__pwLog = (window.__pwLog || []).concat([a]); return { data: {}, error: null }; } },
     rpc: async (name, args) => { window.__rpcLog = window.__rpcLog || []; window.__rpcLog.push({ name, args });
       if (name === 'pamm_investor_report') { window.__pammCalls = (window.__pammCalls||0) + 1; return { data: PAMM, error: null }; }
       await new Promise(r => setTimeout(r, 60));   // real network latency → double-tap window
@@ -128,7 +133,9 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   const page = await browser.newPage({ viewport: { width: 430, height: 900 } });
   await page.route('**/vendor/supabase.min.js*', (r) => r.abort());
   await page.route('**/fonts.googleapis.com/**', (r) => r.abort());
-  await page.route('**/functions/v1/fx-prices*', (r) => { const u = new URL(r.request().url()); const n = +u.searchParams.get('n') || 200; const rows = []; const base = 1.157; for (let i = 0; i < Math.min(n, 60); i++) rows.push({ t: Date.now() - (60 - i) * 3600e3, o: base + i * 0.00002, h: base + 0.001, l: base - 0.001, c: base + i * 0.00003, v: 1 }); r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, candles: rows }) }); });
+  const candReq = [], tdReq = [];
+  await page.route('**/api.twelvedata.com/**', (r) => { tdReq.push(r.request().url()); const vals = []; for (let i = 0; i < 40; i++) vals.push({ datetime: new Date(Date.now() - (40 - i) * 3600e3).toISOString().slice(0, 19).replace('T', ' '), open: '150.1', high: '156', low: '149', close: String(150 + i * 0.1), volume: '1000' }); r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ values: vals, status: 'ok' }) }); });
+  await page.route('**/functions/v1/fx-prices*', (r) => { const u = new URL(r.request().url()); candReq.push({ tf: u.searchParams.get('tf'), n: u.searchParams.get('n') }); const n = +u.searchParams.get('n') || 200; const rows = []; const base = 1.157; for (let i = 0; i < Math.min(n, 60); i++) rows.push({ t: Date.now() - (60 - i) * 3600e3, o: base + i * 0.00002, h: base + 0.001, l: base - 0.001, c: base + i * 0.00003, v: 1 }); r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, candles: rows }) }); });
   const errs = []; page.on('pageerror', e => errs.push(e.message));
   await page.addInitScript(new Function('return ' + stubFn)());
   await page.goto(`http://localhost:${PORT}/fx-app.html`, { waitUntil: 'domcontentloaded' });
@@ -284,6 +291,17 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   await page.locator('.otype span[data-act="otype:LIMIT"]').click(); await page.waitForTimeout(150);
   ok('Limit 주문: SL/TP 없음 (폴드·행 0) — Activity 에서 설정', (await page.locator('.fold[data-act="sltp"]').count()) === 0 && (await page.locator('.lotrow:has-text("Stop loss")').count()) === 0 && (await page.locator('.lotrow:has-text("Limit price")').count()) === 1);
   await page.locator('.otype span[data-act="otype:MARKET"]').click(); await page.waitForTimeout(100);
+  // chart timeframes: 4h · 1W · ALL are live (real bars) — ALL = D1 deep history
+  ok('차트 TF: 8칸 전부 활성 (.na 0)', (await page.locator('.ranges span').count()) === 8 && (await page.locator('.ranges span.na').count()) === 0);
+  candReq.length = 0; await page.locator('.ranges span[data-act="tf:H4"]').click(); await page.waitForTimeout(300);
+  ok('4h 탭 → fx-prices ?tf=H4&n=200 실봉 요청 · 차트 렌더', candReq.some(q => q.tf === 'H4' && q.n === '200') && (await page.locator('#chart svg').count()) === 1 && (await page.locator('.ranges span.on').innerText()) === '4h', JSON.stringify(candReq));
+  candReq.length = 0; await page.locator('.ranges span[data-act="tf:ALL"]').click(); await page.waitForTimeout(300);
+  ok('ALL 탭 → D1 1000봉 요청 (깊은 이력)', candReq.some(q => q.tf === 'D1' && q.n === '1000'), JSON.stringify(candReq));
+  await page.locator('.ranges span[data-act="tf:H1"]').click(); await page.waitForTimeout(150);
+  // stocks / indices: real bars from Twelve Data (SpaceX trades as SPCX) — never synthetic
+  await page.evaluate(() => act('pick:SPACEX')); await page.waitForTimeout(500);
+  ok('주식 차트: SPACEX → Twelve Data time_series (symbol=SPCX · interval=1h) 실봉 · SVG 렌더', tdReq.some(u => /symbol=SPCX/.test(u) && /interval=1h/.test(u)) && (await page.locator('#chart svg').count()) === 1, tdReq.join(' ').slice(0, 200));
+  await page.evaluate(() => act('pick:EURUSD')); await page.waitForTimeout(200);
   // pair sheet: real search input filters across all groups
   await page.locator('.det .nm[data-act="sheet:pair"]').click(); await page.waitForTimeout(200);
   ok('페어 시트: 검색 input 존재 · 그룹 칩 = 피드 있는 4 + All', (await page.locator('#pq').count()) === 1 && (await page.locator('.sheet .sseg span').count()) === 5);
@@ -319,6 +337,25 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   const pl = await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'pamm_leave'));
   ok('Redeem all → pamm_leave(ref pamm-FX-850261-out-…, units null=전량) 1회', pl.length === 1 && /^pamm-FX-850261-out-\d+$/.test(pl[0].args.p_ref) && pl[0].args.p_units === null, JSON.stringify(pl.map(c => c.args)));
   ok('Account: Deposit/Withdraw/Transfer = 예전 앱(trading.html) 링크 (새 돈 경로 0)', (await page.locator('.acts div[data-act="go:trading.html"]').count()) === 3);
+  // Security sheet — only real actions (password = auth.updateUser · sign out everywhere); no fake 2FA / device list
+  await page.locator('.srow[data-act="sheet:security"]').click(); await page.waitForTimeout(150);
+  const sec = await page.locator('.sheet').innerText().catch(() => '');
+  ok('Security 시트: 로그인 이메일 · 비밀번호 변경 입력 2 · Sign out everywhere (가짜 2FA/세션 목록 0)', /Security/.test(sec) && /boss@x\.com/.test(sec) && (await page.locator('#pw1').count()) === 1 && (await page.locator('#pw2').count()) === 1 && /Sign out everywhere/.test(sec) && !/2-Factor|Active Sessions/.test(sec), sec.replace(/\n/g, ' ').slice(0, 200));
+  await page.locator('#pw1').fill('abcdefgh'); await page.locator('#pw2').fill('abcdefgX'); await page.locator('.sheet .cta').click(); await page.waitForTimeout(150);
+  ok('비밀번호 불일치 → 토스트 · updateUser 0회 · 시트 유지', /do not match/.test(await page.locator('.toast').innerText().catch(() => '')) && (await page.evaluate(() => (window.__pwLog || []).length)) === 0 && (await page.locator('#pw1').inputValue()) === 'abcdefgh');
+  await page.locator('#pw2').fill('abcdefgh'); await page.locator('.sheet .cta').click(); await page.waitForTimeout(300);
+  const pw = await page.evaluate(() => window.__pwLog || []);
+  ok('일치 → auth.updateUser({password}) 1회 · 시트 닫힘 · 토스트 Password updated', pw.length === 1 && pw[0].password === 'abcdefgh' && Object.keys(pw[0]).join() === 'password' && (await page.locator('.sheet').count()) === 0 && /Password updated/.test(await page.locator('.toast').innerText().catch(() => '')), JSON.stringify(pw));
+  // Support sheet — phone / email cards + topic chips + message → mail app (no backend)
+  await page.locator('.srow[data-act="sheet:support"]').click(); await page.waitForTimeout(150);
+  const sup = await page.locator('.sheet').innerText().catch(() => '');
+  ok('Support 시트: 전화 · 이메일 카드 + 주제 칩 5 + 메시지 입력', /\+41 22 555 9900/.test(sup) && /support@alpexa\.com/.test(sup) && (await page.locator('.sheet .chips span').count()) === 5 && (await page.locator('#smsg').count()) === 1, sup.replace(/\n/g, ' ').slice(0, 200));
+  await page.locator('.sheet .cta').click(); await page.waitForTimeout(120);
+  ok('주제 없이 Send → 토스트 (Pick a topic first)', /Pick a topic/.test(await page.locator('.toast').innerText().catch(() => '')));
+  await page.locator('#smsg').fill('hello there');
+  await page.locator('.sheet .chips span[data-act="stopic:trade"]').click(); await page.waitForTimeout(120);
+  ok('주제 칩 선택 → 칩 on · 렌더 뒤에도 입력한 메시지 유지 (morph)', (await page.locator('.sheet .chips span.on').count()) === 1 && (await page.locator('#smsg').inputValue()) === 'hello there');
+  await page.locator('.sheet .sttl .x').click(); await page.waitForTimeout(100);
   await page.locator('.srow[data-act="sheet:appearance"]').click(); await page.waitForTimeout(100);
   { const ws = await page.locator('.seg3 div').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().width)));
     ok('Appearance = 3분할 세그먼트 (Light · Dark · System) · 칸 너비 전부 동일', ws.length === 3 && ws.every(w => Math.abs(w - ws[0]) <= 1), ws.join(',')); }
@@ -333,6 +370,12 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   ok('M1 런타임: 목록 밖 rpc 0회 · 테이블 쓰기 0회 · 호출된 이름 전부 허용목록 (' + names.length + '건)', rpc === 0 && writes === 0 && names.length > 8 && names.every(x => ALLOW.includes(x)), 'rpc=' + rpc + ' writes=' + writes + ' names=' + [...new Set(names)].join(','));
   ok('M1 런타임: 모든 주문 local_id 가 서로 다름 (멱등 키 재사용 0)', await page.evaluate(() => { const ids = (window.__rpcLog || []).filter(x => /^fx_(open|place_pending)$/.test(x.name)).map(x => x.args.p_local_id); return ids.length === new Set(ids).size; }));
   ok('M6 전 과정 무에러', errs.length === 0, errs.join(' | '));
+  // last (navigates away): Sign out everywhere → auth.signOut({scope:'global'}) → login.html with the fx-rh return token
+  await page.route('**/login.html*', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<html><body>login stub</body></html>' }));
+  await page.evaluate(() => act('sheet:security')); await page.waitForTimeout(150);   // appearance sheet is still open → switch sheets directly
+  await page.locator('.sheet .acts div[data-act="logoutAll"]').click(); await page.waitForTimeout(700);
+  const so = await page.evaluate(() => ({ url: location.href, out: sessionStorage.getItem('__signOut'), dest: sessionStorage.getItem('alpexa.dest2'), me: localStorage.getItem('alpexa.me') })).catch(() => ({}));
+  ok('Sign out everywhere → signOut scope=global · dest2=fx-rh · login.html?switch=1 (alpexa.me 는 initScript 가 재시드해 여기선 검사 불가 — 소스 핀)', /login\.html\?switch=1/.test(so.url || '') && /"scope":"global"/.test(so.out || '') && so.dest === 'fx-rh' && /doLogoutAll\(\)\{[\s\S]*?\['alpexa\.me','alpexa\.userName','alpexa\.userEmail'\]\.forEach/.test(src), JSON.stringify(so));
   await browser.close(); server.close();
   console.log(fail ? `\n🔴 trading-rh FAIL — ${fail}건 (${pass} pass)` : `\n🟢 trading-rh — ${pass} pass · 돈 이동 0 · 락스텝 · Equity 재계산 일치`);
   process.exit(fail ? 1 : 0);
