@@ -33,6 +33,7 @@ const ALLOW = ['pamm_investor_report', 'fx_open', 'fx_modify', 'fx_close', 'fx_p
 ok('M1 소스: ledger / positions / fx_pending 에 insert·update·upsert·delete 없음', !/\.from\(['"](ledger|positions|fx_pending|accounts)['"]\)[\s\S]{0,200}\.(insert|update|upsert|delete)\(/.test(src));
 ok('M1 소스: 승인 밖 돈 경로 0 (app_transfer · place_bet · functions.invoke fx/broker/withdraw)', !/rpc\(\s*['"](app_transfer|place_bet|fx_open_admin|fx_admin)/.test(src) && !/functions\.invoke\(\s*['"](fx|broker|withdraw)/.test(src));
 ok('레이아웃: 4개 화면 상단 전부 safe-area-inset-top 여백 (홈 .top · 트레이드 .det .head · 목록 .ttl) — 노치 겹침 0', /\.top \{[^}]*env\(safe-area-inset-top/.test(src) && /\.det \.head \{[^}]*env\(safe-area-inset-top/.test(src) && /\.ttl \{[^}]*env\(safe-area-inset-top/.test(src));
+ok('터치: 렌더 = DOM morph (app.innerHTML 통째 교체 0) + 터치 중 배경 렌더 보류', !/app\.innerHTML\s*=/.test(src) && /function morph\(o, n\)/.test(src) && /if\(touching&&!force\)\{ renderQueued=true; return; \}/.test(src));
 ok('터치: 모든 [data-act] 요소에 cursor:pointer (iOS 문서 위임 클릭 조건) + touch-action manipulation', /\[data-act\], \[data-act\] \* \{ cursor: pointer; \}/.test(src) && /\[data-act\] \{[^}]*touch-action: manipulation/.test(src));
 ok('M2 소스: half = max(0.1, spr+mk)*pip/2 (fx_close v_half 미러)', /Math\.max\(0\.1,\s*spr\+mk\)\*fxPip\(sym\)\/2/.test(src));
 ok('M2 소스: 비FX half = mid*max(floorBps[cls], spr)/10000/2 (fx_close v_half else-branch 미러) · 계약/클래스 = fx_specs 런타임', /mid\*\(Math\.max\(SPREAD_BPS\[cls\]\|\|0, spr\)\/10000\)\/2/.test(src) && /from\('fx_specs'\)\.select\('symbol,cls,contract'\)/.test(src) && /SPREAD_BPS=\{CRYPTO:10,STOCK:8,INDEX:6\}/.test(src));
@@ -135,6 +136,13 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   await page.waitForTimeout(300);
   ok('M6 로드 무에러', errs.length === 0, errs.join(' | '));
   ok('M6 홈: FX 그룹 10행 (금·은은 Metals 칩으로)', (await page.locator('.row').count()) === 10);
+  { const keep = await page.evaluate(() => { window.__probe = document.querySelector('.tab[data-act="tab:trade"]'); window.__probeRow = document.querySelector('.row[data-sym="EURUSD"] .btn.buy'); return !!window.__probe; });
+    await page.waitForTimeout(2300);   // 1초 재도색 2회 이상 지나감
+    const alive = await page.evaluate(() => window.__probe.isConnected && window.__probeRow.isConnected && document.contains(window.__probe));
+    ok('터치: 1초 재도색 뒤에도 눌린 요소가 같은 노드로 살아 있음 (morph — 탭 증발 0)', keep && alive);
+    // 터치 시뮬레이션: touchstart 중 배경 render 보류 → touchend 350ms 뒤 반영
+    const deferred = await page.evaluate(async () => { const t = new Event('touchstart', { bubbles: true }); document.body.dispatchEvent(t); window.__rh.toast = null; window.__rh.cash = 999.5; render(); const before = document.querySelector('.stat .v').textContent; document.body.dispatchEvent(new Event('touchend', { bubbles: true })); await new Promise(r => setTimeout(r, 450)); const after = document.querySelector('.stat .v').textContent; window.__rh.cash = 12341.10; render(true); return { before, after }; });
+    ok('터치: 손가락 닿은 동안 배경 렌더 보류 → 뗀 뒤 반영 (' + deferred.before + ' → ' + deferred.after + ')', !/999\.50/.test(deferred.before) && /999\.50/.test(deferred.after), JSON.stringify(deferred)); }
   ok('홈: 상품군 칩 = 피드 있는 그룹만 (FX · Metals · Crypto · Stocks — Indices 는 피드 없어 숨김)', (await page.locator('.hseg span').count()) === 4 && (await page.locator('.hseg span[data-act="hseg:Indices"]').count()) === 0);
   // M2 lockstep
   const eurSell = await page.locator('.row[data-sym="EURUSD"] .btn.sell').innerText();
@@ -280,6 +288,8 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   // pair sheet: real search input filters across all groups
   await page.locator('.det .nm[data-act="sheet:pair"]').click(); await page.waitForTimeout(200);
   ok('페어 시트: 검색 input 존재 · 그룹 칩 = 피드 있는 4 + All', (await page.locator('#pq').count()) === 1 && (await page.locator('.sheet .sseg span').count()) === 5);
+  ok('페어 시트: 높이 고정(.sheet.tall) — 종목 적은 그룹에서도 창 크기 불변', (await page.locator('.sheet.tall').count()) === 1 && /82dvh/.test(await page.locator('.sheet.tall').evaluate(el => [...document.styleSheets].flatMap(sh => { try { return [...sh.cssRules]; } catch (e) { return []; } }).filter(r => r.selectorText === '.sheet.tall').map(r => r.style.height).join(','))));
+  ok('morph: 2번째 렌더 후에도 #app 존재 (루트 id 유지)', (await page.locator('#app').count()) === 1);
   await page.locator('#pq').fill('space'); await page.waitForTimeout(150);
   ok('검색 "space" → SPACEX 1행 (그룹 무관 전체 검색) · 입력 포커스 유지', (await page.locator('.plist .prow').count()) === 1 && /SPACEX/.test(await page.locator('.plist').innerText()) && (await page.evaluate(() => document.activeElement && document.activeElement.id === 'pq')));
   await page.locator('#pq').fill('yen'); await page.waitForTimeout(150);

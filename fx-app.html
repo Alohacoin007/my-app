@@ -67,7 +67,7 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .mono { font-family: 'Geist Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
   .up { color: var(--up); } .down { color: var(--down); }
   .app { max-width: 430px; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column; background: var(--bg); position: relative; }
-  .scroll { flex: 1; overflow-y: auto; padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px)); }
+  .scroll { flex: 1; overflow-y: auto; padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
   .hidden { display: none !important; }
   /* top bar */
   .top { display: flex; align-items: center; justify-content: space-between; padding: calc(10px + env(safe-area-inset-top, 0px)) 22px 0; }
@@ -123,7 +123,7 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .app.oc-on .btn.sell { border-color: var(--down); } .app.oc-on .btn.buy { border-color: var(--up); }
   :root[data-theme="dark"] .app.oc-on .btn { background: var(--surface); }
   /* tabs */
-  .tabs { position: fixed; left: 0; right: 0; margin: 0 auto; bottom: 0; width: 100%; max-width: 430px; border-top: 0.5px solid var(--line); display: grid; grid-template-columns: repeat(4,1fr); padding: 6px 6px calc(2px + env(safe-area-inset-bottom, 0px)); background: var(--bg); z-index: 5; }   /* 푸터를 아래로 (사장님 2026-09-21) — 홈 인디케이터 위 여백만 남김 */
+  .tabs { position: fixed; left: 0; right: 0; margin: 0 auto; bottom: 0; width: 100%; max-width: 430px; border-top: 0.5px solid var(--line); display: grid; grid-template-columns: repeat(4,1fr); padding: 5px 6px max(2px, calc(env(safe-area-inset-bottom, 0px) - 14px)); background: var(--bg); z-index: 5; }   /* 푸터 더 아래로 — 홈 인디케이터 영역에 14px 겹쳐 앉힘 (사장님 2026-09-21 2차) */   /* 푸터를 아래로 (사장님 2026-09-21) — 홈 인디케이터 위 여백만 남김 */
   .tab { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; color: var(--mute); cursor: pointer; }
   .tab.on { color: var(--text); } .tab svg { width: 22px; height: 22px; }
   .tab { position: relative; }
@@ -215,6 +215,7 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .out { margin: 16px 22px 8px; text-align: center; font-size: 13px; font-weight: 700; color: var(--down); cursor: pointer; }
   /* sheets */
   .dim { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 20; }
+  .sheet.tall { height: 82dvh; }   /* 페어 시트는 높이 고정 — 그룹에 종목이 적어도 창이 갑자기 작아지지 않게 (사장님 2026-09-21) */
   .sheet { position: fixed; left: 0; right: 0; margin: 0 auto; bottom: 0; width: 100%; max-width: 430px; background: var(--bg); border-radius: 22px 22px 0 0; padding: 8px 0 calc(22px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -12px 40px rgba(0,0,0,.18); z-index: 21; max-height: 82dvh; overflow-y: auto; }
   .sheet .grip { width: 36px; height: 4px; border-radius: 999px; background: var(--surface-up); margin: 4px auto 14px; }
   .sheet .sttl { display: flex; align-items: center; justify-content: space-between; padding: 0 22px 10px; font-size: 16px; font-weight: 700; letter-spacing: -0.2px; }
@@ -411,7 +412,7 @@ function errText(err, d){ var e=String(err||''); d=d||{};
 // 허용 RPC — 이 9개 외에는 호출 자체가 불가능하다 (핀: trading-rh.test.js 가 목록·호출 지점 전수 대조). 새 RPC = 목록 + 표 승인 먼저.
 var RPC_ALLOW={ pamm_investor_report:1, fx_open:1, fx_modify:1, fx_close:1, fx_place_pending:1, fx_modify_pending:1, fx_cancel_pending:1, pamm_join:1, pamm_leave:1 };
 async function rpc(name, args){ if(!RPC_ALLOW[name]) throw new Error('rpc not allowed: '+name); var d=db(); if(!d) throw new Error('no server connection'); var r=await d.rpc(name, args); if(r&&r.error) throw new Error(r.error.message||'connection issue'); return (r&&r.data)||{}; }
-function lock(key){ if(S.busy) return false; S.busy=key; render(); return true; }
+function lock(key){ if(S.busy) return false; S.busy=key; render(true); return true; }
 function unlock(){ S.busy=null; }
 async function refresh(){ try{ await Promise.all([pullCash(), pullPositions(), pullPending()]); }catch(e){} render(); }
 async function doOpen(side, sym, lots, sl, tp){
@@ -541,7 +542,7 @@ function hero(){
   var eq=cash+fl, free=eq-um;
   return '<div class="hero"><div class="lbl">Equity <span class="eye" data-act="toggleMask">'+I.eye+'</span></div>'+
     '<div class="big">'+moneyBig(eq)+'</div>'+
-    '<div class="chg '+(fl>=0?'up':'down')+'">'+(fl>=0?'▲':'▼')+' '+fmtMoney(Math.abs(fl)).replace('−','')+' <span class="t">Open P&amp;L</span></div>'+
+    '<div class="chg '+(fl>=0?'up':'down')+'">'+(fl>=0?'▲':'▼')+' '+fmtMoney(Math.abs(fl)).replace('−','')+'</div>'+   /* "Open P&L" 글자 삭제 — 화살표+금액만 (사장님 2026-09-21) */
     '<div class="stats"><div class="stat"><div class="k">Balance</div><div class="v">'+fmtMoney(cash)+'</div></div>'+
     '<div class="stat"><div class="k">Margin</div><div class="v">'+fmtMoney(um)+'</div></div>'+
     '<div class="stat"><div class="k">Free margin</div><div class="v">'+fmtMoney(free)+'</div></div></div></div>';
@@ -758,18 +759,38 @@ function sheetHtml(){
       '<div class="cta'+(over||S.amt<=0||(isJoin&&(S.amt<minJ||fnd.status!=='active'))?' na':'')+'" style="margin-top:4px;'+((over||S.amt<=0||(isJoin&&(S.amt<minJ||fnd.status!=='active')))?'opacity:.45;pointer-events:none':'')+'" data-act="'+(isJoin?'pjoin:'+fa:'pleave:'+fa+':'+(Math.abs(S.amt-maxR)<0.005?'all':'amt'))+'">'+(S.busy?'Working…':(isJoin?'Invest '+fmtMoney(S.amt):(Math.abs(S.amt-maxR)<0.005?'Redeem all':'Redeem '+fmtMoney(S.amt))))+'</div>'+
       '<div class="acts" style="margin-top:0;grid-template-columns:1fr"><div data-act="sheet:">Cancel</div></div>';
   }
-  return '<div class="dim" data-act="sheet:"></div><div class="sheet">'+'<div class="grip"></div>'+inner+'</div>';
+  return '<div class="dim" data-act="sheet:"></div><div class="sheet'+(S.sheet==='pair'?' tall':'')+'">'+'<div class="grip"></div>'+inner+'</div>';
 }
 var lastScroll=0;
-var render=function(){
+// ── DOM morph (2026-09-21, 사장님 "터치가 잘 안돼"): 화면을 innerHTML 로 통째로 갈아끼우면 손가락을 뗀 뒤 click 이 만들어지기
+//    전에 눌린 요소가 사라져 폰에서 탭이 증발한다(1초 재도색·시세 갱신과 겹칠 때). 그래서 새 HTML 을 만든 뒤 **바뀐 노드만 제자리
+//    에서 갱신**한다 — 눌린 요소·스크롤 위치·입력 포커스가 그대로 살아 있다. 터치 중에는 주기 렌더를 손가락 뗀 뒤 350ms 까지 미룬다.
+function morph(o, n){
+  var i, oa=o.attributes, na=n.attributes;
+  for(i=oa.length-1;i>=0;i--){ if(!n.hasAttribute(oa[i].name)) o.removeAttribute(oa[i].name); }
+  for(i=0;i<na.length;i++){ var a=na[i]; if(o.getAttribute(a.name)!==a.value){ if(a.name==='value'&&o===document.activeElement) continue; o.setAttribute(a.name,a.value); } }
+  var oc=o.childNodes, nc=n.childNodes, k=0;
+  while(k<nc.length){ var nn=nc[k], on=oc[k];
+    if(!on){ o.appendChild(nn.cloneNode(true)); k++; continue; }
+    if(on.nodeType===3&&nn.nodeType===3){ if(on.nodeValue!==nn.nodeValue) on.nodeValue=nn.nodeValue; k++; continue; }
+    if(on.nodeType===1&&nn.nodeType===1&&on.tagName===nn.tagName&&(on.id||'')===(nn.id||'')){ morph(on,nn); k++; continue; }
+    o.replaceChild(nn.cloneNode(true), on); k++; }
+  while(oc.length>nc.length) o.removeChild(oc[oc.length-1]);
+}
+var touching=false, touchTimer=null, renderQueued=false;
+document.addEventListener('touchstart', function(){ touching=true; clearTimeout(touchTimer); }, {passive:true});
+function touchDone(){ clearTimeout(touchTimer); touchTimer=setTimeout(function(){ touching=false; if(renderQueued){ renderQueued=false; render(true); } }, 350); }
+document.addEventListener('touchend', touchDone, {passive:true}); document.addEventListener('touchcancel', touchDone, {passive:true});
+var render=function(force){
   var app=document.getElementById('app'); if(!app) return;
-  var sc=app.querySelector('.scroll'); if(sc) lastScroll=sc.scrollTop;
+  if(touching&&!force){ renderQueued=true; return; }                       // 손가락이 닿아 있는 동안은 배경 재렌더 보류
   var body = S.tab==='home'?screenHome():S.tab==='trade'?screenTrade():S.tab==='activity'?screenActivity():screenAccount();
-  app.className='app'+(S.oneClick?' oc-on':'')+(S.busy?' busy':'');
-  app.innerHTML='<div class="scroll">'+body+'</div>'+tabs()+sheetHtml()+(S.toast?'<div class="toast"><i></i>'+esc(S.toast)+'</div>':'');
-  var sc2=app.querySelector('.scroll'); if(sc2&&S.keepScroll) sc2.scrollTop=lastScroll; S.keepScroll=true;
+  var tpl=document.createElement('div'); tpl.id='app'; tpl.className='app'+(S.oneClick?' oc-on':'')+(S.busy?' busy':'');   // id 유지 — morph 가 루트 속성도 맞추므로 빠지면 #app 이 사라진다
+  tpl.innerHTML='<div class="scroll">'+body+'</div>'+tabs()+sheetHtml()+(S.toast?'<div class="toast"><i></i>'+esc(S.toast)+'</div>':'');
+  morph(app, tpl);
+  var sc=app.querySelector('.scroll'); if(sc&&!S.keepScroll) sc.scrollTop=0; S.keepScroll=true;   // 탭 전환만 맨 위로, 그 외엔 스크롤 유지
 };
-function toast(msg){ S.toast=msg; render(); clearTimeout(S._tt); S._tt=setTimeout(function(){ S.toast=null; render(); },2200); }
+function toast(msg){ S.toast=msg; render(true); clearTimeout(S._tt); S._tt=setTimeout(function(){ S.toast=null; render(); },2200); }
 
 /* ══ actions (NONE of these move money — Stage 1) ══ */
 function act(a){
@@ -816,7 +837,7 @@ function act(a){
   else if(k==='q'){ S.q=v; }
   else if(k==='go'){ location.href=v; return; }
   else if(k==='logout'){ try{ var d=db(); if(d&&d.auth) d.auth.signOut(); }catch(e){} try{ ['alpexa.me','alpexa.userName','alpexa.userEmail'].forEach(function(x){ localStorage.removeItem(x); }); }catch(e){} rhToLogin('?switch=1'); return; }
-  render();
+  render(true);
 }
 document.addEventListener('click', function(e){ var el=e.target.closest('[data-act]'); if(!el) return; var a=el.getAttribute('data-act'); if(a==='sheet:'&&!e.target.closest('.dim, .x, .ghost, .acts')){ /* inner sheet clicks with sheet: only on close targets */ } act(a); });
 // stepper press-and-hold: 350ms → repeat, then accelerate (1 → 5 → 10 steps per tick). Patches the stepper text in place —
