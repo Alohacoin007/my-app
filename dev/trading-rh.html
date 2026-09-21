@@ -8,8 +8,10 @@
 <!--
   ALPEXA FX — Robinhood-style mobile app, STAGE 1 (2026-09-17, 사장님 "시작해").
   ──────────────────────────────────────────────────────────────────────────────
-  · READ-ONLY. 이 파일에는 돈을 움직이는 호출이 0줄이다: rpc() 없음, ledger/positions 쓰기 없음.
-    주문·청산·SL/TP 버튼은 그려지지만 누르면 "Stage 2" 안내만 뜬다. (핀: tests/trading-rh.test.js)
+  · STAGE 2 (2026-09-21 사장님 승인 "진행해. 1 켜, 2 A, 3 제거"): 돈은 **서버 RPC 호출로만** 움직인다 — fx_open(슬리피지 가드) ·
+    fx_modify · fx_close · fx_place_pending · fx_modify_pending · fx_cancel_pending · pamm_join · pamm_leave. 이 파일은 잔고·손익·
+    포지션 행을 쓰지 않는다(insert/update 0). 응답 뒤 서버를 다시 읽어 표시만 한다. 부분청산 RPC 없음 → 버튼 없음.
+    (1단계 "Stage 2 안내" 토스트는 2단계에서 실제 RPC 호출로 대체됨. 핀: tests/trading-rh.test.js — rpc 허용목록 9개 · 쓰기 0)
   · 기존 trading.html 은 0터치. 같은 세션(alpexa-sync.js, sessionStorage)·같은 서버 데이터를 읽는다.
   · 시세 표시 = 딜링 락스텝: bid/ask = mid ∓ half, half = max(0.1, spr_pts + markup_pts) × pip / 2
     (trading.html fxHalfSpread / fx_close.sql v_half 와 동일). 플로팅 = 그 close 가격으로 계산.
@@ -237,6 +239,18 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .prow .pn { font-size: 14px; font-weight: 700; } .prow.on .pn { color: var(--up); }
   .prow .ds { font-size: 11px; color: var(--dim); margin-top: 1px; }
   .prow .ppx { text-align: right; font-family: 'Geist Mono', ui-monospace, monospace; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .app.busy .btn, .app.busy .cta, .app.busy .acts div, .app.busy .arow .x, .app.busy .pf .r3 div { pointer-events: none; opacity: .55; }
+  .sheet .cta.sell { background: var(--down); color: #fff; }
+  .sheet .cta.buy { background: var(--up); }
+  .sheet .kvs { padding: 0 22px; }
+  .sheet .kvs .r { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: .5px solid var(--line); font-size: 13px; }
+  .sheet .kvs .r:last-child { border-bottom: 0; } .sheet .kvs .r .k { color: var(--dim); } .sheet .kvs .r .v { font-family: 'Geist Mono', ui-monospace, monospace; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .sheet .lotrow { padding: 8px 22px; }
+  .sheet .amt { text-align: center; padding: 6px 22px 2px; font-size: 38px; font-weight: 700; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+  .sheet .amt small { font-size: 13px; color: var(--dim); font-weight: 600; display: block; letter-spacing: 0; margin-top: 2px; }
+  .sheet .chips { display: flex; gap: 6px; justify-content: center; padding: 6px 22px 12px; flex-wrap: wrap; }
+  .sheet .chips span { font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 999px; background: var(--surface); color: var(--dim); cursor: pointer; }
+  .sheet .chips span.on { background: var(--text); color: var(--bg); }
   .sheet .cta { margin: 0 22px 8px; background: var(--up); color: #0B0D0E; border-radius: 999px; text-align: center; padding: 13px 0; font-size: 14px; font-weight: 800; cursor: pointer; }
   .sheet .ghost { text-align: center; font-size: 13px; font-weight: 600; color: var(--dim); padding: 6px 0 2px; cursor: pointer; }
   .sheet .ack { display: flex; align-items: center; gap: 10px; margin: 0 22px 16px; padding: 10px 12px; border-radius: 12px; background: var(--surface); font-size: 12px; }
@@ -332,9 +346,13 @@ function midOf(sym){ var f=S.feed[sym]; return (f&&f.mid>0)?f.mid:0; }
 function bidOf(sym){ var m=midOf(sym); return m?m-halfOf(sym,m):0; }
 function askOf(sym){ var m=midOf(sym); return m?m+halfOf(sym,m):0; }
 function closePx(sym, side){ var m=midOf(sym); return m?(side==='BUY'?m-halfOf(sym,m):m+halfOf(sym,m)):0; }   // fx_close v_close
-function defLimit(sym){ var fx=clsOf(sym)==='FX'; return S.otype==='LIMIT' ? (fx?bidOf(sym)-8*fxPip(sym):bidOf(sym)*0.998) : (fx?askOf(sym)+8*fxPip(sym):askOf(sym)*1.002); }
-function defSL(sym, ref){ if(!ref) return 0; return clsOf(sym)==='FX'?ref-80*fxPip(sym):+(ref*0.98).toFixed(digitsOf(sym)); }
-function defTP(sym, ref){ if(!ref) return 0; return clsOf(sym)==='FX'?ref+52*fxPip(sym):+(ref*1.013).toFixed(digitsOf(sym)); }
+// pending default: LIMIT below (BUY) / above (SELL) the market, STOP the reverse — MT5 direction rule the server also enforces
+function defLimit(sym, side){ var fx=clsOf(sym)==='FX', below=(S.otype==='LIMIT')===((side||'BUY')==='BUY'); var d=digitsOf(sym);
+  return +(below ? (fx?bidOf(sym)-8*fxPip(sym):bidOf(sym)*0.998) : (fx?askOf(sym)+8*fxPip(sym):askOf(sym)*1.002)).toFixed(d); }
+function defSL(sym, ref, side){ if(!ref) return 0; var k=side==='SELL'?-1:1; return clsOf(sym)==='FX'?+(ref-k*80*fxPip(sym)).toFixed(digitsOf(sym)):+(ref*(1-k*0.02)).toFixed(digitsOf(sym)); }
+function defTP(sym, ref, side){ if(!ref) return 0; var k=side==='SELL'?-1:1; return clsOf(sym)==='FX'?+(ref+k*52*fxPip(sym)).toFixed(digitsOf(sym)):+(ref*(1+k*0.013)).toFixed(digitsOf(sym)); }
+function curSL(side){ var ref=S.limitPx||midOf(S.sym); return S.slPx||defSL(S.sym,ref,side||'BUY'); }
+function curTP(side){ var ref=S.limitPx||midOf(S.sym); return S.tpPx||defTP(S.sym,ref,side||'BUY'); }
 function spreadPips(sym){ var m=midOf(sym); if(!m) return null; return (2*halfOf(sym,m))/fxPip(sym); }
 function isFresh(sym){ var f=S.feed[sym]; return !!(f&&f.mid>0&&(Date.now()-(f.ts||0))<90000); }
 // USD value of one unit of a currency, from the live feed (cross-pair conversion)
@@ -351,7 +369,7 @@ function pipValueUSD(sym, vol){ return pnlUSD(sym, 0, fxPip(sym), 'BUY', vol); }
 /* ══ state (UI only — money is read from the server on every pull, never stored) ══ */
 var LS = { get:function(k,d){ try{ var v=localStorage.getItem(k); return v==null?d:v; }catch(e){ return d; } }, set:function(k,v){ try{ localStorage.setItem(k,v); }catch(e){} } };
 var S = {
-  tab:'home', sym:'EURUSD', tf:'H1', otype:'MARKET', lots:0.10, sltp:false, sheet:null, sheetSeg:'FX', homeSeg: LS.get('rh.homeSeg','FX'), q:'', pamm:null,
+  tab:'home', sym:'EURUSD', tf:'H1', otype:'MARKET', lots:0.10, sltp:false, sheet:null, sheetSeg:'FX', homeSeg: LS.get('rh.homeSeg','FX'), q:'', pamm:null, busy:null, mSym:'', mSide:'BUY', mRef:0, mSl:0, mTp:0, amt:0,
   oneClick: LS.get('rh.oneClick','0')==='1', ack: LS.get('rh.oneClickAck','0')==='1', masked: LS.get('rh.mask','0')==='1',
   theme: LS.get('rh.theme','light'), actTab:'positions',
   feed:{}, marks:{}, specs:{}, cash:null, positions:[], pending:[], history:[], candles:{}, dayOpen:{}, scrub:null, toast:null, ready:false,
@@ -368,8 +386,65 @@ async function pullFeed(){ var d=db(); if(!d) return;
   try{ var r=await d.from('prices').select('symbol,mid,spr_pts'); if(r&&r.data) applyFeedRows(r.data); }catch(e){} }
 async function pullMarks(){ var d=db(); if(!d) return; try{ var r=await d.from('pricing_marks').select('symbol,markup_pts'); if(r&&r.data){ var m={}; r.data.forEach(function(p){ m[p.symbol]=Math.max(0,Math.min(50,+p.markup_pts||0)); }); S.marks=m; } }catch(e){} }
 async function pullSpecs(){ var d=db(); if(!d) return; try{ var r=await d.from('fx_specs').select('symbol,cls,contract'); if(r&&r.data){ var m={}; r.data.forEach(function(x){ if(x&&x.symbol) m[x.symbol]={cls:String(x.cls||'').toUpperCase(), contract:+x.contract||0}; }); S.specs=m; } }catch(e){} }
-// Managed funds (PAMM) — 투자자 리포트 RPC 는 **읽기 전용**(jsonb 스냅샷, 돈 이동 0). 이 파일의 유일한 rpc 호출. 참여/회수는 Stage 2.
+/* ══ STAGE 2 — money actions. Every one is a server RPC the existing app already uses; nothing here computes or writes
+   balances, P&L or position rows. After each call the server is re-read (refresh) and only that is displayed. ══ */
+function newId(){ return 'R-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,6).toUpperCase(); }   // one order = one local_id (server idempotency key)
+function slipOf(sym, px){ return clsOf(sym)==='FX' ? +(3*fxPip(sym)).toFixed(6) : +(px*0.001).toFixed(digitsOf(sym)+2); }       // MT5 "deviation": FX 3 pips · non-FX 0.1%
+function errText(err, d){ var e=String(err||''); d=d||{};
+  if(/margin|insufficient|balance/i.test(e)) return d.required!=null?'Insufficient margin — needs '+fmtMoney(+d.required)+', free '+(d.free!=null?fmtMoney(+d.free):'?'):'Insufficient balance';
+  if(/slippage/i.test(e)) return 'Price moved — try again';
+  if(/stale|price unavailable|no price/i.test(e)) return 'Price unavailable right now — try again';
+  if(/market closed/i.test(e)) return 'Market closed'+(d.symbol?' for '+d.symbol:'');
+  if(/spec/i.test(e)) return 'Not available to trade right now';
+  if(/already closed|not found/i.test(e)) return 'Already closed or not found';
+  if(/not authenticated|no fx account/i.test(e)) return 'Please sign in again';
+  if(/open positions|rollover/i.test(e)) return 'Fund has open positions — try after rollover';
+  if(/minimum/i.test(e)) return 'Below the fund minimum'+(d.min!=null?' ($'+d.min+')':'');
+  return e||'Rejected — try again'; }
+// 허용 RPC — 이 9개 외에는 호출 자체가 불가능하다 (핀: trading-rh.test.js 가 목록·호출 지점 전수 대조). 새 RPC = 목록 + 표 승인 먼저.
+var RPC_ALLOW={ pamm_investor_report:1, fx_open:1, fx_modify:1, fx_close:1, fx_place_pending:1, fx_modify_pending:1, fx_cancel_pending:1, pamm_join:1, pamm_leave:1 };
+async function rpc(name, args){ if(!RPC_ALLOW[name]) throw new Error('rpc not allowed: '+name); var d=db(); if(!d) throw new Error('no server connection'); var r=await d.rpc(name, args); if(r&&r.error) throw new Error(r.error.message||'connection issue'); return (r&&r.data)||{}; }
+function lock(key){ if(S.busy) return false; S.busy=key; render(); return true; }
+function unlock(){ S.busy=null; }
+async function refresh(){ try{ await Promise.all([pullCash(), pullPositions(), pullPending()]); }catch(e){} render(); }
+async function doOpen(side, sym, lots, sl, tp){
+  if(!lock('open')) return; var id=newId(); var px=side==='BUY'?askOf(sym):bidOf(sym);
+  try{ var d=await rpc('fx_open',{ p_local_id:id, p_symbol:sym, p_side:side, p_size:lots, p_leverage:null, p_requested_price:px||null, p_max_slippage:px?slipOf(sym,px):null });
+    if(!d.ok){ S.sheet=null; toast(errText(d.error,d)); return; }
+    var fill=d.open!=null?+d.open:px, note='';
+    if((sl>0)||(tp>0)){ var m=await rpc('fx_modify',{ p_local_id:id, p_sl:sl>0?sl:null, p_tp:tp>0?tp:null }); if(!m.ok) note=' · SL/TP not set: '+errText(m.error,m); }
+    S.sheet=null; S.slPx=S.tpPx=0; S.sltp=false;
+    toast((side==='BUY'?'Bought ':'Sold ')+lots.toFixed(2)+' '+sym+' @ '+fmtPx(fill,sym)+note);
+  }catch(e){ toast('Order not placed — '+e.message); } finally{ unlock(); refresh(); } }
+async function doPending(side, sym, otype, lots, trigger){
+  if(!lock('pend')) return; var id=newId();
+  try{ var d=await rpc('fx_place_pending',{ p_local_id:id, p_symbol:sym, p_side:side, p_otype:otype, p_size:lots, p_trigger:trigger, p_sl:null, p_tp:null });
+    if(!d.ok){ S.sheet=null; toast(errText(d.error,d)); return; }
+    S.sheet=null; S.limitPx=0; toast((side==='BUY'?'Buy ':'Sell ')+(otype==='LIMIT'?'Limit':'Stop')+' '+lots.toFixed(2)+' '+sym+' @ '+fmtPx(trigger,sym)+' placed');
+  }catch(e){ toast('Order not placed — '+e.message); } finally{ unlock(); refresh(); } }
+async function doClose(id){
+  if(!lock('close:'+id)) return; var p=S.positions.find(function(x){return x.id===id;});
+  try{ var d=await rpc('fx_close',{ p_local_id:id }); if(!d.ok){ S.sheet=null; toast(errText(d.error,d)); return; }
+    S.sheet=null; toast('Closed '+(p?p.sym:'')+(d.pnl!=null?' · '+fmtSigned(+d.pnl):''));
+  }catch(e){ toast('Close failed — '+e.message); } finally{ unlock(); pullHistory(); refresh(); } }
+async function doModify(kind, id, sl, tp){
+  if(!lock('mod')) return;
+  try{ var d=await rpc(kind==='pos'?'fx_modify':'fx_modify_pending',{ p_local_id:id, p_sl:sl>0?sl:null, p_tp:tp>0?tp:null }); if(!d.ok){ toast(errText(d.error,d)); return; }
+    S.sheet=null; toast((sl>0||tp>0)?'Stop loss / take profit saved':'Stop loss / take profit cleared');
+  }catch(e){ toast('Not saved — '+e.message); } finally{ unlock(); refresh(); } }
+async function doCancel(id){
+  if(!lock('cancel:'+id)) return;
+  try{ var d=await rpc('fx_cancel_pending',{ p_local_id:id }); if(!d.ok){ S.sheet=null; toast(errText(d.error,d)); return; } S.sheet=null; toast('Order cancelled'); }
+  catch(e){ toast('Cancel failed — '+e.message); } finally{ unlock(); refresh(); } }
+async function doPamm(kind, fund, usd, units){
+  if(!lock('pamm')) return; var ref='pamm-'+fund+'-'+(kind==='join'?'':'out-')+Date.now();   // same ref scheme as trading.html (pamm_ops PK = idempotent)
+  try{ var d = kind==='join' ? await rpc('pamm_join',{ p_ref:ref, p_fund:fund, p_usd:usd }) : await rpc('pamm_leave',{ p_ref:ref, p_fund:fund, p_units:(units==null?null:units) });
+    if(!d.ok){ S.sheet=null; toast(errText(d.error,d)); return; }
+    S.sheet=null; S.amt=0; toast(kind==='join' ? 'Invested '+fmtMoney(usd) : 'Redeemed '+fmtMoney(+d.net||0)+(d.fee>0?' (perf. fee '+fmtMoney(+d.fee)+')':'')+' → FX balance');
+  }catch(e){ toast('Not completed — '+e.message); } finally{ unlock(); pullPamm(); refresh(); } }
+// Managed funds (PAMM) — 투자자 리포트 RPC 는 **읽기 전용**(jsonb 스냅샷, 돈 이동 0). 참여/회수 = doPamm (pamm_join / pamm_leave).
 async function pullPamm(){ var d=db(); if(!d||!me()){ S.pamm=[]; return; } try{ var r=await d.rpc('pamm_investor_report'); S.pamm=(r&&r.data&&r.data.ok&&Array.isArray(r.data.funds))?r.data.funds:[]; }catch(e){ S.pamm=[]; } render(); }
+function pammFund(acct){ return (S.pamm||[]).find(function(f){ return f.fund_acct===acct; }); }
 function pammMine(){ var t=0, has=false; (S.pamm||[]).forEach(function(f){ if(f.mine&&f.mine.value!=null){ t+=+f.mine.value; has=true; } }); return has?t:null; }
 async function pullCash(){ var d=db(), a=fxAcct(); if(!d||!a) return; try{ var r=await d.from('accounts').select('balance').eq('acct_no',a).limit(1); if(r&&r.data&&r.data.length) S.cash=+r.data[0].balance||0; }catch(e){} }
 async function pullPositions(){ var d=db(), a=fxAcct(); if(!d||!a) return;
@@ -567,13 +642,13 @@ function screenAccount(){
   var chev='<span style="color:var(--mute)">›</span>';
   return '<div class="acc"><div class="ttl">Account</div>'+
     '<div class="prof"><div class="av">'+esc(ini)+'</div><div><div class="nm">'+esc(nm)+'</div><div class="id">'+esc(fxAcct()||'—')+' <b>FX · 1:'+LEVERAGE_FX+'</b></div></div></div>'+
-    '<div class="acts"><div class="pri" data-act="toast:Deposit — use the main app (Stage 2)">Deposit</div><div data-act="toast:Withdraw — use the main app (Stage 2)">Withdraw</div><div data-act="toast:Transfer — use the main app (Stage 2)">Transfer</div></div>'+
+    '<div class="acts"><div class="pri" data-act="go:../trading.html">Deposit</div><div data-act="go:../trading.html">Withdraw</div><div data-act="go:../trading.html">Transfer</div></div>'+
     '<div class="list2">'+
     srow(I.fund,'Managed funds',(pammMine()!=null?fmtMoney(pammMine())+' ':(S.pamm&&S.pamm.length?S.pamm.length+' fund'+(S.pamm.length===1?'':'s')+' ':''))+chev,'sheet:pamm')+
     srow(I.bolt,'1-Click trading','<span class="tog'+(S.oneClick?' on':'')+'"><i></i></span>','toggleOneClick')+
     srow(I.look,'Appearance',(S.theme==='dark'?'Dark ':'Light ')+chev,'sheet:appearance')+
-    srow(I.lock,'Security',chev,'toast:Security — Stage 2')+
-    srow(I.doc,'Support',chev,'toast:Support — Stage 2')+
+    srow(I.lock,'Security',chev,'toast:Security — coming soon')+
+    srow(I.doc,'Support',chev,'toast:Support — coming soon')+
     '</div><div class="out" data-act="logout">Log out</div></div>';
 }
 function tabs(){ var t=[['home',I.home,'Home'],['trade',I.tr,'Trade'],['activity',I.ac,'Activity'],['account',I.me,'Account']];
@@ -610,8 +685,8 @@ function sheetHtml(){
     inner='<div class="sttl">Pending order<span class="x" data-act="sheet:">✕</span></div>'+
       '<div class="body" style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;color:var(--text)"><span><b class="'+(o.side==='BUY'?'up':'down')+'">'+(o.side==='BUY'?'Buy':'Sell')+' '+(o.otype==='LIMIT'?'Limit':'Stop')+'</b> '+o.vol.toFixed(2)+' '+o.sym+'</span><span class="mono">'+fmtPx(o.trigger,o.sym)+'</span></div>'+
       '<div class="kv" style="padding:0 22px">'+kv('Market now', omid?fmtPx(omid,o.sym)+' <small style="color:var(--mute)">('+distLabel(o.sym,omid,o.trigger)+')</small>':'—')+kv('Stop loss', o.sl?fmtPx(o.sl,o.sym):'—')+kv('Take profit', o.tp?fmtPx(o.tp,o.sym):'—')+kv('Expiry','GTC')+'</div>'+
-      '<div class="cta" style="margin-top:14px" data-act="toast:Set SL / TP — Stage 2">Set stop loss / take profit</div>'+
-      '<div class="acts" style="margin-top:0"><div data-act="toast:Modify order — Stage 2">Modify price</div><div style="border-color:var(--down);color:var(--down)" data-act="toast:Cancel order — Stage 2">Cancel order</div><div data-act="sheet:">Close</div></div>';
+      '<div class="cta" style="margin-top:14px" data-act="sheet:sltp:ord:'+o.id+'">'+(o.sl||o.tp?'Edit stop loss / take profit':'Set stop loss / take profit')+'</div>'+
+      '<div class="acts" style="margin-top:0;grid-template-columns:1fr 1fr"><div style="border-color:var(--down);color:var(--down)" data-act="cancelord:'+o.id+'">Cancel order</div><div data-act="sheet:">Close</div></div>';
   } else if(S.sheet==='pamm'){
     var funds=S.pamm; var num=function(x){ return (Number(x)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); };
     inner='<div class="sttl">Managed funds<span class="x" data-act="sheet:">✕</span></div>';
@@ -623,8 +698,8 @@ function sheetHtml(){
            : '<div class="r2">Perf. fee '+(+f.perf_fee_pct||0)+'% · min $'+num(f.min_join)+(f.status!=='active'?' · '+esc(f.status):'')+'</div>')+
         (f.unpriced>0 ? '<div class="r2" style="color:var(--mute)">Valuation paused — market closed</div>' : '')+
         '<div class="r3">'+(f.is_manager ? '<span style="font-size:12px;color:var(--mute);align-self:center">You manage this fund</span>'
-          : (m ? '<div data-act="toast:Add to fund — Stage 2">Add</div><div class="out" data-act="toast:Redeem — Stage 2">Redeem</div>'
-               : (f.status==='active' ? '<div class="pri" data-act="toast:Join fund — Stage 2">Join</div>' : '')))+'</div></div>'; }).join('');
+          : (m ? (f.status==='active'?'<div data-act="sheet:pjoin:'+f.fund_acct+'">Add</div>':'')+'<div class="out" data-act="sheet:pleave:'+f.fund_acct+'">Redeem</div>'
+               : (f.status==='active' ? '<div class="pri" data-act="sheet:pjoin:'+f.fund_acct+'">Join</div>' : '')))+'</div></div>'; }).join('');
   } else if(S.sheet.indexOf('pos:')===0){
     var p=S.positions.find(function(x){return x.id===S.sheet.slice(4);}); if(!p) return '';
     var pnl=posPnl(p), cur=closePx(p.sym,p.side), pv=pipValueUSD(p.sym,p.vol);
@@ -637,8 +712,44 @@ function sheetHtml(){
       '<div class="r" style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:.5px solid var(--line);font-size:13px"><span style="color:var(--dim)">Close price now</span><span class="mono">'+fmtPx(cur,p.sym)+'</span></div>'+
       '<div class="r" style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:.5px solid var(--line);font-size:13px"><span style="color:var(--dim)">'+(clsOf(p.sym)==='FX'?'Pip value':'Value per 1.00 move')+'</span><span class="mono">'+fmtMoney(clsOf(p.sym)==='FX'?pv:contractOf(p.sym)*p.vol)+'</span></div>'+
       '<div class="r" style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px"><span style="color:var(--dim)">Swap accrued</span><span class="mono '+(p.swap!=null&&p.swap<0?'down':'')+'">'+(p.swap==null?'—':fmtSigned(p.swap))+'</span></div></div>'+
-      '<div class="cta" style="margin-top:14px" data-act="toast:Modify SL / TP — Stage 2">Modify SL / TP</div>'+
-      '<div class="acts" style="margin-top:0"><div data-act="toast:Partial close — Stage 2">Close half</div><div style="border-color:var(--down);color:var(--down)" data-act="toast:Close position — Stage 2">Close all</div><div data-act="sheet:">Cancel</div></div>';
+      '<div class="cta" style="margin-top:14px" data-act="sheet:sltp:pos:'+p.id+'">'+(p.sl||p.tp?'Edit stop loss / take profit':'Set stop loss / take profit')+'</div>'+
+      '<div class="acts" style="margin-top:0;grid-template-columns:1fr 1fr"><div style="border-color:var(--down);color:var(--down)" data-act="close:'+p.id+'">Close position</div><div data-act="sheet:">Cancel</div></div>';
+  } else if(S.sheet.indexOf('confirm:')===0||S.sheet.indexOf('pconfirm:')===0){
+    var pc=S.sheet.indexOf('pconfirm:')===0, cs=S.sheet.split(':'), side=cs[1], sym=cs[2], isBuy=side==='BUY';
+    var px = pc ? (S.limitPx||defLimit(sym, side)) : (isBuy?askOf(sym):bidOf(sym)); var mg=marginUSD(sym,S.lots,px);
+    var kv=function(k,v){ return '<div class="r"><span class="k">'+k+'</span><span class="v">'+v+'</span></div>'; };
+    var lines = kv('Instrument', sym+' <small style="color:var(--mute);font-family:Geist,sans-serif;font-weight:500">'+esc(nameOf(sym))+'</small>') + kv('Volume', S.lots.toFixed(2)+' lot') +
+      (pc ? kv((S.otype==='LIMIT'?'Limit':'Stop')+' price', fmtPx(px,sym)) : kv('Price now', fmtPx(px,sym)+' <small style="color:var(--mute)">±'+(clsOf(sym)==='FX'?'3 pips':'0.1%')+'</small>')) +
+      (!pc&&S.sltp ? kv('Stop loss', fmtPx(curSL(side),sym))+kv('Take profit', fmtPx(curTP(side),sym)) : '') +
+      kv('Margin', fmtMoney(mg)+' <small style="color:var(--mute)">(1:'+levOf(sym)+')</small>') +
+      (S.cash!=null ? kv('Free margin after', fmtMoney(S.cash+floating()-usedMargin()-mg)) : '');
+    inner='<div class="sttl">'+(pc?'Confirm '+(S.otype==='LIMIT'?'limit':'stop')+' order':'Confirm order')+'<span class="x" data-act="sheet:">✕</span></div>'+
+      '<div class="kvs">'+lines+'</div>'+
+      (pc ? '<div class="body" style="padding-top:10px">Stop loss / take profit can be added from Activity › Orders after it is placed.</div>' : '<div class="body" style="padding-top:10px">Filled at the live server price. If it moves more than the deviation shown, nothing is placed and you can try again.</div>')+
+      '<div class="cta '+(isBuy?'buy':'sell')+'" style="margin-top:6px" data-act="'+(pc?'gop':'go2')+':'+side+':'+sym+'">'+(S.busy?'Working…':(isBuy?'Buy ':'Sell ')+S.lots.toFixed(2)+' '+sym+(pc?(S.otype==='LIMIT'?' Limit':' Stop'):''))+'</div>'+
+      '<div class="acts" style="margin-top:0;grid-template-columns:1fr"><div data-act="sheet:">Cancel</div></div>';
+  } else if(S.sheet.indexOf('sltp:')===0){
+    var ss=S.sheet.split(':'), kind=ss[1], tid=ss[2]; var sym2=S.mSym; var slv=S.mSl||defSL(sym2,S.mRef,S.mSide), tpv=S.mTp||defTP(sym2,S.mRef,S.mSide);
+    var refLbl = kind==='pos' ? 'Market' : 'Trigger';
+    inner='<div class="sttl">Stop loss / take profit<span class="x" data-act="sheet:">✕</span></div>'+
+      '<div class="body" style="padding-bottom:6px"><b class="'+(S.mSide==='BUY'?'up':'down')+'">'+(S.mSide==='BUY'?'Buy':'Sell')+'</b> '+sym2+' · '+refLbl+' '+fmtPx(S.mRef,sym2)+'</div>'+
+      '<div class="lotrow"><span>Stop loss<small>'+distLabel(sym2,S.mRef,slv)+(kind==='pos'?'':' from trigger')+'</small></span><div class="lots"><b data-act="msl:-">−</b><span>'+fmtPx(slv,sym2)+'</span><b data-act="msl:+">+</b></div></div>'+
+      '<div class="lotrow"><span>Take profit<small>'+distLabel(sym2,S.mRef,tpv)+(kind==='pos'?'':' from trigger')+'</small></span><div class="lots"><b data-act="mtp:-">−</b><span>'+fmtPx(tpv,sym2)+'</span><b data-act="mtp:+">+</b></div></div>'+
+      '<div class="cta" style="margin-top:10px" data-act="savesltp:'+kind+':'+tid+'">'+(S.busy?'Working…':'Save')+'</div>'+
+      '<div class="acts" style="margin-top:0;grid-template-columns:1fr 1fr"><div data-act="clearsltp:'+kind+':'+tid+'">Clear both</div><div data-act="sheet:">Cancel</div></div>';
+  } else if(S.sheet.indexOf('pjoin:')===0||S.sheet.indexOf('pleave:')===0){
+    var isJoin=S.sheet.indexOf('pjoin:')===0, fa=S.sheet.slice(isJoin?6:7), fnd=pammFund(fa); if(!fnd) return '';
+    var mine=fnd.mine, minJ=+fnd.min_join||0, maxR=mine&&mine.value!=null?+mine.value:0;
+    var chips = isJoin ? [minJ||100, 250, 500, 1000].filter(function(x,i,a){return a.indexOf(x)===i;}) : [Math.round(maxR*0.25), Math.round(maxR*0.5), Math.round(maxR)].filter(function(x){return x>0;});
+    var over = isJoin ? (S.cash!=null&&S.amt>S.cash) : (S.amt>maxR+0.005);
+    inner='<div class="sttl">'+(isJoin?(mine?'Add to ':'Join ')+esc(fnd.name):'Redeem from '+esc(fnd.name))+'<span class="x" data-act="sheet:">✕</span></div>'+
+      '<div class="amt">'+fmtMoney(S.amt)+'<small>'+(isJoin?('min '+fmtMoney(minJ)+(S.cash!=null?' · FX balance '+fmtMoney(S.cash):'')):'your stake '+fmtMoney(maxR)+(fnd.nav_trade!=null?' · NAV '+(+fnd.nav_trade).toFixed(4):''))+'</small></div>'+
+      '<div class="lotrow" style="justify-content:center"><div class="lots"><b data-act="amt:-">−</b><span>'+fmtMoney(S.amt)+'</span><b data-act="amt:+">+</b></div></div>'+
+      '<div class="chips">'+chips.map(function(c){ return '<span class="'+(Math.abs(S.amt-c)<0.005?'on':'')+'" data-act="amt:'+c+'">'+(isJoin?fmtMoney(c):(c===Math.round(maxR)?'All':fmtMoney(c)))+'</span>'; }).join('')+'</div>'+
+      (fnd.status!=='active'&&isJoin ? '<div class="body">This fund is not accepting new money.</div>' : '')+
+      '<div class="body" style="padding-top:0">'+(isJoin?'Perf. fee '+(+fnd.perf_fee_pct||0)+'% on gains above your high-water mark. Joins and redemptions settle when the fund has no open positions.':'Redeems at the fund NAV. If the fund has open positions, it settles after rollover.')+'</div>'+
+      '<div class="cta'+(over||S.amt<=0||(isJoin&&(S.amt<minJ||fnd.status!=='active'))?' na':'')+'" style="margin-top:4px;'+((over||S.amt<=0||(isJoin&&(S.amt<minJ||fnd.status!=='active')))?'opacity:.45;pointer-events:none':'')+'" data-act="'+(isJoin?'pjoin:'+fa:'pleave:'+fa+':'+(Math.abs(S.amt-maxR)<0.005?'all':'amt'))+'">'+(S.busy?'Working…':(isJoin?'Invest '+fmtMoney(S.amt):(Math.abs(S.amt-maxR)<0.005?'Redeem all':'Redeem '+fmtMoney(S.amt))))+'</div>'+
+      '<div class="acts" style="margin-top:0;grid-template-columns:1fr"><div data-act="sheet:">Cancel</div></div>';
   }
   return '<div class="dim" data-act="sheet:"></div><div class="sheet">'+'<div class="grip"></div>'+inner+'</div>';
 }
@@ -647,7 +758,7 @@ var render=function(){
   var app=document.getElementById('app'); if(!app) return;
   var sc=app.querySelector('.scroll'); if(sc) lastScroll=sc.scrollTop;
   var body = S.tab==='home'?screenHome():S.tab==='trade'?screenTrade():S.tab==='activity'?screenActivity():screenAccount();
-  app.className='app'+(S.oneClick?' oc-on':'');
+  app.className='app'+(S.oneClick?' oc-on':'')+(S.busy?' busy':'');
   app.innerHTML='<div class="scroll">'+body+'</div>'+tabs()+sheetHtml()+(S.toast?'<div class="toast"><i></i>'+esc(S.toast)+'</div>':'');
   var sc2=app.querySelector('.scroll'); if(sc2&&S.keepScroll) sc2.scrollTop=lastScroll; S.keepScroll=true;
 };
@@ -659,17 +770,36 @@ function act(a){
   if(k==='tab'){ S.tab=v; S.keepScroll=false; S.scrub=null; if(v==='trade'){ pullCandles(S.sym,S.tf); pullDayOpen(S.sym); } if(v==='activity'){ pullPositions(); pullPending(); pullHistory(); } if(v==='account') pullPamm(); }
   else if(k==='open'){ S.sym=v; S.tab='trade'; S.keepScroll=false; S.scrub=null; S.limitPx=S.slPx=S.tpPx=0; pullCandles(v,S.tf); pullDayOpen(v); }
   else if(k==='pick'){ S.sym=v; S.sheet=null; S.scrub=null; S.limitPx=S.slPx=S.tpPx=0; pullCandles(v,S.tf); pullDayOpen(v); }
-  else if(k==='order'){ toast('Preview — orders are enabled in Stage 2'); return; }
-  else if(k==='close'){ toast('Preview — closing is enabled in Stage 2'); return; }
+  else if(k==='order'){ var side=parts[1], sym=parts[2]; if(S.busy) return;
+    if(S.tab==='home'){ if(!S.oneClick){ act('open:'+sym); return; } if(!isFresh(sym)){ toast('Price unavailable — try again'); return; } doOpen(side, sym, S.lots, 0, 0); return; }
+    if(S.otype!=='MARKET'){ S.sheet='pconfirm:'+side+':'+sym; }                                   // pending orders always confirm
+    else if(S.oneClick){ doOpen(side, sym, S.lots, S.sltp?curSL(side):0, S.sltp?curTP(side):0); return; }
+    else { S.sheet='confirm:'+side+':'+sym; } }
+  else if(k==='go2'){ doOpen(parts[1], parts[2], S.lots, S.sltp?curSL(parts[1]):0, S.sltp?curTP(parts[1]):0); return; }
+  else if(k==='gop'){ doPending(parts[1], parts[2], S.otype, S.lots, S.limitPx||defLimit(parts[2], parts[1])); return; }
+  else if(k==='close'){ doClose(v); return; }
+  else if(k==='cancelord'){ doCancel(v); return; }
+  else if(k==='savesltp'){ doModify(parts[1], parts[2], S.mSl||defSL(S.mSym,S.mRef,S.mSide), S.mTp||defTP(S.mSym,S.mRef,S.mSide)); return; }   // 화면에 보이는 값 그대로 저장
+  else if(k==='clearsltp'){ doModify(parts[1], parts[2], 0, 0); return; }
+  else if(k==='msl'||k==='mtp'){ var ms=stepOf(S.mSym); var cv=(k==='msl'?S.mSl:S.mTp)||(k==='msl'?defSL(S.mSym,S.mRef,S.mSide):defTP(S.mSym,S.mRef,S.mSide));
+    cv=+Math.max(tickOf(S.mSym), cv+(v==='+'?ms:-ms)).toFixed(digitsOf(S.mSym)); if(k==='msl') S.mSl=cv; else S.mTp=cv; }
+  else if(k==='amt'){ if(v==='+'||v==='-'){ S.amt=Math.max(0, Math.round((S.amt+(v==='+'?50:-50))*100)/100); } else S.amt=+v||0; }
+  else if(k==='pjoin'){ doPamm('join', v, S.amt, null); return; }
+  else if(k==='pleave'){ var fd=pammFund(parts[1]); if(!fd||!fd.mine) return; var u = parts[2]==='all' ? null : Math.min(+fd.mine.units, S.amt/(+fd.nav_trade||+fd.nav||1)); doPamm('leave', parts[1], S.amt, u); return; }
   else if(k==='toast'){ toast(v); return; }
   else if(k==='toggleOneClick'){ if(S.oneClick){ S.oneClick=false; LS.set('rh.oneClick','0'); } else if(S.ack){ S.oneClick=true; LS.set('rh.oneClick','1'); } else { S.sheet='ack'; } }
   else if(k==='ackOn'){ S.ack=true; LS.set('rh.oneClickAck','1'); S.oneClick=true; LS.set('rh.oneClick','1'); S.sheet=null; }
   else if(k==='toggleMask'){ S.masked=!S.masked; LS.set('rh.mask',S.masked?'1':'0'); }
   else if(k==='theme'){ S.theme=v; LS.set('rh.theme',v); document.documentElement.setAttribute('data-theme',v==='dark'?'dark':'light'); }
-  else if(k==='sheet'){ S.sheet=v||null; if(v==='pair'){ S.q=''; instruments(S.sheetSeg).slice(0,24).forEach(function(c){ pullDayOpen(c.sym); }); } if(v==='pamm') pullPamm(); }
+  else if(k==='sheet'){ if(S.busy&&v) return; S.sheet=v||null; if(v==='pair'){ S.q=''; instruments(S.sheetSeg).slice(0,24).forEach(function(c){ pullDayOpen(c.sym); }); } if(v==='pamm') pullPamm();
+    if(v&&v.indexOf('sltp:')===0){ var kind=v.split(':')[1], id=v.split(':')[2];                                        // SL/TP editor: seed from the row (or side-aware defaults)
+      if(kind==='pos'){ var pp=S.positions.find(function(x){return x.id===id;}); if(pp){ S.mSym=pp.sym; S.mSide=pp.side; S.mRef=midOf(pp.sym)||pp.open; S.mSl=pp.sl||0; S.mTp=pp.tp||0; } }
+      else { var oo=S.pending.find(function(x){return x.id===id;}); if(oo){ S.mSym=oo.sym; S.mSide=oo.side; S.mRef=oo.trigger; S.mSl=oo.sl||0; S.mTp=oo.tp||0; } } }
+    if(v&&v.indexOf('pjoin:')===0){ var fj=pammFund(v.slice(6)); S.amt=fj?Math.max(+fj.min_join||0, 100):100; }
+    if(v&&v.indexOf('pleave:')===0){ var fl=pammFund(v.slice(7)); S.amt=(fl&&fl.mine&&fl.mine.value!=null)?+fl.mine.value:0; } }
   else if(k==='seg'){ S.sheetSeg=v; S.q=''; instruments(v).slice(0,24).forEach(function(c){ pullDayOpen(c.sym); }); }
   else if(k==='act'){ S.actTab=v; S.keepScroll=false; }
-  else if(k==='tf'){ if(!v){ toast('4h · 1W · ALL come in Stage 2'); return; } S.tf=v; S.scrub=null; pullCandles(S.sym,v); }
+  else if(k==='tf'){ if(!v){ toast('4h · 1W · ALL — coming soon'); return; } S.tf=v; S.scrub=null; pullCandles(S.sym,v); }
   else if(k==='otype'){ S.otype=v; S.limitPx=0; }
   else if(k==='lots'){ S.lots=Math.max(0.01, Math.round((S.lots+(v==='+'?0.01:-0.01))*100)/100); }
   else if(k==='sltp'){ S.sltp=true; }
@@ -685,7 +815,9 @@ document.addEventListener('click', function(e){ var el=e.target.closest('[data-a
 // stepper press-and-hold: 350ms → repeat, then accelerate (1 → 5 → 10 steps per tick). Patches the stepper text in place —
 // a full render() would replace the pressed element and cancel the touch. Full render on release.
 (function(){ var t=null, iv=null, fired=false, swallow=false, n=0, cur=null;
-  function stepperText(k){ if(k==='lots') return S.lots.toFixed(2)+'<small>lot</small>'; var sym=S.sym, ref=S.limitPx||midOf(sym);
+  function stepperText(k){ if(k==='lots') return S.lots.toFixed(2)+'<small>lot</small>'; if(k==='amt') return fmtMoney(S.amt);
+    if(k==='msl'||k==='mtp') return fmtPx((k==='msl'?S.mSl:S.mTp)||(k==='msl'?defSL(S.mSym,S.mRef,S.mSide):defTP(S.mSym,S.mRef,S.mSide)), S.mSym);
+    var sym=S.sym, ref=S.limitPx||midOf(sym);
     return fmtPx(k==='lim'?(S.limitPx||defLimit(sym)):k==='sl'?(S.slPx||defSL(sym,ref)):(S.tpPx||defTP(sym,ref)), sym); }
   function apply(a){ var k=a.split(':')[0]; var r=render; render=function(){}; try{ act(a); } finally { render=r; }
     document.querySelectorAll('.lots b[data-act="'+k+':+"]').forEach(function(b){ var sp=b.previousElementSibling; if(sp) sp.innerHTML=stepperText(k); }); }

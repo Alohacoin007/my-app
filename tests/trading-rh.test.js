@@ -2,11 +2,12 @@
 // Alpexa — FX 로빈후드형 앱 1단계 (dev/trading-rh.html) 행위 게이트 (헤드리스 + supabase 스텁, 네트워크 0)
 // ============================================================================
 // 계약 (2026-09-17 사장님 "시작해" · 1단계 = 읽기 전용):
-//   M1. 돈 이동 0 — 소스에 rpc()/ledger 쓰기/positions 쓰기 없음 + 런타임에서 rpc 호출 0회 (스파이).
+//   M1. 돈은 서버 RPC 로만 — 허용 RPC 9개(RPC_ALLOW) 외 호출 0 · ledger/positions/accounts 쓰기 0 (소스 + 런타임 스파이).
+//       2단계(2026-09-21 승인): fx_open(슬리피지 가드)·fx_modify·fx_close·fx_place_pending·fx_modify_pending·fx_cancel_pending·pamm_join·pamm_leave.
 //   M2. 표시 락스텝 — bid/ask = mid ∓ half, half = max(0.1, spr_pts+markup_pts)×pip/2 (trading.html 과 동일).
 //   M3. Equity = 서버 cash + Σ플로팅, 플로팅 = pnlUSD(open → fx_close 청산가) — 화면 숫자를 스텁 데이터로 재계산해 대조.
 //   M4. 돈은 localStorage 에 저장되지 않는다 (rh.* 키는 테마·1-Click·가림 뿐).
-//   M5. 1-Click OFF = 글자만 · ON(동의 1회) = 상자 · 상자/주문/청산 탭 = "Stage 2" 토스트 (주문 안 나감).
+//   M5. 1-Click OFF = 글자만(탭→트레이드 화면) · ON(동의 1회) = 상자(탭→fx_open 즉시) · 트레이드 주문 = 확인 시트 → RPC · 더블탭 = 1회.
 //   M6. 로드 무에러 · 4탭 렌더 · 포지션/히스토리 실데이터 표시.
 // playwright/Chromium 없으면 SKIP(exit 0).
 'use strict';
@@ -17,10 +18,20 @@ const ok = (n, c, d) => { if (c) { pass++; console.log('  ✅ ' + n); } else { f
 
 // ── (A) 소스 핀: 돈 코드 0줄 ──
 const src = fs.readFileSync(path.join(REPO, 'dev/trading-rh.html'), 'utf8');
-// rpc 허용목록 = pamm_investor_report 하나 (읽기 전용 jsonb 스냅샷 · 돈 이동 0). 그 외 .rpc( 는 0건.
-ok('M1 소스: .rpc( 호출 = 읽기 전용 pamm_investor_report 만', (src.match(/\.rpc\(/g) || []).length === (src.match(/\.rpc\('pamm_investor_report'\)/g) || []).length && (src.match(/\.rpc\(/g) || []).length >= 1);
+// rpc 허용목록 (2단계): 읽기 리포트 1 + 승인된 돈 RPC 8. 그 외 .rpc( 는 0건 — 헬퍼가 목록 밖 이름을 throw.
+const ALLOW = ['pamm_investor_report', 'fx_open', 'fx_modify', 'fx_close', 'fx_place_pending', 'fx_modify_pending', 'fx_cancel_pending', 'pamm_join', 'pamm_leave'];
+{ const m = src.match(/var RPC_ALLOW=\{([^}]*)\}/); const keys = m ? m[1].split(',').map(x => x.split(':')[0].trim()).filter(Boolean) : [];
+  ok('M1 소스: RPC_ALLOW = 승인된 9개와 정확히 일치', keys.length === ALLOW.length && ALLOW.every(k => keys.includes(k)), keys.join(','));
+  const dyn = (src.match(/\.rpc\(/g) || []).length, lit = (src.match(/\.rpc\('pamm_investor_report'\)/g) || []).length;
+  ok('M1 소스: supabase .rpc( 호출 지점 = 헬퍼 1 + 읽기 전용 리포트 1 (그 외 직접 호출 0)', dyn === 2 && lit === 1, 'dyn=' + dyn + ' lit=' + lit);
+  const names = (src.match(/\brpc\('([a-z_]+)'/g) || []).map(x => x.match(/'([a-z_]+)'/)[1]);
+  ok('M1 소스: 헬퍼 호출 이름 전부 허용목록 (' + names.length + '건)', names.length >= 8 && names.every(x => ALLOW.includes(x)), names.filter(x => !ALLOW.includes(x)).join(','));
+  ok('M1 소스: 헬퍼가 목록 밖 이름을 거절 (rpc not allowed)', /if\(!RPC_ALLOW\[name\]\) throw/.test(src));
+  ok('M2 소스: fx_open 에 슬리피지 가드 인자 (p_requested_price · p_max_slippage) — MT5 deviation', /p_requested_price:px\|\|null, p_max_slippage:px\?slipOf\(sym,px\):null/.test(src) && /3\*fxPip\(sym\)/.test(src));
+  ok('M1 소스: 부분청산 없음 (RPC 없음 → 버튼 없음)', !/Close half|fx_close_partial/.test(src));
+  ok('M1 소스: 잔고·손익을 클라가 계산해 저장하는 코드 0 (S\.cash 는 서버 pull 에서만 대입)', (src.match(/S\.cash\s*=/g) || []).length === 1 && /S\.cash=\+r\.data\[0\]\.balance/.test(src)); }
 ok('M1 소스: ledger / positions / fx_pending 에 insert·update·upsert·delete 없음', !/\.from\(['"](ledger|positions|fx_pending|accounts)['"]\)[\s\S]{0,200}\.(insert|update|upsert|delete)\(/.test(src));
-ok('M1 소스: 돈 RPC 호출 없음 (rpc("fx_open"/"fx_close"/"fx_modify"/…) 형태 0건 — settlements kind 필터 "fx_close" 는 읽기)', !/rpc\(\s*['"](fx_open|fx_close|fx_modify|fx_place_pending|fx_cancel_pending|app_transfer|place_bet)['"]/.test(src) && !/functions\.invoke\(\s*['"](fx|broker|withdraw)/.test(src));
+ok('M1 소스: 승인 밖 돈 경로 0 (app_transfer · place_bet · functions.invoke fx/broker/withdraw)', !/rpc\(\s*['"](app_transfer|place_bet|fx_open_admin|fx_admin)/.test(src) && !/functions\.invoke\(\s*['"](fx|broker|withdraw)/.test(src));
 ok('M2 소스: half = max(0.1, spr+mk)*pip/2 (fx_close v_half 미러)', /Math\.max\(0\.1,\s*spr\+mk\)\*fxPip\(sym\)\/2/.test(src));
 ok('M2 소스: 비FX half = mid*max(floorBps[cls], spr)/10000/2 (fx_close v_half else-branch 미러) · 계약/클래스 = fx_specs 런타임', /mid\*\(Math\.max\(SPREAD_BPS\[cls\]\|\|0, spr\)\/10000\)\/2/.test(src) && /from\('fx_specs'\)\.select\('symbol,cls,contract'\)/.test(src) && /SPREAD_BPS=\{CRYPTO:10,STOCK:8,INDEX:6\}/.test(src));
 ok('M2 소스: pip 락스텝 (JPY .01 · XAU .01 · XAG .001 · else .0001)', /JPY\$\/\.test\(sym\)\?0\.01:sym==='XAUUSD'\?0\.01:sym==='XAGUSD'\?0\.001:0\.0001/.test(src));
@@ -78,7 +89,15 @@ const stubFn = `() => {
     return o; };
   window.supabase = { createClient: () => ({
     auth: { getSession: async () => ({ data: { session: { user: { id: 'auth-1' } } } }), signOut: async () => ({}) },
-    rpc: async (name) => { if (name === 'pamm_investor_report') { window.__pammCalls = (window.__pammCalls||0) + 1; return { data: PAMM, error: null }; } window.__rpcCalls++; return { data: null, error: null }; },
+    rpc: async (name, args) => { window.__rpcLog = window.__rpcLog || []; window.__rpcLog.push({ name, args });
+      if (name === 'pamm_investor_report') { window.__pammCalls = (window.__pammCalls||0) + 1; return { data: PAMM, error: null }; }
+      await new Promise(r => setTimeout(r, 60));   // real network latency → double-tap window
+      if (name === 'fx_open') return { data: args.p_symbol === 'GBPUSD' ? { ok: false, error: 'insufficient margin', code: 'MARGIN', required: 1234.5, free: 100 } : { ok: true, open: args.p_requested_price, local_id: args.p_local_id }, error: null };
+      if (name === 'fx_close') return { data: { ok: true, close: 1.15975, pnl: 26.3 }, error: null };
+      if (name === 'fx_modify' || name === 'fx_modify_pending' || name === 'fx_place_pending' || name === 'fx_cancel_pending') return { data: { ok: true }, error: null };
+      if (name === 'pamm_join') return { data: { ok: true, units: 111.97, nav: 2.2329 }, error: null };
+      if (name === 'pamm_leave') return { data: { ok: true, gross: 223.29, fee: 0, net: 223.29, nav: 2.2329 }, error: null };
+      window.__rpcCalls++; return { data: { ok: false, error: 'unexpected rpc ' + name }, error: null }; },
     functions: { invoke: async () => ({ error: { message: 'stub' } }) },
     channel: () => { const c = { on: () => c, subscribe: () => c }; return c; },
     from: q }) };
@@ -143,10 +162,19 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   ok('M5 ⚡ 첫 탭 → 동의 시트', (await page.locator('.sheet .cta').count()) === 1);
   await page.locator('.sheet .cta').click(); await page.waitForTimeout(100);
   ok('M5 동의 → ON: 상자 적용', (await page.locator('.app.oc-on').count()) === 1);
-  await page.locator('.row[data-sym="EURUSD"] .btn.buy').click(); await page.waitForTimeout(150);
+  await page.locator('.row[data-sym="EURUSD"] .btn.buy').click(); await page.waitForTimeout(350);
   const t1 = await page.locator('.toast').innerText().catch(() => '');
-  ok('M5 상자 탭 → "Stage 2" 토스트 (주문 안 나감)', /Stage 2/.test(t1), t1);
-  ok('M4 localStorage: rh.* 에 돈 없음 · 1-Click 만 저장', await page.evaluate(() => localStorage.getItem('rh.oneClick') === '1' && !Object.keys(localStorage).some(k => /bal|pos|equity|cash/i.test(k))));
+  const log1 = await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'fx_open'));
+  ok('M5 ON 상자 탭 → fx_open 1회: EURUSD BUY 0.10 · 표시가 = ask · 허용편차 3핍 · local_id R-…', log1.length === 1 && log1[0].args.p_symbol === 'EURUSD' && log1[0].args.p_side === 'BUY' && Math.abs(log1[0].args.p_size - 0.10) < 1e-9 && Math.abs(log1[0].args.p_requested_price - ask('EURUSD')) < 1e-9 && Math.abs(log1[0].args.p_max_slippage - 0.0003) < 1e-9 && /^R-/.test(log1[0].args.p_local_id), JSON.stringify(log1[0] && log1[0].args));
+  ok('M5 ON 체결 토스트 = 서버 open 가격 (Bought 0.10 EURUSD @ ' + ask('EURUSD').toFixed(5) + ')', t1.indexOf('Bought 0.10 EURUSD @ ' + ask('EURUSD').toFixed(5)) >= 0, t1);
+  ok('M5 ON 체결 후 서버 재조회 (positions 다시 pull)', (await page.evaluate(() => window.__rh.positions.length)) === 3);
+  await page.locator('.oc').click(); await page.waitForTimeout(100);
+  ok('M5 ⚡ 다시 탭 → OFF (상자 사라짐)', !(await page.locator('.app.oc-on').count()));
+  await page.locator('.row[data-sym="GBPUSD"] .btn.sell').click(); await page.waitForTimeout(200);
+  ok('M5 OFF 가격 탭 → 주문 없이 트레이드 화면으로 (GBPUSD)', (await page.evaluate(() => window.__rh.tab + ':' + window.__rh.sym)) === 'trade:GBPUSD' && (await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'fx_open').length)) === 1);
+  await page.locator('.tab[data-act="tab:home"]').click(); await page.waitForTimeout(200);
+  ok('M4 localStorage: rh.* 에 돈 없음 · 1-Click 설정만 저장', await page.evaluate(() => localStorage.getItem('rh.oneClick') !== null && !Object.keys(localStorage).some(k => /bal|pos|equity|cash|order|pnl/i.test(k))));
+  await page.evaluate(() => act('pick:EURUSD')); await page.waitForTimeout(120);   // back to EURUSD for the trade-screen checks
   // stepper: tap = +0.01 · press-and-hold = accelerates
   await page.locator('.hd .lots b[data-act="lots:+"]').click(); await page.waitForTimeout(80);
   ok('스테퍼 탭 1회 = +0.01 (0.10 → 0.11)', Math.abs((await page.evaluate(() => window.__rh.lots)) - 0.11) < 1e-9);
@@ -164,13 +192,25 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   const p1 = await page.locator('.arow.px').nth(0).innerText();
   ok('M3 포지션 행 플로팅 = pnlUSD(open→청산가) (' + fmt(pnl(POS[0])).replace('$', '+$') + ')', p1.indexOf(pnl(POS[0]).toFixed(2)) >= 0, p1.replace(/\n/g, ' '));
   ok('스왑 표시 (positions.meta.swap)', /Swap\s*−\$0\.42/.test(p1), p1.replace(/\n/g, ' '));
-  await page.locator('.arow .x').nth(0).click(); await page.waitForTimeout(150);
-  ok('M5 ✕ 탭 → "Stage 2" 토스트 (청산 안 나감)', /Stage 2/.test(await page.locator('.toast').innerText().catch(() => '')));
+  await page.evaluate(() => { const x = document.querySelectorAll('.arow .x')[0]; x.click(); x.click(); });   // double-tap
+  await page.waitForTimeout(350);
+  const closes = await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'fx_close'));
+  ok('✕ 더블탭 → fx_close 정확히 1회 (busy 잠금) · p_local_id = P1', closes.length === 1 && closes[0].args.p_local_id === 'P1', JSON.stringify(closes.map(c => c.args)));
+  ok('✕ 청산 토스트 = 서버 pnl (Closed EURUSD · +$26.30)', /Closed EURUSD · \+\$26\.30/.test(await page.locator('.toast').innerText().catch(() => '')));
   await page.locator('.seg span[data-act="act:orders"]').click(); await page.waitForTimeout(200);
   await page.locator('.arow').first().click(); await page.waitForTimeout(150);
   const ordSheet = await page.locator('.sheet').innerText().catch(() => '');
-  ok('Orders 행 탭 → 대기주문 시트 (SL/TP 는 여기서) · Stage 2 CTA', /Pending order/.test(ordSheet) && /Stop loss/.test(ordSheet) && /Take profit/.test(ordSheet) && /Set stop loss/.test(ordSheet));
-  await page.locator('.sheet .sttl .x').click(); await page.waitForTimeout(100);
+  ok('Orders 행 탭 → 대기주문 시트 (SL/TP 는 여기서) · Modify price 없음', /Pending order/.test(ordSheet) && /Stop loss/.test(ordSheet) && /Take profit/.test(ordSheet) && /Set stop loss/.test(ordSheet) && !/Modify price/.test(ordSheet));
+  await page.locator('.sheet .cta').click(); await page.waitForTimeout(150);
+  ok('대기주문 SL/TP 시트: 트리거 기준 기본값 (BUY 1.15500 → SL 1.14700 · TP 1.16020)', /Stop loss \/ take profit/.test(await page.locator('.sheet .sttl').innerText()) && /1\.14700/.test(await page.locator('.sheet').innerText()) && /1\.16020/.test(await page.locator('.sheet').innerText()));
+  await page.locator('.sheet .lots b[data-act="msl:+"]').click(); await page.waitForTimeout(80);
+  await page.locator('.sheet .cta').click(); await page.waitForTimeout(350);
+  const mp = await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'fx_modify_pending'));
+  ok('Save → fx_modify_pending(O1, sl 1.14710, tp 1.16020) 1회 — 새 SQL 경로', mp.length === 1 && mp[0].args.p_local_id === 'O1' && Math.abs(mp[0].args.p_sl - 1.1471) < 1e-9 && Math.abs(mp[0].args.p_tp - 1.1602) < 1e-9, JSON.stringify(mp.map(c => c.args)));
+  await page.locator('.arow').first().click(); await page.waitForTimeout(150);
+  await page.locator('.sheet .acts div[data-act^="cancelord:"]').click(); await page.waitForTimeout(350);
+  const cp = await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'fx_cancel_pending'));
+  ok('Cancel order → fx_cancel_pending(O1) 1회', cp.length === 1 && cp[0].args.p_local_id === 'O1', JSON.stringify(cp.map(c => c.args)));
   await page.locator('.seg span[data-act="act:history"]').click(); await page.waitForTimeout(200);
   ok('M6 History: settlements 행 (GBPUSD −$44.00 · SL hit)', /GBPUSD/.test(await page.locator('.act').innerText()) && /SL hit/.test(await page.locator('.act').innerText()));
   // Trade screen
@@ -178,12 +218,50 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   ok('M6 Trade: 차트 SVG 렌더 (스텁 봉)', (await page.locator('#chart svg').count()) === 1);
   ok('M2 Trade: B/A 줄 = bid – ask 락스텝', (await page.locator('.det .quote').innerText()).replace(/\s/g, '').indexOf(bid('EURUSD').toFixed(5) + '–' + ask('EURUSD').toFixed(5)) >= 0);
   await page.locator('.foot .btn.buy').click(); await page.waitForTimeout(150);
-  ok('M5 주문 버튼 → "Stage 2" 토스트', /Stage 2/.test(await page.locator('.toast').innerText().catch(() => '')));
+  const cf = await page.locator('.sheet').innerText().catch(() => '');
+  ok('OFF 주문 버튼 → 확인 시트 (Confirm order · Price now · ±3 pips · Margin)', /Confirm order/.test(cf) && /Price now/.test(cf) && /3 pips/.test(cf) && /Margin/.test(cf) && (await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'fx_open').length)) === 1, cf.replace(/\n/g, ' ').slice(0, 160));
+  await page.evaluate(() => { const c = document.querySelector('.sheet .cta'); c.click(); c.click(); });   // double-tap confirm
+  await page.waitForTimeout(350);
+  const op2 = await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'fx_open'));
+  ok('확인 더블탭 → fx_open 1회 추가 (총 2) · SL/TP 접힘이면 fx_modify 0', op2.length === 2 && op2[1].args.p_side === 'BUY' && op2[1].args.p_symbol === 'EURUSD' && (await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'fx_modify').length)) === 0, JSON.stringify(op2[1] && op2[1].args));
+  await page.locator('.fold[data-act="sltp"]').click(); await page.waitForTimeout(120);
+  await page.locator('.foot .btn.sell').click(); await page.waitForTimeout(150);
+  const cf2 = await page.locator('.sheet').innerText().catch(() => '');
+  ok('SL/TP 펼친 채 SELL → 확인 시트에 SELL 방향 기본값 (SL 위 1.16779 · TP 아래 1.15459)', /Stop loss/.test(cf2) && /1\.16779/.test(cf2) && /1\.15459/.test(cf2), cf2.replace(/\n/g, ' ').slice(0, 200));
+  await page.locator('.sheet .cta').click(); await page.waitForTimeout(400);
+  const md = await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'fx_modify')), op3 = await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'fx_open'));
+  ok('SELL 체결 후 fx_modify(같은 local_id, sl 1.16779, tp 1.15459) 1회', md.length === 1 && op3.length === 3 && md[0].args.p_local_id === op3[2].args.p_local_id && Math.abs(md[0].args.p_sl - 1.16779) < 1e-9 && Math.abs(md[0].args.p_tp - 1.15459) < 1e-9, JSON.stringify(md.map(c => c.args)));
+  // server rejection path (GBPUSD stub = insufficient margin)
+  await page.locator('.det .nm[data-act="sheet:pair"]').click(); await page.waitForTimeout(150);
+  await page.locator('#pq').fill('GBPUSD'); await page.waitForTimeout(120); await page.locator('.plist .prow').first().click(); await page.waitForTimeout(200);
+  await page.locator('.foot .btn.buy').click(); await page.waitForTimeout(150); await page.locator('.sheet .cta').click(); await page.waitForTimeout(350);
+  ok('서버 거절 → 문구 그대로 (Insufficient margin — needs $1,234.50, free $100.00) · 포지션 수 불변', /Insufficient margin — needs \$1,234\.50, free \$100\.00/.test(await page.locator('.toast').innerText().catch(() => '')) && (await page.evaluate(() => window.__rh.positions.length)) === 3);
+  ok('거절 시 시트 닫힘·busy 해제', (await page.locator('.sheet').count()) === 0 && (await page.evaluate(() => window.__rh.busy)) === null);
+  // pending: SELL LIMIT → side-aware default trigger (above market) → fx_place_pending, sl/tp null
+  await page.locator('.otype span[data-act="otype:LIMIT"]').click(); await page.waitForTimeout(120);
+  await page.locator('.foot .btn.sell').click(); await page.waitForTimeout(150);
+  const pcf = await page.locator('.sheet').innerText().catch(() => '');
+  ok('Limit SELL → 확인 시트 (Confirm limit order · 트리거 = ask+8핍 = ' + (ask('GBPUSD') + 0.0008).toFixed(5) + ' · SL/TP 안내)', /Confirm limit order/.test(pcf) && pcf.indexOf((ask('GBPUSD') + 0.0008).toFixed(5)) >= 0 && /Activity/.test(pcf), pcf.replace(/\n/g, ' ').slice(0, 200));
+  await page.locator('.sheet .cta').click(); await page.waitForTimeout(350);
+  const pp = await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'fx_place_pending'));
+  ok('→ fx_place_pending(GBPUSD SELL LIMIT 0.10 @ trigger, sl null, tp null) 1회', pp.length === 1 && pp[0].args.p_symbol === 'GBPUSD' && pp[0].args.p_side === 'SELL' && pp[0].args.p_otype === 'LIMIT' && Math.abs(pp[0].args.p_trigger - (ask('GBPUSD') + 0.0008)) < 1e-9 && pp[0].args.p_sl === null && pp[0].args.p_tp === null, JSON.stringify(pp.map(c => c.args)));
+  await page.locator('.otype span[data-act="otype:MARKET"]').click(); await page.waitForTimeout(100);
+  await page.locator('.det .nm[data-act="sheet:pair"]').click(); await page.waitForTimeout(150);
+  await page.locator('#pq').fill('EURUSD'); await page.waitForTimeout(120); await page.locator('.plist .prow').first().click(); await page.waitForTimeout(200);
   { const mineTxt = await page.locator('.det .mine').innerText().catch(() => '');
     ok('Trade: 내 포지션 한 줄 (Buy 0.10 lot · +$' + pnl(POS[0]).toFixed(2) + ') → 탭하면 포지션 시트', /Buy\s+0\.10 lot/.test(mineTxt) && mineTxt.indexOf(pnl(POS[0]).toFixed(2)) >= 0, mineTxt);
     await page.locator('.det .mine').click(); await page.waitForTimeout(150);
     ok('Trade: 포지션 한 줄 탭 → Position 시트', /Position/.test(await page.locator('.sheet .sttl').innerText().catch(() => '')));
-    await page.locator('.sheet .sttl .x').click(); await page.waitForTimeout(100); }
+    const ps = await page.locator('.sheet').innerText().catch(() => '');
+    ok('Position 시트: Close half 없음 · Edit SL/TP · Close position', !/Close half/.test(ps) && /Edit stop loss/.test(ps) && /Close position/.test(ps));
+    await page.locator('.sheet .cta').click(); await page.waitForTimeout(150);
+    ok('포지션 SL/TP 시트: 기존값 시드 (SL 1.15200 · TP 1.16500)', /1\.15200/.test(await page.locator('.sheet').innerText()) && /1\.16500/.test(await page.locator('.sheet').innerText()));
+    await page.locator('.sheet .cta').click(); await page.waitForTimeout(350);
+    const fm = await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'fx_modify'));
+    ok('Save → fx_modify(P1, 1.152, 1.165) — 열린 포지션 경로', fm.some(c => c.args.p_local_id === 'P1' && Math.abs(c.args.p_sl - 1.152) < 1e-9 && Math.abs(c.args.p_tp - 1.165) < 1e-9), JSON.stringify(fm.map(c => c.args)));
+    await page.locator('.det .mine').click(); await page.waitForTimeout(150);
+    await page.locator('.sheet .acts div[data-act^="close:"]').click(); await page.waitForTimeout(350);
+    ok('Close position → fx_close(P1) (총 2회: ✕ 1 + 시트 1)', (await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'fx_close' && x.args.p_local_id === 'P1').length)) === 2); }
   ok('Trade: B/A 줄은 모노 아니고 본문 서체 (위 변동 줄과 동일)', !/Mono/.test(await page.locator('.det .quote').evaluate(el => getComputedStyle(el).fontFamily)));
   ok('Market 주문: SL/TP 접힘 폴드 있음', (await page.locator('.fold[data-act="sltp"]').count()) === 1);
   await page.locator('.otype span[data-act="otype:LIMIT"]').click(); await page.waitForTimeout(150);
@@ -208,14 +286,28 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   const pammTxt = await page.locator('.sheet').innerText().catch(() => '');
   ok('PAMM 시트: 펀드 2개 · Alpha 수익률 +123.29% · Invested $100.00 → now $223.29 · Beta Join', /Alpha/.test(pammTxt) && /\+123\.29%/.test(pammTxt) && /\$100\.00/.test(pammTxt) && /\$223\.29/.test(pammTxt) && /Beta/.test(pammTxt) && /Join/.test(pammTxt));
   await page.locator('.pf .r3 div.pri').first().click(); await page.waitForTimeout(150);
-  ok('PAMM Join 탭 → "Stage 2" 토스트 (pamm_join 호출 0)', /Stage 2/.test(await page.locator('.toast').innerText().catch(() => '')));
-  await page.locator('.sheet .sttl .x').click(); await page.waitForTimeout(100);
+  const js = await page.locator('.sheet').innerText().catch(() => '');
+  ok('PAMM Join(Beta) → 금액 시트: 기본 = 최소 $250.00 · FX balance 표시 · CTA Invest $250.00', /Join Beta/.test(js) && /\$250\.00/.test(js) && /FX balance/.test(js) && /Invest \$250\.00/.test(js), js.replace(/\n/g, ' ').slice(0, 200));
+  await page.locator('.sheet .chips span').nth(1).click(); await page.waitForTimeout(80);   // $500 chip (칩 = 250 · 500 · 1000)
+  await page.locator('.sheet .cta').click(); await page.waitForTimeout(350);
+  const pj = await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'pamm_join'));
+  ok('Invest → pamm_join(ref pamm-FX-900001-…, fund FX-900001, usd 500) 1회', pj.length === 1 && /^pamm-FX-900001-\d+$/.test(pj[0].args.p_ref) && pj[0].args.p_fund === 'FX-900001' && pj[0].args.p_usd === 500, JSON.stringify(pj.map(c => c.args)));
+  await page.locator('.srow[data-act="sheet:pamm"]').click(); await page.waitForTimeout(250);
+  await page.locator('.pf .r3 div.out').first().click(); await page.waitForTimeout(150);
+  const rs = await page.locator('.sheet').innerText().catch(() => '');
+  ok('PAMM Redeem(Alpha) → 시트 기본 = 전량 $223.29 · CTA Redeem all', /Redeem from Alpha/.test(rs) && /\$223\.29/.test(rs) && /Redeem all/.test(rs), rs.replace(/\n/g, ' ').slice(0, 200));
+  await page.locator('.sheet .cta').click(); await page.waitForTimeout(350);
+  const pl = await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'pamm_leave'));
+  ok('Redeem all → pamm_leave(ref pamm-FX-850261-out-…, units null=전량) 1회', pl.length === 1 && /^pamm-FX-850261-out-\d+$/.test(pl[0].args.p_ref) && pl[0].args.p_units === null, JSON.stringify(pl.map(c => c.args)));
+  ok('Account: Deposit/Withdraw/Transfer = 기존 앱 링크 (새 돈 경로 0)', (await page.locator('.acts div[data-act="go:../trading.html"]').count()) === 3);
   await page.locator('.srow[data-act="sheet:appearance"]').click(); await page.waitForTimeout(100);
   await page.locator('.opt2 div[data-act="theme:dark"]').click(); await page.waitForTimeout(100);
   ok('테마 스위치 → data-theme=dark', (await page.evaluate(() => document.documentElement.getAttribute('data-theme'))) === 'dark');
   // M1 runtime
   const rpc = await page.evaluate(() => window.__rpcCalls || 0), writes = await page.evaluate(() => window.__writeCalls || 0);
-  ok('M1 런타임: 돈 rpc 호출 0회 · 테이블 쓰기 0회 (전 화면·전 버튼 눌러본 뒤; 읽기 rpc pamm_investor_report 만 허용)', rpc === 0 && writes === 0 && (await page.evaluate(() => window.__pammCalls || 0)) >= 1, 'rpc=' + rpc + ' writes=' + writes);
+  const names = await page.evaluate(() => (window.__rpcLog || []).map(x => x.name));
+  ok('M1 런타임: 목록 밖 rpc 0회 · 테이블 쓰기 0회 · 호출된 이름 전부 허용목록 (' + names.length + '건)', rpc === 0 && writes === 0 && names.length > 8 && names.every(x => ALLOW.includes(x)), 'rpc=' + rpc + ' writes=' + writes + ' names=' + [...new Set(names)].join(','));
+  ok('M1 런타임: 모든 주문 local_id 가 서로 다름 (멱등 키 재사용 0)', await page.evaluate(() => { const ids = (window.__rpcLog || []).filter(x => /^fx_(open|place_pending)$/.test(x.name)).map(x => x.args.p_local_id); return ids.length === new Set(ids).size; }));
   ok('M6 전 과정 무에러', errs.length === 0, errs.join(' | '));
   await browser.close(); server.close();
   console.log(fail ? `\n🔴 trading-rh FAIL — ${fail}건 (${pass} pass)` : `\n🟢 trading-rh — ${pass} pass · 돈 이동 0 · 락스텝 · Equity 재계산 일치`);
