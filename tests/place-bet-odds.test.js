@@ -18,6 +18,10 @@ const GAMES = [
   // array as `threeWay`. place_bet must MAP '1X2' → 'threeWay' (the bug this catches:
   // an unmapped '1X2' rejects EVERY soccer bet at "market not offered").
   { gid: 'SOC_1', threeWay: [{ sel: 'Argentina ML', am: -283 }, { sel: 'Draw', am: 400 }, { sel: 'Egypt ML', am: 1075 }] },
+  // ⚽ 2026-09-18 실측 모양 (Brentford v Chelsea): sports-games 가 옛 클라 호환용 2-way `ml` 을 1X2 홈/원정 가격
+  // **그대로** 남긴다(합 76.7%). sports-settle 은 ml 을 Draw-No-Bet 으로 채점 → 양쪽 베팅 = 무손실 차익. 게이트가 막아야 한다.
+  { gid: 'SOC_2', oddsReal: true, ml: [{ sel: 'Brentford ML', am: 166 }, { sel: 'Chelsea ML', am: 156 }],
+    threeWay: [{ sel: 'Brentford ML', am: 166 }, { sel: 'Draw', am: 275 }, { sel: 'Chelsea ML', am: 156 }] },
   // NO real line (The Odds API had no odds for this game): sports-games left the
   // fabricated -140/120 placeholder and flags oddsReal:false. place_bet MUST reject
   // any leg here — the house won't honor a made-up line (regulated-book doctrine).
@@ -66,6 +70,9 @@ function reprice(legs, games, stake) {
       if (isNaN(ts) || Date.now() - ts > 15 * 60000) return { ok: false, error: 'odds updating' };
     }
     if (gm && gm.oddsReal === false) return { ok: false, error: 'odds unavailable' };
+    // ⚽ SOCCER GATE (mirrors the SQL, 2026-09-21 배포): a game that carries a 3-way 1X2 board offers NO 2-way ml.
+    if (String(l.market).toLowerCase() === 'moneyline' && gm && Array.isArray(gm.threeWay) && gm.threeWay.length === 3)
+      return { ok: false, error: 'use 1X2 for soccer' };
     const sam = serverAm(games, l.gid, l.market, l.sel);
     if (sam === null) return { ok: false, error: 'line not offered' };  // FAIL SAFE
     combo *= decOf(sam);
@@ -165,6 +172,32 @@ console.log('\n=== ⛳ GOLF OUTRIGHT (tournament winner) — 2026-07-16 ===');
   // Pre-tournament board (GOLF_401, not live) needs NO freshness stamp — prices are static.
   ok('PRE-tournament board without oddsTs → accepted',
      reprice([{ gid: 'GOLF_401', market: 'Outright', sel: 'Jon Rahm', am: 1400 }], GAMES, 20).potential === Math.round(20 * decOf(1400) * 100) / 100);
+}
+
+console.log('\n=== ⚽ SOCCER GATE: 2-way ml on a 1X2 game → REJECT (2026-09-18 발견 · 09-21 배포) ===');
+{
+  const fs = require('fs'), path = require('path');
+  const home = [{ gid: 'SOC_2', market: 'Moneyline', sel: 'Brentford ML', am: 166 }];
+  const away = [{ gid: 'SOC_2', market: 'Moneyline', sel: 'Chelsea ML', am: 156 }];
+  const rh = reprice(home, GAMES, 100), ra = reprice(away, GAMES, 100);
+  ok('soccer Moneyline home leg → REJECT (use 1X2 for soccer)', rh.ok === false && /1X2/.test(rh.error));
+  ok('soccer Moneyline away leg → REJECT', ra.ok === false);
+  // the arbitrage this closes: both sides on ml = +$66 / +$56 / $0(draw refund) — never a loss
+  const dnbHome = 100 * decOf(166) - 200, dnbAway = 100 * decOf(156) - 200;
+  ok('(증거) 게이트 없으면 양쪽 100달러 = 홈승 +' + dnbHome.toFixed(0) + ' · 원정승 +' + dnbAway.toFixed(0) + ' · 무승부 0 → 손실 경로 없음', dnbHome > 0 && dnbAway > 0);
+  ok('same game via 1X2 (team pick) → accepted + priced from threeWay',
+     reprice([{ gid: 'SOC_2', market: '1X2', sel: 'Brentford ML', am: 166 }], GAMES, 100).potential === Math.round(100 * decOf(166) * 100) / 100);
+  ok('same game via 1X2 (Draw) → accepted', reprice([{ gid: 'SOC_2', market: '1X2', sel: 'Draw', am: 275 }], GAMES, 100).ok === true);
+  ok('non-soccer Moneyline (no threeWay) still accepted', reprice([{ gid: 'NBA_1', market: 'Moneyline', sel: 'LAL ML', am: -140 }], GAMES, 20).ok === true);
+  ok('parlay: soccer ml leg poisons the whole ticket → REJECT',
+     reprice([{ gid: 'NBA_1', market: 'Moneyline', sel: 'LAL ML', am: -140 }, ...home], GAMES, 20).ok === false);
+  // SOURCE PIN — the SQL that is deployed must carry the gate, placed BEFORE the market-array read
+  const sql = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'sql', 'place_bet_server_odds.sql'), 'utf8');
+  const gi = sql.indexOf("if v_key = 'ml' and jsonb_typeof(v_game->'threeWay') = 'array'");
+  const ri = sql.indexOf("jsonb_typeof(v_game->v_key) is distinct from 'array'");
+  ok('SQL 핀: place_bet 에 SOCCER GATE 존재 (ml + threeWay 3개 → 거절)', gi > 0 && /jsonb_array_length\(v_game->'threeWay'\) = 3/.test(sql) && /'use 1X2 for soccer'/.test(sql));
+  ok('SQL 핀: 게이트가 시장 배열 읽기보다 앞에 있다 (가격을 읽기 전에 거절)', gi > 0 && ri > gi);
+  ok('SQL 핀: 게이트는 가격을 만들거나 고치지 않는다 (return 거절만)', /and jsonb_array_length\(v_game->'threeWay'\) = 3 then\s*\n\s*return jsonb_build_object\('ok',false/.test(sql));
 }
 
 console.log('\n' + (pass ? '🟢 place_bet re-prices from server lines (client odds can\'t inflate)' : '🔴 odds exploit open') + '\n');

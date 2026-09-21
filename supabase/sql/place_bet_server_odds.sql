@@ -1,4 +1,5 @@
--- Alpexa — D12 FIX (DRAFT — TEST BEFORE PROD): place_bet re-prices every leg from
+-- Alpexa — place_bet (2026-09-21: ⚽ SOCCER GATE 추가 — 1X2 있는 경기의 2-way ml 거절)
+-- D12 FIX: place_bet re-prices every leg from
 -- the SERVER lines (live_games), ignoring client-submitted odds. This closes the
 -- money-printing hole where a modified client could send inflated leg odds and be
 -- paid on them (sports-settle pays stake × Π(meta.legs[].am), and meta came from
@@ -117,6 +118,14 @@ begin
     -- house would otherwise honor it). Missing flag = real (backward-compat pre-deploy).
     if coalesce((v_game->>'oddsReal')::boolean, true) = false then
       return jsonb_build_object('ok',false,'error','odds unavailable for this game'); end if;
+    -- ⚽ SOCCER GATE (2026-09-18 아침 점검 발견): 1X2 보드(threeWay 3개)가 있는 경기의 2-way `ml` 은
+    --    sports-games 가 옛 클라 호환용으로 남긴 표시 배열이고, 값이 1X2 의 홈/원정 가격 **그대로**(합 ~77%).
+    --    sports-settle 은 `ml` leg 를 Draw-No-Bet(무승부=환불)으로 채점하므로 양쪽 베팅 = 어떤 결과든 무손실 차익.
+    --    축구에서 베팅 가능한 시장은 1X2 만. 가격을 고치지 않고 **거절만** 한다(오즈 불변식: 라인 생성·수정 금지).
+    --    핀: tests/place-bet-odds.test.js "SOC gid + Moneyline → use 1X2 for soccer".
+    if v_key = 'ml' and jsonb_typeof(v_game->'threeWay') = 'array'
+       and jsonb_array_length(v_game->'threeWay') = 3 then
+      return jsonb_build_object('ok',false,'error','use 1X2 for soccer'); end if;
     if jsonb_typeof(v_game->v_key) is distinct from 'array' then
       return jsonb_build_object('ok',false,'error','market not available for this game'); end if;
     select (e.value->>'am')::numeric into v_srv_am
