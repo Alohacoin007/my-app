@@ -59,7 +59,10 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
     color-scheme: dark;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; background: var(--bg); color: var(--text); overflow-x: hidden; }   /* 가로 넘침 0 — 고정 시트/탭바가 밀리지 않게 (모바일 깨짐, 사장님 2026-09-21) */
+  html, body { margin: 0; background: var(--bg); color: var(--text); overflow-x: hidden; }
+  /* iOS Safari: 문서 레벨 click 위임은 요소(또는 조상)에 cursor:pointer 가 있어야 탭이 click 으로 온다 — 탭 가능한 것 전부에 부여 (사장님 2026-09-21 "터치가 잘 안돼") */
+  [data-act], [data-act] * { cursor: pointer; }
+  [data-act] { -webkit-touch-callout: none; touch-action: manipulation; }   /* 가로 넘침 0 — 고정 시트/탭바가 밀리지 않게 (모바일 깨짐, 사장님 2026-09-21) */
   body { font-family: 'Geist', 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; overscroll-behavior-y: none; }
   .mono { font-family: 'Geist Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
   .up { color: var(--up); } .down { color: var(--down); }
@@ -88,10 +91,11 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .hero .chg { margin-top: 10px; font-size: 13px; font-weight: 700; }
   .hero .chg span.t { color: var(--dim); font-weight: 500; }
   .hero .note { margin-top: 10px; font-size: 13px; color: var(--mute); font-weight: 500; }
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 16px 0 0; }
-  .stat { background: var(--surface); border-radius: 12px; padding: 9px 12px; }
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 16px 0 0; width: 100%; }   /* 세 칸이 항상 가로 전체를 나눠 채움 — 폰에서 왼쪽으로 몰림 방지 (사장님 2026-09-21) */
+  .stat { background: var(--surface); border-radius: 12px; padding: 9px 10px; min-width: 0; overflow: hidden; }
+  .stat .k, .stat .v { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .stat .k { font-size: 10.5px; color: var(--dim); font-weight: 500; }
-  .stat .v { margin-top: 3px; font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stat .v { margin-top: 3px; font-size: clamp(11.5px, 3.4vw, 13.5px); font-weight: 600; font-variant-numeric: tabular-nums; }
   /* list header + rows */
   .hd { display: grid; grid-template-columns: minmax(0,1fr) 196px; gap: 8px; align-items: end; padding: 14px 18px 6px 22px; }
   /* 스테퍼 — 크게, 숫자·단위 사이 여백, 길게 누르면 가속 (사장님 2026-09-21 "사용하기 불편해") */
@@ -112,6 +116,7 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .half { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .btn { border-radius: 12px; padding: 6px 0; text-align: right; font-family: 'Geist Mono', ui-monospace, monospace; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; cursor: default; }
   .btn big { font-size: 15px; font-weight: 800; }
+  .app:not(.oc-on) .btn { font-size: 17px; } .app:not(.oc-on) .btn big { font-size: 17px; }   /* 1-Click OFF 시세 글자 키움 (사장님 2026-09-21) */
   .btn.sell { color: var(--down); } .btn.buy { color: var(--up); }
   .btn.stale { opacity: .45; }
   .app.oc-on .btn { border: 1.5px solid; border-radius: 10px; padding: 7px 0 6px; text-align: center; background: var(--bg); cursor: pointer; }
@@ -130,6 +135,7 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .det .nm .chev svg { width: 11px; height: 11px; }
   .det .sub { font-size: 12px; color: var(--dim); margin-top: 2px; }
   .det .px { margin-top: 10px; font-family: 'Geist Mono', ui-monospace, monospace; font-size: 34px; font-weight: 600; letter-spacing: -0.8px; line-height: 1; font-variant-numeric: tabular-nums; }
+  .det .px big { font-size: inherit; font-weight: inherit; }   /* 헤더 시세는 자릿수 크기 통일 (사장님 2026-09-21 "소수점 아래 숫자 크기가 안 맞아") — 버튼의 큰 핍 자리는 유지 */
   .det .chg { margin-top: 8px; font-size: 13px; font-weight: 700; }
   .det .chg span.t { color: var(--dim); font-weight: 500; }
   .det .quote { margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--dim); font-variant-numeric: tabular-nums; }   /* 위 변동 줄과 같은 서체 (사장님 2026-09-21) */

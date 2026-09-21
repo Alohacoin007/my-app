@@ -33,6 +33,7 @@ const ALLOW = ['pamm_investor_report', 'fx_open', 'fx_modify', 'fx_close', 'fx_p
 ok('M1 소스: ledger / positions / fx_pending 에 insert·update·upsert·delete 없음', !/\.from\(['"](ledger|positions|fx_pending|accounts)['"]\)[\s\S]{0,200}\.(insert|update|upsert|delete)\(/.test(src));
 ok('M1 소스: 승인 밖 돈 경로 0 (app_transfer · place_bet · functions.invoke fx/broker/withdraw)', !/rpc\(\s*['"](app_transfer|place_bet|fx_open_admin|fx_admin)/.test(src) && !/functions\.invoke\(\s*['"](fx|broker|withdraw)/.test(src));
 ok('레이아웃: 4개 화면 상단 전부 safe-area-inset-top 여백 (홈 .top · 트레이드 .det .head · 목록 .ttl) — 노치 겹침 0', /\.top \{[^}]*env\(safe-area-inset-top/.test(src) && /\.det \.head \{[^}]*env\(safe-area-inset-top/.test(src) && /\.ttl \{[^}]*env\(safe-area-inset-top/.test(src));
+ok('터치: 모든 [data-act] 요소에 cursor:pointer (iOS 문서 위임 클릭 조건) + touch-action manipulation', /\[data-act\], \[data-act\] \* \{ cursor: pointer; \}/.test(src) && /\[data-act\] \{[^}]*touch-action: manipulation/.test(src));
 ok('M2 소스: half = max(0.1, spr+mk)*pip/2 (fx_close v_half 미러)', /Math\.max\(0\.1,\s*spr\+mk\)\*fxPip\(sym\)\/2/.test(src));
 ok('M2 소스: 비FX half = mid*max(floorBps[cls], spr)/10000/2 (fx_close v_half else-branch 미러) · 계약/클래스 = fx_specs 런타임', /mid\*\(Math\.max\(SPREAD_BPS\[cls\]\|\|0, spr\)\/10000\)\/2/.test(src) && /from\('fx_specs'\)\.select\('symbol,cls,contract'\)/.test(src) && /SPREAD_BPS=\{CRYPTO:10,STOCK:8,INDEX:6\}/.test(src));
 ok('M2 소스: pip 락스텝 (JPY .01 · XAU .01 · XAG .001 · else .0001)', /JPY\$\/\.test\(sym\)\?0\.01:sym==='XAUUSD'\?0\.01:sym==='XAGUSD'\?0\.001:0\.0001/.test(src));
@@ -157,6 +158,10 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   ok('M3 Equity = cash + Σ플로팅 (' + fmt(equity) + ')', heroTxt === fmt(equity).replace('−', '−'), heroTxt + ' vs ' + fmt(equity));
   const balTxt = (await page.locator('.stat').nth(0).innerText()).replace(/\s/g, '');
   ok('M3 Balance 카드 = 서버 cash', balTxt.indexOf(fmt(CASH)) >= 0, balTxt);
+  { const boxes = await page.locator('.stat').evaluateAll(els => els.map(e => e.getBoundingClientRect())); const host = await page.locator('.stats').boundingBox();
+    ok('홈 3칸 카드가 가로 전체를 균등 분할 (첫 칸 왼쪽 = 컨테이너 왼쪽 · 마지막 칸 오른쪽 = 컨테이너 오른쪽 ±1px)', boxes.length === 3 && Math.abs(boxes[0].x - host.x) < 1 && Math.abs((boxes[2].x + boxes[2].width) - (host.x + host.width)) < 1, JSON.stringify([host, boxes.map(b => [Math.round(b.x), Math.round(b.width)])]));
+    const offPx = await page.locator('.row[data-sym="EURUSD"] .btn.sell').evaluate(el => parseFloat(getComputedStyle(el).fontSize));
+    ok('1-Click OFF 시세 글자 17px', offPx === 17, String(offPx)); }
   // M5 one-click OFF → no boxes; toggle → ack sheet → ON → boxes; tapping → toast, no rpc
   ok('M5 OFF: 상자 없음 (app.oc-on 미적용)', !(await page.locator('.app.oc-on').count()));
   await page.locator('.oc').click(); await page.waitForTimeout(100);
@@ -266,7 +271,9 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   ok('Trade: B/A 줄은 모노 아니고 본문 서체 (위 변동 줄과 동일)', !/Mono/.test(await page.locator('.det .quote').evaluate(el => getComputedStyle(el).fontFamily)));
   ok('Market 주문: SL/TP 접힘 폴드 있음', (await page.locator('.fold[data-act="sltp"]').count()) === 1);
   { const bb = await page.locator('.foot .lotrow .lots span').first().boundingBox(); const sm = await page.locator('.foot .lotrow .lots small').first().evaluate(el => getComputedStyle(el).display);
-    ok('Trade 볼륨 스테퍼 "0.10 lot" 한 줄 (small inline · 높이 < 30px)', sm === 'inline' && bb && bb.height < 30, 'display=' + sm + ' h=' + (bb && bb.height)); }
+    ok('Trade 볼륨 스테퍼 "0.10 lot" 한 줄 (small inline · 한 줄 높이 < 40px, 두 줄이면 50px+)', sm === 'inline' && bb && bb.height < 40, 'display=' + sm + ' h=' + (bb && bb.height));
+    const pxBig = await page.locator('.det .px big').first().evaluate(el => getComputedStyle(el).fontSize === getComputedStyle(el.parentElement).fontSize);
+    ok('Trade 헤더 시세: 소수점 자릿수 크기 통일 (big = 부모와 같은 font-size)', pxBig); }
   await page.locator('.otype span[data-act="otype:LIMIT"]').click(); await page.waitForTimeout(150);
   ok('Limit 주문: SL/TP 없음 (폴드·행 0) — Activity 에서 설정', (await page.locator('.fold[data-act="sltp"]').count()) === 0 && (await page.locator('.lotrow:has-text("Stop loss")').count()) === 0 && (await page.locator('.lotrow:has-text("Limit price")').count()) === 1);
   await page.locator('.otype span[data-act="otype:MARKET"]').click(); await page.waitForTimeout(100);
