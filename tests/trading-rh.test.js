@@ -114,7 +114,7 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   await page.waitForTimeout(300);
   ok('M6 로드 무에러', errs.length === 0, errs.join(' | '));
   ok('M6 홈: FX 그룹 10행 (금·은은 Metals 칩으로)', (await page.locator('.row').count()) === 10);
-  ok('홈: 상품군 칩 5개 (FX · Metals · Crypto · Stocks · Indices)', (await page.locator('.hseg span').count()) === 5);
+  ok('홈: 상품군 칩 = 피드 있는 그룹만 (FX · Metals · Crypto · Stocks — Indices 는 피드 없어 숨김)', (await page.locator('.hseg span').count()) === 4 && (await page.locator('.hseg span[data-act="hseg:Indices"]').count()) === 0);
   // M2 lockstep
   const eurSell = await page.locator('.row[data-sym="EURUSD"] .btn.sell').innerText();
   const eurBuy = await page.locator('.row[data-sym="EURUSD"] .btn.buy').innerText();
@@ -131,8 +131,6 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   ok('홈 Stocks 칩 → 피드 있는 종목만 (SPACEX 1행) · 가격 2자리 · half = 8bps', stRows === 1 && spx.replace(/\s/g, '') === (155.11 * (1 + 0.0008 / 2)).toFixed(2), 'rows=' + stRows + ' ' + spx);
   await page.locator('.hseg span[data-act="hseg:Crypto"]').click(); await page.waitForTimeout(150);
   ok('홈 Crypto 칩 → BTCUSD 1행 (피드 있음) · 1자리 · half = max(10bps, 1.4bps)', (await page.locator('.row').count()) === 1 && (await page.locator('.row[data-sym="BTCUSD"] .btn.buy').innerText()).replace(/\s/g, '') === (116980 * (1 + 0.001 / 2)).toFixed(1));
-  await page.locator('.hseg span[data-act="hseg:Indices"]').click(); await page.waitForTimeout(150);
-  ok('홈 Indices 칩 → 피드 없음 = 빈 상태 문구 (거래 불가한데 가능처럼 안 보임)', (await page.locator('.row').count()) === 0 && /No live feed/.test(await page.locator('.list').innerText()));
   await page.locator('.hseg span[data-act="hseg:FX"]').click(); await page.waitForTimeout(150);
   // M3 equity
   const heroTxt = (await page.locator('.hero .big').innerText()).replace(/\s/g, '');
@@ -181,6 +179,11 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   ok('M2 Trade: B/A 줄 = bid – ask 락스텝', (await page.locator('.det .quote').innerText()).replace(/\s/g, '').indexOf(bid('EURUSD').toFixed(5) + '–' + ask('EURUSD').toFixed(5)) >= 0);
   await page.locator('.foot .btn.buy').click(); await page.waitForTimeout(150);
   ok('M5 주문 버튼 → "Stage 2" 토스트', /Stage 2/.test(await page.locator('.toast').innerText().catch(() => '')));
+  { const mineTxt = await page.locator('.det .mine').innerText().catch(() => '');
+    ok('Trade: 내 포지션 한 줄 (Buy 0.10 lot · +$' + pnl(POS[0]).toFixed(2) + ') → 탭하면 포지션 시트', /Buy\s+0\.10 lot/.test(mineTxt) && mineTxt.indexOf(pnl(POS[0]).toFixed(2)) >= 0, mineTxt);
+    await page.locator('.det .mine').click(); await page.waitForTimeout(150);
+    ok('Trade: 포지션 한 줄 탭 → Position 시트', /Position/.test(await page.locator('.sheet .sttl').innerText().catch(() => '')));
+    await page.locator('.sheet .sttl .x').click(); await page.waitForTimeout(100); }
   ok('Trade: B/A 줄은 모노 아니고 본문 서체 (위 변동 줄과 동일)', !/Mono/.test(await page.locator('.det .quote').evaluate(el => getComputedStyle(el).fontFamily)));
   ok('Market 주문: SL/TP 접힘 폴드 있음', (await page.locator('.fold[data-act="sltp"]').count()) === 1);
   await page.locator('.otype span[data-act="otype:LIMIT"]').click(); await page.waitForTimeout(150);
@@ -188,7 +191,7 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   await page.locator('.otype span[data-act="otype:MARKET"]').click(); await page.waitForTimeout(100);
   // pair sheet: real search input filters across all groups
   await page.locator('.det .nm[data-act="sheet:pair"]').click(); await page.waitForTimeout(200);
-  ok('페어 시트: 검색 input 존재 · 그룹 칩 6개 (5 + All)', (await page.locator('#pq').count()) === 1 && (await page.locator('.sheet .sseg span').count()) === 6);
+  ok('페어 시트: 검색 input 존재 · 그룹 칩 = 피드 있는 4 + All', (await page.locator('#pq').count()) === 1 && (await page.locator('.sheet .sseg span').count()) === 5);
   await page.locator('#pq').fill('space'); await page.waitForTimeout(150);
   ok('검색 "space" → SPACEX 1행 (그룹 무관 전체 검색) · 입력 포커스 유지', (await page.locator('.plist .prow').count()) === 1 && /SPACEX/.test(await page.locator('.plist').innerText()) && (await page.evaluate(() => document.activeElement && document.activeElement.id === 'pq')));
   await page.locator('#pq').fill('yen'); await page.waitForTimeout(150);
@@ -197,6 +200,7 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   // Account + theme
   await page.locator('.tab[data-act="tab:account"]').click(); await page.waitForTimeout(200);
   ok('M6 Account: 계좌번호 표시', /FX-850261/.test(await page.locator('.acc').innerText()));
+  ok('Account: Notifications 토글 없음 (동작 없는 스위치 제거 — 심플)', !/Notifications/.test(await page.locator('.acc').innerText()));
   await page.waitForTimeout(200);
   const accTxt = await page.locator('.acc').innerText();
   ok('PAMM: Account 에 Managed funds 행 + 내 평가액 $223.29 (pamm_investor_report 읽기)', /Managed funds/.test(accTxt) && /\$223\.29/.test(accTxt), accTxt.replace(/\n/g, ' ').slice(0, 200));

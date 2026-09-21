@@ -140,6 +140,10 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .det .ranges span.on { background: var(--up); color: #0B0D0E; }
   .det .ranges span.na { color: var(--mute); }
   .det .kv { padding: 10px 22px 0; }
+  .det .mine { margin: 6px 22px 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-radius: 12px; background: var(--surface); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .det .mine .l b.b { color: var(--up); } .det .mine .l b.s { color: var(--down); }
+  .det .mine .r { font-family: 'Geist Mono', ui-monospace, monospace; font-weight: 700; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 6px; }
+  .det .mine .r i { font-style: normal; color: var(--mute); font-family: 'Geist', sans-serif; font-weight: 700; }
   .det .kv .r { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 0.5px solid var(--line); font-size: 13px; }
   .det .kv .r:last-child { border-bottom: 0; }
   .det .kv .k { color: var(--dim); } .det .kv .v { font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -297,6 +301,7 @@ var GROUPS = ['FX','Metals','Crypto','Stocks','Indices'];
 function groupOf(c){ return c.cls==='FX' ? (/^XA[UG]/.test(c.sym)?'Metals':'FX') : c.cls==='CRYPTO'?'Crypto' : c.cls==='STOCK'?'Stocks' : 'Indices'; }
 function catOf(sym){ return CATALOG.find(function(x){return x.sym===sym;}); }
 // 보이는 상품 = 카탈로그 ∩ 피드. 핵심 FX 12는 항상. 나머지는 prices 에 mid 가 있어야 등장(거래 불가한데 가능처럼 보이면 안 됨).
+function liveGroups(){ return GROUPS.filter(function(g){ return instruments(g).length>0; }); }
 function instruments(group){ return CATALOG.filter(function(c){ if(group&&group!=='All'&&groupOf(c)!==group) return false; return CORE_FX.indexOf(c.sym)>=0 || midOf(c.sym)>0; }); }
 var FX_FN_URL = 'https://grxnbgtfnaayeluenvqh.supabase.co/functions/v1/fx-prices';
 var LEVERAGE_FX = 500;                           // fx_lev_cap FX (2026-09-08) — display only
@@ -467,7 +472,8 @@ function homeRows(){
 }
 function screenHome(){
   return topBar()+hero()+
-    '<div class="sseg hseg">'+GROUPS.map(function(g){ return '<span class="'+(S.homeSeg===g?'on':'')+'" data-act="hseg:'+g+'">'+g+'</span>'; }).join('')+'</div>'+
+    (function(){ var lg=liveGroups(); if(lg.indexOf(S.homeSeg)<0) S.homeSeg='FX';   // saved group lost its feed → fall back
+      return lg.length>1 ? '<div class="sseg hseg">'+lg.map(function(g){ return '<span class="'+(S.homeSeg===g?'on':'')+'" data-act="hseg:'+g+'">'+g+'</span>'; }).join('')+'</div>' : ''; })()+
     '<div class="hd"><div class="lots"><b data-act="lots:-">−</b><span>'+S.lots.toFixed(2)+'<small>lot</small></span><b data-act="lots:+">+</b></div><div class="cols"><span>SELL</span><span>BUY</span></div></div>'+
     '<div class="list">'+homeRows()+'</div>';
 }
@@ -491,6 +497,13 @@ function lineChart(rows, opts){
     '<path d="'+d+'" fill="none" stroke="'+c+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+
     (S.scrub==null?'<circle cx="'+ex.toFixed(1)+'" cy="'+ey.toFixed(1)+'" r="3.5" fill="'+c+'"/>':'')+scrub+'</svg>';
 }
+function myPositionLine(sym){
+  var mine=S.positions.filter(function(p){ return p.sym===sym; }); if(!mine.length) return '';
+  var pnl=0; mine.forEach(function(p){ pnl+=posPnl(p); });
+  if(mine.length===1){ var p=mine[0]; return '<div class="mine" data-act="sheet:pos:'+p.id+'"><span class="l"><b class="'+(p.side==='BUY'?'b':'s')+'">'+(p.side==='BUY'?'Buy':'Sell')+'</b> '+p.vol.toFixed(2)+' lot · your position</span><span class="r '+(pnl>=0?'up':'down')+'">'+fmtSigned(pnl)+' <i>›</i></span></div>'; }
+  var vol=0; mine.forEach(function(p){ vol+=p.vol; });
+  return '<div class="mine" data-act="tab:activity"><span class="l">'+mine.length+' positions · '+vol.toFixed(2)+' lot</span><span class="r '+(pnl>=0?'up':'down')+'">'+fmtSigned(pnl)+' <i>›</i></span></div>';
+}
 function screenTrade(){
   var sym=S.sym, mid=midOf(sym), bid=bidOf(sym), ask=askOf(sym), fresh=isFresh(sym);
   var key=sym+'|'+S.tf, cd=S.candles[key]||{rows:[],loading:true};
@@ -511,6 +524,7 @@ function screenTrade(){
     '<div class="chg '+(chg==null?'':(chg>=0?'up':'down'))+'">'+(chg==null?'<span class="t">—</span>':(chg>=0?'▲ ':'▼ ')+Math.abs(chg).toFixed(digitsOf(sym))+' ('+(chg>=0?'+':'−')+Math.abs(chgPct).toFixed(2)+'%) <span class="t">Today</span>')+'</div>'+
     '<div class="quote"><b>B</b> '+fmtPx(bid,sym)+' <i>–</i> '+fmtPx(ask,sym)+' <b>A</b></div></div>'+
     '<div class="chart" id="chart">'+lineChart(cd.rows,{loading:cd.loading})+'</div>'+
+    myPositionLine(sym)+
     '<div class="ranges">'+TF.map(function(t){ return '<span class="'+(t[1]===S.tf?'on':(t[1]?'':'na'))+'" data-act="tf:'+(t[1]||'')+'">'+t[0]+'</span>'; }).join('')+'</div>'+
     '<div class="kv"><div class="r"><span class="k">Spread</span><span class="v">'+spreadLabel(sym)+'</span></div>'+
     '<div class="r"><span class="k">Margin for '+S.lots.toFixed(2)+' lot</span><span class="v">'+(mg==null?'—':fmtMoney(mg))+' <span style="color:var(--dim);font-weight:500">(1:'+levOf(sym)+')</span></span></div></div>'+
@@ -558,7 +572,6 @@ function screenAccount(){
     srow(I.fund,'Managed funds',(pammMine()!=null?fmtMoney(pammMine())+' ':(S.pamm&&S.pamm.length?S.pamm.length+' fund'+(S.pamm.length===1?'':'s')+' ':''))+chev,'sheet:pamm')+
     srow(I.bolt,'1-Click trading','<span class="tog'+(S.oneClick?' on':'')+'"><i></i></span>','toggleOneClick')+
     srow(I.look,'Appearance',(S.theme==='dark'?'Dark ':'Light ')+chev,'sheet:appearance')+
-    srow(I.bell,'Notifications','<span class="tog on"><i></i></span>','toast:Notifications — Stage 2')+
     srow(I.lock,'Security',chev,'toast:Security — Stage 2')+
     srow(I.doc,'Support',chev,'toast:Support — Stage 2')+
     '</div><div class="out" data-act="logout">Log out</div></div>';
@@ -579,7 +592,7 @@ function sheetHtml(){
   if(S.sheet==='pair'){
     inner='<div class="sttl">Select instrument<span class="x" data-act="sheet:">✕</span></div>'+
       '<div class="search">'+I.search+'<input id="pq" type="search" placeholder="Search symbol or name" value="'+esc(S.q)+'" autocomplete="off" autocorrect="off" autocapitalize="characters"></div>'+
-      '<div class="sseg">'+GROUPS.concat(['All']).map(function(g){return '<span class="'+(S.sheetSeg===g&&!S.q?'on':'')+'" data-act="seg:'+g+'">'+g+'</span>';}).join('')+'</div>'+
+      '<div class="sseg">'+liveGroups().concat(['All']).map(function(g){return '<span class="'+(S.sheetSeg===g&&!S.q?'on':'')+'" data-act="seg:'+g+'">'+g+'</span>';}).join('')+'</div>'+
       '<div class="plist">'+pairList()+'</div>';
   } else if(S.sheet==='ack'){
     inner='<div class="sttl">Turn on 1-Click trading?<span class="x" data-act="sheet:">✕</span></div><div class="body">Tapping <b>SELL</b> or <b>BUY</b> on the list places the order <b>immediately</b> at the shown price — there is no confirmation step. You can turn this off anytime from the ⚡ chip.</div>'+
