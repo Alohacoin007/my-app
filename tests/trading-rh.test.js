@@ -17,7 +17,7 @@ let pass = 0, fail = 0;
 const ok = (n, c, d) => { if (c) { pass++; console.log('  ✅ ' + n); } else { fail++; console.log('  ❌ ' + n + (d ? '  ' + d : '')); } };
 
 // ── (A) 소스 핀: 돈 코드 0줄 ──
-const src = fs.readFileSync(path.join(REPO, 'dev/trading-rh.html'), 'utf8');
+const src = fs.readFileSync(path.join(REPO, 'fx-app.html'), 'utf8');
 // rpc 허용목록 (2단계): 읽기 리포트 1 + 승인된 돈 RPC 8. 그 외 .rpc( 는 0건 — 헬퍼가 목록 밖 이름을 throw.
 const ALLOW = ['pamm_investor_report', 'fx_open', 'fx_modify', 'fx_close', 'fx_place_pending', 'fx_modify_pending', 'fx_cancel_pending', 'pamm_join', 'pamm_leave'];
 { const m = src.match(/var RPC_ALLOW=\{([^}]*)\}/); const keys = m ? m[1].split(',').map(x => x.split(':')[0].trim()).filter(Boolean) : [];
@@ -38,9 +38,9 @@ ok('M2 소스: pip 락스텝 (JPY .01 · XAU .01 · XAG .001 · else .0001)', /J
 ok('M4 소스: localStorage 에 잔고·포지션 저장 없음 (rh.theme/rh.oneClick/rh.oneClickAck/rh.mask/rh.homeSeg 만)', (src.match(/LS\.set\('rh\.[a-zA-Z]+'/g) || []).every(x => /rh\.(theme|oneClick|oneClickAck|mask|homeSeg)'/.test(x)) && !/localStorage\.setItem\(['"]alpexa\.(balances|fxLive|positions)/.test(src));
 ok('세션: trading.html 과 같은 로그인 게이트 + 세션 가드 (login.html 로 회귀)', /localStorage\.getItem\("alpexa\.me"\)/.test(src) && /rhToLogin\("\?expired=1"\)/.test(src) && /alpexa-sync\.js/.test(src));
 // 로그인 복귀: 모든 login.html 이동 전에 폐쇄 허용목록 토큰 fx-rh 를 sessionStorage 에 둔다 (URL 로 목적지 선택 불가 — login.html 계약 유지)
-ok('복귀 토큰: rhToLogin 이 alpexa.dest2=fx-rh 를 심고 ../login.html 로만 이동', /sessionStorage\.setItem\("alpexa\.dest2","fx-rh"\)/.test(src) && /location\.replace\("\.\.\/login\.html"\+/.test(src) && (src.match(/location\.replace\([^)]*login\.html/g) || []).length === 1);
+ok('복귀 토큰: rhToLogin 이 alpexa.dest2=fx-rh 를 심고 ../login.html 로만 이동', /sessionStorage\.setItem\("alpexa\.dest2","fx-rh"\)/.test(src) && /location\.replace\("login\.html"\+/.test(src) && (src.match(/location\.replace\([^)]*login\.html/g) || []).length === 1);
 { const login = fs.readFileSync(path.join(REPO, 'login.html'), 'utf8');
-  ok('login.html: fx-rh 토큰 → dev/trading-rh.html (고정 문자열, URL 파라미터 아님)', /dest2==='fx-rh'\)\s*return\s*'dev\/trading-rh\.html'/.test(login)); }
+  ok('login.html: fx-rh 토큰 → fx-app.html · 모바일 FX 기본 착지 = fx-app.html (고정 문자열, URL 파라미터 아님)', /dest2==='fx-rh'\)\s*return\s*'fx-app\.html'/.test(login) && /return mobile\?'fx-app\.html':'webtrade\.html'/.test(login)); }
 
 // ── (B) 헤드리스 행위 ──
 function findChromium() {
@@ -128,7 +128,7 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   await page.route('**/functions/v1/fx-prices*', (r) => { const u = new URL(r.request().url()); const n = +u.searchParams.get('n') || 200; const rows = []; const base = 1.157; for (let i = 0; i < Math.min(n, 60); i++) rows.push({ t: Date.now() - (60 - i) * 3600e3, o: base + i * 0.00002, h: base + 0.001, l: base - 0.001, c: base + i * 0.00003, v: 1 }); r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, candles: rows }) }); });
   const errs = []; page.on('pageerror', e => errs.push(e.message));
   await page.addInitScript(new Function('return ' + stubFn)());
-  await page.goto(`http://localhost:${PORT}/dev/trading-rh.html`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`http://localhost:${PORT}/fx-app.html`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__rh && window.__rh.ready, null, { timeout: 8000 }).catch(() => {});
   await page.waitForTimeout(300);
   ok('M6 로드 무에러', errs.length === 0, errs.join(' | '));
@@ -299,7 +299,7 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   await page.locator('.sheet .cta').click(); await page.waitForTimeout(350);
   const pl = await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'pamm_leave'));
   ok('Redeem all → pamm_leave(ref pamm-FX-850261-out-…, units null=전량) 1회', pl.length === 1 && /^pamm-FX-850261-out-\d+$/.test(pl[0].args.p_ref) && pl[0].args.p_units === null, JSON.stringify(pl.map(c => c.args)));
-  ok('Account: Deposit/Withdraw/Transfer = 기존 앱 링크 (새 돈 경로 0)', (await page.locator('.acts div[data-act="go:../trading.html"]').count()) === 3);
+  ok('Account: Deposit/Withdraw/Transfer = 예전 앱(trading.html) 링크 (새 돈 경로 0)', (await page.locator('.acts div[data-act="go:trading.html"]').count()) === 3);
   await page.locator('.srow[data-act="sheet:appearance"]').click(); await page.waitForTimeout(100);
   await page.locator('.opt2 div[data-act="theme:dark"]').click(); await page.waitForTimeout(100);
   ok('테마 스위치 → data-theme=dark', (await page.evaluate(() => document.documentElement.getAttribute('data-theme'))) === 'dark');

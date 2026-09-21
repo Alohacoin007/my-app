@@ -27,7 +27,7 @@ const parser = loadParser();
 // apps whose inline scripts must parse clean
 const APPS = ['crypto-live.html', 'sports-live.html', 'trading.html', 'index.html',
               'login.html', 'signup.html', 'manager-mobile.html', 'statement.html', 'webtrade.html',
-              'fx.html', 'agent.html', 'dev/trading-rh.html'];
+              'fx.html', 'agent.html', 'fx-app.html'];
 
 let fail = 0;
 

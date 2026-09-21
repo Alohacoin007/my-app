@@ -1366,7 +1366,7 @@ function ServerSwitcher({ cryptoBal }) {
     { id: 'fx',     label: 'Alpexa FX',   desc: 'FX · Stocks · Indices', code: 'FX', bal: effBal('fx', SB.fx) },
     { id: 'sports', label: 'Alpexa Sports', desc: 'Sports markets',      code: 'SP', bal: SB.sports },
   ];
-  const go = (id) => { if (id === 'fx') { window.location.href = 'trading.html'; return; } if (id === 'sports') { window.location.href = 'sports-live.html'; return; } setOpen(false); };
+  const go = (id) => { if (id === 'fx') { window.location.href = 'fx-app.html'; return; } if (id === 'sports') { window.location.href = 'sports-live.html'; return; } setOpen(false); };
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button aria-label="Switch server" onClick={() => setOpen((o) => !o)} style={{
@@ -1726,7 +1726,7 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
                   return (
                     <button
                       key={s.id}
-                      onClick={() => { if(s.id==='sports'){window.location.href='sports-live.html';return;} if(s.id==='fx'){window.location.href='trading.html';return;} setServer(s.id); setServerMenuOpen(false); }}
+                      onClick={() => { if(s.id==='sports'){window.location.href='sports-live.html';return;} if(s.id==='fx'){window.location.href='fx-app.html';return;} setServer(s.id); setServerMenuOpen(false); }}
                       style={{
                         width: '100%', textAlign: 'left',
                         background: active ? RH.surfaceUp : 'transparent',

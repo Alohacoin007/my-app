@@ -2843,7 +2843,7 @@ function ServerSwitcher({
   }];
   const go = id => {
     if (id === 'fx') {
-      window.location.href = 'trading.html';
+      window.location.href = 'fx-app.html';
       return;
     }
     if (id === 'sports') {
@@ -3554,7 +3554,7 @@ function Dashboard({
           return;
         }
         if (s.id === 'fx') {
-          window.location.href = 'trading.html';
+          window.location.href = 'fx-app.html';
           return;
         }
         setServer(s.id);

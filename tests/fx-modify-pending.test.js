@@ -19,7 +19,7 @@ ok('돈 이동 0: ledger·accounts·positions·settlements 언급 0', !/ledger|a
 ok('권한: anon/public revoke · authenticated 만 execute', /revoke all on function public\.fx_modify_pending\(text,numeric,numeric\) from public, anon;/.test(sql) && /grant execute on function public\.fx_modify_pending\(text,numeric,numeric\) to authenticated;/.test(sql));
 ok('음수·0 레벨 거절 (bad SL / bad TP)', /p_sl <= 0 then return jsonb_build_object\('ok',false,'error','bad SL'\)/.test(sql) && /p_tp <= 0 then return jsonb_build_object\('ok',false,'error','bad TP'\)/.test(sql));
 // 앱 쪽: 대기주문 SL/TP 는 이 RPC 로만 (직접 update 0)
-const app = fs.readFileSync(path.join(__dirname, '..', 'dev', 'trading-rh.html'), 'utf8');
+const app = fs.readFileSync(path.join(__dirname, '..', 'fx-app.html'), 'utf8');
 ok('앱: 대기주문 SL/TP 저장 = rpc fx_modify_pending 만 (fx_pending 직접 update 0)', /rpc\(kind==='pos'\?'fx_modify':'fx_modify_pending'/.test(app) && !/from\('fx_pending'\)[\s\S]{0,120}\.update\(/.test(app));
 console.log('\n' + (fail ? `🔴 fx_modify_pending FAIL — ${fail}건` : `🟢 fx_modify_pending — ${pass} pass`));
 process.exit(fail ? 1 : 0);

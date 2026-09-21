@@ -50,7 +50,7 @@ if (/get\('dest'\)/.test(lg)) bad('the dest= override must be fully gone (no ope
     const mk=(ua)=> new Function('navigator', fd+'\nreturn fxDest;')({userAgent:ua});
     const pc=mk('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'), mob=mk('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile');
     if(pc(0)!=='webtrade.html') bad('FX on a PC must land on the WebTrade terminal');
-    if(mob(0)!=='trading.html') bad('FX on a phone must land on the mobile FX app');
+    if(mob(0)!=='fx-app.html') bad('FX on a phone must land on the mobile FX app (fx-app.html, 2026-09-21 교체)');
     // 2026-07-17: crypto now device-routes like FX/Sports — PC dashboard, phone app.
     if(pc(1)!=='dev/crypto-dashboard.html'||mob(1)!=='crypto-live.html') bad('Crypto landing: PC=dashboard, phone=app');
     // Sports mirrors FX device routing (2026-07-15): PC → widget dashboard, phone → app.

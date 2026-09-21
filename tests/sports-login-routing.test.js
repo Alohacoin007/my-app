@@ -48,7 +48,7 @@ eq('Mobile + Sports (no token) = 폰 앱',          makeFxDest(PHONE)(2), 'sport
 
 // 4) FX (server 3): unchanged — the parallel we are matching.
 eq('PC + FX = webtrade 터미널',   makeFxDest(PC)(3), 'webtrade.html');
-eq('Mobile + FX = trading 앱',    makeFxDest(PHONE)(3), 'trading.html');
+eq('Mobile + FX = 새 FX 앱(fx-app)', makeFxDest(PHONE)(3), 'fx-app.html');
 
 // 5) Crypto (server 1) — 2026-07-17 계약 변경(사장님 지시): 크립토도 기기 라우팅.
 eq('Crypto PC = 크립토 대시보드', makeFxDest(PC)(1), 'dev/crypto-dashboard.html');

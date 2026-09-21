@@ -21,15 +21,15 @@
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<script src="../vendor/supabase.min.js?v=2"></script>
+<script src="vendor/supabase.min.js?v=2"></script>
 <script>
 /* Login gate — same rule as trading.html: a logged-in identity (email or authId) is required. */
-function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }catch(e){} location.replace("../login.html"+(q||"")); }   /* 복귀 토큰(폐쇄 허용목록) — login.html fxDest 가 1회 소비 → 이 프리뷰로 돌아온다 */
+function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }catch(e){} location.replace("login.html"+(q||"")); }   /* 복귀 토큰(폐쇄 허용목록) — login.html fxDest 가 1회 소비 → 이 프리뷰로 돌아온다 */
 (function(){try{var m=JSON.parse(localStorage.getItem("alpexa.me")||"null");if(!(m&&m.accts&&(m.email||m.authId))){rhToLogin("");}}catch(e){rhToLogin("");}})();
 /* #5: money is never truth in localStorage — purge any legacy money keys on load. */
 (function(){try{["alpexa.serverBalances","alpexa.balances","alpexa.fxLive","alpexa.positions"].forEach(function(k){localStorage.removeItem(k);});}catch(e){}})();
 </script>
-<script src="../alpexa-sync.js?v=16"></script>
+<script src="alpexa-sync.js?v=16"></script>
 <script>
 /* Session guard (same as the crypto/FX apps): reading your own positions/balance needs a real
    Supabase auth SESSION — without it RLS hides every row. No session → login. Per-tab flag prevents loops. */
@@ -642,7 +642,7 @@ function screenAccount(){
   var chev='<span style="color:var(--mute)">›</span>';
   return '<div class="acc"><div class="ttl">Account</div>'+
     '<div class="prof"><div class="av">'+esc(ini)+'</div><div><div class="nm">'+esc(nm)+'</div><div class="id">'+esc(fxAcct()||'—')+' <b>FX · 1:'+LEVERAGE_FX+'</b></div></div></div>'+
-    '<div class="acts"><div class="pri" data-act="go:../trading.html">Deposit</div><div data-act="go:../trading.html">Withdraw</div><div data-act="go:../trading.html">Transfer</div></div>'+
+    '<div class="acts"><div class="pri" data-act="go:trading.html">Deposit</div><div data-act="go:trading.html">Withdraw</div><div data-act="go:trading.html">Transfer</div></div>'+
     '<div class="list2">'+
     srow(I.fund,'Managed funds',(pammMine()!=null?fmtMoney(pammMine())+' ':(S.pamm&&S.pamm.length?S.pamm.length+' fund'+(S.pamm.length===1?'':'s')+' ':''))+chev,'sheet:pamm')+
     srow(I.bolt,'1-Click trading','<span class="tog'+(S.oneClick?' on':'')+'"><i></i></span>','toggleOneClick')+
@@ -676,8 +676,8 @@ function sheetHtml(){
     inner='<div class="sttl">Appearance<span class="x" data-act="sheet:">✕</span></div><div class="opt2"><div class="'+(S.theme!=='dark'?'on':'')+'" data-act="theme:light"><div class="sw l"></div>Light</div><div class="'+(S.theme==='dark'?'on':'')+'" data-act="theme:dark"><div class="sw d"></div>Dark</div></div><div class="body">Same layout in both — only colors change.</div>';
   } else if(S.sheet==='server'){
     inner='<div class="sttl">Switch server<span class="x" data-act="sheet:">✕</span></div>'+
-      '<div class="prow" data-act="go:../sports-live.html"><span class="chk"></span><div><div class="pn">Sports</div><div class="ds">Sportsbook</div></div><div class="ppx">›</div></div>'+
-      '<div class="prow" data-act="go:../crypto-live.html"><span class="chk"></span><div><div class="pn">Crypto</div><div class="ds">Wallet · trading · staking</div></div><div class="ppx">›</div></div>'+
+      '<div class="prow" data-act="go:sports-live.html"><span class="chk"></span><div><div class="pn">Sports</div><div class="ds">Sportsbook</div></div><div class="ppx">›</div></div>'+
+      '<div class="prow" data-act="go:crypto-live.html"><span class="chk"></span><div><div class="pn">Crypto</div><div class="ds">Wallet · trading · staking</div></div><div class="ppx">›</div></div>'+
       '<div class="prow on"><span class="chk">'+I.check+'</span><div><div class="pn">FX</div><div class="ds">You are here</div></div><div class="ppx"></div></div>';
   } else if(S.sheet.indexOf('ord:')===0){
     var o=S.pending.find(function(x){return x.id===S.sheet.slice(4);}); if(!o) return '';
