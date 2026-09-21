@@ -264,6 +264,9 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .sheet .ack { display: flex; align-items: center; gap: 10px; margin: 0 22px 16px; padding: 10px 12px; border-radius: 12px; background: var(--surface); font-size: 12px; }
   .sheet .ack i { width: 18px; height: 18px; border-radius: 50%; background: var(--up); display: inline-grid; place-items: center; color: #0B0D0E; flex: none; }
   .sheet .ack i svg { width: 11px; height: 11px; }
+  .seg3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 4px; margin: 0 22px 14px; padding: 4px; background: var(--surface); border-radius: 14px; }   /* 크기 동일한 3분할 (사장님 2026-09-21 "사이즈가 안 맞아") */
+  .seg3 div { text-align: center; padding: 10px 0; border-radius: 11px; font-size: 13px; font-weight: 700; color: var(--dim); cursor: pointer; }
+  .seg3 div.on { background: var(--bg); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
   .opt2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 22px 14px; }
   .opt2 div { border: 1.5px solid var(--line); border-radius: 14px; padding: 10px; text-align: center; font-size: 12px; font-weight: 700; cursor: pointer; }
   .opt2 div.on { border-color: var(--up); }
@@ -382,7 +385,8 @@ var S = {
   theme: LS.get('rh.theme','light'), actTab:'positions',
   feed:{}, marks:{}, specs:{}, cash:null, positions:[], pending:[], history:[], candles:{}, dayOpen:{}, scrub:null, toast:null, ready:false,
 };
-document.documentElement.setAttribute('data-theme', S.theme==='dark'?'dark':'light');
+function applyTheme(){ var t=S.theme==='system' ? ((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light') : (S.theme==='dark'?'dark':'light'); document.documentElement.setAttribute('data-theme', t); }
+applyTheme(); try{ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(){ if(S.theme==='system'){ applyTheme(); render(); } }); }catch(e){}
 function me(){ try{ var m=JSON.parse(localStorage.getItem('alpexa.me')||'null'); return (m&&m.accts)?m:null; }catch(e){ return null; } }
 function fxAcct(){ var m=me(); return m&&m.accts&&m.accts.fx?String(m.accts.fx):''; }
 function db(){ return (window.AlpexaSync&&AlpexaSync.db)?AlpexaSync.db:null; }
@@ -605,7 +609,7 @@ function screenTrade(){
     '<div class="head"><div class="nm" data-act="sheet:pair">'+sym+'<span class="chev">'+I.chev+'</span></div><div class="sub">'+esc(nameOf(sym))+(fresh?'':' · <span class="down">feed stale</span>')+'</div>'+
     '<div class="px">'+fmtPx(mid,sym,true)+'</div>'+
     '<div class="chg '+(chg==null?'':(chg>=0?'up':'down'))+'">'+(chg==null?'<span class="t">—</span>':(chg>=0?'▲ ':'▼ ')+Math.abs(chg).toFixed(digitsOf(sym))+' ('+(chg>=0?'+':'−')+Math.abs(chgPct).toFixed(2)+'%) <span class="t">Today</span>')+'</div>'+
-    '<div class="quote"><b>B</b> '+fmtPx(bid,sym)+' <i>–</i> '+fmtPx(ask,sym)+' <b>A</b></div></div>'+
+    '</div>'+   /* B/A 줄 제거 — 아래 주문 버튼이 매도/매수가를 보여줌 (사장님 2026-09-21) */
     '<div class="chart" id="chart">'+lineChart(cd.rows,{loading:cd.loading})+'</div>'+
     myPositionLine(sym)+
     '<div class="ranges">'+TF.map(function(t){ return '<span class="'+(t[1]===S.tf?'on':(t[1]?'':'na'))+'" data-act="tf:'+(t[1]||'')+'">'+t[0]+'</span>'; }).join('')+'</div>'+
@@ -654,7 +658,7 @@ function screenAccount(){
     '<div class="list2">'+
     srow(I.fund,'Managed funds',(pammMine()!=null?fmtMoney(pammMine())+' ':(S.pamm&&S.pamm.length?S.pamm.length+' fund'+(S.pamm.length===1?'':'s')+' ':''))+chev,'sheet:pamm')+
     srow(I.bolt,'1-Click trading','<span class="tog'+(S.oneClick?' on':'')+'"><i></i></span>','toggleOneClick')+
-    srow(I.look,'Appearance',(S.theme==='dark'?'Dark ':'Light ')+chev,'sheet:appearance')+
+    srow(I.look,'Appearance',(S.theme==='dark'?'Dark ':S.theme==='system'?'System ':'Light ')+chev,'sheet:appearance')+
     srow(I.lock,'Security',chev,'toast:Security — coming soon')+
     srow(I.doc,'Support',chev,'toast:Support — coming soon')+
     '</div><div class="out" data-act="logout">Log out</div></div>';
@@ -681,7 +685,7 @@ function sheetHtml(){
     inner='<div class="sttl">Turn on 1-Click trading?<span class="x" data-act="sheet:">✕</span></div><div class="body">Tapping <b>SELL</b> or <b>BUY</b> on the list places the order <b>immediately</b> at the shown price — there is no confirmation step. You can turn this off anytime from the ⚡ chip.</div>'+
       '<div class="ack"><i>'+I.check+'</i>I understand orders execute instantly</div><div class="cta" data-act="ackOn">Turn on 1-Click</div><div class="ghost" data-act="sheet:">Not now</div>';
   } else if(S.sheet==='appearance'){
-    inner='<div class="sttl">Appearance<span class="x" data-act="sheet:">✕</span></div><div class="opt2"><div class="'+(S.theme!=='dark'?'on':'')+'" data-act="theme:light"><div class="sw l"></div>Light</div><div class="'+(S.theme==='dark'?'on':'')+'" data-act="theme:dark"><div class="sw d"></div>Dark</div></div><div class="body">Same layout in both — only colors change.</div>';
+    inner='<div class="sttl">Appearance<span class="x" data-act="sheet:">✕</span></div><div class="seg3">'+[['light','Light'],['dark','Dark'],['system','System']].map(function(o){ return '<div class="'+(S.theme===o[0]?'on':'')+'" data-act="theme:'+o[0]+'">'+o[1]+'</div>'; }).join('')+'</div><div class="body">System follows your phone setting. Same layout in all — only colors change.</div>';
   } else if(S.sheet==='server'){
     inner='<div class="sttl">Switch server<span class="x" data-act="sheet:">✕</span></div>'+
       '<div class="prow" data-act="go:sports-live.html"><span class="chk"></span><div><div class="pn">Sports</div><div class="ds">Sportsbook</div></div><div class="ppx">›</div></div>'+
@@ -818,7 +822,7 @@ function act(a){
   else if(k==='toggleOneClick'){ if(S.oneClick){ S.oneClick=false; LS.set('rh.oneClick','0'); } else if(S.ack){ S.oneClick=true; LS.set('rh.oneClick','1'); } else { S.sheet='ack'; } }
   else if(k==='ackOn'){ S.ack=true; LS.set('rh.oneClickAck','1'); S.oneClick=true; LS.set('rh.oneClick','1'); S.sheet=null; }
   else if(k==='toggleMask'){ S.masked=!S.masked; LS.set('rh.mask',S.masked?'1':'0'); }
-  else if(k==='theme'){ S.theme=v; LS.set('rh.theme',v); document.documentElement.setAttribute('data-theme',v==='dark'?'dark':'light'); }
+  else if(k==='theme'){ S.theme=v; LS.set('rh.theme',v); applyTheme(); }
   else if(k==='sheet'){ if(S.busy&&v) return; S.sheet=v||null; if(v==='pair'){ S.q=''; instruments(S.sheetSeg).slice(0,24).forEach(function(c){ pullDayOpen(c.sym); }); } if(v==='pamm') pullPamm();
     if(v&&v.indexOf('sltp:')===0){ var kind=v.split(':')[1], id=v.split(':')[2];                                        // SL/TP editor: seed from the row (or side-aware defaults)
       if(kind==='pos'){ var pp=S.positions.find(function(x){return x.id===id;}); if(pp){ S.mSym=pp.sym; S.mSide=pp.side; S.mRef=midOf(pp.sym)||pp.open; S.mSl=pp.sl||0; S.mTp=pp.tp||0; } }

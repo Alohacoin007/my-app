@@ -230,7 +230,7 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   // Trade screen
   await page.locator('.tab[data-act="tab:trade"]').click(); await page.waitForTimeout(500);
   ok('M6 Trade: 차트 SVG 렌더 (스텁 봉)', (await page.locator('#chart svg').count()) === 1);
-  ok('M2 Trade: B/A 줄 = bid – ask 락스텝', (await page.locator('.det .quote').innerText()).replace(/\s/g, '').indexOf(bid('EURUSD').toFixed(5) + '–' + ask('EURUSD').toFixed(5)) >= 0);
+  ok('Trade: B/A 줄 없음 (주문 버튼이 매도/매수가) · 버튼 = bid/ask 락스텝', (await page.locator('.det .quote').count()) === 0 && (await page.locator('.foot .btn.sell').innerText()).replace(/\s/g, '').indexOf(bid('EURUSD').toFixed(5)) >= 0 && (await page.locator('.foot .btn.buy').innerText()).replace(/\s/g, '').indexOf(ask('EURUSD').toFixed(5)) >= 0);
   await page.locator('.foot .btn.buy').click(); await page.waitForTimeout(150);
   const cf = await page.locator('.sheet').innerText().catch(() => '');
   ok('OFF 주문 버튼 → 확인 시트 (Confirm order · Price now · ±3 pips · Margin)', /Confirm order/.test(cf) && /Price now/.test(cf) && /3 pips/.test(cf) && /Margin/.test(cf) && (await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'fx_open').length)) === 1, cf.replace(/\n/g, ' ').slice(0, 160));
@@ -276,7 +276,6 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
     await page.locator('.det .mine').click(); await page.waitForTimeout(150);
     await page.locator('.sheet .acts div[data-act^="close:"]').click(); await page.waitForTimeout(350);
     ok('Close position → fx_close(P1) (총 2회: ✕ 1 + 시트 1)', (await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'fx_close' && x.args.p_local_id === 'P1').length)) === 2); }
-  ok('Trade: B/A 줄은 모노 아니고 본문 서체 (위 변동 줄과 동일)', !/Mono/.test(await page.locator('.det .quote').evaluate(el => getComputedStyle(el).fontFamily)));
   ok('Market 주문: SL/TP 접힘 폴드 있음', (await page.locator('.fold[data-act="sltp"]').count()) === 1);
   { const bb = await page.locator('.foot .lotrow .lots span').first().boundingBox(); const sm = await page.locator('.foot .lotrow .lots small').first().evaluate(el => getComputedStyle(el).display);
     ok('Trade 볼륨 스테퍼 "0.10 lot" 한 줄 (small inline · 한 줄 높이 < 40px, 두 줄이면 50px+)', sm === 'inline' && bb && bb.height < 40, 'display=' + sm + ' h=' + (bb && bb.height));
@@ -321,8 +320,13 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   ok('Redeem all → pamm_leave(ref pamm-FX-850261-out-…, units null=전량) 1회', pl.length === 1 && /^pamm-FX-850261-out-\d+$/.test(pl[0].args.p_ref) && pl[0].args.p_units === null, JSON.stringify(pl.map(c => c.args)));
   ok('Account: Deposit/Withdraw/Transfer = 예전 앱(trading.html) 링크 (새 돈 경로 0)', (await page.locator('.acts div[data-act="go:trading.html"]').count()) === 3);
   await page.locator('.srow[data-act="sheet:appearance"]').click(); await page.waitForTimeout(100);
-  await page.locator('.opt2 div[data-act="theme:dark"]').click(); await page.waitForTimeout(100);
+  { const ws = await page.locator('.seg3 div').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().width)));
+    ok('Appearance = 3분할 세그먼트 (Light · Dark · System) · 칸 너비 전부 동일', ws.length === 3 && ws.every(w => Math.abs(w - ws[0]) <= 1), ws.join(',')); }
+  await page.locator('.seg3 div[data-act="theme:dark"]').click(); await page.waitForTimeout(100);
   ok('테마 스위치 → data-theme=dark', (await page.evaluate(() => document.documentElement.getAttribute('data-theme'))) === 'dark');
+  await page.emulateMedia({ colorScheme: 'light' }); await page.locator('.seg3 div[data-act="theme:system"]').click(); await page.waitForTimeout(100);
+  ok('System = 폰 설정 따라감 (light 에뮬레이션 → data-theme=light)', (await page.evaluate(() => document.documentElement.getAttribute('data-theme'))) === 'light');
+  await page.locator('.seg3 div[data-act="theme:dark"]').click(); await page.waitForTimeout(100);
   // M1 runtime
   const rpc = await page.evaluate(() => window.__rpcCalls || 0), writes = await page.evaluate(() => window.__writeCalls || 0);
   const names = await page.evaluate(() => (window.__rpcLog || []).map(x => x.name));
