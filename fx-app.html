@@ -673,7 +673,8 @@ function screenHome(){
   return topBar()+hero()+
     (function(){ var lg=liveGroups(); if(lg.indexOf(S.homeSeg)<0) S.homeSeg='FX';   // saved group lost its feed → fall back
       return lg.length>1 ? '<div class="sseg hseg">'+lg.map(function(g){ return '<span class="'+(S.homeSeg===g?'on':'')+'" data-act="hseg:'+g+'">'+g+'</span>'; }).join('')+'</div>' : ''; })()+
-    '<div class="hd"><div class="lots"><b data-act="lots:-">−</b><span>'+S.lots.toFixed(2)+'<small>lot</small></span><b data-act="lots:+">+</b></div><div class="cols"><span>SELL</span><span>BUY</span></div></div>'+
+    /* 랏 스테퍼는 1-Click ON 일 때만 (사장님 2026-09-22 "2번 실행"): OFF 면 탭이 Trade 화면으로 가서 거기서 수량을 정하므로 홈의 스테퍼는 쓰이지 않는 컨트롤 */
+    '<div class="hd">'+(S.oneClick?'<div class="lots"><b data-act="lots:-">−</b><span>'+S.lots.toFixed(2)+'<small>lot</small></span><b data-act="lots:+">+</b></div>':'<div></div>')+'<div class="cols"><span>SELL</span><span>BUY</span></div></div>'+
     '<div class="list">'+homeRows()+'</div>';
 }
 function lineChart(rows, opts){

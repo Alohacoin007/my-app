@@ -212,6 +212,10 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   await page.locator('.tab[data-act="tab:home"]').click(); await page.waitForTimeout(200);
   ok('M4 localStorage: rh.* 에 돈 없음 · 1-Click 설정만 저장', await page.evaluate(() => localStorage.getItem('rh.oneClick') !== null && !Object.keys(localStorage).some(k => /bal|pos|equity|cash|order|pnl/i.test(k))));
   await page.evaluate(() => act('pick:EURUSD')); await page.waitForTimeout(120);   // back to EURUSD for the trade-screen checks
+  // 홈 스테퍼 = 1-Click ON 일 때만 (2026-09-22 "2번 실행") — OFF 는 Trade 화면에서 수량을 정하므로 홈에 컨트롤 없음, 열 제목은 유지
+  ok('1-Click OFF: 홈 랏 스테퍼 없음 · SELL/BUY 열 제목 유지', (await page.locator('.hd .lots').count()) === 0 && (await page.locator('.hd .cols').count()) === 1);
+  await page.evaluate(() => act('toggleOneClick')); await page.waitForTimeout(120);
+  ok('1-Click ON: 홈 랏 스테퍼 나타남', (await page.locator('.hd .lots').count()) === 1 && (await page.locator('.app.oc-on').count()) === 1);
   // stepper: tap = +0.01 · press-and-hold = accelerates
   await page.locator('.hd .lots b[data-act="lots:+"]').click(); await page.waitForTimeout(80);
   ok('스테퍼 탭 1회 = +0.01 (0.10 → 0.11)', Math.abs((await page.evaluate(() => window.__rh.lots)) - 0.11) < 1e-9);
@@ -219,6 +223,8 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   const heldLots = await page.evaluate(() => window.__rh.lots);
   ok('스테퍼 길게 누르기 1.4s → 가속 (0.11 → ≥ 0.40, 실측 ' + heldLots.toFixed(2) + ')', heldLots >= 0.40, String(heldLots));
   ok('스테퍼 표시 = 상태 (길게 누른 뒤 화면 값 일치)', (await page.locator('.hd .lots span').innerText()).replace(/\s/g, '').indexOf(heldLots.toFixed(2)) === 0);
+  await page.evaluate(() => act('toggleOneClick')); await page.waitForTimeout(120);   // back to OFF for the confirm-sheet checks below
+  ok('1-Click 다시 OFF → 홈 스테퍼 사라짐', (await page.locator('.hd .lots').count()) === 0);
   // Activity
   await page.locator('.tab[data-act="tab:activity"]').click(); await page.waitForTimeout(400);
   ok('M6 Activity: 포지션 3행 (서버 positions — FX 2 + STOCK 1)', (await page.locator('.arow.px').count()) === 3);
