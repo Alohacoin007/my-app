@@ -45,6 +45,7 @@ ok('M1 소스: 승인 밖 돈 경로 0 (place_bet · admin RPC · functions.invo
 ok('레이아웃: 4개 화면 상단 전부 safe-area-inset-top 여백 (홈 .top · 트레이드 .det .head · 목록 .ttl) — 노치 겹침 0', /\.top \{[^}]*env\(safe-area-inset-top/.test(src) && /\.det \.head \{[^}]*env\(safe-area-inset-top/.test(src) && /\.ttl \{[^}]*env\(safe-area-inset-top/.test(src));
 ok('터치: 렌더 = DOM morph (app.innerHTML 통째 교체 0) + 터치 중 배경 렌더 보류', !/app\.innerHTML\s*=/.test(src) && /function morph\(o, n\)/.test(src) && /if\(touching&&!force\)\{ renderQueued=true; return; \}/.test(src));
 ok('터치: 요청 타임아웃 = rpc·pushRequest 전부 withTimeout 경유 · busy 감시자(45s) 가 1초 루프에서 돈다 · 버튼/행에 user-select none (iOS 길게누름 선택 차단)', /await withTimeout\(d\.rpc\(name, args\)\)/.test(src) && (src.match(/withTimeout\(AlpexaSync\.pushRequest\(/g) || []).length === 2 && /function busyWatchdog\(\)\{ if\(S\.busy&&S\.busySince&&Date\.now\(\)-S\.busySince>45000\)/.test(src) && /setInterval\(function\(\)\{ busyWatchdog\(\);/.test(src) && /\[data-act\], \.tabs, \.row, \.arow, \.srow, \.prow, \.chips[^}]*user-select: none/.test(src) && /input, textarea \{ -webkit-user-select: text; user-select: text; \}/.test(src));
+ok('푸터: 탭 히트 영역이 화면 바닥까지 (.tab 이 safe-area 패딩을 품음 · .tabs 하단 패딩 0) · 글자는 안전영역 위 ≥6px', /\.tabs \{[^}]*padding: 0 6px;/.test(src) && /\.tab \{[^}]*padding: 7px 0 max\(10px, calc\(env\(safe-area-inset-bottom, 0px\) - 6px\)\)/.test(src));
 ok('터치: 모든 [data-act] 요소에 cursor:pointer (iOS 문서 위임 클릭 조건) + touch-action manipulation', /\[data-act\], \[data-act\] \* \{ cursor: pointer; \}/.test(src) && /\[data-act\] \{[^}]*touch-action: manipulation/.test(src));
 ok('M2 소스: half = max(0.1, spr+mk)*pip/2 (fx_close v_half 미러)', /Math\.max\(0\.1,\s*spr\+mk\)\*fxPip\(sym\)\/2/.test(src));
 ok('M2 소스: 비FX half = mid*max(floorBps[cls], spr)/10000/2 (fx_close v_half else-branch 미러) · 계약/클래스 = fx_specs 런타임', /mid\*\(Math\.max\(SPREAD_BPS\[cls\]\|\|0, spr\)\/10000\)\/2/.test(src) && /from\('fx_specs'\)\.select\('symbol,cls,contract'\)/.test(src) && /SPREAD_BPS=\{CRYPTO:10,STOCK:8,INDEX:6\}/.test(src));
@@ -155,6 +156,8 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   await page.waitForTimeout(300);
   ok('M6 로드 무에러', errs.length === 0, errs.join(' | '));
   ok('M6 홈: FX 그룹 10행 (금·은은 Metals 칩으로)', (await page.locator('.row').count()) === 10);
+  { const tb = await page.locator('.tab[data-act="tab:trade"]').boundingBox(); const vh = await page.evaluate(() => innerHeight);
+    ok('푸터 런타임: .tab 히트 영역 바닥 = 뷰포트 바닥 (' + Math.round(tb.y + tb.height) + '/' + vh + ') · 높이 ≥ 44px', tb && Math.abs((tb.y + tb.height) - vh) <= 1 && tb.height >= 44, JSON.stringify(tb)); }
   { const keep = await page.evaluate(() => { window.__probe = document.querySelector('.tab[data-act="tab:trade"]'); window.__probeRow = document.querySelector('.row[data-sym="EURUSD"] .btn.buy'); return !!window.__probe; });
     await page.waitForTimeout(2300);   // 1초 재도색 2회 이상 지나감
     const alive = await page.evaluate(() => window.__probe.isConnected && window.__probeRow.isConnected && document.contains(window.__probe));
