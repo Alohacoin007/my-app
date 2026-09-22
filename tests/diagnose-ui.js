@@ -15,7 +15,7 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 
-const DEPLOYED = ['crypto-live.html', 'sports-live.html', 'trading.html', 'manager-mobile.html'];
+const DEPLOYED = ['crypto-live.html', 'sports-live.html', 'trading.html', 'fx-app.html', 'manager-mobile.html'];
 
 const CHECKS = [
   // Hardcoded non-zero money in a data literal = demo/seed balance that can show before (or

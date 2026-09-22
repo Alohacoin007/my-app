@@ -19,9 +19,14 @@ const ok = (n, c, d) => { if (c) { pass++; console.log('  ✅ ' + n); } else { f
 // ── (A) 소스 핀: 돈 코드 0줄 ──
 const src = fs.readFileSync(path.join(REPO, 'fx-app.html'), 'utf8');
 // rpc 허용목록 (2단계): 읽기 리포트 1 + 승인된 돈 RPC 8. 그 외 .rpc( 는 0건 — 헬퍼가 목록 밖 이름을 throw.
-const ALLOW = ['pamm_investor_report', 'fx_open', 'fx_modify', 'fx_close', 'fx_place_pending', 'fx_modify_pending', 'fx_cancel_pending', 'pamm_join', 'pamm_leave'];
+// 2026-09-21 사장님 "1 2 3 진행해": 입금·출금 = requests 행 insert(AlpexaSync.pushRequest, 승인 전 잔고 불변) · 이체 = app_transfer RPC → 10개.
+const ALLOW = ['pamm_investor_report', 'fx_open', 'fx_modify', 'fx_close', 'fx_place_pending', 'fx_modify_pending', 'fx_cancel_pending', 'pamm_join', 'pamm_leave', 'app_transfer'];
 { const m = src.match(/var RPC_ALLOW=\{([^}]*)\}/); const keys = m ? m[1].split(',').map(x => x.split(':')[0].trim()).filter(Boolean) : [];
-  ok('M1 소스: RPC_ALLOW = 승인된 9개와 정확히 일치', keys.length === ALLOW.length && ALLOW.every(k => keys.includes(k)), keys.join(','));
+  ok('M1 소스: RPC_ALLOW = 승인된 10개와 정확히 일치', keys.length === ALLOW.length && ALLOW.every(k => keys.includes(k)), keys.join(','));
+  // 입출금 = 기존 앱과 같은 단일 경로(AlpexaSync.pushRequest → requests insert). 앱 소스에 직접 insert 0, 잔고를 만지는 코드 0.
+  ok('M7 소스: 입금·출금 = AlpexaSync.pushRequest 만 (직접 .insert( 0) · 이체 = rpc(app_transfer) p_ref xfer- 멱등', (src.match(/AlpexaSync\.pushRequest\(/g) || []).length >= 1 && !/\.insert\(/.test(src) && /rpc\('app_transfer',\{ p_ref:ref, p_from:fxAcct\(\), p_to:to, p_amount:amt \}\)/.test(src) && /var ref='xfer-'/.test(src));
+  ok('M7 소스: Account 버튼 = 앱 내 시트 (sheet:deposit · sheet:withdraw · sheet:transfer) · 옛 앱 링크 0', /data-act="sheet:deposit"/.test(src) && /data-act="sheet:withdraw"/.test(src) && /data-act="sheet:transfer"/.test(src) && !/go:trading\.html/.test(src));
+  ok('M7 소스: 출금 은행 정보가 서버 address 필드에 실린다 (옛 앱은 입력만 받고 안 보냈음)', /address:\s*\(?\s*method==='wallet'/.test(src) || /address:addr/.test(src));
   const dyn = (src.match(/\.rpc\(/g) || []).length, lit = (src.match(/\.rpc\('pamm_investor_report'\)/g) || []).length;
   ok('M1 소스: supabase .rpc( 호출 지점 = 헬퍼 1 + 읽기 전용 리포트 1 (그 외 직접 호출 0)', dyn === 2 && lit === 1, 'dyn=' + dyn + ' lit=' + lit);
   const names = (src.match(/\brpc\('([a-z_]+)'/g) || []).map(x => x.match(/'([a-z_]+)'/)[1]);
@@ -35,7 +40,7 @@ const ALLOW = ['pamm_investor_report', 'fx_open', 'fx_modify', 'fx_close', 'fx_p
   ok('풀앱 소스: Security = auth.updateUser + signOut(global) 만 (테이블 쓰기 0) · Support = tel/mailto 만 (백엔드 0)', /auth\.updateUser\(\{ password:p1 \}\)/.test(src) && /signOut\(\{ scope:'global' \}\)/.test(src) && /mailto:support@alpexa\.com\?subject=/.test(src) && /go:tel:\+41225559900/.test(src) && !/2-Factor|Active Sessions/.test(src));
   ok('M1 소스: 잔고·손익을 클라가 계산해 저장하는 코드 0 (S\.cash 는 서버 pull 에서만 대입)', (src.match(/S\.cash\s*=/g) || []).length === 1 && /S\.cash=\+r\.data\[0\]\.balance/.test(src)); }
 ok('M1 소스: ledger / positions / fx_pending 에 insert·update·upsert·delete 없음', !/\.from\(['"](ledger|positions|fx_pending|accounts)['"]\)[\s\S]{0,200}\.(insert|update|upsert|delete)\(/.test(src));
-ok('M1 소스: 승인 밖 돈 경로 0 (app_transfer · place_bet · functions.invoke fx/broker/withdraw)', !/rpc\(\s*['"](app_transfer|place_bet|fx_open_admin|fx_admin)/.test(src) && !/functions\.invoke\(\s*['"](fx|broker|withdraw)/.test(src));
+ok('M1 소스: 승인 밖 돈 경로 0 (place_bet · admin RPC · functions.invoke fx/broker/withdraw)', !/rpc\(\s*['"](place_bet|fx_open_admin|fx_admin|admin_set_balance|crypto_trade|withdraw_hold)/.test(src) && !/functions\.invoke\(\s*['"](fx|broker|withdraw)/.test(src));
 ok('레이아웃: 4개 화면 상단 전부 safe-area-inset-top 여백 (홈 .top · 트레이드 .det .head · 목록 .ttl) — 노치 겹침 0', /\.top \{[^}]*env\(safe-area-inset-top/.test(src) && /\.det \.head \{[^}]*env\(safe-area-inset-top/.test(src) && /\.ttl \{[^}]*env\(safe-area-inset-top/.test(src));
 ok('터치: 렌더 = DOM morph (app.innerHTML 통째 교체 0) + 터치 중 배경 렌더 보류', !/app\.innerHTML\s*=/.test(src) && /function morph\(o, n\)/.test(src) && /if\(touching&&!force\)\{ renderQueued=true; return; \}/.test(src));
 ok('터치: 모든 [data-act] 요소에 cursor:pointer (iOS 문서 위임 클릭 조건) + touch-action manipulation', /\[data-act\], \[data-act\] \* \{ cursor: pointer; \}/.test(src) && /\[data-act\] \{[^}]*touch-action: manipulation/.test(src));
@@ -91,8 +96,10 @@ const stubFn = `() => {
       if (t === 'fx_specs') return { data: SPECS };
       if (t === 'fx_pending') return { data: [{ local_id: 'O1', symbol: 'EURUSD', side: 'BUY', size: 0.1, otype: 'LIMIT', trigger: 1.155, sl: 0, tp: 0, status: 'pending', created_at: new Date().toISOString() }] };
       if (t === 'settlements') return { data: [{ local_id: 'H1', ticket: 'FX-1', symbol: 'GBPUSD', stake: 0.2, pnl: -44, detail: 'BUY 0.20 @ 1.35410 → 1.35190 SL', created_at: new Date().toISOString() }] };
+      if (t === 'requests') { if (o._ins && o._ins.type === 'withdraw' && o._ins.amount > CASH) return { error: { message: 'Amount plus pending withdrawals ($0) exceeds your withdrawable balance (max $' + CASH + ')' } };   // guard_withdraw_request 트리거
+        return { data: [{ local_id: 'D0', type: 'deposit', amount: 500, status: 'approved', network: 'bank', created_at: new Date(Date.now() - 86400e3).toISOString() }] }; }
       return { data: [] }; } };
-    o.insert = o.update = o.upsert = o.delete = () => { window.__writeCalls = (window.__writeCalls||0) + 1; return o; };
+    o.insert = o.update = o.upsert = o.delete = (row) => { window.__writeCalls = (window.__writeCalls||0) + 1; window.__writeLog = (window.__writeLog||[]).concat([{ t, row }]); o._ins = row; return o; };
     return o; };
   window.supabase = { createClient: () => ({
     auth: { getSession: async () => ({ data: { session: { user: { id: 'auth-1' } } } }), signOut: async (o) => { try { sessionStorage.setItem('__signOut', JSON.stringify(o || {})); } catch (e) {} return {}; },
@@ -105,6 +112,7 @@ const stubFn = `() => {
       if (name === 'fx_modify' || name === 'fx_modify_pending' || name === 'fx_place_pending' || name === 'fx_cancel_pending') return { data: { ok: true }, error: null };
       if (name === 'pamm_join') return { data: { ok: true, units: 111.97, nav: 2.2329 }, error: null };
       if (name === 'pamm_leave') return { data: { ok: true, gross: 223.29, fee: 0, net: 223.29, nav: 2.2329 }, error: null };
+      if (name === 'app_transfer') return { data: args.p_amount > CASH ? { ok: false, error: 'insufficient balance', balance: CASH } : { ok: true, ref: args.p_ref }, error: null };
       window.__rpcCalls++; return { data: { ok: false, error: 'unexpected rpc ' + name }, error: null }; },
     functions: { invoke: async () => ({ error: { message: 'stub' } }) },
     channel: () => { const c = { on: () => c, subscribe: () => c }; return c; },
@@ -336,7 +344,57 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   await page.locator('.sheet .cta').click(); await page.waitForTimeout(350);
   const pl = await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'pamm_leave'));
   ok('Redeem all → pamm_leave(ref pamm-FX-850261-out-…, units null=전량) 1회', pl.length === 1 && /^pamm-FX-850261-out-\d+$/.test(pl[0].args.p_ref) && pl[0].args.p_units === null, JSON.stringify(pl.map(c => c.args)));
-  ok('Account: Deposit/Withdraw/Transfer = 예전 앱(trading.html) 링크 (새 돈 경로 0)', (await page.locator('.acts div[data-act="go:trading.html"]').count()) === 3);
+  // ── M7 입금·출금·이체 (2026-09-21 승인 "1 2 3 진행해") ──
+  ok('M7 Account: Deposit/Withdraw/Transfer = 앱 내 시트 3 · 옛 앱 링크 0', (await page.locator('.acc .acts div[data-act^="sheet:"]').count()) === 3 && (await page.locator('[data-act="go:trading.html"]').count()) === 0);
+  const writesBefore = await page.evaluate(() => (window.__writeLog || []).length);
+  // Deposit
+  await page.locator('.acc .acts div[data-act="sheet:deposit"]').click(); await page.waitForTimeout(200);
+  const dp = await page.locator('.sheet').innerText().catch(() => '');
+  ok('M7 입금 시트: 방법 칩(Bank wire · USDT · Card) · 은행 안내 + 참조 ALPX-C-1 · 금액 입력', /Deposit/.test(dp) && /Bank wire/.test(dp) && /USDT/.test(dp) && /Card/.test(dp) && /ALPX-C-1/.test(dp) && (await page.locator('#amtIn').count()) === 1, dp.replace(/\n/g, ' ').slice(0, 220));
+  await page.locator('.sheet .cta').click(); await page.waitForTimeout(120);
+  ok('M7 입금: 금액 없이 제출 → 토스트 · 서버 쓰기 0', /amount/i.test(await page.locator('.toast').innerText().catch(() => '')) && (await page.evaluate(() => (window.__writeLog || []).length)) === writesBefore);
+  await page.locator('#amtIn').fill('250'); await page.waitForTimeout(80);
+  ok('M7 입금: 금액 입력 → CTA 에 금액 반영 (I\'ve sent $250.00)', /\$250\.00/.test(await page.locator('.sheet .cta').innerText()));
+  await page.evaluate(() => { const c = document.querySelector('.sheet .cta'); c.click(); c.click(); }); await page.waitForTimeout(400);   // double-tap
+  const wl1 = await page.evaluate(() => (window.__writeLog || []).slice());
+  ok('M7 입금 제출(더블탭) → requests insert 정확히 1행 {type deposit · server FX · acct FX-850261 · 250 · bank · pending} · 잔고 불변 · 시트 닫힘', wl1.length === writesBefore + 1 && wl1[wl1.length - 1].t === 'requests' && (r => r.type === 'deposit' && r.server === 'FX' && r.acct_no === 'FX-850261' && r.amount === 250 && r.network === 'bank' && r.status === 'pending' && /^R-/.test(r.local_id))(wl1[wl1.length - 1].row) && (await page.evaluate(() => window.__rh.cash)) === CASH && (await page.locator('.sheet').count()) === 0, JSON.stringify(wl1.slice(-1)));
+  ok('M7 입금 토스트 = pending approval', /pending approval/i.test(await page.locator('.toast').innerText().catch(() => '')));
+  // Withdraw — wallet
+  await page.locator('.acc .acts div[data-act="sheet:withdraw"]').click(); await page.waitForTimeout(200);
+  const wd = await page.locator('.sheet').innerText().catch(() => '');
+  ok('M7 출금 시트: 방법 칩(Bank · USDT wallet) · Available 표시 · 금액 입력', /Withdraw/.test(wd) && /Bank/.test(wd) && /wallet/i.test(wd) && /Available \$12,322\.91/i.test(wd) && (await page.locator('#amtIn').count()) === 1, wd.replace(/\n/g, ' ').slice(0, 200));
+  await page.locator('.sheet .chips span[data-act="wmethod:wallet"]').click(); await page.waitForTimeout(120);
+  await page.locator('#amtIn').fill('100'); await page.locator('#wAddr').fill('0xnotanaddress'); await page.locator('.sheet .cta').click(); await page.waitForTimeout(150);
+  ok('M7 출금: 잘못된 USDT 주소 → 토스트 · 서버 쓰기 0', /USDT/.test(await page.locator('.toast').innerText().catch(() => '')) && (await page.evaluate(() => (window.__writeLog || []).length)) === writesBefore + 1);
+  await page.locator('#wAddr').fill('0x6B1c8941698Affc56757eF9Be1723Ec43F720966'); await page.locator('.sheet .cta').click(); await page.waitForTimeout(400);
+  const wl2 = await page.evaluate(() => (window.__writeLog || []).slice(-1)[0]);
+  ok('M7 출금(wallet) 제출 → requests insert {type withdraw · 100 · network wallet · address 0x…} · pending 토스트', wl2 && wl2.t === 'requests' && wl2.row.type === 'withdraw' && wl2.row.amount === 100 && wl2.row.network === 'wallet' && /^0x6B1c/.test(wl2.row.address) && /pending approval/i.test(await page.locator('.toast').innerText().catch(() => '')), JSON.stringify(wl2));
+  // Withdraw — bank, over the withdrawable → server guard rejects → message shown, sheet stays
+  await page.locator('.acc .acts div[data-act="sheet:withdraw"]').click(); await page.waitForTimeout(200);
+  await page.locator('#wHolder').fill('Test User'); await page.locator('#wBank').fill('Nevada State Bank'); await page.locator('#wSwift').fill('ZFNBUS55'); await page.locator('#wIban').fill('984869966');
+  await page.locator('#amtIn').fill('99999'); await page.locator('.sheet .cta').click(); await page.waitForTimeout(400);
+  const wl3 = await page.evaluate(() => (window.__writeLog || []).slice(-1)[0]);
+  ok('M7 출금(bank) 은행 4항목이 address 로 서버에 실림 · 초과 금액 = 서버 guard 거절 문구 그대로 · 시트 유지', wl3 && wl3.row.type === 'withdraw' && wl3.row.network === 'bank' && /Test User/.test(wl3.row.address) && /Nevada State Bank/.test(wl3.row.address) && /ZFNBUS55/.test(wl3.row.address) && /984869966/.test(wl3.row.address) && /exceeds your withdrawable/.test(await page.locator('.toast').innerText().catch(() => '')) && (await page.locator('.sheet').count()) === 1, JSON.stringify(wl3));
+  await page.locator('.sheet .sttl .x').click(); await page.waitForTimeout(100);
+  // Transfer — app_transfer RPC (immediate, idempotent by ref)
+  await page.locator('.acc .acts div[data-act="sheet:transfer"]').click(); await page.waitForTimeout(200);
+  const tf = await page.locator('.sheet').innerText().catch(() => '');
+  ok('M7 이체 시트: From FX · To 칩(Crypto · Sports) · 금액 입력', /Transfer/.test(tf) && /Crypto/.test(tf) && /Sports/.test(tf) && (await page.locator('#amtIn').count()) === 1, tf.replace(/\n/g, ' ').slice(0, 200));
+  await page.locator('#amtIn').fill('99999'); await page.locator('.sheet .cta').click(); await page.waitForTimeout(400);
+  ok('M7 이체 초과 → 서버 거절 (Insufficient balance) 문구 · 시트 유지', /Insufficient balance/.test(await page.locator('.toast').innerText().catch(() => '')) && (await page.locator('.sheet').count()) === 1);
+  await page.locator('.sheet .sttl .x').click(); await page.waitForTimeout(100);
+  await page.locator('.acc .acts div[data-act="sheet:transfer"]').click(); await page.waitForTimeout(200);
+  await page.locator('#amtIn').fill('300'); await page.waitForTimeout(80);
+  await page.evaluate(() => { const c = document.querySelector('.sheet .cta'); c.click(); c.click(); }); await page.waitForTimeout(400);   // double-tap
+  const xf = await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'app_transfer' && x.args.p_amount === 300));
+  ok('M7 이체 $300 더블탭 → app_transfer 정확히 1회 {p_ref xfer-… · p_from FX-850261 · p_to CR-1 · 300} · 시트 닫힘', xf.length === 1 && /^xfer-\d+-[a-z0-9]{5}$/.test(xf[0].args.p_ref) && xf[0].args.p_from === 'FX-850261' && xf[0].args.p_to === 'CR-1' && (await page.locator('.sheet').count()) === 0, JSON.stringify(xf.map(c => c.args)));
+  ok('M7 이체 토스트 (Transferred $300.00 → Crypto) · 잔고는 서버 재조회 값', /Transferred \$300\.00/.test(await page.locator('.toast').innerText().catch(() => '')) && (await page.evaluate(() => window.__rh.cash)) === CASH);
+  // Funding history (read-only)
+  await page.locator('.srow[data-act="sheet:funding"]').click(); await page.waitForTimeout(250);
+  const fh = await page.locator('.sheet').innerText().catch(() => '');
+  ok('M7 입출금 내역 시트: requests 읽기 (Deposit $500.00 · approved)', /Deposit/.test(fh) && /\$500\.00/.test(fh) && /approved/i.test(fh), fh.replace(/\n/g, ' ').slice(0, 200));
+  await page.locator('.sheet .sttl .x').click(); await page.waitForTimeout(100);
+  ok('M7 런타임: 테이블 쓰기 = requests 만 (' + (await page.evaluate(() => (window.__writeLog || []).length)) + '건) · ledger/accounts/positions 쓰기 0', await page.evaluate(() => (window.__writeLog || []).every(w => w.t === 'requests')));
   // Security sheet — only real actions (password = auth.updateUser · sign out everywhere); no fake 2FA / device list
   await page.locator('.srow[data-act="sheet:security"]').click(); await page.waitForTimeout(150);
   const sec = await page.locator('.sheet').innerText().catch(() => '');
@@ -367,7 +425,7 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   // M1 runtime
   const rpc = await page.evaluate(() => window.__rpcCalls || 0), writes = await page.evaluate(() => window.__writeCalls || 0);
   const names = await page.evaluate(() => (window.__rpcLog || []).map(x => x.name));
-  ok('M1 런타임: 목록 밖 rpc 0회 · 테이블 쓰기 0회 · 호출된 이름 전부 허용목록 (' + names.length + '건)', rpc === 0 && writes === 0 && names.length > 8 && names.every(x => ALLOW.includes(x)), 'rpc=' + rpc + ' writes=' + writes + ' names=' + [...new Set(names)].join(','));
+  ok('M1 런타임: 목록 밖 rpc 0회 · 테이블 쓰기 = requests 3건뿐(입금 1 · 출금 2, 이체는 RPC) · 호출된 이름 전부 허용목록 (' + names.length + '건)', rpc === 0 && writes === 3 && (await page.evaluate(() => (window.__writeLog || []).every(w => w.t === 'requests'))) && names.length > 8 && names.every(x => ALLOW.includes(x)), 'rpc=' + rpc + ' writes=' + writes + ' names=' + [...new Set(names)].join(','));
   ok('M1 런타임: 모든 주문 local_id 가 서로 다름 (멱등 키 재사용 0)', await page.evaluate(() => { const ids = (window.__rpcLog || []).filter(x => /^fx_(open|place_pending)$/.test(x.name)).map(x => x.args.p_local_id); return ids.length === new Set(ids).size; }));
   ok('M6 전 과정 무에러', errs.length === 0, errs.join(' | '));
   // last (navigates away): Sign out everywhere → auth.signOut({scope:'global'}) → login.html with the fx-rh return token
