@@ -20,9 +20,10 @@ const ok = (n, c, d) => { if (c) { pass++; console.log('  ✅ ' + n); } else { f
 const src = fs.readFileSync(path.join(REPO, 'fx-app.html'), 'utf8');
 // rpc 허용목록 (2단계): 읽기 리포트 1 + 승인된 돈 RPC 8. 그 외 .rpc( 는 0건 — 헬퍼가 목록 밖 이름을 throw.
 // 2026-09-21 사장님 "1 2 3 진행해": 입금·출금 = requests 행 insert(AlpexaSync.pushRequest, 승인 전 잔고 불변) · 이체 = app_transfer RPC → 10개.
-const ALLOW = ['pamm_investor_report', 'fx_open', 'fx_modify', 'fx_close', 'fx_place_pending', 'fx_modify_pending', 'fx_cancel_pending', 'pamm_join', 'pamm_leave', 'app_transfer'];
+// 2026-09-22 사장님 "4번 부분청산도 진행해" + "배포 완료": fx_close_partial(p_local_id, p_size, p_ref) → 11개.
+const ALLOW = ['pamm_investor_report', 'fx_open', 'fx_modify', 'fx_close', 'fx_place_pending', 'fx_modify_pending', 'fx_cancel_pending', 'pamm_join', 'pamm_leave', 'app_transfer', 'fx_close_partial'];
 { const m = src.match(/var RPC_ALLOW=\{([^}]*)\}/); const keys = m ? m[1].split(',').map(x => x.split(':')[0].trim()).filter(Boolean) : [];
-  ok('M1 소스: RPC_ALLOW = 승인된 10개와 정확히 일치', keys.length === ALLOW.length && ALLOW.every(k => keys.includes(k)), keys.join(','));
+  ok('M1 소스: RPC_ALLOW = 승인된 11개와 정확히 일치', keys.length === ALLOW.length && ALLOW.every(k => keys.includes(k)), keys.join(','));
   // 입출금 = 기존 앱과 같은 단일 경로(AlpexaSync.pushRequest → requests insert). 앱 소스에 직접 insert 0, 잔고를 만지는 코드 0.
   ok('M7 소스: 입금·출금 = AlpexaSync.pushRequest 만 (직접 .insert( 0) · 이체 = rpc(app_transfer) p_ref xfer- 멱등', (src.match(/AlpexaSync\.pushRequest\(/g) || []).length >= 1 && !/\.insert\(/.test(src) && /rpc\('app_transfer',\{ p_ref:ref, p_from:fxAcct\(\), p_to:to, p_amount:amt \}\)/.test(src) && /var ref='xfer-'/.test(src));
   ok('M7 소스: Account 버튼 = 앱 내 시트 (sheet:deposit · sheet:withdraw · sheet:transfer) · 옛 앱 링크 0', /data-act="sheet:deposit"/.test(src) && /data-act="sheet:withdraw"/.test(src) && /data-act="sheet:transfer"/.test(src) && !/go:trading\.html/.test(src));
@@ -33,7 +34,7 @@ const ALLOW = ['pamm_investor_report', 'fx_open', 'fx_modify', 'fx_close', 'fx_p
   ok('M1 소스: 헬퍼 호출 이름 전부 허용목록 (' + names.length + '건)', names.length >= 8 && names.every(x => ALLOW.includes(x)), names.filter(x => !ALLOW.includes(x)).join(','));
   ok('M1 소스: 헬퍼가 목록 밖 이름을 거절 (rpc not allowed)', /if\(!RPC_ALLOW\[name\]\) throw/.test(src));
   ok('M2 소스: fx_open 에 슬리피지 가드 인자 (p_requested_price · p_max_slippage) — MT5 deviation', /p_requested_price:px\|\|null, p_max_slippage:px\?slipOf\(sym,px\):null/.test(src) && /3\*fxPip\(sym\)/.test(src));
-  ok('M1 소스: 부분청산 없음 (RPC 없음 → 버튼 없음)', !/Close half|fx_close_partial/.test(src));
+  ok('M8 소스: 부분청산 = rpc(fx_close_partial, {p_local_id, p_size, p_ref=newId()}) · 수량은 [0.01, vol−0.01] 로 클램프', /rpc\('fx_close_partial',\{ p_local_id:id, p_size:lots, p_ref:ref \}\)/.test(src) && /Math\.min\(pv\.vol-0\.01, Math\.max\(0\.01,/.test(src));
   // 풀 앱 (2026-09-21): 남은 비돈 기능 이관 — 차트 TF 전부 실봉 · 주식/지수 실봉 · Security/Support 실동작만
   ok('풀앱 소스: 차트 TF 8개 전부 활성 (null 0) · "coming soon" 문구 0', /var TF = \[\['1m','M1'\],\['5m','M5'\],\['30m','M30'\],\['1h','H1'\],\['4h','H4'\],\['1D','D1'\],\['1W','W1'\],\['ALL','ALL'\]\]/.test(src) && !/coming soon/i.test(src));
   ok('풀앱 소스: 봉 출처 3종 전부 실봉 (크립토 Binance · FX Polygon · 주식/지수 Twelve Data) · 합성 봉 생성 0 · ALL = D1 1000봉', /api\.twelvedata\.com\/time_series/.test(src) && /data-api\.binance\.vision\/api\/v3\/klines/.test(src) && /FX_FN_URL\+'\?candles='/.test(src) && !/Math\.random\(\)[^\n]*(candle|bar|ohlc)/i.test(src) && /tf==='ALL'\?1000:200/.test(src));
@@ -109,6 +110,7 @@ const stubFn = `() => {
       await new Promise(r => setTimeout(r, 60));   // real network latency → double-tap window
       if (name === 'fx_open') return { data: args.p_symbol === 'GBPUSD' ? { ok: false, error: 'insufficient margin', code: 'MARGIN', required: 1234.5, free: 100 } : { ok: true, open: args.p_requested_price, local_id: args.p_local_id }, error: null };
       if (name === 'fx_close') return { data: { ok: true, close: 1.15975, pnl: 26.3 }, error: null };
+      if (name === 'fx_close_partial') return { data: { ok: true, close: 1.15975, pnl: 12.34, closed: args.p_size, remaining: +(0.10 - args.p_size).toFixed(2) }, error: null };
       if (name === 'fx_modify' || name === 'fx_modify_pending' || name === 'fx_place_pending' || name === 'fx_cancel_pending') return { data: { ok: true }, error: null };
       if (name === 'pamm_join') return { data: { ok: true, units: 111.97, nav: 2.2329 }, error: null };
       if (name === 'pamm_leave') return { data: { ok: true, gross: 223.29, fee: 0, net: 223.29, nav: 2.2329 }, error: null };
@@ -282,7 +284,24 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
     await page.locator('.det .mine').click(); await page.waitForTimeout(150);
     ok('Trade: 포지션 한 줄 탭 → Position 시트', /Position/.test(await page.locator('.sheet .sttl').innerText().catch(() => '')));
     const ps = await page.locator('.sheet').innerText().catch(() => '');
-    ok('Position 시트: Close half 없음 · Edit SL/TP · Close position', !/Close half/.test(ps) && /Edit stop loss/.test(ps) && /Close position/.test(ps));
+    ok('Position 시트: Edit SL/TP · Close part · Close position', /Edit stop loss/.test(ps) && /Close part/.test(ps) && /Close position/.test(ps), ps.replace(/\n/g, ' ').slice(0, 200));
+    // ── M8 부분청산 (2026-09-22) ──
+    await page.locator('.sheet .acts div[data-act^="sheet:pclose:"]').click(); await page.waitForTimeout(150);
+    const pcs = await page.locator('.sheet').innerText().catch(() => '');
+    ok('M8 부분청산 시트: 기본 = 절반 0.05 of 0.10 · 잔여 0.05 안내 · 슬라이스 예상 P&L = 포지션 P&L 절반 (' + (pnl(POS[0]) / 2).toFixed(2) + ')', /Close part/.test(pcs) && /0\.05/.test(pcs) && /of 0\.10/.test(pcs) && pcs.indexOf((pnl(POS[0]) / 2).toFixed(2)) >= 0, pcs.replace(/\n/g, ' ').slice(0, 220));
+    await page.locator('.sheet .lots b[data-act="pvol:+"]').click(); await page.waitForTimeout(80);
+    ok('M8 스테퍼 + → 0.06', Math.abs((await page.evaluate(() => window.__rh.pVol)) - 0.06) < 1e-9);
+    for (let i = 0; i < 8; i++) { await page.locator('.sheet .lots b[data-act="pvol:+"]').click(); await page.waitForTimeout(30); }
+    ok('M8 스테퍼 상한 = vol − 0.01 (0.09 에서 멈춤 — 전량은 Close position 으로)', Math.abs((await page.evaluate(() => window.__rh.pVol)) - 0.09) < 1e-9, String(await page.evaluate(() => window.__rh.pVol)));
+    await page.locator('.sheet .chips span[data-act="pvolset:0.5"]').click(); await page.waitForTimeout(80);
+    ok('M8 50% 칩 → 0.05', Math.abs((await page.evaluate(() => window.__rh.pVol)) - 0.05) < 1e-9);
+    await page.locator('.sheet .lots b[data-act="pvol:+"]').click(); await page.waitForTimeout(80);   // 0.06
+    await page.evaluate(() => { const c = document.querySelector('.sheet .cta'); c.click(); c.click(); }); await page.waitForTimeout(400);   // double-tap
+    const pcl = await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'fx_close_partial'));
+    ok('M8 확인 더블탭 → fx_close_partial 정확히 1회 {P1 · p_size 0.06 · p_ref R-…} · 시트 닫힘', pcl.length === 1 && pcl[0].args.p_local_id === 'P1' && Math.abs(pcl[0].args.p_size - 0.06) < 1e-9 && /^R-/.test(pcl[0].args.p_ref) && (await page.locator('.sheet').count()) === 0, JSON.stringify(pcl.map(c => c.args)));
+    ok('M8 토스트 = 서버 응답 (Closed 0.06 EURUSD · +$12.34 · 0.04 left)', /Closed 0\.06 EURUSD · \+\$12\.34 · 0\.04 left/.test(await page.locator('.toast').innerText().catch(() => '')), await page.locator('.toast').innerText().catch(() => ''));
+    ok('M8 fx_close 는 호출되지 않음 (부분청산이 전량청산 경로를 타지 않음)', (await page.evaluate(() => (window.__rpcLog || []).filter(x => x.name === 'fx_close').length)) === 1);
+    await page.locator('.det .mine').click(); await page.waitForTimeout(150);
     await page.locator('.sheet .cta').click(); await page.waitForTimeout(150);
     ok('포지션 SL/TP 시트: 기존값 시드 (SL 1.15200 · TP 1.16500)', /1\.15200/.test(await page.locator('.sheet').innerText()) && /1\.16500/.test(await page.locator('.sheet').innerText()));
     await page.locator('.sheet .cta').click(); await page.waitForTimeout(350);

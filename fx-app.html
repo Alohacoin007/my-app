@@ -15,7 +15,7 @@
   · 풀 앱 (2026-09-21 사장님 "나머지 안된 부분 다 옮겨서 풀 앱으로"): 차트 4h·1W·ALL(실봉) · 주식/지수 실봉(Twelve Data) · Security(비밀번호 변경·전 기기
     로그아웃 = auth API) · Support(전화·메일·mailto).
   · 입금·출금·이체 (2026-09-21 표 승인 "1 2 3 진행해"): 입금/출금 = requests 행 insert(AlpexaSync.pushRequest, 승인 전 잔고 불변) · 이체 = app_transfer RPC
-    (RPC_ALLOW 10번째). 부분청산은 RPC 없음 → 버튼 없음(별도 SQL 승인 대기).
+    (RPC_ALLOW 10번째). 부분청산 = fx_close_partial(2026-09-22 SQL 배포 완료, 11번째) — Position 시트 "Close part", 수량 [0.01, vol−0.01].
   · 기존 trading.html 은 0터치. 같은 세션(alpexa-sync.js, sessionStorage)·같은 서버 데이터를 읽는다.
   · 시세 표시 = 딜링 락스텝: bid/ask = mid ∓ half, half = max(0.1, spr_pts + markup_pts) × pip / 2
     (trading.html fxHalfSpread / fx_close.sql v_half 와 동일). 플로팅 = 그 close 가격으로 계산.
@@ -400,7 +400,7 @@ var LS = { get:function(k,d){ try{ var v=localStorage.getItem(k); return v==null
 var S = {
   tab:'home', sym:'EURUSD', tf:'H1', otype:'MARKET', lots:0.10, sltp:false, sheet:null, sheetSeg:'FX', homeSeg: LS.get('rh.homeSeg','FX'), q:'', pamm:null, busy:null, mSym:'', mSide:'BUY', mRef:0, mSl:0, mTp:0, amt:0,
   oneClick: LS.get('rh.oneClick','0')==='1', ack: LS.get('rh.oneClickAck','0')==='1', masked: LS.get('rh.mask','0')==='1',
-  theme: LS.get('rh.theme','light'), actTab:'positions', dMethod:'bank', wMethod:'bank', xTo:'crypto', reqs:null,
+  theme: LS.get('rh.theme','light'), actTab:'positions', dMethod:'bank', wMethod:'bank', xTo:'crypto', reqs:null, pVol:0,
   feed:{}, marks:{}, specs:{}, cash:null, positions:[], pending:[], history:[], candles:{}, dayOpen:{}, scrub:null, toast:null, ready:false,
 };
 function applyTheme(){ var t=S.theme==='system' ? ((window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light') : (S.theme==='dark'?'dark':'light'); document.documentElement.setAttribute('data-theme', t); }
@@ -427,12 +427,14 @@ function errText(err, d){ var e=String(err||''); d=d||{};
   if(/market closed/i.test(e)) return 'Market closed'+(d.symbol?' for '+d.symbol:'');
   if(/spec/i.test(e)) return 'Not available to trade right now';
   if(/already closed|not found/i.test(e)) return 'Already closed or not found';
+  if(/full close/i.test(e)) return 'Use Close position for the full amount';
+  if(/0\.01/.test(e)) return 'Volume must be in 0.01 steps, leaving at least 0.01 open';
   if(/not authenticated|no fx account/i.test(e)) return 'Please sign in again';
   if(/open positions|rollover/i.test(e)) return 'Fund has open positions — try after rollover';
   if(/minimum/i.test(e)) return 'Below the fund minimum'+(d.min!=null?' ($'+d.min+')':'');
   return e||'Rejected — try again'; }
 // 허용 RPC — 이 9개 외에는 호출 자체가 불가능하다 (핀: trading-rh.test.js 가 목록·호출 지점 전수 대조). 새 RPC = 목록 + 표 승인 먼저.
-var RPC_ALLOW={ pamm_investor_report:1, fx_open:1, fx_modify:1, fx_close:1, fx_place_pending:1, fx_modify_pending:1, fx_cancel_pending:1, pamm_join:1, pamm_leave:1, app_transfer:1 };   // app_transfer: 2026-09-21 표 승인 "1 2 3 진행해"
+var RPC_ALLOW={ pamm_investor_report:1, fx_open:1, fx_modify:1, fx_close:1, fx_place_pending:1, fx_modify_pending:1, fx_cancel_pending:1, pamm_join:1, pamm_leave:1, app_transfer:1, fx_close_partial:1 };   // app_transfer: 2026-09-21 표 승인 "1 2 3 진행해" · fx_close_partial: 2026-09-22 "4번" + 배포 완료
 async function rpc(name, args){ if(!RPC_ALLOW[name]) throw new Error('rpc not allowed: '+name); var d=db(); if(!d) throw new Error('no server connection'); var r=await d.rpc(name, args); if(r&&r.error) throw new Error(r.error.message||'connection issue'); return (r&&r.data)||{}; }
 function lock(key){ if(S.busy) return false; S.busy=key; render(true); return true; }
 function unlock(){ S.busy=null; }
@@ -456,6 +458,14 @@ async function doClose(id){
   if(!lock('close:'+id)) return; var p=S.positions.find(function(x){return x.id===id;});
   try{ var d=await rpc('fx_close',{ p_local_id:id }); if(!d.ok){ S.sheet=null; toast(errText(d.error,d)); return; }
     S.sheet=null; toast('Closed '+(p?p.sym:'')+(d.pnl!=null?' · '+fmtSigned(+d.pnl):''));
+  }catch(e){ toast('Close failed — '+e.message); } finally{ unlock(); pullHistory(); refresh(); } }
+// 부분청산 (2026-09-22 사장님 "4번" · SQL fx_close_partial 배포 완료): 슬라이스 손익·잔여 size 전부 서버. p_ref = 이 탭이 만든 멱등 키 → 더블탭·재시도 = 1회.
+async function doClosePartial(id, lots){
+  var p=S.positions.find(function(x){return x.id===id;}); if(!p) return;
+  if(!(lots>=0.01)||lots>p.vol-0.005){ toast('Use Close position for the full amount'); return; }
+  if(!lock('pclose:'+id)) return; var ref=newId();
+  try{ var d=await rpc('fx_close_partial',{ p_local_id:id, p_size:lots, p_ref:ref }); if(!d.ok){ S.sheet=null; toast(errText(d.error,d)); return; }
+    S.sheet=null; toast('Closed '+(+d.closed||lots).toFixed(2)+' '+p.sym+(d.pnl!=null?' · '+fmtSigned(+d.pnl):'')+(d.remaining!=null?' · '+(+d.remaining).toFixed(2)+' left':''));
   }catch(e){ toast('Close failed — '+e.message); } finally{ unlock(); pullHistory(); refresh(); } }
 async function doModify(kind, id, sl, tp){
   if(!lock('mod')) return;
@@ -869,7 +879,19 @@ function sheetHtml(){
       '<div class="r" style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:.5px solid var(--line);font-size:13px"><span style="color:var(--dim)">'+(clsOf(p.sym)==='FX'?'Pip value':'Value per 1.00 move')+'</span><span class="mono">'+fmtMoney(clsOf(p.sym)==='FX'?pv:contractOf(p.sym)*p.vol)+'</span></div>'+
       '<div class="r" style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px"><span style="color:var(--dim)">Swap accrued</span><span class="mono '+(p.swap!=null&&p.swap<0?'down':'')+'">'+(p.swap==null?'—':fmtSigned(p.swap))+'</span></div></div>'+
       '<div class="cta" style="margin-top:14px" data-act="sheet:sltp:pos:'+p.id+'">'+(p.sl||p.tp?'Edit stop loss / take profit':'Set stop loss / take profit')+'</div>'+
-      '<div class="acts" style="margin-top:0;grid-template-columns:1fr 1fr"><div style="border-color:var(--down);color:var(--down)" data-act="close:'+p.id+'">Close position</div><div data-act="sheet:">Cancel</div></div>';
+      '<div class="acts" style="margin-top:0;grid-template-columns:'+(p.vol>=0.02?'1fr 1fr 1fr':'1fr 1fr')+'">'+(p.vol>=0.02?'<div data-act="sheet:pclose:'+p.id+'">Close part</div>':'')+'<div style="border-color:var(--down);color:var(--down)" data-act="close:'+p.id+'">Close position</div><div data-act="sheet:">Cancel</div></div>';
+  } else if(S.sheet.indexOf('pclose:')===0){
+    // 부분청산 — MT5 Close By Volume. 수량 = [0.01, vol−0.01] (전량은 Close position). 슬라이스 예상 P&L = 표시 P&L × 비율 (표시용; 실현은 서버).
+    var pv=S.positions.find(function(x){return x.id===S.sheet.slice(7);}); if(!pv) return '';
+    var whole=posPnl(pv), part=whole*(S.pVol/pv.vol), rest=+(pv.vol-S.pVol).toFixed(2);
+    inner='<div class="sttl">Close part of position<span class="x" data-act="sheet:">✕</span></div>'+
+      '<div class="body" style="padding-bottom:6px"><b class="'+(pv.side==='BUY'?'up':'down')+'">'+(pv.side==='BUY'?'Buy':'Sell')+'</b> '+pv.vol.toFixed(2)+' '+pv.sym+' · @ '+fmtPx(pv.open,pv.sym)+' · <span class="'+(whole>=0?'up':'down')+'">'+fmtSigned(whole)+'</span></div>'+
+      '<div class="lotrow"><span>Close volume<small>of '+pv.vol.toFixed(2)+' · '+rest.toFixed(2)+' stays open</small></span><div class="lots"><b data-act="pvol:-">−</b><span>'+S.pVol.toFixed(2)+'<small>lot</small></span><b data-act="pvol:+">+</b></div></div>'+
+      '<div class="chips">'+[[0.25,'25%'],[0.5,'50%'],[0.75,'75%']].map(function(c){ return '<span class="'+(Math.abs(S.pVol-Math.round(pv.vol*c[0]*100)/100)<0.005?'on':'')+'" data-act="pvolset:'+c[0]+'">'+c[1]+'</span>'; }).join('')+'</div>'+
+      '<div class="kvs"><div class="r"><span class="k">Est. P&amp;L on '+S.pVol.toFixed(2)+'</span><span class="v '+(part>=0?'up':'down')+'">'+fmtSigned(part)+'</span></div><div class="r"><span class="k">Close price now</span><span class="v">'+fmtPx(closePx(pv.sym,pv.side),pv.sym)+'</span></div></div>'+
+      '<div class="body" style="padding-top:10px">Filled at the live server price. The rest keeps its open price, stop loss and take profit.</div>'+
+      '<div class="cta sell" style="margin-top:4px" data-act="pclose:'+pv.id+'">'+(S.busy?'Working…':'Close '+S.pVol.toFixed(2)+' of '+pv.vol.toFixed(2))+'</div>'+
+      '<div class="acts" style="margin-top:0;grid-template-columns:1fr"><div data-act="sheet:">Cancel</div></div>';
   } else if(S.sheet.indexOf('confirm:')===0||S.sheet.indexOf('pconfirm:')===0){
     var pc=S.sheet.indexOf('pconfirm:')===0, cs=S.sheet.split(':'), side=cs[1], sym=cs[2], isBuy=side==='BUY';
     var px = pc ? (S.limitPx||defLimit(sym, side)) : (isBuy?askOf(sym):bidOf(sym)); var mg=marginUSD(sym,S.lots,px);
@@ -954,6 +976,10 @@ function act(a){
   else if(k==='go2'){ doOpen(parts[1], parts[2], S.lots, S.sltp?curSL(parts[1]):0, S.sltp?curTP(parts[1]):0); return; }
   else if(k==='gop'){ doPending(parts[1], parts[2], S.otype, S.lots, S.limitPx||defLimit(parts[2], parts[1])); return; }
   else if(k==='close'){ doClose(v); return; }
+  else if(k==='pclose'){ doClosePartial(v, S.pVol); return; }
+  else if(k==='pvol'||k==='pvolset'){ var pv=S.positions.find(function(x){return x.id===String(S.sheet||'').slice(7);}); if(!pv) return;
+    var want = k==='pvol' ? S.pVol+(v==='+'?0.01:-0.01) : pv.vol*(+v||0.5);
+    S.pVol=Math.round(Math.min(pv.vol-0.01, Math.max(0.01, want))*100)/100; }
   else if(k==='cancelord'){ doCancel(v); return; }
   else if(k==='savesltp'){ doModify(parts[1], parts[2], S.mSl||defSL(S.mSym,S.mRef,S.mSide), S.mTp||defTP(S.mSym,S.mRef,S.mSide)); return; }   // 화면에 보이는 값 그대로 저장
   else if(k==='clearsltp'){ doModify(parts[1], parts[2], 0, 0); return; }
@@ -969,6 +995,7 @@ function act(a){
   else if(k==='theme'){ S.theme=v; LS.set('rh.theme',v); applyTheme(); }
   else if(k==='sheet'){ if(S.busy&&v) return; S.sheet=v||null; if(v==='pair'){ S.q=''; instruments(S.sheetSeg).slice(0,24).forEach(function(c){ pullDayOpen(c.sym); }); } if(v==='pamm') pullPamm();
     if(v==='deposit'||v==='withdraw'||v==='transfer'){ S.amt=0; S.dMethod='bank'; S.wMethod='bank'; pullCash(); } if(v==='funding') pullRequests();
+    if(v&&v.indexOf('pclose:')===0){ var pc=S.positions.find(function(x){return x.id===v.slice(7);}); if(pc){ S.pVol=Math.round(Math.min(pc.vol-0.01, Math.max(0.01, pc.vol/2))*100)/100; } }   // 기본 = 절반
     if(v&&v.indexOf('sltp:')===0){ var kind=v.split(':')[1], id=v.split(':')[2];                                        // SL/TP editor: seed from the row (or side-aware defaults)
       if(kind==='pos'){ var pp=S.positions.find(function(x){return x.id===id;}); if(pp){ S.mSym=pp.sym; S.mSide=pp.side; S.mRef=midOf(pp.sym)||pp.open; S.mSl=pp.sl||0; S.mTp=pp.tp||0; } }
       else { var oo=S.pending.find(function(x){return x.id===id;}); if(oo){ S.mSym=oo.sym; S.mSide=oo.side; S.mRef=oo.trigger; S.mSl=oo.sl||0; S.mTp=oo.tp||0; } } }
@@ -1006,7 +1033,7 @@ document.addEventListener('click', function(e){ var el=e.target.closest('[data-a
 // stepper press-and-hold: 350ms → repeat, then accelerate (1 → 5 → 10 steps per tick). Patches the stepper text in place —
 // a full render() would replace the pressed element and cancel the touch. Full render on release.
 (function(){ var t=null, iv=null, fired=false, swallow=false, n=0, cur=null;
-  function stepperText(k){ if(k==='lots') return S.lots.toFixed(2)+'<small>lot</small>'; if(k==='amt') return fmtMoney(S.amt);
+  function stepperText(k){ if(k==='lots') return S.lots.toFixed(2)+'<small>lot</small>'; if(k==='amt') return fmtMoney(S.amt); if(k==='pvol') return S.pVol.toFixed(2)+'<small>lot</small>';
     if(k==='msl'||k==='mtp') return fmtPx((k==='msl'?S.mSl:S.mTp)||(k==='msl'?defSL(S.mSym,S.mRef,S.mSide):defTP(S.mSym,S.mRef,S.mSide)), S.mSym);
     var sym=S.sym, ref=S.limitPx||midOf(sym);
     return fmtPx(k==='lim'?(S.limitPx||defLimit(sym)):k==='sl'?(S.slPx||defSL(sym,ref)):(S.tpPx||defTP(sym,ref)), sym); }
