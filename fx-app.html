@@ -66,6 +66,9 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   html, body { margin: 0; background: var(--bg); color: var(--text); overflow-x: hidden; }
   /* iOS Safari: 문서 레벨 click 위임은 요소(또는 조상)에 cursor:pointer 가 있어야 탭이 click 으로 온다 — 탭 가능한 것 전부에 부여 (사장님 2026-09-21 "터치가 잘 안돼") */
   [data-act], [data-act] * { cursor: pointer; }
+  /* iOS: 길게 누르면 텍스트 선택/콜아웃(복사 말풍선)이 떠서 그 탭이 사라진다 → 버튼·행·탭에서는 선택 자체를 끈다 (입력칸은 그대로) */
+  [data-act], .tabs, .row, .arow, .srow, .prow, .chips, .seg, .sseg, .otype, .ranges, .stat, .hero { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+  input, textarea { -webkit-user-select: text; user-select: text; }
   [data-act] { -webkit-touch-callout: none; touch-action: manipulation; }   /* 가로 넘침 0 — 고정 시트/탭바가 밀리지 않게 (모바일 깨짐, 사장님 2026-09-21) */
   body { font-family: 'Geist', 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; overscroll-behavior-y: none; }
   .mono { font-family: 'Geist Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
@@ -435,9 +438,15 @@ function errText(err, d){ var e=String(err||''); d=d||{};
   return e||'Rejected — try again'; }
 // 허용 RPC — 이 9개 외에는 호출 자체가 불가능하다 (핀: trading-rh.test.js 가 목록·호출 지점 전수 대조). 새 RPC = 목록 + 표 승인 먼저.
 var RPC_ALLOW={ pamm_investor_report:1, fx_open:1, fx_modify:1, fx_close:1, fx_place_pending:1, fx_modify_pending:1, fx_cancel_pending:1, pamm_join:1, pamm_leave:1, app_transfer:1, fx_close_partial:1 };   // app_transfer: 2026-09-21 표 승인 "1 2 3 진행해" · fx_close_partial: 2026-09-22 "4번" + 배포 완료
-async function rpc(name, args){ if(!RPC_ALLOW[name]) throw new Error('rpc not allowed: '+name); var d=db(); if(!d) throw new Error('no server connection'); var r=await d.rpc(name, args); if(r&&r.error) throw new Error(r.error.message||'connection issue'); return (r&&r.data)||{}; }
-function lock(key){ if(S.busy) return false; S.busy=key; render(true); return true; }
-function unlock(){ S.busy=null; }
+// 타임아웃 (2026-09-22 사장님 "클릭이 잘 안돼"): 폰에서 요청이 응답 없이 매달리면 busy 잠금이 영구히 남아 시트·주문·입출금 버튼이 전부 죽는다
+// (supabase-js fetch 는 기본 타임아웃 없음). 응답이 RPC_TIMEOUT_MS 안에 없으면 실패로 끝내 잠금을 푼다 — 서버는 멱등(local_id/p_ref)이라 재시도 안전.
+var RPC_TIMEOUT_MS=20000;
+function withTimeout(p, ms){ return new Promise(function(res, rej){ var t=setTimeout(function(){ rej(new Error('no response — check your connection and try again')); }, ms||S.rpcTimeout||RPC_TIMEOUT_MS); Promise.resolve(p).then(function(v){ clearTimeout(t); res(v); }, function(e){ clearTimeout(t); rej(e); }); }); }
+async function rpc(name, args){ if(!RPC_ALLOW[name]) throw new Error('rpc not allowed: '+name); var d=db(); if(!d) throw new Error('no server connection'); var r=await withTimeout(d.rpc(name, args)); if(r&&r.error) throw new Error(r.error.message||'connection issue'); return (r&&r.data)||{}; }
+function lock(key){ if(S.busy) return false; S.busy=key; S.busySince=Date.now(); render(true); return true; }
+function unlock(){ S.busy=null; S.busySince=0; }
+// 감시자: 어떤 경로든 busy 가 45초 넘게 남아 있으면 강제 해제 (버튼이 조용히 죽어 있는 상태를 표현 불가능하게)
+function busyWatchdog(){ if(S.busy&&S.busySince&&Date.now()-S.busySince>45000){ unlock(); toast('Request timed out — try again'); } }
 async function refresh(){ try{ await Promise.all([pullCash(), pullPositions(), pullPending()]); }catch(e){} render(); }
 async function doOpen(side, sym, lots, sl, tp){
   if(!lock('open')) return; var id=newId(); var px=side==='BUY'?askOf(sym):bidOf(sym);
@@ -501,7 +510,7 @@ async function doDeposit(){
   var amt=S.amt; if(!(amt>0)){ toast('Enter the amount you sent'); return; }
   if(!lock('dep')) return; var id=newId();
   try{ if(!(window.AlpexaSync&&AlpexaSync.pushRequest)) throw new Error('no server connection');
-    var res=await AlpexaSync.pushRequest({ id:id, type:'deposit', server:'FX', amount:amt, asset:'USD', network:S.dMethod, address:'' });
+    var res=await withTimeout(AlpexaSync.pushRequest({ id:id, type:'deposit', server:'FX', amount:amt, asset:'USD', network:S.dMethod, address:'' }));
     if(!res||res.skipped||res.error) throw new Error((res&&res.error&&res.error.message)||'could not reach the server');
     S.sheet=null; S.amt=0; toast('Deposit request sent · pending approval');
   }catch(e){ toast('Not submitted — '+e.message); } finally{ unlock(); pullRequests(); render(true); } }
@@ -513,7 +522,7 @@ async function doWithdraw(){
     addr='Bank: '+b+' · Holder: '+h+' · SWIFT: '+(sw||'—')+' · Acct/IBAN: '+ib; }
   if(!lock('wd')) return; var id=newId();
   try{ if(!(window.AlpexaSync&&AlpexaSync.pushRequest)) throw new Error('no server connection');
-    var res=await AlpexaSync.pushRequest({ id:id, type:'withdraw', server:'FX', amount:amt, asset:'USD', network:method, address:addr });
+    var res=await withTimeout(AlpexaSync.pushRequest({ id:id, type:'withdraw', server:'FX', amount:amt, asset:'USD', network:method, address:addr }));
     if(!res||res.skipped||res.error) throw new Error((res&&res.error&&res.error.message)||'could not reach the server');   // 서버 guard 거절 문구 그대로
     S.sheet=null; S.amt=0; toast('Withdrawal requested · pending approval');
   }catch(e){ toast('Not submitted — '+e.message); } finally{ unlock(); pullRequests(); render(true); } }
@@ -1072,7 +1081,7 @@ document.addEventListener('touchend', function(){ if(S.scrub!=null){ S.scrub=nul
   setInterval(function(){ if(!document.hidden) pullFeed(); },1500);
   setInterval(function(){ if(!document.hidden){ pullCash(); pullPositions(); } },10000);
   setInterval(function(){ if(!document.hidden) pullMarks(); },30000);
-  setInterval(function(){ if(!document.hidden&&!S.sheet&&S.scrub==null) render(); },1000);   // re-paint quotes / floating once a second
+  setInterval(function(){ busyWatchdog(); if(!document.hidden&&!S.sheet&&S.scrub==null) render(); },1000);   // re-paint quotes / floating once a second (+ busy 감시자)
   document.addEventListener('visibilitychange', function(){ if(!document.hidden){ pullFeed(); pullCash(); pullPositions(); } });
 })();
 window.__rh = S;   // for the headless test only (read-only introspection)

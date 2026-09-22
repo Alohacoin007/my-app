@@ -44,6 +44,7 @@ ok('M1 소스: ledger / positions / fx_pending 에 insert·update·upsert·delet
 ok('M1 소스: 승인 밖 돈 경로 0 (place_bet · admin RPC · functions.invoke fx/broker/withdraw)', !/rpc\(\s*['"](place_bet|fx_open_admin|fx_admin|admin_set_balance|crypto_trade|withdraw_hold)/.test(src) && !/functions\.invoke\(\s*['"](fx|broker|withdraw)/.test(src));
 ok('레이아웃: 4개 화면 상단 전부 safe-area-inset-top 여백 (홈 .top · 트레이드 .det .head · 목록 .ttl) — 노치 겹침 0', /\.top \{[^}]*env\(safe-area-inset-top/.test(src) && /\.det \.head \{[^}]*env\(safe-area-inset-top/.test(src) && /\.ttl \{[^}]*env\(safe-area-inset-top/.test(src));
 ok('터치: 렌더 = DOM morph (app.innerHTML 통째 교체 0) + 터치 중 배경 렌더 보류', !/app\.innerHTML\s*=/.test(src) && /function morph\(o, n\)/.test(src) && /if\(touching&&!force\)\{ renderQueued=true; return; \}/.test(src));
+ok('터치: 요청 타임아웃 = rpc·pushRequest 전부 withTimeout 경유 · busy 감시자(45s) 가 1초 루프에서 돈다 · 버튼/행에 user-select none (iOS 길게누름 선택 차단)', /await withTimeout\(d\.rpc\(name, args\)\)/.test(src) && (src.match(/withTimeout\(AlpexaSync\.pushRequest\(/g) || []).length === 2 && /function busyWatchdog\(\)\{ if\(S\.busy&&S\.busySince&&Date\.now\(\)-S\.busySince>45000\)/.test(src) && /setInterval\(function\(\)\{ busyWatchdog\(\);/.test(src) && /\[data-act\], \.tabs, \.row, \.arow, \.srow, \.prow, \.chips[^}]*user-select: none/.test(src) && /input, textarea \{ -webkit-user-select: text; user-select: text; \}/.test(src));
 ok('터치: 모든 [data-act] 요소에 cursor:pointer (iOS 문서 위임 클릭 조건) + touch-action manipulation', /\[data-act\], \[data-act\] \* \{ cursor: pointer; \}/.test(src) && /\[data-act\] \{[^}]*touch-action: manipulation/.test(src));
 ok('M2 소스: half = max(0.1, spr+mk)*pip/2 (fx_close v_half 미러)', /Math\.max\(0\.1,\s*spr\+mk\)\*fxPip\(sym\)\/2/.test(src));
 ok('M2 소스: 비FX half = mid*max(floorBps[cls], spr)/10000/2 (fx_close v_half else-branch 미러) · 계약/클래스 = fx_specs 런타임', /mid\*\(Math\.max\(SPREAD_BPS\[cls\]\|\|0, spr\)\/10000\)\/2/.test(src) && /from\('fx_specs'\)\.select\('symbol,cls,contract'\)/.test(src) && /SPREAD_BPS=\{CRYPTO:10,STOCK:8,INDEX:6\}/.test(src));
@@ -108,6 +109,7 @@ const stubFn = `() => {
     rpc: async (name, args) => { window.__rpcLog = window.__rpcLog || []; window.__rpcLog.push({ name, args });
       if (name === 'pamm_investor_report') { window.__pammCalls = (window.__pammCalls||0) + 1; return { data: PAMM, error: null }; }
       await new Promise(r => setTimeout(r, 60));   // real network latency → double-tap window
+      if (name === 'fx_open' && args.p_symbol === 'USDCHF') return new Promise(() => {});   // 응답 없이 매달리는 요청 (폰 네트워크) — busy 잠금 해제 검증용
       if (name === 'fx_open') return { data: args.p_symbol === 'GBPUSD' ? { ok: false, error: 'insufficient margin', code: 'MARGIN', required: 1234.5, free: 100 } : { ok: true, open: args.p_requested_price, local_id: args.p_local_id }, error: null };
       if (name === 'fx_close') return { data: { ok: true, close: 1.15975, pnl: 26.3 }, error: null };
       if (name === 'fx_close_partial') return { data: { ok: true, close: 1.15975, pnl: 12.34, closed: args.p_size, remaining: +(0.10 - args.p_size).toFixed(2) }, error: null };
@@ -268,6 +270,18 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   await page.locator('.foot .btn.buy').click(); await page.waitForTimeout(150); await page.locator('.sheet .cta').click(); await page.waitForTimeout(350);
   ok('서버 거절 → 문구 그대로 (Insufficient margin — needs $1,234.50, free $100.00) · 포지션 수 불변', /Insufficient margin — needs \$1,234\.50, free \$100\.00/.test(await page.locator('.toast').innerText().catch(() => '')) && (await page.evaluate(() => window.__rh.positions.length)) === 3);
   ok('거절 시 시트 닫힘·busy 해제', (await page.locator('.sheet').count()) === 0 && (await page.evaluate(() => window.__rh.busy)) === null);
+  // 응답 없는 요청 (2026-09-22 "클릭이 잘 안돼"): 타임아웃이 없으면 busy 가 영구히 남아 시트/버튼이 전부 죽는다 → 타임아웃 후 잠금 해제 + 안내
+  await page.evaluate(() => { window.__rh.rpcTimeout = 300; });
+  await page.locator('.det .nm[data-act="sheet:pair"]').click(); await page.waitForTimeout(150);
+  await page.locator('#pq').fill('USDCHF'); await page.waitForTimeout(120); await page.locator('.plist .prow').first().click(); await page.waitForTimeout(200);
+  await page.locator('.foot .btn.buy').click(); await page.waitForTimeout(150); await page.locator('.sheet .cta').click(); await page.waitForTimeout(120);
+  ok('매달린 요청 중: busy 잠금 (open) · 시트 열기 차단', (await page.evaluate(() => window.__rh.busy)) === 'open' && (await page.evaluate(() => { act('sheet:pair'); return window.__rh.sheet; })) !== 'pair');
+  await page.waitForTimeout(600);
+  ok('타임아웃(300ms) → busy 해제 · 토스트 "check your connection" · 포지션 수 불변 (돈 이동 0)', (await page.evaluate(() => window.__rh.busy)) === null && /check your connection/.test(await page.locator('.toast').innerText().catch(() => '')) && (await page.evaluate(() => window.__rh.positions.length)) === 3, await page.locator('.toast').innerText().catch(() => ''));
+  await page.evaluate(() => { window.__rh.rpcTimeout = 0; window.__rh.sheet = null; render(true); });
+  ok('해제 후 시트 다시 열림 (버튼 부활)', await page.evaluate(() => { act('sheet:pair'); const o = window.__rh.sheet === 'pair'; act('sheet:'); return o; }));
+  await page.locator('.det .nm[data-act="sheet:pair"]').click(); await page.waitForTimeout(150);
+  await page.locator('#pq').fill('GBPUSD'); await page.waitForTimeout(120); await page.locator('.plist .prow').first().click(); await page.waitForTimeout(200);
   // pending: SELL LIMIT → side-aware default trigger (above market) → fx_place_pending, sl/tp null
   await page.locator('.otype span[data-act="otype:LIMIT"]').click(); await page.waitForTimeout(120);
   await page.locator('.foot .btn.sell').click(); await page.waitForTimeout(150);
