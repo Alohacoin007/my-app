@@ -63,12 +63,28 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
     color-scheme: dark;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; background: var(--bg); color: var(--text); overflow-x: hidden; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); overflow-x: hidden; overscroll-behavior: none; }
   /* iOS Safari: 문서 레벨 click 위임은 요소(또는 조상)에 cursor:pointer 가 있어야 탭이 click 으로 온다 — 탭 가능한 것 전부에 부여 (사장님 2026-09-21 "터치가 잘 안돼") */
   [data-act], [data-act] * { cursor: pointer; }
   /* iOS: 길게 누르면 텍스트 선택/콜아웃(복사 말풍선)이 떠서 그 탭이 사라진다 → 버튼·행·탭에서는 선택 자체를 끈다 (입력칸은 그대로) */
   [data-act], .tabs, .row, .arow, .srow, .prow, .chips, .seg, .sseg, .otype, .ranges, .stat, .hero { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
   input, textarea { -webkit-user-select: text; user-select: text; }
+  /* ── 탭 반응 (2026-09-24 사장님 "클릭이 잘 안돼" → 1·2·3 + 작은 것 2개) ─────────────────────────────────────────
+     ① 누르는 순간 반응: 버튼류는 살짝 작아지고(scale .97) 행은 배경이 깔린다. 누를 땐 즉시, 뗄 때만 0.12초.
+        (iOS 는 document 에 touchstart 리스너가 있어야 :active 가 켜진다 — 아래 touchstart 가 그 역할도 한다)
+     ② 44px 터치 영역: 작은 버튼은 보이는 크기 그대로 두고 ::after 로 누르는 범위만 넓힌다 (애플 HIG 44pt). z-index 1 = 겹치는 몇 px 은 작은 버튼이 받는다.
+     ③ 토스트는 탭을 통과시킨다 (.toast pointer-events none — 주문 뒤 2초간 아래 버튼을 먹던 결함). */
+  .btn, .cta, .acts div, .seg span, .sseg span, .chips span, .ranges span, .otype span, .oc, .hero .eye, .sheet .sttl .x, .arow .x, .pf .r3 div, .seg3 div, .cards > div, .tab, .fold, .det .nm { transition: transform .12s ease-out; }
+  .btn:active, .cta:active, .acts div:active, .seg span:active, .sseg span:active, .chips span:active, .ranges span:active, .otype span:active, .oc:active, .hero .eye:active, .sheet .sttl .x:active, .arow .x:active, .pf .r3 div:active, .seg3 div:active, .cards > div:active, .tab:active, .fold:active, .det .nm:active { transform: scale(.97); transition: none; }
+  .arow:active, .srow:active, .prow:active, .row:active, .mine:active { background: var(--surface); }
+  .det .mine:active { background: var(--surface-up); }
+  .ranges span, .seg span, .sseg span, .chips span, .otype span, .oc, .hero .eye, .sheet .sttl .x, .arow .x, .lots b, .det .nm { position: relative; }
+  .ranges span::after, .seg span::after, .sseg span::after, .chips span::after, .otype span::after, .oc::after, .hero .eye::after, .sheet .sttl .x::after, .arow .x::after, .lots b::after, .det .nm::after { content: ''; position: absolute; z-index: 1; inset: -11px -3px; }
+  .otype span::after { left: 0; right: 0; }                                   /* 붙어 있는 3분할 — 옆 칸을 넘보지 않게 */
+  .lots b::after { inset: -6px 0; }                                             /* 스테퍼 ± (34px → 46px) */
+  .hero .eye::after, .sheet .sttl .x::after, .arow .x::after { inset: -10px; }  /* 동그란 아이콘 버튼: 사방 */
+  .det .nm::after { inset: -13px -4px; }                                       /* 종목명 줄은 20px — 위아래 13px 씩 = 46px */
+  .sheet, .sheet .plist { overscroll-behavior: contain; }                        /* 시트·목록 끝에서 뒤 화면이 끌려가며 튕기지 않게 (튕기는 중 탭 무시 방지) */
   [data-act] { -webkit-touch-callout: none; touch-action: manipulation; }   /* 가로 넘침 0 — 고정 시트/탭바가 밀리지 않게 (모바일 깨짐, 사장님 2026-09-21) */
   body { font-family: 'Geist', 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; overscroll-behavior-y: none; }
   .mono { font-family: 'Geist Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
@@ -109,7 +125,8 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   /* list header + rows */
   .hd { display: grid; grid-template-columns: minmax(0,1fr) 196px; gap: 8px; align-items: end; padding: 14px 18px 6px 22px; }
   /* 스테퍼 — 크게, 숫자·단위 사이 여백, 길게 누르면 가속 (사장님 2026-09-21 "사용하기 불편해") */
-  .lots { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; font-variant-numeric: tabular-nums; }
+  .lots { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 14px; font-variant-numeric: tabular-nums; }   /* overflow hidden 제거 — ± 의 44px 터치 확장이 잘리지 않게. 모서리는 아래 b 자체 radius 로 */
+  .lots b:first-child { border-radius: 13px 0 0 13px; } .lots b:last-child { border-radius: 0 13px 13px 0; }
   .lots b { padding: 8px 14px; font-size: 17px; line-height: 1; font-weight: 600; color: var(--dim); background: var(--surface); cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
   .lots b:active { background: var(--line); color: var(--text); }
   .lots span { padding: 7px 12px; font-size: 15px; font-weight: 700; white-space: nowrap; }
@@ -239,7 +256,7 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .sheet .search svg { width: 16px; height: 16px; flex: none; }
   .sheet .search input { flex: 1; min-width: 0; border: 0; background: transparent; font: inherit; font-size: 14px; font-weight: 500; color: var(--text); outline: none; padding: 0; }
   .sheet .search input::placeholder { color: var(--mute); }
-  .sseg.hseg { display: flex; gap: 6px; padding: 18px 22px 0; overflow-x: auto; scrollbar-width: none; } .sseg.hseg::-webkit-scrollbar { display: none; }
+  .sseg.hseg { display: flex; gap: 6px; padding: 18px 22px 10px; margin-bottom: -10px; overflow-x: auto; scrollbar-width: none; } .sseg.hseg::-webkit-scrollbar { display: none; }
   .sseg.hseg span { flex: none; font-size: 12px; font-weight: 700; color: var(--dim); padding: 6px 12px; border-radius: 999px; background: var(--surface); cursor: pointer; }
   .sseg.hseg span.on { background: var(--text); color: var(--bg); }
   .list .empty { padding: 40px 22px; text-align: center; color: var(--mute); font-size: 13px; }
@@ -300,7 +317,7 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .opt2 .sw { height: 54px; border-radius: 10px; margin-bottom: 8px; border: 1px solid var(--line); }
   .opt2 .sw.l { background: #FFFFFF; } .opt2 .sw.d { background: #0B0D0E; }
   /* toast */
-  .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 100px; background: var(--text); color: var(--bg); border-radius: 999px; padding: 9px 16px; font-size: 12px; font-weight: 600; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,.18); z-index: 30; max-width: 92%; overflow: hidden; text-overflow: ellipsis; }
+  .toast { pointer-events: none; position: fixed; left: 50%; transform: translateX(-50%); bottom: 100px; background: var(--text); color: var(--bg); border-radius: 999px; padding: 9px 16px; font-size: 12px; font-weight: 600; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,.18); z-index: 30; max-width: 92%; overflow: hidden; text-overflow: ellipsis; }
   .toast i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--up); margin-right: 7px; }
 </style>
 </head>
@@ -973,8 +990,11 @@ var render=function(force){
   var body = S.tab==='home'?screenHome():S.tab==='trade'?screenTrade():S.tab==='activity'?screenActivity():screenAccount();
   var tpl=document.createElement('div'); tpl.id='app'; tpl.className='app'+(S.oneClick?' oc-on':'')+(S.busy?' busy':'');   // id 유지 — morph 가 루트 속성도 맞추므로 빠지면 #app 이 사라진다
   tpl.innerHTML='<div class="scroll">'+body+'</div>'+tabs()+sheetHtml()+(S.toast?'<div class="toast"><i></i>'+esc(S.toast)+'</div>':'');
+  // 탭 전환만 맨 위로(그 외엔 스크롤 유지). 스크롤하는 건 .scroll 이 아니라 문서(window) — 예전 .scroll.scrollTop=0 은 효과 없이
+  // DOM 교체 **뒤**에 써서 새 화면 전체를 강제로 즉시 배치시켰다(폰 속도 실측 58ms). 레이아웃이 깨끗한 교체 **전**에 window 로 옮긴다.
+  if(!S.keepScroll&&(window.scrollY||0)!==0) window.scrollTo(0,0);
   morph(app, tpl);
-  var sc=app.querySelector('.scroll'); if(sc&&!S.keepScroll) sc.scrollTop=0; S.keepScroll=true;   // 탭 전환만 맨 위로, 그 외엔 스크롤 유지
+  S.keepScroll=true;
 };
 function toast(msg){ S.toast=msg; render(true); clearTimeout(S._tt); S._tt=setTimeout(function(){ S.toast=null; render(); },2200); }
 
@@ -1082,6 +1102,12 @@ document.addEventListener('touchend', function(){ if(S.scrub!=null){ S.scrub=nul
   await Promise.all([pullSpecs(), pullMarks(), pullFeed(), pullCash(), pullPositions()]);
   S.ready=true; render();
   pullPending(); pullHistory();
+  // 첫 방문 예열 (2026-09-24 탭 반응): Trade 화면은 **처음** 열 때만 글꼴·스타일 첫 배치로 폰 속도 92ms, 두 번째부터 17ms.
+  // 시작 1.2초 뒤 한 번, 보이지 않고 눌리지 않는 사본을 그려 캐시를 데워 둔다(실측 첫 방문 92 → 26ms). 2프레임 뒤 제거 · 돈/상태 변경 0.
+  setTimeout(function(){ try{ var w=document.createElement('div'); w.className='app'; w.setAttribute('aria-hidden','true'); w.setAttribute('data-prewarm','1');
+    w.style.cssText='position:fixed;left:0;top:0;width:100%;height:100vh;overflow:hidden;visibility:hidden;pointer-events:none;contain:strict';
+    w.innerHTML='<div class="scroll">'+screenTrade()+screenActivity()+screenAccount()+'</div>'; document.body.appendChild(w); void w.offsetHeight;
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ w.remove(); }); }); }catch(e){} }, 1200);
   // Realtime: prices UPDATE merges straight into the feed (same shape as the poll)
   try{ var d=db(); if(d&&d.channel){ d.channel('rh-prices').on('postgres_changes',{event:'*',schema:'public',table:'prices'},function(m){ var row=m&&m.new; if(row&&row.symbol) S.feed[row.symbol]={mid:+row.mid||0,spr:+row.spr_pts||0,ts:Date.now()}; }).subscribe();
     var a=fxAcct(); if(a) d.channel('rh-pos-'+a).on('postgres_changes',{event:'*',schema:'public',table:'positions',filter:'acct_no=eq.'+a},function(){ pullPositions(); pullCash(); }).subscribe(); } }catch(e){}

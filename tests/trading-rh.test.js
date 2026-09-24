@@ -46,6 +46,13 @@ ok('레이아웃: 4개 화면 상단 전부 safe-area-inset-top 여백 (홈 .top
 ok('터치: 렌더 = DOM morph (app.innerHTML 통째 교체 0) + 터치 중 배경 렌더 보류', !/app\.innerHTML\s*=/.test(src) && /function morph\(o, n\)/.test(src) && /if\(touching&&!force\)\{ renderQueued=true; return; \}/.test(src));
 ok('터치: 요청 타임아웃 = rpc·pushRequest 전부 withTimeout 경유 · busy 감시자(45s) 가 1초 루프에서 돈다 · 버튼/행에 user-select none (iOS 길게누름 선택 차단)', /await withTimeout\(d\.rpc\(name, args\)\)/.test(src) && (src.match(/withTimeout\(AlpexaSync\.pushRequest\(/g) || []).length === 2 && /function busyWatchdog\(\)\{ if\(S\.busy&&S\.busySince&&Date\.now\(\)-S\.busySince>45000\)/.test(src) && /setInterval\(function\(\)\{ busyWatchdog\(\);/.test(src) && /\[data-act\], \.tabs, \.row, \.arow, \.srow, \.prow, \.chips[^}]*user-select: none/.test(src) && /input, textarea \{ -webkit-user-select: text; user-select: text; \}/.test(src));
 ok('스크롤바 숨김: .scroll/.sheet/.plist 에 scrollbar-width none + ::-webkit-scrollbar display none (스크롤은 유지)', /\.scroll, \.sheet, \.sheet \.plist, \.app \{ scrollbar-width: none;/.test(src) && /\.scroll::-webkit-scrollbar, \.sheet::-webkit-scrollbar, \.sheet \.plist::-webkit-scrollbar, \.app::-webkit-scrollbar \{ display: none;/.test(src));
+// 탭 반응 (2026-09-24 사장님 "클릭이 잘 안돼" → 1·2·3 + 작은 것 2개): 토스트가 탭을 먹지 않음 · 누르는 순간 반응 · 44px 터치 영역 · 튕김 차단 · 탭 전환 강제 레이아웃 제거
+ok('탭반응 소스: 토스트 pointer-events none (주문 뒤 2초간 아래 버튼을 먹던 결함)', /\.toast \{[^}]*pointer-events: none/.test(src));
+ok('탭반응 소스: 누르는 순간 반응 — 버튼류 :active scale(.97) · 행류 :active 배경 · 뗄 때만 150ms 이하 전환', /:active \{ transform: scale\(\.97\); transition: none; \}/.test(src) && /\.arow:active, \.srow:active, \.prow:active, \.row:active, \.mine:active \{ background: var\(--surface\); \}/.test(src) && /transition: transform \.12s ease-out/.test(src));
+ok('탭반응 소스: 작은 버튼 44px 터치 영역 = ::after 확장 (보이는 크기 그대로) · .lots overflow hidden 제거(확장이 잘리지 않게)', /::after \{ content: ''; position: absolute;/.test(src) && !/\.lots \{[^}]*overflow: hidden/.test(src) && /\.sseg\.hseg \{[^}]*padding: 18px 22px 10px;[^}]*margin-bottom: -10px/.test(src));
+ok('탭반응 소스: 스크롤 끝 튕김 차단 (html·body none · 시트/목록 contain)', /html, body \{[^}]*overscroll-behavior: none/.test(src) && /\.sheet, \.sheet \.plist \{ overscroll-behavior: contain; \}/.test(src));
+ok('탭반응 소스: 탭 전환 스크롤 리셋 = morph 전에 window 로 (DOM 교체 뒤 scrollTop 쓰기 = 강제 레이아웃 58ms 제거)', /if\(!S\.keepScroll&&\(window\.scrollY\|\|0\)!==0\) window\.scrollTo\(0,0\);[\s\S]{0,400}morph\(app, tpl\);/.test(src) && !/sc\.scrollTop=0/.test(src));
+ok('탭반응 소스: 첫 방문 예열 = 보이지 않고(visibility hidden) 눌리지 않는(pointer-events none) 사본 1회 · 2프레임 뒤 제거', /w\.setAttribute\('data-prewarm','1'\)/.test(src) && /visibility:hidden;pointer-events:none;contain:strict/.test(src) && /requestAnimationFrame\(function\(\)\{ requestAnimationFrame\(function\(\)\{ w\.remove\(\); \}\); \}\)/.test(src));
 ok('푸터: 탭 히트 영역이 화면 바닥까지 (.tab 이 safe-area 패딩을 품음 · .tabs 하단 패딩 0) · 글자는 안전영역 위 ≥6px', /\.tabs \{[^}]*padding: 0 6px;/.test(src) && /\.tab \{[^}]*padding: 7px 0 max\(10px, calc\(env\(safe-area-inset-bottom, 0px\) - 6px\)\)/.test(src));
 ok('터치: 모든 [data-act] 요소에 cursor:pointer (iOS 문서 위임 클릭 조건) + touch-action manipulation', /\[data-act\], \[data-act\] \* \{ cursor: pointer; \}/.test(src) && /\[data-act\] \{[^}]*touch-action: manipulation/.test(src));
 ok('M2 소스: half = max(0.1, spr+mk)*pip/2 (fx_close v_half 미러)', /Math\.max\(0\.1,\s*spr\+mk\)\*fxPip\(sym\)\/2/.test(src));
@@ -156,6 +163,8 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   await page.waitForFunction(() => window.__rh && window.__rh.ready, null, { timeout: 8000 }).catch(() => {});
   await page.waitForTimeout(300);
   ok('M6 로드 무에러', errs.length === 0, errs.join(' | '));
+  await page.waitForTimeout(1400);
+  ok('첫 방문 예열: 1.2초 뒤 한 번 그리고 즉시 제거 (사본 남지 않음 · #app 하나)', (await page.locator('[data-prewarm]').count()) === 0 && (await page.locator('#app').count()) === 1 && (await page.locator('#chart').count()) === 0);
   ok('M6 홈: FX 그룹 10행 (금·은은 Metals 칩으로)', (await page.locator('.row').count()) === 10);
   { const tb = await page.locator('.tab[data-act="tab:trade"]').boundingBox(); const vh = await page.evaluate(() => innerHeight);
     ok('푸터 런타임: .tab 히트 영역 바닥 = 뷰포트 바닥 (' + Math.round(tb.y + tb.height) + '/' + vh + ') · 높이 ≥ 44px', tb && Math.abs((tb.y + tb.height) - vh) <= 1 && tb.height >= 44, JSON.stringify(tb)); }
@@ -471,6 +480,39 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   ok('M1 런타임: 목록 밖 rpc 0회 · 테이블 쓰기 = requests 3건뿐(입금 1 · 출금 2, 이체는 RPC) · 호출된 이름 전부 허용목록 (' + names.length + '건)', rpc === 0 && writes === 3 && (await page.evaluate(() => (window.__writeLog || []).every(w => w.t === 'requests'))) && names.length > 8 && names.every(x => ALLOW.includes(x)), 'rpc=' + rpc + ' writes=' + writes + ' names=' + [...new Set(names)].join(','));
   ok('M1 런타임: 모든 주문 local_id 가 서로 다름 (멱등 키 재사용 0)', await page.evaluate(() => { const ids = (window.__rpcLog || []).filter(x => /^fx_(open|place_pending)$/.test(x.name)).map(x => x.args.p_local_id); return ids.length === new Set(ids).size; }));
   ok('M6 전 과정 무에러', errs.length === 0, errs.join(' | '));
+  // ── 탭 반응 런타임 (2026-09-24) ──
+  const hit44 = (sel, round) => page.evaluate(([sel, round]) => { const out = [];
+    document.querySelectorAll(sel).forEach((el, i) => { if (i > 2) return; const r = el.getBoundingClientRect(); if (!r.width) return; const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      const pts = [[cx, cy - 21], [cx, cy + 21]].concat(round ? [[cx - 21, cy], [cx + 21, cy]] : []);
+      pts.forEach(([x, y]) => { const e = document.elementFromPoint(x, y); const t = e && e.closest('[data-act]'); if (t !== el) out.push(sel + '#' + i + ' @' + Math.round(x) + ',' + Math.round(y) + '→' + (t ? t.getAttribute('data-act') : (e ? e.className || e.tagName : 'none'))); }); });
+    return out; }, [sel, round]);
+  await page.evaluate(() => { act('sheet:'); act('tab:home'); }); await page.waitForTimeout(200);
+  { const miss = [].concat(await hit44('.sseg.hseg span'), await hit44('.hero .eye', true), await hit44('.top .oc'));
+    ok('44px 홈: 그룹 칩 · 눈 · 1-Click 칩 — 중심 ±21px 이 전부 그 버튼', miss.length === 0, miss.join(' | ')); }
+  await page.evaluate(() => { toast('Order placed test'); }); await page.waitForTimeout(80);
+  { const t = await page.evaluate(() => { const r = document.querySelector('.toast').getBoundingClientRect(); const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { hit: e && (e.closest('.toast') ? 'toast' : (e.className || e.tagName)) }; });
+    ok('토스트가 떠 있어도 그 자리 탭은 아래 요소가 받는다 (토스트 통과)', t.hit !== 'toast', JSON.stringify(t)); }
+  { const bb = await page.locator('.sseg.hseg span').nth(1).boundingBox(); await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2); await page.mouse.down();
+    const tf = await page.locator('.sseg.hseg span').nth(1).evaluate((el) => getComputedStyle(el).transform); await page.mouse.up(); await page.waitForTimeout(150);
+    const tf2 = await page.locator('.sseg.hseg span').nth(1).evaluate((el) => getComputedStyle(el).transform);
+    ok('누르는 순간 반응: 칩 누름 = scale(0.97) · 떼면 원래대로', /matrix\(0\.97/.test(tf) && !/matrix\(0\.97/.test(tf2), tf + ' / ' + tf2); }
+  await page.evaluate(() => act('hseg:FX')); await page.waitForTimeout(150);
+  await page.evaluate(() => window.scrollTo(0, 300)); await page.waitForTimeout(80);
+  await page.evaluate(() => act('tab:trade')); await page.waitForTimeout(400);
+  ok('탭 전환 → 화면 맨 위로 (window 스크롤 0)', (await page.evaluate(() => window.scrollY)) === 0);
+  { const miss = [].concat(await hit44('.det .ranges span'), await hit44('.otype span'), await hit44('.foot .lots b'), await hit44('.det .nm'));
+    ok('44px 트레이드: 기간 버튼 · 주문 종류 · 수량 ± · 종목 선택 — 중심 ±21px 이 전부 그 버튼', miss.length === 0, miss.join(' | ')); }
+  await page.evaluate(() => act('tab:activity')); await page.waitForTimeout(250);
+  { const miss = [].concat(await hit44('.act .seg span'), await hit44('.arow .x', true));
+    ok('44px Activity: 세그 · 포지션 ✕ — 중심 ±21px 이 전부 그 버튼', miss.length === 0, miss.join(' | ')); }
+  await page.evaluate(() => act('sheet:pair')); await page.waitForTimeout(200);
+  { const miss = [].concat(await hit44('.sheet .sseg span'), await hit44('.sheet .sttl .x', true));
+    ok('44px 페어 시트: 그룹 칩 · 닫기 ✕ — 중심 ±21px 이 전부 그 버튼', miss.length === 0, miss.join(' | ')); }
+  await page.evaluate(() => { act('sheet:'); act('tab:account'); act('sheet:deposit'); }); await page.waitForTimeout(200);
+  { const miss = await hit44('.sheet .chips span');
+    ok('44px 입금 시트: 방법·금액 칩 — 중심 ±21px 이 전부 그 칩', miss.length === 0, miss.join(' | ')); }
+  ok('튕김 차단 런타임: 시트 overscroll contain', (await page.locator('.sheet').evaluate((el) => getComputedStyle(el).overscrollBehaviorY)) === 'contain');
+  await page.evaluate(() => act('sheet:')); await page.waitForTimeout(100);
   // last (navigates away): Sign out everywhere → auth.signOut({scope:'global'}) → login.html with the fx-rh return token
   await page.route('**/login.html*', (r) => r.fulfill({ status: 200, contentType: 'text/html', body: '<html><body>login stub</body></html>' }));
   await page.evaluate(() => act('sheet:security')); await page.waitForTimeout(150);   // appearance sheet is still open → switch sheets directly
