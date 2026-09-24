@@ -41,7 +41,32 @@ async function hit(url) {
     return { status: res.status, events, snip: res.ok ? '' : txt.replace(/\s+/g, ' ').slice(0, 160), ms: Date.now() - t0 };
   } catch (e) { return { status: 0, events: null, snip: String(e && e.message).slice(0, 80), ms: Date.now() - t0 }; }
 }
+// ── 정산 모양 프로브 (2026-09-24 미청산 2건 진단): sports-settle 가 쓰는 **일자별 단일 URL** 로 최근 3일 MLB 를 받아
+//    (a) 200 인지 (b) 최종(STATUS_FINAL) 경기 수 (c) 특정 경기(BAL·SF·TEX 포함) 의 status/score 를 그대로 찍는다. 읽기만.
+const WATCH = /\b(BAL|SF|TEX)\b/;
+async function settleShape() {
+  console.log('\n── 정산 모양(일자별 단일 URL) · baseball/mlb');
+  for (const off of [-2, -1, 0]) {
+    const d = ymd(day(off));
+    const url = `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates=${d}`;
+    try {
+      const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 20000);
+      const res = await fetch(url, { headers: UA, signal: ctl.signal }); clearTimeout(tm);
+      const txt = await res.text(); let j = null; try { j = JSON.parse(txt); } catch (_e) {}
+      const evs = (j && j.events) || [];
+      const finals = evs.filter((e) => /FINAL/i.test(String((e.competitions?.[0]?.status?.type?.name) || (e.status?.type?.name) || ''))).length;
+      console.log(`  dates=${d} status=${res.status} events=${evs.length} final=${finals}${res.ok ? '' : ' «' + txt.replace(/\s+/g, ' ').slice(0, 120) + '»'}`);
+      for (const e of evs) {
+        const c = e.competitions?.[0] || {}; const teams = (c.competitors || []).map((x) => `${x.team?.abbreviation}${x.winner ? '*' : ''}:${x.score ?? '-'}`).join(' v ');
+        if (!WATCH.test(teams)) continue;
+        const st = c.status?.type || e.status?.type || {};
+        console.log(`     ${e.id} ${e.date} ${st.name}/${st.state} completed=${st.completed} «${st.detail}» | ${teams}`);
+      }
+    } catch (e) { console.log(`  dates=${d} ERR ${String(e && e.message).slice(0, 80)}`); }
+  }
+}
 (async () => {
+  await settleShape();
   console.log(`🛰️  ESPN 날짜범위 프로브 · today=${T} · UA=${UA['User-Agent']}\n`);
   for (const path of PATHS) {
     console.log(`── ${path}`);
