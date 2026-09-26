@@ -52,8 +52,21 @@ function oddsStatus(g) {
   const ml = g.ml || [];
   if (ml.length < 2) return 'MISSING';
   const a = +ml[0].am, b = +ml[1].am;
-  if ((a === -140 && b === 120) || (a === 120 && b === -140)) return 'PLACEHOLDER';
+  const mlSentinel = (a === -140 && b === 120) || (a === 120 && b === -140);
+  // 서버가 실배당(oddsReal:true)이라 한 경기는 옛 가짜 라인의 **완전한 지문**(ml -140/120 +
+  // spread ±3.5 둘 다 -110 + total 45.5 둘 다 -110)이 전부 맞을 때만 가짜로 본다 — daily-selfcheck
+  // 와 같은 규칙. 2026-09-26 Rangers@Red Wings 실북 -140/+120(Bovada 그대로, DK -142/+120)이
+  // ml 두 숫자만으로 🚨샘 오탐. SOC +230 과 같은 클래스(위 주석).
+  if (g.oddsReal === true) return mlSentinel && fullFakePrint(g) ? 'PLACEHOLDER' : 'REAL';
+  if (mlSentinel) return 'PLACEHOLDER';
   return 'REAL';
+}
+function fullFakePrint(g) {
+  const am = (x) => +((x || {}).am);
+  const pair = (arr, v, j) => Array.isArray(arr) && arr.length >= 2 &&
+    Math.abs(Math.abs(parseFloat(String(arr[0].ln).replace(/[^\d.]/g, ''))) - v) < 1e-9 &&
+    am(arr[0]) === j && am(arr[1]) === j;
+  return pair(g.spread, 3.5, -110) && pair(g.total, 45.5, -110);
 }
 function isTBD(g) {
   const s = ((g.home && g.home.nm) || '') + ' ' + ((g.away && g.away.nm) || '');
