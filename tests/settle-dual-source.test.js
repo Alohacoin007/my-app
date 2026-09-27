@@ -35,6 +35,14 @@ ok(/g\.oid\s*=\s*String\(ev\.id/.test(games) && /g\.hn\s*=\s*String\(ev\.home_te
 ok(/'oid',\s*v_game->>'oid'/.test(sql) && /'hn',\s*v_game->>'hn'/.test(sql) && /'an',\s*v_game->>'an'/.test(sql), 'place_bet: oid·hn·an 을 live_games 값으로 서버 도장 (클라 값 덮어씀)');
 ok(/betpay-/.test(settle) && /status=eq\.open`/.test(settle) && /rest\/v1\/ledger`/.test(settle), 'settle: 지급 경로(betpay 멱등 ref · 선점 삭제 · ledger) 그대로');
 
+const TS = require('./ts-strip-guard');
+{ const g = TS.deployGatesOnNode22(); ok(g.ok, '배포 게이트(deploy.yml·deploy-edge.yml) Node ≥22 — 아래 행위 검증이 실제로 도는 곳' + (g.ok ? '' : ' ✗ ' + g.bad.join(' '))); }
+if (!TS.canStrip) {
+  console.log(`── (B) ⏭️  Node ${process.version} 에 TS 스트립 없음 → 행위 절 생략 (배포 게이트 Node 22 에서 강제)`);
+  console.log(failed ? `\n🔴 settle-dual-source FAIL — ${failed}건` : '\n🟢 settle-dual-source — 소스 핀 초록 (행위 절은 Node 22 게이트에서)');
+  process.exit(failed ? 1 : 0);
+}
+
 console.log('── (B) 행위: legVerdict 8케이스 ──');
 // TS → JS 스트립 후 필요한 함수·상수만 추출 (settle-team-match 처럼 재구현하지 않고 **실제 코드**를 돌린다)
 const js = mod.stripTypeScriptTypes(settle, { mode: 'strip' });

@@ -27,6 +27,14 @@ ok(/const oddsOnly = oddsOnlyGames\(oddsRows, consumed/.test(games) && /games\.p
 ok(games.indexOf('games.push(...oddsOnly)') > games.indexOf('await overlayRealOdds(games, oddsRows, consumed)') && games.indexOf('games.push(...oddsOnly)') < games.indexOf('collapse-guard'), 'sports-games: 합치기가 overlay 뒤 · 붕괴 가드 앞 (가드가 합친 목록을 본다)');
 ok(/_o[0-9a-f]\{6,\}\$/.test(settle) || /_o\[0-9a-f\]\{6,\}\$/.test(settle), 'settle: `_o` gid 는 규칙 B void 금지 (legVerdict)');
 
+const TS = require('./ts-strip-guard');
+{ const g = TS.deployGatesOnNode22(); ok(g.ok, '배포 게이트(deploy.yml·deploy-edge.yml) Node ≥22 — 아래 행위 검증이 실제로 도는 곳' + (g.ok ? '' : ' ✗ ' + g.bad.join(' '))); }
+if (!TS.canStrip) {
+  console.log(`── (B)(C) ⏭️  Node ${process.version} 에 TS 스트립 없음 → 행위 절 생략 (배포 게이트 Node 22 에서 강제)`);
+  console.log(failed ? `\n🔴 feed-odds-primary FAIL — ${failed}건` : '\n🟢 feed-odds-primary — 소스 핀 초록 (행위 절은 Node 22 게이트에서)');
+  process.exit(failed ? 1 : 0);
+}
+
 // ── TS 스트립 + 함수/상수 추출 ──
 function extractor(src) {
   const js = mod.stripTypeScriptTypes(src, { mode: 'strip' });
