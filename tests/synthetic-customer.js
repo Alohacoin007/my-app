@@ -102,12 +102,16 @@ const rest = async (path) => (await fetch(`${URL}/rest/v1/${path}`, { headers: h
       games.sort((a, b) => Date.parse(a.iso) - Date.parse(b.iso));
       const g = games[0]; const sel = g.ml[0].sel;
       const lid = `synbet-${ts}`;
+      const tm = (t) => (t && (t.ab || t.nm)) || '?';
+      const gm = `${tm(g.away)} @ ${tm(g.home)}`;
+      // leg 모양 = 실고객 앱(sports-live.html)과 동일: kt(킥오프)·lg 필수 — 없으면 정산 규칙 B(48h void)·
+      // Odds 2차 출처·C1 킥오프 기준이 전부 꺼진다 (2026-09-22 synbet 연기 경기 영구 미청산, 결함-로그 09-24).
       const pb = await rpc('place_bet', {
         p_acct: A.sports.acct_no, p_stake: BET_STAKE, p_potential: 0, p_symbol: 'SPORTS',
-        p_local_id: lid, p_meta: { legs: [{ gid: g.gid, market: 'Moneyline', sel: sel }] },
+        p_local_id: lid, p_meta: { legs: [{ gid: g.gid, market: 'Moneyline', sel: sel, pk: sel, gm, kt: g.iso || '', lg: g.lg || '' }] },
       });
-      if (!pb.body || pb.body.ok !== true) bad('실베팅 실패: ' + (pb.raw || '').slice(0, 140) + ` (${g.lg} ${g.away}@${g.home})`);
-      else { ok(`실베팅 $${BET_STAKE} — ${g.lg} ${g.away}@${g.home} · ${sel} (${lid}) — 정산은 내일 런이 확인`); betPlaced = true; }
+      if (!pb.body || pb.body.ok !== true) bad('실베팅 실패: ' + (pb.raw || '').slice(0, 140) + ` (${g.lg} ${gm})`);
+      else { ok(`실베팅 $${BET_STAKE} — ${g.lg} ${gm} · ${sel} (${lid}) — 정산은 내일 런이 확인`); betPlaced = true; }
     }
   } catch (e) { bad('스포츠 풀루프 예외: ' + e.message); }
 

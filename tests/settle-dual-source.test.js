@@ -34,6 +34,8 @@ ok(!/if \(!r\) \{\s*\/\/ 규칙 B/.test(settle), 'settle: 옛 fail-open 분기(�
 ok(/g\.oid\s*=\s*String\(ev\.id/.test(games) && /g\.hn\s*=\s*String\(ev\.home_team/.test(games) && /g\.an\s*=\s*String\(ev\.away_team/.test(games), 'sports-games: 매칭된 Odds 이벤트의 oid·hn·an 을 live_games 에 도장');
 ok(/'oid',\s*v_game->>'oid'/.test(sql) && /'hn',\s*v_game->>'hn'/.test(sql) && /'an',\s*v_game->>'an'/.test(sql), 'place_bet: oid·hn·an 을 live_games 값으로 서버 도장 (클라 값 덮어씀)');
 ok(/betpay-/.test(settle) && /status=eq\.open`/.test(settle) && /rest\/v1\/ledger`/.test(settle), 'settle: 지급 경로(betpay 멱등 ref · 선점 삭제 · ledger) 그대로');
+ok(!/if \(st\.state !== "post"\) continue; \/\/ only FINAL games/.test(settle), 'settle: 팀 종목 파서가 state=post 단독으로 최종 판정하지 않는다 (연기·취소 0-0 채점 금지)');
+ok(/legVerdict\(l, results, odds, covered, NOW, off\)/.test(settle), 'settle: 메인 루프가 연기·취소 증거(off)를 legVerdict 에 넘긴다');
 
 const TS = require('./ts-strip-guard');
 { const g = TS.deployGatesOnNode22(); ok(g.ok, '배포 게이트(deploy.yml·deploy-edge.yml) Node ≥22 — 아래 행위 검증이 실제로 도는 곳' + (g.ok ? '' : ' ✗ ' + g.bad.join(' '))); }
@@ -77,6 +79,37 @@ if (legVerdict) {
   ok(v({ ...leg, kt: new Date(NOW - 3600e3).toISOString() }, {}, {}, all) === 'pending', '7. 48h 미만이면 조회 성공이어도 보류');
   ok(v({ ...leg, oid: undefined }, {}, oddsWon, none) === 'pending', '8. oid 없는 옛 베팅은 Odds 를 안 본다 (ESPN 전용, 하위호환)');
   ok(v({ ...leg, kt: '2026-09-01T20:00:00Z' }, {}, {}, all) === 'pending', '9. 6일 증명창 밖이면 void 금지 (PROVABLE_MS)');
+}
+
+console.log('── (C) 행위: 연기·취소(POSTPONED) — 2026-09-22 BAL@TOR 실사고 재현 ──');
+// ESPN 실측 그대로: MLB_401817035 · STATUS_POSTPONED · state=post · completed=false · 0-0 (espn-range-probe 러너 출력)
+let espnStatusKind = null;
+try { espnStatusKind = new Function(grab('espnStatusKind') + '\nreturn espnStatusKind;')(); } catch (e) { ok(false, 'espnStatusKind 추출 실패: ' + e.message); }
+ok(typeof espnStatusKind === 'function', 'settle: ESPN 상태 판정이 순수 함수 espnStatusKind 로 분리 (state=post 단독 판정 금지)');
+if (typeof espnStatusKind === 'function') {
+  const K = espnStatusKind;
+  ok(K({ name: 'STATUS_POSTPONED', state: 'post', completed: false }) === 'off', 'C1. POSTPONED (state=post·completed:false) → 채점 금지·연기 (0-0 을 최종으로 안 씀 → Under 지급 차단)');
+  ok(K({ name: 'STATUS_CANCELED', state: 'post', completed: false }) === 'off', 'C2. CANCELED → 연기·취소');
+  ok(K({ name: 'STATUS_FINAL', state: 'post', completed: true }) === 'final', 'C3. FINAL completed:true → 채점 (회귀 없음)');
+  ok(K({ name: 'STATUS_FULL_TIME', state: 'post', completed: true }) === 'final', 'C4. 축구 FULL_TIME → 채점 (회귀 없음)');
+  ok(K({ name: 'STATUS_FINAL', state: 'post' }) === 'final', 'C5. completed 필드 없는 FINAL → 채점 (피드 모양 차이 대비)');
+  ok(K({ name: 'STATUS_SUSPENDED', state: 'post', completed: false }) === null, 'C6. SUSPENDED → 보류 (재개될 수 있음)');
+  ok(K({ name: 'STATUS_IN_PROGRESS', state: 'in', completed: false }) === null, 'C7. 진행중 → 보류');
+  ok(K({ name: 'STATUS_POSTPONED', state: 'post', completed: true }) === 'off', 'C8. 이름이 POSTPONED 면 completed 가 이상해도 스코어 안 씀');
+}
+if (legVerdict) {
+  const NOW = Date.parse('2026-09-28T16:00:00Z');
+  const orig = Date.parse('2026-09-22T22:35:00Z');   // ESPN 원일정
+  const off = { MLB_401817035: orig };
+  // 합성 봇 leg 실모양: kt·lg·oid 없음 (결함-로그 2026-09-24 원인 ②)
+  const botLeg = { gid: 'MLB_401817035', sel: 'Baltimore Orioles ML', market: 'Moneyline' };
+  ok(legVerdict(botLeg, {}, {}, () => false, NOW, off) === 'void', 'C9. 실사고: kt 없는 봇 leg + ESPN POSTPONED + 원일정 6일 경과 → void (환불)');
+  ok(legVerdict({ ...botLeg, sel: 'Under 8.5', market: 'Total' }, {}, {}, () => false, NOW, off) === 'void', 'C10. 같은 경기 Under → 지급 아닌 void');
+  ok(legVerdict(botLeg, {}, {}, () => false, orig + 3600e3, off) === 'pending', 'C11. 연기 확정이어도 48h 안에는 보류 (같은 날 재개 대비)');
+  ok(legVerdict({ ...botLeg, kt: '2026-09-27T20:00:00Z' }, {}, {}, () => false, NOW, off) === 'pending', 'C12. leg kt 가 있으면 kt 기준 (재편성 킥오프 24h → 보류)');
+  const fin = { MLB_401817035: { hs: 5, as: 3, homeNm: 'Blue Jays', awayNm: 'Orioles', homeAb: 'TOR', awayAb: 'BAL' } };
+  ok(legVerdict(botLeg, fin, {}, () => false, NOW, off) === 'lost', 'C13. 최종 스코어가 있으면 그게 우선 (off 무시)');
+  ok(legVerdict(botLeg, {}, {}, () => true, NOW) === 'pending', 'C14. off 증거 없고 kt 없으면 종전대로 보류 (규칙 B 는 kt 필수)');
 }
 
 console.log(failed ? `\n🔴 settle-dual-source FAIL — ${failed}건` : '\n🟢 settle-dual-source — 이중 출처·void 커버리지 전부 초록');

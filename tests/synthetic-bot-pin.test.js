@@ -45,6 +45,11 @@ if (!/duplicate === true\)/.test(src)) bad('idempotency probe: same-ref re-call 
 // ⑤ 불변식 대조
 if (!/Math\.abs\(d - sum\) < 0\.005/.test(src)) bad('invariant: Δbalance must equal Σledger to the cent');
 
+// ⑧ 봇 베팅 leg 모양 = 실고객 앱과 동일 (kt·lg 필수) — 없으면 정산 규칙 B·Odds 2차 출처·C1 킥오프 기준이
+//    전부 꺼져 연기 경기 티켓이 영구 미청산 (2026-09-22 synbet-1790100210997, 결함-로그 09-24)
+if (!/legs: \[\{[^\]]*\bkt: g\.iso/.test(src)) bad('bot bet legs must carry kt (kickoff) like the real app');
+if (!/legs: \[\{[^\]]*\blg: g\.lg/.test(src)) bad('bot bet legs must carry lg (league) like the real app');
+
 // ⑥⑦ fail-closed + 미설정 생략
 if (!/process\.exit\(red \? 1 : 0\)/.test(src)) bad('bot must exit 1 on any red (silent-gate email)');
 if (!/미설정.*생략[\s\S]*?process\.exit\(0\)/.test(src)) bad('missing secrets must skip quietly with exit 0');

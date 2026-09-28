@@ -76,7 +76,22 @@ type Result = { hs: number; as: number; homeNm: string; awayNm: string; homeAb: 
 
 // cov: `${lg}|${YYYYMMDD}` → 그날 스코어보드를 200 으로 받은 경로 수. SOC 처럼 한 lg 에 경로가 여러 개면 전부
 //      성공해야 "그날을 다 봤다"(covered) — 하나라도 실패한 날은 그 리그 경기가 빠졌을 수 있으니 void 금지.
-async function fetchLeagueResults(L: { lg: string; path: string }, out: Record<string, Result>, cov: Record<string, number>) {
+// ESPN 경기 상태 → 채점 가능 여부 (순수 함수 — tests/settle-dual-source.test.js 가 추출해 실행).
+// "끝남(state=post)" ≠ "결과 확정": ESPN 은 연기·취소도 state=post 로 준다 (2026-09-22 BAL@TOR
+// STATUS_POSTPONED · completed:false · 0-0 → 0-0 이 최종으로 들어가면 Under 지급·스프레드 오채점).
+//   "final" = completed:true (필드가 없을 때만 이름 FINAL/FULL_TIME) 이고 연기·중단류가 아님
+//   "off"   = POSTPONED/CANCELED/ABANDONED — 경기가 열리지 않았다는 적극적 증거 (legVerdict 가 48h 뒤 void)
+//   null    = 진행중·예정·지연·중단(SUSPENDED) → 채점 안 함 (보류)
+function espnStatusKind(st: any): "final" | "off" | null {
+  const name = String((st && st.name) || "");
+  if (/POSTPONED|CANCEL|ABANDON/i.test(name)) return "off";
+  if (!st || st.state !== "post" || /SUSPEND|DELAY/i.test(name)) return null;
+  if (st.completed === true) return "final";
+  if (st.completed == null && /FINAL|FULL_TIME/i.test(name)) return "final";
+  return null;
+}
+
+async function fetchLeagueResults(L: { lg: string; path: string }, out: Record<string, Result>, cov: Record<string, number>, off: Record<string, number>) {
   // CATCH-UP WINDOW (#33): ESPN's default scoreboard returns ONLY the current day. A game that
   // finished but wasn't settled the same day (settle downtime / late finish) fell off the feed
   // → its still-open bet could never settle and was orphaned forever (the daily audit's C1
@@ -102,7 +117,9 @@ async function fetchLeagueResults(L: { lg: string; path: string }, out: Record<s
           const comp = ev.competitions && ev.competitions[0];
           if (!comp || !comp.competitors) continue;
           const st = (ev.status && ev.status.type) ? ev.status.type : {};
-          if (st.state !== "post") continue; // only FINAL games
+          const kind = espnStatusKind(st);
+          if (kind === "off") { off[L.lg + "_" + ev.id] = Date.parse(ev.date || ""); continue; }   // 연기·취소 = 스코어 안 씀
+          if (kind !== "final") continue; // only FINAL games (완료 확정만)
           const hc = comp.competitors.find((c: any) => c.homeAway === "home");
           const ac = comp.competitors.find((c: any) => c.homeAway === "away");
           if (!hc || !ac || !hc.team || !ac.team) continue;
@@ -165,11 +182,17 @@ async function fetchOddsScores(KEY: string, sportKey: string, oids: string[], ou
 //      팀 이름은 Odds 이름 + place_bet 이 도장한 hn/an 둘 다로 매칭(teamSide 가 못 정하면 보류).
 //   ③ 둘 다 없음 → 규칙 B: 48h 초과 · 6일 증명창 안 · **킥오프 날과 전날을 그 리그가 200 으로 다 봤을 때만** void.
 //      조회 실패한 날은 "경기가 없다"의 증거가 아니다 → 보류. (2026-09-16 fail-open 폐쇄)
-function legVerdict(l: any, espn: Record<string, Result>, odds: Record<string, OddsScore>, covered: (lg: string, ymd: string) => boolean, now: number): string {
+//   ⓪ ESPN 이 그 경기를 연기·취소(off)로 명시 → 킥오프(leg kt, 없으면 ESPN 원일정)+48h 지나면 void, 그 전엔 보류.
+//      (2026-09-28 승인. kt 없는 옛/봇 leg 도 ESPN 일정으로 판정 — synbet-1790100210997 영구 미청산 원인)
+function legVerdict(l: any, espn: Record<string, Result>, odds: Record<string, OddsScore>, covered: (lg: string, ymd: string) => boolean, now: number, off?: Record<string, number>): string {
   const r = espn[l.gid];
   if (r) return gradeLeg(l, r) ?? "pending";
   const oid = l.oid ? String(l.oid) : "";
   const kt = Date.parse(l.kt || "");
+  if (off && Object.prototype.hasOwnProperty.call(off, String(l.gid || ""))) {
+    const k = Number.isFinite(kt) ? kt : off[l.gid];
+    return Number.isFinite(k) && now - k > VOID_AFTER_MS ? "void" : "pending";
+  }
   if (oid && odds[oid]) {
     const o = odds[oid];
     if (o.completed === true && Number.isFinite(kt) && Number.isFinite(o.commence) && Math.abs(o.commence - kt) <= ODDS_KICKOFF_MS
@@ -363,7 +386,8 @@ Deno.serve(async (req) => {
   const results: Record<string, Result> = {};
   const golfWin: Record<string, string> = {};
   const cov: Record<string, number> = {};   // `${lg}|${YYYYMMDD}` → 200 받은 경로 수 (void 커버리지 증명)
-  await Promise.all([...LEAGUES.map((L) => fetchLeagueResults(L, results, cov)), fetchUFCResults(results), fetchGolfWinners(golfWin)]);
+  const off: Record<string, number> = {};   // gid → ESPN 원일정(ms) : 연기·취소 확정 경기 (legVerdict ⓪)
+  await Promise.all([...LEAGUES.map((L) => fetchLeagueResults(L, results, cov, off)), fetchUFCResults(results), fetchGolfWinners(golfWin)]);
   const pathsOf: Record<string, number> = {}; LEAGUES.forEach((L) => { pathsOf[L.lg] = (pathsOf[L.lg] || 0) + 1; });
   const covered = (lg: string, ymd: string) => (cov[lg + "|" + ymd] || 0) >= (pathsOf[lg] || Infinity);
   // Debug: ?debug=1 returns the final-game results map (gid -> score) so we can
@@ -422,7 +446,7 @@ Deno.serve(async (req) => {
           g = playerMatch(l.sel || l.pk || "", w) ? "won" : "lost"; // cut/WD/runner-up = not the winner = lost
         } else {
           // 팀 종목: ESPN → (없으면) Odds oid → (둘 다 없으면) 규칙 B — 전부 legVerdict 한 곳 (순수 함수, 테스트 추출)
-          g = legVerdict(l, results, odds, covered, NOW);
+          g = legVerdict(l, results, odds, covered, NOW, off);
           if (g === "pending") { pending++; push("pending"); continue; }
         }
         if (g === "lost") anyLost = true;
