@@ -35,7 +35,8 @@ ok(/g\.oid\s*=\s*String\(ev\.id/.test(games) && /g\.hn\s*=\s*String\(ev\.home_te
 ok(/'oid',\s*v_game->>'oid'/.test(sql) && /'hn',\s*v_game->>'hn'/.test(sql) && /'an',\s*v_game->>'an'/.test(sql), 'place_bet: oid·hn·an 을 live_games 값으로 서버 도장 (클라 값 덮어씀)');
 ok(/betpay-/.test(settle) && /status=eq\.open`/.test(settle) && /rest\/v1\/ledger`/.test(settle), 'settle: 지급 경로(betpay 멱등 ref · 선점 삭제 · ledger) 그대로');
 ok(!/if \(st\.state !== "post"\) continue; \/\/ only FINAL games/.test(settle), 'settle: 팀 종목 파서가 state=post 단독으로 최종 판정하지 않는다 (연기·취소 0-0 채점 금지)');
-ok(/legVerdict\(l, results, odds, covered, NOW, off\)/.test(settle), 'settle: 메인 루프가 연기·취소 증거(off)를 legVerdict 에 넘긴다');
+ok(/legVerdict\(l, results, odds, covered, NOW, off, idx\)/.test(settle), 'settle: 메인 루프가 연기·취소 증거(off)와 ESPN 경기 인덱스(idx)를 legVerdict 에 넘긴다');
+ok(/if \(kind === "final"\) out\[gid\] = res;/.test(settle), 'settle: 최종 스코어 맵(out)에는 확정 경기만 — 연기 0-0 은 인덱스에만');
 
 const TS = require('./ts-strip-guard');
 { const g = TS.deployGatesOnNode22(); ok(g.ok, '배포 게이트(deploy.yml·deploy-edge.yml) Node ≥22 — 아래 행위 검증이 실제로 도는 곳' + (g.ok ? '' : ' ✗ ' + g.bad.join(' '))); }
@@ -56,7 +57,7 @@ function grab(name) {
   return js.slice(i, j + 1);
 }
 const consts = ['VOID_AFTER_MS', 'PROVABLE_MS', 'ODDS_KICKOFF_MS'].map((k) => { const m = js.match(new RegExp('const ' + k + '\\s*=\\s*[^;]+;')); return m ? m[0] : ''; }).join('\n');
-const code = consts + '\n' + ['normTeam', 'nameHit', 'teamSide', 'gradeLeg', 'legVerdict'].map(grab).join('\n');
+const code = consts + '\n' + ['normTeam', 'nameHit', 'teamSide', 'gradeLeg', 'sameTeams', 'oddsOnlyViaEspn', 'legVerdict'].map(grab).join('\n');
 let legVerdict = null;
 try { legVerdict = new Function(code + '\nreturn legVerdict;')(); } catch (e) { ok(false, 'legVerdict 추출 실패: ' + e.message); }
 
@@ -110,6 +111,37 @@ if (legVerdict) {
   const fin = { MLB_401817035: { hs: 5, as: 3, homeNm: 'Blue Jays', awayNm: 'Orioles', homeAb: 'TOR', awayAb: 'BAL' } };
   ok(legVerdict(botLeg, fin, {}, () => false, NOW, off) === 'lost', 'C13. 최종 스코어가 있으면 그게 우선 (off 무시)');
   ok(legVerdict(botLeg, {}, {}, () => true, NOW) === 'pending', 'C14. off 증거 없고 kt 없으면 종전대로 보류 (규칙 B 는 kt 필수)');
+}
+
+console.log('── (D) 행위: Odds 전용(`_o`) leg → ESPN 경기 연결 — synbet-1790100210997 실제 행 모양 ──');
+// 사장님 SQL 실측 leg: gid MLB_o7fafa…, oid, hn=Baltimore(Odds 는 홈/원정을 ESPN 과 반대로 표기), an=Toronto, kt·lg 없음.
+// ESPN 실측(러너 프로브 09-24): 09-22 401817035 BAL@TOR POSTPONED 0-0 · 09-23 401923610 BAL 4-2 17:35Z · 401817050 BAL 4-2 22:35Z
+//   · 09-23 401817043 SF 2 @ MIN 3 01:45Z
+if (legVerdict) {
+  const NOW = Date.parse('2026-09-28T16:00:00Z');
+  const R = (away, awayAll, awayAb, home, homeAll, homeAb, as, hs) => ({ hs, as, homeNm: home, awayNm: away, homeAb, awayAb, homeAll, awayAll });
+  const BT = (as, hs) => R('Orioles', ['Orioles', 'Baltimore Orioles', 'Baltimore'], 'BAL', 'Blue Jays', ['Blue Jays', 'Toronto Blue Jays', 'Toronto'], 'TOR', as, hs);
+  const idx = { MLB: [
+    { gid: 'MLB_401817035', t: Date.parse('2026-09-22T22:35:00Z'), kind: 'off', r: BT(0, 0) },
+    { gid: 'MLB_401923610', t: Date.parse('2026-09-23T17:35:00Z'), kind: 'final', r: BT(4, 2) },
+    { gid: 'MLB_401817050', t: Date.parse('2026-09-23T22:35:00Z'), kind: 'final', r: BT(4, 2) },
+    { gid: 'MLB_401817043', t: Date.parse('2026-09-23T01:45:00Z'), kind: 'final', r: R('Giants', ['Giants', 'San Francisco Giants', 'San Francisco'], 'SF', 'Twins', ['Twins', 'Minnesota Twins', 'Minnesota'], 'MIN', 2, 3) },
+  ] };
+  const real = { am: -117, an: 'Toronto Blue Jays', hn: 'Baltimore Orioles', gid: 'MLB_o7fafa79a573ac098f38c8c6c4293b93e', oid: '7fafa79a573ac098f38c8c6c4293b93e', sel: 'Baltimore Orioles ML', market: 'Moneyline' };
+  const withKt = { ...real, kt: '2026-09-22T22:35:00Z' };
+  const V = (l, now = NOW) => legVerdict(l, {}, {}, () => true, now, {}, idx);
+  ok(V(withKt) === 'void', 'D1. `_o` leg + kt + ESPN 같은 경기 POSTPONED(홈/원정 반대 표기여도) + 48h 경과 → void (실고객 앱 모양)');
+  ok(V(real) === 'pending', 'D2. 실제 봇 티켓(kt 없음) → 보류 (시각 없이 추측 연결 금지 — 이 한 건은 수동 Void)');
+  ok(V(withKt, Date.parse('2026-09-23T10:00:00Z')) === 'pending', 'D3. 연기 확정이어도 48h 안 → 보류');
+  ok(V({ ...withKt, kt: '2026-09-23T17:35:00Z' }) === 'pending', 'D4. 더블헤더(같은 두 팀 5h 간격 2경기 ±6h) → 모호 → 보류');
+  const sf = { gid: 'MLB_oaaaaaa1111', oid: 'aaaaaa1111', hn: 'Minnesota Twins', an: 'San Francisco Giants', sel: 'San Francisco Giants ML', market: 'Moneyline', kt: '2026-09-23T01:45:00Z' };
+  ok(V(sf) === 'lost', 'D5. 유일 매칭 + ESPN 최종 → ESPN 스코어로 채점 (SF 2-3 → lost)');
+  ok(V({ ...sf, sel: 'Minnesota Twins ML' }) === 'won', 'D6. 같은 경기 반대 픽 → won');
+  ok(V({ ...sf, kt: '2026-09-23T08:50:00Z' }) === 'pending', 'D7. 킥오프 7h 어긋남 → 다른 경기로 보고 보류');
+  ok(V({ ...sf, an: 'Chicago Cubs' }) === 'pending', 'D8. 한 팀만 맞음 → 보류');
+  ok(legVerdict(withKt, {}, {}, () => true, NOW) === 'pending', 'D9. ESPN 인덱스 없으면 종전대로 `_o` void 금지 (보류)');
+  const oddsDone = { [real.oid]: { completed: true, commence: Date.parse(withKt.kt), home: 'Baltimore Orioles', away: 'Toronto Blue Jays', hs: 1, as: 5 } };
+  ok(legVerdict(withKt, {}, oddsDone, () => true, NOW, {}, idx) === 'lost', 'D10. Odds 결과(completed)가 있으면 Odds 가 우선 (한 leg 한 출처)');
 }
 
 console.log(failed ? `\n🔴 settle-dual-source FAIL — ${failed}건` : '\n🟢 settle-dual-source — 이중 출처·void 커버리지 전부 초록');

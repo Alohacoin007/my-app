@@ -110,7 +110,7 @@ if (oddsOnlyGames) {
 console.log('── (C) 행위: 정산 — `_o` gid 는 void 금지 ──');
 {
   const S = extractor(settle);
-  const scode = ['VOID_AFTER_MS', 'PROVABLE_MS', 'ODDS_KICKOFF_MS'].map(S.cst).join('\n') + '\n' + ['normTeam', 'nameHit', 'teamSide', 'gradeLeg', 'legVerdict'].map(S.fn).join('\n');
+  const scode = ['VOID_AFTER_MS', 'PROVABLE_MS', 'ODDS_KICKOFF_MS'].map(S.cst).join('\n') + '\n' + ['normTeam', 'nameHit', 'teamSide', 'gradeLeg', 'sameTeams', 'oddsOnlyViaEspn', 'legVerdict'].map(S.fn).join('\n');
   let legVerdict = null;
   try { legVerdict = new Function(scode + '\nreturn legVerdict;')(); } catch (e) { ok(false, 'legVerdict 추출 실패: ' + e.message); }
   if (legVerdict) {
