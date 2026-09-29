@@ -55,6 +55,13 @@ ok('탭반응 소스: 탭 전환 스크롤 리셋 = morph 전에 window 로 (DOM
 ok('탭반응 소스: 첫 방문 예열 = 보이지 않고(visibility hidden) 눌리지 않는(pointer-events none) 사본 1회 · 2프레임 뒤 제거', /w\.setAttribute\('data-prewarm','1'\)/.test(src) && /visibility:hidden;pointer-events:none;contain:strict/.test(src) && /requestAnimationFrame\(function\(\)\{ requestAnimationFrame\(function\(\)\{ w\.remove\(\); \}\); \}\)/.test(src));
 ok('푸터: 탭 히트 영역이 화면 바닥까지 (.tab 이 safe-area 패딩을 품음 · .tabs 하단 패딩 0) · 글자는 안전영역 위 ≥6px', /\.tabs \{[^}]*padding: 0 6px;/.test(src) && /\.tab \{[^}]*padding: 7px 0 max\(10px, calc\(env\(safe-area-inset-bottom, 0px\) - 6px\)\)/.test(src));
 ok('터치: 모든 [data-act] 요소에 cursor:pointer (iOS 문서 위임 클릭 조건) + touch-action manipulation', /\[data-act\], \[data-act\] \* \{ cursor: pointer; \}/.test(src) && /\[data-act\] \{[^}]*touch-action: manipulation/.test(src));
+// iOS 탭 (2026-09-29 사장님 "Crypto 는 잘 되는데 FX 는 클릭이 안 돼"): `.btn { cursor: default }` 가 [data-act] 의 pointer 를
+// 같은 강도로 덮어써 SELL/BUY 가격(1-Click OFF)이 iOS 에서 click 을 못 만들었다. Crypto(React)는 onClick 요소마다 빈 onclick 을
+// 직접 달아(iOS 버그 우회) CSS 와 무관하게 클릭된다 → 같은 방식 + cursor 되돌리는 규칙 금지.
+{ const css = (src.match(/<style[^>]*>([\s\S]*?)<\/style>/g) || []).join('\n');
+  const undo = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].filter((m) => /cursor\s*:\s*(default|auto|text|not-allowed)/.test(m[2])).map((m) => m[1].trim());
+  ok('iOS 탭 소스: cursor 를 default/auto 로 되돌리는 CSS 규칙 0 (있으면 그 버튼은 iOS 에서 안 눌림)', undo.length === 0, undo.join(' | '));
+  ok('iOS 탭 소스: 렌더마다 [data-act] 전부에 빈 onclick (React 와 같은 iOS 클릭 우회)', /morph\(app, tpl\);[\s\S]{0,300}querySelectorAll\('\[data-act\]'\)[\s\S]{0,120}\.onclick=/.test(src)); }
 ok('M2 소스: half = max(0.1, spr+mk)*pip/2 (fx_close v_half 미러)', /Math\.max\(0\.1,\s*spr\+mk\)\*fxPip\(sym\)\/2/.test(src));
 ok('M2 소스: 비FX half = mid*max(floorBps[cls], spr)/10000/2 (fx_close v_half else-branch 미러) · 계약/클래스 = fx_specs 런타임', /mid\*\(Math\.max\(SPREAD_BPS\[cls\]\|\|0, spr\)\/10000\)\/2/.test(src) && /from\('fx_specs'\)\.select\('symbol,cls,contract'\)/.test(src) && /SPREAD_BPS=\{CRYPTO:10,STOCK:8,INDEX:6\}/.test(src));
 ok('M2 소스: pip 락스텝 (JPY .01 · XAU .01 · XAG .001 · else .0001)', /JPY\$\/\.test\(sym\)\?0\.01:sym==='XAUUSD'\?0\.01:sym==='XAGUSD'\?0\.001:0\.0001/.test(src));
@@ -175,6 +182,13 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
     // 터치 시뮬레이션: touchstart 중 배경 render 보류 → touchend 350ms 뒤 반영
     const deferred = await page.evaluate(async () => { const t = new Event('touchstart', { bubbles: true }); document.body.dispatchEvent(t); window.__rh.toast = null; window.__rh.cash = 999.5; render(); const before = document.querySelector('.stat .v').textContent; document.body.dispatchEvent(new Event('touchend', { bubbles: true })); await new Promise(r => setTimeout(r, 450)); const after = document.querySelector('.stat .v').textContent; window.__rh.cash = 12341.10; render(true); return { before, after }; });
     ok('터치: 손가락 닿은 동안 배경 렌더 보류 → 뗀 뒤 반영 (' + deferred.before + ' → ' + deferred.after + ')', !/999\.50/.test(deferred.before) && /999\.50/.test(deferred.after), JSON.stringify(deferred)); }
+  { const ios = await page.evaluate(() => { const els = [...document.querySelectorAll('#app [data-act]')];
+      const noClick = els.filter((e) => typeof e.onclick !== 'function').map((e) => e.getAttribute('data-act')).slice(0, 5);
+      const noPtr = els.filter((e) => getComputedStyle(e).cursor !== 'pointer').map((e) => e.getAttribute('data-act')).slice(0, 5);
+      const btn = document.querySelector('.row .btn.buy');
+      return { n: els.length, oneClick: window.__rh.oneClick, noClick, noPtr, btnCursor: btn && getComputedStyle(btn).cursor, btnClick: btn && typeof btn.onclick }; });
+    ok('iOS 탭 런타임 (1-Click OFF): 탭 대상 ' + ios.n + '개 전부 onclick 보유 · cursor pointer — SELL/BUY 가격 포함 (' + ios.btnCursor + ' / ' + ios.btnClick + ')',
+      ios.oneClick === false && ios.n > 20 && !ios.noClick.length && !ios.noPtr.length && ios.btnCursor === 'pointer' && ios.btnClick === 'function', JSON.stringify(ios)); }
   ok('홈: 상품군 칩 = 피드 있는 그룹만 (FX · Metals · Crypto · Stocks — Indices 는 피드 없어 숨김)', (await page.locator('.hseg span').count()) === 4 && (await page.locator('.hseg span[data-act="hseg:Indices"]').count()) === 0);
   // M2 lockstep
   const eurSell = await page.locator('.row[data-sym="EURUSD"] .btn.sell').innerText();
