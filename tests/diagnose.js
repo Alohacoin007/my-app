@@ -21,7 +21,7 @@ const DEPLOYED = ['crypto-live.html', 'sports-live.html', 'trading.html', 'fx-ap
 const MONEY_EDGE = ['sports-settle', 'stake-accrue'];   // edge fns that MOVE money (must fail-closed)
 // Price/game FEEDS: not payouts, but they WRITE market data settlements read, and a fail-open
 // endpoint is world-callable (abuse → external-API cost, stale/garbage writes). Fail-closed too.
-const FEED_EDGE = ['crypto-prices', 'fx-prices', 'sports-games', 'sports-odds', 'stock-prices'];
+const FEED_EDGE = ['crypto-price', 'fx-prices', 'sports-games', 'sports-odds', 'stock-prices'];
 // Every page a customer could ever load (shipped apps + landing + the parked site/ mirror) —
 // scanned so hardcoded FAKE BALANCES / demo emails can't sneak back (the 2026-06 cleanup class).
 const DEMO_FILES = DEPLOYED.concat([

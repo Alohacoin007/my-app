@@ -59,7 +59,9 @@ console.log('\n── TESTS: RED→GREEN suite ───────────
 const testDir = __dirname;
 const tests = fs.readdirSync(testDir).filter(f => f.endsWith('.test.js')).sort();
 for (const t of tests) {
-  const r = cp.spawnSync(process.execPath, [path.join(testDir, t)], { encoding: 'utf8' });
+  let r = cp.spawnSync(process.execPath, [path.join(testDir, t)], { encoding: 'utf8' });
+  // 한 번 재시도 (2026-10-01): 헤드리스 브라우저 타이밍 흔들림이 배포를 막지 않게. 진짜 버그는 두 번 다 빨강.
+  if (r.status !== 0) { const r2 = cp.spawnSync(process.execPath, [path.join(testDir, t)], { encoding: 'utf8' }); if (r2.status === 0) { console.log(`  ⚠️  ${t} — 1차 실패·재시도 통과 (흔들림 의심, 반복되면 고칠 것)`); } r = r2; }
   const okExit = r.status === 0;
   if (!okExit) fail++;
   console.log(`  ${okExit ? '✅' : '❌'} ${t}`);

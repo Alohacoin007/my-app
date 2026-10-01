@@ -1,3 +1,4 @@
+-- ⛔ 재실행 금지 (2026-10-01 정리): 여기 fx_open 은 v2 = 구버전. 현행은 fx_pending_engine.sql(v4). 다시 돌리면 운영 fx_open 이 v2 로 덮인다. (fx-slippage.test.js 근거라 보관)
 -- Alpexa — fx_open CONSOLIDATED (margin gate + leverage clamp + SLIPPAGE guard).
 -- ============================================================================
 -- SUPERSEDES fx_open_margin.sql (4-arg) and fx_open_leverage.sql (5-arg). Deploy this AFTER

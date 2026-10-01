@@ -17,7 +17,7 @@ console.log('fx watermark — 스파이크 판정·레벨 정산 게이트');
 const sltp = fs.readFileSync(path.join(REPO, 'supabase/sql/fx_modify.sql'), 'utf8');
 const stop = fs.readFileSync(path.join(REPO, 'supabase/sql/fx_stopout.sql'), 'utf8');
 const fxs = fs.readFileSync(path.join(REPO, 'supabase/functions/fx-stream/index.ts'), 'utf8');
-const cps = fs.readFileSync(path.join(REPO, 'supabase/functions/crypto-prices/index.ts'), 'utf8');
+const cps = fs.readFileSync(path.join(REPO, 'supabase/functions/crypto-price/index.ts'), 'utf8');
 ok('prices에 tick_hi/tick_lo 추가 (재실행 안전)', /add column if not exists tick_hi/.test(sltp) && /add column if not exists tick_lo/.test(sltp));
 ok('fx_sltp: coalesce(tick_lo, mid)/coalesce(tick_hi, mid) 판정 (null=현행 동일)',
    /coalesce\(tick_lo, mid\), coalesce\(tick_hi, mid\)/.test(sltp));

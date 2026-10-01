@@ -15,9 +15,21 @@ jobs:
         with: { node-version: '22' }
       - name: Install parser (for verify's JSX parse arm)
         run: npm i @babel/parser --no-save || true
+      # 브라우저 테스트(로그인·주문·렌더 20여 개)가 CI 에서 SKIP 되지 않게 Chromium 을 깐다 (2026-10-01).
+      # 테스트는 <PLAYWRIGHT_BROWSERS_PATH>/chromium*/chrome-linux/chrome 을 찾는다 → 새 빌드의 chrome-linux64 를 맞춰 준다.
+      - name: Install headless Chromium (browser tests)
+        run: |
+          npm i playwright-core@1.63.0 --no-save
+          PLAYWRIGHT_BROWSERS_PATH=$HOME/pw npx playwright-core install --with-deps chromium
+          for d in $HOME/pw/chromium-*; do
+            [ -e "$d/chrome-linux/chrome" ] || { [ -d "$d/chrome-linux64" ] && ln -s chrome-linux64 "$d/chrome-linux"; } || true
+          done
+          echo "PLAYWRIGHT_BROWSERS_PATH=$HOME/pw" >> "$GITHUB_ENV"
       - run: node tests/verify.js          # 🔴면 배포 중단
+      # 공개 묶음 = 고객 화면 파일만 (CLAUDE.md·결함-로그·SQL·tests 등 내부 파일 제외). 핀: tests/site-bundle.test.js
+      - run: node tools/build-site.js _site
       - uses: actions/upload-pages-artifact@v3
-        with: { path: '.' }
+        with: { path: '_site' }
   publish:
     needs: gate
     runs-on: ubuntu-latest

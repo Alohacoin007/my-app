@@ -1,3 +1,4 @@
+-- ⛔ 통째 재실행 금지 (2026-10-01 정리): snapshot_portfolios 는 portfolio_total_history.sql 판이 현행. 테이블·get_portfolio_history 는 여전히 사용 중이라 보관.
 -- portfolio_history — REAL per-account value history for the wallet chart.
 --
 -- Replaces the synthesized "scale current total by a coin-price shape" chart (which never

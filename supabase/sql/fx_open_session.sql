@@ -1,3 +1,4 @@
+-- ⛔ 재실행 금지 (2026-10-01 정리): 여기 fx_open 은 v3 = 구버전. 현행 fx_open v4 는 fx_pending_engine.sql. 이 파일을 다시 돌리면 운영 fx_open 이 v3 로 덮인다. (fx_market_open 등 다른 블록·테스트 핀 근거라 보관)
 -- Alpexa — fx_open v3 CONSOLIDATED (세션 게이트 + 마진 + 레버리지 클램프 + 슬리피지)
 -- ============================================================================
 -- SUPERSEDES fx_open_slippage.sql (v2). fx_open_margin.sql의 fx_ccy_to_usd / fx_notional_usd /

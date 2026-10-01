@@ -1,4 +1,4 @@
-// Alpexa — CACHE + THROTTLE harness (mirrors supabase/functions/_shared/ttl-cache.ts &
+// Alpexa — CACHE + THROTTLE harness (mirrors the former supabase/functions/_shared/ttl-cache.ts (원본 삭제 2026-10-01, 로직은 feed/index.ts 안) &
 // throttle.ts). Proves the read-proxy collapses N concurrent DB reads into 1 per second
 // (single-flight + 1s TTL) and that the broadcast throttle caps publishes to ~2–3/sec.
 // Also emits the before/after DB-load numbers for the report.

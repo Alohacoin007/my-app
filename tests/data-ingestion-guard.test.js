@@ -1,4 +1,4 @@
-// Alpexa — DATA INGESTION GUARD tests (mirrors supabase/functions/_shared/data-guard.ts)
+// Alpexa — DATA INGESTION GUARD tests (mirrors the former supabase/functions/_shared/data-guard.ts (원본 삭제 2026-10-01 — 어디서도 import 안 됨))
 // Real-time feed integrity: staleness → circuit-breaker lock, invalid/outlier ticks ignored.
 // Two calibration correctness points proven here:
 //   • staleness threshold is CONFIGURABLE (10s literal would lock a ~60s cron feed);

@@ -1,3 +1,4 @@
+-- ⛔ 통째 재실행 금지 (2026-10-01 정리): 여기 4-인자 fx_open 은 구버전(현행 = fx_pending_engine.sql v4). fx_notional_usd 등 이 파일의 다른 함수가 필요하면 그 블록만 — 또는 생성본 fx_contract_size.sql 을 쓴다.
 -- Alpexa — D13: fx_open enforces MARGIN server-side (DRAFT — TEST BEFORE PROD).
 -- ============================================================================
 -- Today neither the client (canPlace ignores balance) nor fx_open checks margin, so a
