@@ -25,7 +25,7 @@ const FEED_EDGE = ['crypto-price', 'fx-prices', 'sports-games', 'sports-odds', '
 // Every page a customer could ever load (shipped apps + landing + the parked site/ mirror) —
 // scanned so hardcoded FAKE BALANCES / demo emails can't sneak back (the 2026-06 cleanup class).
 const DEMO_FILES = DEPLOYED.concat([
-  'manager.html', 'manager-app.html',   // agent.html now in DEPLOYED above
+  // (옛 manager.html · manager-app.html 은 2026-10-01 삭제 — 백오피스 = manager-mobile.html, DEPLOYED 에 있음)
   'site/index.html', 'site/wallet.html', 'site/settings.html', 'site/dashboard.html',
   'site/my-bets.html', 'site/sports.html', 'site/promotions.html',
   'site/introducing-broker.html', 'site/legal.html', 'site/login.html', 'site/signup.html']);

@@ -3,7 +3,7 @@
 //
 // 왜: 종전엔 고객 폰마다 3MB Babel을 내려받아 JSX를 실시간 컴파일했다 (크립토 1.2s+,
 // 트레이딩 0.6s+ — 폰에선 3~5배). 이제 배포 전에 여기서 한 번만 컴파일한다.
-// 전례: manager-app → vendor/manager-compiled.js.
+// 전례: 옛 manager-app → vendor/manager-compiled.js (2026-10-01 삭제 — 백오피스는 manager-mobile.html).
 //
 // 사용: 앱 JSX(src/*.jsx) 수정 후  →  node tools/precompile-jsx.js  →  커밋.
 // 잊어버림 방지: tests/precompiled-fresh.test.js 가 verify 게이트에서 신선도를 강제
