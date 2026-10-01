@@ -44,6 +44,20 @@ for (const f of pub) {
   }
 }
 
+// ── S4 · 끊긴 페이지 링크 0 (2026-10-01) — 페이지를 지울 때 그걸 가리키던 href 가 남으면 고객이 404 를 본다 ──
+const HREF = /href\s*=\s*["']([^"'#?:]+\.html)/g;
+let dangling = 0;
+for (const f of pub) {
+  if (!/\.html$/.test(f)) continue;
+  const txt = fs.readFileSync(path.join(ROOT, f), 'utf8'); let m;
+  while ((m = HREF.exec(txt))) {
+    if (m[1].includes('${') || m[1].startsWith('//')) continue;
+    // 브라우저처럼 사이트 루트 위의 ../ 는 버린다 (최상위 terminal.html 의 '../login.html' = /login.html — 정상)
+    const target = path.posix.normalize(m[1].startsWith('/') ? m[1].slice(1) : path.posix.join(path.posix.dirname(f), m[1])).replace(/^(\.\.\/)+/, '');
+    if (!pubSet.has(target)) { dangling++; bad(`${f} 의 링크 ${m[1]} → ${target} 이 없다 (404)`); }
+  }
+}
+
 // ── S3 ──
 const dep = fs.readFileSync(path.join(ROOT, '.github/workflows/deploy.yml'), 'utf8');
 if (/path:\s*['"]?\.['"]?\s*}/.test(dep)) bad("deploy.yml 이 리포 전체(path: '.')를 올린다 — _site 묶음만 올려야 한다");
@@ -52,4 +66,4 @@ const iV = dep.indexOf('node tests/verify.js'), iB = dep.indexOf('node tools/bui
 if (iV < 0 || iB < 0 || iV > iB) bad('verify 게이트가 묶음 생성보다 앞에 있어야 한다');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail}건.`); process.exit(1); }
-console.log(`🟢 PASS: 공개 묶음 ${pub.length}/${tracked.size} 파일 · 내부 파일 0 · 로컬 참조 ${checked}건 전부 포함 · deploy.yml = _site.`);
+console.log(`🟢 PASS: 공개 묶음 ${pub.length}/${tracked.size} 파일 · 내부 파일 0 · 로컬 참조 ${checked}건 전부 포함 · 끊긴 페이지 링크 0 · deploy.yml = _site.`);

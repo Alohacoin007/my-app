@@ -26,9 +26,9 @@ const FEED_EDGE = ['crypto-price', 'fx-prices', 'sports-games', 'sports-odds', '
 // scanned so hardcoded FAKE BALANCES / demo emails can't sneak back (the 2026-06 cleanup class).
 const DEMO_FILES = DEPLOYED.concat([
   // (옛 manager.html · manager-app.html 은 2026-10-01 삭제 — 백오피스 = manager-mobile.html, DEPLOYED 에 있음)
-  'site/index.html', 'site/wallet.html', 'site/settings.html', 'site/dashboard.html',
-  'site/my-bets.html', 'site/sports.html', 'site/promotions.html',
-  'site/introducing-broker.html', 'site/legal.html', 'site/login.html', 'site/signup.html']);
+  // site/: 2026-10-01 정리 — 링크 0 데모(wallet·settings·dashboard·my-bets)와 두 번째 로그인 경로(login·signup) 삭제
+  'site/index.html', 'site/sports.html', 'site/promotions.html',
+  'site/introducing-broker.html', 'site/legal.html']);
 
 // 돈이 걸린 SQL 전부 (배포 스크립트 = 서버 진실). 파일 목록을 손으로 관리하면 새 파일이
 // 조용히 스캔 밖으로 빠진다 — 디렉터리를 읽어 **기본값이 "검사한다"** 가 되게 한다.
