@@ -13,19 +13,22 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '22' }
-      - name: Install parser (for verify's JSX parse arm)
-        run: npm i @babel/parser --no-save || true
       # 브라우저 테스트(로그인·주문·렌더 20여 개)가 CI 에서 SKIP 되지 않게 Chromium 을 깐다 (2026-10-01).
       # 테스트는 <PLAYWRIGHT_BROWSERS_PATH>/chromium*/chrome-linux/chrome 을 찾는다 → 새 빌드의 chrome-linux64 를 맞춰 준다.
       - name: Install headless Chromium (browser tests)
         run: |
-          npm i playwright-core@1.63.0 --no-save
+          # 한 번에 설치 — 따로 npm i 하면 두 번째가 첫 번째(--no-save)를 지워 JSX 파싱 검사가 조용히 SKIP 됐다.
+          npm i @babel/parser playwright-core@1.63.0 --no-save
           PLAYWRIGHT_BROWSERS_PATH=$HOME/pw npx playwright-core install --with-deps chromium
           for d in $HOME/pw/chromium-*; do
             [ -e "$d/chrome-linux/chrome" ] || { [ -d "$d/chrome-linux64" ] && ln -s chrome-linux64 "$d/chrome-linux"; } || true
           done
           echo "PLAYWRIGHT_BROWSERS_PATH=$HOME/pw" >> "$GITHUB_ENV"
-      - run: node tests/verify.js          # 🔴면 배포 중단
+      # 🔴면 배포 중단. **오프라인 네트워크 네임스페이스**에서 돈다(lo 만) — 테스트는 스텁 데이터로
+      # 판정해야 하는데, CI 브라우저가 실제 Binance 시세를 받아 스텁 기대값과 어긋났다(2026-10-01 첫 실행).
+      - name: Verify gate (offline)
+        run: |
+          sudo unshare --net -- sh -c "ip link set lo up && sudo -u $(id -un) env PATH='$PATH' HOME='$HOME' PLAYWRIGHT_BROWSERS_PATH='$PLAYWRIGHT_BROWSERS_PATH' node tests/verify.js"
       # 공개 묶음 = 고객 화면 파일만 (CLAUDE.md·결함-로그·SQL·tests 등 내부 파일 제외). 핀: tests/site-bundle.test.js
       - run: node tools/build-site.js _site
       - uses: actions/upload-pages-artifact@v3
