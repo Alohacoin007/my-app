@@ -623,6 +623,8 @@
   .om-body{flex:1;display:flex;flex-direction:column;gap:13px;padding:16px 18px;overflow-y:auto;min-height:0}
   /* fields */
   .om-field{display:flex;flex-direction:column;gap:5px}
+  .om-row2{display:flex;gap:10px} .om-row2>.om-field{flex:1;min-width:0}   /* Symbol|Type · Order|Price 한 줄 (2026-10-02 대기주문) */
+  .omodal.pend{height:596px}                                               /* 대기주문 모드 = 한 줄(Order|Price)만큼 높게 → Place 버튼이 잘리지 않게 */
   .om-field>label{font-size:10.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:#8890a0}
   .om-field select,.om-field input,.om-vol input{width:100%;height:34px;background:#0d1420;border:1px solid #222;color:#fff;
     font-size:14px;padding:0 10px;outline:none}
@@ -1426,7 +1428,7 @@ const DEMO_POS  = [{ local_id:'3172308', symbol:'EURUSD', side:'buy', stake:0.01
   open_price:1.14318, status:'open', created_at:'2026-07-09T20:17:40', _demo:true, profit:-0.39 }];
 
 const positionsStore = {
-  acct:null, pos:[], listeners:new Set(), ch1:null, ch2:null, ch3:null, started:false,
+  acct:null, pos:[], pend:[], listeners:new Set(), ch1:null, ch2:null, ch3:null, ch4:null, started:false,
   async loadAcct(){ try{ if(WT_DEMO || !(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me)) return;
     const acct=AlpexaSync.acctFor&&AlpexaSync.acctFor('fx'); if(!acct) return;   // scope to the LOGGED-IN fx account (trading.html lockstep) — limit(1) grabbed a random account → wrong balance
     const r=await AlpexaSync.db.from('accounts').select('acct_no,balance').eq('server','fx').eq('acct_no',acct).limit(1);
@@ -1435,6 +1437,11 @@ const positionsStore = {
     const acct=AlpexaSync.acctFor&&AlpexaSync.acctFor('fx'); if(!acct) return;   // only THIS account's positions (not every fx account RLS can see)
     const r=await AlpexaSync.db.from('positions').select('local_id,symbol,side,size,open_price,pnl,status,updated_at,meta').eq('server','fx').eq('acct_no',acct).eq('status','open').limit(200);   // real columns only (updated_at not created_at) + meta jsonb (holds sl/tp) + scoped to the logged-in account
     if(r&&r.data){ this.pos=r.data; this.notify(); } }catch(e){} },   // real load REPLACES the demo seed
+  // 서버 대기주문(fx_pending, status=pending) — 읽기 전용 표시. 접수·취소는 RPC, 체결은 서버 fx_pending_fill (2026-10-02).
+  async loadPend(){ try{ if(WT_DEMO || !(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me)) return;
+    const acct=AlpexaSync.acctFor&&AlpexaSync.acctFor('fx'); if(!acct) return;
+    const r=await AlpexaSync.db.from('fx_pending').select('local_id,symbol,side,size,otype,trigger,sl,tp,status,created_at').eq('acct_no',acct).eq('status','pending').limit(200);
+    if(r&&r.data){ this.pend=r.data; this.notify(); } }catch(e){} },
   // CLOSED-TRADE HISTORY from the server (settlements kind='fx_close') so the History tab survives a
   // refresh. CHUNK-PAGED (50 first, +20 per scroll-to-bottom) so tens of thousands of rows never hit
   // the wire at once. Memory-only (#5 — server is the source of truth). detail = "SIDE size @ open ->
@@ -1464,9 +1471,10 @@ const positionsStore = {
   start(){ if(this.started) return; this.started=true;
     if(WT_DEMO){ this.acct=DEMO_ACCT; this.pos=DEMO_POS.slice(); this.notify(); }   // demo seed ONLY in demo mode; production loads the real account below
     try{ if(!WT_DEMO && window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me){   // WT_DEMO: stay server-independent (never load/overwrite demo with real)
-      this.loadAcct(); this.loadPos(); this.loadHistory();            // logged in → overwrite demo with reality (+ closed-trade history)
+      this.loadAcct(); this.loadPos(); this.loadHistory(); this.loadPend();   // logged in → overwrite demo with reality (+ closed-trade history + pending)
       this.ch1=AlpexaSync.db.channel('wt-acct').on('postgres_changes',{event:'*',schema:'public',table:'accounts'},()=>this.loadAcct()).subscribe();
-      this.ch2=AlpexaSync.db.channel('wt-pos').on('postgres_changes',{event:'*',schema:'public',table:'positions'},()=>this.loadPos()).subscribe();
+      this.ch2=AlpexaSync.db.channel('wt-pos').on('postgres_changes',{event:'*',schema:'public',table:'positions'},()=>{ this.loadPos(); this.loadPend(); }).subscribe();   // 대기 체결 = positions 행 생성 → 대기 목록도 갱신
+      this.ch4=AlpexaSync.db.channel('wt-pend').on('postgres_changes',{event:'*',schema:'public',table:'fx_pending'},()=>this.loadPend()).subscribe();
       // 30% 스탑아웃 크론(fx_stopout)이 강제청산하면 settlements에 detail 'STOPOUT …'을 남긴다.
       // 그 INSERT를 실시간으로 잡아 강제청산 효과음을 울린다(수동 fx_close와는 detail 접두사로 구분).
       this.ch3=AlpexaSync.db.channel('wt-stopout').on('postgres_changes',{event:'INSERT',schema:'public',table:'settlements'},(payload)=>{
@@ -1823,7 +1831,34 @@ function useTradeEngine(){
     }
     return { ok:false, reason:'not_logged_in' };
   }
-  return { acct, pos, connected, placeOrder, closeOrder, TRADE_API,
+  // PENDING ORDERS (2026-10-02 사장님 승인) — 서버 RPC 2개만. 클라는 fx_pending 에 쓰지 않는다.
+  // 방향·신선가·SL/TP 검증 = fx_place_pending, 체결(마진 게이트 포함) = 서버 fx_pending_fill. 한 번 호출 = local_id 1개.
+  async function placePending({ symbol, side, otype, volume, trigger, sl, tp }){
+    if(WT_DEMO || !(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me)) return { ok:false, reason:'not_logged_in' };
+    const local_id='wt-p-'+Date.now()+'-'+Math.floor(Math.random()*1e6);
+    const S=String(side).toUpperCase(), O=String(otype).toUpperCase();
+    try{
+      const r=await AlpexaSync.db.rpc('fx_place_pending',{ p_local_id:local_id, p_symbol:symbol, p_side:S, p_otype:O,
+        p_size:+volume, p_trigger:+trigger, p_sl:(+sl>0?+sl:null), p_tp:(+tp>0?+tp:null) });
+      const d=r&&r.data;
+      if(r&&!r.error&&d&&d.ok){ positionsStore.loadPend(); playSnd(sndOpen);
+        journalStore.log('Pending placed — '+S+' '+O+' '+volume+' '+symbol+' @ '+trigger, 1);
+        return { ok:true, local_id }; }
+      const why=(d&&d.error)||(r&&r.error&&r.error.message)||'rejected';
+      playSnd(sndError); journalStore.log('Pending rejected — '+S+' '+O+' '+volume+' '+symbol+': '+why, 0);
+      return { ok:false, reason:why };
+    }catch(e){ playSnd(sndError); return { ok:false, reason:String(e&&e.message||e) }; }
+  }
+  async function cancelPending(localId){
+    if(WT_DEMO || !(window.AlpexaSync&&AlpexaSync.db&&AlpexaSync.me)) return { ok:false, reason:'not_logged_in' };
+    try{
+      const r=await AlpexaSync.db.rpc('fx_cancel_pending',{ p_local_id:localId });
+      const d=r&&r.data;
+      if(r&&!r.error&&d&&d.ok){ positionsStore.loadPend(); playSnd(sndClose); journalStore.log('Pending cancelled — '+localId, 1); return { ok:true }; }
+      playSnd(sndError); return { ok:false, reason:(d&&d.error)||(r&&r.error&&r.error.message)||'cancel failed' };
+    }catch(e){ playSnd(sndError); return { ok:false, reason:String(e&&e.message||e) }; }
+  }
+  return { acct, pos, connected, placeOrder, closeOrder, placePending, cancelPending, TRADE_API,
     leverage, setLeverage, balance, equity, floating, usedMargin, freeMargin, marginFor, maxVolume };
 }
 
@@ -3215,6 +3250,7 @@ function useVirtual(total, rowH, onEnd){
 function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-width tab bar lives at screen bottom)
   const [acct,setAcct]=React.useState(positionsStore.acct);
   const [pos,setPos]=React.useState(positionsStore.pos);
+  const [pend,setPend]=React.useState(positionsStore.pend);   // 서버 대기주문 (표시 전용)
   const [hist,setHist]=React.useState(positionsStore.history);
   const [modifyP,setModifyP]=React.useState(null);   // position being SL/TP-modified (double-click a S/L or T/P cell)
   const [histPeriod,setHistPeriod]=React.useState('all');   // MT5 History period filter
@@ -3223,7 +3259,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
   const [mids,setMids]=React.useState({});
   const [leverage,setLev]=React.useState(tradeSettings.leverage);
   const eng=useTradeEngine();
-  React.useEffect(()=> positionsStore.subscribe(s=>{ setAcct(s.acct); setPos([...s.pos]); setHist([...s.history]); }), []);
+  React.useEffect(()=> positionsStore.subscribe(s=>{ setAcct(s.acct); setPos([...s.pos]); setPend([...(s.pend||[])]); setHist([...s.history]); }), []);
   React.useEffect(()=> priceStore.subscribe(throttle(m=>setMids({...m}),RENDER_MS)), []);   // live P&L (mobile-throttled)
   React.useEffect(()=> tradeSettings.subscribe(setLev), []);   // margin/level track the chosen leverage
   const closePos=async(p)=>{
@@ -3238,6 +3274,8 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
     positionsStore.recordClose(p, closePx(p,m)||m.mid, pl);              // realized (per-side close px) → History tab
   };
 
+  // 대기주문 취소 — 서버 fx_cancel_pending (본인+pending 만). 실패하면 이유를 보여준다.
+  const cancelPend=async(p)=>{ const r=await eng.cancelPending(p.local_id); if(!r.ok) alert(t('Order rejected')+': '+(r.reason||'cancel failed')); };
   // floating P&L — the SAME per-position, per-side helper the engine uses (BUY→BID, SELL→ASK).
   // Each row marks against its own symbol quote + its own entry; no shared/copied state.
   const plOf=(p)=> positionPnL(p, mids[p.symbol]);
@@ -3305,7 +3343,7 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
               </tr>
             ))}
             {tab==='History' && histV.botH>0 && <tr aria-hidden="true" style={{height:histV.botH}}><td colSpan="11"></td></tr>}
-            {tab==='Trade' && !pos.length && <tr><td className="empty" colSpan="11">{(!WT_DEMO && window.AlpexaSync&&AlpexaSync.me)?'No open positions':'Log in to see your live positions (Log in to trade)'}</td></tr>}
+            {tab==='Trade' && !pos.length && !pend.length && <tr><td className="empty" colSpan="11">{(!WT_DEMO && window.AlpexaSync&&AlpexaSync.me)?'No open positions':'Log in to see your live positions (Log in to trade)'}</td></tr>}
             {tab==='Trade' && pos.map(p=>{ const m=mids[p.symbol]||{}; const pl=plOf(p);
               const tkt=String(p.local_id||'').replace(/\D/g,'').slice(-8)||p.local_id;
               const _tt=p.updated_at||p.created_at; const tm=_tt?String(_tt).slice(0,19).replace('T',' ').replace(/-/g,'.'):'—';  // real positions carry updated_at (no created_at col); demo seed carries created_at. MT5: 2026.07.09 20:17:40
@@ -3316,6 +3354,18 @@ function BottomBar({ onResize, tab }){   // `tab` is owned by App now (the full-
                 <td className="sltp" onDoubleClick={()=>setModifyP(p)} title="더블클릭: SL/TP 수정 (Modify)">{(p.meta&&p.meta.tp!=null)?fmtPx(p.symbol,+p.meta.tp):'—'}</td>
                 <td>{fmtPx(p.symbol,closePx(p,m))}</td><td className={pl>=0?'up':'down'}>{num(pl)}</td>
                 <td><button className="xclose" title="Close position" onClick={()=>closePos(p)}>✕</button></td>
+              </tr>); })}
+            {/* MT5: 대기주문은 포지션 아래 — 유형(buy limit…)·수량·지정가·S/L·T/P·현재가(BUY=ASK·SELL=BID)·✕ 취소 */}
+            {tab==='Trade' && pend.map(p=>{ const m=mids[p.symbol]||{}; const buy=sideUp(p.side)!=='SELL';
+              const tkt=String(p.local_id||'').replace(/\D/g,'').slice(-8)||p.local_id;
+              const tm=p.created_at?String(p.created_at).slice(0,19).replace('T',' ').replace(/-/g,'.'):'—';
+              return (<tr key={'pend-'+p.local_id} className="pendrow">
+                <td><i className="symico"></i>{p.symbol.toLowerCase()}{sfx(p.symbol).toLowerCase()}</td><td>{tkt}</td><td>{tm}</td>
+                <td className={"typ "+(buy?'up':'down')}>{(buy?'buy':'sell')+' '+String(p.otype||'').toLowerCase()}</td>
+                <td>{(+p.size||0).toFixed(2)}</td><td>{fmtPx(p.symbol,+p.trigger)}</td>
+                <td>{p.sl!=null?fmtPx(p.symbol,+p.sl):'—'}</td><td>{p.tp!=null?fmtPx(p.symbol,+p.tp):'—'}</td>
+                <td>{fmtPx(p.symbol, buy?m.ask:m.bid)}</td><td className="pendst">placed</td>
+                <td><button className="xclose xcancel" title="Cancel pending order" onClick={()=>cancelPend(p)}>✕</button></td>
               </tr>); })}
           </tbody>
           {/* Balance bar lives INSIDE the table as <tfoot> → glued right under the last position
@@ -3735,11 +3785,17 @@ const OIC = {
   dom:  <svg viewBox="0 0 24 24" fill="none" stroke="#5a6270" strokeWidth="2" strokeLinecap="round"><path d="M4 6h10M4 12h16M4 18h7"/></svg>,
   min:  <svg viewBox="0 0 24 24" fill="none" stroke="#5a6270" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5l-7 7 7 7"/><path d="M4 12h16"/></svg>,
 };
+// MT5 Pending Order 유형 — 서버 fx_place_pending 이 받는 4종만 (Stop Limit 은 서버 미지원이라 노출 안 함).
+const WT_PEND_TYPES=['Buy Limit','Sell Limit','Buy Stop','Sell Stop'];
 function OrderModal({ symbol:sym0, onClose }){
   const [symbol,setSymbol]=React.useState(sym0);
   const [vol,setVol]=React.useState('0.01');
   const [sl,setSl]=React.useState('0.00000');
   const [tp,setTp]=React.useState('0.00000');
+  const [mode,setMode]=React.useState('market');         // MT5 Type: Market Execution | Pending Order
+  const [ptype,setPtype]=React.useState('Buy Limit');
+  const [trig,setTrig]=React.useState('');                // pending 지정가
+  const busyRef=React.useRef(false); const [busy,setBusy]=React.useState(false);   // Place 1클릭 = 1주문 (더블클릭 차단)
   const [m,setM]=React.useState(priceStore.get(symbol)||{});
   const dir=React.useRef({bid:0,ask:0}); const prev=React.useRef({});
   const eng=useTradeEngine();
@@ -3829,19 +3885,55 @@ function OrderModal({ symbol:sym0, onClose }){
     else if(r.reason){ console.warn('order rejected:', r.code||r.reason); alert(t('Order rejected')+': '+(r.reason||r.code)); return; }   // show WHY (server reason)
     onClose();
   };
+  // PENDING — 서버 fx_place_pending 이 방향·신선가·SL/TP 를 검증하고, 체결(마진 게이트 포함)은 서버 스위프가 한다.
+  // 마진은 체결 시점에 서버가 본다(MT5 동일) → 여기선 장 마감만 막는다. busyRef 는 동기 잠금(상태 갱신 전 두 번째 클릭 차단).
+  const pxFor=(type)=>{ const q=priceStore.get(symbol)||m; const v=/^Buy/.test(type)?q.ask:q.bid; return v!=null?(+v).toFixed(digits(symbol)):''; };
+  const submitPending=async()=>{
+    if(busyRef.current) return;
+    if(!marketOpen(symbol)){ playSnd(sndError); alert(t('Market closed')); return; }
+    const d=digits(symbol), trigger=+trig;
+    if(!(trigger>0)){ playSnd(sndError); alert(t('Order rejected')+': price'); return; }
+    busyRef.current=true; setBusy(true);
+    try{
+      const [sd,ot]=ptype.split(' ');
+      const r=await eng.placePending({ symbol, side:sd, otype:ot, volume:+vol, trigger:+trigger.toFixed(d),
+        sl:(+sl>0?+(+sl).toFixed(d):null), tp:(+tp>0?+(+tp).toFixed(d):null) });
+      if(r.ok){ onClose(); return; }
+      if(r.reason==='not_logged_in'){ alert(t('Please log in to trade')); return; }
+      alert(t('Order rejected')+': '+r.reason);                // 서버 거절 이유 그대로 (무음 탈락 금지)
+    }finally{ busyRef.current=false; setBusy(false); }
+  };
   const spin=(set,cur,step,dg)=>({ up:()=>set((+cur+step).toFixed(dg)), dn:()=>set(Math.max(0,+cur-step).toFixed(dg)) });
 
   return (
     <div className="omodal-ov" onMouseDown={onClose}>
-      <div className="omodal" ref={cardRef} style={pos?{position:'absolute',left:pos.left+'px',top:pos.top+'px',margin:0}:null} onMouseDown={e=>e.stopPropagation()}>
+      <div className={'omodal'+(mode==='pending'?' pend':'')} ref={cardRef} style={pos?{position:'absolute',left:pos.left+'px',top:pos.top+'px',margin:0}:null} onMouseDown={e=>e.stopPropagation()}>
         <div className="obar" onMouseDown={onHeaderDown} style={{cursor:'move'}}>
           <div className="t">{t('New Order')} — {symbol}{sfx(symbol)}</div>
           <span className="wb x" onMouseDown={e=>e.stopPropagation()} onClick={onClose}>✕</span>
         </div>
         <div className="om-body">
           {/* Symbol */}
+          {/* Symbol | MT5 Type (Market Execution / Pending Order, 2026-10-02) — 한 줄 */}
+          <div className="om-row2">
           <div className="om-field"><label>{t('Symbol')}</label>
             <select value={symbol} onChange={e=>setSymbol(e.target.value)}>{WATCH.map(s=><option key={s} value={s}>{s}{sfx(s)}</option>)}</select></div>
+          <div className="om-field"><label>{t('Type')}</label>
+            <select className="om-mode" value={mode} onChange={e=>{ const v=e.target.value; setMode(v); if(v==='pending') setTrig(pxFor(ptype)); }}>
+              <option value="market">Market Execution</option><option value="pending">Pending Order</option></select></div>
+          </div>
+          {mode==='pending' && <div className="om-row2">
+            <div className="om-field"><label>Order</label>
+              <select className="om-ptype" value={ptype} onChange={e=>{ setPtype(e.target.value); setTrig(pxFor(e.target.value)); }}>
+                {WT_PEND_TYPES.map(x=><option key={x} value={x}>{x}</option>)}</select></div>
+            <div className="om-field"><label>{t('Price')}</label>
+              <div className="om-price">
+                <input className="om-trigger" value={trig} onChange={e=>setTrig(e.target.value)} />
+                <span className="om-pspin">
+                  <b onMouseDown={()=>startPriceHold(setTrig,1)} onMouseUp={stopPHold} onMouseLeave={stopPHold}>▲</b>
+                  <b onMouseDown={()=>startPriceHold(setTrig,-1)} onMouseUp={stopPHold} onMouseLeave={stopPHold}>▼</b>
+                </span></div></div>
+          </div>}
           {/* Big Bid / Ask + live SPREAD in the middle — same Arial-Black BigFig look as the panel */}
           <div className="om-quote">
             <div className="om-px"><span className="om-tag">BID · SELL</span><BigFig symbol={symbol} v={m.bid} /></div>
@@ -3883,11 +3975,13 @@ function OrderModal({ symbol:sym0, onClose }){
           </div>
           {!open && <div className="om-closed">🔒 {t('Market closed')}</div>}
           {open && !canAfford && <div className="om-closed">⚠ {t('Margin Call — insufficient free margin')}</div>}
-          {/* Sell / Buy by Market — matte flat (Binance/TradingView pro) */}
-          <div className="om-btns">
+          {/* Sell / Buy by Market — matte flat (Binance/TradingView pro) · Pending = Place 하나 */}
+          {mode==='market' ? <div className="om-btns">
             <button className="om-sell" disabled={!canAfford||!open} onClick={()=>submit('sell')}>{t('Sell by Market')}</button>
             <button className="om-buy" disabled={!canAfford||!open} onClick={()=>submit('buy')}>{t('Buy by Market')}</button>
-          </div>
+          </div> : <div className="om-btns">
+            <button className={(/^Sell/.test(ptype)?'om-sell':'om-buy')+' om-place'} disabled={!open||busy} onClick={submitPending}>Place {ptype}</button>
+          </div>}
         </div>
       </div>
     </div>
