@@ -438,11 +438,18 @@ function fxAcct(){ var m=me(); return m&&m.accts&&m.accts.fx?String(m.accts.fx):
 function db(){ return (window.AlpexaSync&&AlpexaSync.db)?AlpexaSync.db:null; }
 
 /* ══ server reads (all read-only) ══ */
-// 시세 저장은 여기 한 곳 (2026-10-03) — 직전 mid 와 비교해 방향(dir)을 기록한다: 오르면 'u'(파랑) · 내리면 'd'(빨강) · 같으면 직전 방향 유지 (MT5 Market Watch).
-function setFeed(sym, mid, spr, ts){ var o=S.feed[sym]||{}, m=+mid||0, dir=o.dir||'';
-  if(m>0 && o.mid>0 && m!==o.mid) dir = m>o.mid ? 'u' : 'd';
-  S.feed[sym]={mid:m, spr:+spr||0, ts:ts, dir:dir}; }
-function tickCls(sym){ var f=S.feed[sym]; return f&&f.dir==='u' ? ' tu' : f&&f.dir==='d' ? ' td' : ''; }
+// 시세 저장은 여기 한 곳 (2026-10-03) — 직전 값과 비교해 방향을 기록한다: 오르면 'u'(파랑) · 내리면 'd'(빨강) · 같으면 직전 방향 유지 (MT5 Market Watch).
+// BID·ASK 는 따로 본다 (사장님 "비드 에스크 따로") — 스프레드가 벌어지면 BID 는 내려가고 ASK 는 올라간다. 비교는 화면 자릿수 기준(미세 오차로 깜빡이지 않게).
+function setFeed(sym, mid, spr, ts){ var o=S.feed[sym]||{}, m=+mid||0, d=digitsOf(sym), r=function(x){ return +(+x).toFixed(d); };
+  var ob=o.mid>0?r(bidOf(sym)):0, oa=o.mid>0?r(askOf(sym)):0, dir=o.dir||'', db=o.db||'', da=o.da||'';
+  S.feed[sym]={mid:m, spr:+spr||0, ts:ts, dir:dir, db:db, da:da};
+  if(!(m>0)) return;
+  var nb=r(bidOf(sym)), na=r(askOf(sym)), f=S.feed[sym];
+  if(o.mid>0 && r(m)!==r(o.mid)) f.dir = m>o.mid ? 'u' : 'd';
+  if(ob>0 && nb!==ob) f.db = nb>ob ? 'u' : 'd';
+  if(oa>0 && na!==oa) f.da = na>oa ? 'u' : 'd'; }
+// side: 'b' = BID(SELL 칸) · 'a' = ASK(BUY 칸) · 생략 = mid(상세 큰 시세)
+function tickCls(sym, side){ var f=S.feed[sym]; if(!f) return ''; var v = side==='b' ? f.db : side==='a' ? f.da : f.dir; return v==='u' ? ' tu' : v==='d' ? ' td' : ''; }
 function applyFeedRows(rows){ var now=Date.now(); (rows||[]).forEach(function(p){ if(p&&p.symbol) setFeed(p.symbol, p.mid, p.spr_pts, now); }); }
 async function pullFeed(){ var d=db(); if(!d) return;
   try{ if(d.functions){ var x=await d.functions.invoke('feed',{body:{t:'prices'}}); if(x&&!x.error&&Array.isArray(x.data)){ applyFeedRows(x.data); return; } } }catch(e){}
@@ -691,7 +698,7 @@ function homeRows(){
   var list=instruments(S.homeSeg); if(!list.length) return '<div class="empty">No live feed for '+esc(S.homeSeg)+' right now</div>';
   return list.map(function(p){ var fresh=isFresh(p.sym); var sprTxt=spreadLabel(p.sym);
     return '<div class="row" data-sym="'+p.sym+'"><div class="nm" data-act="open:'+p.sym+'"><div class="sym">'+p.sym+'</div><div class="sub">'+esc(p.name)+' · <span class="spr">'+sprTxt+'</span></div></div>'+
-      '<div class="half"><div class="btn sell'+tickCls(p.sym)+(fresh?'':' stale')+'" data-act="order:SELL:'+p.sym+'">'+fmtPx(bidOf(p.sym),p.sym,true)+'</div><div class="btn buy'+tickCls(p.sym)+(fresh?'':' stale')+'" data-act="order:BUY:'+p.sym+'">'+fmtPx(askOf(p.sym),p.sym,true)+'</div></div></div>'; }).join('');
+      '<div class="half"><div class="btn sell'+tickCls(p.sym,'b')+(fresh?'':' stale')+'" data-act="order:SELL:'+p.sym+'">'+fmtPx(bidOf(p.sym),p.sym,true)+'</div><div class="btn buy'+tickCls(p.sym,'a')+(fresh?'':' stale')+'" data-act="order:BUY:'+p.sym+'">'+fmtPx(askOf(p.sym),p.sym,true)+'</div></div></div>'; }).join('');
 }
 function screenHome(){
   return topBar()+hero()+
@@ -757,7 +764,7 @@ function screenTrade(){
     (S.otype==='MARKET'?'':'<div class="lotrow"><span>'+(S.otype==='LIMIT'?'Limit':'Stop')+' price<small>'+(mid?distLabel(sym,mid,limitPx).replace(/^[+−]/,'')+' '+(limitPx<mid?'below':'above')+' market':'')+'</small></span><div class="lots"><b data-act="lim:-">−</b><span>'+fmtPx(limitPx,sym)+'</span><b data-act="lim:+">+</b></div></div>')+
     '<div class="lotrow"><span>Volume</span><div class="lots"><b data-act="lots:-">−</b><span>'+S.lots.toFixed(2)+'<small>lot</small></span><b data-act="lots:+">+</b></div></div>'+
     sltpBlock+
-    '<div class="half"><div class="btn sell'+tickCls(sym)+'" data-act="order:SELL:'+sym+'"><div class="k">SELL'+lbl+'</div>'+fmtPx(limitPx||bid,sym,true)+'</div><div class="btn buy'+tickCls(sym)+'" data-act="order:BUY:'+sym+'"><div class="k">BUY'+lbl+'</div>'+fmtPx(limitPx||ask,sym,true)+'</div></div>'+
+    '<div class="half"><div class="btn sell'+tickCls(sym,'b')+'" data-act="order:SELL:'+sym+'"><div class="k">SELL'+lbl+'</div>'+fmtPx(limitPx||bid,sym,true)+'</div><div class="btn buy'+tickCls(sym,'a')+'" data-act="order:BUY:'+sym+'"><div class="k">BUY'+lbl+'</div>'+fmtPx(limitPx||ask,sym,true)+'</div></div>'+
     '</div></div>';
 }
 function arow(t, d, amt, cls, sub, x, act){ return '<div class="arow'+(x?' px':'')+'"'+(act?' data-act="'+act+'"':'')+'><div><div class="t">'+t+'</div><div class="d">'+d+'</div></div><div class="amt '+cls+'">'+amt+(sub?'<small>'+sub+'</small>':'')+'</div>'+(x?'<span class="x" data-act="'+x+'">'+I.x+'</span>':'')+'</div>'; }
