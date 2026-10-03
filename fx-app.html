@@ -21,7 +21,7 @@
     (trading.html fxHalfSpread / fx_close.sql v_half 와 동일). 플로팅 = 그 close 가격으로 계산.
   · 돈 잔고는 서버(accounts.balance)에서 매번 읽고 표시만 한다 — localStorage 에 돈 없음 (CLAUDE.md #5).
     로컬 저장은 UI 설정 3개뿐: 테마 · 1-Click 스위치 · 잔고 가림.
-  · 디자인 = fx-mockup v57 (모던 라이트/다크, 로빈후드 그린 #00C805 / 오렌지 #FF5000).
+  · 디자인 = fx-mockup v57 (모던 라이트/다크, 로빈후드 그린 #00C805 → 2026-10-03 사장님 "파랑으로 바꿔" = 블루 #0A6CFF / 오렌지 #FF5000 → 빨강 #FF3B30 (시세 오르면 파랑·내리면 빨강)).
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@500;600;700&display=swap" rel="stylesheet">
@@ -54,12 +54,12 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   :root {
     --bg: #FFFFFF; --surface: #F5F5F4; --surface-up: #ECECEA; --line: #ECECEA;
     --text: #111111; --dim: #6B6B68; --mute: #9A9A96;
-    --up: #00C805; --down: #FF5000;
+    --up: #0A6CFF; --down: #FF3B30;
     color-scheme: light;
   }
   :root[data-theme="dark"] {
     --bg: #0B0D0E; --surface: #16181A; --surface-up: #1F2123; --line: #1F2123;
-    --text: #F5F6F7; --dim: #8B9096; --mute: #5F646A; --up: #00C805; --down: #FF5000;
+    --text: #F5F6F7; --dim: #8B9096; --mute: #5F646A; --up: #0A6CFF; --down: #FF3B30;
     color-scheme: dark;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -100,10 +100,10 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .brand { font-size: 13px; font-weight: 700; letter-spacing: -0.2px; }
   .brand small { font-weight: 600; color: var(--mute); margin-left: 6px; font-size: 10px; letter-spacing: .5px; }
   .topr { display: inline-flex; align-items: center; gap: 10px; }
-  .oc { display: inline-flex; align-items: center; gap: 4px; padding: 5px 9px; border-radius: 12px; background: rgba(0,200,5,.12); color: var(--up); font-size: 10.5px; font-weight: 800; letter-spacing: .3px; border: 1px solid transparent; cursor: pointer; }
+  .oc { display: inline-flex; align-items: center; gap: 4px; padding: 5px 9px; border-radius: 12px; background: rgba(10,108,255,.12); color: var(--up); font-size: 10.5px; font-weight: 800; letter-spacing: .3px; border: 1px solid transparent; cursor: pointer; }
   .oc svg { width: 11px; height: 11px; }
   .oc.off { background: transparent; border-color: var(--line); color: var(--mute); }
-  :root[data-theme="dark"] .oc:not(.off) { background: rgba(0,200,5,.16); }
+  :root[data-theme="dark"] .oc:not(.off) { background: rgba(10,108,255,.16); }
   .srv { width: 30px; height: 30px; border-radius: 50%; background: var(--surface-up); display: grid; place-items: center; color: var(--text); cursor: pointer; }
   .srv svg { width: 16px; height: 16px; }
   /* hero */
@@ -144,7 +144,9 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .btn { border-radius: 12px; padding: 6px 0; text-align: right; font-family: 'Geist Mono', ui-monospace, monospace; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; }
   .btn big { font-size: 15px; font-weight: 800; }
   .app:not(.oc-on) .btn { font-size: 17px; } .app:not(.oc-on) .btn big { font-size: 17px; }   /* 1-Click OFF 시세 글자 키움 (사장님 2026-09-21) */
-  .btn.sell { color: var(--down); } .btn.buy { color: var(--up); }
+  .btn.sell, .btn.buy { color: var(--text); }                                   /* 가격 글자 = 시세 방향 색 (아래 tu/td). 매수·매도 쪽 색은 테두리·주문 버튼에 남는다 */
+  .btn.tu { color: var(--up); } .btn.td { color: var(--down); }                  /* 2026-10-03 사장님 "내려가면 빨강 올라가면 파랑" */
+  .det .px.tu { color: var(--up); } .det .px.td { color: var(--down); }
   .btn.stale { opacity: .45; }
   .app.oc-on .btn { border: 1.5px solid; border-radius: 10px; padding: 7px 0 6px; text-align: center; background: var(--bg); cursor: pointer; }
   .app.oc-on .btn.sell { border-color: var(--down); } .app.oc-on .btn.buy { border-color: var(--up); }
@@ -436,7 +438,12 @@ function fxAcct(){ var m=me(); return m&&m.accts&&m.accts.fx?String(m.accts.fx):
 function db(){ return (window.AlpexaSync&&AlpexaSync.db)?AlpexaSync.db:null; }
 
 /* ══ server reads (all read-only) ══ */
-function applyFeedRows(rows){ var now=Date.now(); (rows||[]).forEach(function(p){ if(p&&p.symbol) S.feed[p.symbol]={mid:+p.mid||0, spr:+p.spr_pts||0, ts:now}; }); }
+// 시세 저장은 여기 한 곳 (2026-10-03) — 직전 mid 와 비교해 방향(dir)을 기록한다: 오르면 'u'(파랑) · 내리면 'd'(빨강) · 같으면 직전 방향 유지 (MT5 Market Watch).
+function setFeed(sym, mid, spr, ts){ var o=S.feed[sym]||{}, m=+mid||0, dir=o.dir||'';
+  if(m>0 && o.mid>0 && m!==o.mid) dir = m>o.mid ? 'u' : 'd';
+  S.feed[sym]={mid:m, spr:+spr||0, ts:ts, dir:dir}; }
+function tickCls(sym){ var f=S.feed[sym]; return f&&f.dir==='u' ? ' tu' : f&&f.dir==='d' ? ' td' : ''; }
+function applyFeedRows(rows){ var now=Date.now(); (rows||[]).forEach(function(p){ if(p&&p.symbol) setFeed(p.symbol, p.mid, p.spr_pts, now); }); }
 async function pullFeed(){ var d=db(); if(!d) return;
   try{ if(d.functions){ var x=await d.functions.invoke('feed',{body:{t:'prices'}}); if(x&&!x.error&&Array.isArray(x.data)){ applyFeedRows(x.data); return; } } }catch(e){}
   try{ var r=await d.from('prices').select('symbol,mid,spr_pts'); if(r&&r.data) applyFeedRows(r.data); }catch(e){} }
@@ -684,7 +691,7 @@ function homeRows(){
   var list=instruments(S.homeSeg); if(!list.length) return '<div class="empty">No live feed for '+esc(S.homeSeg)+' right now</div>';
   return list.map(function(p){ var fresh=isFresh(p.sym); var sprTxt=spreadLabel(p.sym);
     return '<div class="row" data-sym="'+p.sym+'"><div class="nm" data-act="open:'+p.sym+'"><div class="sym">'+p.sym+'</div><div class="sub">'+esc(p.name)+' · <span class="spr">'+sprTxt+'</span></div></div>'+
-      '<div class="half"><div class="btn sell'+(fresh?'':' stale')+'" data-act="order:SELL:'+p.sym+'">'+fmtPx(bidOf(p.sym),p.sym,true)+'</div><div class="btn buy'+(fresh?'':' stale')+'" data-act="order:BUY:'+p.sym+'">'+fmtPx(askOf(p.sym),p.sym,true)+'</div></div></div>'; }).join('');
+      '<div class="half"><div class="btn sell'+tickCls(p.sym)+(fresh?'':' stale')+'" data-act="order:SELL:'+p.sym+'">'+fmtPx(bidOf(p.sym),p.sym,true)+'</div><div class="btn buy'+tickCls(p.sym)+(fresh?'':' stale')+'" data-act="order:BUY:'+p.sym+'">'+fmtPx(askOf(p.sym),p.sym,true)+'</div></div></div>'; }).join('');
 }
 function screenHome(){
   return topBar()+hero()+
@@ -737,7 +744,7 @@ function screenTrade(){
   var lbl = S.otype==='MARKET'?'':' '+S.otype;
   return '<div class="det">'+
     '<div class="head"><div class="nm" data-act="sheet:pair">'+sym+'<span class="chev">'+I.chev+'</span></div><div class="sub">'+esc(nameOf(sym))+(fresh?'':' · <span class="down">feed stale</span>')+'</div>'+
-    '<div class="px">'+fmtPx(mid,sym,true)+'</div>'+
+    '<div class="px'+tickCls(sym)+'">'+fmtPx(mid,sym,true)+'</div>'+
     '<div class="chg '+(chg==null?'':(chg>=0?'up':'down'))+'">'+(chg==null?'<span class="t">—</span>':(chg>=0?'▲ ':'▼ ')+Math.abs(chg).toFixed(digitsOf(sym))+' ('+(chg>=0?'+':'−')+Math.abs(chgPct).toFixed(2)+'%) <span class="t">Today</span>')+'</div>'+
     '</div>'+   /* B/A 줄 제거 — 아래 주문 버튼이 매도/매수가를 보여줌 (사장님 2026-09-21) */
     '<div class="chart" id="chart">'+lineChart(cd.rows,{loading:cd.loading})+'</div>'+
@@ -750,7 +757,7 @@ function screenTrade(){
     (S.otype==='MARKET'?'':'<div class="lotrow"><span>'+(S.otype==='LIMIT'?'Limit':'Stop')+' price<small>'+(mid?distLabel(sym,mid,limitPx).replace(/^[+−]/,'')+' '+(limitPx<mid?'below':'above')+' market':'')+'</small></span><div class="lots"><b data-act="lim:-">−</b><span>'+fmtPx(limitPx,sym)+'</span><b data-act="lim:+">+</b></div></div>')+
     '<div class="lotrow"><span>Volume</span><div class="lots"><b data-act="lots:-">−</b><span>'+S.lots.toFixed(2)+'<small>lot</small></span><b data-act="lots:+">+</b></div></div>'+
     sltpBlock+
-    '<div class="half"><div class="btn sell" data-act="order:SELL:'+sym+'"><div class="k">SELL'+lbl+'</div>'+fmtPx(limitPx||bid,sym,true)+'</div><div class="btn buy" data-act="order:BUY:'+sym+'"><div class="k">BUY'+lbl+'</div>'+fmtPx(limitPx||ask,sym,true)+'</div></div>'+
+    '<div class="half"><div class="btn sell'+tickCls(sym)+'" data-act="order:SELL:'+sym+'"><div class="k">SELL'+lbl+'</div>'+fmtPx(limitPx||bid,sym,true)+'</div><div class="btn buy'+tickCls(sym)+'" data-act="order:BUY:'+sym+'"><div class="k">BUY'+lbl+'</div>'+fmtPx(limitPx||ask,sym,true)+'</div></div>'+
     '</div></div>';
 }
 function arow(t, d, amt, cls, sub, x, act){ return '<div class="arow'+(x?' px':'')+'"'+(act?' data-act="'+act+'"':'')+'><div><div class="t">'+t+'</div><div class="d">'+d+'</div></div><div class="amt '+cls+'">'+amt+(sub?'<small>'+sub+'</small>':'')+'</div>'+(x?'<span class="x" data-act="'+x+'">'+I.x+'</span>':'')+'</div>'; }
@@ -1113,7 +1120,7 @@ document.addEventListener('touchend', function(){ if(S.scrub!=null){ S.scrub=nul
     w.innerHTML='<div class="scroll">'+screenTrade()+screenActivity()+screenAccount()+'</div>'; document.body.appendChild(w); void w.offsetHeight;
     requestAnimationFrame(function(){ requestAnimationFrame(function(){ w.remove(); }); }); }catch(e){} }, 1200);
   // Realtime: prices UPDATE merges straight into the feed (same shape as the poll)
-  try{ var d=db(); if(d&&d.channel){ d.channel('rh-prices').on('postgres_changes',{event:'*',schema:'public',table:'prices'},function(m){ var row=m&&m.new; if(row&&row.symbol) S.feed[row.symbol]={mid:+row.mid||0,spr:+row.spr_pts||0,ts:Date.now()}; }).subscribe();
+  try{ var d=db(); if(d&&d.channel){ d.channel('rh-prices').on('postgres_changes',{event:'*',schema:'public',table:'prices'},function(m){ var row=m&&m.new; if(row&&row.symbol) setFeed(row.symbol, row.mid, row.spr_pts, Date.now()); }).subscribe();
     var a=fxAcct(); if(a) d.channel('rh-pos-'+a).on('postgres_changes',{event:'*',schema:'public',table:'positions',filter:'acct_no=eq.'+a},function(){ pullPositions(); pullCash(); }).subscribe(); } }catch(e){}
   setInterval(function(){ if(!document.hidden) pullFeed(); },1500);
   setInterval(function(){ if(!document.hidden){ pullCash(); pullPositions(); } },10000);
