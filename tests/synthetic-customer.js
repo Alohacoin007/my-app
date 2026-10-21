@@ -96,6 +96,7 @@ const rest = async (path) => (await fetch(`${URL}/rest/v1/${path}`, { headers: h
     const lg = await rest('live_games?id=eq.all&select=data');
     const games = ((lg[0] || {}).data || []).filter((g) =>
       g.oddsReal === true && Array.isArray(g.ml) && g.ml.length >= 2 &&
+      !(Array.isArray(g.threeWay) && g.threeWay.length === 3) &&   // 축구 ml = 호환배열 → place_bet 거절 (가짜 🔴)
       Date.parse(g.iso || 0) > Date.now() && Date.parse(g.iso) < Date.now() + 36 * 3600e3);
     if (!games.length) skip('베팅 가능한 실배당 미래 경기 없음 — 오늘 베팅 생략 (드묾)');
     else {

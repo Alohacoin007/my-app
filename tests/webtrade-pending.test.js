@@ -99,6 +99,10 @@ async function openPending(page, mode) {
   const PORT = 8899, server = await serve(PORT);
   const browser = await chromium.launch({ executablePath: exe, headless: true, args: ['--no-sandbox'] });
   const page = await browser.newPage({ viewport: { width: 1900, height: 950 } });
+  // 네트워크 0 (2026-10-21): 실서버(prices REST·Realtime WS·Binance WS) 차단. 안 막으면 FX 장중엔 실 EURUSD 가
+  // 스텁을 덮어 🔴, 주말엔 시세 정지라 🟢 = 요일 따라 바뀌는 오탐. 이후 등록되는 route 가 우선(Playwright 역순).
+  await page.route(u => !/^(http:\/\/localhost|data:|blob:)/.test(String(u)), r => r.abort());
+  await page.routeWebSocket(/.*/, ws => ws.close());
   const VENDOR = {
     'supabase-js': 'supabase.js', 'lightweight-charts': 'lightweight-charts.standalone.production.js',
     'react-dom': 'react-dom.production.min.js', 'react@': 'react.production.min.js', 'babel': 'babel.min.js',

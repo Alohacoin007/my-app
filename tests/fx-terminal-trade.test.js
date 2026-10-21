@@ -70,6 +70,10 @@ const STUB = (rpcMode) => `(() => {
   const browser = await chromium.launch({ executablePath: exe, headless: true, args: ['--no-sandbox'] });
   console.log('fx-terminal trade — M4 real-execution gate (stub RPC)');
   const page = await browser.newPage({ viewport: { width: 1900, height: 904 } });
+  // 네트워크 0 (2026-10-21): 실서버(prices REST·Realtime WS·Binance WS) 차단. 안 막으면 FX 장중엔 실 EURUSD 가
+  // 스텁을 덮어 🔴, 주말엔 시세 정지라 🟢 = 요일 따라 바뀌는 오탐. 이후 등록되는 route 가 우선(Playwright 역순).
+  await page.route(u => !/^(http:\/\/localhost|data:|blob:)/.test(String(u)), r => r.abort());
+  await page.routeWebSocket(/.*/, ws => ws.close());
   await page.goto(`http://localhost:${PORT}/terminal.html`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(700);
   await page.evaluate(() => { fxMarketOpen = () => true; });   // 세션 게이트 개방 — 주말에 돌아도 주문 핀 불변(게이트 자체는 live-guards 테스트가 검증)

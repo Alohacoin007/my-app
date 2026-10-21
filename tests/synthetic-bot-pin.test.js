@@ -50,6 +50,10 @@ if (!/Math\.abs\(d - sum\) < 0\.005/.test(src)) bad('invariant: Δbalance must e
 if (!/legs: \[\{[^\]]*\bkt: g\.iso/.test(src)) bad('bot bet legs must carry kt (kickoff) like the real app');
 if (!/legs: \[\{[^\]]*\blg: g\.lg/.test(src)) bad('bot bet legs must carry lg (league) like the real app');
 
+// ⑨ 봇은 서버 게이트가 거절하는 마켓을 고르지 않는다 — 축구(threeWay 3-way)의 ml 은 호환배열이라 place_bet 이
+//    "use 1X2 for soccer" 로 거절(정상) → 봇이 매일 가짜 🔴 메일 (2026-10-17·10-21 실측, 결함-로그 10-21)
+if (!/!\(Array\.isArray\(g\.threeWay\) && g\.threeWay\.length === 3\)/.test(src)) bad('bot game pick must exclude 3-way (soccer) games — their ml is rejected by place_bet');
+
 // ⑥⑦ fail-closed + 미설정 생략
 if (!/process\.exit\(red \? 1 : 0\)/.test(src)) bad('bot must exit 1 on any red (silent-gate email)');
 if (!/미설정.*생략[\s\S]*?process\.exit\(0\)/.test(src)) bad('missing secrets must skip quietly with exit 0');
