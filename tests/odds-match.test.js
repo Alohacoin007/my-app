@@ -249,6 +249,12 @@ ok('원본에 teamMatchStrict(모든 토큰) 가 있다', /function teamMatchStr
 ok('h2h 배정이 sideOf 경유 (teamMatch(o.name 직접 사용 0곳)', !/teamMatch\(o\.name/.test(SRC));
 ok('원본에 오버라운드 가드가 있다', /impliedSum/.test(SRC));
 ok('가드는 라인을 고치지 않고 버린다 (delete/조건부 생략)', /delete core\.ml/.test(SRC));
+// 감시 도구 락스텝 (2026-10-24): 서버가 매칭 시 찍는 oid 를 crosscheck 가 정확 키로 존중해야 한다 —
+// 안 그러면 경기 중·가드로 잠긴(매칭은 된) 경기를 "매칭 실패" 로 오탐 (10-14·10-24 실측 2회).
+{ const CC = require('fs').readFileSync(require('path').join(__dirname, 'odds-crosscheck.js'), 'utf8');
+  ok('crosscheck: oid 로 프로바이더 이벤트를 소비한다', /String\(e\.id\) === String\(g\.oid\)/.test(CC));
+  ok('crosscheck: oid 있는 잠금 경기는 매칭 용의자에서 제외', /g\.oddsReal !== true && !g\.oid/.test(CC));
+  ok('원본: oid 는 매칭된 이벤트 id 로만 찍힌다', /g\.oid\s*=\s*String\(ev\.id/.test(SRC)); }
 
 console.log('\n' + (pass ? '🟢 team matching recovers soccer odds without cross-matching' : '🔴 matcher broken') + '\n');
 process.exit(pass ? 0 : 1);

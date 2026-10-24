@@ -110,6 +110,9 @@ const fmtT = (ms) => new Date(ms).toISOString().replace('T', ' ').slice(0, 16) +
     // ① 실배당이 붙은 경기가 소비한 프로바이더 이벤트를 표시한다.
     const consumed = new Set();
     for (const g of mine) {
+      // 서버가 도장한 oid = 매칭 성공의 정확한 키 (sports-games overlayRealOdds 가 매칭 시에만 찍는다).
+      // 경기 중(live)·오버라운드 가드로 잠긴 경기도 이벤트는 이미 가져갔다 → 잔여로 세면 오탐 (10-14·10-24 실측).
+      if (g.oid) { const k = pool.findIndex((e) => String(e.id) === String(g.oid)); if (k >= 0) consumed.add(k); }
       if (g.oddsReal !== true) continue;
       const gt = Date.parse(g.iso);
       for (let i = 0; i < pool.length; i++) {
@@ -125,7 +128,7 @@ const fmtT = (ms) => new Date(ms).toISOString().replace('T', ' ').slice(0, 16) +
       .filter((x) => !consumed.has(x.i) && isFinite(x.t) && x.t >= now - 3600e3 && x.t <= horizon);
 
     // ③ 잠긴 경기의 킥오프 슬롯에 잔여 이벤트가 있으면 = 있는데 못 붙인 것
-    const locked = mine.filter((g) => g.oddsReal !== true);
+    const locked = mine.filter((g) => g.oddsReal !== true && !g.oid);   // oid 있음 = 매칭은 됨(잠금 사유는 매칭 밖)
     let hit = 0;
     for (const g of locked) {
       const gt = Date.parse(g.iso);
