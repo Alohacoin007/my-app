@@ -63,4 +63,36 @@ ok('④ SELL 칸 = tickCls(…,\'b\') · BUY 칸 = tickCls(…,\'a\') (홈·주�
 ok('CSS: .tu = var(--up), .td = var(--down) (가격 칸·상세 시세)',
    /\.btn\.tu[^{]*\{[^}]*color:\s*var\(--up\)/.test(src) && /\.btn\.td[^{]*\{[^}]*color:\s*var\(--down\)/.test(src) &&
    /\.det \.px\.tu[^{]*\{[^}]*var\(--up\)/.test(src) && /\.det \.px\.td[^{]*\{[^}]*var\(--down\)/.test(src));
-done();
+
+// ⑤ (2026-10-25 사장님 "셀 박스랑 바이 박스가 빨강·파랑으로 고정 — 가격이 움직일 때마다 박스 색도") 박스 테두리도 시세 방향 색.
+//    SELL/BUY 라는 쪽 색으로 고정하지 않는다: 오르면 파랑 · 내리면 빨강 · 첫 틱 전엔 중립. 1-Click 홈 행 · 주문 화면 하단 둘 다.
+//    실브라우저로 fx-app.html 의 실제 <style> 을 계산해 본다 (선택자 우선순위·!important 함정까지 잡힌다). 네트워크 0 (setContent).
+(async () => {
+  let chromium = null, exe = null;
+  try { chromium = require(path.join(REPO, 'node_modules', 'playwright-core')).chromium; } catch (_) {}
+  try { const base = process.env.PLAYWRIGHT_BROWSERS_PATH || '/opt/pw-browsers';
+    for (const d of fs.readdirSync(base).filter((x) => /chromium/.test(x)))
+      for (const c of ['chrome-linux/chrome', 'chrome-linux/headless_shell']) { const p = path.join(base, d, c); if (!exe && fs.existsSync(p)) exe = p; } } catch (_) {}
+  if (!chromium || !exe) { console.log('  ⏭️  ⑤ 브라우저 없음 — 박스 색 행위 검사 생략'); return done(); }
+  const css = (src.match(/<style>([\s\S]*?)<\/style>/) || [, ''])[1];
+  const browser = await chromium.launch({ executablePath: exe, headless: true, args: ['--no-sandbox'] });
+  const page = await browser.newPage();
+  await page.route(() => true, (r) => r.abort());
+  for (const theme of ['light', 'dark']) {
+    await page.setContent(`<html data-theme="${theme}"><head><style>${css}</style></head><body>
+      <div class="app oc-on"><div class="half"><div id="hs" class="btn sell">1</div><div id="hb" class="btn buy">1</div></div>
+        <div class="half"><div id="hsu" class="btn sell tu">1</div><div id="hbd" class="btn buy td">1</div></div>
+        <div class="half"><div id="hsd" class="btn sell td">1</div><div id="hbu" class="btn buy tu">1</div></div>
+        <div class="foot"><div class="half"><div id="fsu" class="btn sell tu">1</div><div id="fbd" class="btn buy td">1</div><div id="fs" class="btn sell">1</div></div></div></div>
+    </body></html>`);
+    const bc = await page.evaluate(() => Object.fromEntries(['hs', 'hb', 'hsu', 'hbd', 'hsd', 'hbu', 'fsu', 'fbd', 'fs']
+      .map((id) => [id, getComputedStyle(document.getElementById(id)).borderTopColor])));
+    const UP = 'rgb(10, 108, 255)', DN = 'rgb(255, 59, 48)';
+    ok(`⑤ [${theme}] 1-Click 홈: SELL 칸이 오르면 파랑 테두리 · BUY 칸이 내리면 빨강 테두리`, bc.hsu === UP && bc.hbd === DN, JSON.stringify(bc));
+    ok(`⑤ [${theme}] 1-Click 홈: SELL 내리면 빨강 · BUY 오르면 파랑`, bc.hsd === DN && bc.hbu === UP, JSON.stringify(bc));
+    ok(`⑤ [${theme}] 주문 화면 하단: SELL 오르면 파랑 · BUY 내리면 빨강 (!important 덮음)`, bc.fsu === UP && bc.fbd === DN, JSON.stringify(bc));
+    ok(`⑤ [${theme}] 첫 틱 전 = 중립 테두리 (쪽 색 고정 아님)`, ![UP, DN].includes(bc.hs) && ![UP, DN].includes(bc.hb) && ![UP, DN].includes(bc.fs), JSON.stringify(bc));
+  }
+  await browser.close();
+  done();
+})();
