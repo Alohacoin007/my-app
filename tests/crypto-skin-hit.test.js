@@ -77,6 +77,46 @@ const done = () => { console.log(`\n${fail ? '🔴' : '🟢'} crypto-skin-hit �
       ok(`[${theme}] ③ 홈 기간 1W 실클릭 → 주황 캡슐 이동 (1W ${bg1w} · 1D ${bg1d})`, bg1w === accRgb && bg1d !== accRgb);
       await page.close();
     }
+    // ④ 캔들 차트 (2026-10-25 사장님 캔들 시안 "진행해"): Binance klines 를 스텁으로 주면 코인 상세가 실봉 60개 캔들 + O·H·L·C 줄,
+    //    라인 버튼 → 라인 차트, 다시 캔들 → 캔들. klines 가 실패하면 가짜 봉을 만들지 않고 라인으로 돌아간다.
+    for (const klines of ['stub', 'fail']) {
+      const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+      await page.route((u) => !/^(http:\/\/localhost|data:|blob:)/.test(String(u)), (r) => r.abort());
+      await page.routeWebSocket(/.*/, (ws) => ws.close());
+      const kReq = [];
+      await page.route('**/data-api.binance.vision/api/v3/klines*', (r) => {
+        const u = new URL(r.request().url()); kReq.push(u.searchParams.get('interval') + ':' + u.searchParams.get('limit'));
+        if (klines === 'fail') return r.abort();
+        const rows = []; let p = 80000;
+        for (let i = 0; i < 60; i++) { const o = p, c = p + (i % 3 === 0 ? -40 : 55); rows.push([Date.now() - (60 - i) * 300e3, String(o), String(Math.max(o, c) + 20), String(Math.min(o, c) - 20), String(c), '1']); p = c; }
+        r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows) });
+      });
+      await page.addInitScript(() => { try {
+        localStorage.setItem('alpexa.me', JSON.stringify({ email: 'skin@test', authId: 'skin', accts: { crypto: 'C-SKIN' } }));
+        sessionStorage.setItem('alpexa.sessChecked', '1');
+      } catch (e) {} });
+      await page.goto(`http://localhost:${port}/crypto-live.html`, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Trade'), null, { timeout: 15000 }).catch(() => {});
+      await page.locator('button', { hasText: /^Trade$/ }).last().click(); await page.waitForTimeout(800);
+      const st = async () => page.evaluate(() => { const svg = document.querySelector('svg[data-mode="candle"]');
+        return { candle: !!svg, rects: svg ? svg.querySelectorAll('rect').length : 0, ohlc: /\nO [\d,.]+\nH [\d,.]+\nL [\d,.]+\nC [\d,.]+/.test(document.body.innerText), on: [...document.querySelectorAll('button[aria-label$="chart"]')].map((b) => b.getAttribute('aria-label') + '=' + getComputedStyle(b).backgroundColor) }; });
+      if (klines === 'stub') {
+        const a = await st();
+        ok('④ 캔들: 실봉 스텁 → 코인 상세 캔들 60개 + O·H·L·C 줄 · 요청 = 봉 크기 interval & limit=60 (' + kReq.join(',') + ')', a.candle && a.rects === 60 && a.ohlc && kReq.length > 0 && kReq.every((q) => /:60$/.test(q)), JSON.stringify(a));
+        const hit = await page.evaluate(() => [...document.querySelectorAll('button[aria-label$="chart"]')].map((b) => { const r = b.getBoundingClientRect(); return [[r.left + r.width / 2, r.top + r.height / 2], [r.left + r.width / 2, r.top + 3], [r.left + 6, r.top + r.height / 2], [r.right - 6, r.top + r.height / 2], [r.left + r.width / 2, r.bottom - 3]].every(([x, y]) => { const e = document.elementFromPoint(x, y); return e && b.contains(e); }); }));
+        ok('④ 캔들: 라인/캔들 전환 버튼 2개 × 5지점 히트 (가운데·위·좌·우·아래 — 둥근 모서리 바깥 제외)', hit.length === 2 && hit.every(Boolean), JSON.stringify(hit));
+        await page.locator('button[aria-label="Line chart"]').click(); await page.waitForTimeout(300);
+        const b = await st();
+        ok('④ 캔들: 라인 버튼 → 라인 차트 (캔들 svg 없음 · O·H·L·C 숨김) · 설정 기억 alpexa.chartMode=line', !b.candle && !b.ohlc && (await page.evaluate(() => localStorage.getItem('alpexa.chartMode'))) === '"line"', JSON.stringify(b));
+        await page.locator('button[aria-label="Candle chart"]').click(); await page.waitForTimeout(500);
+        const c = await st();
+        ok('④ 캔들: 다시 캔들 버튼 → 캔들 60개 복귀', c.candle && c.rects === 60, JSON.stringify(c));
+      } else {
+        const d = await st();
+        ok('④ 캔들: klines 실패 → 가짜 봉 0 · 라인 차트로 폴백 (O·H·L·C 줄 없음)', !d.candle && !d.ohlc && kReq.length > 0, JSON.stringify(d));
+      }
+      await page.close();
+    }
   } finally { await browser.close(); srv.close(); }
   done();
 })().catch((e) => { console.log('  ❌ crashed: ' + (e && e.message)); fail++; done(); });

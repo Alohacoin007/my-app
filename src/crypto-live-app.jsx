@@ -882,6 +882,66 @@ function Chart({ series, color, baseline, scrubIdx, onScrub }) {
   );
 }
 
+// ── 캔들 차트 (2026-10-25 사장님 캔들 시안 승인 "진행해") ─────────────────────────────────────────────
+// 봉 = Binance 공개 미러 klines 의 실제 o/h/l/c (fx-app 과 같은 출처·키 불필요). 기간 버튼 = 봉 크기(1m 봉·5m 봉 …), 최근 60개.
+// 실봉을 못 받으면(ALPXS·증권·스테이블·네트워크 실패) null → 화면은 기존 라인 차트로 돌아간다 — 가짜 봉을 만들지 않는다.
+const CANDLE_TF = { '1m': '1m', '5m': '5m', '30m': '30m', '1h': '1h', '4h': '4h', '1D': '1d', '1W': '1w' };
+function alpexaFetchCandles(sym, range) {
+  try {
+    var base = (typeof BINANCE_SYM !== 'undefined') && BINANCE_SYM[sym];
+    if (!base || !CANDLE_TF[range]) return Promise.resolve(null);
+    var url = 'https://data-api.binance.vision/api/v3/klines?symbol=' + base.toUpperCase() + 'USDT&interval=' + CANDLE_TF[range] + '&limit=60';
+    return fetch(url).then(function (r) { return r.json(); }).then(function (j) {
+      if (!Array.isArray(j) || j.length < 2) return null;
+      var rows = j.map(function (k) { return { t: +k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4] }; })
+        .filter(function (k) { return k.o > 0 && k.h > 0 && k.l > 0 && k.c > 0; });
+      return rows.length >= 2 ? rows : null;
+    }).catch(function () { return null; });
+  } catch (e) { return Promise.resolve(null); }
+}
+function CandleChart({ candles, scrubIdx, onScrub }) {
+  const W = 390, H = 220, padX = 16, padY = 22;
+  const n = candles.length;
+  let lo = Infinity, hi = -Infinity;
+  candles.forEach((k) => { if (k.h > hi) hi = k.h; if (k.l < lo) lo = k.l; });
+  const yAt = (v) => (H - padY) - ((v - lo) / Math.max(1e-9, hi - lo)) * (H - padY * 2);
+  const sx = (W - padX * 2) / n, bw = Math.max(1.5, sx * 0.62);
+  const xAt = (i) => padX + sx * (i + 0.5);
+  const ref = React.useRef(null);
+  const onPointer = (e) => {
+    const rect = ref.current.getBoundingClientRect();
+    const px = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    const ratio = Math.max(0, Math.min(0.9999, (px - padX * rect.width / W) / (rect.width - padX * 2 * rect.width / W)));
+    onScrub(Math.floor(ratio * n));
+  };
+  const endScrub = () => onScrub(null);
+  const isScrubbing = scrubIdx !== null && scrubIdx !== undefined && scrubIdx < n;
+  const lastY = yAt(candles[n - 1].c);
+  return (
+    <svg ref={ref} viewBox={`0 0 ${W} ${H}`} width="100%" height={H} data-mode="candle"
+      style={{ display: 'block', touchAction: 'none', userSelect: 'none' }}
+      onMouseDown={onPointer} onMouseMove={(e) => e.buttons === 1 && onPointer(e)}
+      onMouseUp={endScrub} onMouseLeave={endScrub}
+      onTouchStart={onPointer} onTouchMove={onPointer} onTouchEnd={endScrub}>
+      {[0.25, 0.5, 0.75].map((f) => { const y = padY + (H - padY * 2) * f; return <line key={f} x1={padX} y1={y} x2={W - padX} y2={y} stroke={RH.surface} strokeWidth="1"/>; })}
+      <line x1={padX} y1={lastY} x2={W - padX} y2={lastY} stroke={RH.textMute} strokeWidth="1" strokeDasharray="2 4"/>
+      {candles.map((k, i) => {
+        const col = k.c >= k.o ? RH.green : RH.red;
+        const y1 = yAt(Math.max(k.o, k.c)), y2 = yAt(Math.min(k.o, k.c));
+        return (
+          <g key={i}>
+            <line x1={xAt(i)} y1={yAt(k.h)} x2={xAt(i)} y2={yAt(k.l)} stroke={col} strokeWidth="1"/>
+            <rect x={xAt(i) - bw / 2} y={y1} width={bw} height={Math.max(1, y2 - y1)} fill={col}/>
+          </g>
+        );
+      })}
+      {isScrubbing ? (
+        <line x1={xAt(scrubIdx)} y1={padY} x2={xAt(scrubIdx)} y2={H - padY} stroke={RH.textDim} strokeWidth="1" strokeDasharray="2 3" opacity="0.7"/>
+      ) : null}
+    </svg>
+  );
+}
+
 // Mini sparkline for list rows
 // Mini sparkline.
 // When `stable` is true (stablecoins like USDT pegged at $1) the chart shows
@@ -11030,8 +11090,28 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
   const usingReal = !!(realSeries && realSeries.length > 3);
   // Append the live aggregator price so the chart tip tracks the market in real time.
   const series    = usingReal ? realSeries.concat([close]) : synthSeries;
-  const baseline  = usingReal ? series[0] : open;
-  const scrubPrice = scrubIdx !== null && series[scrubIdx] != null ? series[scrubIdx] : close;
+  // 캔들 모드 (UI 설정만 저장 — 돈 아님): 실봉이 있을 때만 캔들, 마지막 봉 종가 = 실시간 가격(고/저 확장)
+  const [chartMode, setChartMode] = usePersistedState('alpexa.chartMode', 'candle');
+  const [rawCandles, setRawCandles] = React.useState(null);
+  React.useEffect(() => {
+    let alive = true; setRawCandles(null);
+    if (chartMode === 'candle') alpexaFetchCandles(sym, range).then((rows) => { if (alive) setRawCandles(rows); });
+    return () => { alive = false; };
+  }, [sym, range, chartMode]);
+  const candles = React.useMemo(() => {
+    if (chartMode !== 'candle' || !rawCandles || rawCandles.length < 2) return null;
+    const out = rawCandles.slice(); const lastK = out[out.length - 1];
+    // 실시간가가 마지막 봉 종가와 ±2% 안일 때만 끝 봉에 합친다 — 시세 미수신(정적 대체가) 상태에서 끝 봉이 엉뚱하게 늘어나는 것 방지
+    if (close > 0 && Math.abs(close - lastK.c) / lastK.c <= 0.02) out[out.length - 1] = { ...lastK, c: close, h: Math.max(lastK.h, close), l: Math.min(lastK.l, close) };
+    return out;
+  }, [rawCandles, chartMode, close]);
+  const useCandles = !!candles;
+  const baseline  = useCandles ? candles[0].o : (usingReal ? series[0] : open);
+  const scrubPrice = useCandles
+    ? (scrubIdx !== null && candles[scrubIdx] ? candles[scrubIdx].c : close)
+    : (scrubIdx !== null && series[scrubIdx] != null ? series[scrubIdx] : close);
+  const ohlc = useCandles ? (scrubIdx !== null && candles[scrubIdx] ? candles[scrubIdx]
+    : { o: candles[0].o, h: Math.max(...candles.map((k) => k.h)), l: Math.min(...candles.map((k) => k.l)), c: candles[candles.length - 1].c }) : null;
   const chartChange = scrubPrice - baseline;
   const chartPct    = (chartChange / baseline) * 100;
   const chartIsUp   = chartChange >= 0;
@@ -11099,6 +11179,23 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
         )}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {/* Server switcher + bell removed from the Trade/detail page for a cleaner header. */}
+          {/* 라인/캔들 전환 (2026-10-25) — 차트(스크럽 영역) 밖 머리 오른쪽. 선택 = 주황 캡슐 */}
+          <div style={{ display: 'flex', gap: 2, padding: 2, borderRadius: 16, background: RH.surface }}>
+            {[['line', 'Line chart'], ['candle', 'Candle chart']].map(([m, label]) => {
+              const on = chartMode === m;
+              return (
+                <button key={m} aria-label={label} onClick={() => { setChartMode(m); setScrubIdx(null); }} style={{
+                  width: 40, height: 32, borderRadius: 15, border: 'none', padding: 0, cursor: 'pointer',
+                  background: on ? RH.acc : 'transparent', color: on ? RH.onAcc : RH.textDim,
+                  display: 'grid', placeItems: 'center',
+                }}>
+                  {m === 'line'
+                    ? <svg width="18" height="14" viewBox="0 0 18 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M1 11l4-4 3 2 5-6 4 3"/></svg>
+                    : <svg width="18" height="14" viewBox="0 0 18 14" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="M4 1v12M9 3v10M14 0v12"/><rect x="2.5" y="4" width="3" height="5" fill="currentColor"/><rect x="7.5" y="6" width="3" height="4" fill="currentColor"/><rect x="12.5" y="2" width="3" height="6" fill="currentColor"/></svg>}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -11226,12 +11323,21 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
             fontFamily: FONT_UI, letterSpacing: 0.4,
             textTransform: 'none', fontWeight: 400, fontSize: 13,
           }}>24 Hour Market</div>
+          {ohlc ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', marginTop: 6, fontSize: 12, color: RH.textDim, fontVariantNumeric: 'tabular-nums' }}>
+              {[['O', ohlc.o], ['H', ohlc.h], ['L', ohlc.l], ['C', ohlc.c]].map(([k, v]) => (
+                <span key={k}>{k} <span style={{ color: RH.text }}>{fmtUsd(v)}</span></span>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         {/* Chart — big and dramatic */}
         <div style={{ marginTop: 14, position: 'relative' }}>
-          <Chart series={series} color={accentColor} baseline={baseline}
-                 scrubIdx={scrubIdx} onScrub={setScrubIdx}/>
+          {useCandles
+            ? <CandleChart candles={candles} scrubIdx={scrubIdx} onScrub={setScrubIdx}/>
+            : <Chart series={series} color={accentColor} baseline={baseline}
+                 scrubIdx={scrubIdx} onScrub={setScrubIdx}/>}
 
         </div>
 

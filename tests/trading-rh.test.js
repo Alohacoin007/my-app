@@ -65,7 +65,7 @@ ok('터치: 모든 [data-act] 요소에 cursor:pointer (iOS 문서 위임 클릭
 ok('M2 소스: half = max(0.1, spr+mk)*pip/2 (fx_close v_half 미러)', /Math\.max\(0\.1,\s*spr\+mk\)\*fxPip\(sym\)\/2/.test(src));
 ok('M2 소스: 비FX half = mid*max(floorBps[cls], spr)/10000/2 (fx_close v_half else-branch 미러) · 계약/클래스 = fx_specs 런타임', /mid\*\(Math\.max\(SPREAD_BPS\[cls\]\|\|0, spr\)\/10000\)\/2/.test(src) && /from\('fx_specs'\)\.select\('symbol,cls,contract'\)/.test(src) && /SPREAD_BPS=\{CRYPTO:10,STOCK:8,INDEX:6\}/.test(src));
 ok('M2 소스: pip 락스텝 (JPY .01 · XAU .01 · XAG .001 · else .0001)', /JPY\$\/\.test\(sym\)\?0\.01:sym==='XAUUSD'\?0\.01:sym==='XAGUSD'\?0\.001:0\.0001/.test(src));
-ok('M4 소스: localStorage 에 잔고·포지션 저장 없음 (rh.theme/rh.oneClick/rh.oneClickAck/rh.mask/rh.homeSeg 만)', (src.match(/LS\.set\('rh\.[a-zA-Z]+'/g) || []).every(x => /rh\.(theme|oneClick|oneClickAck|mask|homeSeg)'/.test(x)) && !/localStorage\.setItem\(['"]alpexa\.(balances|fxLive|positions)/.test(src));
+ok('M4 소스: localStorage 에 잔고·포지션 저장 없음 (UI 설정 rh.theme/rh.oneClick/rh.oneClickAck/rh.mask/rh.homeSeg/rh.chartMode 만 — chartMode = 라인/캔들, 2026-10-25)', (src.match(/LS\.set\('rh\.[a-zA-Z]+'/g) || []).every(x => /rh\.(theme|oneClick|oneClickAck|mask|homeSeg|chartMode)'/.test(x)) && !/localStorage\.setItem\(['"]alpexa\.(balances|fxLive|positions)/.test(src));
 ok('세션: trading.html 과 같은 로그인 게이트 + 세션 가드 (login.html 로 회귀)', /localStorage\.getItem\("alpexa\.me"\)/.test(src) && /rhToLogin\("\?expired=1"\)/.test(src) && /alpexa-sync\.js/.test(src));
 // 로그인 복귀: 모든 login.html 이동 전에 폐쇄 허용목록 토큰 fx-rh 를 sessionStorage 에 둔다 (URL 로 목적지 선택 불가 — login.html 계약 유지)
 ok('복귀 토큰: rhToLogin 이 alpexa.dest2=fx-rh 를 심고 ../login.html 로만 이동', /sessionStorage\.setItem\("alpexa\.dest2","fx-rh"\)/.test(src) && /location\.replace\("login\.html"\+/.test(src) && (src.match(/location\.replace\([^)]*login\.html/g) || []).length === 1);
@@ -376,6 +376,17 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   await page.locator('.otype span[data-act="otype:MARKET"]').click(); await page.waitForTimeout(100);
   // chart timeframes: 6칸 (1m 5m 1h 4h 1D 1W) 전부 실봉
   ok('차트 TF: 6칸 전부 활성 (.na 0) — 1m 5m 1h 4h 1D 1W', (await page.locator('.ranges span').count()) === 6 && (await page.locator('.ranges span.na').count()) === 0);
+  // 캔들 차트 (2026-10-25 사장님 시안 승인 "진행해"): 기본 = 캔들 · 라인/캔들 전환 · O·H·L·C 줄 · 스크럽은 칸 단위 · 전환 버튼 누르는 지점이 버튼을 맞음
+  { const cs = await page.evaluate(() => { const svg = document.querySelector('#chart svg'); return { mode: svg && svg.getAttribute('data-mode'), n: svg ? svg.querySelectorAll('rect').length : 0, ohlc: !!document.querySelector('.det .ohlc'), on: (document.querySelector('.cmode span.on') || {}).getAttribute && document.querySelector('.cmode span.on').getAttribute('data-act') }; });
+    ok('캔들: 기본 모드 = 캔들 (svg data-mode=candle · 봉 60개 · O·H·L·C 줄 · 전환 버튼 candle 선택)', cs.mode === 'candle' && cs.n === 60 && cs.ohlc && cs.on === 'cmode:candle', JSON.stringify(cs));
+    const hit = await page.evaluate(() => [...document.querySelectorAll('.cmode span')].map((b) => { const r = b.getBoundingClientRect(); return [[r.left + r.width / 2, r.top + r.height / 2], [r.left + 3, r.top + 3], [r.right - 3, r.bottom - 3]].every(([x, y]) => { const e = document.elementFromPoint(x, y); return e && b.contains(e); }); }));
+    ok('캔들: 라인/캔들 전환 버튼 2개 × 3지점 히트 (차트 스크럽 영역 밖)', hit.length === 2 && hit.every(Boolean), JSON.stringify(hit));
+    await page.locator('.cmode span[data-act="cmode:line"]').click(); await page.waitForTimeout(150);
+    const ln = await page.evaluate(() => ({ mode: document.querySelector('#chart svg').getAttribute('data-mode'), path: document.querySelectorAll('#chart svg path').length, ohlc: !!document.querySelector('.det .ohlc'), ls: localStorage.getItem('rh.chartMode') }));
+    ok('캔들: 라인 탭 → 라인 차트(path) · O·H·L·C 줄 숨김 · 설정 기억(rh.chartMode=line, UI 설정만)', ln.mode === null && ln.path === 1 && !ln.ohlc && ln.ls === 'line', JSON.stringify(ln));
+    await page.locator('.cmode span[data-act="cmode:candle"]').click(); await page.waitForTimeout(150);
+    const sc = await page.evaluate(() => { const svg = document.querySelector('#chart svg'); const r = svg.getBoundingClientRect(); scrubAt(r.right - 1); const last = window.__rh.scrub; scrubAt(r.left + 1); const first = window.__rh.scrub; window.__rh.scrub = null; return { mode: svg.getAttribute('data-mode'), last, first }; });
+    ok('캔들: 다시 캔들 · 스크럽 칸 단위 (오른쪽 끝 = 59번 봉 · 왼쪽 끝 = 0번 봉)', sc.mode === 'candle' && sc.last === 59 && sc.first === 0, JSON.stringify(sc)); }
   candReq.length = 0; await page.locator('.ranges span[data-act="tf:H4"]').click(); await page.waitForTimeout(300);
   ok('4h 탭 → fx-prices ?tf=H4&n=200 실봉 요청 · 차트 렌더', candReq.some(q => q.tf === 'H4' && q.n === '200') && (await page.locator('#chart svg').count()) === 1 && (await page.locator('.ranges span.on').innerText()) === '4h', JSON.stringify(candReq));
   ok('ALL·30m 버튼 없음 (6칸으로 줄임 — 2026-10-25)', (await page.locator('.ranges span[data-act="tf:ALL"]').count()) === 0 && (await page.locator('.ranges span[data-act="tf:M30"]').count()) === 0);
