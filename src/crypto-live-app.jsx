@@ -4,35 +4,45 @@
 // ═══════════ 블록 1/5 (원 위치 보존 — 병합돼도 실행 순서·전역 공유 동일) ═══════════
 ;
 
-// Palette — dark phone surface, electric blue accent
+// Palette — 월드클락 스킨 (2026-10-25 사장님 시안 승인 "진행해" — 시안 7rojdeLN8bXrCd8SKXz8q8, FX·스포츠와 같은 규율).
+// iOS 시스템 회색 + 주황 액센트. green = 상승/주요 시세색(파랑 유지 — 오르면 파랑·내리면 빨강), accent = 글자·아이콘용 주황
+// (라이트는 흰 바탕 대비 위해 진한 주황), acc/onAcc = 주황 채움 + 검정 글자, capsule = 탭바 선택 캡슐.
 const DARK_PALETTE = {
   bg:        '#000000',
-  surface:   '#0E0E0E',
-  surfaceUp: '#161616',
-  line:      '#1F1F1F',
+  surface:   '#1C1C1E',
+  surfaceUp: '#2C2C2E',
+  line:      '#38383A',
   text:      '#FFFFFF',
-  textDim:   '#9A9A9A',
-  textMute:  '#5F5F5F',
-  green:     '#4f6ef7',
-  greenDeep: '#3355e0',
-  red:       '#FF5050',
-  accent:    '#4f6ef7',
-  heroBlue:  '#1e40d8',
+  textDim:   '#98989F',
+  textMute:  '#8E8E93',
+  green:     '#0A84FF',
+  greenDeep: '#0060DF',
+  red:       '#FF453A',
+  accent:    '#FF9F0A',
+  heroBlue:  '#0A84FF',
+  acc:       '#FF9F0A',
+  onAcc:     '#000000',
+  capsule:   '#2C2C2E',
 };
 const LIGHT_PALETTE = {
   bg:        '#FFFFFF',
-  surface:   '#F4F6F9',
-  surfaceUp: '#ECEEF1',
-  line:      '#E6E6E9',
-  text:      '#0F1115',
-  textDim:   '#6B7280',
-  textMute:  '#9CA3AF',
-  green:     '#1e40d8',
-  greenDeep: '#1734b0',
+  surface:   '#F2F2F7',
+  surfaceUp: '#E5E5EA',
+  line:      '#D1D1D6',
+  text:      '#000000',
+  textDim:   '#6C6C70',
+  textMute:  '#8E8E93',
+  green:     '#0A6CFF',
+  greenDeep: '#0050CC',
   red:       '#FF3B30',
-  accent:    '#1e40d8',
-  heroBlue:  '#1e40d8',
+  accent:    '#C25E00',
+  heroBlue:  '#0A6CFF',
+  acc:       '#FF9500',
+  onAcc:     '#000000',
+  capsule:   '#FFFFFF',
 };
+// 서체 = iOS 시스템 서체 (월드클락 스킨). 숫자 자릿폭은 crypto-live.html body 의 tabular-nums 상속으로 고정 — 시세 틱에 글자가 흔들리지 않게.
+const FONT_UI = '-apple-system, "SF Pro Display", "SF Pro Text", system-ui, Geist, Inter, sans-serif';
 // Mutable palette object — all RH.x reads pick up whichever palette is active.
 // Toggled via the ThemeContext (Account → Appearance).
 const RH = { ...LIGHT_PALETTE };
@@ -470,7 +480,7 @@ function Phone({ children, width = 390, height = 844, bg = RH.bg }) {
     <div className="phone-shell" style={{
       width, height, background: bg, borderRadius: 54, overflow: 'hidden', position: 'relative',
       display: 'flex', flexDirection: 'column', color: RH.text,
-      fontFamily: 'Geist, Inter, system-ui, sans-serif',
+      fontFamily: FONT_UI,
     }}>
       {children}
     </div>
@@ -910,8 +920,8 @@ function MiniSpark({ seed, sym, w = 56, h = 18, color, stable = false }) {
 function RangeTabs({ range, setRange, color }) {
   return (
     <div style={{
-      display: 'flex', justifyContent: 'space-between',
-      padding: '6px 22px 10px', fontFamily: 'Geist Mono, monospace',
+      display: 'flex', justifyContent: 'space-between', gap: 4,
+      padding: '6px 16px 10px', fontFamily: FONT_UI,
     }}>
       {RANGES.map((r) => {
         const active = r === range;
@@ -920,12 +930,12 @@ function RangeTabs({ range, setRange, color }) {
             key={r}
             onClick={() => setRange(r)}
             style={{
-              background: 'transparent', border: 'none', cursor: 'pointer',
-              padding: '6px 4px',
-              fontSize: 11, fontWeight: 700, letterSpacing: 0.4,
-              color: active ? color : RH.textDim,
-              borderBottom: active ? `2px solid ${color}` : '2px solid transparent',
-              transition: 'color 160ms ease, border-color 160ms ease',
+              flex: 1, height: 32, borderRadius: 16,
+              background: active ? RH.acc : 'transparent', border: 'none', cursor: 'pointer',
+              padding: 0,
+              fontSize: 14, fontWeight: active ? 600 : 500,
+              color: active ? RH.onAcc : RH.textDim,
+              transition: 'color 160ms ease, background 160ms ease',
             }}
           >{r}</button>
         );
@@ -999,7 +1009,7 @@ function AssetRow({ a, kind, liveValue, onTap }) {
             padding: '2px 6px',
             background: `${RH.red}1A`, border: `1px solid ${RH.red}55`,
             borderRadius: 999, marginBottom: 3,
-            fontFamily: 'Geist Mono, monospace', fontSize: 8.5, fontWeight: 700,
+            fontFamily: FONT_UI, fontSize: 8.5, fontWeight: 700,
             color: RH.red, letterSpacing: 0.6, textTransform: 'uppercase',
           }}>
             <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
@@ -1112,7 +1122,7 @@ function NotificationsSheet({ onClose }) {
         border: `1px solid ${RH.line}`,
         maxHeight: '75%',
         display: 'flex', flexDirection: 'column',
-        fontFamily: 'Geist, Inter, system-ui',
+        fontFamily: FONT_UI,
       }}>
         <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 4px' }}>
           <div style={{ width: 38, height: 4, borderRadius: 2, background: RH.line }}/>
@@ -1127,7 +1137,7 @@ function NotificationsSheet({ onClose }) {
               <span style={{
                 fontSize: 10.5, fontWeight: 700, color: RH.red,
                 background: `${RH.red}22`, padding: '2px 8px', borderRadius: 999,
-                fontFamily: 'Geist Mono, monospace', letterSpacing: 0.6,
+                fontFamily: FONT_UI, letterSpacing: 0.6,
               }}>{unreadCount} new</span>
             ) : null}
           </div>
@@ -1185,7 +1195,7 @@ function NotificationsSheet({ onClose }) {
                 <div style={{ marginTop: 3, fontSize: 12, color: RH.textDim, lineHeight: 1.4 }}>{n.body}</div>
                 <div style={{
                   marginTop: 4, fontSize: 10.5, color: RH.textMute,
-                  fontFamily: 'Geist Mono, monospace', letterSpacing: 0.4,
+                  fontFamily: FONT_UI, letterSpacing: 0.4,
                   textTransform: 'uppercase', fontWeight: 700,
                 }}>{fmtAgo(n.ts)}</div>
               </div>
@@ -1206,7 +1216,7 @@ function SectionHeader({ title, count, live = false }) {
       <div style={{
         fontSize: 11.5, fontWeight: 700, color: RH.textDim,
         letterSpacing: 1.4, textTransform: 'uppercase',
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         display: 'inline-flex', alignItems: 'center', gap: 8,
       }}>
         {live ? (
@@ -1232,7 +1242,7 @@ function SectionHeader({ title, count, live = false }) {
         <span>{title}</span>
       </div>
       <div style={{
-        fontSize: 11.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace',
+        fontSize: 11.5, color: RH.textDim, fontFamily: FONT_UI,
         fontVariantNumeric: 'tabular-nums', letterSpacing: 1.4, fontWeight: 700,
         textTransform: 'uppercase',
       }}>{count}</div>
@@ -1296,10 +1306,10 @@ function ActionRow({ onAction }) {
             onClick={() => onAction && onAction(it.id)}
             style={{
               flex: '0 0 calc((100% - 48px) / 4)',
-              padding: '11px 0 9px',
+              padding: '12px 0 10px',
               background: RH.surface,
-              border: `1.2px solid rgba(255,255,255,0.10)`,
-              borderRadius: 14,
+              border: 'none',
+              borderRadius: 18,
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
               cursor: 'pointer',
               scrollSnapAlign: 'start',
@@ -1311,7 +1321,7 @@ function ActionRow({ onAction }) {
           >
             {it.icon}
             <div style={{
-              fontSize: 11, color: RH.accent, fontWeight: 800, letterSpacing: 0.2,
+              fontSize: 12, color: RH.text, fontWeight: 500,
             }}>{it.label}</div>
           </button>
         ))}
@@ -1380,7 +1390,7 @@ function ServerSwitcher({ cryptoBal }) {
       {open ? (
         <div style={{ position: 'absolute', top: 46, right: 0, zIndex: 9001, width: 296, maxWidth: '92vw', background: RH.surface,
           border: `1px solid ${RH.line}`, borderRadius: 12, boxShadow: '0 16px 40px -12px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.4)', padding: 4,
-          fontFamily: 'Geist, Inter, system-ui' }}>
+          fontFamily: FONT_UI }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: RH.textMute, letterSpacing: 1.4, textTransform: 'uppercase', padding: '8px 12px 6px' }}>Switch server</div>
           {servers.map((s) => { const active = s.id === 'crypto'; return (
             <button key={s.id} onClick={() => go(s.id)} style={{ width: '100%', textAlign: 'left',
@@ -1418,26 +1428,33 @@ function TabBar({ active = 'home', onTabChange }) {
     { id: 'account',  label: 'Account',
       icon: (c) => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg> },
   ];
+  // 월드클락 스킨 (2026-10-25): 떠 있는 알약 탭바. 여전히 화면 흐름(flex 열의 마지막 칸) 안에 있어 아무것도 덮지 않는다 —
+  // 버튼은 알약 안에서 각자 flex:1 로 전체 폭을 나누고, 선택 탭은 캡슐 바탕만 깔린다 (누르는 영역 = 버튼 그대로).
   return (
     <div style={{
-      flexShrink: 0, borderTop: `1px solid ${RH.line}`,
-      padding: '8px 8px 22px', background: RH.bg,
-      display: 'flex', justifyContent: 'space-between',
+      flexShrink: 0, padding: '6px 16px 22px', background: RH.bg,
     }}>
-      {items.map((it) => {
-        const isActive = it.id === active;
-        const c = isActive ? RH.green : RH.textDim;
-        return (
-          <button key={it.id} onClick={() => onTabChange && onTabChange(it.id)} style={{
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', gap: 4, flex: 1, cursor: 'pointer',
-            background: 'transparent', border: 'none', padding: '6px 0',
-          }}>
-            {it.icon(c, isActive && it.id === 'home')}
-            <div style={{ fontSize: 10, color: c, fontWeight: 600, letterSpacing: 0.2 }}>{it.label}</div>
-          </button>
-        );
-      })}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', gap: 2,
+        padding: 6, borderRadius: 33, background: RH.surface,
+        boxShadow: RH.bg === '#FFFFFF' ? '0 4px 16px rgba(0,0,0,0.08)' : 'none',
+      }}>
+        {items.map((it) => {
+          const isActive = it.id === active;
+          const c = isActive ? RH.accent : RH.text;
+          return (
+            <button key={it.id} onClick={() => onTabChange && onTabChange(it.id)} style={{
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: 3, flex: 1, minHeight: 54, cursor: 'pointer',
+              background: isActive ? RH.capsule : 'transparent', border: 'none', padding: '6px 0', borderRadius: 27,
+              boxShadow: isActive && RH.bg === '#FFFFFF' ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
+            }}>
+              {it.icon(c, isActive && it.id === 'home')}
+              <div style={{ fontSize: 11, color: c, fontWeight: isActive ? 600 : 500 }}>{it.label}</div>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1708,12 +1725,12 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
                 borderRadius: 12,
                 boxShadow: '0 16px 40px -12px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.4)',
                 padding: 4,
-                fontFamily: 'Geist, Inter, system-ui',
+                fontFamily: FONT_UI,
               }}>
                 <div style={{
                   fontSize: 10, fontWeight: 700, color: RH.textMute,
                   letterSpacing: 1.4, textTransform: 'uppercase',
-                  fontFamily: 'Geist Mono, monospace',
+                  fontFamily: FONT_UI,
                   padding: '8px 12px 6px',
                 }}>Switch server</div>
 
@@ -1789,19 +1806,19 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
       {/* Balance card — PINNED at the top (stays put while holdings scroll) */}
       <div style={{ padding: '0 22px 8px', marginTop: -16, flexShrink: 0 }}>
         <div style={{
-          fontSize: 30, fontWeight: 500, color: RH.textMute,
-          letterSpacing: -0.8, textTransform: 'none', lineHeight: 1.05,
-          fontFamily: 'Geist, Inter, system-ui', marginBottom: 6,
+          fontSize: 15, fontWeight: 400, color: RH.textDim,
+          textTransform: 'none', lineHeight: 1.2,
+          fontFamily: FONT_UI, marginBottom: 2,
         }}>My wallet</div>
         <div style={{
-          fontSize: 38, fontWeight: 600, letterSpacing: -1.2,
+          fontSize: 56, fontWeight: 200, letterSpacing: -2,
           lineHeight: 1.05,
         }}>
-          <Odometer value={scrubValue} fontSize={38} color={RH.text} centsColor={RH.textMute}/>
+          <Odometer value={scrubValue} fontSize={56} color={RH.text} centsColor={RH.textMute}/>
         </div>
         <div style={{
-          marginTop: 8, display: 'flex', alignItems: 'center', gap: 6,
-          fontSize: 14, fontWeight: 600,
+          marginTop: 4, display: 'flex', alignItems: 'center', gap: 6,
+          fontSize: 15, fontWeight: 400,
           fontVariantNumeric: 'tabular-nums',
         }}>
           <span style={{ color, display: 'inline-flex', alignItems: 'center', gap: 4, lineHeight: 1 }}>
@@ -1871,19 +1888,19 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
                         background: `${RH.accent}1A`, border: `1px solid ${RH.accent}55`,
                         color: RH.accent, fontSize: 9, fontWeight: 700,
                         letterSpacing: 0.8, textTransform: 'uppercase',
-                        fontFamily: 'Geist Mono, monospace',
+                        fontFamily: FONT_UI,
                       }}>{o.type}</span>
                     </div>
                     <div style={{
                       fontSize: 10, color: RH.textDim, marginTop: 2,
-                      fontFamily: 'Geist Mono, monospace', letterSpacing: 0.2,
+                      fontFamily: FONT_UI, letterSpacing: 0.2,
                     }}>
                       {o.type === 'Limit' ? '≤' : '≥'} ${o.trigger.toFixed(2)} · ${o.usd.toFixed(2)}
                     </div>
                   </div>
                   <div style={{
                     fontSize: 9.5, fontWeight: 700, color: RH.accent,
-                    fontFamily: 'Geist Mono, monospace', letterSpacing: 0.8, textTransform: 'uppercase',
+                    fontFamily: FONT_UI, letterSpacing: 0.8, textTransform: 'uppercase',
                     padding: '2px 6px',
                     background: `${RH.accent}14`, border: `1px solid ${RH.accent}40`, borderRadius: 999,
                   }}>Pending</div>
@@ -2039,7 +2056,7 @@ function SendAvatar({ initials, color, size = 40 }) {
       color,
       fontWeight: 600, fontSize: Math.round(size * 0.36),
       letterSpacing: 0.2, flexShrink: 0,
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
       boxShadow: `0 0 0 3px ${color}1A`,    // very faint outer glow ring
     }}>{initials}</div>
   );
@@ -2217,7 +2234,7 @@ function QrScanner({ onResult, onClose }) {
         textAlign: 'center',
       }}>
         <div style={{
-          fontSize: 12.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace',
+          fontSize: 12.5, color: RH.textDim, fontFamily: FONT_UI,
           letterSpacing: 0.4, marginBottom: needsFallback ? 12 : 0,
         }}>{status}</div>
         <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
@@ -2229,7 +2246,7 @@ function QrScanner({ onResult, onClose }) {
           }}>📷 Scan from photo</button>
           {needsFallback ? (
             <button onClick={onClose} style={{
-              background: RH.green, color: '#000', border: 'none', borderRadius: 999,
+              background: RH.acc, color: RH.onAcc, border: 'none', borderRadius: 999,
               padding: '10px 18px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
             }}>Enter address manually</button>
           ) : null}
@@ -2261,7 +2278,7 @@ function SendReview({ recipient, asset, assetId, amount, memo, state, onConfirm,
         position: 'absolute', inset: 0, zIndex: 190,
         background: RH.bg,
         display: 'flex', flexDirection: 'column',
-        fontFamily: 'Geist, Inter, system-ui',
+        fontFamily: FONT_UI,
       }}>
         {/* Header */}
         <div style={{
@@ -2308,7 +2325,7 @@ function SendReview({ recipient, asset, assetId, amount, memo, state, onConfirm,
                 width: 6, height: 6, borderRadius: 3, background: RH.green, display: 'inline-block',
               }}/>
               <span style={{
-                fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.green,
+                fontFamily: FONT_UI, fontSize: 10, color: RH.green,
                 letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700,
               }}>Completed</span>
             </div>
@@ -2321,7 +2338,7 @@ function SendReview({ recipient, asset, assetId, amount, memo, state, onConfirm,
             </div>
             <div style={{
               marginTop: 8, fontSize: 11.5, color: RH.textDim,
-              fontFamily: 'Geist Mono, monospace', letterSpacing: 0.4,
+              fontFamily: FONT_UI, letterSpacing: 0.4,
             }}>
               sent · {refData.when.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
             </div>
@@ -2336,7 +2353,7 @@ function SendReview({ recipient, asset, assetId, amount, memo, state, onConfirm,
           }}>
             <div>
               <div style={{
-                fontFamily: 'Geist Mono, monospace', fontSize: 9.5, color: RH.textDim,
+                fontFamily: FONT_UI, fontSize: 9.5, color: RH.textDim,
                 letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6,
               }}>From</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2349,7 +2366,7 @@ function SendReview({ recipient, asset, assetId, amount, memo, state, onConfirm,
             </svg>
             <div style={{ textAlign: 'right' }}>
               <div style={{
-                fontFamily: 'Geist Mono, monospace', fontSize: 9.5, color: RH.textDim,
+                fontFamily: FONT_UI, fontSize: 9.5, color: RH.textDim,
                 letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6,
               }}>To</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
@@ -2397,7 +2414,7 @@ function SendReview({ recipient, asset, assetId, amount, memo, state, onConfirm,
               marginBottom: 14,
             }}>
               <div style={{
-                fontFamily: 'Geist Mono, monospace', fontSize: 9.5, color: RH.textDim,
+                fontFamily: FONT_UI, fontSize: 9.5, color: RH.textDim,
                 letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 4,
               }}>Note</div>
               <div style={{ fontSize: 13, color: RH.text }}>{memo}</div>
@@ -2406,7 +2423,7 @@ function SendReview({ recipient, asset, assetId, amount, memo, state, onConfirm,
 
           <button onClick={() => setReceiptOpen(false)} style={{
             width: '100%', padding: '14px 0', borderRadius: 999,
-            background: RH.green, color: '#000', border: 'none',
+            background: RH.acc, color: RH.onAcc, border: 'none',
             fontSize: 13, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.2,
           }}>Done</button>
         </div>
@@ -2419,7 +2436,7 @@ function SendReview({ recipient, asset, assetId, amount, memo, state, onConfirm,
       position: 'absolute', inset: 0, zIndex: 180,
       background: RH.bg,
       display: 'flex', flexDirection: 'column',
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
     }}>
       {/* Header */}
       <div style={{
@@ -2487,7 +2504,7 @@ function SendReview({ recipient, asset, assetId, amount, memo, state, onConfirm,
             <div style={{
               fontSize: 10.5, color: RH.textDim, fontWeight: 700,
               letterSpacing: 1.6, textTransform: 'uppercase',
-              fontFamily: 'Geist Mono, monospace',
+              fontFamily: FONT_UI,
             }}>You sent</div>
             <div style={{
               marginTop: 8, fontSize: 40, fontWeight: 600, color: RH.text,
@@ -2519,7 +2536,7 @@ function SendReview({ recipient, asset, assetId, amount, memo, state, onConfirm,
             background: RH.surface, border: `1px solid ${RH.line}`,
             borderRadius: 14, padding: '12px 14px',
             animation: 'alpexa-rise 420ms 520ms ease-out both',
-            fontFamily: 'Geist Mono, monospace', fontSize: 10.5,
+            fontFamily: FONT_UI, fontSize: 10.5,
             color: RH.textDim, letterSpacing: 0.4,
           }}>
             <Row label="REFERENCE" value={refData.ref}/>
@@ -2547,7 +2564,7 @@ function SendReview({ recipient, asset, assetId, amount, memo, state, onConfirm,
               }}>View receipt</button>
             <button onClick={onClose} style={{
               flex: 1, padding: '14px 0', borderRadius: 999,
-              background: RH.green, color: '#000', border: 'none',
+              background: RH.acc, color: RH.onAcc, border: 'none',
               fontSize: 13, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.2,
             }}>Done</button>
           </div>
@@ -2566,13 +2583,13 @@ function SendReview({ recipient, asset, assetId, amount, memo, state, onConfirm,
           }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{
-                fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.textDim,
+                fontFamily: FONT_UI, fontSize: 10, color: RH.textDim,
                 letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 2,
               }}>To</div>
               <div style={{ fontSize: 14, fontWeight: 600, color: RH.text, letterSpacing: -0.1 }}>
                 {recipient.name}
               </div>
-              <div style={{ fontSize: 11.5, color: RH.textDim, marginTop: 1, fontFamily: 'Geist Mono, monospace' }}>
+              <div style={{ fontSize: 11.5, color: RH.textDim, marginTop: 1, fontFamily: FONT_UI }}>
                 {recipient.handle}
               </div>
             </div>
@@ -2582,7 +2599,7 @@ function SendReview({ recipient, asset, assetId, amount, memo, state, onConfirm,
           <div style={{ padding: '36px 0 24px', textAlign: 'center' }}>
             <div style={{
               fontSize: 11, color: RH.textDim, fontWeight: 600, letterSpacing: 1.2,
-              textTransform: 'uppercase', fontFamily: 'Geist Mono, monospace', marginBottom: 8,
+              textTransform: 'uppercase', fontFamily: FONT_UI, marginBottom: 8,
             }}>You're sending</div>
             <div style={{
               display: 'inline-flex', alignItems: 'baseline', color: RH.text,
@@ -2595,7 +2612,7 @@ function SendReview({ recipient, asset, assetId, amount, memo, state, onConfirm,
             </div>
             <div style={{
               marginTop: 8, fontSize: 11.5, color: RH.textDim,
-              fontFamily: 'Geist Mono, monospace', letterSpacing: 0.4,
+              fontFamily: FONT_UI, letterSpacing: 0.4,
             }}>
               from {asset.name}
             </div>
@@ -2620,7 +2637,7 @@ function SendReview({ recipient, asset, assetId, amount, memo, state, onConfirm,
               borderRadius: 14, marginBottom: 12,
             }}>
               <div style={{
-                fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.textDim,
+                fontFamily: FONT_UI, fontSize: 10, color: RH.textDim,
                 letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 4,
               }}>Note</div>
               <div style={{ fontSize: 13, color: RH.text }}>{memo}</div>
@@ -2636,7 +2653,7 @@ function SendReview({ recipient, asset, assetId, amount, memo, state, onConfirm,
               disabled={sending}
               style={{
                 width: '100%', padding: '16px 0', borderRadius: 999,
-                background: RH.green, color: '#000', border: 'none',
+                background: RH.acc, color: RH.onAcc, border: 'none',
                 fontSize: 15, fontWeight: 700, letterSpacing: 0.2,
                 cursor: sending ? 'wait' : 'pointer',
                 opacity: sending ? 0.6 : 1,
@@ -2874,7 +2891,7 @@ function Send({ onBack, balances = {}, holdingsQty = {}, onSent }) {
         </div>
 
         {/* Title block */}
-        <div style={{ padding: '18px 22px 4px', textAlign: 'center', fontFamily: 'Geist, Inter, system-ui' }}>
+        <div style={{ padding: '18px 22px 4px', textAlign: 'center', fontFamily: FONT_UI }}>
           <div style={{ fontSize: 22, fontWeight: 700, color: RH.text, letterSpacing: -0.4 }}>Wallet</div>
           <div style={{ marginTop: 6, fontSize: 13, color: RH.textDim }}>
             {introMode === 'scan' ? 'Point camera at recipient’s QR' : 'Send or pay with crypto'}
@@ -2938,7 +2955,7 @@ function Send({ onBack, balances = {}, holdingsQty = {}, onSent }) {
             width: '100%', padding: '15px 0', borderRadius: 999,
             background: RH.text, color: RH.bg, border: 'none',
             fontSize: 14.5, fontWeight: 700, letterSpacing: 0.2, cursor: 'pointer',
-            fontFamily: 'Geist, Inter, system-ui',
+            fontFamily: FONT_UI,
           }}>Enter Manually</button>
         </div>
         </div>
@@ -3010,12 +3027,12 @@ function Send({ onBack, balances = {}, holdingsQty = {}, onSent }) {
           cursor: 'pointer',
         }} onClick={() => setRecipientOpen((o) => !o)}>
           <div style={{
-            fontFamily: 'Geist Mono, monospace', fontSize: 10.5, color: RH.textDim,
+            fontFamily: FONT_UI, fontSize: 10.5, color: RH.textDim,
             letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginRight: 4,
           }}>To</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: RH.text, letterSpacing: -0.1 }}>{recipient.name}</div>
-            <div style={{ fontSize: 11.5, color: RH.textDim, marginTop: 2, fontFamily: 'Geist Mono, monospace' }}>{recipient.handle}</div>
+            <div style={{ fontSize: 11.5, color: RH.textDim, marginTop: 2, fontFamily: FONT_UI }}>{recipient.handle}</div>
           </div>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={RH.textDim} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{
             transform: recipientOpen ? 'rotate(180deg)' : 'rotate(0deg)',
@@ -3043,7 +3060,7 @@ function Send({ onBack, balances = {}, holdingsQty = {}, onSent }) {
                   borderRadius: 12, padding: '11px 14px',
                   color: RH.text, fontSize: 12.5, fontWeight: 500,
                   outline: 'none',
-                  fontFamily: 'Geist Mono, monospace',
+                  fontFamily: FONT_UI,
                   letterSpacing: -0.1,
                   transition: 'border-color 160ms ease',
                 }}
@@ -3053,7 +3070,7 @@ function Send({ onBack, balances = {}, holdingsQty = {}, onSent }) {
                   onClick={confirmAddress}
                   style={{
                     height: 42, padding: '0 14px', borderRadius: 12,
-                    background: RH.green, color: '#000', border: 'none',
+                    background: RH.acc, color: RH.onAcc, border: 'none',
                     fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
                   }}
                 >Use</button>
@@ -3078,7 +3095,7 @@ function Send({ onBack, balances = {}, holdingsQty = {}, onSent }) {
               <div style={{
                 padding: '6px 22px 0',
                 display: 'flex', alignItems: 'center', gap: 6,
-                fontFamily: 'Geist Mono, monospace', fontSize: 10.5,
+                fontFamily: FONT_UI, fontSize: 10.5,
                 color: RH.textDim, letterSpacing: 0.8, textTransform: 'uppercase', fontWeight: 700,
               }}>
                 <span style={{
@@ -3093,7 +3110,7 @@ function Send({ onBack, balances = {}, holdingsQty = {}, onSent }) {
             {/* Section label */}
             {recents.length > 0 ? (<div style={{
               padding: '14px 22px 6px',
-              fontFamily: 'Geist Mono, monospace',
+              fontFamily: FONT_UI,
               fontSize: 10.5, color: RH.textDim,
               letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700,
             }}>Recent</div>) : null}
@@ -3161,7 +3178,7 @@ function Send({ onBack, balances = {}, holdingsQty = {}, onSent }) {
           <div style={{
             marginTop: 10, fontSize: 11.5,
             color: insufficient ? RH.red : RH.textDim,
-            fontFamily: 'Geist Mono, monospace',
+            fontFamily: FONT_UI,
             fontVariantNumeric: 'tabular-nums', letterSpacing: 0.6,
           }}>
             {insufficient
@@ -3211,7 +3228,7 @@ function Send({ onBack, balances = {}, holdingsQty = {}, onSent }) {
             border: `1px solid ${RH.line}`, borderRadius: 12,
             padding: '12px 14px',
             color: RH.text, fontSize: 13.5, fontWeight: 500,
-            outline: 'none', fontFamily: 'Geist, Inter, system-ui',
+            outline: 'none', fontFamily: FONT_UI,
           }}/>
         </div>
 
@@ -3226,7 +3243,7 @@ function Send({ onBack, balances = {}, holdingsQty = {}, onSent }) {
             <button key={k} onClick={() => onKey(k)} style={{
               background: 'transparent', border: 'none', padding: '12px 0',
               color: RH.text, fontSize: 22, fontWeight: 500,
-              letterSpacing: -0.5, cursor: 'pointer', fontFamily: 'Geist, Inter, system-ui',
+              letterSpacing: -0.5, cursor: 'pointer', fontFamily: FONT_UI,
             }}>{k}</button>
           ))}
         </div>
@@ -3461,7 +3478,7 @@ function Receive({ onBack, balances = {}, onReceived }) {
                   color: active ? RH.text : RH.textDim, letterSpacing: -0.1,
                 }}>{t.label}</span>
                 <span style={{
-                  fontFamily: 'Geist Mono, monospace', fontSize: 9.5,
+                  fontFamily: FONT_UI, fontSize: 9.5,
                   color: active ? RH.accent : RH.textMute,
                   letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: 700,
                 }}>{t.sub}</span>
@@ -3527,11 +3544,11 @@ function Receive({ onBack, balances = {}, onReceived }) {
               }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
-                    fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.textDim,
+                    fontFamily: FONT_UI, fontSize: 10, color: RH.textDim,
                     letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6,
                   }}>Your {assetId} deposit address</div>
                   <div style={{
-                    fontFamily: 'Geist Mono, monospace',
+                    fontFamily: FONT_UI,
                     fontSize: 12.5,
                     color: RH.text, fontWeight: 600, letterSpacing: -0.2,
                     lineHeight: 1.4, wordBreak: 'break-all',
@@ -3547,7 +3564,7 @@ function Receive({ onBack, balances = {}, onReceived }) {
                     fontSize: 12, fontWeight: 700, cursor: 'pointer',
                     display: 'inline-flex', alignItems: 'center', gap: 6,
                     transition: 'background 180ms ease, color 180ms ease, border-color 180ms ease',
-                    fontFamily: 'Geist, Inter, system-ui',
+                    fontFamily: FONT_UI,
                   }}
                 >
                   {copied ? (
@@ -3601,7 +3618,7 @@ function Receive({ onBack, balances = {}, onReceived }) {
           }}>
             <div>
               <div style={{
-                fontFamily: 'Geist Mono, monospace', fontSize: 9.5, color: RH.green,
+                fontFamily: FONT_UI, fontSize: 9.5, color: RH.green,
                 letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 2,
               }}>Requesting</div>
               <div style={{
@@ -3629,7 +3646,7 @@ function Receive({ onBack, balances = {}, onReceived }) {
             }}>{requestAmount > 0 ? 'Edit amount' : 'Request amount'}</button>
           <button onClick={onShare} style={{
             flex: 1, padding: '14px 0', borderRadius: 999,
-            background: RH.green, color: '#000', border: 'none',
+            background: RH.acc, color: RH.onAcc, border: 'none',
             fontSize: 13, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.2,
           }}>Share</button>
           {shareToast ? (
@@ -3638,7 +3655,7 @@ function Receive({ onBack, balances = {}, onReceived }) {
               padding: '8px 14px', background: RH.surface,
               border: `1px solid ${RH.line}`,
               color: RH.text, fontSize: 12, fontWeight: 600,
-              borderRadius: 999, fontFamily: 'Geist Mono, monospace',
+              borderRadius: 999, fontFamily: FONT_UI,
               letterSpacing: 0.6, textTransform: 'uppercase', whiteSpace: 'nowrap',
               boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
             }}>{shareToast}</div>
@@ -3651,7 +3668,7 @@ function Receive({ onBack, balances = {}, onReceived }) {
         <div style={{
           position: 'absolute', inset: 0, zIndex: 170,
           background: RH.bg,
-          display: 'flex', flexDirection: 'column', fontFamily: 'Geist, Inter, system-ui',
+          display: 'flex', flexDirection: 'column', fontFamily: FONT_UI,
         }}>
           <div style={{
             padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
@@ -3668,7 +3685,7 @@ function Receive({ onBack, balances = {}, onReceived }) {
           </div>
           <div style={{ padding: '50px 22px 22px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <div style={{
-              fontFamily: 'Geist Mono, monospace', fontSize: 10.5, color: RH.textDim,
+              fontFamily: FONT_UI, fontSize: 10.5, color: RH.textDim,
               letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 14,
             }}>You're requesting {assetId}</div>
             <div style={{
@@ -3692,14 +3709,14 @@ function Receive({ onBack, balances = {}, onReceived }) {
               <button key={k} onClick={() => onReqKey(k)} style={{
                 background: 'transparent', border: 'none', padding: '12px 0',
                 color: RH.text, fontSize: 22, fontWeight: 500,
-                letterSpacing: -0.5, cursor: 'pointer', fontFamily: 'Geist, Inter, system-ui',
+                letterSpacing: -0.5, cursor: 'pointer', fontFamily: FONT_UI,
               }}>{k}</button>
             ))}
           </div>
           <div style={{ padding: '12px 22px 22px' }}>
             <button onClick={applyRequest} style={{
               width: '100%', padding: '16px 0', borderRadius: 999,
-              background: RH.green, color: '#000', border: 'none',
+              background: RH.acc, color: RH.onAcc, border: 'none',
               fontSize: 15, fontWeight: 700, letterSpacing: 0.2, cursor: 'pointer',
             }}>Apply</button>
           </div>
@@ -3834,7 +3851,7 @@ function Stake({ onBack, balances = {}, staked = {}, onStaked, initialAssetId })
             display: 'inline-flex', alignItems: 'center', gap: 6,
           }}>
             <span style={{
-              fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.green,
+              fontFamily: FONT_UI, fontSize: 10, color: RH.green,
               letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700,
             }}>APY</span>
             <span style={{
@@ -3906,7 +3923,7 @@ function Stake({ onBack, balances = {}, staked = {}, onStaked, initialAssetId })
           <div style={{
             marginTop: 8, fontSize: 11,
             color: insufficient ? RH.red : RH.textDim,
-            fontFamily: 'Geist Mono, monospace',
+            fontFamily: FONT_UI,
             fontVariantNumeric: 'tabular-nums', letterSpacing: 0.6,
           }}>
             {insufficient
@@ -3937,7 +3954,7 @@ function Stake({ onBack, balances = {}, staked = {}, onStaked, initialAssetId })
                   fontSize: 12, fontWeight: 700, color: RH.text, letterSpacing: -0.1,
                 }}>{p.label}</span>
                 <span style={{
-                  fontFamily: 'Geist Mono, monospace', fontSize: 9.5,
+                  fontFamily: FONT_UI, fontSize: 9.5,
                   color: active ? RH.green : RH.textDim,
                   letterSpacing: 0.4, fontWeight: 700,
                 }}>{stakePeriodApy(assetId, p.id)}% APY</span>
@@ -3963,7 +3980,7 @@ function Stake({ onBack, balances = {}, staked = {}, onStaked, initialAssetId })
           borderRadius: 14,
         }}>
           <div style={{
-            fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.textDim,
+            fontFamily: FONT_UI, fontSize: 10, color: RH.textDim,
             letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 8,
           }}>You'll earn (estimated)</div>
           <div style={{
@@ -4001,7 +4018,7 @@ function Stake({ onBack, balances = {}, staked = {}, onStaked, initialAssetId })
             <button key={k} onClick={() => onKey(k)} style={{
               background: 'transparent', border: 'none', padding: '12px 0',
               color: RH.text, fontSize: 22, fontWeight: 500,
-              letterSpacing: -0.5, cursor: 'pointer', fontFamily: 'Geist, Inter, system-ui',
+              letterSpacing: -0.5, cursor: 'pointer', fontFamily: FONT_UI,
             }}>{k}</button>
           ))}
         </div>
@@ -4115,7 +4132,7 @@ function Transfer({ onBack, serverBalances = {}, onTransferred }) {
             background: RH.surface, border: `1px solid ${RH.line}`,
             borderRadius: 14,
             display: 'flex', alignItems: 'center', gap: 12, cursor: locked ? 'default' : 'pointer',
-            fontFamily: 'Geist, Inter, system-ui',
+            fontFamily: FONT_UI,
           }}
         >
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -4124,7 +4141,7 @@ function Transfer({ onBack, serverBalances = {}, onTransferred }) {
             </div>
             <div style={{
               marginTop: 3, fontSize: 13, fontWeight: 500, color: RH.textDim,
-              fontFamily: 'Geist Mono, monospace',
+              fontFamily: FONT_UI,
               fontVariantNumeric: 'tabular-nums', letterSpacing: -0.1,
             }}>${bal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           </div>
@@ -4269,7 +4286,7 @@ function Transfer({ onBack, serverBalances = {}, onTransferred }) {
           <div style={{
             marginTop: 8, fontSize: 11,
             color: insufficient ? RH.red : RH.textDim,
-            fontFamily: 'Geist Mono, monospace',
+            fontFamily: FONT_UI,
             fontVariantNumeric: 'tabular-nums', letterSpacing: 0.6,
           }}>
             {insufficient
@@ -4290,7 +4307,7 @@ function Transfer({ onBack, serverBalances = {}, onTransferred }) {
                 color: active ? RH.accent : RH.text,
                 fontSize: 11.5, fontWeight: 700,
                 cursor: 'pointer', letterSpacing: 0.2,
-                fontFamily: 'Geist Mono, monospace',
+                fontFamily: FONT_UI,
                 transition: 'background 160ms ease, color 160ms ease, border-color 160ms ease',
               }}>{l}</button>
             );
@@ -4309,7 +4326,7 @@ function Transfer({ onBack, serverBalances = {}, onTransferred }) {
             <button key={k} onClick={() => onKey(k)} style={{
               background: 'transparent', border: 'none', padding: '12px 0',
               color: RH.text, fontSize: 22, fontWeight: 500,
-              letterSpacing: -0.5, cursor: 'pointer', fontFamily: 'Geist, Inter, system-ui',
+              letterSpacing: -0.5, cursor: 'pointer', fontFamily: FONT_UI,
             }}>{k}</button>
           ))}
         </div>
@@ -4434,14 +4451,14 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
           <div style={{
             background: RH.surface, border: `1px solid ${RH.line}`,
             borderRadius: 14, padding: '14px 16px', marginBottom: 14,
-            fontFamily: 'Geist, Inter, system-ui',
+            fontFamily: FONT_UI,
           }}>
-            <div style={{ fontSize: 11, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700 }}>Withdrawable</div>
+            <div style={{ fontSize: 11, color: RH.textDim, fontFamily: FONT_UI, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700 }}>Withdrawable</div>
             <div style={{ marginTop: 4, fontSize: 24, fontWeight: 700, color: RH.text, letterSpacing: -0.5, fontVariantNumeric: 'tabular-nums' }}>${fmtUsd(availUsd)}</div>
             <div style={{ marginTop: 2, fontSize: 11.5, color: RH.textDim }}>Bonus &amp; locked funds excluded · Crypto / FX / Sports</div>
           </div>
 
-          <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 8 }}>How would you like to receive?</div>
+          <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: FONT_UI, letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 8 }}>How would you like to receive?</div>
 
           {METHODS.map((m, i) => (
             <button key={m.id} onClick={() => { if (m.external) { try { window.open(m.external, '_blank', 'noopener'); } catch (e) {} return; } setMethodUsed(m); setStep(m.id); }} style={{
@@ -4449,7 +4466,7 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
               background: RH.surface, border: `1px solid ${RH.line}`,
               borderRadius: 14, padding: '14px 16px',
               marginBottom: i < METHODS.length - 1 ? 10 : 0,
-              cursor: 'pointer', fontFamily: 'Geist, Inter, system-ui',
+              cursor: 'pointer', fontFamily: FONT_UI,
               display: 'flex', alignItems: 'center', gap: 12,
             }}>
               <div style={{
@@ -4468,7 +4485,7 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color: RH.text, letterSpacing: -0.2 }}>{m.label}</span>
-                  <span style={{ fontSize: 9.5, fontWeight: 700, color: m.accent, fontFamily: 'Geist Mono, monospace', letterSpacing: 0.6, padding: '2px 6px', borderRadius: 4, background: `${m.accent}1F` }}>{m.badge}</span>
+                  <span style={{ fontSize: 9.5, fontWeight: 700, color: m.accent, fontFamily: FONT_UI, letterSpacing: 0.6, padding: '2px 6px', borderRadius: 4, background: `${m.accent}1F` }}>{m.badge}</span>
                 </div>
                 <div style={{ marginTop: 2, fontSize: 11.5, color: RH.textDim }}>{m.sub}</div>
               </div>
@@ -4479,9 +4496,9 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
           <div style={{
             marginTop: 16, padding: '12px 14px',
             background: `${RH.accent}10`, border: `1px solid ${RH.accent}33`,
-            borderRadius: 12, fontFamily: 'Geist, Inter, system-ui',
+            borderRadius: 12, fontFamily: FONT_UI,
           }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: RH.accent, fontFamily: 'Geist Mono, monospace', letterSpacing: 1, textTransform: 'uppercase' }}>Daily limit</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: RH.accent, fontFamily: FONT_UI, letterSpacing: 1, textTransform: 'uppercase' }}>Daily limit</div>
             <div style={{ marginTop: 3, fontSize: 12.5, color: RH.text, fontWeight: 600 }}>${fees.withdrawDailyLimit.toLocaleString('en-US')} · resets midnight UTC</div>
           </div>
         </div>
@@ -4502,7 +4519,7 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
     const renderField = ({label, val, set, ph, mono = false, mode = 'text', maxLen}) => (
       <div style={{ marginBottom: 10 }}>
         <div style={{
-          fontSize: 10, color: RH.textDim, fontFamily: 'Geist Mono, monospace',
+          fontSize: 10, color: RH.textDim, fontFamily: FONT_UI,
           letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700, marginBottom: 4,
         }}>{label}</div>
         <input
@@ -4551,7 +4568,7 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
 
         <div className="alpexa-hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '4px 22px calc(20px + env(safe-area-inset-bottom, 0px))' }}>
           {/* Source picker */}
-          <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 8 }}>Withdraw from</div>
+          <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: FONT_UI, letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 8 }}>Withdraw from</div>
           <div style={{
             background: RH.surface, border: `1px solid ${RH.line}`,
             borderRadius: 12, padding: 4, marginBottom: 14,
@@ -4564,9 +4581,9 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
                 <button key={sid} onClick={() => setSourceId(sid)} style={{
                   background: active ? RH.surfaceUp : 'transparent', border: 'none',
                   padding: '8px 4px', borderRadius: 8, cursor: 'pointer',
-                  fontFamily: 'Geist, Inter, system-ui', textAlign: 'center',
+                  fontFamily: FONT_UI, textAlign: 'center',
                 }}>
-                  <div style={{ fontSize: 10.5, color: active ? RH.accent : RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 0.8, textTransform: 'uppercase', fontWeight: 700 }}>{sid === 'crypto' ? 'Crypto' : sid === 'fx' ? 'FX' : 'Sports'}</div>
+                  <div style={{ fontSize: 10.5, color: active ? RH.accent : RH.textDim, fontFamily: FONT_UI, letterSpacing: 0.8, textTransform: 'uppercase', fontWeight: 700 }}>{sid === 'crypto' ? 'Crypto' : sid === 'fx' ? 'FX' : 'Sports'}</div>
                   <div style={{ marginTop: 2, fontSize: 12, color: RH.text, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>${fmtUsd(bal)}</div>
                 </button>
               );
@@ -4574,13 +4591,13 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
           </div>
 
           {/* Destination — full bank info for ACH/Wire, card-on-file for Card */}
-          <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Destination</div>
+          <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: FONT_UI, letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Destination</div>
           {step === 'card' ? (
             <input value={debitCard} onChange={(e) => setDebitCard(e.target.value)} style={{
               width: '100%', boxSizing: 'border-box',
               background: RH.surface, border: `1px solid ${RH.line}`,
               borderRadius: 12, padding: '12px 14px', color: RH.text,
-              fontSize: 14, fontWeight: 600, fontFamily: 'Geist Mono, monospace',
+              fontSize: 14, fontWeight: 600, fontFamily: FONT_UI,
               marginBottom: 14, outline: 'none',
             }} onFocus={(e) => (e.currentTarget.style.borderColor = RH.accent)}
                onBlur={(e) => (e.currentTarget.style.borderColor = RH.line)}/>
@@ -4602,7 +4619,7 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
           )}
 
           {/* Amount */}
-          <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Amount (USD)</div>
+          <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: FONT_UI, letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Amount (USD)</div>
           <div style={{
             background: RH.surface, border: `1px solid ${amount > srcBal ? RH.red : RH.line}`,
             borderRadius: 14, padding: '20px 14px', textAlign: 'center', marginBottom: 10,
@@ -4612,7 +4629,7 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
               size={36}
               tint={amount > srcBal ? RH.red : RH.text}
             />
-            <div style={{ marginTop: 8, fontSize: 11, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 0.4 }}>
+            <div style={{ marginTop: 8, fontSize: 11, color: RH.textDim, fontFamily: FONT_UI, letterSpacing: 0.4 }}>
               Available ${fmtUsd(srcBal)}
             </div>
           </div>
@@ -4629,7 +4646,7 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
                 padding: '8px 0', borderRadius: 999,
                 background: RH.surface, border: `1px solid ${RH.line}`,
                 color: RH.text, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                fontFamily: 'Geist, Inter, system-ui',
+                fontFamily: FONT_UI,
               }}>{c.label}</button>
             ))}
           </div>
@@ -4645,7 +4662,7 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
                 padding: '14px 0', borderRadius: 12,
                 background: RH.surface, border: `1px solid ${RH.line}`,
                 color: RH.text, fontSize: 18, fontWeight: 600, cursor: 'pointer',
-                fontFamily: 'Geist Mono, monospace',
+                fontFamily: FONT_UI,
               }}>{k}</button>
             ))}
           </div>
@@ -4654,7 +4671,7 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
           <div style={{
             marginTop: 14, padding: '12px 14px',
             background: RH.surface, border: `1px solid ${RH.line}`,
-            borderRadius: 12, fontFamily: 'Geist, Inter, system-ui',
+            borderRadius: 12, fontFamily: FONT_UI,
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
               <span style={{ fontSize: 12, color: RH.textDim }}>Fee</span>
@@ -4676,7 +4693,7 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
             border: 'none',
             fontSize: 14, fontWeight: 700, letterSpacing: 0.2,
             cursor: valid ? 'pointer' : 'not-allowed',
-            fontFamily: 'Geist, Inter, system-ui',
+            fontFamily: FONT_UI,
           }}>
             {amount === 0 ? 'Enter amount' :
              amount > srcBal ? 'Insufficient balance' :
@@ -4739,7 +4756,7 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
             <div style={{
               position: 'relative', zIndex: 1, marginTop: 70,
               fontSize: 11, color: 'rgba(255,255,255,0.78)',
-              fontFamily: 'Geist Mono, monospace', letterSpacing: 1.4,
+              fontFamily: FONT_UI, letterSpacing: 1.4,
               textTransform: 'uppercase', fontWeight: 700,
             }}>Confirm withdrawal</div>
             <div style={{
@@ -4749,7 +4766,7 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
             <div style={{
               position: 'relative', zIndex: 1, marginTop: 12,
               fontSize: 13, color: 'rgba(255,255,255,0.78)',
-              fontFamily: 'Geist Mono, monospace', letterSpacing: 0.3,
+              fontFamily: FONT_UI, letterSpacing: 0.3,
             }}>via {m.label}</div>
           </div>
 
@@ -4757,7 +4774,7 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
           <div className="alpexa-hide-scrollbar" style={{
             background: 'transparent', padding: '40px 26px 16px', flex: 1,
             overflowY: 'auto', minHeight: 0,
-            fontFamily: 'Geist, Inter, system-ui', position: 'relative', zIndex: 1,
+            fontFamily: FONT_UI, position: 'relative', zIndex: 1,
           }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '22px 24px' }}>
               {[
@@ -4769,7 +4786,7 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
                 { label: 'Arrival', value: arrival },
               ].map((r, i) => (
                 <div key={i}>
-                  <div style={{ fontSize: 11, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 0.3, textTransform: 'uppercase', fontWeight: 700 }}>{r.label}</div>
+                  <div style={{ fontSize: 11, color: RH.textDim, fontFamily: FONT_UI, letterSpacing: 0.3, textTransform: 'uppercase', fontWeight: 700 }}>{r.label}</div>
                   <div style={{ marginTop: 4, fontSize: 14.5, color: RH.text, fontVariantNumeric: 'tabular-nums', letterSpacing: -0.2, fontWeight: 500, wordBreak: 'break-word' }}>{r.value}</div>
                 </div>
               ))}
@@ -4779,9 +4796,9 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
               <div style={{
                 marginTop: 22, padding: '14px 16px',
                 background: RH.surface, border: `1px solid ${RH.line}`,
-                borderRadius: 14, fontFamily: 'Geist, Inter, system-ui',
+                borderRadius: 14, fontFamily: FONT_UI,
               }}>
-                <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700, marginBottom: 10 }}>Beneficiary</div>
+                <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: FONT_UI, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700, marginBottom: 10 }}>Beneficiary</div>
                 {(m.id === 'ach'
                   ? [
                       { label: 'Bank',    value: achBank },
@@ -4824,13 +4841,13 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
               flex: 1, padding: '15px 0', borderRadius: 999,
               background: RH.surfaceUp, color: RH.text, border: 'none',
               fontSize: 14, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.2,
-              fontFamily: 'Geist, Inter, system-ui',
+              fontFamily: FONT_UI,
             }}>Cancel</button>
             <button onClick={proceed} style={{
               flex: 1, padding: '15px 0', borderRadius: 999,
               background: RH.text, color: RH.bg, border: 'none',
               fontSize: 14, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.2,
-              fontFamily: 'Geist, Inter, system-ui',
+              fontFamily: FONT_UI,
             }}>Verify & send</button>
           </div>
         </div>
@@ -5065,7 +5082,7 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
         <Header title="Add funds" back={onBack}/>
         <div style={{ padding: '8px 22px 0', flex: 1 }}>
           <div style={{
-            fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.textDim,
+            fontFamily: FONT_UI, fontSize: 10, color: RH.textDim,
             letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 8,
           }}>Choose method</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -5123,7 +5140,7 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
         {amount > 0 ? (
           <div style={{
             marginTop: 6, fontSize: 11, color: RH.textDim,
-            fontFamily: 'Geist Mono, monospace', letterSpacing: 0.4,
+            fontFamily: FONT_UI, letterSpacing: 0.4,
             fontVariantNumeric: 'tabular-nums',
           }}>{(() => {
             const f = feeFor(step);
@@ -5138,7 +5155,7 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
             background: RH.surface, border: `1px solid ${RH.line}`,
             color: RH.text, fontSize: 11.5, fontWeight: 600,
             cursor: 'pointer', letterSpacing: 0.2,
-            fontFamily: 'Geist Mono, monospace',
+            fontFamily: FONT_UI,
             fontVariantNumeric: 'tabular-nums',
           }}>${v}</button>
         ))}
@@ -5151,7 +5168,7 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
           display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
         }}>
           <div style={{
-            fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.textDim,
+            fontFamily: FONT_UI, fontSize: 10, color: RH.textDim,
             letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, width: 24, flexShrink: 0,
           }}>TO</div>
           <div style={{
@@ -5216,7 +5233,7 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
           <button key={k} onClick={() => onKey(k)} style={{
             background: 'transparent', border: 'none', padding: '8px 0',
             color: RH.text, fontSize: 22, fontWeight: 500,
-            letterSpacing: -0.5, cursor: 'pointer', fontFamily: 'Geist, Inter, system-ui',
+            letterSpacing: -0.5, cursor: 'pointer', fontFamily: FONT_UI,
           }}>{k}</button>
         ))}
       </div>
@@ -5249,7 +5266,7 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
       try { b.textContent = 'Got it — we will confirm shortly ✓'; b.disabled = true; b.style.opacity = '0.7'; } catch (_) {}
     };
     const copyAddr = (e) => { try { navigator.clipboard.writeText(addr); } catch (_) {} const b = e.currentTarget; const o = b.textContent; b.textContent = 'Copied'; setTimeout(() => { try { b.textContent = o; } catch (_) {} }, 1400); };
-    const label = (t) => (<div style={{ fontSize: 11, letterSpacing: 1.6, fontWeight: 700, color: RH.textDim, fontFamily: 'Geist Mono, monospace', textTransform: 'uppercase', marginBottom: 12 }}>{t}</div>);
+    const label = (t) => (<div style={{ fontSize: 11, letterSpacing: 1.6, fontWeight: 700, color: RH.textDim, fontFamily: FONT_UI, textTransform: 'uppercase', marginBottom: 12 }}>{t}</div>);
     return (
       <Phone width={390} height={844} bg={RH.bg}>
         <StatusBar/>
@@ -5261,20 +5278,20 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
             <span style={{ fontSize: 40, fontWeight: 800, color: RH.text, marginRight: 4, letterSpacing: -1 }}>$</span>
             <input type="text" inputMode="decimal" value={amountStr === '0' ? '' : amountStr}
               onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ''); setAmountStr(v === '' ? '0' : v); }}
-              placeholder="0" style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', color: RH.text, fontSize: 44, fontWeight: 800, letterSpacing: -1.5, fontFamily: 'Geist, Inter, system-ui' }}/>
+              placeholder="0" style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', color: RH.text, fontSize: 44, fontWeight: 800, letterSpacing: -1.5, fontFamily: FONT_UI }}/>
             <span style={{ fontSize: 14, fontWeight: 600, color: RH.textDim }}>USD</span>
           </div>
 
           {/* Buy */}
           {label('Buy USDT with your card')}
-          <button onClick={() => openProvider('https://www.moonpay.com/buy')} style={{ width: '100%', padding: '17px 0', borderRadius: 18, background: RH.accent, color: '#fff', border: 'none', fontSize: 16.5, fontWeight: 700, letterSpacing: 0.2, cursor: 'pointer' }}>Buy USDT with card</button>
+          <button onClick={() => openProvider('https://www.moonpay.com/buy')} style={{ width: '100%', padding: '17px 0', borderRadius: 18, background: RH.acc, color: RH.onAcc, border: 'none', fontSize: 16.5, fontWeight: 700, letterSpacing: 0.2, cursor: 'pointer' }}>Buy USDT with card</button>
           <button onClick={() => openProvider('https://portfolio.metamask.io/buy')} style={{ display: 'block', margin: '14px auto 32px', background: 'none', border: 'none', color: RH.textDim, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>or use MetaMask</button>
 
           {/* Send to */}
           {label('Send to')}
           <div style={{ background: RH.surface, borderRadius: 18, padding: '16px 18px', marginBottom: 32, display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: 'Geist Mono, monospace', fontSize: 14.5, color: RH.text, fontWeight: 600 }}>{shortAddr}</div>
+              <div style={{ fontFamily: FONT_UI, fontSize: 14.5, color: RH.text, fontWeight: 600 }}>{shortAddr}</div>
               <div style={{ fontSize: 12, color: RH.textDim, marginTop: 3 }}>USDT · Ethereum (ERC-20) only</div>
             </div>
             <button onClick={copyAddr} style={{ flexShrink: 0, padding: '9px 18px', borderRadius: 18, background: RH.text, color: RH.bg, border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Copy</button>
@@ -5298,7 +5315,7 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
         <div className="alpexa-hide-scrollbar" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '4px 22px 0' }}>
             <div style={{
-              fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.textDim,
+              fontFamily: FONT_UI, fontSize: 10, color: RH.textDim,
               letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 8,
             }}>From linked account</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -5335,7 +5352,7 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
                       </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: RH.text }}>{b.bank}</div>
-                        <div style={{ fontSize: 11, color: RH.textDim, marginTop: 1, fontFamily: 'Geist Mono, monospace' }}>•••• {b.tail}</div>
+                        <div style={{ fontSize: 11, color: RH.textDim, marginTop: 1, fontFamily: FONT_UI }}>•••• {b.tail}</div>
                       </div>
                       {active ? (
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={RH.green} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
@@ -5411,7 +5428,7 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
             <div style={{
               position: 'absolute', inset: 0, zIndex: 200,
               background: RH.bg, display: 'flex', flexDirection: 'column',
-              fontFamily: 'Geist, Inter, system-ui',
+              fontFamily: FONT_UI,
             }}>
               <div style={{
                 padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
@@ -5440,7 +5457,7 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
                 ].map((f) => (
                   <div key={f.label} style={{ marginBottom: 14 }}>
                     <div style={{
-                      fontSize: 10.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace',
+                      fontSize: 10.5, color: RH.textDim, fontFamily: FONT_UI,
                       letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6,
                     }}>{f.label}</div>
                     <input value={f.val} onChange={(e) => f.set(e.target.value)}
@@ -5450,7 +5467,7 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
                         background: RH.surface, border: `1px solid ${RH.line}`,
                         borderRadius: 10, padding: '12px 14px', color: RH.text,
                         fontSize: 14, fontWeight: 600,
-                        fontFamily: f.inputMode === 'numeric' ? 'Geist Mono, monospace' : 'Geist, Inter, system-ui',
+                        fontFamily: f.inputMode === 'numeric' ? FONT_UI : FONT_UI,
                         outline: 'none',
                       }}
                       onFocus={(e) => (e.currentTarget.style.borderColor = RH.accent)}
@@ -5472,7 +5489,7 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
                   color: valid ? '#fff' : RH.textMute,
                   border: 'none', cursor: valid ? 'pointer' : 'not-allowed',
                   fontSize: 14, fontWeight: 700, letterSpacing: 0.2,
-                  fontFamily: 'Geist, Inter, system-ui',
+                  fontFamily: FONT_UI,
                 }}>{valid ? 'Link bank account' : 'Fill in all fields'}</button>
               </div>
             </div>
@@ -5493,12 +5510,12 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
         <div className="alpexa-hide-scrollbar" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '14px 22px 0' }}>
             {/* Amount — tap to type (native keyboard); no custom keypad */}
-            <div style={{ fontSize: 10, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Amount you'll send</div>
+            <div style={{ fontSize: 10, color: RH.textDim, fontFamily: FONT_UI, letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Amount you'll send</div>
             <div style={{ display: 'flex', alignItems: 'center', borderBottom: '2px solid ' + RH.line, paddingBottom: 8, marginBottom: 8 }}>
               <span style={{ fontSize: 34, fontWeight: 800, color: RH.text, marginRight: 4, opacity: 0.55 }}>$</span>
               <input type="text" inputMode="decimal" value={amountStr === '0' ? '' : amountStr}
                 onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ''); setAmountStr(v === '' ? '0' : v); }}
-                placeholder="0" style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', color: RH.text, fontSize: 40, fontWeight: 800, letterSpacing: -1.5, fontFamily: 'Geist, Inter, system-ui' }}/>
+                placeholder="0" style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', color: RH.text, fontSize: 40, fontWeight: 800, letterSpacing: -1.5, fontFamily: FONT_UI }}/>
             </div>
             <div style={{ fontSize: 12, color: RH.textDim, marginBottom: 22 }}>Tap to enter how much you are wiring</div>
 
@@ -5507,7 +5524,7 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 12, borderBottom: '1px solid ' + RH.line, marginBottom: 12 }}>
                 <span style={{ fontSize: 13, color: RH.red, fontWeight: 600 }}>Reference</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontFamily: 'Geist Mono, monospace', fontSize: 14, fontWeight: 800, color: RH.red, letterSpacing: 0.5 }}>{WIRE_INFO.reference}</span>
+                  <span style={{ fontFamily: FONT_UI, fontSize: 14, fontWeight: 800, color: RH.red, letterSpacing: 0.5 }}>{WIRE_INFO.reference}</span>
                   <button onClick={copyRef} style={{ background: 'none', border: 'none', color: RH.accent, fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: 0 }}>Copy</button>
                 </div>
               </div>
@@ -5529,7 +5546,7 @@ function Funds({ onBack, serverBalances = {}, onFunded, savedCards: pSavedCards,
             {/* Destination — white card */}
             <div style={{ position: 'relative', marginTop: 12 }}>
               <div onClick={() => setDestOpen((o) => !o)} style={{ padding: '12px 14px', background: RH.bg, border: '1px solid ' + RH.line, borderRadius: 14, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                <div style={{ fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.textDim, letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, width: 24, flexShrink: 0 }}>TO</div>
+                <div style={{ fontFamily: FONT_UI, fontSize: 10, color: RH.textDim, letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, width: 24, flexShrink: 0 }}>TO</div>
                 <div style={{ width: 24, height: 24, borderRadius: 12, background: RH.surfaceUp, border: '1px solid ' + RH.line, color: RH.text, fontWeight: 700, fontSize: 9, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{SERVERS[destId].code}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: RH.text }}>{SERVERS[destId].label}</div>
@@ -5593,7 +5610,7 @@ function SuccessOverlay({ state }) {
       background: RH.bg,
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', padding: '70px 28px 28px',
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
     }}>
       <div style={{
         width: 96, height: 96, borderRadius: 48,
@@ -5608,7 +5625,7 @@ function SuccessOverlay({ state }) {
       </div>
       <div style={{
         marginTop: 22, fontSize: 11, color: RH.textDim, fontWeight: 700,
-        letterSpacing: 1.4, textTransform: 'uppercase', fontFamily: 'Geist Mono, monospace',
+        letterSpacing: 1.4, textTransform: 'uppercase', fontFamily: FONT_UI,
       }}>{label}</div>
       <div style={{
         marginTop: 6, fontSize: 32, fontWeight: 600, color: RH.text,
@@ -5622,7 +5639,7 @@ function SuccessOverlay({ state }) {
           marginTop: 14, padding: '8px 14px',
           background: `${RH.accent}14`, border: `1px solid ${RH.accent}40`,
           borderRadius: 999,
-          fontFamily: 'Geist Mono, monospace', fontSize: 10.5,
+          fontFamily: FONT_UI, fontSize: 10.5,
           color: RH.accent, letterSpacing: 0.8, textTransform: 'uppercase', fontWeight: 700,
         }}>{arrival}</div>
       ) : null}
@@ -5858,7 +5875,7 @@ function Swap({ onBack, balances = {}, onSwapped }) {
                 <div style={{ fontSize: 13, fontWeight: 600, color: RH.text }}>
                   {(typeof COIN_NAMES !== 'undefined' && COIN_NAMES[a.sym]) || a.name || a.sym}
                 </div>
-                <div style={{ fontSize: 11, color: RH.textDim, marginTop: 1, fontFamily: 'Geist Mono, monospace', fontVariantNumeric: 'tabular-nums' }}>
+                <div style={{ fontSize: 11, color: RH.textDim, marginTop: 1, fontFamily: FONT_UI, fontVariantNumeric: 'tabular-nums' }}>
                   ${(a.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
@@ -5908,12 +5925,12 @@ function Swap({ onBack, balances = {}, onSwapped }) {
               marginBottom: 8,
             }}>
               <div style={{
-                fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.textDim,
+                fontFamily: FONT_UI, fontSize: 10, color: RH.textDim,
                 letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700,
               }}>From</div>
               <div style={{
                 fontSize: 11, color: RH.textDim,
-                fontFamily: 'Geist Mono, monospace', fontVariantNumeric: 'tabular-nums',
+                fontFamily: FONT_UI, fontVariantNumeric: 'tabular-nums',
               }}>Balance ${fromBalanceUsd.toFixed(2)}</div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -5940,7 +5957,7 @@ function Swap({ onBack, balances = {}, onSwapped }) {
                 }}>{amountStr}</div>
                 <div style={{
                   marginTop: 2, fontSize: 11, color: RH.textDim,
-                  fontFamily: 'Geist Mono, monospace', fontVariantNumeric: 'tabular-nums',
+                  fontFamily: FONT_UI, fontVariantNumeric: 'tabular-nums',
                 }}>≈ ${fromUsd.toFixed(2)}</div>
               </div>
             </div>
@@ -5950,7 +5967,7 @@ function Swap({ onBack, balances = {}, onSwapped }) {
                   flex: 1, padding: '6px 0', borderRadius: 999,
                   background: 'transparent', border: `1px solid ${RH.line}`,
                   color: RH.textDim, fontSize: 10.5, fontWeight: 700,
-                  fontFamily: 'Geist Mono, monospace', letterSpacing: 0.4,
+                  fontFamily: FONT_UI, letterSpacing: 0.4,
                   cursor: 'pointer',
                 }}>{f === 1 ? 'MAX' : `${f * 100}%`}</button>
               ))}
@@ -5981,7 +5998,7 @@ function Swap({ onBack, balances = {}, onSwapped }) {
             borderRadius: 14, padding: 14,
           }}>
             <div style={{
-              fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.textDim,
+              fontFamily: FONT_UI, fontSize: 10, color: RH.textDim,
               letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700,
               marginBottom: 8,
             }}>To</div>
@@ -6008,7 +6025,7 @@ function Swap({ onBack, balances = {}, onSwapped }) {
                 }}>{toCoin.toFixed(toCoin < 1 ? 6 : 4).replace(/\.?0+$/, '') || '0'}</div>
                 <div style={{
                   marginTop: 2, fontSize: 11, color: RH.textDim,
-                  fontFamily: 'Geist Mono, monospace', fontVariantNumeric: 'tabular-nums',
+                  fontFamily: FONT_UI, fontVariantNumeric: 'tabular-nums',
                 }}>≈ ${toUsd.toFixed(2)}</div>
               </div>
             </div>
@@ -6021,7 +6038,7 @@ function Swap({ onBack, balances = {}, onSwapped }) {
           <div style={{
             background: RH.surface, border: `1px solid ${RH.line}`,
             borderRadius: 12, padding: '10px 14px',
-            fontFamily: 'Geist Mono, monospace', fontSize: 11,
+            fontFamily: FONT_UI, fontSize: 11,
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' }}>
               <span style={{ color: RH.textDim, letterSpacing: 0.3 }}>Rate</span>
@@ -6045,7 +6062,7 @@ function Swap({ onBack, balances = {}, onSwapped }) {
                       border: `1px solid ${active ? RH.accent : RH.line}`,
                       color: active ? '#fff' : RH.textDim,
                       fontSize: 10.5, fontWeight: 700, cursor: 'pointer',
-                      fontFamily: 'Geist Mono, monospace', letterSpacing: 0.3,
+                      fontFamily: FONT_UI, letterSpacing: 0.3,
                     }}>{(s * 100).toFixed(1)}%</button>
                   );
                 })}
@@ -6062,9 +6079,9 @@ function Swap({ onBack, balances = {}, onSwapped }) {
         }}>
           {['1','2','3','4','5','6','7','8','9','.','0','⌫'].map((k) => (
             <button key={k} onClick={() => onKey(k)} style={{
-              background: 'transparent', border: 'none', padding: '10px 0',
-              color: RH.text, fontSize: 20, fontWeight: 500,
-              letterSpacing: -0.5, cursor: 'pointer', fontFamily: 'Geist, Inter, system-ui',
+              background: 'transparent', border: 'none', padding: '8px 0',
+              color: RH.text, fontSize: 28, fontWeight: 300,
+              letterSpacing: -0.5, cursor: 'pointer', fontFamily: FONT_UI,
             }}>{k}</button>
           ))}
         </div>
@@ -6170,7 +6187,7 @@ function Discover({ onPickAsset, onPickStakeInfo, tabBar }) {
         padding: '10px 20px', display: 'grid',
         gridTemplateColumns: '1fr auto 1fr',
         alignItems: 'center', gap: 10,
-        cursor: 'pointer', fontFamily: 'Geist, Inter, system-ui',
+        cursor: 'pointer', fontFamily: FONT_UI,
       }}>
         <div style={{ minWidth: 0, justifySelf: 'start' }}>
           <div style={{
@@ -6219,12 +6236,11 @@ function Discover({ onPickAsset, onPickStakeInfo, tabBar }) {
       <button onClick={() => onPickAsset && onPickAsset(m.sym)} style={{
         flex: '0 0 auto', width: 126,
         background: RH.surface,
-        border: `1px solid ${RH.accent}`,
-        borderRadius: 12, padding: '10px',
+        border: 'none',
+        borderRadius: 18, padding: '12px',
         cursor: 'pointer', textAlign: 'left',
         scrollSnapAlign: 'start',
-        fontFamily: 'Geist, Inter, system-ui',
-        boxShadow: `inset 0 0 0 1px ${RH.accent}22, 0 4px 12px -8px ${RH.accent}55`,
+        fontFamily: FONT_UI,
       }}>
         <div style={{
           fontSize: 13.5, fontWeight: 700, color: RH.text, letterSpacing: -0.15,
@@ -6281,7 +6297,7 @@ function Discover({ onPickAsset, onPickStakeInfo, tabBar }) {
           <input value={query} onChange={(e) => setQuery(e.target.value)}
             placeholder="Search Alpexa..." style={{
               flex: 1, background: 'transparent', border: 'none',
-              color: RH.text, fontSize: 14.5, fontFamily: 'Geist, Inter, system-ui',
+              color: RH.text, fontSize: 14.5, fontFamily: FONT_UI,
               outline: 'none',
             }}/>
         </div>
@@ -6321,7 +6337,7 @@ function Discover({ onPickAsset, onPickStakeInfo, tabBar }) {
             background: '#0E0F14',
             border: `1px solid ${RH.line}`,
             borderRadius: 16,
-            fontFamily: 'Geist, Inter, system-ui',
+            fontFamily: FONT_UI,
             cursor: 'pointer',
           }}>
             {/* Decorative graphic (right side) */}
@@ -6379,7 +6395,7 @@ function Discover({ onPickAsset, onPickStakeInfo, tabBar }) {
             borderTop: i === 0 ? 'none' : `1px solid ${RH.line}`,
             padding: '12px 22px',
             display: 'flex', alignItems: 'center', gap: 14,
-            cursor: 'pointer', fontFamily: 'Geist, Inter, system-ui',
+            cursor: 'pointer', fontFamily: FONT_UI,
           }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: RH.text }}>
@@ -6428,8 +6444,8 @@ function Discover({ onPickAsset, onPickStakeInfo, tabBar }) {
         <div style={{ padding: '0 22px 6px' }}>
           <div className="alpexa-hide-scrollbar" style={{
             display: 'inline-flex',
-            background: RH.surface, border: `1px solid ${RH.line}`,
-            borderRadius: 999, padding: 3, gap: 0,
+            background: RH.surface, border: 'none',
+            borderRadius: 18, padding: 2, gap: 2,
             overflowX: 'auto', overflowY: 'hidden',
             maxWidth: '100%',
           }}>
@@ -6438,15 +6454,14 @@ function Discover({ onPickAsset, onPickStakeInfo, tabBar }) {
               return (
                 <button key={f.id} onClick={() => setFilter(f.id)} style={{
                   flexShrink: 0,
-                  background: active ? RH.surfaceUp : 'transparent',
+                  background: active ? RH.acc : 'transparent',
                   border: 'none', cursor: 'pointer',
-                  padding: '7px 14px', borderRadius: 999,
-                  color: active ? RH.text : RH.textDim,
-                  fontSize: 13.5, fontWeight: active ? 700 : 600,
-                  fontFamily: 'Geist, Inter, system-ui',
+                  padding: '0 16px', height: 32, borderRadius: 16,
+                  color: active ? RH.onAcc : RH.text,
+                  fontSize: 14, fontWeight: active ? 600 : 500,
+                  fontFamily: FONT_UI,
                   letterSpacing: -0.1,
                   whiteSpace: 'nowrap',
-                  boxShadow: active ? `inset 0 0 0 1px ${RH.line}` : 'none',
                   transition: 'background 160ms ease, color 160ms ease',
                 }}>
                   {f.id}
@@ -6514,7 +6529,7 @@ function AcctSection({ title, children }) {
     <div style={{ marginBottom: 18 }}>
       {title ? (
         <div style={{
-          fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.textDim,
+          fontFamily: FONT_UI, fontSize: 10, color: RH.textDim,
           letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700,
           marginBottom: 6, padding: '0 2px',
         }}>{title}</div>
@@ -6534,7 +6549,7 @@ function AcctRow({ label, value, sub, chevron = true, status, statusColor, onCli
       borderTop: '1px solid transparent',
       padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12,
       cursor: onClick ? 'pointer' : 'default',
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13.5, fontWeight: 500, color: RH.text, letterSpacing: -0.15 }}>{label}</div>
@@ -6545,7 +6560,7 @@ function AcctRow({ label, value, sub, chevron = true, status, statusColor, onCli
       {value ? (
         <div style={{
           fontSize: 12.5, color: RH.text, fontWeight: 500,
-          fontFamily: 'Geist Mono, monospace', fontVariantNumeric: 'tabular-nums',
+          fontFamily: FONT_UI, fontVariantNumeric: 'tabular-nums',
         }}>{value}</div>
       ) : null}
       {status ? (
@@ -6553,7 +6568,7 @@ function AcctRow({ label, value, sub, chevron = true, status, statusColor, onCli
           fontSize: 10.5, fontWeight: 700, color: statusColor || RH.green,
           background: `${statusColor || RH.green}22`,
           padding: '2px 8px', borderRadius: 999,
-          fontFamily: 'Geist Mono, monospace', letterSpacing: 0.6,
+          fontFamily: FONT_UI, letterSpacing: 0.6,
           textTransform: 'uppercase',
         }}>{status}</div>
       ) : null}
@@ -6573,7 +6588,7 @@ function AcctToggle({ label, sub, on, onChange }) {
   return (
     <div style={{
       padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12,
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13.5, fontWeight: 500, color: RH.text }}>{label}</div>
@@ -6614,10 +6629,10 @@ function ToastHost({ message }) {
       pointerEvents: 'none',
     }}>
       <div style={{
-        background: RH.accent, color: '#fff',
+        background: RH.acc, color: RH.onAcc,
         padding: '10px 18px', borderRadius: 999,
         fontSize: 12.5, fontWeight: 700, letterSpacing: 0.3,
-        fontFamily: 'Geist, Inter, system-ui',
+        fontFamily: FONT_UI,
         boxShadow: `0 8px 24px ${RH.accent}55`,
       }}>{message}</div>
     </div>
@@ -6628,10 +6643,10 @@ function ToastHost({ message }) {
 function AcctInput({ label, defaultValue = '', value, onChange, placeholder, type = 'text', inputRef }) {
   const controlled = onChange != null;
   return (
-    <div style={{ padding: '12px 16px', fontFamily: 'Geist, Inter, system-ui' }}>
+    <div style={{ padding: '12px 16px', fontFamily: FONT_UI }}>
       <div style={{
         fontSize: 10.5, color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2,
+        fontFamily: FONT_UI, letterSpacing: 1.2,
         textTransform: 'uppercase', fontWeight: 700, marginBottom: 6,
       }}>{label}</div>
       <input ref={inputRef} type={type}
@@ -6640,7 +6655,7 @@ function AcctInput({ label, defaultValue = '', value, onChange, placeholder, typ
         width: '100%', background: 'transparent', border: 'none',
         color: RH.text, fontSize: 14, fontWeight: 500,
         outline: 'none', padding: 0,
-        fontFamily: 'Geist, Inter, system-ui',
+        fontFamily: FONT_UI,
       }}/>
     </div>
   );
@@ -6682,17 +6697,17 @@ function MailingAddressPanel({ onSaved }) {
 }
 function AcctTextarea({ label, placeholder, rows = 4, value, onChange }) {
   return (
-    <div style={{ padding: '12px 16px', fontFamily: 'Geist, Inter, system-ui' }}>
+    <div style={{ padding: '12px 16px', fontFamily: FONT_UI }}>
       <div style={{
         fontSize: 10.5, color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2,
+        fontFamily: FONT_UI, letterSpacing: 1.2,
         textTransform: 'uppercase', fontWeight: 700, marginBottom: 6,
       }}>{label}</div>
       <textarea placeholder={placeholder} rows={rows} value={value} onChange={onChange} style={{
         width: '100%', background: 'transparent', border: 'none',
         color: RH.text, fontSize: 14, fontWeight: 500,
         outline: 'none', padding: 0, resize: 'none',
-        fontFamily: 'Geist, Inter, system-ui',
+        fontFamily: FONT_UI,
       }}/>
     </div>
   );
@@ -6724,7 +6739,7 @@ function AcctPolicyText({ children }) {
   return (
     <div style={{
       fontSize: 13.5, color: RH.text, lineHeight: 1.6,
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
     }}>{children}</div>
   );
 }
@@ -6737,7 +6752,7 @@ function AcctSaveButton({ label = 'Save', onClick, disabled = false }) {
       border: 'none',
       fontSize: 14, fontWeight: 700, letterSpacing: 0.2,
       cursor: disabled ? 'not-allowed' : 'pointer',
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
     }}>{label}</button>
   );
 }
@@ -6903,7 +6918,7 @@ function HelpCenterPanel() {
           style={{
             flex: 1, background: 'transparent', border: 'none', outline: 'none',
             padding: '12px 0', color: RH.text, fontSize: 13,
-            fontFamily: 'Geist, Inter, system-ui',
+            fontFamily: FONT_UI,
           }}/>
         {query ? (
           <button onClick={() => setQuery('')} style={{
@@ -6924,7 +6939,7 @@ function HelpCenterPanel() {
         {searchHits.length === 0 ? (
           <div style={{
             padding: 24, textAlign: 'center', color: RH.textDim,
-            fontSize: 13, fontFamily: 'Geist, Inter, system-ui',
+            fontSize: 13, fontFamily: FONT_UI,
           }}>No results for "{query}".</div>
         ) : (
           <AcctSection title={`${searchHits.length} result${searchHits.length === 1 ? '' : 's'}`}>
@@ -6950,7 +6965,7 @@ function HelpCenterPanel() {
           display: 'flex', alignItems: 'center', gap: 6,
           background: 'transparent', border: 'none', color: RH.accent,
           padding: '0 0 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-          fontFamily: 'Geist, Inter, system-ui',
+          fontFamily: FONT_UI,
         }}>
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={RH.accent} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
             <path d="M15 6 L9 12 L15 18"/>
@@ -6960,10 +6975,10 @@ function HelpCenterPanel() {
         <div style={{
           background: RH.surface, border: `1px solid ${RH.line}`,
           borderRadius: 14, padding: '16px 18px',
-          fontFamily: 'Geist, Inter, system-ui',
+          fontFamily: FONT_UI,
         }}>
           <div style={{
-            fontSize: 10, color: RH.textDim, fontFamily: 'Geist Mono, monospace',
+            fontSize: 10, color: RH.textDim, fontFamily: FONT_UI,
             letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6,
           }}>{topic.label}</div>
           <div style={{
@@ -6988,7 +7003,7 @@ function HelpCenterPanel() {
           display: 'flex', alignItems: 'center', gap: 6,
           background: 'transparent', border: 'none', color: RH.accent,
           padding: '0 0 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-          fontFamily: 'Geist, Inter, system-ui',
+          fontFamily: FONT_UI,
         }}>
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={RH.accent} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
             <path d="M15 6 L9 12 L15 18"/>
@@ -6998,7 +7013,7 @@ function HelpCenterPanel() {
         <div style={{
           marginBottom: 12, padding: '14px 16px',
           background: RH.surface, border: `1px solid ${RH.line}`,
-          borderRadius: 14, fontFamily: 'Geist, Inter, system-ui',
+          borderRadius: 14, fontFamily: FONT_UI,
         }}>
           <div style={{ fontSize: 18, fontWeight: 700, color: RH.text, letterSpacing: -0.4 }}>{topic.label}</div>
           <div style={{ marginTop: 4, fontSize: 12, color: RH.textDim }}>{arts.length} article{arts.length === 1 ? '' : 's'}</div>
@@ -7136,7 +7151,7 @@ function SupportChatPanel() {
         display: 'flex', alignItems: 'center', gap: 8,
         padding: '8px 12px', marginBottom: 10,
         background: RH.surface, border: `1px solid ${RH.line}`,
-        borderRadius: 12, fontFamily: 'Geist, Inter, system-ui',
+        borderRadius: 12, fontFamily: FONT_UI,
       }}>
         <div style={{
           width: 32, height: 32, borderRadius: 16,
@@ -7148,7 +7163,7 @@ function SupportChatPanel() {
           <div style={{ fontSize: 13, fontWeight: 700, color: RH.text }}>Alpexa Assistant</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
             <span style={{ width: 6, height: 6, borderRadius: 3, background: RH.green, boxShadow: `0 0 6px ${RH.green}` }}/>
-            <span style={{ fontSize: 10.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 0.4 }}>AI · Online</span>
+            <span style={{ fontSize: 10.5, color: RH.textDim, fontFamily: FONT_UI, letterSpacing: 0.4 }}>AI · Online</span>
           </div>
         </div>
       </div>
@@ -7172,14 +7187,14 @@ function SupportChatPanel() {
               color: m.role === 'user' ? '#fff' : RH.text,
               fontSize: 13, lineHeight: 1.5,
               whiteSpace: 'pre-line',
-              fontFamily: 'Geist, Inter, system-ui',
+              fontFamily: FONT_UI,
             }}>
               {m.text}
               {m.source ? (
                 <div style={{
                   marginTop: 6, paddingTop: 6, borderTop: `1px solid ${RH.line}`,
                   fontSize: 10.5, color: RH.textDim, fontWeight: 600,
-                  fontFamily: 'Geist Mono, monospace', letterSpacing: 0.3,
+                  fontFamily: FONT_UI, letterSpacing: 0.3,
                 }}>📘 {m.source}</div>
               ) : null}
             </div>
@@ -7213,7 +7228,7 @@ function SupportChatPanel() {
               padding: '7px 11px', borderRadius: 999,
               background: RH.surface, border: `1px solid ${RH.line}`,
               color: RH.text, fontSize: 11.5, fontWeight: 600, cursor: 'pointer',
-              fontFamily: 'Geist, Inter, system-ui',
+              fontFamily: FONT_UI,
             }}>{s}</button>
           ))}
         </div>
@@ -7230,7 +7245,7 @@ function SupportChatPanel() {
           style={{
             flex: 1, background: RH.surface, border: `1px solid ${RH.line}`,
             borderRadius: 999, padding: '10px 14px', color: RH.text,
-            fontSize: 13, fontWeight: 500, fontFamily: 'Geist, Inter, system-ui',
+            fontSize: 13, fontWeight: 500, fontFamily: FONT_UI,
             outline: 'none', marginTop: 8,
           }}
           onFocus={(e) => (e.currentTarget.style.borderColor = RH.accent)}
@@ -7251,7 +7266,7 @@ function SupportChatPanel() {
         marginTop: 12, padding: '10px 0', borderRadius: 999,
         background: 'transparent', border: `1px solid ${RH.line}`,
         color: RH.textDim, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-        fontFamily: 'Geist, Inter, system-ui',
+        fontFamily: FONT_UI,
       }}>Talk to a human</button>
     </div>
   );
@@ -7319,7 +7334,7 @@ function TaxDocsPanel({ onDownload }) {
                 color: active ? RH.text : RH.textDim,
                 border: 'none', borderRadius: 8, padding: '8px 4px',
                 fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
-                fontFamily: 'Geist Mono, monospace', letterSpacing: 0.6,
+                fontFamily: FONT_UI, letterSpacing: 0.6,
               }}>
                 <div>{r}</div>
                 <div style={{ marginTop: 2, fontSize: 9, fontWeight: 600, color: active ? RH.accent : RH.textMute, letterSpacing: 0.4 }}>{CATALOGS[r].currency}</div>
@@ -7332,9 +7347,9 @@ function TaxDocsPanel({ onDownload }) {
       <div style={{
         marginBottom: 12, padding: '10px 14px',
         background: `${RH.accent}10`, border: `1px solid ${RH.accent}33`,
-        borderRadius: 12, fontFamily: 'Geist, Inter, system-ui',
+        borderRadius: 12, fontFamily: FONT_UI,
       }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: RH.accent, fontFamily: 'Geist Mono, monospace', letterSpacing: 1, textTransform: 'uppercase' }}>{cur.label}</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: RH.accent, fontFamily: FONT_UI, letterSpacing: 1, textTransform: 'uppercase' }}>{cur.label}</div>
         <div style={{ marginTop: 2, fontSize: 11.5, color: RH.text }}>
           Forms below are formatted for {cur.label} tax reporting.
         </div>
@@ -7369,7 +7384,7 @@ function TaxDocsPanel({ onDownload }) {
         marginTop: 14, padding: '11px 14px',
         background: RH.surface, border: `1px solid ${RH.line}`,
         borderRadius: 12, fontSize: 11.5, color: RH.textDim, lineHeight: 1.5,
-        fontFamily: 'Geist, Inter, system-ui',
+        fontFamily: FONT_UI,
       }}>
         Forms are issued automatically each year after the relevant tax deadline. Tax treatment of digital assets varies by jurisdiction — consult a tax professional for guidance specific to your situation.
       </div>
@@ -7404,7 +7419,7 @@ function AppearancePanel() {
         marginTop: 14, padding: '11px 14px',
         background: RH.surface, border: `1px solid ${RH.line}`,
         borderRadius: 12, fontSize: 11.5, color: RH.textDim, lineHeight: 1.5,
-        fontFamily: 'Geist, Inter, system-ui',
+        fontFamily: FONT_UI,
       }}>
         Changes apply instantly across the whole app and persist after restart.
       </div>
@@ -7423,7 +7438,7 @@ function PaymentCardsPanel({ cards = [], setCards }) {
   if (cards.length === 0) {
     return (
       <div style={{
-        padding: '50px 20px', textAlign: 'center', fontFamily: 'Geist, Inter, system-ui',
+        padding: '50px 20px', textAlign: 'center', fontFamily: FONT_UI,
       }}>
         <div style={{
           width: 56, height: 56, borderRadius: 28,
@@ -7475,7 +7490,7 @@ function LinkedBanksPanel({ banks = [], setBanks }) {
     <>
       {banks.length === 0 ? (
         <div style={{
-          padding: '50px 20px', textAlign: 'center', fontFamily: 'Geist, Inter, system-ui',
+          padding: '50px 20px', textAlign: 'center', fontFamily: FONT_UI,
         }}>
           <div style={{
             width: 56, height: 56, borderRadius: 28,
@@ -7517,7 +7532,7 @@ function LinkedBanksPanel({ banks = [], setBanks }) {
         marginTop: 14, padding: '11px 14px',
         background: RH.surface, border: `1px solid ${RH.line}`,
         borderRadius: 12, fontSize: 11.5, color: RH.textDim, lineHeight: 1.5,
-        fontFamily: 'Geist, Inter, system-ui',
+        fontFamily: FONT_UI,
       }}>
         New banks are linked through Plaid during your first ACH deposit. The micro-deposit verification step takes 1–3 business days.
       </div>
@@ -7621,7 +7636,7 @@ function WhitelistPanel({ list = [], setList }) {
           display: 'flex', alignItems: 'center', gap: 6,
           background: 'transparent', border: 'none', color: RH.accent,
           padding: '0 0 10px', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-          fontFamily: 'Geist, Inter, system-ui',
+          fontFamily: FONT_UI,
         }}>
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={RH.accent} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
             <path d="M15 6 L9 12 L15 18"/>
@@ -7631,21 +7646,21 @@ function WhitelistPanel({ list = [], setList }) {
 
         <AcctSection title="New destination">
           <div style={{ padding: '12px 16px' }}>
-            <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Nickname</div>
+            <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: FONT_UI, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Nickname</div>
             <input value={fName} onChange={(e) => setFName(e.target.value)}
               placeholder="e.g. My Coinbase wallet"
               style={{
                 width: '100%', boxSizing: 'border-box',
                 background: RH.surfaceUp, border: `1px solid ${RH.line}`,
                 borderRadius: 10, padding: '12px 14px', color: RH.text,
-                fontSize: 14, fontWeight: 600, fontFamily: 'Geist, Inter, system-ui', outline: 'none',
+                fontSize: 14, fontWeight: 600, fontFamily: FONT_UI, outline: 'none',
               }}
               onFocus={(e) => (e.currentTarget.style.borderColor = RH.accent)}
               onBlur={(e) => (e.currentTarget.style.borderColor = RH.line)}/>
           </div>
           <AcctDivider/>
           <div style={{ padding: '12px 16px' }}>
-            <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Network</div>
+            <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: FONT_UI, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Network</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               {NETWORKS.map((n) => {
                 const active = fNetwork === n.id;
@@ -7656,7 +7671,7 @@ function WhitelistPanel({ list = [], setList }) {
                     border: `1px solid ${active ? RH.accent : RH.line}`,
                     color: active ? RH.accent : RH.text,
                     fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                    fontFamily: 'Geist, Inter, system-ui',
+                    fontFamily: FONT_UI,
                     transition: 'all 140ms ease',
                   }}>
                     <div>{n.id}</div>
@@ -7668,7 +7683,7 @@ function WhitelistPanel({ list = [], setList }) {
           </div>
           <AcctDivider/>
           <div style={{ padding: '12px 16px' }}>
-            <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Address</div>
+            <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: FONT_UI, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Address</div>
             <input value={fAddress} onChange={(e) => setFAddress(e.target.value)}
               placeholder={net.example}
               spellCheck={false} autoCorrect="off" autoCapitalize="off"
@@ -7676,7 +7691,7 @@ function WhitelistPanel({ list = [], setList }) {
                 width: '100%', boxSizing: 'border-box',
                 background: RH.surfaceUp, border: `1px solid ${RH.line}`,
                 borderRadius: 10, padding: '12px 14px', color: RH.text,
-                fontSize: 12.5, fontWeight: 600, fontFamily: 'Geist Mono, monospace', outline: 'none',
+                fontSize: 12.5, fontWeight: 600, fontFamily: FONT_UI, outline: 'none',
                 letterSpacing: 0.3, wordBreak: 'break-all',
               }}
               onFocus={(e) => (e.currentTarget.style.borderColor = RH.accent)}
@@ -7687,9 +7702,9 @@ function WhitelistPanel({ list = [], setList }) {
         <div style={{
           marginTop: 12, padding: '11px 14px',
           background: `${RH.accent}10`, border: `1px solid ${RH.accent}33`,
-          borderRadius: 12, fontFamily: 'Geist, Inter, system-ui',
+          borderRadius: 12, fontFamily: FONT_UI,
         }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: RH.accent, fontFamily: 'Geist Mono, monospace', letterSpacing: 1, textTransform: 'uppercase' }}>24-hour delay</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: RH.accent, fontFamily: FONT_UI, letterSpacing: 1, textTransform: 'uppercase' }}>24-hour delay</div>
           <div style={{ marginTop: 3, fontSize: 11.5, color: RH.text, lineHeight: 1.5 }}>
             New destinations are held for 24 hours before they can receive a withdrawal. If it wasn't you, remove it before the timer ends.
           </div>
@@ -7704,7 +7719,7 @@ function WhitelistPanel({ list = [], setList }) {
     <>
       {list.length === 0 ? (
         <div style={{
-          padding: '50px 20px', textAlign: 'center', fontFamily: 'Geist, Inter, system-ui',
+          padding: '50px 20px', textAlign: 'center', fontFamily: FONT_UI,
         }}>
           <div style={{
             width: 56, height: 56, borderRadius: 28,
@@ -7752,7 +7767,7 @@ function WhitelistPanel({ list = [], setList }) {
         marginTop: 14, padding: '11px 14px',
         background: RH.surface, border: `1px solid ${RH.line}`,
         borderRadius: 12, fontSize: 11.5, color: RH.textDim, lineHeight: 1.55,
-        fontFamily: 'Geist, Inter, system-ui',
+        fontFamily: FONT_UI,
       }}>
         Withdrawals of $5,000+ can only go to an address on this list; $1,000+ need 2-factor verification; smaller sends are unrestricted. New entries are held 24h to prevent an attacker from quickly adding their own.
       </div>
@@ -7826,7 +7841,7 @@ function ChangePasswordPanel({ onSaved }) {
             padding: setShow ? '0 28px 0 0' : 0,
             color: error ? RH.red : RH.text,
             fontSize: 14, fontWeight: 600,
-            fontFamily: 'Geist Mono, monospace', letterSpacing: 1,
+            fontFamily: FONT_UI, letterSpacing: 1,
             outline: 'none',
           }}/>
         {setShow ? (
@@ -7915,7 +7930,7 @@ function PersonalNamePanel({ onSaved }) {
           background: 'transparent', border: 'none',
           padding: 0, color: RH.text,
           fontSize: 14, fontWeight: 600,
-          fontFamily: 'Geist, Inter, system-ui',
+          fontFamily: FONT_UI,
           outline: 'none',
         }}/>
     </div>
@@ -7950,7 +7965,7 @@ function PersonalEmailPanel({ onSaved }) {
       <AcctSection title="Account email">
         <div style={{ padding: '12px 16px' }}>
           <div style={{
-            fontSize: 10.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace',
+            fontSize: 10.5, color: RH.textDim, fontFamily: FONT_UI,
             letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6,
           }}>Email</div>
           <input value={val} onChange={(e) => setVal(e.target.value)}
@@ -7962,7 +7977,7 @@ function PersonalEmailPanel({ onSaved }) {
               background: RH.surfaceUp,
               border: `1px solid ${valid ? RH.line : RH.red}`,
               borderRadius: 10, padding: '12px 14px', color: RH.text,
-              fontSize: 15, fontWeight: 600, fontFamily: 'Geist Mono, monospace',
+              fontSize: 15, fontWeight: 600, fontFamily: FONT_UI,
               letterSpacing: 0.3, outline: 'none',
             }}
             onFocus={(e) => valid && (e.currentTarget.style.borderColor = RH.accent)}
@@ -7978,7 +7993,7 @@ function PersonalEmailPanel({ onSaved }) {
         marginTop: 12, padding: '11px 14px',
         background: `${RH.accent}10`, border: `1px solid ${RH.accent}33`,
         borderRadius: 12, fontSize: 11.5, color: RH.text, lineHeight: 1.5,
-        fontFamily: 'Geist, Inter, system-ui',
+        fontFamily: FONT_UI,
       }}>
         We'll send a verification link to the new address. The old email keeps receiving security alerts until you click the link.
       </div>
@@ -8017,7 +8032,7 @@ function PersonalPhonePanel({ onSaved }) {
       <AcctSection title="Mobile number">
         <div style={{ padding: '12px 16px' }}>
           <div style={{
-            fontSize: 10.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace',
+            fontSize: 10.5, color: RH.textDim, fontFamily: FONT_UI,
             letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6,
           }}>Phone</div>
           <input value={phone} onChange={(e) => setPhone(format(e.target.value))}
@@ -8028,7 +8043,7 @@ function PersonalPhonePanel({ onSaved }) {
               background: RH.surfaceUp,
               border: `1px solid ${valid ? RH.line : RH.red}`,
               borderRadius: 10, padding: '12px 14px', color: RH.text,
-              fontSize: 15, fontWeight: 600, fontFamily: 'Geist Mono, monospace',
+              fontSize: 15, fontWeight: 600, fontFamily: FONT_UI,
               letterSpacing: 0.4, outline: 'none',
             }}
             onFocus={(e) => valid && (e.currentTarget.style.borderColor = RH.accent)}
@@ -8044,7 +8059,7 @@ function PersonalPhonePanel({ onSaved }) {
         marginTop: 12, padding: '11px 14px',
         background: `${RH.accent}10`, border: `1px solid ${RH.accent}33`,
         borderRadius: 12, fontSize: 11.5, color: RH.text, lineHeight: 1.5,
-        fontFamily: 'Geist, Inter, system-ui',
+        fontFamily: FONT_UI,
       }}>
         We'll text a 6-digit verification code to this number before any changes are saved. SMS charges may apply.
       </div>
@@ -8067,7 +8082,7 @@ function PersonalDobPanel({ onContact }) {
         marginTop: 12, padding: '11px 14px',
         background: `${RH.accent}10`, border: `1px solid ${RH.accent}33`,
         borderRadius: 12, fontSize: 11.5, color: RH.text, lineHeight: 1.55,
-        fontFamily: 'Geist, Inter, system-ui',
+        fontFamily: FONT_UI,
       }}>
         Your date of birth is locked once verified. Changes require a court order or government-issued correction — contact our support team and submit documentation.
       </div>
@@ -8138,7 +8153,7 @@ function RecurringPanel({ isBuy, linkedBanks = [], onSaved }) {
       <AcctSection title={isBuy ? 'New recurring buy' : 'New recurring deposit'}>
         <div style={{ padding: '12px 16px' }}>
           <div style={{
-            fontSize: 10.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace',
+            fontSize: 10.5, color: RH.textDim, fontFamily: FONT_UI,
             letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6,
           }}>Amount (USD)</div>
           <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
@@ -8148,7 +8163,7 @@ function RecurringPanel({ isBuy, linkedBanks = [], onSaved }) {
               background: RH.surfaceUp,
               border: `1px solid ${amtNum > 0 ? RH.line : RH.red}`,
               borderRadius: 10, padding: '12px 14px', color: RH.text,
-              fontSize: 15, fontWeight: 700, fontFamily: 'Geist Mono, monospace',
+              fontSize: 15, fontWeight: 700, fontFamily: FONT_UI,
               fontVariantNumeric: 'tabular-nums', outline: 'none',
             }}
             onFocus={(e) => amtNum > 0 && (e.currentTarget.style.borderColor = RH.accent)}
@@ -8182,7 +8197,7 @@ function RecurringPanel({ isBuy, linkedBanks = [], onSaved }) {
       <div style={{
         marginTop: 12, padding: '11px 14px',
         background: `${RH.accent}10`, border: `1px solid ${RH.accent}33`,
-        borderRadius: 12, fontFamily: 'Geist, Inter, system-ui',
+        borderRadius: 12, fontFamily: FONT_UI,
         fontSize: 11.5, color: RH.text, lineHeight: 1.5,
       }}>
         {isBuy
@@ -8234,13 +8249,13 @@ function TransferHistoryPanel({ kind, transactions, setTransactions, flashAndClo
   const ChipBar = (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14,
-      fontSize: 12.5, fontFamily: 'Geist, Inter, system-ui',
+      fontSize: 12.5, fontFamily: FONT_UI,
     }}>
       <div style={{ position: 'relative' }}>
         <button onClick={() => setDateMenuOpen((o) => !o)} style={{
           color: RH.text, fontWeight: 700,
           background: 'transparent', border: 'none', padding: 0,
-          cursor: 'pointer', fontFamily: 'Geist, Inter, system-ui',
+          cursor: 'pointer', fontFamily: FONT_UI,
           fontSize: 12.5, lineHeight: 1.4,
           borderBottom: `1px dashed ${RH.text}`,
         }}>{dateLabel}</button>
@@ -8262,14 +8277,14 @@ function TransferHistoryPanel({ kind, transactions, setTransactions, flashAndClo
                   border: 'none',
                   color: active ? RH.accent : RH.text,
                   fontSize: 12.5, fontWeight: active ? 700 : 500,
-                  cursor: 'pointer', fontFamily: 'Geist, Inter, system-ui',
+                  cursor: 'pointer', fontFamily: FONT_UI,
                 }}>{lbl}</button>
               );
             })}
           </div>
         ) : null}
       </div>
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" style={{ marginLeft: 'auto', flex: '0 1 130px', minWidth: 0, background: RH.surface, border: `1px solid ${RH.line}`, borderRadius: 999, padding: '5px 12px', fontSize: 12, color: RH.text, outline: 'none', fontFamily: 'Geist, Inter, system-ui' }}/>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" style={{ marginLeft: 'auto', flex: '0 1 130px', minWidth: 0, background: RH.surface, border: `1px solid ${RH.line}`, borderRadius: 999, padding: '5px 12px', fontSize: 12, color: RH.text, outline: 'none', fontFamily: FONT_UI }}/>
     </div>
   );
 
@@ -8280,7 +8295,7 @@ function TransferHistoryPanel({ kind, transactions, setTransactions, flashAndClo
         ? { icon: 'M12 3 V15 M7 10 L12 15 L17 10 M4 20 H20', title: 'No withdrawals yet', desc: 'When you cash out to a bank or card, your withdrawals will appear here.' }
         : { icon: 'M3 9 L12 4 L21 9 M3 20 H21', title: 'No transfers yet', desc: 'Movements between Crypto / FX / Sports servers show up here.' };
     return (
-      <div style={{ padding: '50px 20px', textAlign: 'center', fontFamily: 'Geist, Inter, system-ui' }}>
+      <div style={{ padding: '50px 20px', textAlign: 'center', fontFamily: FONT_UI }}>
         <div style={{
           width: 56, height: 56, borderRadius: 28,
           background: RH.surface, border: `1px solid ${RH.line}`,
@@ -8406,7 +8421,7 @@ function RedeemCodePanel({ onRedeemed }) {
     return (
       <>
         <div style={{
-          padding: '50px 20px', textAlign: 'center', fontFamily: 'Geist, Inter, system-ui',
+          padding: '50px 20px', textAlign: 'center', fontFamily: FONT_UI,
         }}>
           <div style={{
             width: 56, height: 56, borderRadius: 28,
@@ -8425,7 +8440,7 @@ function RedeemCodePanel({ onRedeemed }) {
               marginTop: 6, fontSize: 12.5, color: RH.textDim, lineHeight: 1.5,
               maxWidth: 280, margin: '6px auto 0',
             }}>
-              <span style={{ fontFamily: 'Geist Mono, monospace' }}>{redemptionInfo.code}</span>
+              <span style={{ fontFamily: FONT_UI }}>{redemptionInfo.code}</span>
               {' '}was applied {new Date(redemptionInfo.ts).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}. Your 100 ALPXS referral reward is in your wallet.
             </div>
           ) : null}
@@ -8438,7 +8453,7 @@ function RedeemCodePanel({ onRedeemed }) {
       <AcctSection title="Friend's code">
         <div style={{ padding: '12px 16px' }}>
           <div style={{
-            fontSize: 10.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace',
+            fontSize: 10.5, color: RH.textDim, fontFamily: FONT_UI,
             letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6,
           }}>Referral code</div>
           <input
@@ -8452,7 +8467,7 @@ function RedeemCodePanel({ onRedeemed }) {
               border: `1px solid ${error ? RH.red : RH.line}`,
               borderRadius: 10, padding: '12px 14px', color: RH.text,
               fontSize: 16, fontWeight: 700,
-              fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2,
+              fontFamily: FONT_UI, letterSpacing: 1.2,
               outline: 'none', textTransform: 'uppercase',
             }}
             onFocus={(e) => !error && (e.currentTarget.style.borderColor = RH.accent)}
@@ -8462,7 +8477,7 @@ function RedeemCodePanel({ onRedeemed }) {
             <div style={{ marginTop: 6, fontSize: 11.5, color: RH.red, fontWeight: 600 }}>{error}</div>
           ) : (
             <div style={{ marginTop: 6, fontSize: 11.5, color: RH.textDim }}>
-              Codes look like <span style={{ fontFamily: 'Geist Mono, monospace' }}>JR2025</span> or the trailing part of a friend's link.
+              Codes look like <span style={{ fontFamily: FONT_UI }}>JR2025</span> or the trailing part of a friend's link.
             </div>
           )}
         </div>
@@ -8479,9 +8494,9 @@ function RedeemCodePanel({ onRedeemed }) {
       <div style={{
         marginTop: 12, padding: '11px 14px',
         background: `${RH.accent}10`, border: `1px solid ${RH.accent}33`,
-        borderRadius: 12, fontFamily: 'Geist, Inter, system-ui',
+        borderRadius: 12, fontFamily: FONT_UI,
       }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: RH.accent, fontFamily: 'Geist Mono, monospace', letterSpacing: 1, textTransform: 'uppercase' }}>One-time</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: RH.accent, fontFamily: FONT_UI, letterSpacing: 1, textTransform: 'uppercase' }}>One-time</div>
         <div style={{ marginTop: 2, fontSize: 12, color: RH.text }}>
           A referral code can be applied once per account. Bonuses unlock after your first $50 deposit.
         </div>
@@ -8557,45 +8572,45 @@ function BeneficiariesPanel({ list: pList, setList: pSetList }) {
     return (
       <>
         <AcctSection title="New beneficiary">
-          <div style={{ padding: '12px 16px', fontFamily: 'Geist, Inter, system-ui' }}>
+          <div style={{ padding: '12px 16px', fontFamily: FONT_UI }}>
             <div style={{
               fontSize: 10.5, color: RH.textDim,
-              fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2,
+              fontFamily: FONT_UI, letterSpacing: 1.2,
               textTransform: 'uppercase', fontWeight: 700, marginBottom: 6,
             }}>Full name</div>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Alex Reyes" style={{
               width: '100%', background: 'transparent', border: 'none',
               color: RH.text, fontSize: 14, fontWeight: 500, outline: 'none',
-              padding: 0, fontFamily: 'Geist, Inter, system-ui',
+              padding: 0, fontFamily: FONT_UI,
             }}/>
           </div>
           <AcctDivider/>
-          <div style={{ padding: '12px 16px', fontFamily: 'Geist, Inter, system-ui' }}>
+          <div style={{ padding: '12px 16px', fontFamily: FONT_UI }}>
             <div style={{
               fontSize: 10.5, color: RH.textDim,
-              fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2,
+              fontFamily: FONT_UI, letterSpacing: 1.2,
               textTransform: 'uppercase', fontWeight: 700, marginBottom: 6,
             }}>Relationship</div>
             <input value={rel} onChange={(e) => setRel(e.target.value)} placeholder="Spouse, child, sibling…" style={{
               width: '100%', background: 'transparent', border: 'none',
               color: RH.text, fontSize: 14, fontWeight: 500, outline: 'none',
-              padding: 0, fontFamily: 'Geist, Inter, system-ui',
+              padding: 0, fontFamily: FONT_UI,
             }}/>
           </div>
           <AcctDivider/>
-          <div style={{ padding: '12px 16px', fontFamily: 'Geist, Inter, system-ui' }}>
+          <div style={{ padding: '12px 16px', fontFamily: FONT_UI }}>
             <div style={{
               fontSize: 10.5, color: RH.textDim,
-              fontFamily: 'Geist Mono, monospace', letterSpacing: 1.2,
+              fontFamily: FONT_UI, letterSpacing: 1.2,
               textTransform: 'uppercase', fontWeight: 700, marginBottom: 6,
             }}>Allocation %</div>
             <input value={pct} onChange={(e) => setPct(e.target.value.replace(/[^0-9.]/g, ''))} placeholder={`Up to ${remaining}%`} inputMode="decimal" style={{
               width: '100%', background: 'transparent', border: 'none',
               color: RH.text, fontSize: 14, fontWeight: 500, outline: 'none',
-              padding: 0, fontFamily: 'Geist, Inter, system-ui',
+              padding: 0, fontFamily: FONT_UI,
               fontVariantNumeric: 'tabular-nums',
             }}/>
-            <div style={{ marginTop: 4, fontSize: 11, color: RH.textDim, fontFamily: 'Geist Mono, monospace' }}>
+            <div style={{ marginTop: 4, fontSize: 11, color: RH.textDim, fontFamily: FONT_UI }}>
               {remaining}% remaining unassigned
             </div>
           </div>
@@ -8606,7 +8621,7 @@ function BeneficiariesPanel({ list: pList, setList: pSetList }) {
             background: RH.surfaceUp, color: RH.text,
             border: 'none',
             fontSize: 14, fontWeight: 700, cursor: 'pointer',
-            fontFamily: 'Geist, Inter, system-ui',
+            fontFamily: FONT_UI,
           }}>Cancel</button>
           <button onClick={save} disabled={!canSave} style={{
             flex: 1, padding: '14px 0', borderRadius: 999,
@@ -8615,7 +8630,7 @@ function BeneficiariesPanel({ list: pList, setList: pSetList }) {
             border: 'none',
             fontSize: 14, fontWeight: 700, letterSpacing: 0.2,
             cursor: canSave ? 'pointer' : 'not-allowed',
-            fontFamily: 'Geist, Inter, system-ui',
+            fontFamily: FONT_UI,
           }}>Add beneficiary</button>
         </div>
       </>
@@ -8636,7 +8651,7 @@ function BeneficiariesPanel({ list: pList, setList: pSetList }) {
               {i > 0 ? <AcctDivider/> : null}
               <div style={{
                 padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12,
-                fontFamily: 'Geist, Inter, system-ui',
+                fontFamily: FONT_UI,
               }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 600, color: RH.text }}>{b.name}</div>
@@ -8703,7 +8718,7 @@ function ReferralLinkPanel() {
       <AcctSection title="Your link">
         <div style={{ padding: '14px 16px' }}>
           <div style={{
-            fontFamily: 'Geist Mono, monospace', fontSize: 13.5, color: RH.accent,
+            fontFamily: FONT_UI, fontSize: 13.5, color: RH.accent,
             letterSpacing: 0.2, wordBreak: 'break-all',
           }}>{URL}</div>
         </div>
@@ -8764,7 +8779,7 @@ function ShareViaPanel() {
             background: 'transparent', border: 'none',
             padding: '14px 16px',
             display: 'flex', alignItems: 'center', gap: 12,
-            cursor: 'pointer', fontFamily: 'Geist, Inter, system-ui',
+            cursor: 'pointer', fontFamily: FONT_UI,
           }}>
             <div style={{
               flexShrink: 0, width: 32, height: 32, borderRadius: 16,
@@ -8904,7 +8919,7 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
                 <QrPattern data={ADDR[sym] || ''} size={130}/>
               </div>
               <div style={{
-                marginTop: 14, fontFamily: 'Geist Mono, monospace', fontSize: 11.5,
+                marginTop: 14, fontFamily: FONT_UI, fontSize: 11.5,
                 color: RH.text, letterSpacing: 0.3, wordBreak: 'break-all',
                 padding: '0 12px',
               }}>{ADDR[sym]}</div>
@@ -8918,7 +8933,7 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
                 marginTop: 14, padding: '8px 14px', borderRadius: 999,
                 background: RH.surfaceUp, border: `1px solid ${RH.line}`,
                 color: RH.text, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                fontFamily: 'Geist, Inter, system-ui',
+                fontFamily: FONT_UI,
               }}>Copy address</button>
             </div>
           </AcctSection>
@@ -8933,7 +8948,7 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
             marginTop: 12, padding: '11px 14px',
             background: `${RH.accent}10`, border: `1px solid ${RH.accent}33`,
             borderRadius: 12, fontSize: 11.5, color: RH.text, lineHeight: 1.55,
-            fontFamily: 'Geist, Inter, system-ui',
+            fontFamily: FONT_UI,
           }}>
             This deposit address is unique to your Alpexa account — funds are held in Alpexa custody and credited after the confirmations above.
           </div>
@@ -9042,7 +9057,7 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
             padding: '14px 28px', borderRadius: 999,
             background: RH.red, color: '#fff', border: 'none',
             fontSize: 14, fontWeight: 700, letterSpacing: 0.2, cursor: 'pointer',
-            fontFamily: 'Geist, Inter, system-ui',
+            fontFamily: FONT_UI,
           }}>Sign out all other devices</button>
         </div>
       );
@@ -9105,7 +9120,7 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
             : { icon: 'M3 9 L12 4 L21 9 M3 20 H21', title: 'No transfers yet', desc: 'Movements between Crypto / FX / Sports servers show up here.' };
         return (
           <div style={{
-            padding: '50px 20px', textAlign: 'center', fontFamily: 'Geist, Inter, system-ui',
+            padding: '50px 20px', textAlign: 'center', fontFamily: FONT_UI,
           }}>
             <div style={{
               width: 56, height: 56, borderRadius: 28,
@@ -9247,7 +9262,7 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
               marginTop: 8, width: '100%', padding: '14px 0', borderRadius: 999,
               background: RH.red, color: '#fff', border: 'none',
               fontSize: 14, fontWeight: 700, cursor: 'pointer',
-              fontFamily: 'Geist, Inter, system-ui',
+              fontFamily: FONT_UI,
             }}>Sign out this device</button>
           )}
         </>
@@ -9390,7 +9405,7 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
             background: 'transparent', color: RH.red,
             border: `1px solid ${RH.red}`,
             fontSize: 14, fontWeight: 700, cursor: 'pointer',
-            fontFamily: 'Geist, Inter, system-ui',
+            fontFamily: FONT_UI,
           }}>Delete alert</button>
         </>
       );
@@ -9646,7 +9661,7 @@ function AccountSubPageContent({ subPage, setSubSub, transactions = [], setTrans
         <AcctSection>
           <div style={{ padding: '18px 16px', textAlign: 'center' }}>
             <div style={{
-              fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.textDim,
+              fontFamily: FONT_UI, fontSize: 10, color: RH.textDim,
               letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700,
             }}>Your ALPXS rewards</div>
             <div style={{
@@ -9824,7 +9839,7 @@ function ActivityList({ transactions = [] }) {
   const dashedLink = {
     color: RH.text, fontWeight: 700,
     background: 'transparent', border: 'none', padding: 0,
-    cursor: 'pointer', fontFamily: 'Geist, Inter, system-ui',
+    cursor: 'pointer', fontFamily: FONT_UI,
     fontSize: 12.5, lineHeight: 1.4,
     borderBottom: `1px dashed ${RH.text}`,
   };
@@ -9835,7 +9850,7 @@ function ActivityList({ transactions = [] }) {
     boxShadow: '0 12px 32px rgba(0,0,0,0.3)',
   };
   return (
-    <div style={{ fontFamily: 'Geist, Inter, system-ui' }}>
+    <div style={{ fontFamily: FONT_UI }}>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14,
         fontSize: 12.5, flexWrap: 'wrap',
@@ -9854,7 +9869,7 @@ function ActivityList({ transactions = [] }) {
                     border: 'none',
                     color: active ? RH.accent : RH.text,
                     fontSize: 12.5, fontWeight: active ? 700 : 500,
-                    cursor: 'pointer', fontFamily: 'Geist, Inter, system-ui',
+                    cursor: 'pointer', fontFamily: FONT_UI,
                   }}>{r.label}</button>
                 );
               })}
@@ -9878,7 +9893,7 @@ function ActivityList({ transactions = [] }) {
                     border: 'none',
                     color: active ? RH.accent : RH.text,
                     fontSize: 12.5, fontWeight: active ? 700 : 500,
-                    cursor: 'pointer', fontFamily: 'Geist, Inter, system-ui',
+                    cursor: 'pointer', fontFamily: FONT_UI,
                   }}>{sym === 'all' ? 'All assets' : sym}</button>
                 );
               })}
@@ -9893,7 +9908,7 @@ function ActivityList({ transactions = [] }) {
       ) : dayKeys.map((day) => (
         <div key={day} style={{ marginBottom: 14 }}>
           <div style={{
-            fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.textDim,
+            fontFamily: FONT_UI, fontSize: 10, color: RH.textDim,
             letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 700,
             margin: '4px 0 6px',
           }}>{fmtDay(day)}</div>
@@ -9920,18 +9935,18 @@ function ActivityList({ transactions = [] }) {
                           padding: '1px 6px', borderRadius: 999,
                           background: `${s.color}1F`, color: s.color,
                           fontSize: 9, fontWeight: 700, letterSpacing: 0.6,
-                          textTransform: 'uppercase', fontFamily: 'Geist Mono, monospace',
+                          textTransform: 'uppercase', fontFamily: FONT_UI,
                         }}>{s.label}</span>
                       ) : null; })()}
                     </div>
                     <div style={{
                       marginTop: 2, fontSize: 11, color: RH.textDim,
-                      fontFamily: 'Geist Mono, monospace', letterSpacing: 0.3,
+                      fontFamily: FONT_UI, letterSpacing: 0.3,
                     }}>{t.ticket ? t.ticket + ' · ' : ''}{fmtTime(t.ts)}{(() => { const sub = buildSub(t); return sub ? ` · ${sub}` : ''; })()}</div>
                   </div>
                   <div style={{
                     fontSize: 13.5, fontWeight: 700, color: meta.color,
-                    fontFamily: 'Geist Mono, monospace',
+                    fontFamily: FONT_UI,
                     fontVariantNumeric: 'tabular-nums', letterSpacing: -0.1,
                   }}>{meta.sign} ${t.usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 </div>
@@ -10080,7 +10095,7 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
             <AccountSubPageContent subPage={subPage} setSubSub={setSubSub} transactions={transactions} setTransactions={setTransactions} savedCards={savedCards} setSavedCards={setSavedCards} linkedBanks={linkedBanks} setLinkedBanks={setLinkedBanks} whitelist={whitelist} setWhitelist={setWhitelist} beneficiaries={beneficiaries} setBeneficiaries={setBeneficiaries}/>
           ) : isSignOut ? (
             <div style={{
-              padding: '40px 12px', textAlign: 'center', fontFamily: 'Geist, Inter, system-ui',
+              padding: '40px 12px', textAlign: 'center', fontFamily: FONT_UI,
             }}>
               <div style={{ fontSize: 22, fontWeight: 700, color: RH.text, letterSpacing: -0.4 }}>Sign out of Alpexa?</div>
               <div style={{ marginTop: 10, fontSize: 13.5, color: RH.textDim, lineHeight: 1.55 }}>
@@ -10090,7 +10105,7 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
                 marginTop: 26, padding: '14px 28px', borderRadius: 999,
                 background: RH.red, color: '#fff', border: 'none',
                 fontSize: 14, fontWeight: 700, letterSpacing: 0.2, cursor: 'pointer',
-                fontFamily: 'Geist, Inter, system-ui',
+                fontFamily: FONT_UI,
               }}>Sign out</button>
               <button onClick={() => setSubPage(null)} style={{
                 marginTop: 12, display: 'block', margin: '12px auto 0',
@@ -10098,7 +10113,7 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
                 background: 'transparent', color: RH.text,
                 border: `1px solid ${RH.line}`,
                 fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                fontFamily: 'Geist, Inter, system-ui',
+                fontFamily: FONT_UI,
               }}>Cancel</button>
             </div>
           ) : null}
@@ -10147,7 +10162,7 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
           <div style={{
             marginTop: 6, display: 'flex', alignItems: 'center', gap: 6,
             fontSize: 13, fontWeight: 600,
-            fontFamily: 'Geist Mono, monospace', fontVariantNumeric: 'tabular-nums',
+            fontFamily: FONT_UI, fontVariantNumeric: 'tabular-nums',
           }}>
             <svg width="9" height="9" viewBox="0 0 24 24" fill={accent}>
               {isUp ? <path d="M12 4 L20 16 H4 Z"/> : <path d="M12 20 L4 8 H20 Z"/>}
@@ -10171,11 +10186,11 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
               const active = r === range;
               return (
                 <button key={r} onClick={() => setRange(r)} style={{
-                  flex: 1, padding: '7px 0', borderRadius: 999,
-                  background: active ? `${accent}22` : 'transparent',
-                  border: 'none', color: active ? accent : RH.textDim,
-                  fontSize: 12, fontWeight: 700,
-                  fontFamily: 'Geist Mono, monospace', letterSpacing: 0.6,
+                  flex: 1, height: 32, padding: 0, borderRadius: 16,
+                  background: active ? RH.acc : 'transparent',
+                  border: 'none', color: active ? RH.onAcc : RH.textDim,
+                  fontSize: 14, fontWeight: active ? 600 : 500,
+                  fontFamily: FONT_UI,
                   cursor: 'pointer',
                 }}>{r}</button>
               );
@@ -10186,7 +10201,7 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
         {/* Accounts — compact 3-column row */}
         <div style={{ padding: '8px 22px 0' }}>
           <div style={{
-            fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.textDim,
+            fontFamily: FONT_UI, fontSize: 10, color: RH.textDim,
             letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700,
             marginBottom: 8,
           }}>Accounts</div>
@@ -10201,11 +10216,11 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
                 style={{
                   textAlign: 'left', background: 'transparent', border: 'none',
                   padding: 0, cursor: 'pointer',
-                  fontFamily: 'Geist, Inter, system-ui',
+                  fontFamily: FONT_UI,
                 }}>
                 <div style={{
                   fontSize: 10, color: RH.textDim,
-                  fontFamily: 'Geist Mono, monospace',
+                  fontFamily: FONT_UI,
                   letterSpacing: 0.8, textTransform: 'uppercase', fontWeight: 700,
                 }}>{s.id === 'crypto' ? 'Crypto' : s.id === 'fx' ? 'FX' : 'Sport'}</div>
                 <div style={{
@@ -10244,7 +10259,7 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
                 borderTop: `1px solid ${RH.line}`,
                 padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 14,
                 cursor: 'pointer',
-                fontFamily: 'Geist, Inter, system-ui',
+                fontFamily: FONT_UI,
               }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
@@ -10276,7 +10291,7 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
                     color: isLive ? RH.text : RH.textDim,
                     letterSpacing: 0.1,
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                    fontFamily: isLive ? 'Geist Mono, monospace' : 'Geist, Inter, system-ui',
+                    fontFamily: isLive ? FONT_UI : FONT_UI,
                     fontVariantNumeric: 'tabular-nums',
                   }}>{dynamicDesc}</div>
                 </div>
@@ -10293,7 +10308,7 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
             borderBottom: `1px solid ${RH.line}`,
             padding: '18px 22px', display: 'flex', alignItems: 'center',
             cursor: 'pointer', color: RH.red,
-            fontFamily: 'Geist, Inter, system-ui',
+            fontFamily: FONT_UI,
           }}>
             <div style={{ fontSize: 15, fontWeight: 700 }}>Sign out</div>
           </button>
@@ -10333,7 +10348,7 @@ function StakeInfo({ onBack, sym, onStartStake }) {
   const Feature = ({ title, desc }) => (
     <div style={{
       display: 'flex', gap: 14, padding: '12px 0',
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
     }}>
       <div style={{
         flexShrink: 0, width: 22, height: 22,
@@ -10395,11 +10410,11 @@ function StakeInfo({ onBack, sym, onStartStake }) {
           <div style={{
             fontSize: 28, fontWeight: 700, color: RH.text,
             letterSpacing: -0.7, lineHeight: 1.1,
-            fontFamily: 'Geist, Inter, system-ui',
+            fontFamily: FONT_UI,
           }}>Earn with {sym} staking</div>
           <div style={{
             marginTop: 12, fontSize: 14, color: RH.textDim, lineHeight: 1.55,
-            fontFamily: 'Geist, Inter, system-ui',
+            fontFamily: FONT_UI,
           }}>
             Earn {sym} when you help secure {networkNm} network transactions.
           </div>
@@ -10438,7 +10453,7 @@ function StakeInfo({ onBack, sym, onStartStake }) {
           width: '100%', padding: '15px 0', borderRadius: 999,
           background: RH.text, color: RH.bg, border: 'none',
           fontSize: 15, fontWeight: 700, letterSpacing: 0.2, cursor: 'pointer',
-          fontFamily: 'Geist, Inter, system-ui',
+          fontFamily: FONT_UI,
         }}>Stake {sym}</button>
       </div>
     </Phone>
@@ -10470,7 +10485,7 @@ function AccountMenuSheet({ onClose, onJumpSubpage }) {
         border: `1px solid ${RH.line}`,
         maxHeight: '75%',
         display: 'flex', flexDirection: 'column',
-        fontFamily: 'Geist, Inter, system-ui',
+        fontFamily: FONT_UI,
       }}>
         <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 4px' }}>
           <div style={{ width: 38, height: 4, borderRadius: 2, background: RH.line }}/>
@@ -10500,7 +10515,7 @@ function AccountMenuSheet({ onClose, onJumpSubpage }) {
               display: 'flex', alignItems: 'center', gap: 12,
               cursor: 'pointer',
               color: it.red ? RH.red : RH.text,
-              fontFamily: 'Geist, Inter, system-ui',
+              fontFamily: FONT_UI,
             }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: -0.15 }}>{it.label}</div>
@@ -10559,13 +10574,13 @@ function HeroConfirm({ heroColor, label, sublabel, rows = [], footnote, onDone, 
             position: 'relative', zIndex: 1,
             marginTop: 84,
             fontSize: 42, fontWeight: 600, lineHeight: 1.05, letterSpacing: -1.4,
-            fontFamily: 'Geist, Inter, system-ui',
+            fontFamily: FONT_UI,
           }}>{label}</div>
           {sublabel ? (
             <div style={{
               position: 'relative', zIndex: 1,
               marginTop: 14, fontSize: 13, color: 'rgba(255,255,255,0.68)',
-              fontFamily: 'Geist Mono, monospace', letterSpacing: 0.3,
+              fontFamily: FONT_UI, letterSpacing: 0.3,
               fontVariantNumeric: 'tabular-nums',
             }}>{sublabel}</div>
           ) : null}
@@ -10573,7 +10588,7 @@ function HeroConfirm({ heroColor, label, sublabel, rows = [], footnote, onDone, 
 
         <div style={{
           background: 'transparent', padding: '40px 26px 0', flex: 1,
-          fontFamily: 'Geist, Inter, system-ui',
+          fontFamily: FONT_UI,
           position: 'relative', zIndex: 1,
         }}>
           {rows.length > 0 ? (
@@ -10584,7 +10599,7 @@ function HeroConfirm({ heroColor, label, sublabel, rows = [], footnote, onDone, 
                 <div key={i}>
                   <div style={{
                     fontSize: 12, color: RH.textDim,
-                    fontFamily: 'Geist Mono, monospace', letterSpacing: 0.3,
+                    fontFamily: FONT_UI, letterSpacing: 0.3,
                   }}>{r.label}</div>
                   <div style={{
                     marginTop: 4, fontSize: 14.5, color: RH.text,
@@ -10688,10 +10703,10 @@ function Unstake({ onBack, sym, staked = {}, onUnstaked }) {
       <div className="alpexa-hide-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '4px 22px 22px' }}>
         <div style={{
           padding: 16, background: RH.surface, border: `1px solid ${RH.line}`,
-          borderRadius: 14, fontFamily: 'Geist, Inter, system-ui',
+          borderRadius: 14, fontFamily: FONT_UI,
         }}>
           <div style={{
-            fontFamily: 'Geist Mono, monospace', fontSize: 10,
+            fontFamily: FONT_UI, fontSize: 10,
             color: locked ? RH.red : RH.textDim,
             letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700,
           }}>{locked ? 'Locked' : 'Unstake'}</div>
@@ -10722,7 +10737,7 @@ function Unstake({ onBack, sym, staked = {}, onUnstaked }) {
             marginTop: 10, padding: 10,
             background: RH.red + '15', border: `1px solid ${RH.red}55`,
             borderRadius: 10,
-            fontFamily: 'Geist Mono, monospace', fontSize: 11,
+            fontFamily: FONT_UI, fontSize: 11,
             color: RH.red, letterSpacing: 0.4, textAlign: 'center',
           }}>
             Locked until {unlockDate} — funds release with full rewards
@@ -10734,7 +10749,7 @@ function Unstake({ onBack, sym, staked = {}, onUnstaked }) {
             marginTop: 10, padding: 10,
             background: RH.red + '12', border: `1px solid ${RH.red}44`,
             borderRadius: 10,
-            fontFamily: 'Geist Mono, monospace', fontSize: 11,
+            fontFamily: FONT_UI, fontSize: 11,
             color: RH.red, letterSpacing: 0.3, textAlign: 'center', lineHeight: 1.5,
           }}>
             Early unstake before {unlockDate} — accrued interest (−${forfeited.toFixed(2)}) is forfeited. You get your principal ${principalVal.toFixed(2)} back.
@@ -10763,13 +10778,13 @@ function BreakRow({ label, value, strong, colorValue }) {
       padding: '6px 0',
     }}>
       <span style={{
-        fontSize: 12.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace',
+        fontSize: 12.5, color: RH.textDim, fontFamily: FONT_UI,
         letterSpacing: 0.3,
       }}>{label}</span>
       <span style={{
         fontSize: 13, fontWeight: strong ? 700 : 600,
         color: colorValue || RH.text,
-        fontFamily: 'Geist Mono, monospace', letterSpacing: 0.3,
+        fontFamily: FONT_UI, letterSpacing: 0.3,
         fontVariantNumeric: 'tabular-nums',
       }}>{value}</span>
     </div>
@@ -10852,10 +10867,10 @@ function Redeem({ onBack, sym, securityRedeemed = {}, onRedeemed, balances = {} 
         {/* Holdings summary */}
         <div style={{
           padding: 14, background: RH.surface, border: `1px solid ${RH.line}`,
-          borderRadius: 14, fontFamily: 'Geist, Inter, system-ui',
+          borderRadius: 14, fontFamily: FONT_UI,
         }}>
           <div style={{
-            fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.textDim,
+            fontFamily: FONT_UI, fontSize: 10, color: RH.textDim,
             letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700,
           }}>You hold</div>
           <div style={{
@@ -10864,7 +10879,7 @@ function Redeem({ onBack, sym, securityRedeemed = {}, onRedeemed, balances = {} 
           }}>${heldUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           <div style={{
             marginTop: 4, fontSize: 12, color: RH.textDim,
-            fontFamily: 'Geist Mono, monospace', letterSpacing: 0.3,
+            fontFamily: FONT_UI, letterSpacing: 0.3,
             fontVariantNumeric: 'tabular-nums',
           }}>
             {heldShares.toFixed(2)} {sym} · {sym === 'ALPX-RE1' ? 'Real Estate fund' : sym === 'ALPX-CR2' ? 'Credit fund' : 'Fund'}
@@ -10873,7 +10888,7 @@ function Redeem({ onBack, sym, securityRedeemed = {}, onRedeemed, balances = {} 
 
         {/* Mode options */}
         <div style={{
-          marginTop: 14, fontFamily: 'Geist Mono, monospace', fontSize: 10,
+          marginTop: 14, fontFamily: FONT_UI, fontSize: 10,
           color: RH.textDim, letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700,
           padding: '0 4px',
         }}>Redemption method</div>
@@ -10883,17 +10898,17 @@ function Redeem({ onBack, sym, securityRedeemed = {}, onRedeemed, balances = {} 
           padding: 14, background: RH.surface,
           border: `1px solid ${mode === 'standard' ? RH.green : RH.line}`,
           borderRadius: 14, cursor: 'pointer',
-          fontFamily: 'Geist, Inter, system-ui',
+          fontFamily: FONT_UI,
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: RH.text }}>Standard · T+7</div>
             <div style={{
               fontSize: 11, fontWeight: 700, color: RH.green,
               padding: '2px 8px', borderRadius: 6, background: RH.green + '22',
-              fontFamily: 'Geist Mono, monospace', letterSpacing: 0.6,
+              fontFamily: FONT_UI, letterSpacing: 0.6,
             }}>0% fee</div>
           </div>
-          <div style={{ marginTop: 6, fontSize: 12, color: RH.textDim, fontFamily: 'Geist Mono, monospace' }}>
+          <div style={{ marginTop: 6, fontSize: 12, color: RH.textDim, fontFamily: FONT_UI }}>
             Receive ${heldUsd.toFixed(2)} in 7 business days
           </div>
         </button>
@@ -10903,17 +10918,17 @@ function Redeem({ onBack, sym, securityRedeemed = {}, onRedeemed, balances = {} 
           padding: 14, background: RH.surface,
           border: `1px solid ${mode === 'instant' ? RH.green : RH.line}`,
           borderRadius: 14, cursor: 'pointer',
-          fontFamily: 'Geist, Inter, system-ui',
+          fontFamily: FONT_UI,
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: RH.text }}>Instant</div>
             <div style={{
               fontSize: 11, fontWeight: 700, color: RH.red,
               padding: '2px 8px', borderRadius: 6, background: RH.red + '22',
-              fontFamily: 'Geist Mono, monospace', letterSpacing: 0.6,
+              fontFamily: FONT_UI, letterSpacing: 0.6,
             }}>1% fee</div>
           </div>
-          <div style={{ marginTop: 6, fontSize: 12, color: RH.textDim, fontFamily: 'Geist Mono, monospace' }}>
+          <div style={{ marginTop: 6, fontSize: 12, color: RH.textDim, fontFamily: FONT_UI }}>
             Receive ${(heldUsd * (1 - INSTANT_FEE_PCT)).toFixed(2)} now
           </div>
         </button>
@@ -11135,11 +11150,11 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
               <AssetIcon sym={a.sym} size={22}/>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: RH.text }}>{a.name || a.sym}</div>
-                <div style={{ fontSize: 11, color: RH.textDim, marginTop: 1, fontFamily: 'Geist Mono, monospace', fontVariantNumeric: 'tabular-nums' }}>
+                <div style={{ fontSize: 11, color: RH.textDim, marginTop: 1, fontFamily: FONT_UI, fontVariantNumeric: 'tabular-nums' }}>
                   ${(a.price || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
-              <div style={{ fontSize: 11, color: RH.textDim, fontVariantNumeric: 'tabular-nums', fontFamily: 'Geist Mono, monospace' }}>
+              <div style={{ fontSize: 11, color: RH.textDim, fontVariantNumeric: 'tabular-nums', fontFamily: FONT_UI }}>
                 {bal > 0 ? `$${bal.toFixed(2)}` : ''}
               </div>
             </button>
@@ -11149,7 +11164,7 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
           <div style={{
             padding: '10px 10px 4px',
             fontSize: 9.5, fontWeight: 700, color: RH.textDim,
-            fontFamily: 'Geist Mono, monospace',
+            fontFamily: FONT_UI,
             letterSpacing: 1.2, textTransform: 'uppercase',
             display: 'flex', justifyContent: 'space-between',
           }}>
@@ -11176,17 +11191,17 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
         {/* Asset name + price block */}
         <div style={{ padding: '4px 22px 0' }}>
           <div style={{
-            fontSize: 11, color: RH.textDim, fontFamily: 'Geist Mono, monospace',
+            fontSize: 11, color: RH.textDim, fontFamily: FONT_UI,
             letterSpacing: 0.8, fontWeight: 700, marginBottom: 6,
           }}>{sym}</div>
           <div style={{
-            fontSize: 30, fontWeight: 700, color: RH.text,
+            fontSize: 34, fontWeight: 700, color: RH.text,
             letterSpacing: -0.8, lineHeight: 1.05,
           }}>{fullName}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6 }}>
             <div style={{
-              fontSize: 36, fontWeight: 600, color: RH.text,
-              letterSpacing: -1.2, lineHeight: 1, fontVariantNumeric: 'tabular-nums',
+              fontSize: 52, fontWeight: 200, color: RH.text,
+              letterSpacing: -2, lineHeight: 1, fontVariantNumeric: 'tabular-nums',
             }}>{(() => {
               const s = fmtUsd(scrubPrice);
               const i = s.lastIndexOf('.');
@@ -11197,7 +11212,7 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
           </div>
           <div style={{
             marginTop: 6, display: 'flex', alignItems: 'center', gap: 6,
-            fontSize: 13, fontWeight: 600, fontVariantNumeric: 'tabular-nums',
+            fontSize: 15, fontWeight: 400, fontVariantNumeric: 'tabular-nums',
             color: accentColor,
           }}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill={accentColor}>
@@ -11208,8 +11223,8 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
           </div>
           <div style={{
             marginTop: 6, fontSize: 11, color: RH.textDim,
-            fontFamily: 'Geist Mono, monospace', letterSpacing: 0.4,
-            textTransform: 'uppercase', fontWeight: 600,
+            fontFamily: FONT_UI, letterSpacing: 0.4,
+            textTransform: 'none', fontWeight: 400, fontSize: 13,
           }}>24 Hour Market</div>
         </div>
 
@@ -11230,12 +11245,12 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
               const active = r === range;
               return (
                 <button key={r} onClick={() => setRange(r)} style={{
-                  flex: 1, padding: '7px 0', borderRadius: 999,
-                  background: active ? `${RH.green}22` : 'transparent',
+                  flex: 1, padding: 0, borderRadius: 16,
+                  background: active ? RH.acc : 'transparent',
                   border: 'none',
-                  color: active ? RH.green : RH.textDim,
-                  fontSize: 12, fontWeight: 700,
-                  fontFamily: 'Geist Mono, monospace', letterSpacing: 0.6,
+                  color: active ? RH.onAcc : RH.textDim,
+                  fontSize: 14, fontWeight: active ? 600 : 500, height: 32,
+                  fontFamily: FONT_UI, letterSpacing: 0.6,
                   cursor: 'pointer',
                 }}>{r}</button>
               );
@@ -11247,46 +11262,46 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
         {/* Your position */}
         <div style={{ padding: '20px 22px 0' }}>
           <div style={{
-            fontSize: 16, fontWeight: 700, color: RH.text,
+            fontSize: 20, fontWeight: 600, color: RH.text,
             letterSpacing: -0.2, marginBottom: 10,
           }}>{isStaked ? 'Staked balance' : 'Your position'}</div>
           <div style={{
-            padding: 14, background: RH.surface, border: `1px solid ${RH.line}`,
-            borderRadius: 14,
+            padding: '14px 16px', background: RH.surface, border: 'none',
+            borderRadius: 18,
           }}>
             <div style={{
               display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 16px',
-              fontFamily: 'Geist Mono, monospace',
+              fontFamily: FONT_UI,
             }}>
               <div>
-                <div style={{ fontSize: 10.5, color: RH.textDim, letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: 700 }}>
+                <div style={{ fontSize: 12, color: RH.textDim, fontWeight: 400 }}>
                   {isStaked ? 'Principal' : 'Market value'}
                 </div>
                 <div style={{
-                  marginTop: 4, fontSize: 16, fontWeight: 600, color: RH.text,
+                  marginTop: 2, fontSize: 22, fontWeight: 200, color: RH.text,
                   fontVariantNumeric: 'tabular-nums', letterSpacing: -0.3,
                 }}>${fmtUsd(holdingUsd)}</div>
               </div>
               <div>
-                <div style={{ fontSize: 10.5, color: RH.textDim, letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: 700 }}>
+                <div style={{ fontSize: 12, color: RH.textDim, fontWeight: 400 }}>
                   {sym} held
                 </div>
                 <div style={{
-                  marginTop: 4, fontSize: 16, fontWeight: 600, color: RH.text,
+                  marginTop: 2, fontSize: 22, fontWeight: 200, color: RH.text,
                   fontVariantNumeric: 'tabular-nums', letterSpacing: -0.3,
                 }}>{holdingCoin.toFixed(holdingCoin < 1 ? 6 : 4).replace(/\.?0+$/, '') || '0'}</div>
               </div>
               {isStaked ? (
                 <>
                   <div>
-                    <div style={{ fontSize: 10.5, color: RH.textDim, letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: 700 }}>APY</div>
-                    <div style={{ marginTop: 4, fontSize: 16, fontWeight: 700, color: RH.green, fontVariantNumeric: 'tabular-nums' }}>
+                    <div style={{ fontSize: 12, color: RH.textDim, fontWeight: 400 }}>APY</div>
+                    <div style={{ marginTop: 2, fontSize: 22, fontWeight: 300, color: RH.green, fontVariantNumeric: 'tabular-nums' }}>
                       {stakePeriodApy(sym, lockPeriod).toFixed(1)}%
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 10.5, color: RH.textDim, letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: 700 }}>Accrued</div>
-                    <div style={{ marginTop: 4, fontSize: 16, fontWeight: 600, color: RH.green, fontVariantNumeric: 'tabular-nums' }}>
+                    <div style={{ fontSize: 12, color: RH.textDim, fontWeight: 400 }}>Accrued</div>
+                    <div style={{ marginTop: 2, fontSize: 22, fontWeight: 200, color: RH.green, fontVariantNumeric: 'tabular-nums' }}>
                       +${accruedUsd.toFixed(2)}
                     </div>
                   </div>
@@ -11294,13 +11309,13 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
               ) : isSecurity ? (
                 <>
                   <div>
-                    <div style={{ fontSize: 10.5, color: RH.textDim, letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: 700 }}>APY</div>
-                    <div style={{ marginTop: 4, fontSize: 16, fontWeight: 700, color: RH.green, fontVariantNumeric: 'tabular-nums' }}>
+                    <div style={{ fontSize: 12, color: RH.textDim, fontWeight: 400 }}>APY</div>
+                    <div style={{ marginTop: 2, fontSize: 22, fontWeight: 300, color: RH.green, fontVariantNumeric: 'tabular-nums' }}>
                       {(meta.apy || 0).toFixed(1)}%
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 10.5, color: RH.textDim, letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: 700 }}>Type</div>
+                    <div style={{ fontSize: 12, color: RH.textDim, fontWeight: 400 }}>Type</div>
                     <div style={{ marginTop: 4, fontSize: 14, fontWeight: 600, color: RH.text }}>
                       {sym === 'ALPX-RE1' ? 'Real Estate' : sym === 'ALPX-CR2' ? 'Credit' : 'Token'}
                     </div>
@@ -11309,16 +11324,16 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
               ) : (
                 <>
                   <div>
-                    <div style={{ fontSize: 10.5, color: RH.textDim, letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: 700 }}>Today's return</div>
+                    <div style={{ fontSize: 12, color: RH.textDim, fontWeight: 400 }}>Today's return</div>
                     <div style={{
-                      marginTop: 4, fontSize: 16, fontWeight: 700,
+                      marginTop: 2, fontSize: 22, fontWeight: 300,
                       color: accentColor, fontVariantNumeric: 'tabular-nums',
                     }}>{chartIsUp ? '+' : '-'}${Math.abs(chartChange * (holdingCoin || 0)).toFixed(2)}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 10.5, color: RH.textDim, letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: 700 }}>Avg cost</div>
+                    <div style={{ fontSize: 12, color: RH.textDim, fontWeight: 400 }}>Avg cost</div>
                     <div style={{
-                      marginTop: 4, fontSize: 16, fontWeight: 600, color: RH.text,
+                      marginTop: 2, fontSize: 22, fontWeight: 200, color: RH.text,
                       fontVariantNumeric: 'tabular-nums', letterSpacing: -0.3,
                     }}>${fmtUsd((meta.price || 1) * 0.94)}</div>
                   </div>
@@ -11335,7 +11350,7 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
                   <path d="M8 11 V7 a4 4 0 0 1 8 0 V11"/>
                 </svg>
                 <span style={{
-                  fontFamily: 'Geist Mono, monospace', fontSize: 10.5,
+                  fontFamily: FONT_UI, fontSize: 10.5,
                   color: RH.red, letterSpacing: 0.6, fontWeight: 700, textTransform: 'uppercase',
                 }}>{lockPeriod === 'flexible' ? 'Flexible' : lockPeriod === '90d' ? '90 days' : lockPeriod === '1y' ? '1 year' : lockPeriod}</span>
               </div>
@@ -11349,9 +11364,8 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
       {/* Sticky bottom — Robinhood-style. Account picker + Sell + Buy with prices. */}
       <div style={{
         flexShrink: 0,
-        borderTop: `1px solid ${RH.line}`,
         background: RH.bg,
-        padding: '10px 14px 22px',
+        padding: '10px 16px 22px',
       }}>
         {isStaked ? (
           <button onClick={() => onUnstake && onUnstake(sym)} style={{
@@ -11372,13 +11386,13 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
                   border: `1px solid ${holdingUsd > 0 ? RH.red : RH.line}`,
                   fontSize: 13, fontWeight: 700, letterSpacing: 0.2,
                   cursor: holdingUsd > 0 ? 'pointer' : 'not-allowed',
-                  fontFamily: 'Geist, Inter, system-ui',
+                  fontFamily: FONT_UI,
                 }}>{holdingUsd > 0 ? 'Redeem' : 'No holdings'}</button>
               <button onClick={() => onBuy && onBuy(sym)} style={{
-                flex: 1, padding: '13px 0', borderRadius: 999,
-                background: RH.green, color: '#000', border: 'none',
-                fontSize: 13, fontWeight: 700, letterSpacing: 0.2, cursor: 'pointer',
-                fontFamily: 'Geist, Inter, system-ui',
+                flex: 1, padding: '15px 0', borderRadius: 20,
+                background: RH.bg, color: RH.green, border: `1.5px solid ${RH.green}`,
+                fontSize: 16, fontWeight: 400, cursor: 'pointer',
+                fontFamily: FONT_UI,
                 fontVariantNumeric: 'tabular-nums',
               }}>Buy · ${fmtUsd(askPrice)}</button>
             </div>
@@ -11387,7 +11401,7 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
           <div style={{
             padding: '14px 14px', borderRadius: 12,
             background: RH.surface, border: `1px solid ${RH.line}`,
-            fontFamily: 'Geist, Inter, system-ui',
+            fontFamily: FONT_UI,
           }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: RH.text, letterSpacing: -0.1 }}>USDT is your spending balance</div>
             <div style={{ marginTop: 4, fontSize: 11.5, color: RH.textDim, lineHeight: 1.5 }}>
@@ -11400,20 +11414,20 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
               <button onClick={() => onSell && onSell(sym)}
                 disabled={holdingUsd <= 0}
                 style={{
-                  flex: 1, padding: '13px 0', borderRadius: 999,
-                  background: holdingUsd > 0 ? `${RH.red}26` : RH.surfaceUp,
+                  flex: 1, padding: '15px 0', borderRadius: 20,
+                  background: RH.bg,
                   color: holdingUsd > 0 ? RH.red : RH.textMute,
-                  border: `1px solid ${holdingUsd > 0 ? RH.red : RH.line}`,
-                  fontSize: 13, fontWeight: 700, letterSpacing: 0.2,
+                  border: `1.5px solid ${holdingUsd > 0 ? RH.red : RH.line}`,
+                  fontSize: 16, fontWeight: 400,
                   cursor: holdingUsd > 0 ? 'pointer' : 'not-allowed',
-                  fontFamily: 'Geist, Inter, system-ui',
+                  fontFamily: FONT_UI,
                   fontVariantNumeric: 'tabular-nums',
                 }}>Sell · ${fmtUsd(bidPrice)}</button>
               <button onClick={() => onBuy && onBuy(sym)} style={{
-                flex: 1, padding: '13px 0', borderRadius: 999,
-                background: RH.green, color: '#000', border: 'none',
-                fontSize: 13, fontWeight: 700, letterSpacing: 0.2, cursor: 'pointer',
-                fontFamily: 'Geist, Inter, system-ui',
+                flex: 1, padding: '15px 0', borderRadius: 20,
+                background: RH.bg, color: RH.green, border: `1.5px solid ${RH.green}`,
+                fontSize: 16, fontWeight: 400, cursor: 'pointer',
+                fontFamily: FONT_UI,
                 fontVariantNumeric: 'tabular-nums',
               }}>Buy · ${fmtUsd(askPrice)}</button>
             </div>
@@ -11469,7 +11483,7 @@ function SellPicker({ onBack, onPick, balances = {} }) {
         <div style={{
           flex: 1, display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', padding: '0 36px',
-          textAlign: 'center', fontFamily: 'Geist, Inter, system-ui',
+          textAlign: 'center', fontFamily: FONT_UI,
         }}>
           <div style={{
             width: 64, height: 64, borderRadius: 32,
@@ -11515,9 +11529,9 @@ function SellPicker({ onBack, onPick, balances = {} }) {
         <div style={{ width: 36 }}/>
       </div>
 
-      <div style={{ padding: '8px 22px 18px', fontFamily: 'Geist, Inter, system-ui' }}>
+      <div style={{ padding: '8px 22px 18px', fontFamily: FONT_UI }}>
         <div style={{
-          fontFamily: 'Geist Mono, monospace', fontSize: 10.5, color: RH.textDim,
+          fontFamily: FONT_UI, fontSize: 10.5, color: RH.textDim,
           letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700,
           marginBottom: 6,
         }}>Total holdings</div>
@@ -11538,7 +11552,7 @@ function SellPicker({ onBack, onPick, balances = {} }) {
               width: '100%', textAlign: 'left', background: 'transparent',
               border: 'none', borderTop: i === 0 ? 'none' : `1px solid ${RH.line}`,
               padding: '14px 8px', display: 'flex', alignItems: 'center', gap: 14,
-              cursor: 'pointer', fontFamily: 'Geist, Inter, system-ui',
+              cursor: 'pointer', fontFamily: FONT_UI,
             }}>
               <AssetIcon sym={a.sym} size={34}/>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -11548,7 +11562,7 @@ function SellPicker({ onBack, onPick, balances = {} }) {
                 }}>{a.name}</div>
                 <div style={{
                   marginTop: 2, fontSize: 11.5, color: RH.textDim,
-                  fontFamily: 'Geist Mono, monospace', letterSpacing: 0.3,
+                  fontFamily: FONT_UI, letterSpacing: 0.3,
                   fontVariantNumeric: 'tabular-nums',
                 }}>
                   {coinAmt.toFixed(coinAmt < 1 ? 6 : 4).replace(/\.?0+$/, '')} {a.sym}
@@ -11563,7 +11577,7 @@ function SellPicker({ onBack, onPick, balances = {} }) {
                 }}>${a.owned.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 <div style={{
                   marginTop: 2, fontSize: 11.5, fontWeight: 600,
-                  fontFamily: 'Geist Mono, monospace', letterSpacing: 0.3,
+                  fontFamily: FONT_UI, letterSpacing: 0.3,
                   fontVariantNumeric: 'tabular-nums',
                   color: a.chg >= 0 ? RH.green : RH.red,
                 }}>{a.chg >= 0 ? '+' : ''}{a.chg.toFixed(2)}%</div>
@@ -11959,7 +11973,7 @@ function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiq
         <div style={{
           flex: 1, display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', padding: '0 36px',
-          textAlign: 'center', fontFamily: 'Geist, Inter, system-ui',
+          textAlign: 'center', fontFamily: FONT_UI,
         }}>
           <div style={{
             width: 64, height: 64, borderRadius: 32,
@@ -12068,7 +12082,7 @@ function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiq
                     }}>${(balances[a.sym] || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                     <div style={{
                       marginTop: 2, fontSize: 10.5, fontWeight: 600,
-                      fontFamily: 'Geist Mono, monospace', letterSpacing: 0.4,
+                      fontFamily: FONT_UI, letterSpacing: 0.4,
                       color: a.chg >= 0 ? RH.green : RH.red,
                       fontVariantNumeric: 'tabular-nums',
                     }}>{a.chg >= 0 ? '+' : ''}{a.chg.toFixed(2)}%</div>
@@ -12088,7 +12102,7 @@ function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiq
           <div style={{
             padding: '10px 10px 4px',
             fontSize: 9.5, fontWeight: 700, color: RH.textDim,
-            fontFamily: 'Geist Mono, monospace',
+            fontFamily: FONT_UI,
             letterSpacing: 1.2, textTransform: 'uppercase',
             display: 'flex', justifyContent: 'space-between',
           }}>
@@ -12120,15 +12134,15 @@ function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiq
         {/* Price block — uses live or scrubbed value */}
         <div style={{ padding: '4px 22px 0' }}>
           <div style={{
-            fontSize: 28, fontWeight: 600, color: RH.text, letterSpacing: -0.8,
+            fontSize: 40, fontWeight: 200, color: RH.text, letterSpacing: -1.2,
             fontVariantNumeric: 'tabular-nums', lineHeight: 1,
           }}>${scrubPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           <div style={{
             marginTop: 6, display: 'flex', alignItems: 'center', gap: 8,
-            fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums',
+            fontSize: 14, fontWeight: 400, fontVariantNumeric: 'tabular-nums',
           }}>
             <span style={{ color: accentColor }}>{chartIsUp ? '▲' : '▼'} ${Math.abs(chartChange).toFixed(2)} ({chartIsUp ? '+' : ''}{chartPct.toFixed(2)}%)</span>
-            <span style={{ color: RH.textDim, fontFamily: 'Geist Mono, monospace', fontSize: 10.5, letterSpacing: 0.6, textTransform: 'uppercase' }}>
+            <span style={{ color: RH.textDim, fontFamily: FONT_UI, fontSize: 14 }}>
               {scrubIdx !== null ? 'Scrubbing' : (BUY_RANGE_META[range] && BUY_RANGE_META[range].label) || 'Today'}
             </span>
           </div>
@@ -12147,35 +12161,35 @@ function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiq
 
         {/* Range tabs */}
         <div style={{
-          display: 'flex', justifyContent: 'space-between',
-          padding: '6px 22px 10px', fontFamily: 'Geist Mono, monospace',
+          display: 'flex', justifyContent: 'space-between', gap: 4,
+          padding: '6px 16px 10px', fontFamily: FONT_UI,
         }}>
           {BUY_RANGES.map((r) => {
             const active = r === range;
             return (
               <button key={r} onClick={() => setRange(r)} style={{
-                background: 'transparent', border: 'none', cursor: 'pointer',
-                padding: '6px 4px',
-                fontSize: 11, fontWeight: 700, letterSpacing: 0.4,
-                color: active ? accentColor : RH.textDim,
-                borderBottom: active ? `2px solid ${accentColor}` : '2px solid transparent',
-                transition: 'color 160ms ease, border-color 160ms ease',
+                flex: 1, height: 30, borderRadius: 15, background: active ? RH.acc : 'transparent', border: 'none', cursor: 'pointer',
+                padding: 0,
+                fontSize: 13, fontWeight: active ? 600 : 500,
+                color: active ? RH.onAcc : RH.textDim,
+                
+                transition: 'color 160ms ease, background 160ms ease',
               }}>{r}</button>
             );
           })}
         </div>
 
         {/* Order type tabs */}
-        <div style={{ padding: '6px 22px 0', display: 'flex', gap: 4 }}>
+        <div style={{ margin: '6px 16px 0', padding: 2, display: 'flex', gap: 2, borderRadius: 18, background: RH.surface }}>
           {['Market','Limit','Stop'].map((t) => {
             const active = t === orderType;
             return (
               <button key={t} onClick={() => setOrderType(t)} style={{
-                flex: 1, padding: '8px 0', borderRadius: 10,
-                background: active ? RH.surfaceUp : RH.surface,
-                border: `1px solid ${active ? RH.accent : RH.line}`,
-                color: active ? RH.text : RH.textDim,
-                fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
+                flex: 1, height: 32, padding: 0, borderRadius: 16,
+                background: active ? RH.acc : 'transparent',
+                border: 'none',
+                color: active ? RH.onAcc : RH.text,
+                fontSize: 14, fontWeight: active ? 600 : 500, cursor: 'pointer',
                 letterSpacing: 0.2,
               }}>{t}</button>
             );
@@ -12240,13 +12254,13 @@ function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiq
                   marginBottom: 10,
                 }}>
                   <div style={{
-                    fontFamily: 'Geist Mono, monospace', fontSize: 10, color: RH.textDim,
+                    fontFamily: FONT_UI, fontSize: 10, color: RH.textDim,
                     letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700,
                   }}>{isLimit ? 'Limit price' : 'Stop price'}</div>
                   <button onClick={setToMarket} style={{
                     background: 'transparent', border: `1px solid ${RH.line}`,
                     color: RH.textDim, fontSize: 10, fontWeight: 600,
-                    fontFamily: 'Geist Mono, monospace', letterSpacing: 0.8,
+                    fontFamily: FONT_UI, letterSpacing: 0.8,
                     padding: '4px 10px', borderRadius: 999, cursor: 'pointer',
                     textTransform: 'uppercase',
                   }}>Market</button>
@@ -12269,7 +12283,7 @@ function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiq
 
                   <div style={{
                     flex: 1, textAlign: 'center',
-                    fontFamily: 'Geist Mono, monospace',
+                    fontFamily: FONT_UI,
                     fontSize: 26, fontWeight: 600, color: RH.text,
                     letterSpacing: -0.5, fontVariantNumeric: 'tabular-nums',
                   }}>
@@ -12293,7 +12307,7 @@ function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiq
                   marginTop: 10,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   gap: 6,
-                  fontFamily: 'Geist Mono, monospace', fontSize: 10.5,
+                  fontFamily: FONT_UI, fontSize: 10.5,
                   letterSpacing: 0.4,
                   color: tierColor,
                 }}>
@@ -12313,7 +12327,7 @@ function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiq
               {/* Tier-aware footnote: explanation OR warning */}
               <div style={{
                 marginTop: 8, fontSize: 10.5,
-                fontFamily: 'Geist Mono, monospace', letterSpacing: 0.4,
+                fontFamily: FONT_UI, letterSpacing: 0.4,
                 textAlign: 'center',
                 color: triggerTier === 'warn' ? '#F5B543'
                      : (triggerTier === 'wrong-side' || triggerTier === 'too-far') ? RH.red
@@ -12355,20 +12369,20 @@ function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiq
           }}>
             {unit === 'usd' ? (
               <>
-                <span style={{ fontSize: 24, fontWeight: 500, marginRight: 4, opacity: 0.6 }}>$</span>
-                <span style={{ fontSize: 48, fontWeight: 600 }}>{intPart}</span>
-                <span style={{ fontSize: 30, fontWeight: 500, opacity: 0.45 }}>{fracDisplay}</span>
+                <span style={{ fontSize: 30, fontWeight: 200, marginRight: 3, opacity: 0.6 }}>$</span>
+                <span style={{ fontSize: 60, fontWeight: 200 }}>{intPart}</span>
+                <span style={{ fontSize: 30, fontWeight: 200, opacity: 0.45 }}>{fracDisplay}</span>
               </>
             ) : (
               <>
-                <span style={{ fontSize: 36, fontWeight: 600 }}>{intPart}{fracDisplay}</span>
+                <span style={{ fontSize: 44, fontWeight: 200 }}>{intPart}{fracDisplay}</span>
                 <span style={{ fontSize: 18, fontWeight: 500, marginLeft: 6, opacity: 0.6 }}>{assetId}</span>
               </>
             )}
           </div>
           <div style={{
-            marginTop: 6, fontSize: 11, color: RH.textDim,
-            fontFamily: 'Geist Mono, monospace', letterSpacing: 0.4,
+            marginTop: 4, fontSize: 14, color: RH.textDim,
+            fontFamily: FONT_UI, letterSpacing: 0.4,
             fontVariantNumeric: 'tabular-nums',
           }}>
             {unit === 'usd'
@@ -12380,18 +12394,18 @@ function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiq
         {/* USD / Coin toggle */}
         <div style={{ padding: '6px 22px 0', display: 'flex', justifyContent: 'center' }}>
           <div style={{
-            display: 'inline-flex', background: RH.surface, border: `1px solid ${RH.line}`,
-            borderRadius: 999, padding: 3,
+            display: 'inline-flex', background: RH.surface, border: 'none',
+            borderRadius: 18, padding: 2,
           }}>
             {['usd', 'coin'].map((u) => {
               const active = u === unit;
               return (
                 <button key={u} onClick={() => { setUnit(u); setAmountStr('0'); }} style={{
-                  padding: '6px 14px', borderRadius: 999,
-                  background: active ? RH.surfaceUp : 'transparent',
+                  padding: '0 16px', height: 32, borderRadius: 16,
+                  background: active ? RH.capsule : 'transparent',
                   border: 'none', cursor: 'pointer',
                   color: active ? RH.text : RH.textDim,
-                  fontSize: 11.5, fontWeight: 700, letterSpacing: 0.4,
+                  fontSize: 14, fontWeight: active ? 600 : 500,
                 }}>{u === 'usd' ? 'USD' : assetId}</button>
               );
             })}
@@ -12405,13 +12419,13 @@ function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiq
               const active = activeQuick === f;
               return (
                 <button key={l} onClick={() => setQuick(f)} style={{
-                  padding: '5px 12px', borderRadius: 999,
-                  background: active ? `${RH.accent}26` : RH.surface,
-                  border: `1px solid ${active ? RH.accent : RH.line}`,
-                  color: active ? RH.accent : RH.text,
-                  fontSize: 11, fontWeight: 700,
+                  padding: '0 14px', height: 36, borderRadius: 18,
+                  background: active ? RH.acc : RH.surface,
+                  border: 'none',
+                  color: active ? RH.onAcc : RH.text,
+                  fontSize: 14, fontWeight: active ? 600 : 500,
                   cursor: 'pointer', letterSpacing: 0.2,
-                  fontFamily: 'Geist Mono, monospace',
+                  fontFamily: FONT_UI,
                   transition: 'background 160ms ease, color 160ms ease, border-color 160ms ease',
                 }}>{l}</button>
               );
@@ -12423,8 +12437,8 @@ function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiq
         <div style={{ padding: '14px 22px 0' }}>
           <div style={{
             padding: '12px 14px',
-            background: RH.surface, border: `1px solid ${RH.line}`,
-            borderRadius: 14, fontVariantNumeric: 'tabular-nums',
+            background: RH.surface, border: 'none',
+            borderRadius: 18, fontVariantNumeric: 'tabular-nums',
           }}>
             <Row label="Order type"  value={orderType}/>
             <div style={{ height: 1, background: RH.line, margin: '8px 0' }}/>
@@ -12435,9 +12449,9 @@ function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiq
             <Row label="Total cost"  value={`$${total.toFixed(2)}`} strong/>
           </div>
           <div style={{
-            marginTop: 8, fontSize: 11, color: insufficient ? RH.red : RH.textDim,
-            fontFamily: 'Geist Mono, monospace',
-            fontVariantNumeric: 'tabular-nums', letterSpacing: 0.6,
+            marginTop: 8, fontSize: 13, color: insufficient ? RH.red : RH.textDim,
+            fontFamily: FONT_UI,
+            fontVariantNumeric: 'tabular-nums',
             textAlign: 'center',
           }}>
             {insufficient
@@ -12456,9 +12470,9 @@ function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiq
         }}>
           {['1','2','3','4','5','6','7','8','9','.','0','⌫'].map((k) => (
             <button key={k} onClick={() => onKey(k)} style={{
-              background: 'transparent', border: 'none', padding: '10px 0',
-              color: RH.text, fontSize: 20, fontWeight: 500,
-              letterSpacing: -0.5, cursor: 'pointer', fontFamily: 'Geist, Inter, system-ui',
+              background: 'transparent', border: 'none', padding: '8px 0',
+              color: RH.text, fontSize: 28, fontWeight: 300,
+              letterSpacing: -0.5, cursor: 'pointer', fontFamily: FONT_UI,
             }}>{k}</button>
           ))}
         </div>
@@ -12469,11 +12483,11 @@ function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiq
             onClick={doBuy}
             style={{
               width: '100%', padding: '16px 0', borderRadius: 999,
-              background: (valid && triggerOk) ? (isSell ? `${RH.red}26` : accentColor) : RH.surfaceUp,
-              color: (valid && triggerOk) ? (isSell ? RH.red : (chartIsUp ? '#000' : '#fff')) : RH.textMute,
+              background: (valid && triggerOk) ? (isSell ? `${RH.red}26` : RH.acc) : RH.surfaceUp,
+              color: (valid && triggerOk) ? (isSell ? RH.red : RH.onAcc) : RH.textMute,
               border: (valid && triggerOk) && isSell ? `1px solid ${RH.red}` : 'none',
               cursor: (valid && triggerOk) ? 'pointer' : 'not-allowed',
-              fontSize: 15, fontWeight: 700, letterSpacing: 0.2,
+              fontSize: 17, fontWeight: 600,
             }}>
             {!valid ? 'Enter amount'
               : !triggerOk ? `Enter ${orderType.toLowerCase()} price`
@@ -12674,7 +12688,7 @@ function TwoFAFullScreen({ item, onClose }) {
           onPaste={i === 0 ? handlePaste : undefined}
           style={{ width: 42, height: 54, textAlign: 'center', background: RH.surface,
             border: `1.5px solid ${error ? RH.red : (d ? RH.accent : RH.line)}`, borderRadius: 12,
-            color: error ? RH.red : RH.text, fontSize: 24, fontWeight: 700, fontFamily: 'Geist Mono, monospace',
+            color: error ? RH.red : RH.text, fontSize: 24, fontWeight: 700, fontFamily: FONT_UI,
             fontVariantNumeric: 'tabular-nums', outline: 'none', caretColor: RH.accent,
             transition: 'border-color 140ms ease, color 140ms ease' }}/>
       ))}
@@ -12685,7 +12699,7 @@ function TwoFAFullScreen({ item, onClose }) {
       position: 'absolute', inset: 0, zIndex: 9999,
       background: 'rgba(8,10,16,0.55)',
       display: 'flex', justifyContent: 'center', alignItems: 'center',
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
       animation: 'alpexa-modal-fade 200ms ease-out both',
     }}>
     <div style={{
@@ -12763,11 +12777,11 @@ function TwoFAFullScreen({ item, onClose }) {
                 {/^\s*<svg/i.test(enroll.qr)
                   ? <div style={{ width: 160, height: 160, background: '#fff', borderRadius: 12, padding: 8, boxSizing: 'border-box' }} dangerouslySetInnerHTML={{ __html: enroll.qr }}/>
                   : <img src={enroll.qr} alt="2FA QR" style={{ width: 160, height: 160, background: '#fff', borderRadius: 12, padding: 8, boxSizing: 'border-box' }}/>}
-                <div style={{ marginTop: 9, fontSize: 10, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 0.8, textAlign: 'center' }}>Can't scan? Enter this key:</div>
-                <div style={{ marginTop: 3, fontSize: 11.5, color: RH.text, fontFamily: 'Geist Mono, monospace', wordBreak: 'break-all', maxWidth: 280, textAlign: 'center' }}>{enroll.secret}</div>
+                <div style={{ marginTop: 9, fontSize: 10, color: RH.textDim, fontFamily: FONT_UI, letterSpacing: 0.8, textAlign: 'center' }}>Can't scan? Enter this key:</div>
+                <div style={{ marginTop: 3, fontSize: 11.5, color: RH.text, fontFamily: FONT_UI, wordBreak: 'break-all', maxWidth: 280, textAlign: 'center' }}>{enroll.secret}</div>
               </div>
             ) : null}
-            <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: 'Geist Mono, monospace', letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 14 }}>Authenticator code</div>
+            <div style={{ fontSize: 10.5, color: RH.textDim, fontFamily: FONT_UI, letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700, marginBottom: 14 }}>Authenticator code</div>
             {Digits()}
             {error ? <div style={{ fontSize: 12, color: RH.red, fontWeight: 600, marginBottom: 6 }}>{error}</div> : null}
           </React.Fragment>
@@ -12778,11 +12792,11 @@ function TwoFAFullScreen({ item, onClose }) {
       <div style={{ padding: '14px 22px 26px', position: 'relative', zIndex: 1 }}>
         {mode === 'prompt' ? (
           <React.Fragment>
-            <button onClick={startEnroll} disabled={busy} style={{ width: '100%', padding: '16px 0', borderRadius: 999, background: RH.text, color: RH.bg, border: 'none', cursor: busy ? 'default' : 'pointer', fontSize: 15, fontWeight: 700, letterSpacing: 0.2, fontFamily: 'Geist, Inter, system-ui', opacity: busy ? 0.6 : 1 }}>{busy ? 'Setting up…' : 'Set up 2FA'}</button>
-            <button onClick={() => onClose(true)} style={{ width: '100%', marginTop: 10, padding: '12px 0', borderRadius: 999, background: 'transparent', color: RH.textDim, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'Geist, Inter, system-ui' }}>Not now — continue without 2FA</button>
+            <button onClick={startEnroll} disabled={busy} style={{ width: '100%', padding: '16px 0', borderRadius: 999, background: RH.text, color: RH.bg, border: 'none', cursor: busy ? 'default' : 'pointer', fontSize: 15, fontWeight: 700, letterSpacing: 0.2, fontFamily: FONT_UI, opacity: busy ? 0.6 : 1 }}>{busy ? 'Setting up…' : 'Set up 2FA'}</button>
+            <button onClick={() => onClose(true)} style={{ width: '100%', marginTop: 10, padding: '12px 0', borderRadius: 999, background: 'transparent', color: RH.textDim, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: FONT_UI }}>Not now — continue without 2FA</button>
           </React.Fragment>
         ) : (mode === 'verify' || mode === 'enroll') ? (
-          <button onClick={submit} disabled={filled !== 6 || busy} style={{ width: '100%', padding: '16px 0', borderRadius: 999, background: (filled === 6 && !busy) ? RH.text : RH.surfaceUp, color: (filled === 6 && !busy) ? RH.bg : RH.textMute, border: 'none', cursor: (filled === 6 && !busy) ? 'pointer' : 'not-allowed', fontSize: 15, fontWeight: 700, letterSpacing: 0.2, fontFamily: 'Geist, Inter, system-ui' }}>{busy ? 'Verifying…' : (mode === 'enroll' ? 'Verify & enable' : 'Verify')}</button>
+          <button onClick={submit} disabled={filled !== 6 || busy} style={{ width: '100%', padding: '16px 0', borderRadius: 999, background: (filled === 6 && !busy) ? RH.text : RH.surfaceUp, color: (filled === 6 && !busy) ? RH.bg : RH.textMute, border: 'none', cursor: (filled === 6 && !busy) ? 'pointer' : 'not-allowed', fontSize: 15, fontWeight: 700, letterSpacing: 0.2, fontFamily: FONT_UI }}>{busy ? 'Verifying…' : (mode === 'enroll' ? 'Verify & enable' : 'Verify')}</button>
         ) : null}
       </div>
     </div>
@@ -12835,7 +12849,7 @@ function EmailOTPFullScreen({ item, onClose }) {
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: RH.bg, display: 'flex', flexDirection: 'column', fontFamily: 'Geist, Inter, system-ui' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: RH.bg, display: 'flex', flexDirection: 'column', fontFamily: FONT_UI }}>
       <div style={{ padding: '20px 24px 0' }}>
         <button onClick={() => onClose(false)} aria-label="Cancel" style={{ width: 36, height: 36, borderRadius: 18, background: RH.surface, border: `1px solid ${RH.line}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={RH.text} strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 L6 18 M6 6 L18 18"/></svg>
@@ -12851,7 +12865,7 @@ function EmailOTPFullScreen({ item, onClose }) {
           {digits.map((d, i) => (
             <input key={i} ref={(el) => (inputsRef.current[i] = el)} type="text" inputMode="numeric" maxLength={1} value={d}
               onChange={(e) => setDigit(i, e.target.value)} onKeyDown={(e) => onKey(i, e)} onPaste={i === 0 ? onPaste : undefined}
-              style={{ width: 44, height: 56, textAlign: 'center', background: RH.surface, border: `1.5px solid ${err ? RH.red : (d ? RH.accent : RH.line)}`, borderRadius: 12, color: err ? RH.red : RH.text, fontSize: 24, fontWeight: 700, outline: 'none', fontFamily: 'Geist Mono, monospace' }}/>
+              style={{ width: 44, height: 56, textAlign: 'center', background: RH.surface, border: `1.5px solid ${err ? RH.red : (d ? RH.accent : RH.line)}`, borderRadius: 12, color: err ? RH.red : RH.text, fontSize: 24, fontWeight: 700, outline: 'none', fontFamily: FONT_UI }}/>
           ))}
         </div>
         {err ? <div style={{ marginTop: 12, fontSize: 13, color: RH.red, fontWeight: 600 }}>{err}</div> : null}
@@ -12945,7 +12959,7 @@ function AlpexaModal({ item, onClose }) {
         width: '100%', maxWidth: isTwofa ? 340 : 320,
         background: RH.surface, border: `1px solid ${RH.line}`,
         borderRadius: 20, padding: isTwofa ? '26px 24px 22px' : '24px 22px 20px',
-        fontFamily: 'Geist, Inter, system-ui',
+        fontFamily: FONT_UI,
         boxShadow: '0 20px 56px rgba(0,0,0,0.5), 0 4px 16px rgba(0,0,0,0.3)',
         animation: 'alpexa-modal-pop 280ms cubic-bezier(0.22, 1.4, 0.36, 1) both',
       }}>
@@ -12995,7 +13009,7 @@ function AlpexaModal({ item, onClose }) {
                     border: `1.5px solid ${twofaError ? RH.red : (d ? RH.accent : RH.line)}`,
                     borderRadius: 10, color: twofaError ? RH.red : RH.text,
                     fontSize: 22, fontWeight: 700,
-                    fontFamily: 'Geist Mono, monospace',
+                    fontFamily: FONT_UI,
                     fontVariantNumeric: 'tabular-nums', outline: 'none',
                     caretColor: RH.accent,
                     transition: 'border-color 140ms ease, color 140ms ease',
@@ -13021,14 +13035,14 @@ function AlpexaModal({ item, onClose }) {
             fontSize: 15, fontWeight: 700,
             cursor: (isTwofa && digits.join('').length !== 6) ? 'not-allowed' : 'pointer',
             letterSpacing: 0.2,
-            fontFamily: 'Geist, Inter, system-ui',
+            fontFamily: FONT_UI,
           }}>{isConfirm ? 'Confirm' : isTwofa ? 'Verify' : 'OK'}</button>
         {(isConfirm || isTwofa) ? (
           <button onClick={() => onClose(false)} style={{
             marginTop: 6, width: '100%', padding: '11px 0', borderRadius: 999,
             background: 'transparent', color: RH.textDim, border: 'none',
             fontSize: 13, fontWeight: 600, cursor: 'pointer',
-            fontFamily: 'Geist, Inter, system-ui',
+            fontFamily: FONT_UI,
           }}>Cancel</button>
         ) : null}
       </div>

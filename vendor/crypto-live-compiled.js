@@ -6,35 +6,45 @@ function _extends() { return _extends = Object.assign ? Object.assign.bind() : f
 // ═══════════ 블록 1/5 (원 위치 보존 — 병합돼도 실행 순서·전역 공유 동일) ═══════════
 ;
 
-// Palette — dark phone surface, electric blue accent
+// Palette — 월드클락 스킨 (2026-10-25 사장님 시안 승인 "진행해" — 시안 7rojdeLN8bXrCd8SKXz8q8, FX·스포츠와 같은 규율).
+// iOS 시스템 회색 + 주황 액센트. green = 상승/주요 시세색(파랑 유지 — 오르면 파랑·내리면 빨강), accent = 글자·아이콘용 주황
+// (라이트는 흰 바탕 대비 위해 진한 주황), acc/onAcc = 주황 채움 + 검정 글자, capsule = 탭바 선택 캡슐.
 const DARK_PALETTE = {
   bg: '#000000',
-  surface: '#0E0E0E',
-  surfaceUp: '#161616',
-  line: '#1F1F1F',
+  surface: '#1C1C1E',
+  surfaceUp: '#2C2C2E',
+  line: '#38383A',
   text: '#FFFFFF',
-  textDim: '#9A9A9A',
-  textMute: '#5F5F5F',
-  green: '#4f6ef7',
-  greenDeep: '#3355e0',
-  red: '#FF5050',
-  accent: '#4f6ef7',
-  heroBlue: '#1e40d8'
+  textDim: '#98989F',
+  textMute: '#8E8E93',
+  green: '#0A84FF',
+  greenDeep: '#0060DF',
+  red: '#FF453A',
+  accent: '#FF9F0A',
+  heroBlue: '#0A84FF',
+  acc: '#FF9F0A',
+  onAcc: '#000000',
+  capsule: '#2C2C2E'
 };
 const LIGHT_PALETTE = {
   bg: '#FFFFFF',
-  surface: '#F4F6F9',
-  surfaceUp: '#ECEEF1',
-  line: '#E6E6E9',
-  text: '#0F1115',
-  textDim: '#6B7280',
-  textMute: '#9CA3AF',
-  green: '#1e40d8',
-  greenDeep: '#1734b0',
+  surface: '#F2F2F7',
+  surfaceUp: '#E5E5EA',
+  line: '#D1D1D6',
+  text: '#000000',
+  textDim: '#6C6C70',
+  textMute: '#8E8E93',
+  green: '#0A6CFF',
+  greenDeep: '#0050CC',
   red: '#FF3B30',
-  accent: '#1e40d8',
-  heroBlue: '#1e40d8'
+  accent: '#C25E00',
+  heroBlue: '#0A6CFF',
+  acc: '#FF9500',
+  onAcc: '#000000',
+  capsule: '#FFFFFF'
 };
+// 서체 = iOS 시스템 서체 (월드클락 스킨). 숫자 자릿폭은 crypto-live.html body 의 tabular-nums 상속으로 고정 — 시세 틱에 글자가 흔들리지 않게.
+const FONT_UI = '-apple-system, "SF Pro Display", "SF Pro Text", system-ui, Geist, Inter, sans-serif';
 // Mutable palette object — all RH.x reads pick up whichever palette is active.
 // Toggled via the ThemeContext (Account → Appearance).
 const RH = {
@@ -1129,7 +1139,7 @@ function Phone({
       display: 'flex',
       flexDirection: 'column',
       color: RH.text,
-      fontFamily: 'Geist, Inter, system-ui, sans-serif'
+      fontFamily: FONT_UI
     }
   }, children);
 }
@@ -1913,8 +1923,9 @@ function RangeTabs({
     style: {
       display: 'flex',
       justifyContent: 'space-between',
-      padding: '6px 22px 10px',
-      fontFamily: 'Geist Mono, monospace'
+      gap: 4,
+      padding: '6px 16px 10px',
+      fontFamily: FONT_UI
     }
   }, RANGES.map(r => {
     const active = r === range;
@@ -1922,16 +1933,17 @@ function RangeTabs({
       key: r,
       onClick: () => setRange(r),
       style: {
-        background: 'transparent',
+        flex: 1,
+        height: 32,
+        borderRadius: 16,
+        background: active ? RH.acc : 'transparent',
         border: 'none',
         cursor: 'pointer',
-        padding: '6px 4px',
-        fontSize: 11,
-        fontWeight: 700,
-        letterSpacing: 0.4,
-        color: active ? color : RH.textDim,
-        borderBottom: active ? `2px solid ${color}` : '2px solid transparent',
-        transition: 'color 160ms ease, border-color 160ms ease'
+        padding: 0,
+        fontSize: 14,
+        fontWeight: active ? 600 : 500,
+        color: active ? RH.onAcc : RH.textDim,
+        transition: 'color 160ms ease, background 160ms ease'
       }
     }, r);
   }));
@@ -2043,7 +2055,7 @@ function AssetRow({
       border: `1px solid ${RH.red}55`,
       borderRadius: 999,
       marginBottom: 3,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 8.5,
       fontWeight: 700,
       color: RH.red,
@@ -2305,7 +2317,7 @@ function NotificationsSheet({
       maxHeight: '75%',
       display: 'flex',
       flexDirection: 'column',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2348,7 +2360,7 @@ function NotificationsSheet({
       background: `${RH.red}22`,
       padding: '2px 8px',
       borderRadius: 999,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.6
     }
   }, unreadCount, " new") : null), /*#__PURE__*/React.createElement("div", {
@@ -2511,7 +2523,7 @@ function NotificationsSheet({
       marginTop: 4,
       fontSize: 10.5,
       color: RH.textMute,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.4,
       textTransform: 'uppercase',
       fontWeight: 700
@@ -2537,7 +2549,7 @@ function SectionHeader({
       color: RH.textDim,
       letterSpacing: 1.4,
       textTransform: 'uppercase',
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       display: 'inline-flex',
       alignItems: 'center',
       gap: 8
@@ -2574,7 +2586,7 @@ function SectionHeader({
     style: {
       fontSize: 11.5,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontVariantNumeric: 'tabular-nums',
       letterSpacing: 1.4,
       fontWeight: 700,
@@ -2733,10 +2745,10 @@ function ActionRow({
     onClick: () => onAction && onAction(it.id),
     style: {
       flex: '0 0 calc((100% - 48px) / 4)',
-      padding: '11px 0 9px',
+      padding: '12px 0 10px',
       background: RH.surface,
-      border: `1.2px solid rgba(255,255,255,0.10)`,
-      borderRadius: 14,
+      border: 'none',
+      borderRadius: 18,
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -2750,10 +2762,9 @@ function ActionRow({
     onMouseLeave: e => e.currentTarget.style.transform = ''
   }, it.icon, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 11,
-      color: RH.accent,
-      fontWeight: 800,
-      letterSpacing: 0.2
+      fontSize: 12,
+      color: RH.text,
+      fontWeight: 500
     }
   }, it.label)))));
 }
@@ -2916,7 +2927,7 @@ function ServerSwitcher({
       borderRadius: 12,
       boxShadow: '0 16px 40px -12px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.4)',
       padding: 4,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3107,18 +3118,27 @@ function TabBar({
       d: "M4 21c0-4 4-6 8-6s8 2 8 6"
     }))
   }];
+  // 월드클락 스킨 (2026-10-25): 떠 있는 알약 탭바. 여전히 화면 흐름(flex 열의 마지막 칸) 안에 있어 아무것도 덮지 않는다 —
+  // 버튼은 알약 안에서 각자 flex:1 로 전체 폭을 나누고, 선택 탭은 캡슐 바탕만 깔린다 (누르는 영역 = 버튼 그대로).
   return /*#__PURE__*/React.createElement("div", {
     style: {
       flexShrink: 0,
-      borderTop: `1px solid ${RH.line}`,
-      padding: '8px 8px 22px',
-      background: RH.bg,
+      padding: '6px 16px 22px',
+      background: RH.bg
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
       display: 'flex',
-      justifyContent: 'space-between'
+      justifyContent: 'space-between',
+      gap: 2,
+      padding: 6,
+      borderRadius: 33,
+      background: RH.surface,
+      boxShadow: RH.bg === '#FFFFFF' ? '0 4px 16px rgba(0,0,0,0.08)' : 'none'
     }
   }, items.map(it => {
     const isActive = it.id === active;
-    const c = isActive ? RH.green : RH.textDim;
+    const c = isActive ? RH.accent : RH.text;
     return /*#__PURE__*/React.createElement("button", {
       key: it.id,
       onClick: () => onTabChange && onTabChange(it.id),
@@ -3126,22 +3146,25 @@ function TabBar({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: 4,
+        justifyContent: 'center',
+        gap: 3,
         flex: 1,
+        minHeight: 54,
         cursor: 'pointer',
-        background: 'transparent',
+        background: isActive ? RH.capsule : 'transparent',
         border: 'none',
-        padding: '6px 0'
+        padding: '6px 0',
+        borderRadius: 27,
+        boxShadow: isActive && RH.bg === '#FFFFFF' ? '0 1px 3px rgba(0,0,0,0.12)' : 'none'
       }
     }, it.icon(c, isActive && it.id === 'home'), /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: 10,
+        fontSize: 11,
         color: c,
-        fontWeight: 600,
-        letterSpacing: 0.2
+        fontWeight: isActive ? 600 : 500
       }
     }, it.label));
-  }));
+  })));
 }
 
 // ═══════════ 블록 5/5 (원 위치 보존 — 병합돼도 실행 순서·전역 공유 동일) ═══════════
@@ -3514,7 +3537,7 @@ function Dashboard({
       borderRadius: 12,
       boxShadow: '0 16px 40px -12px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.4)',
       padding: 4,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3523,7 +3546,7 @@ function Dashboard({
       color: RH.textMute,
       letterSpacing: 1.4,
       textTransform: 'uppercase',
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       padding: '8px 12px 6px'
     }
   }, "Switch server"), [{
@@ -3659,35 +3682,34 @@ function Dashboard({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 30,
-      fontWeight: 500,
-      color: RH.textMute,
-      letterSpacing: -0.8,
+      fontSize: 15,
+      fontWeight: 400,
+      color: RH.textDim,
       textTransform: 'none',
-      lineHeight: 1.05,
-      fontFamily: 'Geist, Inter, system-ui',
-      marginBottom: 6
+      lineHeight: 1.2,
+      fontFamily: FONT_UI,
+      marginBottom: 2
     }
   }, "My wallet"), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 38,
-      fontWeight: 600,
-      letterSpacing: -1.2,
+      fontSize: 56,
+      fontWeight: 200,
+      letterSpacing: -2,
       lineHeight: 1.05
     }
   }, /*#__PURE__*/React.createElement(Odometer, {
     value: scrubValue,
-    fontSize: 38,
+    fontSize: 56,
     color: RH.text,
     centsColor: RH.textMute
   })), /*#__PURE__*/React.createElement("div", {
     style: {
-      marginTop: 8,
+      marginTop: 4,
       display: 'flex',
       alignItems: 'center',
       gap: 6,
-      fontSize: 14,
-      fontWeight: 600,
+      fontSize: 15,
+      fontWeight: 400,
       fontVariantNumeric: 'tabular-nums'
     }
   }, /*#__PURE__*/React.createElement("span", {
@@ -3805,14 +3827,14 @@ function Dashboard({
         fontWeight: 700,
         letterSpacing: 0.8,
         textTransform: 'uppercase',
-        fontFamily: 'Geist Mono, monospace'
+        fontFamily: FONT_UI
       }
     }, o.type)), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 10,
         color: RH.textDim,
         marginTop: 2,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 0.2
       }
     }, o.type === 'Limit' ? '≤' : '≥', " $", o.trigger.toFixed(2), " \xB7 $", o.usd.toFixed(2))), /*#__PURE__*/React.createElement("div", {
@@ -3820,7 +3842,7 @@ function Dashboard({
         fontSize: 9.5,
         fontWeight: 700,
         color: RH.accent,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 0.8,
         textTransform: 'uppercase',
         padding: '2px 6px',
@@ -4035,7 +4057,7 @@ function SendAvatar({
       fontSize: Math.round(size * 0.36),
       letterSpacing: 0.2,
       flexShrink: 0,
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
       boxShadow: `0 0 0 3px ${color}1A` // very faint outer glow ring
     }
   }, initials);
@@ -4301,7 +4323,7 @@ function QrScanner({
     style: {
       fontSize: 12.5,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.4,
       marginBottom: needsFallback ? 12 : 0
     }
@@ -4344,8 +4366,8 @@ function QrScanner({
   }, "\uD83D\uDCF7 Scan from photo"), needsFallback ? /*#__PURE__*/React.createElement("button", {
     onClick: onClose,
     style: {
-      background: RH.green,
-      color: '#000',
+      background: RH.acc,
+      color: RH.onAcc,
       border: 'none',
       borderRadius: 999,
       padding: '10px 18px',
@@ -4393,7 +4415,7 @@ function SendReview({
         background: RH.bg,
         display: 'flex',
         flexDirection: 'column',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -4500,7 +4522,7 @@ function SendReview({
       }
     }), /*#__PURE__*/React.createElement("span", {
       style: {
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         fontSize: 10,
         color: RH.green,
         letterSpacing: 1.4,
@@ -4524,7 +4546,7 @@ function SendReview({
         marginTop: 8,
         fontSize: 11.5,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 0.4
       }
     }, "sent \xB7 ", refData.when.toLocaleString('en-US', {
@@ -4547,7 +4569,7 @@ function SendReview({
       }
     }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         fontSize: 9.5,
         color: RH.textDim,
         letterSpacing: 1.4,
@@ -4587,7 +4609,7 @@ function SendReview({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         fontSize: 9.5,
         color: RH.textDim,
         letterSpacing: 1.4,
@@ -4692,7 +4714,7 @@ function SendReview({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         fontSize: 9.5,
         color: RH.textDim,
         letterSpacing: 1.4,
@@ -4711,8 +4733,8 @@ function SendReview({
         width: '100%',
         padding: '14px 0',
         borderRadius: 999,
-        background: RH.green,
-        color: '#000',
+        background: RH.acc,
+        color: RH.onAcc,
         border: 'none',
         fontSize: 13,
         fontWeight: 700,
@@ -4729,7 +4751,7 @@ function SendReview({
       background: RH.bg,
       display: 'flex',
       flexDirection: 'column',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -4840,7 +4862,7 @@ function SendReview({
       fontWeight: 700,
       letterSpacing: 1.6,
       textTransform: 'uppercase',
-      fontFamily: 'Geist Mono, monospace'
+      fontFamily: FONT_UI
     }
   }, "You sent"), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -4892,7 +4914,7 @@ function SendReview({
       borderRadius: 14,
       padding: '12px 14px',
       animation: 'alpexa-rise 420ms 520ms ease-out both',
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10.5,
       color: RH.textDim,
       letterSpacing: 0.4
@@ -4954,8 +4976,8 @@ function SendReview({
       flex: 1,
       padding: '14px 0',
       borderRadius: 999,
-      background: RH.green,
-      color: '#000',
+      background: RH.acc,
+      color: RH.onAcc,
       border: 'none',
       fontSize: 13,
       fontWeight: 700,
@@ -4989,7 +5011,7 @@ function SendReview({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10,
       color: RH.textDim,
       letterSpacing: 1.4,
@@ -5009,7 +5031,7 @@ function SendReview({
       fontSize: 11.5,
       color: RH.textDim,
       marginTop: 1,
-      fontFamily: 'Geist Mono, monospace'
+      fontFamily: FONT_UI
     }
   }, recipient.handle))), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -5023,7 +5045,7 @@ function SendReview({
       fontWeight: 600,
       letterSpacing: 1.2,
       textTransform: 'uppercase',
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       marginBottom: 8
     }
   }, "You're sending"), /*#__PURE__*/React.createElement("div", {
@@ -5055,7 +5077,7 @@ function SendReview({
       marginTop: 8,
       fontSize: 11.5,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.4
     }
   }, "from ", asset.name)), /*#__PURE__*/React.createElement("div", {
@@ -5090,7 +5112,7 @@ function SendReview({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10,
       color: RH.textDim,
       letterSpacing: 1.4,
@@ -5118,8 +5140,8 @@ function SendReview({
       width: '100%',
       padding: '16px 0',
       borderRadius: 999,
-      background: RH.green,
-      color: '#000',
+      background: RH.acc,
+      color: RH.onAcc,
       border: 'none',
       fontSize: 15,
       fontWeight: 700,
@@ -5490,7 +5512,7 @@ function Send({
       style: {
         padding: '18px 22px 4px',
         textAlign: 'center',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -5624,7 +5646,7 @@ function Send({
         fontWeight: 700,
         letterSpacing: 0.2,
         cursor: 'pointer',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, "Enter Manually"))));
   }
@@ -5740,7 +5762,7 @@ function Send({
     onClick: () => setRecipientOpen(o => !o)
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10.5,
       color: RH.textDim,
       letterSpacing: 1.4,
@@ -5765,7 +5787,7 @@ function Send({
       fontSize: 11.5,
       color: RH.textDim,
       marginTop: 2,
-      fontFamily: 'Geist Mono, monospace'
+      fontFamily: FONT_UI
     }
   }, recipient.handle)), /*#__PURE__*/React.createElement("svg", {
     width: "12",
@@ -5808,7 +5830,7 @@ function Send({
       fontSize: 12.5,
       fontWeight: 500,
       outline: 'none',
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: -0.1,
       transition: 'border-color 160ms ease'
     }
@@ -5818,8 +5840,8 @@ function Send({
       height: 42,
       padding: '0 14px',
       borderRadius: 12,
-      background: RH.green,
-      color: '#000',
+      background: RH.acc,
+      color: RH.onAcc,
       border: 'none',
       fontSize: 12.5,
       fontWeight: 700,
@@ -5875,7 +5897,7 @@ function Send({
       display: 'flex',
       alignItems: 'center',
       gap: 6,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10.5,
       color: RH.textDim,
       letterSpacing: 0.8,
@@ -5893,7 +5915,7 @@ function Send({
   }), /*#__PURE__*/React.createElement("span", null, pending.type === 'handle' ? 'Alpexa user' : pending.type === 'email' ? 'Email transfer' : 'External wallet (on-chain)')) : null, recents.length > 0 ? /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '14px 22px 6px',
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10.5,
       color: RH.textDim,
       letterSpacing: 1.4,
@@ -6014,7 +6036,7 @@ function Send({
       marginTop: 10,
       fontSize: 11.5,
       color: insufficient ? RH.red : RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontVariantNumeric: 'tabular-nums',
       letterSpacing: 0.6
     }
@@ -6100,7 +6122,7 @@ function Send({
       fontSize: 13.5,
       fontWeight: 500,
       outline: 'none',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   })), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -6126,7 +6148,7 @@ function Send({
       fontWeight: 500,
       letterSpacing: -0.5,
       cursor: 'pointer',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, k))), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -6511,7 +6533,7 @@ function Receive({
       }
     }, t.label), /*#__PURE__*/React.createElement("span", {
       style: {
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         fontSize: 9.5,
         color: active ? RH.accent : RH.textMute,
         letterSpacing: 0.6,
@@ -6615,7 +6637,7 @@ function Receive({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10,
       color: RH.textDim,
       letterSpacing: 1.4,
@@ -6625,7 +6647,7 @@ function Receive({
     }
   }, "Your ", assetId, " deposit address"), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 12.5,
       color: RH.text,
       fontWeight: 600,
@@ -6648,7 +6670,7 @@ function Receive({
       alignItems: 'center',
       gap: 6,
       transition: 'background 180ms ease, color 180ms ease, border-color 180ms ease',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, copied ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("svg", {
     width: "12",
@@ -6734,7 +6756,7 @@ function Receive({
     }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 9.5,
       color: RH.green,
       letterSpacing: 1.4,
@@ -6792,8 +6814,8 @@ function Receive({
       flex: 1,
       padding: '14px 0',
       borderRadius: 999,
-      background: RH.green,
-      color: '#000',
+      background: RH.acc,
+      color: RH.onAcc,
       border: 'none',
       fontSize: 13,
       fontWeight: 700,
@@ -6813,7 +6835,7 @@ function Receive({
       fontSize: 12,
       fontWeight: 600,
       borderRadius: 999,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.6,
       textTransform: 'uppercase',
       whiteSpace: 'nowrap',
@@ -6827,7 +6849,7 @@ function Receive({
       background: RH.bg,
       display: 'flex',
       flexDirection: 'column',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -6881,7 +6903,7 @@ function Receive({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10.5,
       color: RH.textDim,
       letterSpacing: 1.4,
@@ -6940,7 +6962,7 @@ function Receive({
       fontWeight: 500,
       letterSpacing: -0.5,
       cursor: 'pointer',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, k))), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -6952,8 +6974,8 @@ function Receive({
       width: '100%',
       padding: '16px 0',
       borderRadius: 999,
-      background: RH.green,
-      color: '#000',
+      background: RH.acc,
+      color: RH.onAcc,
       border: 'none',
       fontSize: 15,
       fontWeight: 700,
@@ -7169,7 +7191,7 @@ function Stake({
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10,
       color: RH.green,
       letterSpacing: 1.2,
@@ -7301,7 +7323,7 @@ function Stake({
       marginTop: 8,
       fontSize: 11,
       color: insufficient ? RH.red : RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontVariantNumeric: 'tabular-nums',
       letterSpacing: 0.6
     }
@@ -7339,7 +7361,7 @@ function Stake({
       }
     }, p.label), /*#__PURE__*/React.createElement("span", {
       style: {
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         fontSize: 9.5,
         color: active ? RH.green : RH.textDim,
         letterSpacing: 0.4,
@@ -7376,7 +7398,7 @@ function Stake({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10,
       color: RH.textDim,
       letterSpacing: 1.4,
@@ -7449,7 +7471,7 @@ function Stake({
       fontWeight: 500,
       letterSpacing: -0.5,
       cursor: 'pointer',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, k))), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -7592,7 +7614,7 @@ function Transfer({
         alignItems: 'center',
         gap: 12,
         cursor: locked ? 'default' : 'pointer',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -7612,7 +7634,7 @@ function Transfer({
         fontSize: 13,
         fontWeight: 500,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         fontVariantNumeric: 'tabular-nums',
         letterSpacing: -0.1
       }
@@ -7888,7 +7910,7 @@ function Transfer({
       marginTop: 8,
       fontSize: 11,
       color: insufficient ? RH.red : RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontVariantNumeric: 'tabular-nums',
       letterSpacing: 0.6
     }
@@ -7917,7 +7939,7 @@ function Transfer({
         fontWeight: 700,
         cursor: 'pointer',
         letterSpacing: 0.2,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         transition: 'background 160ms ease, color 160ms ease, border-color 160ms ease'
       }
     }, l);
@@ -7945,7 +7967,7 @@ function Transfer({
       fontWeight: 500,
       letterSpacing: -0.5,
       cursor: 'pointer',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, k))), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -8139,13 +8161,13 @@ function Withdraw({
         borderRadius: 14,
         padding: '14px 16px',
         marginBottom: 14,
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 11,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 1.2,
         textTransform: 'uppercase',
         fontWeight: 700
@@ -8169,7 +8191,7 @@ function Withdraw({
       style: {
         fontSize: 10.5,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 1.4,
         textTransform: 'uppercase',
         fontWeight: 700,
@@ -8196,7 +8218,7 @@ function Withdraw({
         padding: '14px 16px',
         marginBottom: i < METHODS.length - 1 ? 10 : 0,
         cursor: 'pointer',
-        fontFamily: 'Geist, Inter, system-ui',
+        fontFamily: FONT_UI,
         display: 'flex',
         alignItems: 'center',
         gap: 12
@@ -8279,7 +8301,7 @@ function Withdraw({
         fontSize: 9.5,
         fontWeight: 700,
         color: m.accent,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 0.6,
         padding: '2px 6px',
         borderRadius: 4,
@@ -8309,14 +8331,14 @@ function Withdraw({
         background: `${RH.accent}10`,
         border: `1px solid ${RH.accent}33`,
         borderRadius: 12,
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 11,
         fontWeight: 700,
         color: RH.accent,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 1,
         textTransform: 'uppercase'
       }
@@ -8356,7 +8378,7 @@ function Withdraw({
       style: {
         fontSize: 10,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 1.2,
         textTransform: 'uppercase',
         fontWeight: 700,
@@ -8447,7 +8469,7 @@ function Withdraw({
       style: {
         fontSize: 10.5,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 1.4,
         textTransform: 'uppercase',
         fontWeight: 700,
@@ -8476,14 +8498,14 @@ function Withdraw({
           padding: '8px 4px',
           borderRadius: 8,
           cursor: 'pointer',
-          fontFamily: 'Geist, Inter, system-ui',
+          fontFamily: FONT_UI,
           textAlign: 'center'
         }
       }, /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 10.5,
           color: active ? RH.accent : RH.textDim,
-          fontFamily: 'Geist Mono, monospace',
+          fontFamily: FONT_UI,
           letterSpacing: 0.8,
           textTransform: 'uppercase',
           fontWeight: 700
@@ -8501,7 +8523,7 @@ function Withdraw({
       style: {
         fontSize: 10.5,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 1.4,
         textTransform: 'uppercase',
         fontWeight: 700,
@@ -8520,7 +8542,7 @@ function Withdraw({
         color: RH.text,
         fontSize: 14,
         fontWeight: 600,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         marginBottom: 14,
         outline: 'none'
       },
@@ -8593,7 +8615,7 @@ function Withdraw({
       style: {
         fontSize: 10.5,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 1.4,
         textTransform: 'uppercase',
         fontWeight: 700,
@@ -8617,7 +8639,7 @@ function Withdraw({
         marginTop: 8,
         fontSize: 11,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 0.4
       }
     }, "Available $", fmtUsd(srcBal))), /*#__PURE__*/React.createElement("div", {
@@ -8651,7 +8673,7 @@ function Withdraw({
         fontSize: 12,
         fontWeight: 600,
         cursor: 'pointer',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, c.label))), /*#__PURE__*/React.createElement("div", {
       style: {
@@ -8673,7 +8695,7 @@ function Withdraw({
         fontSize: 18,
         fontWeight: 600,
         cursor: 'pointer',
-        fontFamily: 'Geist Mono, monospace'
+        fontFamily: FONT_UI
       }
     }, k))), /*#__PURE__*/React.createElement("div", {
       style: {
@@ -8682,7 +8704,7 @@ function Withdraw({
         background: RH.surface,
         border: `1px solid ${RH.line}`,
         borderRadius: 12,
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -8737,7 +8759,7 @@ function Withdraw({
         fontWeight: 700,
         letterSpacing: 0.2,
         cursor: valid ? 'pointer' : 'not-allowed',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, amount === 0 ? 'Enter amount' : amount > srcBal ? 'Insufficient balance' : netAmt <= 0 ? 'Amount below fee' : !destValid ? step === 'card' ? 'Enter card number' : 'Complete recipient details' : `Withdraw $${fmtUsd(amount)}`)));
   }
@@ -8840,7 +8862,7 @@ function Withdraw({
         marginTop: 70,
         fontSize: 11,
         color: 'rgba(255,255,255,0.78)',
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 1.4,
         textTransform: 'uppercase',
         fontWeight: 700
@@ -8862,7 +8884,7 @@ function Withdraw({
         marginTop: 12,
         fontSize: 13,
         color: 'rgba(255,255,255,0.78)',
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 0.3
       }
     }, "via ", m.label)), /*#__PURE__*/React.createElement("div", {
@@ -8873,7 +8895,7 @@ function Withdraw({
         flex: 1,
         overflowY: 'auto',
         minHeight: 0,
-        fontFamily: 'Geist, Inter, system-ui',
+        fontFamily: FONT_UI,
         position: 'relative',
         zIndex: 1
       }
@@ -8907,7 +8929,7 @@ function Withdraw({
       style: {
         fontSize: 11,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 0.3,
         textTransform: 'uppercase',
         fontWeight: 700
@@ -8929,13 +8951,13 @@ function Withdraw({
         background: RH.surface,
         border: `1px solid ${RH.line}`,
         borderRadius: 14,
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 10.5,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 1.2,
         textTransform: 'uppercase',
         fontWeight: 700,
@@ -9027,7 +9049,7 @@ function Withdraw({
         fontWeight: 700,
         cursor: 'pointer',
         letterSpacing: 0.2,
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, "Cancel"), /*#__PURE__*/React.createElement("button", {
       onClick: proceed,
@@ -9042,7 +9064,7 @@ function Withdraw({
         fontWeight: 700,
         cursor: 'pointer',
         letterSpacing: 0.2,
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, "Verify & send"))));
   }
@@ -9393,7 +9415,7 @@ function Funds({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         fontSize: 10,
         color: RH.textDim,
         letterSpacing: 1.4,
@@ -9526,7 +9548,7 @@ function Funds({
       marginTop: 6,
       fontSize: 11,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.4,
       fontVariantNumeric: 'tabular-nums'
     }
@@ -9553,7 +9575,7 @@ function Funds({
       fontWeight: 600,
       cursor: 'pointer',
       letterSpacing: 0.2,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontVariantNumeric: 'tabular-nums'
     }
   }, "$", v))), /*#__PURE__*/React.createElement("div", {
@@ -9575,7 +9597,7 @@ function Funds({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10,
       color: RH.textDim,
       letterSpacing: 1.4,
@@ -9719,7 +9741,7 @@ function Funds({
       fontWeight: 500,
       letterSpacing: -0.5,
       cursor: 'pointer',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, k))));
 
@@ -9797,7 +9819,7 @@ function Funds({
         letterSpacing: 1.6,
         fontWeight: 700,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         textTransform: 'uppercase',
         marginBottom: 12
       }
@@ -9851,7 +9873,7 @@ function Funds({
         fontSize: 44,
         fontWeight: 800,
         letterSpacing: -1.5,
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }), /*#__PURE__*/React.createElement("span", {
       style: {
@@ -9865,8 +9887,8 @@ function Funds({
         width: '100%',
         padding: '17px 0',
         borderRadius: 18,
-        background: RH.accent,
-        color: '#fff',
+        background: RH.acc,
+        color: RH.onAcc,
         border: 'none',
         fontSize: 16.5,
         fontWeight: 700,
@@ -9902,7 +9924,7 @@ function Funds({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         fontSize: 14.5,
         color: RH.text,
         fontWeight: 600
@@ -9966,7 +9988,7 @@ function Funds({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         fontSize: 10,
         color: RH.textDim,
         letterSpacing: 1.4,
@@ -10058,7 +10080,7 @@ function Funds({
           fontSize: 11,
           color: RH.textDim,
           marginTop: 1,
-          fontFamily: 'Geist Mono, monospace'
+          fontFamily: FONT_UI
         }
       }, "\u2022\u2022\u2022\u2022 ", b.tail)), active ? /*#__PURE__*/React.createElement("svg", {
         width: "14",
@@ -10210,7 +10232,7 @@ function Funds({
           background: RH.bg,
           display: 'flex',
           flexDirection: 'column',
-          fontFamily: 'Geist, Inter, system-ui'
+          fontFamily: FONT_UI
         }
       }, /*#__PURE__*/React.createElement("div", {
         style: {
@@ -10301,7 +10323,7 @@ function Funds({
         style: {
           fontSize: 10.5,
           color: RH.textDim,
-          fontFamily: 'Geist Mono, monospace',
+          fontFamily: FONT_UI,
           letterSpacing: 1.2,
           textTransform: 'uppercase',
           fontWeight: 700,
@@ -10322,7 +10344,7 @@ function Funds({
           color: RH.text,
           fontSize: 14,
           fontWeight: 600,
-          fontFamily: f.inputMode === 'numeric' ? 'Geist Mono, monospace' : 'Geist, Inter, system-ui',
+          fontFamily: f.inputMode === 'numeric' ? FONT_UI : FONT_UI,
           outline: 'none'
         },
         onFocus: e => e.currentTarget.style.borderColor = RH.accent,
@@ -10357,7 +10379,7 @@ function Funds({
           fontSize: 14,
           fontWeight: 700,
           letterSpacing: 0.2,
-          fontFamily: 'Geist, Inter, system-ui'
+          fontFamily: FONT_UI
         }
       }, valid ? 'Link bank account' : 'Fill in all fields')));
     })() : null);
@@ -10402,7 +10424,7 @@ function Funds({
       style: {
         fontSize: 10,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 1.4,
         textTransform: 'uppercase',
         fontWeight: 700,
@@ -10443,7 +10465,7 @@ function Funds({
         fontSize: 40,
         fontWeight: 800,
         letterSpacing: -1.5,
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     })), /*#__PURE__*/React.createElement("div", {
       style: {
@@ -10481,7 +10503,7 @@ function Funds({
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         fontSize: 14,
         fontWeight: 800,
         color: RH.red,
@@ -10540,7 +10562,7 @@ function Funds({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         fontSize: 10,
         color: RH.textDim,
         letterSpacing: 1.4,
@@ -10722,7 +10744,7 @@ function SuccessOverlay({
       flexDirection: 'column',
       alignItems: 'center',
       padding: '70px 28px 28px',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -10755,7 +10777,7 @@ function SuccessOverlay({
       fontWeight: 700,
       letterSpacing: 1.4,
       textTransform: 'uppercase',
-      fontFamily: 'Geist Mono, monospace'
+      fontFamily: FONT_UI
     }
   }, label), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -10780,7 +10802,7 @@ function SuccessOverlay({
       background: `${RH.accent}14`,
       border: `1px solid ${RH.accent}40`,
       borderRadius: 999,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10.5,
       color: RH.accent,
       letterSpacing: 0.8,
@@ -11117,7 +11139,7 @@ function Swap({
           fontSize: 11,
           color: RH.textDim,
           marginTop: 1,
-          fontFamily: 'Geist Mono, monospace',
+          fontFamily: FONT_UI,
           fontVariantNumeric: 'tabular-nums'
         }
       }, "$", (a.price || 0).toLocaleString('en-US', {
@@ -11210,7 +11232,7 @@ function Swap({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10,
       color: RH.textDim,
       letterSpacing: 1.4,
@@ -11221,7 +11243,7 @@ function Swap({
     style: {
       fontSize: 11,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontVariantNumeric: 'tabular-nums'
     }
   }, "Balance $", fromBalanceUsd.toFixed(2))), /*#__PURE__*/React.createElement("div", {
@@ -11287,7 +11309,7 @@ function Swap({
       marginTop: 2,
       fontSize: 11,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontVariantNumeric: 'tabular-nums'
     }
   }, "\u2248 $", fromUsd.toFixed(2)))), /*#__PURE__*/React.createElement("div", {
@@ -11308,7 +11330,7 @@ function Swap({
       color: RH.textDim,
       fontSize: 10.5,
       fontWeight: 700,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.4,
       cursor: 'pointer'
     }
@@ -11358,7 +11380,7 @@ function Swap({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10,
       color: RH.textDim,
       letterSpacing: 1.4,
@@ -11429,7 +11451,7 @@ function Swap({
       marginTop: 2,
       fontSize: 11,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontVariantNumeric: 'tabular-nums'
     }
   }, "\u2248 $", toUsd.toFixed(2)))))), toOpen ? renderPicker(toSym, false, setToSym, setToOpen) : null, /*#__PURE__*/React.createElement("div", {
@@ -11442,7 +11464,7 @@ function Swap({
       border: `1px solid ${RH.line}`,
       borderRadius: 12,
       padding: '10px 14px',
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 11
     }
   }, /*#__PURE__*/React.createElement("div", {
@@ -11510,7 +11532,7 @@ function Swap({
         fontSize: 10.5,
         fontWeight: 700,
         cursor: 'pointer',
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 0.3
       }
     }, (s * 100).toFixed(1), "%");
@@ -11528,13 +11550,13 @@ function Swap({
     style: {
       background: 'transparent',
       border: 'none',
-      padding: '10px 0',
+      padding: '8px 0',
       color: RH.text,
-      fontSize: 20,
-      fontWeight: 500,
+      fontSize: 28,
+      fontWeight: 300,
       letterSpacing: -0.5,
       cursor: 'pointer',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, k))), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -11683,7 +11705,7 @@ function Discover({
         alignItems: 'center',
         gap: 10,
         cursor: 'pointer',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -11759,14 +11781,13 @@ function Discover({
         flex: '0 0 auto',
         width: 126,
         background: RH.surface,
-        border: `1px solid ${RH.accent}`,
-        borderRadius: 12,
-        padding: '10px',
+        border: 'none',
+        borderRadius: 18,
+        padding: '12px',
         cursor: 'pointer',
         textAlign: 'left',
         scrollSnapAlign: 'start',
-        fontFamily: 'Geist, Inter, system-ui',
-        boxShadow: `inset 0 0 0 1px ${RH.accent}22, 0 4px 12px -8px ${RH.accent}55`
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -11884,7 +11905,7 @@ function Discover({
       border: 'none',
       color: RH.text,
       fontSize: 14.5,
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
       outline: 'none'
     }
   })), /*#__PURE__*/React.createElement("button", {
@@ -11964,7 +11985,7 @@ function Discover({
       background: '#0E0F14',
       border: `1px solid ${RH.line}`,
       borderRadius: 16,
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
       cursor: 'pointer'
     }
   }, /*#__PURE__*/React.createElement("svg", {
@@ -12090,7 +12111,7 @@ function Discover({
       alignItems: 'center',
       gap: 14,
       cursor: 'pointer',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -12186,10 +12207,10 @@ function Discover({
     style: {
       display: 'inline-flex',
       background: RH.surface,
-      border: `1px solid ${RH.line}`,
-      borderRadius: 999,
-      padding: 3,
-      gap: 0,
+      border: 'none',
+      borderRadius: 18,
+      padding: 2,
+      gap: 2,
       overflowX: 'auto',
       overflowY: 'hidden',
       maxWidth: '100%'
@@ -12201,18 +12222,18 @@ function Discover({
       onClick: () => setFilter(f.id),
       style: {
         flexShrink: 0,
-        background: active ? RH.surfaceUp : 'transparent',
+        background: active ? RH.acc : 'transparent',
         border: 'none',
         cursor: 'pointer',
-        padding: '7px 14px',
-        borderRadius: 999,
-        color: active ? RH.text : RH.textDim,
-        fontSize: 13.5,
-        fontWeight: active ? 700 : 600,
-        fontFamily: 'Geist, Inter, system-ui',
+        padding: '0 16px',
+        height: 32,
+        borderRadius: 16,
+        color: active ? RH.onAcc : RH.text,
+        fontSize: 14,
+        fontWeight: active ? 600 : 500,
+        fontFamily: FONT_UI,
         letterSpacing: -0.1,
         whiteSpace: 'nowrap',
-        boxShadow: active ? `inset 0 0 0 1px ${RH.line}` : 'none',
         transition: 'background 160ms ease, color 160ms ease'
       }
     }, f.id);
@@ -12289,7 +12310,7 @@ function AcctSection({
     }
   }, title ? /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10,
       color: RH.textDim,
       letterSpacing: 1.4,
@@ -12330,7 +12351,7 @@ function AcctRow({
       alignItems: 'center',
       gap: 12,
       cursor: onClick ? 'pointer' : 'default',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -12356,7 +12377,7 @@ function AcctRow({
       fontSize: 12.5,
       color: RH.text,
       fontWeight: 500,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontVariantNumeric: 'tabular-nums'
     }
   }, value) : null, status ? /*#__PURE__*/React.createElement("div", {
@@ -12367,7 +12388,7 @@ function AcctRow({
       background: `${statusColor || RH.green}22`,
       padding: '2px 8px',
       borderRadius: 999,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.6,
       textTransform: 'uppercase'
     }
@@ -12407,7 +12428,7 @@ function AcctToggle({
       display: 'flex',
       alignItems: 'center',
       gap: 12,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -12480,14 +12501,14 @@ function ToastHost({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      background: RH.accent,
-      color: '#fff',
+      background: RH.acc,
+      color: RH.onAcc,
       padding: '10px 18px',
       borderRadius: 999,
       fontSize: 12.5,
       fontWeight: 700,
       letterSpacing: 0.3,
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
       boxShadow: `0 8px 24px ${RH.accent}55`
     }
   }, message));
@@ -12507,13 +12528,13 @@ function AcctInput({
   return /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '12px 16px',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 10.5,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 1.2,
       textTransform: 'uppercase',
       fontWeight: 700,
@@ -12538,7 +12559,7 @@ function AcctInput({
       fontWeight: 500,
       outline: 'none',
       padding: 0,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   })));
 }
@@ -12618,13 +12639,13 @@ function AcctTextarea({
   return /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '12px 16px',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 10.5,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 1.2,
       textTransform: 'uppercase',
       fontWeight: 700,
@@ -12645,7 +12666,7 @@ function AcctTextarea({
       outline: 'none',
       padding: 0,
       resize: 'none',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }));
 }
@@ -12694,7 +12715,7 @@ function AcctPolicyText({
       fontSize: 13.5,
       color: RH.text,
       lineHeight: 1.6,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, children);
 }
@@ -12718,7 +12739,7 @@ function AcctSaveButton({
       fontWeight: 700,
       letterSpacing: 0.2,
       cursor: disabled ? 'not-allowed' : 'pointer',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, label);
 }
@@ -12970,7 +12991,7 @@ function HelpCenterPanel() {
       padding: '12px 0',
       color: RH.text,
       fontSize: 13,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }), query ? /*#__PURE__*/React.createElement("button", {
     onClick: () => setQuery(''),
@@ -12997,7 +13018,7 @@ function HelpCenterPanel() {
         textAlign: 'center',
         color: RH.textDim,
         fontSize: 13,
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, "No results for \"", query, "\".") : /*#__PURE__*/React.createElement(AcctSection, {
       title: `${searchHits.length} result${searchHits.length === 1 ? '' : 's'}`
@@ -13035,7 +13056,7 @@ function HelpCenterPanel() {
         cursor: 'pointer',
         fontSize: 12,
         fontWeight: 600,
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("svg", {
       width: "11",
@@ -13054,13 +13075,13 @@ function HelpCenterPanel() {
         border: `1px solid ${RH.line}`,
         borderRadius: 14,
         padding: '16px 18px',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 10,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 1.2,
         textTransform: 'uppercase',
         fontWeight: 700,
@@ -13103,7 +13124,7 @@ function HelpCenterPanel() {
         cursor: 'pointer',
         fontSize: 12,
         fontWeight: 600,
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("svg", {
       width: "11",
@@ -13123,7 +13144,7 @@ function HelpCenterPanel() {
         background: RH.surface,
         border: `1px solid ${RH.line}`,
         borderRadius: 14,
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -13311,7 +13332,7 @@ function SupportChatPanel() {
       background: RH.surface,
       border: `1px solid ${RH.line}`,
       borderRadius: 12,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -13356,7 +13377,7 @@ function SupportChatPanel() {
     style: {
       fontSize: 10.5,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.4
     }
   }, "AI \xB7 Online")))), /*#__PURE__*/React.createElement("div", {
@@ -13389,7 +13410,7 @@ function SupportChatPanel() {
       fontSize: 13,
       lineHeight: 1.5,
       whiteSpace: 'pre-line',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, m.text, m.source ? /*#__PURE__*/React.createElement("div", {
     style: {
@@ -13399,7 +13420,7 @@ function SupportChatPanel() {
       fontSize: 10.5,
       color: RH.textDim,
       fontWeight: 600,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.3
     }
   }, "\uD83D\uDCD8 ", m.source) : null))), typing ? /*#__PURE__*/React.createElement("div", {
@@ -13447,7 +13468,7 @@ function SupportChatPanel() {
       fontSize: 11.5,
       fontWeight: 600,
       cursor: 'pointer',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, s))) : null, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -13472,7 +13493,7 @@ function SupportChatPanel() {
       color: RH.text,
       fontSize: 13,
       fontWeight: 500,
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
       outline: 'none',
       marginTop: 8
     },
@@ -13522,7 +13543,7 @@ function SupportChatPanel() {
       fontSize: 12,
       fontWeight: 600,
       cursor: 'pointer',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, "Talk to a human"));
 }
@@ -13677,7 +13698,7 @@ function TaxDocsPanel({
         fontSize: 11.5,
         fontWeight: 700,
         cursor: 'pointer',
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 0.6
       }
     }, /*#__PURE__*/React.createElement("div", null, r), /*#__PURE__*/React.createElement("div", {
@@ -13696,14 +13717,14 @@ function TaxDocsPanel({
       background: `${RH.accent}10`,
       border: `1px solid ${RH.accent}33`,
       borderRadius: 12,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       fontWeight: 700,
       color: RH.accent,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 1,
       textTransform: 'uppercase'
     }
@@ -13747,7 +13768,7 @@ function TaxDocsPanel({
       fontSize: 11.5,
       color: RH.textDim,
       lineHeight: 1.5,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, "Forms are issued automatically each year after the relevant tax deadline. Tax treatment of digital assets varies by jurisdiction \u2014 consult a tax professional for guidance specific to your situation."));
 }
@@ -13785,7 +13806,7 @@ function AppearancePanel() {
       fontSize: 11.5,
       color: RH.textDim,
       lineHeight: 1.5,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, "Changes apply instantly across the whole app and persist after restart."));
 }
@@ -13807,7 +13828,7 @@ function PaymentCardsPanel({
       style: {
         padding: '50px 20px',
         textAlign: 'center',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -13886,7 +13907,7 @@ function LinkedBanksPanel({
     style: {
       padding: '50px 20px',
       textAlign: 'center',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -13952,7 +13973,7 @@ function LinkedBanksPanel({
       fontSize: 11.5,
       color: RH.textDim,
       lineHeight: 1.5,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, "New banks are linked through Plaid during your first ACH deposit. The micro-deposit verification step takes 1\u20133 business days."));
 }
@@ -14124,7 +14145,7 @@ function WhitelistPanel({
         cursor: 'pointer',
         fontSize: 12,
         fontWeight: 600,
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("svg", {
       width: "11",
@@ -14147,7 +14168,7 @@ function WhitelistPanel({
       style: {
         fontSize: 10.5,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 1.2,
         textTransform: 'uppercase',
         fontWeight: 700,
@@ -14167,7 +14188,7 @@ function WhitelistPanel({
         color: RH.text,
         fontSize: 14,
         fontWeight: 600,
-        fontFamily: 'Geist, Inter, system-ui',
+        fontFamily: FONT_UI,
         outline: 'none'
       },
       onFocus: e => e.currentTarget.style.borderColor = RH.accent,
@@ -14180,7 +14201,7 @@ function WhitelistPanel({
       style: {
         fontSize: 10.5,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 1.2,
         textTransform: 'uppercase',
         fontWeight: 700,
@@ -14206,7 +14227,7 @@ function WhitelistPanel({
           fontSize: 12,
           fontWeight: 700,
           cursor: 'pointer',
-          fontFamily: 'Geist, Inter, system-ui',
+          fontFamily: FONT_UI,
           transition: 'all 140ms ease'
         }
       }, /*#__PURE__*/React.createElement("div", null, n.id), /*#__PURE__*/React.createElement("div", {
@@ -14225,7 +14246,7 @@ function WhitelistPanel({
       style: {
         fontSize: 10.5,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 1.2,
         textTransform: 'uppercase',
         fontWeight: 700,
@@ -14248,7 +14269,7 @@ function WhitelistPanel({
         color: RH.text,
         fontSize: 12.5,
         fontWeight: 600,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         outline: 'none',
         letterSpacing: 0.3,
         wordBreak: 'break-all'
@@ -14262,14 +14283,14 @@ function WhitelistPanel({
         background: `${RH.accent}10`,
         border: `1px solid ${RH.accent}33`,
         borderRadius: 12,
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 11,
         fontWeight: 700,
         color: RH.accent,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 1,
         textTransform: 'uppercase'
       }
@@ -14289,7 +14310,7 @@ function WhitelistPanel({
     style: {
       padding: '50px 20px',
       textAlign: 'center',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -14360,7 +14381,7 @@ function WhitelistPanel({
       fontSize: 11.5,
       color: RH.textDim,
       lineHeight: 1.55,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, "Withdrawals of $5,000+ can only go to an address on this list; $1,000+ need 2-factor verification; smaller sends are unrestricted. New entries are held 24h to prevent an attacker from quickly adding their own."));
 }
@@ -14458,7 +14479,7 @@ function ChangePasswordPanel({
       color: error ? RH.red : RH.text,
       fontSize: 14,
       fontWeight: 600,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 1,
       outline: 'none'
     }
@@ -14627,7 +14648,7 @@ function PersonalNamePanel({
       color: RH.text,
       fontSize: 14,
       fontWeight: 600,
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
       outline: 'none'
     }
   }));
@@ -14671,7 +14692,7 @@ function PersonalEmailPanel({
     style: {
       fontSize: 10.5,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 1.2,
       textTransform: 'uppercase',
       fontWeight: 700,
@@ -14697,7 +14718,7 @@ function PersonalEmailPanel({
       color: RH.text,
       fontSize: 15,
       fontWeight: 600,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.3,
       outline: 'none'
     },
@@ -14720,7 +14741,7 @@ function PersonalEmailPanel({
       fontSize: 11.5,
       color: RH.text,
       lineHeight: 1.5,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, "We'll send a verification link to the new address. The old email keeps receiving security alerts until you click the link."), /*#__PURE__*/React.createElement(AcctSaveButton, {
     label: valid ? 'Update email' : 'Enter a valid email',
@@ -14769,7 +14790,7 @@ function PersonalPhonePanel({
     style: {
       fontSize: 10.5,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 1.2,
       textTransform: 'uppercase',
       fontWeight: 700,
@@ -14792,7 +14813,7 @@ function PersonalPhonePanel({
       color: RH.text,
       fontSize: 15,
       fontWeight: 600,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.4,
       outline: 'none'
     },
@@ -14815,7 +14836,7 @@ function PersonalPhonePanel({
       fontSize: 11.5,
       color: RH.text,
       lineHeight: 1.5,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, "We'll text a 6-digit verification code to this number before any changes are saved. SMS charges may apply."), /*#__PURE__*/React.createElement(AcctSaveButton, {
     label: valid ? 'Send verification code' : 'Enter a valid number',
@@ -14843,7 +14864,7 @@ function PersonalDobPanel({
       fontSize: 11.5,
       color: RH.text,
       lineHeight: 1.55,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, "Your date of birth is locked once verified. Changes require a court order or government-issued correction \u2014 contact our support team and submit documentation."), /*#__PURE__*/React.createElement(AcctSaveButton, {
     label: "Contact support",
@@ -14940,7 +14961,7 @@ function RecurringPanel({
     style: {
       fontSize: 10.5,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 1.2,
       textTransform: 'uppercase',
       fontWeight: 700,
@@ -14961,7 +14982,7 @@ function RecurringPanel({
       color: RH.text,
       fontSize: 15,
       fontWeight: 700,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontVariantNumeric: 'tabular-nums',
       outline: 'none'
     },
@@ -14997,7 +15018,7 @@ function RecurringPanel({
       background: `${RH.accent}10`,
       border: `1px solid ${RH.accent}33`,
       borderRadius: 12,
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
       fontSize: 11.5,
       color: RH.text,
       lineHeight: 1.5
@@ -15063,7 +15084,7 @@ function TransferHistoryPanel({
       gap: 12,
       marginBottom: 14,
       fontSize: 12.5,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -15078,7 +15099,7 @@ function TransferHistoryPanel({
       border: 'none',
       padding: 0,
       cursor: 'pointer',
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
       fontSize: 12.5,
       lineHeight: 1.4,
       borderBottom: `1px dashed ${RH.text}`
@@ -15117,7 +15138,7 @@ function TransferHistoryPanel({
         fontSize: 12.5,
         fontWeight: active ? 700 : 500,
         cursor: 'pointer',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, lbl);
   })) : null), /*#__PURE__*/React.createElement("input", {
@@ -15135,7 +15156,7 @@ function TransferHistoryPanel({
       fontSize: 12,
       color: RH.text,
       outline: 'none',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }));
   if (allByKind.length === 0) {
@@ -15156,7 +15177,7 @@ function TransferHistoryPanel({
       style: {
         padding: '50px 20px',
         textAlign: 'center',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -15356,7 +15377,7 @@ function RedeemCodePanel({
       style: {
         padding: '50px 20px',
         textAlign: 'center',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -15399,7 +15420,7 @@ function RedeemCodePanel({
       }
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        fontFamily: 'Geist Mono, monospace'
+        fontFamily: FONT_UI
       }
     }, redemptionInfo.code), ' ', "was applied ", new Date(redemptionInfo.ts).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -15417,7 +15438,7 @@ function RedeemCodePanel({
     style: {
       fontSize: 10.5,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 1.2,
       textTransform: 'uppercase',
       fontWeight: 700,
@@ -15443,7 +15464,7 @@ function RedeemCodePanel({
       color: RH.text,
       fontSize: 16,
       fontWeight: 700,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 1.2,
       outline: 'none',
       textTransform: 'uppercase'
@@ -15465,7 +15486,7 @@ function RedeemCodePanel({
     }
   }, "Codes look like ", /*#__PURE__*/React.createElement("span", {
     style: {
-      fontFamily: 'Geist Mono, monospace'
+      fontFamily: FONT_UI
     }
   }, "JR2025"), " or the trailing part of a friend's link."))), /*#__PURE__*/React.createElement(AcctSection, {
     title: "What you'll get"
@@ -15490,14 +15511,14 @@ function RedeemCodePanel({
       background: `${RH.accent}10`,
       border: `1px solid ${RH.accent}33`,
       borderRadius: 12,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       fontWeight: 700,
       color: RH.accent,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 1,
       textTransform: 'uppercase'
     }
@@ -15595,13 +15616,13 @@ function BeneficiariesPanel({
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         padding: '12px 16px',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 10.5,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 1.2,
         textTransform: 'uppercase',
         fontWeight: 700,
@@ -15620,18 +15641,18 @@ function BeneficiariesPanel({
         fontWeight: 500,
         outline: 'none',
         padding: 0,
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     })), /*#__PURE__*/React.createElement(AcctDivider, null), /*#__PURE__*/React.createElement("div", {
       style: {
         padding: '12px 16px',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 10.5,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 1.2,
         textTransform: 'uppercase',
         fontWeight: 700,
@@ -15650,18 +15671,18 @@ function BeneficiariesPanel({
         fontWeight: 500,
         outline: 'none',
         padding: 0,
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     })), /*#__PURE__*/React.createElement(AcctDivider, null), /*#__PURE__*/React.createElement("div", {
       style: {
         padding: '12px 16px',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 10.5,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 1.2,
         textTransform: 'uppercase',
         fontWeight: 700,
@@ -15681,7 +15702,7 @@ function BeneficiariesPanel({
         fontWeight: 500,
         outline: 'none',
         padding: 0,
-        fontFamily: 'Geist, Inter, system-ui',
+        fontFamily: FONT_UI,
         fontVariantNumeric: 'tabular-nums'
       }
     }), /*#__PURE__*/React.createElement("div", {
@@ -15689,7 +15710,7 @@ function BeneficiariesPanel({
         marginTop: 4,
         fontSize: 11,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace'
+        fontFamily: FONT_UI
       }
     }, remaining, "% remaining unassigned"))), /*#__PURE__*/React.createElement("div", {
       style: {
@@ -15709,7 +15730,7 @@ function BeneficiariesPanel({
         fontSize: 14,
         fontWeight: 700,
         cursor: 'pointer',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, "Cancel"), /*#__PURE__*/React.createElement("button", {
       onClick: save,
@@ -15725,7 +15746,7 @@ function BeneficiariesPanel({
         fontWeight: 700,
         letterSpacing: 0.2,
         cursor: canSave ? 'pointer' : 'not-allowed',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, "Add beneficiary")));
   }
@@ -15746,7 +15767,7 @@ function BeneficiariesPanel({
       display: 'flex',
       alignItems: 'center',
       gap: 12,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -15850,7 +15871,7 @@ function ReferralLinkPanel() {
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 13.5,
       color: RH.accent,
       letterSpacing: 0.2,
@@ -15953,7 +15974,7 @@ function ShareViaPanel() {
       alignItems: 'center',
       gap: 12,
       cursor: 'pointer',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -16304,7 +16325,7 @@ function SubSubDetail({
       })), /*#__PURE__*/React.createElement("div", {
         style: {
           marginTop: 14,
-          fontFamily: 'Geist Mono, monospace',
+          fontFamily: FONT_UI,
           fontSize: 11.5,
           color: RH.text,
           letterSpacing: 0.3,
@@ -16332,7 +16353,7 @@ function SubSubDetail({
           fontSize: 12,
           fontWeight: 600,
           cursor: 'pointer',
-          fontFamily: 'Geist, Inter, system-ui'
+          fontFamily: FONT_UI
         }
       }, "Copy address"))), /*#__PURE__*/React.createElement(AcctSection, {
         title: "Details"
@@ -16358,7 +16379,7 @@ function SubSubDetail({
           fontSize: 11.5,
           color: RH.text,
           lineHeight: 1.55,
-          fontFamily: 'Geist, Inter, system-ui'
+          fontFamily: FONT_UI
         }
       }, "This deposit address is unique to your Alpexa account \u2014 funds are held in Alpexa custody and credited after the confirmations above."));
     }
@@ -16520,7 +16541,7 @@ function SubSubDetail({
           fontWeight: 700,
           letterSpacing: 0.2,
           cursor: 'pointer',
-          fontFamily: 'Geist, Inter, system-ui'
+          fontFamily: FONT_UI
         }
       }, "Sign out all other devices"));
     }
@@ -16622,7 +16643,7 @@ function SubSubDetail({
           style: {
             padding: '50px 20px',
             textAlign: 'center',
-            fontFamily: 'Geist, Inter, system-ui'
+            fontFamily: FONT_UI
           }
         }, /*#__PURE__*/React.createElement("div", {
           style: {
@@ -16864,7 +16885,7 @@ function SubSubDetail({
           fontSize: 14,
           fontWeight: 700,
           cursor: 'pointer',
-          fontFamily: 'Geist, Inter, system-ui'
+          fontFamily: FONT_UI
         }
       }, "Sign out this device"));
     }
@@ -17082,7 +17103,7 @@ function SubSubDetail({
           fontSize: 14,
           fontWeight: 700,
           cursor: 'pointer',
-          fontFamily: 'Geist, Inter, system-ui'
+          fontFamily: FONT_UI
         }
       }, "Delete alert"));
     }
@@ -17462,7 +17483,7 @@ function AccountSubPageContent({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         fontSize: 10,
         color: RH.textDim,
         letterSpacing: 1.4,
@@ -17761,7 +17782,7 @@ function ActivityList({
     border: 'none',
     padding: 0,
     cursor: 'pointer',
-    fontFamily: 'Geist, Inter, system-ui',
+    fontFamily: FONT_UI,
     fontSize: 12.5,
     lineHeight: 1.4,
     borderBottom: `1px dashed ${RH.text}`
@@ -17779,7 +17800,7 @@ function ActivityList({
   };
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -17825,7 +17846,7 @@ function ActivityList({
         fontSize: 12.5,
         fontWeight: active ? 700 : 500,
         cursor: 'pointer',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, r.label);
   })) : null), /*#__PURE__*/React.createElement("span", {
@@ -17870,7 +17891,7 @@ function ActivityList({
         fontSize: 12.5,
         fontWeight: active ? 700 : 500,
         cursor: 'pointer',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, sym === 'all' ? 'All assets' : sym);
   })) : null)), dayKeys.length === 0 ? /*#__PURE__*/React.createElement("div", {
@@ -17887,7 +17908,7 @@ function ActivityList({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10,
       color: RH.textDim,
       letterSpacing: 1.2,
@@ -17947,7 +17968,7 @@ function ActivityList({
           fontWeight: 700,
           letterSpacing: 0.6,
           textTransform: 'uppercase',
-          fontFamily: 'Geist Mono, monospace'
+          fontFamily: FONT_UI
         }
       }, s.label) : null;
     })()), /*#__PURE__*/React.createElement("div", {
@@ -17955,7 +17976,7 @@ function ActivityList({
         marginTop: 2,
         fontSize: 11,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 0.3
       }
     }, t.ticket ? t.ticket + ' · ' : '', fmtTime(t.ts), (() => {
@@ -17966,7 +17987,7 @@ function ActivityList({
         fontSize: 13.5,
         fontWeight: 700,
         color: meta.color,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         fontVariantNumeric: 'tabular-nums',
         letterSpacing: -0.1
       }
@@ -18195,7 +18216,7 @@ function Account({
       style: {
         padding: '40px 12px',
         textAlign: 'center',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -18224,7 +18245,7 @@ function Account({
         fontWeight: 700,
         letterSpacing: 0.2,
         cursor: 'pointer',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, "Sign out"), /*#__PURE__*/React.createElement("button", {
       onClick: () => setSubPage(null),
@@ -18240,7 +18261,7 @@ function Account({
         fontSize: 13,
         fontWeight: 600,
         cursor: 'pointer',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, "Cancel")) : null)), tabBar);
   }
@@ -18331,7 +18352,7 @@ function Account({
       gap: 6,
       fontSize: 13,
       fontWeight: 600,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontVariantNumeric: 'tabular-nums'
     }
   }, /*#__PURE__*/React.createElement("svg", {
@@ -18377,15 +18398,15 @@ function Account({
       onClick: () => setRange(r),
       style: {
         flex: 1,
-        padding: '7px 0',
-        borderRadius: 999,
-        background: active ? `${accent}22` : 'transparent',
+        height: 32,
+        padding: 0,
+        borderRadius: 16,
+        background: active ? RH.acc : 'transparent',
         border: 'none',
-        color: active ? accent : RH.textDim,
-        fontSize: 12,
-        fontWeight: 700,
-        fontFamily: 'Geist Mono, monospace',
-        letterSpacing: 0.6,
+        color: active ? RH.onAcc : RH.textDim,
+        fontSize: 14,
+        fontWeight: active ? 600 : 500,
+        fontFamily: FONT_UI,
         cursor: 'pointer'
       }
     }, r);
@@ -18395,7 +18416,7 @@ function Account({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10,
       color: RH.textDim,
       letterSpacing: 1.4,
@@ -18425,13 +18446,13 @@ function Account({
       border: 'none',
       padding: 0,
       cursor: 'pointer',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 10,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.8,
       textTransform: 'uppercase',
       fontWeight: 700
@@ -18482,7 +18503,7 @@ function Account({
         alignItems: 'center',
         gap: 14,
         cursor: 'pointer',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -18535,7 +18556,7 @@ function Account({
         whiteSpace: 'nowrap',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
-        fontFamily: isLive ? 'Geist Mono, monospace' : 'Geist, Inter, system-ui',
+        fontFamily: isLive ? FONT_UI : FONT_UI,
         fontVariantNumeric: 'tabular-nums'
       }
     }, dynamicDesc)), /*#__PURE__*/React.createElement("svg", {
@@ -18564,7 +18585,7 @@ function Account({
       alignItems: 'center',
       cursor: 'pointer',
       color: RH.red,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -18617,7 +18638,7 @@ function StakeInfo({
       display: 'flex',
       gap: 14,
       padding: '12px 0',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -18771,7 +18792,7 @@ function StakeInfo({
       color: RH.text,
       letterSpacing: -0.7,
       lineHeight: 1.1,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, "Earn with ", sym, " staking"), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -18779,7 +18800,7 @@ function StakeInfo({
       fontSize: 14,
       color: RH.textDim,
       lineHeight: 1.55,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, "Earn ", sym, " when you help secure ", networkNm, " network transactions.")), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -18820,7 +18841,7 @@ function StakeInfo({
       fontWeight: 700,
       letterSpacing: 0.2,
       cursor: 'pointer',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, "Stake ", sym)));
 }
@@ -18882,7 +18903,7 @@ function AccountMenuSheet({
       maxHeight: '75%',
       display: 'flex',
       flexDirection: 'column',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -18957,7 +18978,7 @@ function AccountMenuSheet({
       gap: 12,
       cursor: 'pointer',
       color: it.red ? RH.red : RH.text,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -19071,7 +19092,7 @@ function HeroConfirm({
       fontWeight: 600,
       lineHeight: 1.05,
       letterSpacing: -1.4,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, label), sublabel ? /*#__PURE__*/React.createElement("div", {
     style: {
@@ -19080,7 +19101,7 @@ function HeroConfirm({
       marginTop: 14,
       fontSize: 13,
       color: 'rgba(255,255,255,0.68)',
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.3,
       fontVariantNumeric: 'tabular-nums'
     }
@@ -19089,7 +19110,7 @@ function HeroConfirm({
       background: 'transparent',
       padding: '40px 26px 0',
       flex: 1,
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
       position: 'relative',
       zIndex: 1
     }
@@ -19105,7 +19126,7 @@ function HeroConfirm({
     style: {
       fontSize: 12,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.3
     }
   }, r.label), /*#__PURE__*/React.createElement("div", {
@@ -19274,11 +19295,11 @@ function Unstake({
       background: RH.surface,
       border: `1px solid ${RH.line}`,
       borderRadius: 14,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10,
       color: locked ? RH.red : RH.textDim,
       letterSpacing: 1.4,
@@ -19332,7 +19353,7 @@ function Unstake({
       background: RH.red + '15',
       border: `1px solid ${RH.red}55`,
       borderRadius: 10,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 11,
       color: RH.red,
       letterSpacing: 0.4,
@@ -19345,7 +19366,7 @@ function Unstake({
       background: RH.red + '12',
       border: `1px solid ${RH.red}44`,
       borderRadius: 10,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 11,
       color: RH.red,
       letterSpacing: 0.3,
@@ -19390,7 +19411,7 @@ function BreakRow({
     style: {
       fontSize: 12.5,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.3
     }
   }, label), /*#__PURE__*/React.createElement("span", {
@@ -19398,7 +19419,7 @@ function BreakRow({
       fontSize: 13,
       fontWeight: strong ? 700 : 600,
       color: colorValue || RH.text,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.3,
       fontVariantNumeric: 'tabular-nums'
     }
@@ -19522,11 +19543,11 @@ function Redeem({
       background: RH.surface,
       border: `1px solid ${RH.line}`,
       borderRadius: 14,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10,
       color: RH.textDim,
       letterSpacing: 1.4,
@@ -19550,14 +19571,14 @@ function Redeem({
       marginTop: 4,
       fontSize: 12,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.3,
       fontVariantNumeric: 'tabular-nums'
     }
   }, heldShares.toFixed(2), " ", sym, " \xB7 ", sym === 'ALPX-RE1' ? 'Real Estate fund' : sym === 'ALPX-CR2' ? 'Credit fund' : 'Fund')), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 14,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10,
       color: RH.textDim,
       letterSpacing: 1.4,
@@ -19576,7 +19597,7 @@ function Redeem({
       border: `1px solid ${mode === 'standard' ? RH.green : RH.line}`,
       borderRadius: 14,
       cursor: 'pointer',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -19598,7 +19619,7 @@ function Redeem({
       padding: '2px 8px',
       borderRadius: 6,
       background: RH.green + '22',
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.6
     }
   }, "0% fee")), /*#__PURE__*/React.createElement("div", {
@@ -19606,7 +19627,7 @@ function Redeem({
       marginTop: 6,
       fontSize: 12,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace'
+      fontFamily: FONT_UI
     }
   }, "Receive $", heldUsd.toFixed(2), " in 7 business days")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setMode('instant'),
@@ -19619,7 +19640,7 @@ function Redeem({
       border: `1px solid ${mode === 'instant' ? RH.green : RH.line}`,
       borderRadius: 14,
       cursor: 'pointer',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -19641,7 +19662,7 @@ function Redeem({
       padding: '2px 8px',
       borderRadius: 6,
       background: RH.red + '22',
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.6
     }
   }, "1% fee")), /*#__PURE__*/React.createElement("div", {
@@ -19649,7 +19670,7 @@ function Redeem({
       marginTop: 6,
       fontSize: 12,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace'
+      fontFamily: FONT_UI
     }
   }, "Receive $", (heldUsd * (1 - INSTANT_FEE_PCT)).toFixed(2), " now")), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -20031,7 +20052,7 @@ function AssetDetail({
           fontSize: 11,
           color: RH.textDim,
           marginTop: 1,
-          fontFamily: 'Geist Mono, monospace',
+          fontFamily: FONT_UI,
           fontVariantNumeric: 'tabular-nums'
         }
       }, "$", (a.price || 0).toLocaleString('en-US', {
@@ -20042,7 +20063,7 @@ function AssetDetail({
           fontSize: 11,
           color: RH.textDim,
           fontVariantNumeric: 'tabular-nums',
-          fontFamily: 'Geist Mono, monospace'
+          fontFamily: FONT_UI
         }
       }, bal > 0 ? `$${bal.toFixed(2)}` : ''));
     };
@@ -20055,7 +20076,7 @@ function AssetDetail({
         fontSize: 9.5,
         fontWeight: 700,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 1.2,
         textTransform: 'uppercase',
         display: 'flex',
@@ -20097,14 +20118,14 @@ function AssetDetail({
     style: {
       fontSize: 11,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.8,
       fontWeight: 700,
       marginBottom: 6
     }
   }, sym), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 30,
+      fontSize: 34,
       fontWeight: 700,
       color: RH.text,
       letterSpacing: -0.8,
@@ -20119,10 +20140,10 @@ function AssetDetail({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 36,
-      fontWeight: 600,
+      fontSize: 52,
+      fontWeight: 200,
       color: RH.text,
-      letterSpacing: -1.2,
+      letterSpacing: -2,
       lineHeight: 1,
       fontVariantNumeric: 'tabular-nums'
     }
@@ -20140,8 +20161,8 @@ function AssetDetail({
       display: 'flex',
       alignItems: 'center',
       gap: 6,
-      fontSize: 13,
-      fontWeight: 600,
+      fontSize: 15,
+      fontWeight: 400,
       fontVariantNumeric: 'tabular-nums',
       color: accentColor
     }
@@ -20164,10 +20185,11 @@ function AssetDetail({
       marginTop: 6,
       fontSize: 11,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.4,
-      textTransform: 'uppercase',
-      fontWeight: 600
+      textTransform: 'none',
+      fontWeight: 400,
+      fontSize: 13
     }
   }, "24 Hour Market")), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -20198,14 +20220,15 @@ function AssetDetail({
       onClick: () => setRange(r),
       style: {
         flex: 1,
-        padding: '7px 0',
-        borderRadius: 999,
-        background: active ? `${RH.green}22` : 'transparent',
+        padding: 0,
+        borderRadius: 16,
+        background: active ? RH.acc : 'transparent',
         border: 'none',
-        color: active ? RH.green : RH.textDim,
-        fontSize: 12,
-        fontWeight: 700,
-        fontFamily: 'Geist Mono, monospace',
+        color: active ? RH.onAcc : RH.textDim,
+        fontSize: 14,
+        fontWeight: active ? 600 : 500,
+        height: 32,
+        fontFamily: FONT_UI,
         letterSpacing: 0.6,
         cursor: 'pointer'
       }
@@ -20216,115 +20239,103 @@ function AssetDetail({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 16,
-      fontWeight: 700,
+      fontSize: 20,
+      fontWeight: 600,
       color: RH.text,
       letterSpacing: -0.2,
       marginBottom: 10
     }
   }, isStaked ? 'Staked balance' : 'Your position'), /*#__PURE__*/React.createElement("div", {
     style: {
-      padding: 14,
+      padding: '14px 16px',
       background: RH.surface,
-      border: `1px solid ${RH.line}`,
-      borderRadius: 14
+      border: 'none',
+      borderRadius: 18
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: '1fr 1fr',
       gap: '14px 16px',
-      fontFamily: 'Geist Mono, monospace'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 10.5,
+      fontSize: 12,
       color: RH.textDim,
-      letterSpacing: 0.6,
-      textTransform: 'uppercase',
-      fontWeight: 700
+      fontWeight: 400
     }
   }, isStaked ? 'Principal' : 'Market value'), /*#__PURE__*/React.createElement("div", {
     style: {
-      marginTop: 4,
-      fontSize: 16,
-      fontWeight: 600,
+      marginTop: 2,
+      fontSize: 22,
+      fontWeight: 200,
       color: RH.text,
       fontVariantNumeric: 'tabular-nums',
       letterSpacing: -0.3
     }
   }, "$", fmtUsd(holdingUsd))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 10.5,
+      fontSize: 12,
       color: RH.textDim,
-      letterSpacing: 0.6,
-      textTransform: 'uppercase',
-      fontWeight: 700
+      fontWeight: 400
     }
   }, sym, " held"), /*#__PURE__*/React.createElement("div", {
     style: {
-      marginTop: 4,
-      fontSize: 16,
-      fontWeight: 600,
+      marginTop: 2,
+      fontSize: 22,
+      fontWeight: 200,
       color: RH.text,
       fontVariantNumeric: 'tabular-nums',
       letterSpacing: -0.3
     }
   }, holdingCoin.toFixed(holdingCoin < 1 ? 6 : 4).replace(/\.?0+$/, '') || '0')), isStaked ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 10.5,
+      fontSize: 12,
       color: RH.textDim,
-      letterSpacing: 0.6,
-      textTransform: 'uppercase',
-      fontWeight: 700
+      fontWeight: 400
     }
   }, "APY"), /*#__PURE__*/React.createElement("div", {
     style: {
-      marginTop: 4,
-      fontSize: 16,
-      fontWeight: 700,
+      marginTop: 2,
+      fontSize: 22,
+      fontWeight: 300,
       color: RH.green,
       fontVariantNumeric: 'tabular-nums'
     }
   }, stakePeriodApy(sym, lockPeriod).toFixed(1), "%")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 10.5,
+      fontSize: 12,
       color: RH.textDim,
-      letterSpacing: 0.6,
-      textTransform: 'uppercase',
-      fontWeight: 700
+      fontWeight: 400
     }
   }, "Accrued"), /*#__PURE__*/React.createElement("div", {
     style: {
-      marginTop: 4,
-      fontSize: 16,
-      fontWeight: 600,
+      marginTop: 2,
+      fontSize: 22,
+      fontWeight: 200,
       color: RH.green,
       fontVariantNumeric: 'tabular-nums'
     }
   }, "+$", accruedUsd.toFixed(2)))) : isSecurity ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 10.5,
+      fontSize: 12,
       color: RH.textDim,
-      letterSpacing: 0.6,
-      textTransform: 'uppercase',
-      fontWeight: 700
+      fontWeight: 400
     }
   }, "APY"), /*#__PURE__*/React.createElement("div", {
     style: {
-      marginTop: 4,
-      fontSize: 16,
-      fontWeight: 700,
+      marginTop: 2,
+      fontSize: 22,
+      fontWeight: 300,
       color: RH.green,
       fontVariantNumeric: 'tabular-nums'
     }
   }, (meta.apy || 0).toFixed(1), "%")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 10.5,
+      fontSize: 12,
       color: RH.textDim,
-      letterSpacing: 0.6,
-      textTransform: 'uppercase',
-      fontWeight: 700
+      fontWeight: 400
     }
   }, "Type"), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -20335,33 +20346,29 @@ function AssetDetail({
     }
   }, sym === 'ALPX-RE1' ? 'Real Estate' : sym === 'ALPX-CR2' ? 'Credit' : 'Token'))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 10.5,
+      fontSize: 12,
       color: RH.textDim,
-      letterSpacing: 0.6,
-      textTransform: 'uppercase',
-      fontWeight: 700
+      fontWeight: 400
     }
   }, "Today's return"), /*#__PURE__*/React.createElement("div", {
     style: {
-      marginTop: 4,
-      fontSize: 16,
-      fontWeight: 700,
+      marginTop: 2,
+      fontSize: 22,
+      fontWeight: 300,
       color: accentColor,
       fontVariantNumeric: 'tabular-nums'
     }
   }, chartIsUp ? '+' : '-', "$", Math.abs(chartChange * (holdingCoin || 0)).toFixed(2))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 10.5,
+      fontSize: 12,
       color: RH.textDim,
-      letterSpacing: 0.6,
-      textTransform: 'uppercase',
-      fontWeight: 700
+      fontWeight: 400
     }
   }, "Avg cost"), /*#__PURE__*/React.createElement("div", {
     style: {
-      marginTop: 4,
-      fontSize: 16,
-      fontWeight: 600,
+      marginTop: 2,
+      fontSize: 22,
+      fontWeight: 200,
       color: RH.text,
       fontVariantNumeric: 'tabular-nums',
       letterSpacing: -0.3
@@ -20394,7 +20401,7 @@ function AssetDetail({
     d: "M8 11 V7 a4 4 0 0 1 8 0 V11"
   })), /*#__PURE__*/React.createElement("span", {
     style: {
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10.5,
       color: RH.red,
       letterSpacing: 0.6,
@@ -20408,9 +20415,8 @@ function AssetDetail({
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       flexShrink: 0,
-      borderTop: `1px solid ${RH.line}`,
       background: RH.bg,
-      padding: '10px 14px 22px'
+      padding: '10px 16px 22px'
     }
   }, isStaked ? /*#__PURE__*/React.createElement("button", {
     onClick: () => onUnstake && onUnstake(sym),
@@ -20446,22 +20452,21 @@ function AssetDetail({
       fontWeight: 700,
       letterSpacing: 0.2,
       cursor: holdingUsd > 0 ? 'pointer' : 'not-allowed',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, holdingUsd > 0 ? 'Redeem' : 'No holdings'), /*#__PURE__*/React.createElement("button", {
     onClick: () => onBuy && onBuy(sym),
     style: {
       flex: 1,
-      padding: '13px 0',
-      borderRadius: 999,
-      background: RH.green,
-      color: '#000',
-      border: 'none',
-      fontSize: 13,
-      fontWeight: 700,
-      letterSpacing: 0.2,
+      padding: '15px 0',
+      borderRadius: 20,
+      background: RH.bg,
+      color: RH.green,
+      border: `1.5px solid ${RH.green}`,
+      fontSize: 16,
+      fontWeight: 400,
       cursor: 'pointer',
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
       fontVariantNumeric: 'tabular-nums'
     }
   }, "Buy \xB7 $", fmtUsd(askPrice)))) : sym === 'USDT' ? /*#__PURE__*/React.createElement("div", {
@@ -20470,7 +20475,7 @@ function AssetDetail({
       borderRadius: 12,
       background: RH.surface,
       border: `1px solid ${RH.line}`,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -20497,32 +20502,30 @@ function AssetDetail({
     disabled: holdingUsd <= 0,
     style: {
       flex: 1,
-      padding: '13px 0',
-      borderRadius: 999,
-      background: holdingUsd > 0 ? `${RH.red}26` : RH.surfaceUp,
+      padding: '15px 0',
+      borderRadius: 20,
+      background: RH.bg,
       color: holdingUsd > 0 ? RH.red : RH.textMute,
-      border: `1px solid ${holdingUsd > 0 ? RH.red : RH.line}`,
-      fontSize: 13,
-      fontWeight: 700,
-      letterSpacing: 0.2,
+      border: `1.5px solid ${holdingUsd > 0 ? RH.red : RH.line}`,
+      fontSize: 16,
+      fontWeight: 400,
       cursor: holdingUsd > 0 ? 'pointer' : 'not-allowed',
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
       fontVariantNumeric: 'tabular-nums'
     }
   }, "Sell \xB7 $", fmtUsd(bidPrice)), /*#__PURE__*/React.createElement("button", {
     onClick: () => onBuy && onBuy(sym),
     style: {
       flex: 1,
-      padding: '13px 0',
-      borderRadius: 999,
-      background: RH.green,
-      color: '#000',
-      border: 'none',
-      fontSize: 13,
-      fontWeight: 700,
-      letterSpacing: 0.2,
+      padding: '15px 0',
+      borderRadius: 20,
+      background: RH.bg,
+      color: RH.green,
+      border: `1.5px solid ${RH.green}`,
+      fontSize: 16,
+      fontWeight: 400,
       cursor: 'pointer',
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
       fontVariantNumeric: 'tabular-nums'
     }
   }, "Buy \xB7 $", fmtUsd(askPrice))), isALPXS ? /*#__PURE__*/React.createElement("button", {
@@ -20616,7 +20619,7 @@ function SellPicker({
         justifyContent: 'center',
         padding: '0 36px',
         textAlign: 'center',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -20723,11 +20726,11 @@ function SellPicker({
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '8px 22px 18px',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontSize: 10.5,
       color: RH.textDim,
       letterSpacing: 1.4,
@@ -20775,7 +20778,7 @@ function SellPicker({
         alignItems: 'center',
         gap: 14,
         cursor: 'pointer',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement(AssetIcon, {
       sym: a.sym,
@@ -20797,7 +20800,7 @@ function SellPicker({
         marginTop: 2,
         fontSize: 11.5,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 0.3,
         fontVariantNumeric: 'tabular-nums'
       }
@@ -20828,7 +20831,7 @@ function SellPicker({
         marginTop: 2,
         fontSize: 11.5,
         fontWeight: 600,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 0.3,
         fontVariantNumeric: 'tabular-nums',
         color: a.chg >= 0 ? RH.green : RH.red
@@ -21311,7 +21314,7 @@ function Buy({
         justifyContent: 'center',
         padding: '0 36px',
         textAlign: 'center',
-        fontFamily: 'Geist, Inter, system-ui'
+        fontFamily: FONT_UI
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -21525,7 +21528,7 @@ function Buy({
           marginTop: 2,
           fontSize: 10.5,
           fontWeight: 600,
-          fontFamily: 'Geist Mono, monospace',
+          fontFamily: FONT_UI,
           letterSpacing: 0.4,
           color: a.chg >= 0 ? RH.green : RH.red,
           fontVariantNumeric: 'tabular-nums'
@@ -21548,7 +21551,7 @@ function Buy({
         fontSize: 9.5,
         fontWeight: 700,
         color: RH.textDim,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 1.2,
         textTransform: 'uppercase',
         display: 'flex',
@@ -21591,10 +21594,10 @@ function Buy({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 28,
-      fontWeight: 600,
+      fontSize: 40,
+      fontWeight: 200,
       color: RH.text,
-      letterSpacing: -0.8,
+      letterSpacing: -1.2,
       fontVariantNumeric: 'tabular-nums',
       lineHeight: 1
     }
@@ -21607,8 +21610,8 @@ function Buy({
       display: 'flex',
       alignItems: 'center',
       gap: 8,
-      fontSize: 12,
-      fontWeight: 600,
+      fontSize: 14,
+      fontWeight: 400,
       fontVariantNumeric: 'tabular-nums'
     }
   }, /*#__PURE__*/React.createElement("span", {
@@ -21618,10 +21621,8 @@ function Buy({
   }, chartIsUp ? '▲' : '▼', " $", Math.abs(chartChange).toFixed(2), " (", chartIsUp ? '+' : '', chartPct.toFixed(2), "%)"), /*#__PURE__*/React.createElement("span", {
     style: {
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
-      fontSize: 10.5,
-      letterSpacing: 0.6,
-      textTransform: 'uppercase'
+      fontFamily: FONT_UI,
+      fontSize: 14
     }
   }, scrubIdx !== null ? 'Scrubbing' : BUY_RANGE_META[range] && BUY_RANGE_META[range].label || 'Today'))), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -21637,8 +21638,9 @@ function Buy({
     style: {
       display: 'flex',
       justifyContent: 'space-between',
-      padding: '6px 22px 10px',
-      fontFamily: 'Geist Mono, monospace'
+      gap: 4,
+      padding: '6px 16px 10px',
+      fontFamily: FONT_UI
     }
   }, BUY_RANGES.map(r => {
     const active = r === range;
@@ -21646,23 +21648,27 @@ function Buy({
       key: r,
       onClick: () => setRange(r),
       style: {
-        background: 'transparent',
+        flex: 1,
+        height: 30,
+        borderRadius: 15,
+        background: active ? RH.acc : 'transparent',
         border: 'none',
         cursor: 'pointer',
-        padding: '6px 4px',
-        fontSize: 11,
-        fontWeight: 700,
-        letterSpacing: 0.4,
-        color: active ? accentColor : RH.textDim,
-        borderBottom: active ? `2px solid ${accentColor}` : '2px solid transparent',
-        transition: 'color 160ms ease, border-color 160ms ease'
+        padding: 0,
+        fontSize: 13,
+        fontWeight: active ? 600 : 500,
+        color: active ? RH.onAcc : RH.textDim,
+        transition: 'color 160ms ease, background 160ms ease'
       }
     }, r);
   })), /*#__PURE__*/React.createElement("div", {
     style: {
-      padding: '6px 22px 0',
+      margin: '6px 16px 0',
+      padding: 2,
       display: 'flex',
-      gap: 4
+      gap: 2,
+      borderRadius: 18,
+      background: RH.surface
     }
   }, ['Market', 'Limit', 'Stop'].map(t => {
     const active = t === orderType;
@@ -21671,13 +21677,14 @@ function Buy({
       onClick: () => setOrderType(t),
       style: {
         flex: 1,
-        padding: '8px 0',
-        borderRadius: 10,
-        background: active ? RH.surfaceUp : RH.surface,
-        border: `1px solid ${active ? RH.accent : RH.line}`,
-        color: active ? RH.text : RH.textDim,
-        fontSize: 11.5,
-        fontWeight: 700,
+        height: 32,
+        padding: 0,
+        borderRadius: 16,
+        background: active ? RH.acc : 'transparent',
+        border: 'none',
+        color: active ? RH.onAcc : RH.text,
+        fontSize: 14,
+        fontWeight: active ? 600 : 500,
         cursor: 'pointer',
         letterSpacing: 0.2
       }
@@ -21740,7 +21747,7 @@ function Buy({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         fontSize: 10,
         color: RH.textDim,
         letterSpacing: 1.4,
@@ -21755,7 +21762,7 @@ function Buy({
         color: RH.textDim,
         fontSize: 10,
         fontWeight: 600,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 0.8,
         padding: '4px 10px',
         borderRadius: 999,
@@ -21791,7 +21798,7 @@ function Buy({
       style: {
         flex: 1,
         textAlign: 'center',
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         fontSize: 26,
         fontWeight: 600,
         color: RH.text,
@@ -21829,7 +21836,7 @@ function Buy({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 6,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         fontSize: 10.5,
         letterSpacing: 0.4,
         color: tierColor
@@ -21850,7 +21857,7 @@ function Buy({
       style: {
         marginTop: 8,
         fontSize: 10.5,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         letterSpacing: 0.4,
         textAlign: 'center',
         color: triggerTier === 'warn' ? '#F5B543' : triggerTier === 'wrong-side' || triggerTier === 'too-far' ? RH.red : RH.textDim
@@ -21874,26 +21881,26 @@ function Buy({
     }
   }, unit === 'usd' ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: 24,
-      fontWeight: 500,
-      marginRight: 4,
+      fontSize: 30,
+      fontWeight: 200,
+      marginRight: 3,
       opacity: 0.6
     }
   }, "$"), /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: 48,
-      fontWeight: 600
+      fontSize: 60,
+      fontWeight: 200
     }
   }, intPart), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 30,
-      fontWeight: 500,
+      fontWeight: 200,
       opacity: 0.45
     }
   }, fracDisplay)) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: 36,
-      fontWeight: 600
+      fontSize: 44,
+      fontWeight: 200
     }
   }, intPart, fracDisplay), /*#__PURE__*/React.createElement("span", {
     style: {
@@ -21904,10 +21911,10 @@ function Buy({
     }
   }, assetId))), /*#__PURE__*/React.createElement("div", {
     style: {
-      marginTop: 6,
-      fontSize: 11,
+      marginTop: 4,
+      fontSize: 14,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.4,
       fontVariantNumeric: 'tabular-nums'
     }
@@ -21921,9 +21928,9 @@ function Buy({
     style: {
       display: 'inline-flex',
       background: RH.surface,
-      border: `1px solid ${RH.line}`,
-      borderRadius: 999,
-      padding: 3
+      border: 'none',
+      borderRadius: 18,
+      padding: 2
     }
   }, ['usd', 'coin'].map(u => {
     const active = u === unit;
@@ -21934,15 +21941,15 @@ function Buy({
         setAmountStr('0');
       },
       style: {
-        padding: '6px 14px',
-        borderRadius: 999,
-        background: active ? RH.surfaceUp : 'transparent',
+        padding: '0 16px',
+        height: 32,
+        borderRadius: 16,
+        background: active ? RH.capsule : 'transparent',
         border: 'none',
         cursor: 'pointer',
         color: active ? RH.text : RH.textDim,
-        fontSize: 11.5,
-        fontWeight: 700,
-        letterSpacing: 0.4
+        fontSize: 14,
+        fontWeight: active ? 600 : 500
       }
     }, u === 'usd' ? 'USD' : assetId);
   }))), unit === 'usd' ? /*#__PURE__*/React.createElement("div", {
@@ -21958,16 +21965,17 @@ function Buy({
       key: l,
       onClick: () => setQuick(f),
       style: {
-        padding: '5px 12px',
-        borderRadius: 999,
-        background: active ? `${RH.accent}26` : RH.surface,
-        border: `1px solid ${active ? RH.accent : RH.line}`,
-        color: active ? RH.accent : RH.text,
-        fontSize: 11,
-        fontWeight: 700,
+        padding: '0 14px',
+        height: 36,
+        borderRadius: 18,
+        background: active ? RH.acc : RH.surface,
+        border: 'none',
+        color: active ? RH.onAcc : RH.text,
+        fontSize: 14,
+        fontWeight: active ? 600 : 500,
         cursor: 'pointer',
         letterSpacing: 0.2,
-        fontFamily: 'Geist Mono, monospace',
+        fontFamily: FONT_UI,
         transition: 'background 160ms ease, color 160ms ease, border-color 160ms ease'
       }
     }, l);
@@ -21979,8 +21987,8 @@ function Buy({
     style: {
       padding: '12px 14px',
       background: RH.surface,
-      border: `1px solid ${RH.line}`,
-      borderRadius: 14,
+      border: 'none',
+      borderRadius: 18,
       fontVariantNumeric: 'tabular-nums'
     }
   }, /*#__PURE__*/React.createElement(Row, {
@@ -22017,11 +22025,10 @@ function Buy({
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 8,
-      fontSize: 11,
+      fontSize: 13,
       color: insufficient ? RH.red : RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontVariantNumeric: 'tabular-nums',
-      letterSpacing: 0.6,
       textAlign: 'center'
     }
   }, insufficient ? `Insufficient · only $${buyingPower.toFixed(2)} ${isSell ? 'in ' + assetId : 'USDT'} available` : `${isSell ? 'Available · ' : 'Buying power · '}$${buyingPower.toFixed(2)} ${isSell ? assetId : 'USDT'}`)), /*#__PURE__*/React.createElement("div", {
@@ -22042,13 +22049,13 @@ function Buy({
     style: {
       background: 'transparent',
       border: 'none',
-      padding: '10px 0',
+      padding: '8px 0',
       color: RH.text,
-      fontSize: 20,
-      fontWeight: 500,
+      fontSize: 28,
+      fontWeight: 300,
       letterSpacing: -0.5,
       cursor: 'pointer',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, k))), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -22060,13 +22067,12 @@ function Buy({
       width: '100%',
       padding: '16px 0',
       borderRadius: 999,
-      background: valid && triggerOk ? isSell ? `${RH.red}26` : accentColor : RH.surfaceUp,
-      color: valid && triggerOk ? isSell ? RH.red : chartIsUp ? '#000' : '#fff' : RH.textMute,
+      background: valid && triggerOk ? isSell ? `${RH.red}26` : RH.acc : RH.surfaceUp,
+      color: valid && triggerOk ? isSell ? RH.red : RH.onAcc : RH.textMute,
       border: valid && triggerOk && isSell ? `1px solid ${RH.red}` : 'none',
       cursor: valid && triggerOk ? 'pointer' : 'not-allowed',
-      fontSize: 15,
-      fontWeight: 700,
-      letterSpacing: 0.2
+      fontSize: 17,
+      fontWeight: 600
     }
   }, !valid ? 'Enter amount' : !triggerOk ? `Enter ${orderType.toLowerCase()} price` : orderType === 'Market' ? `${isSell ? 'Sell' : 'Buy'} $${usdAmount.toFixed(2)} of ${assetId}` : `Place ${orderType} order`))));
 }
@@ -22367,7 +22373,7 @@ function TwoFAFullScreen({
       color: error ? RH.red : RH.text,
       fontSize: 24,
       fontWeight: 700,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontVariantNumeric: 'tabular-nums',
       outline: 'none',
       caretColor: RH.accent,
@@ -22383,7 +22389,7 @@ function TwoFAFullScreen({
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
       animation: 'alpexa-modal-fade 200ms ease-out both'
     }
   }, /*#__PURE__*/React.createElement("div", {
@@ -22567,7 +22573,7 @@ function TwoFAFullScreen({
       marginTop: 9,
       fontSize: 10,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 0.8,
       textAlign: 'center'
     }
@@ -22576,7 +22582,7 @@ function TwoFAFullScreen({
       marginTop: 3,
       fontSize: 11.5,
       color: RH.text,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       wordBreak: 'break-all',
       maxWidth: 280,
       textAlign: 'center'
@@ -22585,7 +22591,7 @@ function TwoFAFullScreen({
     style: {
       fontSize: 10.5,
       color: RH.textDim,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       letterSpacing: 1.4,
       textTransform: 'uppercase',
       fontWeight: 700,
@@ -22618,7 +22624,7 @@ function TwoFAFullScreen({
       fontSize: 15,
       fontWeight: 700,
       letterSpacing: 0.2,
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
       opacity: busy ? 0.6 : 1
     }
   }, busy ? 'Setting up…' : 'Set up 2FA'), /*#__PURE__*/React.createElement("button", {
@@ -22634,7 +22640,7 @@ function TwoFAFullScreen({
       cursor: 'pointer',
       fontSize: 13,
       fontWeight: 600,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, "Not now \u2014 continue without 2FA")) : mode === 'verify' || mode === 'enroll' ? /*#__PURE__*/React.createElement("button", {
     onClick: submit,
@@ -22650,7 +22656,7 @@ function TwoFAFullScreen({
       fontSize: 15,
       fontWeight: 700,
       letterSpacing: 0.2,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, busy ? 'Verifying…' : mode === 'enroll' ? 'Verify & enable' : 'Verify') : null)));
 }
@@ -22768,7 +22774,7 @@ function EmailOTPFullScreen({
       background: RH.bg,
       display: 'flex',
       flexDirection: 'column',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -22856,7 +22862,7 @@ function EmailOTPFullScreen({
       fontSize: 24,
       fontWeight: 700,
       outline: 'none',
-      fontFamily: 'Geist Mono, monospace'
+      fontFamily: FONT_UI
     }
   }))), err ? /*#__PURE__*/React.createElement("div", {
     style: {
@@ -23004,7 +23010,7 @@ function AlpexaModal({
       border: `1px solid ${RH.line}`,
       borderRadius: 20,
       padding: isTwofa ? '26px 24px 22px' : '24px 22px 20px',
-      fontFamily: 'Geist, Inter, system-ui',
+      fontFamily: FONT_UI,
       boxShadow: '0 20px 56px rgba(0,0,0,0.5), 0 4px 16px rgba(0,0,0,0.3)',
       animation: 'alpexa-modal-pop 280ms cubic-bezier(0.22, 1.4, 0.36, 1) both'
     }
@@ -23078,7 +23084,7 @@ function AlpexaModal({
       color: twofaError ? RH.red : RH.text,
       fontSize: 22,
       fontWeight: 700,
-      fontFamily: 'Geist Mono, monospace',
+      fontFamily: FONT_UI,
       fontVariantNumeric: 'tabular-nums',
       outline: 'none',
       caretColor: RH.accent,
@@ -23106,7 +23112,7 @@ function AlpexaModal({
       fontWeight: 700,
       cursor: isTwofa && digits.join('').length !== 6 ? 'not-allowed' : 'pointer',
       letterSpacing: 0.2,
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, isConfirm ? 'Confirm' : isTwofa ? 'Verify' : 'OK'), isConfirm || isTwofa ? /*#__PURE__*/React.createElement("button", {
     onClick: () => onClose(false),
@@ -23121,7 +23127,7 @@ function AlpexaModal({
       fontSize: 13,
       fontWeight: 600,
       cursor: 'pointer',
-      fontFamily: 'Geist, Inter, system-ui'
+      fontFamily: FONT_UI
     }
   }, "Cancel") : null));
 }
