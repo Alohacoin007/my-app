@@ -224,7 +224,7 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   { const boxes = await page.locator('.stat').evaluateAll(els => els.map(e => e.getBoundingClientRect())); const host = await page.locator('.stats').boundingBox();
     ok('홈 3칸 카드가 가로 전체를 균등 분할 (첫 칸 왼쪽 = 컨테이너 왼쪽 · 마지막 칸 오른쪽 = 컨테이너 오른쪽 ±1px)', boxes.length === 3 && Math.abs(boxes[0].x - host.x) < 1 && Math.abs((boxes[2].x + boxes[2].width) - (host.x + host.width)) < 1, JSON.stringify([host, boxes.map(b => [Math.round(b.x), Math.round(b.width)])]));
     const offPx = await page.locator('.row[data-sym="EURUSD"] .btn.sell').evaluate(el => parseFloat(getComputedStyle(el).fontSize));
-    ok('1-Click OFF 시세 글자 17px', offPx === 17, String(offPx)); }
+    ok('1-Click OFF 시세 글자 21px (2026-10-25 사장님 "시세가 작아보여" — 17→21, 칸 220px)', offPx === 21, String(offPx)); }
   // M5 one-click OFF → no boxes; toggle → ack sheet → ON → boxes; tapping → toast, no rpc
   ok('M5 OFF: 상자 없음 (app.oc-on 미적용)', !(await page.locator('.app.oc-on').count()));
   await page.locator('.oc').click(); await page.waitForTimeout(100);
