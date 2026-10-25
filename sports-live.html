@@ -25,10 +25,12 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Google+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Google+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap"></noscript>
 <style>
+  /* 월드클락 스킨 토큰 (2026-10-25 사장님 시안 승인 "스포츠 앱도 진행해" — 시안 6323yAVLEkCsaXN4FVX4rb).
+     --accent = 글자·테두리용 주황(흰 바탕 대비 확보) · --acc = 채움 주황(검정 글자 --accent-d) · --accent-t = 옅은 주황 바탕 · --cell = 배당칸·칩 바탕 */
   :root{
-    --bg:#f4f6fb; --surface:#ffffff; --surface-2:#eef1f7; --line:#e7ebf2;
-    --text:#0e1726; --dim:#8a94a6; --accent:#1e40d8; --accent-d:#ffffff;
-    --pos:#16a34a; --neg:#e5484d; --live:#e5484d; --r:12px;
+    --bg:#FFFFFF; --surface:#FFFFFF; --surface-2:#F2F2F7; --cell:#F2F2F7; --line:#D1D1D6;
+    --text:#000000; --dim:#6C6C70; --accent:#C25E00; --acc:#FF9500; --accent-d:#000000; --accent-t:rgba(255,149,0,.14);
+    --pos:#248A3D; --neg:#FF3B30; --live:#FF3B30; --r:12px;
   }
   /* ⚡ Perf (#3): skeleton shell shown while live_games loads, so first entry is never a
      blank screen — perceived speed ↑. Replaced by real cards the moment data arrives. */
@@ -42,30 +44,13 @@
      다크 → LEGEND 다크로 교체. 웹대시보드(sports-dashboard)와 동일 토큰·문법 —
      bg #0B0D0E · surface #16181A · #00C805 = 돈·라이브 전용 · down #EB5D2A.
      accent-d(#04250B)는 그린 솔리드 위 잉크 텍스트. 라이트(:root)는 무변경. */
+  /* 다크 = 월드클락 다크 (2026-10-25 — 예전 LEGEND 그린 다크 오버라이드는 스킨으로 대체, 아래 ══ 월드클락 스킨 ══ 참조) */
   body.dark{
-    --bg:#0B0D0E; --surface:#16181A; --surface-2:#222528; --line:rgba(255,255,255,.08);
-    --text:#F5F6F7; --dim:#8B9096; --accent:#00C805; --accent-d:#04250B;
-    --pos:#00C805; --neg:#EB5D2A; --live:#00C805;
+    --bg:#000000; --surface:#1C1C1E; --surface-2:#2C2C2E; --cell:#1C1C1E; --line:#38383A;
+    --text:#FFFFFF; --dim:#98989F; --accent:#FF9F0A; --acc:#FF9F0A; --accent-d:#000000; --accent-t:rgba(255,159,10,.16);
+    --pos:#30D158; --neg:#FF453A; --live:#FF453A;
   }
   body.dark{background:var(--bg);}
-  /* 레전드 규율 오버라이드 (다크 전용 — 시안 v2 §9 T5·T14):
-     활성 탭/모드 = 잉크 반전(그린은 돈·라이브 전용이라 탭에 금지),
-     선택 배당 셀 = 그린 틴트+보더+그린 텍스트(솔리드 채움 금지 — 대시보드 문법),
-     그린 솔리드 CTA 위 하드코딩 흰 텍스트 2곳은 잉크로. */
-  body.dark .sport.active{background:#F5F6F7;color:#0B0C09}
-  body.dark .mode.active{background:#F5F6F7;color:#0B0C09}
-  body.dark .bet.sel{background:rgba(0,200,5,.08);border-color:#00C805;box-shadow:none}
-  body.dark .bet.sel .ln{color:#6EE7A0}
-  body.dark .bet.sel .pr{color:#00C805}
-  body.dark .lcb.bet.sel{background:rgba(0,200,5,.08);border-color:#00C805}
-  body.dark .lcb.bet.sel .lcb-ln{color:#6EE7A0}
-  body.dark .lcb.bet.sel .lcb-pr{color:#00C805}
-  body.dark .credit-toast{color:#04250B}
-  body.dark .balbar-add{color:#04250B}
-  /* Balance areas use the blue accent in light mode; in dark, swap to an
-     elegant dark card so they blend with the dark UI (white text stays). */
-  body.dark .header{background:var(--surface);box-shadow:0 8px 24px rgba(0,0,0,.28)}
-  body.dark .bal-card{box-shadow:0 10px 26px -10px rgba(0,0,0,.5)}
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   /* slim, app-like scrollbars */
   *{scrollbar-width:thin;scrollbar-color:rgba(95,99,104,.35) transparent}
@@ -730,6 +715,147 @@
   @keyframes lcovpulse{0%{background:var(--surface-2)}100%{background:transparent}}
   .watch-live{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:9px 12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);color:var(--text);font-size:12.5px;font-weight:700;cursor:pointer}
   .watch-live .wl-go{color:var(--dim);font-size:16px}
+  /* ══ 월드클락 스킨 (2026-10-25 사장님 "스포츠 앱도 진행해" — FX 와 같은 규율) ══════════════════════════
+     CSS 만 덮는다 — DOM·클릭 핸들러·data-*·배당 잠금(oddsReal)·렌더 격리 0 변경. 종목 칩 이모지만 시안대로 글자로.
+     얇은 숫자 · 카드 대신 헤어라인 목록(왼쪽 20px 들여쓴 구분선) · 주황 채움(--acc)+검정 글자 · 떠 있는 알약 탭바(::before 그림만). */
+  body{background:var(--bg)}
+  /* header — 카드 아님, 화면 바탕 그대로 (sticky 유지) */
+  .header{background:var(--bg);border-radius:0;box-shadow:none;margin:0;top:0;padding:calc(10px + env(safe-area-inset-top,0px)) 16px 4px 20px}
+  .header-top{margin-bottom:8px}
+  .brand{font-family:inherit;font-size:20px;font-weight:600;letter-spacing:-.3px}
+  .brand::before{display:none}
+  .topbar-r{gap:8px}
+  .server,.bell,.settings-btn{width:40px;height:40px;border-radius:20px;background:var(--cell);color:var(--text)}
+  .server:hover,.bell:hover,.settings-btn:hover,.bell:active,.settings-btn:active{background:var(--surface-2)}
+  .srv-cur-ic{color:var(--text)}
+  .srv-cur-ic svg,.bell svg,.settings-btn svg{width:18px;height:18px}
+  .bell-dot{top:8px;right:9px;border-color:var(--cell)}
+  .balbar-lbl{font-size:15px;font-weight:400;letter-spacing:0;text-transform:none;line-height:1.2}
+  .balbar-val{font-size:56px;font-weight:200;letter-spacing:-2px;line-height:1.05}
+  .bal-stat{font-size:14px;font-weight:400;letter-spacing:0}
+  .bal-stat b{font-size:14px;font-weight:400}
+  .balbar-add{height:40px;padding:0 18px;border-radius:20px;background:var(--acc);color:var(--accent-d);font-size:15px;font-weight:600}
+  /* search + 종목 칩 (한 줄 가로 스크롤) */
+  .searchbar{margin:12px 16px 0;height:40px;padding:0 12px;border:0;border-radius:12px;background:var(--cell)}
+  .searchbar input{font-size:16px}
+  .sports{display:flex;gap:6px;padding:12px 20px 0;overflow-x:auto;scrollbar-width:none}
+  .sport{flex:none;display:flex;align-items:center;height:34px;padding:0 14px;border:0;border-radius:17px;background:var(--cell);color:var(--text);font-size:15px;font-weight:500}
+  .sport.active{background:var(--acc);color:var(--accent-d);font-weight:600}
+  /* 열 머리 + 경기 목록 (헤어라인) */
+  .colhead-wrap{padding:0 16px 0 20px}
+  .colhead{padding:16px 0 6px;border:0;font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase}
+  .list{gap:0;margin-left:20px;padding:0 0 150px;border-top:.5px solid var(--line)}
+  .card{background:transparent;border:0;border-bottom:.5px solid var(--line);border-radius:0;box-shadow:none}
+  .card.pinned{border-color:var(--line);box-shadow:none}
+  .ch{padding:8px 16px 4px 0}
+  .lg,.st{font-size:13px;font-weight:400}
+  .matrix{padding:0 16px 12px 0}
+  .tcell .bd{border-radius:8px;background:var(--cell)}
+  .tcell .nm{font-size:17px;font-weight:400;letter-spacing:-.2px}
+  .tcell .sc{font-size:11px;font-weight:500}
+  .bet{min-height:50px;border:0;border-radius:14px;background:var(--cell)}
+  .bet .ln{top:8px;font-size:11px;font-weight:400}
+  .bet .pr{bottom:8px;font-size:18px;font-weight:300}
+  .bet .pr.pos{font-weight:400}
+  .bet.sus{background:var(--cell)}
+  .bet.sel{background:var(--acc);border-color:var(--acc);box-shadow:none}
+  .bet.sel .ln,.bet.sel .pr{color:var(--accent-d)}
+  .soc-hdr{padding:9px 16px 4px 0} .soc1x2{padding:4px 16px 12px 0} .soc-hdr .bd,.soc-sc{background:var(--cell)}
+  .golf-hdr{padding:9px 16px 6px 0} .golf-list{padding:0 16px 12px 0} .golf-tt{font-size:17px;font-weight:400}
+  .more-mkt{border-top:.5px solid var(--line)}
+  .play-tick{background:var(--accent-t);border:0;border-radius:10px}
+  .watch-live{border:0;border-radius:12px;background:var(--cell)}
+  /* Live — 배너 대신 큰 제목 줄 */
+  .live-hero{margin:0;padding:18px 20px 0;background:transparent;border:0;box-shadow:none;justify-content:flex-start}
+  .live-hero::before,.live-pulse{display:none}
+  .live-pill{background:rgba(255,59,48,.14);color:var(--live);border-radius:13px;padding:5px 10px;font-size:12px}
+  .live-pill .lp-dot{background:var(--live)} .live-pill .lp-dot::after{border-color:var(--live)}
+  .live-txt h2{font-size:28px;letter-spacing:-.5px}
+  .live-txt h2 .lc-wrap{font-size:15px;font-weight:400}
+  .live-txt h2 #liveCount{color:var(--dim);font-weight:400}
+  /* My Bets */
+  .phead{padding:18px 20px 12px} .phead h2{font-size:28px;letter-spacing:-.5px}
+  .seg{gap:2px;margin:0 16px 12px;padding:2px;border-radius:18px;background:var(--cell)}
+  .seg .s{padding:7px;border:0;border-radius:16px;background:transparent;color:var(--text);font-size:14px;font-weight:500}
+  .seg .s.active{background:var(--acc);border-color:var(--acc);color:var(--accent-d);font-weight:600}
+  .bs-cell{border:0;border-radius:12px;background:var(--cell)}
+  .tickets{gap:0;margin-left:20px;padding:0 0 150px;border-top:.5px solid var(--line)}
+  .ticket{background:transparent;border:0;border-bottom:.5px solid var(--line);border-radius:0;padding:12px 16px 12px 0}
+  .ticket.won{border-color:var(--line)}
+  .badge.parlay{background:var(--accent-t);color:var(--accent)}
+  .badge.sgp{background:var(--acc);color:var(--accent-d)}
+  .tfoot .amt b{font-size:22px;font-weight:200;letter-spacing:-.4px}
+  .cashout{background:transparent;border-radius:12px}
+  /* Wallet */
+  .bal-card{background:var(--cell);border-radius:18px;box-shadow:none}
+  .bal-card .lbl,.bsp-k{color:var(--dim);text-transform:none;letter-spacing:0;font-size:13px;font-weight:400}
+  .bal-card .big{color:var(--text);font-size:44px;font-weight:200;letter-spacing:-1.5px}
+  .bal-card .sub{color:var(--dim)} .bal-card .sub b,.bsp-v{color:var(--text)}
+  .bal-split{border-top:.5px solid var(--line)}
+  .wbtn{border:0;border-radius:22px;background:var(--cell);color:var(--text);box-shadow:none}
+  .wbtn.active{background:var(--accent-t);border-color:transparent}
+  .ra-card,.cashback-card{background:transparent;border:0;border-radius:0;box-shadow:none;padding-left:0;padding-right:0}
+  .txn{border-bottom:.5px solid var(--line)}
+  .tft{border:0;border-radius:15px;background:var(--cell);color:var(--text)}
+  .tft.active,.tfp.active{background:var(--acc);border-color:var(--acc);color:var(--accent-d)}
+  .tf-datesel{border:0;border-radius:15px;background:var(--cell)}
+  .cb-rate,.wd-src-tag{background:var(--accent-t)}
+  /* 슬립 바 — 떠 있는 둥근 막대 (숨김 위치는 탭바 뒤로 완전히 내려감) */
+  .slipbar{bottom:calc(98px + env(safe-area-inset-bottom,0px));width:calc(100% - 32px);max-width:358px;border:0;border-radius:22px;padding:10px 8px 10px 10px;transform:translate(-50%,300%);box-shadow:0 2px 16px rgba(0,0,0,.14),0 0 0 .5px rgba(0,0,0,.05)}
+  body.dark .slipbar{box-shadow:0 -12px 24px rgba(0,0,0,.6)}
+  .slipbar.show{transform:translate(-50%,0)}
+  .slipbar .count{width:34px;height:34px;border-radius:17px;background:var(--acc);color:var(--accent-d);font-size:16px}
+  .slipbar .t{font-size:12px;font-weight:400}
+  .slipbar .t b{font-size:22px;font-weight:300;letter-spacing:-.3px}
+  .slipbar .open{height:46px;padding:0 20px;border-radius:23px;background:var(--acc);color:var(--accent-d);font-size:16px;font-weight:600;letter-spacing:0;box-shadow:none}
+  /* 시트 (베팅 슬립 · 입출금 · 설정) */
+  .sheet,.s-sheet{border-radius:28px 28px 0 0}
+  .grip,.s-sheet .grip{width:36px;height:5px;background:var(--line)}
+  .sh h3,.s-sheet-head h3{font-size:28px;letter-spacing:-.5px}
+  .sh .close{width:32px;height:32px;border:0;border-radius:16px;background:var(--surface-2)}
+  .modes{gap:2px;margin:4px 16px 14px;padding:2px;border-radius:16px;background:var(--surface-2)}
+  .mode{padding:8px 4px;border:0;border-radius:14px;background:transparent;color:var(--text);font-size:15px;font-weight:500}
+  .mode .sub{font-size:11px;font-weight:400;color:var(--dim)}
+  .mode.active{background:var(--acc);color:var(--accent-d);font-weight:600}
+  .mode.active .sub{color:var(--accent-d)}
+  .leg{border:0;border-radius:14px;background:var(--surface-2)}
+  .leg .l3 .pr{font-size:22px;font-weight:200;color:var(--text)}
+  .leg .tag{background:var(--acc);color:var(--accent-d)}
+  .stake-row input,.leg .ss input{min-width:0;width:100%;border:0;border-radius:16px;background:var(--surface-2);font-weight:200}
+  .stake-row input{height:56px;padding:0 16px;font-size:28px}
+  .leg .ss input{font-size:18px}
+  .chip,.tf-chips .chip{border:0;border-radius:19px;background:var(--surface-2);color:var(--text);font-size:15px;font-weight:500}
+  .row.tot .v{color:var(--text);font-size:34px;font-weight:200;letter-spacing:-1px}
+  .place{padding:16px;border-radius:28px;background:var(--acc);color:var(--accent-d);font-size:17px;font-weight:600;letter-spacing:0;box-shadow:none}
+  .place:active{box-shadow:none}
+  .place.confirm{background:var(--pos);color:#FFFFFF}
+  .sgp-note{background:var(--accent-t);border:0}
+  .empty-cta .ec-btn,.s-action-btn,.pbtn.primary,.dp-copy{background:var(--acc);color:var(--accent-d);border-radius:22px;box-shadow:none}
+  .s-action-btn:hover{background:var(--acc);filter:brightness(1.06)}
+  .s-action-btn.danger{background:var(--neg);color:#FFFFFF}
+  .s-action-btn.ghost{background:transparent;color:var(--accent);border-color:var(--accent)}
+  .s-action-btn.ghost:hover{background:var(--accent-t)}
+  .credit-toast{background:var(--acc);color:var(--accent-d);box-shadow:0 8px 30px rgba(0,0,0,.25)}
+  .tf-chip.on{border-color:var(--accent);background:var(--accent-t);box-shadow:none}
+  .wd-net-pill.on,.dp-method.on{border-color:var(--accent);background:var(--accent-t)}
+  .dp-method.on .dpm-ic{background:var(--acc);color:var(--accent-d)}
+  .srv-opt.sel{background:var(--accent-t)}
+  .srv-opt.sel .srv-check{border-color:var(--acc);background:var(--acc);box-shadow:none}
+  .notif-item.unread{background:var(--accent-t)}
+  .lcb.bet.sel{background:var(--acc);border-color:var(--acc)}
+  .lcb.bet.sel .lcb-ln,.lcb.bet.sel .lcb-pr{color:var(--accent-d)}
+  /* 설정 */
+  .s-card{border:0;border-radius:12px;background:var(--cell)}
+  .s-toggle.on{background:var(--acc);border-color:var(--acc)}
+  /* 떠 있는 알약 탭바: 알약·선택 캡슐은 ::before 그림 — .item 들의 누르는 영역·위치는 그대로 (nav 는 fixed+z-index 라 쌓임 맥락 안에서 z-index:-1 이 아이템 뒤로 깔린다) */
+  .nav{background:transparent;border-top:0;padding:10px 22px calc(16px + env(safe-area-inset-bottom,0px))}
+  .nav::before{content:'';position:absolute;z-index:-1;left:16px;right:16px;top:4px;bottom:calc(8px + env(safe-area-inset-bottom,0px));border-radius:33px;background:var(--cell);box-shadow:0 4px 16px rgba(0,0,0,.08)}
+  .nav .item{color:var(--text)}
+  .nav .item.active{color:var(--accent);font-weight:600}
+  .nav .item.active::before{content:'';position:absolute;z-index:-1;left:4px;right:4px;top:-4px;bottom:-4px;border-radius:999px;background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+  body.dark .nav .item.active::before{background:var(--surface-2);box-shadow:none}
+  .nav .item.active .ic{background:transparent}
+  .nav .item .nbadge{border-radius:9px;border-color:var(--cell)}
 </style>
 <!-- ⚡ Perf (#3): jsQR is only needed for the deposit/withdraw QR scanner, not the main
      screen — it is now lazy-loaded on demand (see ensureJsQR) instead of a blocking CDN
@@ -825,14 +951,14 @@
         <button class="search-clear" id="searchClear" style="display:none">✕</button>
       </div>
       <div class="sports">
-        <div class="sport active" data-sport="NBA">🏀 NBA</div>
-        <div class="sport" data-sport="NCAAB">🎓 NCAAB</div>
-        <div class="sport" data-sport="NFL">🏈 NFL</div>
-        <div class="sport" data-sport="MLB">⚾ MLB</div>
-        <div class="sport" data-sport="NHL">🏒 NHL</div>
-        <div class="sport" data-sport="SOC">⚽ Soccer</div>
+        <div class="sport active" data-sport="NBA">NBA</div>
+        <div class="sport" data-sport="NCAAB">NCAAB</div>
+        <div class="sport" data-sport="NFL">NFL</div>
+        <div class="sport" data-sport="MLB">MLB</div>
+        <div class="sport" data-sport="NHL">NHL</div>
+        <div class="sport" data-sport="SOC">Soccer</div>
         <!-- UFC 탭 제거 (2026-07-27 사장님 "빼" — 서버 피드 미제공, 배당 폴링도 제거됨) -->
-        <div class="sport" data-sport="GOLF">⛳ Golf</div>
+        <div class="sport" data-sport="GOLF">Golf</div>
       </div>
       <div class="colhead-wrap" id="colheadUp"><div class="colhead"><span data-i18n="col_today">Today</span><span data-i18n="col_spread">Spread</span><span data-i18n="col_total">Total</span><span data-i18n="col_ml">Moneyline</span></div></div>
       <div class="list" id="list"></div>
