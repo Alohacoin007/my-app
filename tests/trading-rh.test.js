@@ -36,7 +36,7 @@ const ALLOW = ['pamm_investor_report', 'fx_open', 'fx_modify', 'fx_close', 'fx_p
   ok('M2 소스: fx_open 에 슬리피지 가드 인자 (p_requested_price · p_max_slippage) — MT5 deviation', /p_requested_price:px\|\|null, p_max_slippage:px\?slipOf\(sym,px\):null/.test(src) && /3\*fxPip\(sym\)/.test(src));
   ok('M8 소스: 부분청산 = rpc(fx_close_partial, {p_local_id, p_size, p_ref=newId()}) · 수량은 [0.01, vol−0.01] 로 클램프', /rpc\('fx_close_partial',\{ p_local_id:id, p_size:lots, p_ref:ref \}\)/.test(src) && /Math\.min\(pv\.vol-0\.01, Math\.max\(0\.01,/.test(src));
   // 풀 앱 (2026-09-21): 남은 비돈 기능 이관 — 차트 TF 전부 실봉 · 주식/지수 실봉 · Security/Support 실동작만
-  ok('풀앱 소스: 차트 TF 8개 전부 활성 (null 0) · "coming soon" 문구 0', /var TF = \[\['1m','M1'\],\['5m','M5'\],\['30m','M30'\],\['1h','H1'\],\['4h','H4'\],\['1D','D1'\],\['1W','W1'\],\['ALL','ALL'\]\]/.test(src) && !/coming soon/i.test(src));
+  ok('풀앱 소스: 차트 TF 6개 전부 활성 (null 0 · 2026-10-25 사장님 "8개→6개" — 30m·ALL 뺌) · "coming soon" 문구 0', /var TF = \[\['1m','M1'\],\['5m','M5'\],\['1h','H1'\],\['4h','H4'\],\['1D','D1'\],\['1W','W1'\]\];/.test(src) && !/coming soon/i.test(src));
   ok('풀앱 소스: 봉 출처 3종 전부 실봉 (크립토 Binance · FX Polygon · 주식/지수 Twelve Data) · 합성 봉 생성 0 · ALL = D1 1000봉', /api\.twelvedata\.com\/time_series/.test(src) && /data-api\.binance\.vision\/api\/v3\/klines/.test(src) && /FX_FN_URL\+'\?candles='/.test(src) && !/Math\.random\(\)[^\n]*(candle|bar|ohlc)/i.test(src) && /tf==='ALL'\?1000:200/.test(src));
   ok('풀앱 소스: Security = auth.updateUser + signOut(global) 만 (테이블 쓰기 0) · Support = tel/mailto 만 (백엔드 0)', /auth\.updateUser\(\{ password:p1 \}\)/.test(src) && /signOut\(\{ scope:'global' \}\)/.test(src) && /mailto:support@alpexa\.com\?subject=/.test(src) && /go:tel:\+41225559900/.test(src) && !/2-Factor|Active Sessions/.test(src));
   ok('M1 소스: 잔고·손익을 클라가 계산해 저장하는 코드 0 (S\.cash 는 서버 pull 에서만 대입)', (src.match(/S\.cash\s*=/g) || []).length === 1 && /S\.cash=\+r\.data\[0\]\.balance/.test(src)); }
@@ -175,6 +175,15 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   ok('M6 홈: FX 그룹 10행 (금·은은 Metals 칩으로)', (await page.locator('.row').count()) === 10);
   { const tb = await page.locator('.tab[data-act="tab:trade"]').boundingBox(); const vh = await page.evaluate(() => innerHeight);
     ok('푸터 런타임: .tab 히트 영역 바닥 = 뷰포트 바닥 (' + Math.round(tb.y + tb.height) + '/' + vh + ') · 높이 ≥ 44px', tb && Math.abs((tb.y + tb.height) - vh) <= 1 && tb.height >= 44, JSON.stringify(tb)); }
+  // 월드클락 스킨 (2026-10-25 사장님 "버튼 클릭이 잘 안되는 버그 만들지 말고"): 떠 있는 알약·선택 캡슐은 ::before 그림 — 실제 손가락 지점이 탭을 맞는지 히트테스트.
+  //   각 탭의 아이콘·글자·좌우 끝·바닥 1px 위, 그리고 홈 SELL/BUY 칸 한가운데 → elementFromPoint 가 그 요소(또는 자식)여야 한다.
+  { const miss = await page.evaluate(() => { const out = [];
+      document.querySelectorAll('.tabs .tab').forEach((t) => { const r = t.getBoundingClientRect();
+        [[r.left + r.width / 2, r.top + 20], [r.left + r.width / 2, r.top + 40], [r.left + 3, r.top + r.height / 2], [r.right - 3, r.top + r.height / 2], [r.left + r.width / 2, r.bottom - 1]]
+          .forEach(([x, y]) => { const e = document.elementFromPoint(x, y); if (!(e && t.contains(e))) out.push(t.getAttribute('data-act') + '@' + Math.round(x) + ',' + Math.round(y) + '→' + (e ? e.className || e.tagName : 'null')); }); });
+      document.querySelectorAll('.row[data-sym="EURUSD"] .btn').forEach((b) => { const r = b.getBoundingClientRect(); const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (!(e && b.contains(e))) out.push(b.getAttribute('data-act') + '→' + (e ? e.className : 'null')); });
+      return out; });
+    ok('스킨 히트테스트: 탭 4개 × 5지점 + 홈 SELL/BUY 칸 — 장식(알약·캡슐)이 손가락을 가로채지 않음', miss.length === 0, miss.join(' | ')); }
   { const keep = await page.evaluate(() => { window.__probe = document.querySelector('.tab[data-act="tab:trade"]'); window.__probeRow = document.querySelector('.row[data-sym="EURUSD"] .btn.buy'); return !!window.__probe; });
     await page.waitForTimeout(2300);   // 1초 재도색 2회 이상 지나감
     const alive = await page.evaluate(() => window.__probe.isConnected && window.__probeRow.isConnected && document.contains(window.__probe));
@@ -365,12 +374,11 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   await page.locator('.otype span[data-act="otype:LIMIT"]').click(); await page.waitForTimeout(150);
   ok('Limit 주문: SL/TP 없음 (폴드·행 0) — Activity 에서 설정', (await page.locator('.fold[data-act="sltp"]').count()) === 0 && (await page.locator('.lotrow:has-text("Stop loss")').count()) === 0 && (await page.locator('.lotrow:has-text("Limit price")').count()) === 1);
   await page.locator('.otype span[data-act="otype:MARKET"]').click(); await page.waitForTimeout(100);
-  // chart timeframes: 4h · 1W · ALL are live (real bars) — ALL = D1 deep history
-  ok('차트 TF: 8칸 전부 활성 (.na 0)', (await page.locator('.ranges span').count()) === 8 && (await page.locator('.ranges span.na').count()) === 0);
+  // chart timeframes: 6칸 (1m 5m 1h 4h 1D 1W) 전부 실봉
+  ok('차트 TF: 6칸 전부 활성 (.na 0) — 1m 5m 1h 4h 1D 1W', (await page.locator('.ranges span').count()) === 6 && (await page.locator('.ranges span.na').count()) === 0);
   candReq.length = 0; await page.locator('.ranges span[data-act="tf:H4"]').click(); await page.waitForTimeout(300);
   ok('4h 탭 → fx-prices ?tf=H4&n=200 실봉 요청 · 차트 렌더', candReq.some(q => q.tf === 'H4' && q.n === '200') && (await page.locator('#chart svg').count()) === 1 && (await page.locator('.ranges span.on').innerText()) === '4h', JSON.stringify(candReq));
-  candReq.length = 0; await page.locator('.ranges span[data-act="tf:ALL"]').click(); await page.waitForTimeout(300);
-  ok('ALL 탭 → D1 1000봉 요청 (깊은 이력)', candReq.some(q => q.tf === 'D1' && q.n === '1000'), JSON.stringify(candReq));
+  ok('ALL·30m 버튼 없음 (6칸으로 줄임 — 2026-10-25)', (await page.locator('.ranges span[data-act="tf:ALL"]').count()) === 0 && (await page.locator('.ranges span[data-act="tf:M30"]').count()) === 0);
   await page.locator('.ranges span[data-act="tf:H1"]').click(); await page.waitForTimeout(150);
   // stocks / indices: real bars from Twelve Data (SpaceX trades as SPCX) — never synthetic
   await page.evaluate(() => act('pick:SPACEX')); await page.waitForTimeout(500);

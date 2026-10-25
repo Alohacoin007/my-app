@@ -51,15 +51,19 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
 })();
 </script>
 <style>
+  /* 월드클락 스킨 토큰 (2026-10-25 사장님 시안 승인 "fx 모바일 부터 진행해") — iOS 시스템 회색 + 주황 액센트.
+     --acc = 채움(주황 바탕·검정 글자) · --acc-tx = 글자용 주황(흰 바탕 대비 확보) · --box = 첫 틱 전 중립 테두리 · --down-tint = 닫기 버튼 바탕 */
   :root {
-    --bg: #FFFFFF; --surface: #F5F5F4; --surface-up: #ECECEA; --line: #ECECEA;
-    --text: #111111; --dim: #6B6B68; --mute: #9A9A96;
+    --bg: #FFFFFF; --surface: #F2F2F7; --surface-up: #FFFFFF; --line: #C6C6C8;
+    --text: #000000; --dim: #6C6C70; --mute: #8E8E93;
     --up: #0A6CFF; --down: #FF3B30;
+    --acc: #FF9500; --acc-tx: #C25E00; --on-acc: #000000; --box: #C7C7CC; --down-tint: rgba(255,59,48,.10);
     color-scheme: light;
   }
   :root[data-theme="dark"] {
-    --bg: #0B0D0E; --surface: #16181A; --surface-up: #1F2123; --line: #1F2123;
-    --text: #F5F6F7; --dim: #8B9096; --mute: #5F646A; --up: #0A6CFF; --down: #FF3B30;
+    --bg: #000000; --surface: #1C1C1E; --surface-up: #2C2C2E; --line: #38383A;
+    --text: #FFFFFF; --dim: #98989F; --mute: #8E8E93; --up: #0A6CFF; --down: #FF3B30;
+    --acc: #FF9F0A; --acc-tx: #FF9F0A; --on-acc: #000000; --box: #48484A; --down-tint: rgba(255,59,48,.16);
     color-scheme: dark;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -86,8 +90,8 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .det .nm::after { inset: -13px -4px; }                                       /* 종목명 줄은 20px — 위아래 13px 씩 = 46px */
   .sheet, .sheet .plist { overscroll-behavior: contain; }                        /* 시트·목록 끝에서 뒤 화면이 끌려가며 튕기지 않게 (튕기는 중 탭 무시 방지) */
   [data-act] { -webkit-touch-callout: none; touch-action: manipulation; }   /* 가로 넘침 0 — 고정 시트/탭바가 밀리지 않게 (모바일 깨짐, 사장님 2026-09-21) */
-  body { font-family: 'Geist', 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; overscroll-behavior-y: none; }
-  .mono { font-family: 'Geist Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  body { font-family: -apple-system, 'SF Pro Display', 'SF Pro Text', system-ui, 'Geist', 'Inter', sans-serif; -webkit-font-smoothing: antialiased; overscroll-behavior-y: none; }
+  .mono { font-family: inherit; font-variant-numeric: tabular-nums; }
   .up { color: var(--up); } .down { color: var(--down); }
   .app { max-width: 430px; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column; background: var(--bg); position: relative; }
   .scroll { flex: 1; overflow-y: auto; padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
@@ -103,7 +107,6 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .oc { display: inline-flex; align-items: center; gap: 4px; padding: 5px 9px; border-radius: 12px; background: rgba(10,108,255,.12); color: var(--up); font-size: 10.5px; font-weight: 800; letter-spacing: .3px; border: 1px solid transparent; cursor: pointer; }
   .oc svg { width: 11px; height: 11px; }
   .oc.off { background: transparent; border-color: var(--line); color: var(--mute); }
-  :root[data-theme="dark"] .oc:not(.off) { background: rgba(10,108,255,.16); }
   .srv { width: 30px; height: 30px; border-radius: 50%; background: var(--surface-up); display: grid; place-items: center; color: var(--text); cursor: pointer; }
   .srv svg { width: 16px; height: 16px; }
   /* hero */
@@ -151,7 +154,6 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .app.oc-on .btn { border: 1.5px solid; border-radius: 10px; padding: 7px 0 6px; text-align: center; background: var(--bg); cursor: pointer; }
   .app.oc-on .btn.sell, .app.oc-on .btn.buy { border-color: var(--mute); }       /* 2026-10-25 사장님 "박스 색도 가격 따라" — 쪽 색 고정 폐지, 첫 틱 전 중립 */
   .app.oc-on .btn.tu { border-color: var(--up); } .app.oc-on .btn.td { border-color: var(--down); }
-  :root[data-theme="dark"] .app.oc-on .btn { background: var(--surface); }
   /* tabs */
   /* 푸터 (사장님 2026-09-21 "밑으로 내려" ×2 → 2026-09-22 "푸터 클릭이 잘 안돼"): 아이콘·글자가 iPhone 홈 인디케이터 영역(하단 ~34px) 안에 들어가면
      그 구역의 첫 탭은 iOS/Safari 가 가져가(툴바 펼치기·홈 제스처) 페이지에 오지 않는다. 그래서 ① 글자 바닥을 안전영역 위 6px 만 남기고(원래보다 여전히 낮게)
@@ -204,7 +206,6 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .foot .half .btn big { font-size: 21px; }
   .foot .half .btn.sell, .foot .half .btn.buy { border-color: var(--mute) !important; }   /* 주문 화면 박스도 시세 방향 색 (2026-10-25) */
   .foot .half .btn.tu { border-color: var(--up) !important; } .foot .half .btn.td { border-color: var(--down) !important; }
-  :root[data-theme="dark"] .foot .half .btn { background: var(--surface) !important; }
   /* activity */
   .ttl { padding: calc(14px + env(safe-area-inset-top, 0px)) 22px 0; font-size: 22px; font-weight: 700; letter-spacing: -0.4px; }
   .seg { display: flex; gap: 6px; padding: 12px 22px 6px; }
@@ -323,6 +324,118 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   /* toast */
   .toast { pointer-events: none; position: fixed; left: 50%; transform: translateX(-50%); bottom: 100px; background: var(--text); color: var(--bg); border-radius: 999px; padding: 9px 16px; font-size: 12px; font-weight: 600; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,.18); z-index: 30; max-width: 92%; overflow: hidden; text-overflow: ellipsis; }
   .toast i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--up); margin-right: 7px; }
+  /* ══ 월드클락 스킨 (2026-10-25 사장님 시안 승인 "fx 모바일 부터 진행해 … 버튼 클릭 잘 안되는 버그 만들지 말고") ══════════
+     CSS 만 덮는다 — DOM·data-act·onclick·morph·44px ::after 히트 확장·탭 히트영역(화면 바닥까지)은 0 변경.
+     얇은 숫자 · 헤어라인 목록(왼쪽 들여쓴 구분선) · 주황 액센트 · 떠 있는 알약 탭바(그림만 ::before — 누르는 영역은 그대로). */
+  .btn, .det .px, .arow .amt, .lotrow .lots span, .prow .ppx, .sheet .kvs .r .v, .det .mine .r, .tab .bdg, .det .quote b, .foot .half .btn .k { font-family: inherit; }
+  /* top */
+  .brand { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
+  .oc { height: 40px; padding: 0 16px; gap: 6px; border-radius: 20px; border: 0; background: var(--acc); color: var(--on-acc); font-size: 15px; font-weight: 600; letter-spacing: 0; }
+  .oc svg { width: 13px; height: 13px; }
+  .oc.off { background: var(--surface); color: var(--dim); }
+  .srv { width: 44px; height: 44px; background: var(--surface); } .srv svg { width: 20px; height: 20px; }
+  /* hero */
+  .hero { padding: 14px 20px 0; }
+  .hero .lbl { font-size: 15px; font-weight: 400; gap: 8px; }
+  .hero .eye { width: 30px; height: 30px; } .hero .eye svg { width: 16px; height: 16px; }
+  .hero .big { margin-top: 2px; font-weight: 200; letter-spacing: -2px; white-space: nowrap; }
+  .hero .big .d { font-size: 30px; font-weight: 200; margin-right: 4px; }
+  .hero .big .n { font-size: 60px; } .hero .big .c { font-size: 30px; letter-spacing: 0; }
+  .hero .chg { margin-top: 2px; font-size: 15px; font-weight: 400; }
+  .stats { gap: 0; margin-top: 16px; border-top: 0.5px solid var(--line); border-bottom: 0.5px solid var(--line); }
+  .stat { background: transparent; border-radius: 0; padding: 10px 8px; }
+  .stat:first-child { padding-left: 0; } .stat:last-child { padding-right: 0; } .stat + .stat { border-left: 0.5px solid var(--line); }
+  .stat .k { font-size: 12px; font-weight: 400; } .stat .v { font-weight: 400; }
+  /* pills: 상품군 · Activity · 시트 칩 — 선택 = 주황 */
+  .sseg.hseg { padding: 16px 20px 10px; }
+  .sseg.hseg span, .seg span { display: inline-flex; align-items: center; height: 36px; padding: 0 16px; border-radius: 18px; background: var(--surface); color: var(--text); font-size: 15px; font-weight: 500; }
+  .sseg.hseg span.on, .seg span.on, .sheet .sseg span.on, .sheet .chips span.on { background: var(--acc); color: var(--on-acc); font-weight: 600; }
+  /* list */
+  .hd { padding: 12px 16px 8px 20px; }
+  .lots { border: 0; gap: 4px; padding: 4px; border-radius: 22px; background: var(--surface); }
+  .lots b, .lots b:first-child, .lots b:last-child { width: 36px; height: 36px; padding: 0; border-radius: 18px; display: grid; place-items: center; background: var(--surface-up); color: var(--text); font-size: 20px; font-weight: 400; }
+  .lots span { padding: 0 8px; min-width: 64px; text-align: center; font-size: 22px; font-weight: 200; }
+  .lots small { font-size: 12px; font-weight: 400; color: var(--dim); margin-left: 3px; }
+  .cols span { font-size: 11px; font-weight: 600; letter-spacing: 1px; color: var(--dim); }
+  .row { margin-left: 20px; padding: 12px 16px 12px 0; }
+  .row .sym { font-size: 22px; font-weight: 400; letter-spacing: -0.3px; }
+  .row .sub { font-size: 12px; }
+  .btn { font-weight: 300; } .btn big { font-weight: 500; }
+  .app.oc-on .btn { border-radius: 12px; padding: 8px 0 7px; background: var(--bg); }
+  .app.oc-on .btn.sell, .app.oc-on .btn.buy { border-color: var(--box); }
+  .app.oc-on .btn.tu { border-color: var(--up); } .app.oc-on .btn.td { border-color: var(--down); }   /* 중립 다음에 다시 — 같은 우선순위라 나중 것이 이긴다 (fx-app-tick-color ⑤ 가 잡음) */
+  /* trade */
+  .det .head { padding: calc(14px + env(safe-area-inset-top, 0px)) 20px 0; }
+  .det .nm { font-size: 22px; font-weight: 600; letter-spacing: -0.3px; }
+  .det .nm .chev { width: 24px; height: 24px; } .det .nm .chev svg { width: 12px; height: 12px; }
+  .det .sub { font-size: 13px; }
+  .det .px { margin-top: 2px; font-size: 64px; font-weight: 200; letter-spacing: -2.5px; }
+  .det .chg { margin-top: 4px; font-size: 14px; font-weight: 400; }
+  .det .chart svg, .det .chart .empty { height: 170px; }
+  .det .mine { margin: 6px 0 0 20px; padding: 10px 20px 10px 0; border-radius: 0; background: transparent; border-top: 0.5px solid var(--line); font-size: 14px; font-weight: 400; }
+  .det .mine .r { font-size: 15px; font-weight: 500; }
+  .det .ranges { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; padding: 8px 20px; }
+  .det .ranges span { display: grid; place-items: center; height: 32px; padding: 0; border-radius: 16px; color: var(--dim); font-size: 14px; font-weight: 500; }
+  .det .ranges span.on { background: var(--acc); color: var(--on-acc); font-weight: 600; }
+  .det .kv { padding: 0 0 0 20px; border-top: 0.5px solid var(--line); }
+  .det .kv .r { padding: 9px 20px 9px 0; font-size: 14px; } .det .kv .r:last-child { border-bottom: 0.5px solid var(--line); }
+  .det .kv .v { font-weight: 400; }
+  .det .foot { margin-top: 8px; padding: 10px 16px; border-top: 0; }
+  .otype { gap: 2px; padding: 2px; margin: 0 0 12px; border-radius: 18px; }
+  .otype span { display: grid; place-items: center; height: 32px; padding: 0; border-radius: 16px; color: var(--text); font-size: 14px; font-weight: 500; }
+  .otype span.on { background: var(--acc); color: var(--on-acc); font-weight: 600; }
+  .lotrow { padding: 0 0 10px 4px; font-size: 17px; color: var(--text); }
+  .fold { padding: 2px 4px 12px; font-size: 15px; font-weight: 500; color: var(--acc-tx); }
+  .fold .plus { width: auto; height: auto; margin-right: 4px; background: transparent; color: inherit; font-size: 16px; font-weight: 500; }
+  .foot .half .btn { border-radius: 20px !important; padding: 12px 0 11px !important; background: var(--bg) !important; font-size: 26px; font-weight: 200; }
+  .foot .half .btn big { font-size: 26px; font-weight: 300; }
+  .foot .half .btn .k { font-size: 11px; font-weight: 600; letter-spacing: 1px; color: var(--dim); }
+  .foot .half .btn.sell, .foot .half .btn.buy { border-color: var(--box) !important; }
+  .foot .half .btn.tu { border-color: var(--up) !important; } .foot .half .btn.td { border-color: var(--down) !important; }
+  /* activity / account */
+  .ttl { padding: calc(14px + env(safe-area-inset-top, 0px)) 20px 0; font-size: 34px; letter-spacing: -0.6px; }
+  .seg { padding: 14px 20px 6px; }
+  .sum { margin: 12px 0 0 20px; padding: 12px 20px 12px 0; border-top: 0.5px solid var(--line); border-bottom: 0.5px solid var(--line); align-items: center; }
+  .sum .k { font-size: 13px; } .sum .v { font-size: 34px; font-weight: 200; letter-spacing: -1px; }
+  .grp { padding: 16px 20px 4px; }
+  .arow { margin-left: 20px; padding: 12px 16px 12px 0; }
+  .arow .t { font-size: 17px; font-weight: 400; letter-spacing: -0.2px; } .arow .t b { font-weight: 600; }
+  .arow .d { font-size: 12px; }
+  .arow .amt { font-size: 22px; font-weight: 200; letter-spacing: -0.4px; }
+  .arow .amt small { font-size: 12px; font-weight: 400; color: var(--dim); }
+  .arow .x { width: 30px; height: 30px; border: 0; background: var(--down-tint); }
+  .arow .x svg { width: 10px; height: 10px; }
+  .prof { padding: 16px 20px 4px; } .prof .av { background: var(--acc); color: var(--on-acc); }
+  .acts { margin: 18px 20px 0; }
+  .acts div { padding: 12px 0; border: 0; border-radius: 22px; background: var(--surface); font-size: 15px; font-weight: 600; }
+  .acts div.pri { background: var(--acc); color: var(--on-acc); }
+  .srow { margin-left: 20px; padding: 13px 20px 13px 0; }
+  .srow .t { font-size: 17px; font-weight: 400; } .srow .r { font-size: 15px; font-weight: 400; }
+  .tog.on { background: var(--acc); }
+  /* sheets — 다크 시트는 한 단 밝은 판(#1C1C1E) 위에 칸(#2C2C2E): 같은 토큰을 시트 안에서만 한 칸씩 올린다 */
+  :root[data-theme="dark"] .sheet { --bg: #1C1C1E; --surface: #2C2C2E; --surface-up: #3A3A3C; }
+  .sheet { border-radius: 28px 28px 0 0; }
+  .sheet .grip { width: 36px; height: 5px; background: var(--box); }
+  .sheet .sttl { font-size: 22px; letter-spacing: -0.4px; padding: 0 20px 12px; }
+  .sheet .sttl .x { width: 32px; height: 32px; }
+  .sheet .cta { background: var(--acc); color: var(--on-acc); padding: 16px 0; font-size: 17px; font-weight: 600; }
+  .sheet .cta.buy { background: var(--up); color: #FFFFFF; } .sheet .cta.sell { background: var(--down); color: #FFFFFF; }
+  .sheet .ack i { background: var(--acc); color: var(--on-acc); }
+  .pf .r3 div.pri { background: var(--acc); border-color: var(--acc); color: var(--on-acc); }
+  .prow.on .chk { background: var(--acc); color: var(--on-acc); } .prow.on .pn { color: var(--acc-tx); }
+  .opt2 div.on { border-color: var(--acc); }
+  /* 떠 있는 알약 탭바: 알약·선택 캡슐은 ::before 그림일 뿐 — .tab 은 여전히 화면 바닥까지 닿는 44px+ 히트 영역 (푸터 탭 씹힘 2026-09-22 결함 재발 0) */
+  .scroll { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+  .tabs { background: transparent; border-top: 0; padding: 0 22px; }
+  .tabs::before { content: ''; position: absolute; z-index: -1; left: 16px; right: 16px; top: 4px; bottom: calc(max(16px, calc(env(safe-area-inset-bottom, 0px) + 10px)) - 8px); border-radius: 33px; background: var(--surface); }
+  .tab { padding: 12px 0 max(16px, calc(env(safe-area-inset-bottom, 0px) + 10px)); gap: 3px; color: var(--text); font-size: 11px; font-weight: 500; }
+  .tab svg { width: 24px; height: 24px; }
+  .tab.on { color: var(--acc-tx); font-weight: 600; }
+  .tab.on::before { content: ''; position: absolute; z-index: -1; left: 2px; right: 2px; top: 8px; bottom: calc(max(16px, calc(env(safe-area-inset-bottom, 0px) + 10px)) - 4px); border-radius: 999px; background: var(--surface-up); }
+  :root:not([data-theme="dark"]) .tabs::before { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+  :root:not([data-theme="dark"]) .tab.on::before { box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .tab .bdg { top: 4px; border-color: var(--surface); }
+  .toast { bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
 </style>
 </head>
 <body>
@@ -378,7 +491,7 @@ function liveGroups(){ return GROUPS.filter(function(g){ return instruments(g).l
 function instruments(group){ return CATALOG.filter(function(c){ if(group&&group!=='All'&&groupOf(c)!==group) return false; return CORE_FX.indexOf(c.sym)>=0 || midOf(c.sym)>0; }); }
 var FX_FN_URL = 'https://grxnbgtfnaayeluenvqh.supabase.co/functions/v1/fx-prices';
 var LEVERAGE_FX = 500;                           // fx_lev_cap FX (2026-09-08) — display only
-var TF = [['1m','M1'],['5m','M5'],['30m','M30'],['1h','H1'],['4h','H4'],['1D','D1'],['1W','W1'],['ALL','ALL']];   // ALL = D1 deep history (1000 bars)
+var TF = [['1m','M1'],['5m','M5'],['1h','H1'],['4h','H4'],['1D','D1'],['1W','W1']];   // 8→6칸 (2026-10-25 사장님 "챠트 주기가 너무 많아 … 6개로" — 30m·ALL 뺌). 'ALL'(D1 1000봉) 경로는 pullCandles 에 남아 있으나 버튼 없음
 // pip — MUST mirror fx_close.sql / fx-prices pip(): JPY 0.01, XAUUSD 0.01, XAGUSD 0.001, else 0.0001
 function fxPip(sym){ return /JPY$/.test(sym)?0.01:sym==='XAUUSD'?0.01:sym==='XAGUSD'?0.001:0.0001; }
 // ── asset class + contract: the FX account also carries STOCK/CRYPTO/INDEX positions opened in trading.html,
