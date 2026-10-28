@@ -186,13 +186,15 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
         const a = s.getBoundingClientRect(), b = sp.getBoundingClientRect();
         if (b.right > a.right + 0.5 || sp.scrollWidth > sp.clientWidth + 0.5) out.sprCut.push(sym);
         if (n.scrollWidth > n.clientWidth + 0.5) out.nameDots.push(sym);
-        if (Math.abs(b.top - n.getBoundingClientRect().top) > 1) out.wrap.push(sym);
+        if (Math.abs(b.top - n.getBoundingClientRect().top) > 1 && parseFloat(getComputedStyle(s).fontSize) > 9.5) out.wrap.push(sym + '@' + getComputedStyle(s).fontSize);
         if (parseFloat(getComputedStyle(s).fontSize) < 9.5) out.tiny.push(sym); });
       return out; });
     ok('스프레드 안 잘림 (' + w + 'px): 홈 전 행 .spr 가 통째로', r.sprCut.length === 0, r.sprCut.join(','));
     ok('이름 … 0 (' + w + 'px): FX 이름은 글자 그대로 (점으로 안 바뀜)', r.nameDots.length === 0, r.nameDots.join(','));
     ok('글자 최소 9.5px (' + w + 'px): 줄인 줄도 읽을 수 있는 크기', r.tiny.length === 0, r.tiny.join(','));
-    if (w === 393) ok('393px(최신 아이폰): FX 전 행 "이름 · 스프레드" 한 줄 (줄인 글자로 맞춤)', r.wrap.length === 0, r.wrap.join(','));
+    // 한 줄 여부는 서체 폭에 달림(CI 서체가 iOS SF 보다 넓어 393 에서도 최소 크기에 닿음 — 2026-10-28 CI 실측) → 서체 무관 불변식만 핀:
+    //   줄이 넘어간 행은 반드시 글자를 최소(9.5px)까지 줄인 뒤에만 넘어간다 (안 줄이고 넘기거나 … 로 자르지 않음).
+    ok('줄바꿈은 최소 크기에서만 (' + w + 'px): 먼저 글자를 줄여 한 줄을 시도', r.wrap.length === 0, r.wrap.join(','));
   }
   await page.setViewportSize({ width: 430, height: 900 }); await page.waitForTimeout(150);
   // 월드클락 스킨 (2026-10-25 사장님 "버튼 클릭이 잘 안되는 버그 만들지 말고"): 떠 있는 알약·선택 캡슐은 ::before 그림 — 실제 손가락 지점이 탭을 맞는지 히트테스트.
