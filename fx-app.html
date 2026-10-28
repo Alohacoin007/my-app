@@ -146,6 +146,10 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .row .sym { font-size: 15px; font-weight: 700; letter-spacing: -0.2px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .row .sub { margin-top: 2px; font-size: 11px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .row .sub .spr { color: var(--mute); font-variant-numeric: tabular-nums; }
+  /* 2026-10-28 사장님 "스프레드가 미세한 차이로 짤려서" — 스프레드는 항상 통째로. 이름이 같이 안 들어가면 이름만 다음 줄로 밀려 숨는다
+     (반쪽 "Sp…" 금지 — 종목 코드가 바로 위라 이름은 보조 정보). DOM 은 spr→snm, row-reverse 로 화면엔 "이름 · 스프레드" */
+  .row .sub { display: flex; flex-flow: row-reverse wrap; justify-content: flex-end; line-height: 16px; height: 16px; overflow: hidden; }
+  .row .sub .spr, .row .sub .snm { flex-shrink: 0; } .row .sub .snm::after { content: '·'; margin: 0 4px; }
   .half { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .btn { border-radius: 12px; padding: 6px 0; text-align: right; font-family: 'Geist Mono', ui-monospace, monospace; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; }
   .btn big { font-size: 15px; font-weight: 800; }
@@ -834,7 +838,7 @@ function hero(){
 function homeRows(){
   var list=instruments(S.homeSeg); if(!list.length) return '<div class="empty">No live feed for '+esc(S.homeSeg)+' right now</div>';
   return list.map(function(p){ var fresh=isFresh(p.sym); var sprTxt=spreadLabel(p.sym);
-    return '<div class="row" data-sym="'+p.sym+'"><div class="nm" data-act="open:'+p.sym+'"><div class="sym">'+p.sym+'</div><div class="sub">'+esc(p.name)+' · <span class="spr">'+sprTxt+'</span></div></div>'+
+    return '<div class="row" data-sym="'+p.sym+'"><div class="nm" data-act="open:'+p.sym+'"><div class="sym">'+p.sym+'</div><div class="sub"><span class="spr">'+sprTxt+'</span><span class="snm">'+esc(p.name)+'</span></div></div>'+
       '<div class="half"><div class="btn sell'+tickCls(p.sym,'b')+(fresh?'':' stale')+'" data-act="order:SELL:'+p.sym+'">'+fmtPx(bidOf(p.sym),p.sym,true)+'</div><div class="btn buy'+tickCls(p.sym,'a')+(fresh?'':' stale')+'" data-act="order:BUY:'+p.sym+'">'+fmtPx(askOf(p.sym),p.sym,true)+'</div></div></div>'; }).join('');
 }
 function screenHome(){

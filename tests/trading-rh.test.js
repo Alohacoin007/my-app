@@ -176,6 +176,15 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   ok('M6 홈: FX 그룹 10행 (금·은은 Metals 칩으로)', (await page.locator('.row').count()) === 10);
   { const tb = await page.locator('.tab[data-act="tab:trade"]').boundingBox(); const vh = await page.evaluate(() => innerHeight);
     ok('푸터 런타임: .tab 히트 영역 바닥 = 뷰포트 바닥 (' + Math.round(tb.y + tb.height) + '/' + vh + ') · 높이 ≥ 44px', tb && Math.abs((tb.y + tb.height) - vh) <= 1 && tb.height >= 44, JSON.stringify(tb)); }
+  // 2026-10-28 사장님 "스프레드가 미세한 차이로 짤려서 보여" — 좁은 폰(360·375)에서도 스프레드 글자는 통째로 보이고, 줄이 넘치면 종목 이름 쪽이 … 로 줄어든다.
+  for (const w of [360, 375]) {
+    await page.setViewportSize({ width: w, height: 900 }); await page.waitForTimeout(150);
+    const cut = await page.evaluate(() => [...document.querySelectorAll('.row[data-sym] .sub')].map(s => { const sp = s.querySelector('.spr'); if (!sp) return s.closest('.row').dataset.sym + ':no-spr'; const a = s.getBoundingClientRect(), b = sp.getBoundingClientRect(); return (b.right > a.right + 0.5 || sp.scrollWidth > sp.clientWidth + 0.5) ? s.closest('.row').dataset.sym + ':' + Math.round(b.right - a.right) + 'px' : null; }).filter(Boolean));
+    ok('스프레드 안 잘림 (' + w + 'px): 홈 전 행 .spr 가 줄 안에 통째로', cut.length === 0, cut.join(','));
+    const half = await page.evaluate(() => [...document.querySelectorAll('.row[data-sym] .sub')].map(s => { const n = s.querySelector('.snm'), sp = s.querySelector('.spr'); if (!n || !sp) return null; const on1 = Math.abs(n.getBoundingClientRect().top - sp.getBoundingClientRect().top) < 1; const r = n.getBoundingClientRect(), a = s.getBoundingClientRect(); return on1 && (r.left < a.left - 0.5 || r.right > a.right + 0.5) ? s.closest('.row').dataset.sym : null; }).filter(Boolean));
+    ok('종목 이름 반쪽 0 (' + w + 'px): 이름은 통째로 보이거나 통째로 숨음 ("Sp…" 금지)', half.length === 0, half.join(','));
+  }
+  await page.setViewportSize({ width: 430, height: 900 }); await page.waitForTimeout(150);
   // 월드클락 스킨 (2026-10-25 사장님 "버튼 클릭이 잘 안되는 버그 만들지 말고"): 떠 있는 알약·선택 캡슐은 ::before 그림 — 실제 손가락 지점이 탭을 맞는지 히트테스트.
   //   각 탭의 아이콘·글자·좌우 끝·바닥 1px 위, 그리고 홈 SELL/BUY 칸 한가운데 → elementFromPoint 가 그 요소(또는 자식)여야 한다.
   { const miss = await page.evaluate(() => { const out = [];
