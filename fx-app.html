@@ -892,6 +892,16 @@ function lineChart(rows, opts){
 /* 캔들 차트 (2026-10-25 사장님 시안 승인) — 표시 전용. 봉 = fetchCandles 의 실제 o/h/l/c (합성 0). 화면 폭에 읽히게 최근 CANDLE_N 개만.
    스크럽은 라인과 같은 경로(data-n · scrubAt) — 인덱스는 보이는 봉 기준(data-mode="candle" 이면 scrubAt 이 칸 단위로 고른다). */
 var CANDLE_N=60;
+/* 실시간 봉 (2026-10-28 사장님 "시세는 움직이는데 차트가 안 움직인다") — 받아 온 봉은 화면 진입 때 1회라 멈춰 있었다.
+   MT5 처럼 현재 봉을 틱마다 자라게: 마지막 봉 c=mid, h/l 확장. 봉 시간이 지났으면(M1~H4) 새 봉 1개를 mid 로 연다.
+   가드: 피드가 신선하고 마지막 봉 종가와 ±2% 안일 때만 (출처 어긋난 값으로 봉을 늘리지 않음). 원본 S.candles 는 그대로(복사본). */
+var TF_MS={M1:60e3,M5:300e3,M30:1800e3,H1:3600e3,H4:14400e3};
+function liveRows(rows, sym){ var n=(rows||[]).length; if(n<1) return rows; var m=midOf(sym); if(!m||!isFresh(sym)) return rows;
+  var last=rows[n-1], lc=+last.c; if(!(lc>0)||Math.abs(m/lc-1)>0.02) return rows;
+  var out=rows.slice(), ms=TF_MS[S.tf], t0=+last.t;
+  if(ms&&t0>0&&Date.now()>=t0+ms){ var t=t0+Math.floor((Date.now()-t0)/ms)*ms; out.push({t:t,o:lc,h:Math.max(lc,m),l:Math.min(lc,m),c:m}); }
+  else { var h=Math.max(+last.h||lc,m), l=Math.min(+last.l||lc,m); out[n-1]={t:last.t,o:last.o,h:h,l:l,c:m,v:last.v}; }
+  return out; }
 function candleRows(rows){ return (rows||[]).filter(function(k){ return +k.c>0; }).slice(-CANDLE_N); }
 function candleChart(rows, opts){
   var W=390, H=200, top=22, bot=H-16;
@@ -926,7 +936,7 @@ function myPositionLine(sym){
 }
 function screenTrade(){
   var sym=S.sym, mid=midOf(sym), bid=bidOf(sym), ask=askOf(sym), fresh=isFresh(sym);
-  var key=sym+'|'+S.tf, cd=S.candles[key]||{rows:[],loading:true};
+  var key=sym+'|'+S.tf, cd=S.candles[key]||{rows:[],loading:true}, rows=liveRows(cd.rows,sym);
   var dopen=(S.dayOpen[sym]||{}).v; var chg=(mid&&dopen)?mid-dopen:null; var chgPct=(chg!=null&&dopen)?chg/dopen*100:null;
   var isFX=clsOf(sym)==='FX'; var mg=mid?marginUSD(sym,S.lots,mid):null; var st=stepOf(sym);
   var limitPx = S.otype==='MARKET'?null:(S.limitPx||defLimit(sym));
@@ -946,9 +956,9 @@ function screenTrade(){
     '<div class="nm" data-act="sheet:pair">'+sym+'<span class="chev">'+I.chev+'</span></div><div class="sub">'+esc(nameOf(sym))+(fresh?'':' · <span class="down">feed stale</span>')+'</div>'+
     '<div class="px'+tickCls(sym)+'">'+fmtPx(mid,sym,true)+'</div>'+
     '<div class="chg '+(chg==null?'':(chg>=0?'up':'down'))+'">'+(chg==null?'<span class="t">—</span>':(chg>=0?'▲ ':'▼ ')+Math.abs(chg).toFixed(digitsOf(sym))+' ('+(chg>=0?'+':'−')+Math.abs(chgPct).toFixed(2)+'%) <span class="t">Today</span>')+'</div>'+
-    (candle?ohlcLine(cd.rows,sym):'')+
+    (candle?ohlcLine(rows,sym):'')+
     '</div>'+   /* B/A 줄 제거 — 아래 주문 버튼이 매도/매수가를 보여줌 (사장님 2026-09-21) */
-    '<div class="chart" id="chart">'+(candle?candleChart(cd.rows,{loading:cd.loading}):lineChart(cd.rows,{loading:cd.loading}))+'</div>'+
+    '<div class="chart" id="chart">'+(candle?candleChart(rows,{loading:cd.loading}):lineChart(rows,{loading:cd.loading}))+'</div>'+
     myPositionLine(sym)+
     '<div class="ranges">'+TF.map(function(t){ return '<span class="'+(t[1]===S.tf?'on':(t[1]?'':'na'))+'" data-act="tf:'+(t[1]||'')+'">'+t[0]+'</span>'; }).join('')+'</div>'+
     '<div class="kv"><div class="r"><span class="k">Spread</span><span class="v">'+spreadLabel(sym)+'</span></div>'+
@@ -1326,7 +1336,7 @@ document.addEventListener('touchend', function(){ if(S.scrub!=null){ S.scrub=nul
   try{ var d=db(); if(d&&d.channel){ d.channel('rh-prices').on('postgres_changes',{event:'*',schema:'public',table:'prices'},function(m){ var row=m&&m.new; if(row&&row.symbol) setFeed(row.symbol, row.mid, row.spr_pts, Date.now()); }).subscribe();
     var a=fxAcct(); if(a) d.channel('rh-pos-'+a).on('postgres_changes',{event:'*',schema:'public',table:'positions',filter:'acct_no=eq.'+a},function(){ pullPositions(); pullCash(); }).subscribe(); } }catch(e){}
   setInterval(function(){ if(!document.hidden) pullFeed(); },1500);
-  setInterval(function(){ if(!document.hidden){ pullCash(); pullPositions(); } },10000);
+  setInterval(function(){ if(!document.hidden){ pullCash(); pullPositions(); if(S.tab==='trade') pullCandles(S.sym,S.tf); } },10000);   // 봉 재조회(60초 캐시) — 확정 봉으로 교정
   setInterval(function(){ if(!document.hidden) pullMarks(); },30000);
   setInterval(function(){ busyWatchdog(); if(!document.hidden&&!S.sheet&&S.scrub==null) render(); },1000);   // re-paint quotes / floating once a second (+ busy 감시자)
   document.addEventListener('visibilitychange', function(){ if(!document.hidden){ pullFeed(); pullCash(); pullPositions(); } });

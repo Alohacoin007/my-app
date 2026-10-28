@@ -411,7 +411,16 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
     ok('캔들: 라인 탭 → 라인 차트(path) · O·H·L·C 줄 숨김 · 설정 기억(rh.chartMode=line, UI 설정만)', ln.mode === null && ln.path === 1 && !ln.ohlc && ln.ls === 'line', JSON.stringify(ln));
     await page.locator('.cmode span[data-act="cmode:candle"]').click(); await page.waitForTimeout(150);
     const sc = await page.evaluate(() => { const svg = document.querySelector('#chart svg'); const r = svg.getBoundingClientRect(); scrubAt(r.right - 1); const last = window.__rh.scrub; scrubAt(r.left + 1); const first = window.__rh.scrub; window.__rh.scrub = null; return { mode: svg.getAttribute('data-mode'), last, first }; });
-    ok('캔들: 다시 캔들 · 스크럽 칸 단위 (오른쪽 끝 = 59번 봉 · 왼쪽 끝 = 0번 봉)', sc.mode === 'candle' && sc.last === 59 && sc.first === 0, JSON.stringify(sc)); }
+    ok('캔들: 다시 캔들 · 스크럽 칸 단위 (오른쪽 끝 = 59번 봉 · 왼쪽 끝 = 0번 봉)', sc.mode === 'candle' && sc.last === 59 && sc.first === 0, JSON.stringify(sc));
+    // 2026-10-28 사장님 "시세는 움직이는데 차트가 안 움직인다" — 마지막 봉 = 실시간 mid (MT5 처럼 현재 봉이 틱마다 자람).
+    //   ±2% 밖이면(피드·봉 출처 어긋남) 합치지 않음 — 가짜로 늘린 봉 금지. 라인 차트 끝점도 같은 값.
+    const lv = await page.evaluate(() => { const S = window.__rh, sym = S.sym, rows = (S.candles[sym + '|' + S.tf] || {}).rows || []; if (!rows.length) return { err: 'no rows' };
+      const lastC = +rows[rows.length - 1].c, f = S.feed[sym], save = Object.assign({}, f), C = () => { const b = [...document.querySelectorAll('.det .ohlc b')]; return b.length === 4 ? b[3].textContent : null; };
+      const m1 = +(lastC * 1.0012).toFixed(5); S.feed[sym] = Object.assign({}, f, { mid: m1, ts: Date.now() }); render(true); const c1 = C();
+      S.cmode = null; const m2 = +(lastC * 1.05).toFixed(5); S.feed[sym] = Object.assign({}, f, { mid: m2, ts: Date.now() }); render(true); const c2 = C();
+      S.feed[sym] = save; render(true); return { c1, want1: fmtPx(m1, sym), c2, want2: fmtPx(lastC, sym) }; });
+    ok('실시간: 마지막 봉 종가(C) = 실시간 가격 — 시세가 움직이면 차트도 움직임', lv.c1 && lv.c1 === lv.want1, JSON.stringify(lv));
+    ok('실시간: 봉과 2% 넘게 어긋난 시세는 합치지 않음 (가짜 봉 늘리기 금지)', lv.c2 && lv.c2 === lv.want2, JSON.stringify(lv)); }
   candReq.length = 0; await page.locator('.ranges span[data-act="tf:H4"]').click(); await page.waitForTimeout(300);
   ok('4h 탭 → fx-prices ?tf=H4&n=200 실봉 요청 · 차트 렌더', candReq.some(q => q.tf === 'H4' && q.n === '200') && (await page.locator('#chart svg').count()) === 1 && (await page.locator('.ranges span.on').innerText()) === '4h', JSON.stringify(candReq));
   ok('ALL·30m 버튼 없음 (6칸으로 줄임 — 2026-10-25)', (await page.locator('.ranges span[data-act="tf:ALL"]').count()) === 0 && (await page.locator('.ranges span[data-act="tf:M30"]').count()) === 0);
