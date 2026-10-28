@@ -176,13 +176,23 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   ok('M6 홈: FX 그룹 10행 (금·은은 Metals 칩으로)', (await page.locator('.row').count()) === 10);
   { const tb = await page.locator('.tab[data-act="tab:trade"]').boundingBox(); const vh = await page.evaluate(() => innerHeight);
     ok('푸터 런타임: .tab 히트 영역 바닥 = 뷰포트 바닥 (' + Math.round(tb.y + tb.height) + '/' + vh + ') · 높이 ≥ 44px', tb && Math.abs((tb.y + tb.height) - vh) <= 1 && tb.height >= 44, JSON.stringify(tb)); }
-  // 2026-10-28 사장님 "스프레드가 미세한 차이로 짤려서 보여" — 좁은 폰(360·375)에서도 스프레드 글자는 통째로 보이고, 줄이 넘치면 종목 이름 쪽이 … 로 줄어든다.
-  for (const w of [360, 375]) {
-    await page.setViewportSize({ width: w, height: 900 }); await page.waitForTimeout(150);
-    const cut = await page.evaluate(() => [...document.querySelectorAll('.row[data-sym] .sub')].map(s => { const sp = s.querySelector('.spr'); if (!sp) return s.closest('.row').dataset.sym + ':no-spr'; const a = s.getBoundingClientRect(), b = sp.getBoundingClientRect(); return (b.right > a.right + 0.5 || sp.scrollWidth > sp.clientWidth + 0.5) ? s.closest('.row').dataset.sym + ':' + Math.round(b.right - a.right) + 'px' : null; }).filter(Boolean));
-    ok('스프레드 안 잘림 (' + w + 'px): 홈 전 행 .spr 가 줄 안에 통째로', cut.length === 0, cut.join(','));
-    const half = await page.evaluate(() => [...document.querySelectorAll('.row[data-sym] .sub')].map(s => { const n = s.querySelector('.snm'), sp = s.querySelector('.spr'); if (!n || !sp) return null; const on1 = Math.abs(n.getBoundingClientRect().top - sp.getBoundingClientRect().top) < 1; const r = n.getBoundingClientRect(), a = s.getBoundingClientRect(); return on1 && (r.left < a.left - 0.5 || r.right > a.right + 0.5) ? s.closest('.row').dataset.sym : null; }).filter(Boolean));
-    ok('종목 이름 반쪽 0 (' + w + 'px): 이름은 통째로 보이거나 통째로 숨음 ("Sp…" 금지)', half.length === 0, half.join(','));
+  // 2026-10-28 사장님 "스프레드가 미세한 차이로 짤려서 보여" → "점 대신 숫자 보이게" — 이름·스프레드 둘 다 글자 그대로(… 금지).
+  //   넘치는 줄만 글자를 줄여 한 줄(iOS fit-to-width, 최소 9.5px) · 그래도 안 되면 스프레드만 통째로 다음 줄.
+  for (const w of [360, 375, 393]) {
+    await page.setViewportSize({ width: w, height: 900 }); await page.waitForTimeout(250);
+    const r = await page.evaluate(() => { const out = { sprCut: [], nameDots: [], wrap: [], tiny: [] };
+      document.querySelectorAll('.row[data-sym] .sub').forEach(s => { const sym = s.closest('.row').dataset.sym, n = s.querySelector('.snm'), sp = s.querySelector('.spr');
+        if (!n || !sp) { out.sprCut.push(sym + ':missing'); return; }
+        const a = s.getBoundingClientRect(), b = sp.getBoundingClientRect();
+        if (b.right > a.right + 0.5 || sp.scrollWidth > sp.clientWidth + 0.5) out.sprCut.push(sym);
+        if (n.scrollWidth > n.clientWidth + 0.5) out.nameDots.push(sym);
+        if (Math.abs(b.top - n.getBoundingClientRect().top) > 1) out.wrap.push(sym);
+        if (parseFloat(getComputedStyle(s).fontSize) < 9.5) out.tiny.push(sym); });
+      return out; });
+    ok('스프레드 안 잘림 (' + w + 'px): 홈 전 행 .spr 가 통째로', r.sprCut.length === 0, r.sprCut.join(','));
+    ok('이름 … 0 (' + w + 'px): FX 이름은 글자 그대로 (점으로 안 바뀜)', r.nameDots.length === 0, r.nameDots.join(','));
+    ok('글자 최소 9.5px (' + w + 'px): 줄인 줄도 읽을 수 있는 크기', r.tiny.length === 0, r.tiny.join(','));
+    if (w === 393) ok('393px(최신 아이폰): FX 전 행 "이름 · 스프레드" 한 줄 (줄인 글자로 맞춤)', r.wrap.length === 0, r.wrap.join(','));
   }
   await page.setViewportSize({ width: 430, height: 900 }); await page.waitForTimeout(150);
   // 월드클락 스킨 (2026-10-25 사장님 "버튼 클릭이 잘 안되는 버그 만들지 말고"): 떠 있는 알약·선택 캡슐은 ::before 그림 — 실제 손가락 지점이 탭을 맞는지 히트테스트.

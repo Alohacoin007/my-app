@@ -146,10 +146,11 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .row .sym { font-size: 15px; font-weight: 700; letter-spacing: -0.2px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .row .sub { margin-top: 2px; font-size: 11px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .row .sub .spr { color: var(--mute); font-variant-numeric: tabular-nums; }
-  /* 2026-10-28 사장님 "스프레드가 미세한 차이로 짤려서" — 스프레드는 항상 통째로. 이름이 같이 안 들어가면 이름만 다음 줄로 밀려 숨는다
-     (반쪽 "Sp…" 금지 — 종목 코드가 바로 위라 이름은 보조 정보). DOM 은 spr→snm, row-reverse 로 화면엔 "이름 · 스프레드" */
-  .row .sub { display: flex; flex-flow: row-reverse wrap; justify-content: flex-end; line-height: 16px; height: 16px; overflow: hidden; }
-  .row .sub .spr, .row .sub .snm { flex-shrink: 0; } .row .sub .snm::after { content: '·'; margin: 0 4px; }
+  /* 2026-10-28 사장님 "스프레드가 미세한 차이로 짤려서 … 점 대신 숫자 보이게" — 이름·스프레드 둘 다 글자 그대로. 한 줄에 다 들어가면 한 줄,
+     안 들어가면 스프레드만 통째로 다음 줄로 (… 금지). 이름이 칸보다 길 때만 이름 끝에 … (스프레드 숫자는 절대 안 잘림) */
+  .row .sub { white-space: normal; overflow: visible; text-overflow: clip; }
+  .row .sub .snm, .row .sub .spr { display: inline-block; white-space: nowrap; vertical-align: top; }
+  .row .sub .snm { max-width: 100%; overflow: hidden; text-overflow: ellipsis; } .row .sub .snm::after { content: '·'; margin: 0 .33em; }   /* em — 글자 줄일 때 여백도 같은 비율로 (px 면 줄여도 모자라 줄바꿈 실측) */
   .half { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .btn { border-radius: 12px; padding: 6px 0; text-align: right; font-family: 'Geist Mono', ui-monospace, monospace; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; }
   .btn big { font-size: 15px; font-weight: 800; }
@@ -835,10 +836,26 @@ function hero(){
     '<div class="stat"><div class="k">Margin</div><div class="v">'+fmtMoney(um)+'</div></div>'+
     '<div class="stat"><div class="k">Free margin</div><div class="v">'+fmtMoney(free)+'</div></div></div></div>';
 }
+// 2026-10-28 사장님 "점 대신 숫자 보이게" — iOS adjustsFontSizeToFitWidth 처럼: "이름 · 스프레드" 줄이 칸보다 길면 **그 줄만** 글자를 줄여
+//   한 줄에 통째로 (최소 9.5px). 폭은 렌더 뒤 화면에서 실측(서체 차이 없음) → 키별 캐시 → 바뀐 게 있을 때만 1회 재렌더.
+//   키의 숫자는 0 으로 접는다(스프레드 숫자 폭은 tabular 라 같음) — 틱마다 0.4→0.5 가 바뀌어도 재측정·깜빡임 없음.
+//   그래도 넘치면(최소 크기에서도) CSS 가 스프레드만 다음 줄로 — … 없음.
+var FIT={ w:0, memo:{} };
+function fitKey(name, spr){ return name+'|'+String(spr).replace(/[0-9]/g,'0'); }
+function subFit(name, spr){ var px=FIT.memo[fitKey(name,spr)]; return px?' style="font-size:'+px+'px"':''; }
+function fitMeasure(){ var subs=document.querySelectorAll('.row[data-sym] .sub'); if(!subs.length) return;
+  var w=subs[0].clientWidth; if(w!==FIT.w){ FIT.w=w; FIT.memo={}; }
+  var changed=false;
+  for(var i=0;i<subs.length;i++){ var sub=subs[i], n=sub.querySelector('.snm'), sp=sub.querySelector('.spr'); if(!n||!sp) continue;
+    var key=fitKey(n.textContent, sp.textContent); if(FIT.memo[key]!==undefined) continue;
+    var cur=parseFloat(getComputedStyle(sub).fontSize)||12, need=n.getBoundingClientRect().width+sp.getBoundingClientRect().width;
+    FIT.memo[key] = need<=w-0.5 ? 0 : Math.max(9.5, Math.floor(cur*(w-1)/need*10)/10); if(FIT.memo[key]) changed=true; }
+  if(changed) requestAnimationFrame(function(){ render(true); }); }
+window.addEventListener('resize', function(){ fitMeasure(); });
 function homeRows(){
   var list=instruments(S.homeSeg); if(!list.length) return '<div class="empty">No live feed for '+esc(S.homeSeg)+' right now</div>';
   return list.map(function(p){ var fresh=isFresh(p.sym); var sprTxt=spreadLabel(p.sym);
-    return '<div class="row" data-sym="'+p.sym+'"><div class="nm" data-act="open:'+p.sym+'"><div class="sym">'+p.sym+'</div><div class="sub"><span class="spr">'+sprTxt+'</span><span class="snm">'+esc(p.name)+'</span></div></div>'+
+    return '<div class="row" data-sym="'+p.sym+'"><div class="nm" data-act="open:'+p.sym+'"><div class="sym">'+p.sym+'</div><div class="sub"'+subFit(p.name,sprTxt)+'><span class="snm">'+esc(p.name)+'</span><span class="spr">'+sprTxt+'</span></div></div>'+
       '<div class="half"><div class="btn sell'+tickCls(p.sym,'b')+(fresh?'':' stale')+'" data-act="order:SELL:'+p.sym+'">'+fmtPx(bidOf(p.sym),p.sym,true)+'</div><div class="btn buy'+tickCls(p.sym,'a')+(fresh?'':' stale')+'" data-act="order:BUY:'+p.sym+'">'+fmtPx(askOf(p.sym),p.sym,true)+'</div></div></div>'; }).join('');
 }
 function screenHome(){
@@ -1186,6 +1203,7 @@ var render=function(force){
   // 직접 달아 이 버그를 피한다 — 같은 방식. CSS cursor 에 기대지 않으므로 스타일이 바뀌어도 탭이 죽지 않는다.
   var acts=app.querySelectorAll('[data-act]'); for(var i=0;i<acts.length;i++){ if(acts[i].onclick!==tapNoop) acts[i].onclick=tapNoop; }
   S.keepScroll=true;
+  if(S.tab==='home') fitMeasure();
 };
 function tapNoop(){}
 function toast(msg){ S.toast=msg; render(true); clearTimeout(S._tt); S._tt=setTimeout(function(){ S.toast=null; render(); },2200); }
