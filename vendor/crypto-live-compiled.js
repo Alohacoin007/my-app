@@ -2093,6 +2093,8 @@ function RangeTabs({
 
 // Grid: icon | name+sub | sparkline | value+chg(right)
 const ROW_GRID = '26px 1fr 52px 96px';
+// 2026-10-28 사장님 "미니 차트만 제거" — 보유 행은 3칸(아이콘·이름·금액). 미니 차트는 7일선인데 옆 % 는 24h 라 서로 어긋났다.
+const ASSET_GRID = '26px minmax(0, 1fr) auto';
 function AssetRow({
   a,
   kind,
@@ -2135,7 +2137,7 @@ function AssetRow({
     onClick: onTap,
     style: {
       display: 'grid',
-      gridTemplateColumns: ROW_GRID,
+      gridTemplateColumns: ASSET_GRID,
       alignItems: 'center',
       gap: 10,
       padding: '10px 22px',
@@ -2169,16 +2171,6 @@ function AssetRow({
       textOverflow: 'ellipsis'
     }
   }, subline)), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      justifyContent: 'flex-start'
-    }
-  }, /*#__PURE__*/React.createElement(MiniSpark, {
-    seed: a.seed,
-    sym: a.sym,
-    color: color,
-    stable: a.stable
-  })), /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: 'right',
       fontVariantNumeric: 'tabular-nums',

@@ -1009,6 +1009,8 @@ function RangeTabs({ range, setRange, color }) {
 
 // Grid: icon | name+sub | sparkline | value+chg(right)
 const ROW_GRID = '26px 1fr 52px 96px';
+// 2026-10-28 사장님 "미니 차트만 제거" — 보유 행은 3칸(아이콘·이름·금액). 미니 차트는 7일선인데 옆 % 는 24h 라 서로 어긋났다.
+const ASSET_GRID = '26px minmax(0, 1fr) auto';
 
 function AssetRow({ a, kind, liveValue, onTap }) {
   const baseValue = a.mine;
@@ -1042,7 +1044,7 @@ function AssetRow({ a, kind, liveValue, onTap }) {
   })();
   return (
     <div onClick={onTap} style={{
-      display: 'grid', gridTemplateColumns: ROW_GRID,
+      display: 'grid', gridTemplateColumns: ASSET_GRID,
       alignItems: 'center', gap: 10,
       padding: '10px 22px',
       cursor: onTap ? 'pointer' : 'default',
@@ -1058,9 +1060,6 @@ function AssetRow({ a, kind, liveValue, onTap }) {
           marginTop: 1, fontSize: 11, color: RH.textDim,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}>{subline}</div>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-        <MiniSpark seed={a.seed} sym={a.sym} color={color} stable={a.stable}/>
       </div>
       <div style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', minWidth: 0 }}>
         {a.isStakedRow ? (
