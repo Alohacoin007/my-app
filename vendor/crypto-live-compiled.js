@@ -2095,6 +2095,8 @@ function RangeTabs({
 const ROW_GRID = '26px 1fr 52px 96px';
 // 2026-10-28 사장님 "미니 차트만 제거" — 보유 행은 3칸(아이콘·이름·금액). 미니 차트는 7일선인데 옆 % 는 24h 라 서로 어긋났다.
 const ASSET_GRID = '26px minmax(0, 1fr) auto';
+
+// 2026-10-29 사장님 시안 승인 "진행해" — 보유 행 글자 키움: 종목 13.5→16 · 수량줄 11→13 · 금액 14→17 · 변동률 11→15 · 행 위아래 여백 10→12
 function AssetRow({
   a,
   kind,
@@ -2140,7 +2142,7 @@ function AssetRow({
       gridTemplateColumns: ASSET_GRID,
       alignItems: 'center',
       gap: 10,
-      padding: '10px 22px',
+      padding: '12px 22px',
       cursor: onTap ? 'pointer' : 'default'
     }
   }, /*#__PURE__*/React.createElement(AssetIcon, {
@@ -2152,7 +2154,7 @@ function AssetRow({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 13.5,
+      fontSize: 16,
       fontWeight: 700,
       color: RH.text,
       letterSpacing: -0.15,
@@ -2164,7 +2166,7 @@ function AssetRow({
   }, a.sym), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 1,
-      fontSize: 11,
+      fontSize: 13,
       color: RH.textDim,
       whiteSpace: 'nowrap',
       overflow: 'hidden',
@@ -2212,7 +2214,7 @@ function AssetRow({
     d: "M8 11 V7 a4 4 0 0 1 8 0 V11"
   })), /*#__PURE__*/React.createElement("span", null, a.lockPeriod === 'flexible' ? 'Flexible' : a.lockPeriod === '90d' ? '90 days' : a.lockPeriod === '1y' ? '1 year' : 'Locked')) : null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 14,
+      fontSize: 17,
       fontWeight: 500,
       color: RH.text,
       display: 'flex',
@@ -2221,11 +2223,11 @@ function AssetRow({
     }
   }, /*#__PURE__*/React.createElement(Odometer, {
     value: v,
-    fontSize: 14,
+    fontSize: 17,
     color: RH.text
   })), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 11,
+      fontSize: 15,
       color: a.isStakedRow ? RH.green : color,
       marginTop: 2,
       fontWeight: 700,
@@ -2675,7 +2677,7 @@ function SectionHeader({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 11.5,
+      fontSize: 13,
       fontWeight: 700,
       color: RH.textDim,
       letterSpacing: 1.4,
@@ -2715,7 +2717,7 @@ function SectionHeader({
     }
   })) : null, /*#__PURE__*/React.createElement("span", null, title)), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 11.5,
+      fontSize: 13,
       color: RH.textDim,
       fontFamily: FONT_UI,
       fontVariantNumeric: 'tabular-nums',
@@ -2893,7 +2895,7 @@ function ActionRow({
     onMouseLeave: e => e.currentTarget.style.transform = ''
   }, it.icon, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 12,
+      fontSize: 14,
       color: RH.text,
       fontWeight: 500
     }
@@ -11854,7 +11856,7 @@ function Discover({
     }, m.sym), /*#__PURE__*/React.createElement("div", {
       style: {
         marginTop: 1,
-        fontSize: 12,
+        fontSize: 14,
         color: RH.textDim,
         whiteSpace: 'nowrap',
         overflow: 'hidden',
@@ -11881,7 +11883,7 @@ function Discover({
         background: c,
         color: '#fff',
         borderRadius: 8,
-        fontSize: 12.5,
+        fontSize: 14,
         fontWeight: 700,
         fontVariantNumeric: 'tabular-nums',
         letterSpacing: -0.1
@@ -11922,7 +11924,7 @@ function Discover({
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: 13.5,
+        fontSize: 15,
         fontWeight: 700,
         color: RH.text,
         letterSpacing: -0.15,
@@ -11934,7 +11936,7 @@ function Discover({
     }, COIN_NAMES[m.sym] || m.name || m.sym), /*#__PURE__*/React.createElement("div", {
       style: {
         marginTop: 1,
-        fontSize: 11,
+        fontSize: 13,
         color: RH.textDim,
         letterSpacing: 0.2
       }
@@ -11970,7 +11972,7 @@ function Discover({
     })), /*#__PURE__*/React.createElement("div", {
       style: {
         marginTop: 2,
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: 700,
         color: c,
         display: 'inline-flex',
@@ -12213,7 +12215,7 @@ function Discover({
   }, "A new home", /*#__PURE__*/React.createElement("br", null), "for crypto"), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 8,
-      fontSize: 13.5,
+      fontSize: 15,
       color: RH.textDim,
       lineHeight: 1.45
     }
@@ -12250,7 +12252,7 @@ function Discover({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 13.5,
+      fontSize: 15,
       fontWeight: 700,
       color: RH.text
     }
@@ -12267,7 +12269,7 @@ function Discover({
   }, "up to ", stakeMaxApy(s.sym), "% APY")), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 2,
-      fontSize: 11.5,
+      fontSize: 13,
       color: RH.textDim
     }
   }, "Stake ", s.sym, " to earn")), /*#__PURE__*/React.createElement("svg", {
@@ -18481,7 +18483,7 @@ function Account({
       display: 'flex',
       alignItems: 'center',
       gap: 6,
-      fontSize: 13,
+      fontSize: 14.5,
       fontWeight: 600,
       fontFamily: FONT_UI,
       fontVariantNumeric: 'tabular-nums'
@@ -18548,7 +18550,7 @@ function Account({
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: FONT_UI,
-      fontSize: 10,
+      fontSize: 12,
       color: RH.textDim,
       letterSpacing: 1.4,
       textTransform: 'uppercase',
@@ -18581,7 +18583,7 @@ function Account({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 10,
+      fontSize: 12,
       color: RH.textDim,
       fontFamily: FONT_UI,
       letterSpacing: 0.8,
@@ -18591,7 +18593,7 @@ function Account({
   }, s.id === 'crypto' ? 'Crypto' : s.id === 'fx' ? 'FX' : 'Sport'), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 4,
-      fontSize: 13.5,
+      fontSize: 15,
       fontWeight: 600,
       color: RH.text,
       fontVariantNumeric: 'tabular-nums',
@@ -18681,7 +18683,7 @@ function Account({
     })) : null), /*#__PURE__*/React.createElement("div", {
       style: {
         marginTop: 3,
-        fontSize: 12,
+        fontSize: 14,
         color: isLive ? RH.text : RH.textDim,
         letterSpacing: 0.1,
         whiteSpace: 'nowrap',
@@ -20349,7 +20351,7 @@ function AssetDetail({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 11,
+      fontSize: 13,
       color: RH.textDim,
       fontFamily: FONT_UI,
       letterSpacing: 0.8,
@@ -20416,13 +20418,13 @@ function AssetDetail({
   }, "Today")), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 6,
-      fontSize: 11,
+      fontSize: 13,
       color: RH.textDim,
       fontFamily: FONT_UI,
       letterSpacing: 0.4,
       textTransform: 'none',
       fontWeight: 400,
-      fontSize: 13
+      fontSize: 14.5
     }
   }, "24 Hour Market"), ohlc ? /*#__PURE__*/React.createElement("div", {
     style: {
@@ -20430,7 +20432,7 @@ function AssetDetail({
       flexWrap: 'wrap',
       gap: '4px 10px',
       marginTop: 6,
-      fontSize: 12,
+      fontSize: 14,
       color: RH.textDim,
       fontVariantNumeric: 'tabular-nums'
     }
@@ -20514,7 +20516,7 @@ function AssetDetail({
     }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 12,
+      fontSize: 14,
       color: RH.textDim,
       fontWeight: 400
     }
@@ -20529,7 +20531,7 @@ function AssetDetail({
     }
   }, "$", fmtUsd(holdingUsd))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 12,
+      fontSize: 14,
       color: RH.textDim,
       fontWeight: 400
     }
@@ -20544,7 +20546,7 @@ function AssetDetail({
     }
   }, holdingCoin.toFixed(holdingCoin < 1 ? 6 : 4).replace(/\.?0+$/, '') || '0')), isStaked ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 12,
+      fontSize: 14,
       color: RH.textDim,
       fontWeight: 400
     }
@@ -20558,7 +20560,7 @@ function AssetDetail({
     }
   }, stakePeriodApy(sym, lockPeriod).toFixed(1), "%")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 12,
+      fontSize: 14,
       color: RH.textDim,
       fontWeight: 400
     }
@@ -20572,7 +20574,7 @@ function AssetDetail({
     }
   }, "+$", accruedUsd.toFixed(2)))) : isSecurity ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 12,
+      fontSize: 14,
       color: RH.textDim,
       fontWeight: 400
     }
@@ -20586,7 +20588,7 @@ function AssetDetail({
     }
   }, (meta.apy || 0).toFixed(1), "%")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 12,
+      fontSize: 14,
       color: RH.textDim,
       fontWeight: 400
     }
@@ -20599,7 +20601,7 @@ function AssetDetail({
     }
   }, sym === 'ALPX-RE1' ? 'Real Estate' : sym === 'ALPX-CR2' ? 'Credit' : 'Token'))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 12,
+      fontSize: 14,
       color: RH.textDim,
       fontWeight: 400
     }
@@ -20613,7 +20615,7 @@ function AssetDetail({
     }
   }, chartIsUp ? '+' : '-', "$", Math.abs(chartChange * (holdingCoin || 0)).toFixed(2))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 12,
+      fontSize: 14,
       color: RH.textDim,
       fontWeight: 400
     }

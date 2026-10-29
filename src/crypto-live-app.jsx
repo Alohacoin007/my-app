@@ -1012,6 +1012,7 @@ const ROW_GRID = '26px 1fr 52px 96px';
 // 2026-10-28 사장님 "미니 차트만 제거" — 보유 행은 3칸(아이콘·이름·금액). 미니 차트는 7일선인데 옆 % 는 24h 라 서로 어긋났다.
 const ASSET_GRID = '26px minmax(0, 1fr) auto';
 
+// 2026-10-29 사장님 시안 승인 "진행해" — 보유 행 글자 키움: 종목 13.5→16 · 수량줄 11→13 · 금액 14→17 · 변동률 11→15 · 행 위아래 여백 10→12
 function AssetRow({ a, kind, liveValue, onTap }) {
   const baseValue = a.mine;
   // Live value moves with the market tick; stablecoins stay flat.
@@ -1046,18 +1047,18 @@ function AssetRow({ a, kind, liveValue, onTap }) {
     <div onClick={onTap} style={{
       display: 'grid', gridTemplateColumns: ASSET_GRID,
       alignItems: 'center', gap: 10,
-      padding: '10px 22px',
+      padding: '12px 22px',
       cursor: onTap ? 'pointer' : 'default',
     }}>
       <AssetIcon sym={a.sym} size={24}/>
       <div style={{ minWidth: 0 }}>
         <div style={{
-          fontSize: 13.5, fontWeight: 700, color: RH.text,
+          fontSize: 16, fontWeight: 700, color: RH.text,
           letterSpacing: -0.15, lineHeight: 1.15,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}>{a.sym}</div>
         <div style={{
-          marginTop: 1, fontSize: 11, color: RH.textDim,
+          marginTop: 1, fontSize: 13, color: RH.textDim,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         }}>{subline}</div>
       </div>
@@ -1078,10 +1079,10 @@ function AssetRow({ a, kind, liveValue, onTap }) {
             <span>{a.lockPeriod === 'flexible' ? 'Flexible' : a.lockPeriod === '90d' ? '90 days' : a.lockPeriod === '1y' ? '1 year' : 'Locked'}</span>
           </div>
         ) : null}
-        <div style={{ fontSize: 14, fontWeight: 500, color: RH.text, display: 'flex', justifyContent: 'flex-end', lineHeight: 1.2 }}>
-          <Odometer value={v} fontSize={14} color={RH.text}/>
+        <div style={{ fontSize: 17, fontWeight: 500, color: RH.text, display: 'flex', justifyContent: 'flex-end', lineHeight: 1.2 }}>
+          <Odometer value={v} fontSize={17} color={RH.text}/>
         </div>
-        <div style={{ fontSize: 11, color: a.isStakedRow ? RH.green : color, marginTop: 2, fontWeight: 700, letterSpacing: 0.1 }}>
+        <div style={{ fontSize: 15, color: a.isStakedRow ? RH.green : color, marginTop: 2, fontWeight: 700, letterSpacing: 0.1 }}>
           {a.isStakedRow ? `${(+a.apy || 0).toFixed(0)}% APY` : fmtPct(livePct)}
         </div>
       </div>
@@ -1273,7 +1274,7 @@ function SectionHeader({ title, count, live = false }) {
       padding: '18px 22px 6px',
     }}>
       <div style={{
-        fontSize: 11.5, fontWeight: 700, color: RH.textDim,
+        fontSize: 13, fontWeight: 700, color: RH.textDim,
         letterSpacing: 1.4, textTransform: 'uppercase',
         fontFamily: FONT_UI,
         display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -1301,7 +1302,7 @@ function SectionHeader({ title, count, live = false }) {
         <span>{title}</span>
       </div>
       <div style={{
-        fontSize: 11.5, color: RH.textDim, fontFamily: FONT_UI,
+        fontSize: 13, color: RH.textDim, fontFamily: FONT_UI,
         fontVariantNumeric: 'tabular-nums', letterSpacing: 1.4, fontWeight: 700,
         textTransform: 'uppercase',
       }}>{count}</div>
@@ -1380,7 +1381,7 @@ function ActionRow({ onAction }) {
           >
             {it.icon}
             <div style={{
-              fontSize: 12, color: RH.text, fontWeight: 500,
+              fontSize: 14, color: RH.text, fontWeight: 500,
             }}>{it.label}</div>
           </button>
         ))}
@@ -6254,7 +6255,7 @@ function Discover({ onPickAsset, onPickStakeInfo, tabBar }) {
             letterSpacing: -0.15, lineHeight: 1.15,
           }}>{m.sym}</div>
           <div style={{
-            marginTop: 1, fontSize: 12, color: RH.textDim,
+            marginTop: 1, fontSize: 14, color: RH.textDim,
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>{COIN_NAMES[m.sym] || m.name || m.sym}</div>
         </div>
@@ -6268,7 +6269,7 @@ function Discover({ onPickAsset, onPickStakeInfo, tabBar }) {
           textAlign: 'center',
           background: c, color: '#fff',
           borderRadius: 8,
-          fontSize: 12.5, fontWeight: 700,
+          fontSize: 14, fontWeight: 700,
           fontVariantNumeric: 'tabular-nums', letterSpacing: -0.1,
         }}>
           {up ? '+' : '-'}{Math.abs(m.chg).toFixed(2)}%
@@ -6302,13 +6303,13 @@ function Discover({ onPickAsset, onPickStakeInfo, tabBar }) {
         fontFamily: FONT_UI,
       }}>
         <div style={{
-          fontSize: 13.5, fontWeight: 700, color: RH.text, letterSpacing: -0.15,
+          fontSize: 15, fontWeight: 700, color: RH.text, letterSpacing: -0.15,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.15,
         }}>
           {COIN_NAMES[m.sym] || m.name || m.sym}
         </div>
         <div style={{
-          marginTop: 1, fontSize: 11, color: RH.textDim, letterSpacing: 0.2,
+          marginTop: 1, fontSize: 13, color: RH.textDim, letterSpacing: 0.2,
         }}>{m.sym}</div>
         <div style={{ marginTop: 7, marginBottom: 7 }}>
           <svg width={w} height={h} style={{ display: 'block' }}>
@@ -6324,7 +6325,7 @@ function Discover({ onPickAsset, onPickStakeInfo, tabBar }) {
           maximumFractionDigits: m.price < 0.001 ? 8 : (m.price < 1 ? 4 : 2),
         })}</div>
         <div style={{
-          marginTop: 2, fontSize: 12, fontWeight: 700, color: c,
+          marginTop: 2, fontSize: 14, fontWeight: 700, color: c,
           display: 'inline-flex', alignItems: 'center', gap: 4,
           fontVariantNumeric: 'tabular-nums',
         }}>
@@ -6437,7 +6438,7 @@ function Discover({ onPickAsset, onPickStakeInfo, tabBar }) {
                 letterSpacing: -0.6, lineHeight: 1.08,
               }}>A new home<br/>for crypto</div>
               <div style={{
-                marginTop: 8, fontSize: 13.5, color: RH.textDim, lineHeight: 1.45,
+                marginTop: 8, fontSize: 15, color: RH.textDim, lineHeight: 1.45,
               }}>Trade and transfer<br/>crypto 24/7.</div>
             </div>
           </div>
@@ -6457,12 +6458,12 @@ function Discover({ onPickAsset, onPickStakeInfo, tabBar }) {
             cursor: 'pointer', fontFamily: FONT_UI,
           }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: RH.text }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: RH.text }}>
                 <span>{s.sym}</span>
                 <span style={{ color: RH.textDim, fontWeight: 600 }}> · </span>
                 <span style={{ color: RH.accent, fontWeight: 700 }}>up to {stakeMaxApy(s.sym)}% APY</span>
               </div>
-              <div style={{ marginTop: 2, fontSize: 11.5, color: RH.textDim }}>
+              <div style={{ marginTop: 2, fontSize: 13, color: RH.textDim }}>
                 Stake {s.sym} to earn
               </div>
             </div>
@@ -10220,7 +10221,7 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
           })()}</div>
           <div style={{
             marginTop: 6, display: 'flex', alignItems: 'center', gap: 6,
-            fontSize: 13, fontWeight: 600,
+            fontSize: 14.5, fontWeight: 600,
             fontFamily: FONT_UI, fontVariantNumeric: 'tabular-nums',
           }}>
             <svg width="9" height="9" viewBox="0 0 24 24" fill={accent}>
@@ -10260,7 +10261,7 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
         {/* Accounts — compact 3-column row */}
         <div style={{ padding: '8px 22px 0' }}>
           <div style={{
-            fontFamily: FONT_UI, fontSize: 10, color: RH.textDim,
+            fontFamily: FONT_UI, fontSize: 12, color: RH.textDim,
             letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700,
             marginBottom: 8,
           }}>Accounts</div>
@@ -10278,12 +10279,12 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
                   fontFamily: FONT_UI,
                 }}>
                 <div style={{
-                  fontSize: 10, color: RH.textDim,
+                  fontSize: 12, color: RH.textDim,
                   fontFamily: FONT_UI,
                   letterSpacing: 0.8, textTransform: 'uppercase', fontWeight: 700,
                 }}>{s.id === 'crypto' ? 'Crypto' : s.id === 'fx' ? 'FX' : 'Sport'}</div>
                 <div style={{
-                  marginTop: 4, fontSize: 13.5, fontWeight: 600, color: RH.text,
+                  marginTop: 4, fontSize: 15, fontWeight: 600, color: RH.text,
                   fontVariantNumeric: 'tabular-nums', letterSpacing: -0.2,
                 }}>${s.bal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
               </button>
@@ -10346,7 +10347,7 @@ function Account({ serverBalances = {}, balances = {}, staked = {}, transactions
                     ) : null}
                   </div>
                   <div style={{
-                    marginTop: 3, fontSize: 12,
+                    marginTop: 3, fontSize: 14,
                     color: isLive ? RH.text : RH.textDim,
                     letterSpacing: 0.1,
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
@@ -11288,7 +11289,7 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
         {/* Asset name + price block */}
         <div style={{ padding: '4px 22px 0' }}>
           <div style={{
-            fontSize: 11, color: RH.textDim, fontFamily: FONT_UI,
+            fontSize: 13, color: RH.textDim, fontFamily: FONT_UI,
             letterSpacing: 0.8, fontWeight: 700, marginBottom: 6,
           }}>{sym}</div>
           <div style={{
@@ -11319,12 +11320,12 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
             <span style={{ color: RH.textDim, fontWeight: 500 }}>Today</span>
           </div>
           <div style={{
-            marginTop: 6, fontSize: 11, color: RH.textDim,
+            marginTop: 6, fontSize: 13, color: RH.textDim,
             fontFamily: FONT_UI, letterSpacing: 0.4,
-            textTransform: 'none', fontWeight: 400, fontSize: 13,
+            textTransform: 'none', fontWeight: 400, fontSize: 14.5,
           }}>24 Hour Market</div>
           {ohlc ? (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', marginTop: 6, fontSize: 12, color: RH.textDim, fontVariantNumeric: 'tabular-nums' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', marginTop: 6, fontSize: 14, color: RH.textDim, fontVariantNumeric: 'tabular-nums' }}>
               {[['O', ohlc.o], ['H', ohlc.h], ['L', ohlc.l], ['C', ohlc.c]].map(([k, v]) => (
                 <span key={k}>{k} <span style={{ color: RH.text }}>{fmtUsd(v)}</span></span>
               ))}
@@ -11380,7 +11381,7 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
               fontFamily: FONT_UI,
             }}>
               <div>
-                <div style={{ fontSize: 12, color: RH.textDim, fontWeight: 400 }}>
+                <div style={{ fontSize: 14, color: RH.textDim, fontWeight: 400 }}>
                   {isStaked ? 'Principal' : 'Market value'}
                 </div>
                 <div style={{
@@ -11389,7 +11390,7 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
                 }}>${fmtUsd(holdingUsd)}</div>
               </div>
               <div>
-                <div style={{ fontSize: 12, color: RH.textDim, fontWeight: 400 }}>
+                <div style={{ fontSize: 14, color: RH.textDim, fontWeight: 400 }}>
                   {sym} held
                 </div>
                 <div style={{
@@ -11400,13 +11401,13 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
               {isStaked ? (
                 <>
                   <div>
-                    <div style={{ fontSize: 12, color: RH.textDim, fontWeight: 400 }}>APY</div>
+                    <div style={{ fontSize: 14, color: RH.textDim, fontWeight: 400 }}>APY</div>
                     <div style={{ marginTop: 2, fontSize: 22, fontWeight: 300, color: RH.green, fontVariantNumeric: 'tabular-nums' }}>
                       {stakePeriodApy(sym, lockPeriod).toFixed(1)}%
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 12, color: RH.textDim, fontWeight: 400 }}>Accrued</div>
+                    <div style={{ fontSize: 14, color: RH.textDim, fontWeight: 400 }}>Accrued</div>
                     <div style={{ marginTop: 2, fontSize: 22, fontWeight: 200, color: RH.green, fontVariantNumeric: 'tabular-nums' }}>
                       +${accruedUsd.toFixed(2)}
                     </div>
@@ -11415,13 +11416,13 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
               ) : isSecurity ? (
                 <>
                   <div>
-                    <div style={{ fontSize: 12, color: RH.textDim, fontWeight: 400 }}>APY</div>
+                    <div style={{ fontSize: 14, color: RH.textDim, fontWeight: 400 }}>APY</div>
                     <div style={{ marginTop: 2, fontSize: 22, fontWeight: 300, color: RH.green, fontVariantNumeric: 'tabular-nums' }}>
                       {(meta.apy || 0).toFixed(1)}%
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 12, color: RH.textDim, fontWeight: 400 }}>Type</div>
+                    <div style={{ fontSize: 14, color: RH.textDim, fontWeight: 400 }}>Type</div>
                     <div style={{ marginTop: 4, fontSize: 14, fontWeight: 600, color: RH.text }}>
                       {sym === 'ALPX-RE1' ? 'Real Estate' : sym === 'ALPX-CR2' ? 'Credit' : 'Token'}
                     </div>
@@ -11430,14 +11431,14 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
               ) : (
                 <>
                   <div>
-                    <div style={{ fontSize: 12, color: RH.textDim, fontWeight: 400 }}>Today's return</div>
+                    <div style={{ fontSize: 14, color: RH.textDim, fontWeight: 400 }}>Today's return</div>
                     <div style={{
                       marginTop: 2, fontSize: 22, fontWeight: 300,
                       color: accentColor, fontVariantNumeric: 'tabular-nums',
                     }}>{chartIsUp ? '+' : '-'}${Math.abs(chartChange * (holdingCoin || 0)).toFixed(2)}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 12, color: RH.textDim, fontWeight: 400 }}>Avg cost</div>
+                    <div style={{ fontSize: 14, color: RH.textDim, fontWeight: 400 }}>Avg cost</div>
                     <div style={{
                       marginTop: 2, fontSize: 22, fontWeight: 200, color: RH.text,
                       fontVariantNumeric: 'tabular-nums', letterSpacing: -0.3,
