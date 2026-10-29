@@ -409,6 +409,25 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
     ok('Trade 볼륨 스테퍼 "0.10 lot" 한 줄 (small inline · 한 줄 높이 < 40px, 두 줄이면 50px+)', sm === 'inline' && bb && bb.height < 40, 'display=' + sm + ' h=' + (bb && bb.height));
     const pxBig = await page.locator('.det .px big').first().evaluate(el => getComputedStyle(el).fontSize === getComputedStyle(el.parentElement).fontSize);
     ok('Trade 헤더 시세: 소수점 자릿수 크기 통일 (big = 부모와 같은 font-size)', pxBig); }
+  // 2026-10-29 사장님 승인: 주문 화면 Sell·Buy 고정 (크립토 Trade 처럼 탭바 바로 위). 작은 폰(375×667)·손절/익절 펼침에서도
+  //   맨 위·맨 아래 둘 다 Sell·Buy 가 화면 안 · 탭바와 겹치지 않음 · 두 버튼과 탭 4개 모두 실제 손가락 지점이 그 요소를 맞음.
+  { const vp0 = page.viewportSize(); await page.setViewportSize({ width: 375, height: 667 }); await page.waitForTimeout(200);
+    const was = await page.evaluate(() => { const S = window.__rh, w = S.sltp; if (!S.sltp) act('sltp'); render(true); return w; }); await page.waitForTimeout(250);
+    const pin = async (where) => page.evaluate((where) => { if (where === 'bottom') scrollTo(0, document.body.scrollHeight); else scrollTo(0, 0);
+      const half = document.querySelector('.det .foot .half'), tabs = document.querySelector('.tabs'); if (!half || !tabs) return { err: 'missing' };
+      const hr = half.getBoundingClientRect(), tr = tabs.getBoundingClientRect(), btns = [...half.querySelectorAll('.btn')];
+      const hit = (el) => { const r = el.getBoundingClientRect(); return [[r.left + r.width / 2, r.top + r.height / 2], [r.left + 8, r.top + 8], [r.right - 8, r.bottom - 8]].every(([x, y]) => { const e = document.elementFromPoint(x, y); return e && el.contains(e); }); };
+      const bb = btns.map((b) => b.getBoundingClientRect());
+      return { fixed: getComputedStyle(half).position, inView: bb.every((r) => r.top >= 0 && r.bottom <= innerHeight), aboveTabs: bb.every((r) => r.bottom <= tr.top + 4), btnHit: btns.map(hit), tabHit: [...document.querySelectorAll('.tab')].map(hit) }; }, where);
+    for (const where of ['top', 'bottom']) { const r = await pin(where);
+      ok('Sell·Buy 고정 (375×667 · 손절/익절 펼침 · ' + (where === 'top' ? '맨 위' : '맨 아래') + '): 화면 안 · 탭바 위 · 버튼 2개·탭 4개 히트', r.fixed === 'fixed' && r.inView && r.aboveTabs && r.btnHit.length === 2 && r.btnHit.every(Boolean) && r.tabHit.length === 4 && r.tabHit.every(Boolean), JSON.stringify(r)); }
+    const last = await page.evaluate(() => { scrollTo(0, document.body.scrollHeight); const rows = [...document.querySelectorAll('.det .foot .lotrow')]; const lr = rows[rows.length - 1].getBoundingClientRect(), hr = document.querySelector('.det .foot .half').getBoundingClientRect(); return { lastBottom: Math.round(lr.bottom), barTop: Math.round(hr.top) }; });
+    ok('끝까지 내리면 마지막 칸(Take profit)이 고정 버튼에 안 가림', last.lastBottom <= last.barTop, JSON.stringify(last));
+    const tst = await page.evaluate(async () => { toast('Bought 0.10 EURUSD @ 1.11440'); await new Promise((r) => setTimeout(r, 80)); const t = document.querySelector('.toast'), h = document.querySelector('.det .foot .half'); if (!t || !h) return { err: 'missing' };
+      const out = { toastBottom: Math.round(t.getBoundingClientRect().bottom), barTop: Math.round(h.getBoundingClientRect().top) }; window.__rh.toast = null; render(true); return out; });
+    ok('주문 화면 토스트는 고정 버튼 줄 위에 뜸 (체결 토스트가 Sell·Buy 를 덮지 않음)', tst.toastBottom <= tst.barTop, JSON.stringify(tst));
+    await page.evaluate((w) => { const S = window.__rh; if (S.sltp !== w) act('sltp'); render(true); scrollTo(0, 0); }, was);
+    await page.setViewportSize(vp0); await page.waitForTimeout(200); }
   await page.locator('.otype span[data-act="otype:LIMIT"]').click(); await page.waitForTimeout(150);
   ok('Limit 주문: SL/TP 없음 (폴드·행 0) — Activity 에서 설정', (await page.locator('.fold[data-act="sltp"]').count()) === 0 && (await page.locator('.lotrow:has-text("Stop loss")').count()) === 0 && (await page.locator('.lotrow:has-text("Limit price")').count()) === 1);
   await page.locator('.otype span[data-act="otype:MARKET"]').click(); await page.waitForTimeout(100);
