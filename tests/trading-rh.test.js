@@ -426,6 +426,8 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
     const tst = await page.evaluate(async () => { toast('Bought 0.10 EURUSD @ 1.11440'); await new Promise((r) => setTimeout(r, 80)); const t = document.querySelector('.toast'), h = document.querySelector('.det .foot .half'); if (!t || !h) return { err: 'missing' };
       const out = { toastBottom: Math.round(t.getBoundingClientRect().bottom), barTop: Math.round(h.getBoundingClientRect().top) }; window.__rh.toast = null; render(true); return out; });
     ok('주문 화면 토스트는 고정 버튼 줄 위에 뜸 (체결 토스트가 Sell·Buy 를 덮지 않음)', tst.toastBottom <= tst.barTop, JSON.stringify(tst));
+    const line = await page.evaluate(() => getComputedStyle(document.querySelector('.det .foot .half')).borderTopWidth);
+    ok('고정 버튼 줄 위 가는 선 없음 (2026-10-29 사장님 "가는 선은 제거해")', line === '0px', line);
     await page.evaluate((w) => { const S = window.__rh; if (S.sltp !== w) act('sltp'); render(true); scrollTo(0, 0); }, was);
     await page.setViewportSize(vp0); await page.waitForTimeout(200); }
   await page.locator('.otype span[data-act="otype:LIMIT"]').click(); await page.waitForTimeout(150);
