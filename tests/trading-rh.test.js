@@ -176,30 +176,27 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   ok('M6 홈: FX 그룹 10행 (금·은은 Metals 칩으로)', (await page.locator('.row').count()) === 10);
   { const tb = await page.locator('.tab[data-act="tab:trade"]').boundingBox(); const vh = await page.evaluate(() => innerHeight);
     ok('푸터 런타임: .tab 히트 영역 바닥 = 뷰포트 바닥 (' + Math.round(tb.y + tb.height) + '/' + vh + ') · 높이 ≥ 44px', tb && Math.abs((tb.y + tb.height) - vh) <= 1 && tb.height >= 44, JSON.stringify(tb)); }
-  // 2026-10-28 사장님 "스프레드가 미세한 차이로 짤려서 보여" → "점 대신 숫자 보이게" — 이름·스프레드 둘 다 글자 그대로(… 금지).
-  //   넘치는 줄만 글자를 줄여 한 줄(iOS fit-to-width, 최소 9.5px) · 그래도 안 되면 스프레드만 통째로 다음 줄.
-  // + iOS SF 흉내: 작은 크기일수록 글자 간격이 넓어짐(비례 축소 계산이 모자람 — 2026-10-28 사장님 아이폰 캡처: ~10.5px 로 줄였는데도 줄바꿈).
-  // 넓은 서체(DejaVu·Liberation — CI 러너 기본)로 고정해 로컬=CI 같은 조건. 같은 페이지에서 폭을 바꿔 가며(회전 등) 잰다 —
-  //   2026-10-28 CI 실측: 폭 변경 뒤 이미 줄인 글자로 재서 "맞음" 오판 → 12px 로 되돌아가 줄바꿈 (EURUSD·GBPUSD 등).
-  await page.addStyleTag({ content: ".row .sub, .row .sub *, .row .btn, .row .btn * { font-family: 'Liberation Sans', 'DejaVu Sans', sans-serif !important; } .row .sub { letter-spacing: calc((12px - 1em) * 0.3); } .row .btn { letter-spacing: calc((23px - 1em) * 0.08); }" }); await page.waitForTimeout(150);
-  for (const w of [360, 366, 372, 375, 380, 386, 393]) {   // 폭을 촘촘히 — '조금만 줄이면 되는' 폭에서 SF 자간 효과가 드러남
+  // 2026-10-29 사장님 지시: 홈 부제 = "이름 · 숫자" (pips/spread 단위 없음) · 한 줄 고정(nowrap·ellipsis) · 이름 칸 min-width:0.
+  //   375px 에서 전 행이 [심볼 1줄 + 부제 1줄] 로 같은 높이. 주문 화면 "Spread 0.9 pips" 는 그대로. … 로 끝나는 행은 실패가 아니라 보고.
+  await page.addStyleTag({ content: ".row .btn, .row .btn * { font-family: 'Liberation Sans', 'DejaVu Sans', sans-serif !important; letter-spacing: calc((23px - 1em) * 0.08); }" }); await page.waitForTimeout(150);
+  for (const w of [375, 360, 393]) {
     await page.setViewportSize({ width: w, height: 900 }); await page.waitForTimeout(250);
-    const r = await page.evaluate(() => { const out = { sprCut: [], nameDots: [], wrap: [], tiny: [] };
-      document.querySelectorAll('.row[data-sym] .sub').forEach(s => { const sym = s.closest('.row').dataset.sym, n = s.querySelector('.snm'), sp = s.querySelector('.spr');
-        if (!n || !sp) { out.sprCut.push(sym + ':missing'); return; }
-        const a = s.getBoundingClientRect(), b = sp.getBoundingClientRect();
-        if (b.right > a.right + 0.5 || sp.scrollWidth > sp.clientWidth + 0.5) out.sprCut.push(sym);
-        if (n.scrollWidth > n.clientWidth + 0.5) out.nameDots.push(sym);
-        if (Math.abs(b.top - n.getBoundingClientRect().top) > 1 && parseFloat(getComputedStyle(s).fontSize) > 9.5) out.wrap.push(sym + '@' + getComputedStyle(s).fontSize);
-        if (parseFloat(getComputedStyle(s).fontSize) < 9.5) out.tiny.push(sym); });
-      return out; });
-    ok('스프레드 안 잘림 (' + w + 'px): 홈 전 행 .spr 가 통째로', r.sprCut.length === 0, r.sprCut.join(','));
-    ok('이름 … 0 (' + w + 'px): FX 이름은 글자 그대로 (점으로 안 바뀜)', r.nameDots.length === 0, r.nameDots.join(','));
-    ok('글자 최소 9.5px (' + w + 'px): 줄인 줄도 읽을 수 있는 크기', r.tiny.length === 0, r.tiny.join(','));
-    // 한 줄 여부는 서체 폭에 달림(CI 서체가 iOS SF 보다 넓어 393 에서도 최소 크기에 닿음 — 2026-10-28 CI 실측) → 서체 무관 불변식만 핀:
-    //   줄이 넘어간 행은 반드시 글자를 최소(9.5px)까지 줄인 뒤에만 넘어간다 (안 줄이고 넘기거나 … 로 자르지 않음).
-    ok('줄바꿈은 최소 크기에서만 (' + w + 'px): 먼저 글자를 줄여 한 줄을 시도', r.wrap.length === 0, r.wrap.join(','));
+    const r = await page.evaluate(() => { const subs = [...document.querySelectorAll('.row[data-sym] .sub')]; const out = { n: subs.length, unit: [], multi: [], heights: new Set(), dots: [], css: '', nmMin: '' };
+      subs.forEach(s => { const sym = s.closest('.row').dataset.sym, t = s.textContent; if (/pips|spread/i.test(t)) out.unit.push(sym + ':' + t);
+        const lh = parseFloat(getComputedStyle(s).lineHeight) || parseFloat(getComputedStyle(s).fontSize) * 1.3; if (s.getBoundingClientRect().height > lh * 1.5) out.multi.push(sym);
+        out.heights.add(Math.round(s.closest('.nm').getBoundingClientRect().height)); if (s.scrollWidth > s.clientWidth + 0.5) out.dots.push(sym + ' "' + t + '"'); });
+      const cs = subs[0] ? getComputedStyle(subs[0]) : {}; out.css = [cs.whiteSpace, cs.overflow, cs.textOverflow].join('/'); out.nmMin = subs[0] ? getComputedStyle(subs[0].closest('.nm')).minWidth : '';
+      out.heights = [...out.heights]; return out; });
+    if (w === 375) {
+      ok('홈 부제 단위 없음 (pips·spread 0) — "이름 · 숫자"', r.n > 0 && r.unit.length === 0, r.unit.join(','));
+      ok('홈 부제 CSS: nowrap/hidden/ellipsis · 이름 칸 min-width 0', r.css === 'nowrap/hidden/ellipsis' && r.nmMin === '0px', r.css + ' ' + r.nmMin);
+    }
+    ok('부제 한 줄 · 전 행 같은 높이 (' + w + 'px)', r.multi.length === 0 && r.heights.length === 1, JSON.stringify({ multi: r.multi, heights: r.heights }));
+    console.log('     (' + w + 'px) … 로 끝나는 부제: ' + (r.dots.length ? r.dots.join(' · ') : '없음'));
   }
+  { const k = await page.evaluate(() => { const S = window.__rh, t0 = S.tab, s0 = S.sym; S.tab = 'trade'; S.sym = 'EURUSD'; render(true);
+      const row = [...document.querySelectorAll('.kv .r')].find(r => /Spread/.test(r.textContent)); const v = row ? row.querySelector('.v').textContent : null; S.tab = t0; S.sym = s0; render(true); return v; });
+    ok('주문 화면 "Spread" 는 단위 그대로 (… pips)', /pips$/.test(k || ''), String(k)); }
   // 2026-10-28 사장님 A안: 가격 OFF 23px · ON 22px. 칸보다 긴 종목(USDMXN 등)만 그 줄 가격을 줄여 맞춤 — 가격이 칸을 넘치면 🔴.
   { const r = await page.evaluate(async () => { const S = window.__rh, was = S.oneClick, out = {};
       for (const on of [false, true]) { S.oneClick = on; render(true); await new Promise(r => setTimeout(r, 120)); render(true); await new Promise(r => setTimeout(r, 120));

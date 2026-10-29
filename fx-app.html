@@ -146,11 +146,7 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .row .sym { font-size: 15px; font-weight: 700; letter-spacing: -0.2px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .row .sub { margin-top: 2px; font-size: 11px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .row .sub .spr { color: var(--mute); font-variant-numeric: tabular-nums; }
-  /* 2026-10-28 사장님 "스프레드가 미세한 차이로 짤려서 … 점 대신 숫자 보이게" — 이름·스프레드 둘 다 글자 그대로. 한 줄에 다 들어가면 한 줄,
-     안 들어가면 스프레드만 통째로 다음 줄로 (… 금지). 이름이 칸보다 길 때만 이름 끝에 … (스프레드 숫자는 절대 안 잘림) */
-  .row .sub { white-space: normal; overflow: visible; text-overflow: clip; }
-  .row .sub .snm, .row .sub .spr { display: inline-block; white-space: nowrap; vertical-align: top; }
-  .row .sub .snm { max-width: 100%; overflow: hidden; text-overflow: ellipsis; } .row .sub .snm::after { content: '·'; margin: 0 .33em; }   /* em — 글자 줄일 때 여백도 같은 비율로 (px 면 줄여도 모자라 줄바꿈 실측) */
+  /* 2026-10-29 사장님 지시: 홈 부제 = "이름 · 숫자"(단위 없음) 한 줄 고정 — 위 .row .sub 의 nowrap·ellipsis, .row .nm 의 min-width:0 그대로 사용 */
   .half { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .btn { border-radius: 12px; padding: 6px 0; text-align: right; font-family: 'Geist Mono', ui-monospace, monospace; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; }
   .btn big { font-size: 15px; font-weight: 800; }
@@ -789,6 +785,7 @@ function nameOf(sym){ var p=catOf(sym); return p?p.name:sym; }
 // price step for steppers / default SL·TP distance: FX = 1 pip; others = 10 ticks (stocks $0.10 · BTC $1 · 1-digit index 1.0)
 function tickOf(sym){ return clsOf(sym)==='FX'?fxPip(sym):Math.pow(10,-digitsOf(sym)); }
 function stepOf(sym){ return clsOf(sym)==='FX'?fxPip(sym):tickOf(sym)*10; }
+function spreadNum(sym){ return spreadLabel(sym).replace(/ (pips|spread)$/,''); }   // 홈 목록 부제 전용 (2026-10-29 사장님 "단위 뺀다")
 function spreadLabel(sym){ var m=midOf(sym); if(!m) return '—'; var c=clsOf(sym); if(c==='FX'&&!/^XA[UG]/.test(sym)) return spreadPips(sym).toFixed(1)+' pips'; return (2*halfOf(sym,m)).toFixed(digitsOf(sym))+' spread'; }
 function distLabel(sym, from, to){ var d=to-from; if(clsOf(sym)==='FX') return (d>=0?'+':'−')+Math.abs(d/fxPip(sym)).toFixed(0)+' pips'; return (d>=0?'+':'−')+Math.abs(d).toFixed(digitsOf(sym)); }
 function distUSD(sym, from, to, vol){ return Math.abs(pnlUSD(sym, from, to, 'BUY', vol)); }
@@ -839,32 +836,13 @@ function hero(){
     '<div class="stat"><div class="k">Margin</div><div class="v">'+fmtMoney(um)+'</div></div>'+
     '<div class="stat"><div class="k">Free margin</div><div class="v">'+fmtMoney(free)+'</div></div></div></div>';
 }
-// 2026-10-28 사장님 "점 대신 숫자 보이게" — iOS adjustsFontSizeToFitWidth 처럼: "이름 · 스프레드" 줄이 칸보다 길면 **그 줄만** 글자를 줄여
-//   한 줄에 통째로 (최소 9.5px). 폭은 렌더 뒤 화면에서 실측(서체 차이 없음) → 키별 캐시 → 바뀐 게 있을 때만 1회 재렌더.
-//   키의 숫자는 0 으로 접는다(스프레드 숫자 폭은 tabular 라 같음) — 틱마다 0.4→0.5 가 바뀌어도 재측정·깜빡임 없음.
-//   그래도 넘치면(최소 크기에서도) CSS 가 스프레드만 다음 줄로 — … 없음.
-var FIT={ w:0, base:12, memo:{}, pmemo:{}, pbase:{} };
-function fitKey(name, spr){ return name+'|'+String(spr).replace(/[0-9]/g,'0'); }
+// 가격 칸 글자 맞춤 (2026-10-28 A안) — 칸보다 긴 종목만 그 칸 글자를 줄인다. 홈 부제는 2026-10-29 부터 한 줄 고정(맞춤 없음).
+var FIT={ w:0, pmemo:{}, pbase:{} };
 function pxKey(sym, html){ return sym+'|'+(S.oneClick?1:0)+'|'+String(html).replace(/[0-9]/g,'0'); }
 function pxFit(sym, html){ var px=FIT.pmemo[pxKey(sym,html)]; return px?' style="font-size:'+px+'px"':''; }
-function subFit(name, spr){ var px=FIT.memo[fitKey(name,spr)]; return px?' style="font-size:'+px+'px"':''; }
-function fitMeasure(){ var subs=document.querySelectorAll('.row[data-sym] .sub'); if(!subs.length) return;
-  var w=subs[0].getBoundingClientRect().width; if(Math.abs(w-FIT.w)>0.5){ FIT.w=w; FIT.memo={}; FIT.pmemo={}; }   // 실폭(clientWidth 는 반올림)
+function fitMeasure(){ var nm=document.querySelector('.row[data-sym] .nm'); if(!nm) return;
+  var w=nm.getBoundingClientRect().width; if(Math.abs(w-FIT.w)>0.5){ FIT.w=w; FIT.pmemo={}; }   // 폭이 바뀌면(회전 등) 다시 잰다
   var changed=false;
-  for(var i=0;i<subs.length;i++){ var sub=subs[i], n=sub.querySelector('.snm'), sp=sub.querySelector('.spr'); if(!n||!sp) continue;
-    var cur=parseFloat(getComputedStyle(sub).fontSize)||12; if(!sub.style.fontSize) FIT.base=cur;      // CSS 기본 크기
-    var key=fitKey(n.textContent, sp.textContent), m=FIT.memo[key];
-    if(m!==undefined){
-      // 줄인 뒤 **실제로** 한 줄인지 다시 확인 — iOS SF 는 작은 크기일수록 자간이 넓어져 비례 계산이 모자란다
-      // (2026-10-28 사장님 아이폰: ~10.5px 로 줄였는데도 줄바꿈). 아직 넘치면 0.5px 씩 더 (최소 9.5px).
-      var wrapped=Math.abs(sp.getBoundingClientRect().top-n.getBoundingClientRect().top)>1;
-      var applied = m===0 ? !sub.style.fontSize : Math.abs((parseFloat(sub.style.fontSize)||0)-m)<0.05;
-      if(applied&&wrapped&&(m===0||m>9.5)){ FIT.memo[key]=Math.max(9.5, Math.round(((m||cur)-0.5)*10)/10); changed=true; }
-      continue; }
-    // 폭 변경(회전 등) 뒤엔 이미 줄인 글자로 재게 되므로 **기본 크기로 환산**해서 판단 — 안 그러면 "맞음"으로 오판해 12px 로 되돌아가 줄바꿈 (CI 실측 2026-10-28)
-    var need=(n.getBoundingClientRect().width+sp.getBoundingClientRect().width)*FIT.base/cur;
-    var px = need<=w-0.5 ? 0 : Math.max(9.5, Math.floor(FIT.base*(w-1)/need*10)/10);
-    FIT.memo[key]=px; if(px||sub.style.fontSize) changed=true; }
   // 가격 칸 (2026-10-28 A안): 글자 폭이 칸보다 넓으면 그 칸만 줄임 (최소 14px). 키 = 종목·모드·자릿수 모양 → 틱마다 재측정 없음.
   var mode=S.oneClick?1:0, btns=document.querySelectorAll('.row[data-sym] .btn');
   for(var j=0;j<btns.length;j++){ var bt=btns[j], sym=bt.closest('.row').getAttribute('data-sym');
@@ -879,8 +857,8 @@ function fitMeasure(){ var subs=document.querySelectorAll('.row[data-sym] .sub')
 window.addEventListener('resize', function(){ fitMeasure(); });
 function homeRows(){
   var list=instruments(S.homeSeg); if(!list.length) return '<div class="empty">No live feed for '+esc(S.homeSeg)+' right now</div>';
-  return list.map(function(p){ var fresh=isFresh(p.sym); var sprTxt=spreadLabel(p.sym), bTxt=fmtPx(bidOf(p.sym),p.sym,true), aTxt=fmtPx(askOf(p.sym),p.sym,true);
-    return '<div class="row" data-sym="'+p.sym+'"><div class="nm" data-act="open:'+p.sym+'"><div class="sym">'+p.sym+'</div><div class="sub"'+subFit(p.name,sprTxt)+'><span class="snm">'+esc(p.name)+'</span><span class="spr">'+sprTxt+'</span></div></div>'+
+  return list.map(function(p){ var fresh=isFresh(p.sym); var sprTxt=spreadNum(p.sym), bTxt=fmtPx(bidOf(p.sym),p.sym,true), aTxt=fmtPx(askOf(p.sym),p.sym,true);
+    return '<div class="row" data-sym="'+p.sym+'"><div class="nm" data-act="open:'+p.sym+'"><div class="sym">'+p.sym+'</div><div class="sub">'+esc(p.name)+' · <span class="spr">'+sprTxt+'</span></div></div>'+
       '<div class="half"><div class="btn sell'+tickCls(p.sym,'b')+(fresh?'':' stale')+'"'+pxFit(p.sym,bTxt)+' data-act="order:SELL:'+p.sym+'">'+bTxt+'</div><div class="btn buy'+tickCls(p.sym,'a')+(fresh?'':' stale')+'"'+pxFit(p.sym,aTxt)+' data-act="order:BUY:'+p.sym+'">'+aTxt+'</div></div></div>'; }).join('');
 }
 function screenHome(){
