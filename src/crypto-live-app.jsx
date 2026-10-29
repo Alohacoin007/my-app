@@ -10599,6 +10599,7 @@ function AccountMenuSheet({ onClose, onJumpSubpage }) {
 // Full-screen confirmation surface — colored hero panel + detail grid + Done CTA.
 // Used after Buy, Sell, Unstake, Redeem so every action ends in the same
 // premium surface.
+// 2026-10-29 사장님 "기존 디자인에서 크기 바꿔줘" (시안 승인): 값 14.5→22 · 항목 12→15 · 수량 13→17 · 설명 11.5→14 · Done 14→17 · 제목 42 유지
 function HeroConfirm({ heroColor, label, sublabel, rows = [], footnote, onDone, doneLabel = 'Done' }) {
   const hero = heroColor || RH.accent;
   return (
@@ -10638,7 +10639,7 @@ function HeroConfirm({ heroColor, label, sublabel, rows = [], footnote, onDone, 
           {sublabel ? (
             <div style={{
               position: 'relative', zIndex: 1,
-              marginTop: 14, fontSize: 13, color: 'rgba(255,255,255,0.68)',
+              marginTop: 14, fontSize: 17, color: 'rgba(255,255,255,0.68)',
               fontFamily: FONT_UI, letterSpacing: 0.3,
               fontVariantNumeric: 'tabular-nums',
             }}>{sublabel}</div>
@@ -10652,16 +10653,16 @@ function HeroConfirm({ heroColor, label, sublabel, rows = [], footnote, onDone, 
         }}>
           {rows.length > 0 ? (
             <div style={{
-              display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '22px 24px',
+              display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '26px 24px',
             }}>
               {rows.map((r, i) => (
                 <div key={i}>
                   <div style={{
-                    fontSize: 12, color: RH.textDim,
+                    fontSize: 15, color: RH.textDim,
                     fontFamily: FONT_UI, letterSpacing: 0.3,
                   }}>{r.label}</div>
                   <div style={{
-                    marginTop: 4, fontSize: 14.5, color: RH.text,
+                    marginTop: 4, fontSize: 22, color: RH.text,
                     fontVariantNumeric: 'tabular-nums', letterSpacing: -0.2,
                     fontWeight: 500, wordBreak: 'break-word',
                   }}>{r.value}</div>
@@ -10672,7 +10673,7 @@ function HeroConfirm({ heroColor, label, sublabel, rows = [], footnote, onDone, 
 
           {footnote ? (
             <div style={{
-              marginTop: 28, fontSize: 11.5, color: RH.textDim,
+              marginTop: 28, fontSize: 14, color: RH.textDim,
               textAlign: 'center', lineHeight: 1.7, padding: '0 6px',
             }}>{footnote}</div>
           ) : null}
@@ -10682,7 +10683,7 @@ function HeroConfirm({ heroColor, label, sublabel, rows = [], footnote, onDone, 
           <button onClick={onDone} style={{
             width: '100%', padding: '15px 0', borderRadius: 999,
             background: RH.text, color: RH.bg, border: 'none',
-            fontSize: 14, fontWeight: 700, letterSpacing: 0.2, cursor: 'pointer',
+            fontSize: 17, fontWeight: 700, letterSpacing: 0.2, cursor: 'pointer',
           }}>{doneLabel}</button>
         </div>
       </div>

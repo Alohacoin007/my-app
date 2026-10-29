@@ -19145,6 +19145,7 @@ function AccountMenuSheet({
 // Full-screen confirmation surface — colored hero panel + detail grid + Done CTA.
 // Used after Buy, Sell, Unstake, Redeem so every action ends in the same
 // premium surface.
+// 2026-10-29 사장님 "기존 디자인에서 크기 바꿔줘" (시안 승인): 값 14.5→22 · 항목 12→15 · 수량 13→17 · 설명 11.5→14 · Done 14→17 · 제목 42 유지
 function HeroConfirm({
   heroColor,
   label,
@@ -19230,7 +19231,7 @@ function HeroConfirm({
       position: 'relative',
       zIndex: 1,
       marginTop: 14,
-      fontSize: 13,
+      fontSize: 17,
       color: 'rgba(255,255,255,0.68)',
       fontFamily: FONT_UI,
       letterSpacing: 0.3,
@@ -19249,13 +19250,13 @@ function HeroConfirm({
     style: {
       display: 'grid',
       gridTemplateColumns: '1fr 1fr',
-      gap: '22px 24px'
+      gap: '26px 24px'
     }
   }, rows.map((r, i) => /*#__PURE__*/React.createElement("div", {
     key: i
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 12,
+      fontSize: 15,
       color: RH.textDim,
       fontFamily: FONT_UI,
       letterSpacing: 0.3
@@ -19263,7 +19264,7 @@ function HeroConfirm({
   }, r.label), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 4,
-      fontSize: 14.5,
+      fontSize: 22,
       color: RH.text,
       fontVariantNumeric: 'tabular-nums',
       letterSpacing: -0.2,
@@ -19273,7 +19274,7 @@ function HeroConfirm({
   }, r.value)))) : null, footnote ? /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 28,
-      fontSize: 11.5,
+      fontSize: 14,
       color: RH.textDim,
       textAlign: 'center',
       lineHeight: 1.7,
@@ -19293,7 +19294,7 @@ function HeroConfirm({
       background: RH.text,
       color: RH.bg,
       border: 'none',
-      fontSize: 14,
+      fontSize: 17,
       fontWeight: 700,
       letterSpacing: 0.2,
       cursor: 'pointer'
