@@ -1013,7 +1013,7 @@ const ROW_GRID = '26px 1fr 52px 96px';
 const ASSET_GRID = '26px minmax(0, 1fr) auto';
 
 // 2026-10-29 사장님 시안 승인 "진행해" — 보유 행 글자 키움: 종목 13.5→16 · 수량줄 11→13 · 금액 14→17 · 변동률 11→15 · 행 위아래 여백 10→12
-function AssetRow({ a, kind, liveValue, onTap }) {
+function AssetRow({ a, kind, liveValue, onTap, masked = false }) {
   const baseValue = a.mine;
   // Live value moves with the market tick; stablecoins stay flat.
   const v         = a.stable ? baseValue : (liveValue != null ? liveValue : baseValue);
@@ -1025,7 +1025,7 @@ function AssetRow({ a, kind, liveValue, onTap }) {
   const fullName = isSecurity
     ? a.name
     : (typeof COIN_NAMES !== 'undefined' && COIN_NAMES[a.sym]) || a.name || a.sym;
-  const subline = (() => {
+  const subline = masked ? `${fullName} · •••• held` : (() => {
     if (isSecurity) {
       const q = (typeof a.qty === 'number' && isFinite(a.qty))
         ? a.qty.toLocaleString('en-US', { maximumFractionDigits: a.qty < 1 ? 4 : 2 })
@@ -1080,7 +1080,7 @@ function AssetRow({ a, kind, liveValue, onTap }) {
           </div>
         ) : null}
         <div style={{ fontSize: 17, fontWeight: 500, color: RH.text, display: 'flex', justifyContent: 'flex-end', lineHeight: 1.2 }}>
-          <Odometer value={v} fontSize={17} color={RH.text}/>
+          {masked ? <span data-masked="row" style={{ color: RH.textDim, letterSpacing: 1 }}>$••••••</span> : <Odometer value={v} fontSize={17} color={RH.text}/>}
         </div>
         <div style={{ fontSize: 15, color: a.isStakedRow ? RH.green : color, marginTop: 2, fontWeight: 700, letterSpacing: 0.1 }}>
           {a.isStakedRow ? `${(+a.apy || 0).toFixed(0)}% APY` : fmtPct(livePct)}
@@ -1528,6 +1528,8 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
   const [range, setRange]       = React.useState('1D');
   const [scrubIdx, setScrubIdx] = React.useState(null);
   const [server, setServer]     = React.useState('crypto');     // 'crypto' | 'fx' | 'sports'
+  // 2026-10-29 사장님 "My wallet 옆 눈 — 클릭하면 내 계좌가 안 보이게". UI 설정만 저장(돈 아님 — CLAUDE.md #5 허용). FX 앱 rh.mask 와 같은 방식.
+  const [masked, setMasked]     = usePersistedState('alpexa.hideBalance', false);
   // REAL portfolio history (portfolio_snapshots via get_portfolio_history). null = still
   // loading → fall back to the live-derived series; [] = loaded-but-empty (no history yet).
   const [histPts, setHistPts] = React.useState(null);
@@ -1869,13 +1871,36 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
           fontSize: 15, fontWeight: 400, color: RH.textDim,
           textTransform: 'none', lineHeight: 1.2,
           fontFamily: FONT_UI, marginBottom: 2,
-        }}>My wallet</div>
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <span>My wallet</span>
+          <button onClick={() => setMasked((m) => !m)} aria-label={masked ? 'Show balance' : 'Hide balance'} data-eye="wallet" style={{
+            width: 30, height: 30, borderRadius: 15, border: 'none', padding: 0, cursor: 'pointer',
+            background: RH.surface, color: RH.textDim, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            position: 'relative',
+          }}>
+            {/* 누르는 영역 44px (아이콘 30px + 사방 7px) */}
+            <span style={{ position: 'absolute', inset: -7 }}/>
+            {masked ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3l18 18"/><path d="M10.6 10.6a3 3 0 0 0 4.2 4.2"/><path d="M9.9 5.2A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1"/><path d="M6.6 6.6C3.6 8.6 2 12 2 12s3.5 7 10 7c1.4 0 2.7-.3 3.8-.7"/></svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+            )}
+          </button>
+        </div>
+        {masked ? (
+          <div data-masked="hero" style={{ fontSize: 56, fontWeight: 200, letterSpacing: -6, lineHeight: 1.05, color: RH.textDim }}>$ ••••••</div>
+        ) : (
         <div style={{
           fontSize: 56, fontWeight: 200, letterSpacing: -2,
           lineHeight: 1.05,
         }}>
           <Odometer value={scrubValue} fontSize={56} color={RH.text} centsColor={RH.textMute}/>
         </div>
+        )}
+        {masked ? (
+          <div style={{ marginTop: 4, fontSize: 15, color: RH.textDim }}>Balance hidden</div>
+        ) : (
         <div style={{
           marginTop: 4, display: 'flex', alignItems: 'center', gap: 6,
           fontSize: 15, fontWeight: 400,
@@ -1890,6 +1915,7 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
           </span>
           <span style={{ color: RH.textDim }}>{footerLabel}</span>
         </div>
+        )}
       </div>
 
       {/* Scroll body — chart + holdings scroll under the pinned balance card */}
@@ -1986,14 +2012,14 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
         {/* Crypto */}
         <SectionHeader title="Crypto" count={`${liveAssets.length} holdings`} live/>
         {liveAssets.map((a, i) => (
-          <AssetRow key={a.sym} a={a} kind="crypto" liveValue={cryptoLive[i]} pulse={pulseAsset === a.sym} onTap={() => onTapAsset && onTapAsset('crypto', a.sym)}/>
+          <AssetRow key={a.sym} a={a} kind="crypto" liveValue={cryptoLive[i]} pulse={pulseAsset === a.sym} masked={masked} onTap={() => onTapAsset && onTapAsset('crypto', a.sym)}/>
         ))}
 
 
         {/* Securities */}
         <SectionHeader title="Securities" count={`${liveSecurities.length} holdings`} live/>
         {liveSecurities.map((s, i) => (
-          <AssetRow key={s.sym} a={s} kind="security" liveValue={securityLive[i]} onTap={() => onTapAsset && onTapAsset('security', s.sym)}/>
+          <AssetRow key={s.sym} a={s} kind="security" liveValue={securityLive[i]} masked={masked} onTap={() => onTapAsset && onTapAsset('security', s.sym)}/>
         ))}
 
         {/* Staked — only assets currently locked up. Lock icon + period chip per row. */}
@@ -2030,6 +2056,7 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
                   kind="security"
                   liveValue={usd}
                   pulse={pulseAsset === asset}
+                  masked={masked}
                   onTap={() => onTapAsset && onTapAsset('staked', key)}
                 />
               );

@@ -2101,7 +2101,8 @@ function AssetRow({
   a,
   kind,
   liveValue,
-  onTap
+  onTap,
+  masked = false
 }) {
   const baseValue = a.mine;
   // Live value moves with the market tick; stablecoins stay flat.
@@ -2112,7 +2113,7 @@ function AssetRow({
   const color = isUp ? RH.green : RH.red;
   const isSecurity = kind === 'security';
   const fullName = isSecurity ? a.name : typeof COIN_NAMES !== 'undefined' && COIN_NAMES[a.sym] || a.name || a.sym;
-  const subline = (() => {
+  const subline = masked ? `${fullName} · •••• held` : (() => {
     if (isSecurity) {
       const q = typeof a.qty === 'number' && isFinite(a.qty) ? a.qty.toLocaleString('en-US', {
         maximumFractionDigits: a.qty < 1 ? 4 : 2
@@ -2221,7 +2222,13 @@ function AssetRow({
       justifyContent: 'flex-end',
       lineHeight: 1.2
     }
-  }, /*#__PURE__*/React.createElement(Odometer, {
+  }, masked ? /*#__PURE__*/React.createElement("span", {
+    "data-masked": "row",
+    style: {
+      color: RH.textDim,
+      letterSpacing: 1
+    }
+  }, "$\u2022\u2022\u2022\u2022\u2022\u2022") : /*#__PURE__*/React.createElement(Odometer, {
     value: v,
     fontSize: 17,
     color: RH.text
@@ -3320,6 +3327,8 @@ function Dashboard({
   const [range, setRange] = React.useState('1D');
   const [scrubIdx, setScrubIdx] = React.useState(null);
   const [server, setServer] = React.useState('crypto'); // 'crypto' | 'fx' | 'sports'
+  // 2026-10-29 사장님 "My wallet 옆 눈 — 클릭하면 내 계좌가 안 보이게". UI 설정만 저장(돈 아님 — CLAUDE.md #5 허용). FX 앱 rh.mask 와 같은 방식.
+  const [masked, setMasked] = usePersistedState('alpexa.hideBalance', false);
   // REAL portfolio history (portfolio_snapshots via get_portfolio_history). null = still
   // loading → fall back to the live-derived series; [] = loaded-but-empty (no history yet).
   const [histPts, setHistPts] = React.useState(null);
@@ -3821,9 +3830,76 @@ function Dashboard({
       textTransform: 'none',
       lineHeight: 1.2,
       fontFamily: FONT_UI,
-      marginBottom: 2
+      marginBottom: 2,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10
     }
-  }, "My wallet"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", null, "My wallet"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setMasked(m => !m),
+    "aria-label": masked ? 'Show balance' : 'Hide balance',
+    "data-eye": "wallet",
+    style: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      border: 'none',
+      padding: 0,
+      cursor: 'pointer',
+      background: RH.surface,
+      color: RH.textDim,
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      position: 'absolute',
+      inset: -7
+    }
+  }), masked ? /*#__PURE__*/React.createElement("svg", {
+    width: "18",
+    height: "18",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "1.8",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M3 3l18 18"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M10.6 10.6a3 3 0 0 0 4.2 4.2"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M9.9 5.2A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M6.6 6.6C3.6 8.6 2 12 2 12s3.5 7 10 7c1.4 0 2.7-.3 3.8-.7"
+  })) : /*#__PURE__*/React.createElement("svg", {
+    width: "18",
+    height: "18",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "1.8",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "12",
+    cy: "12",
+    r: "3"
+  })))), masked ? /*#__PURE__*/React.createElement("div", {
+    "data-masked": "hero",
+    style: {
+      fontSize: 56,
+      fontWeight: 200,
+      letterSpacing: -6,
+      lineHeight: 1.05,
+      color: RH.textDim
+    }
+  }, "$ \u2022\u2022\u2022\u2022\u2022\u2022") : /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 56,
       fontWeight: 200,
@@ -3835,7 +3911,13 @@ function Dashboard({
     fontSize: 56,
     color: RH.text,
     centsColor: RH.textMute
-  })), /*#__PURE__*/React.createElement("div", {
+  })), masked ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 4,
+      fontSize: 15,
+      color: RH.textDim
+    }
+  }, "Balance hidden") : /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 4,
       display: 'flex',
@@ -4020,6 +4102,7 @@ function Dashboard({
     kind: "crypto",
     liveValue: cryptoLive[i],
     pulse: pulseAsset === a.sym,
+    masked: masked,
     onTap: () => onTapAsset && onTapAsset('crypto', a.sym)
   })), /*#__PURE__*/React.createElement(SectionHeader, {
     title: "Securities",
@@ -4030,6 +4113,7 @@ function Dashboard({
     a: s,
     kind: "security",
     liveValue: securityLive[i],
+    masked: masked,
     onTap: () => onTapAsset && onTapAsset('security', s.sym)
   })), Object.keys(staked).filter(k => (staked[k] && staked[k].usd) > 0).length > 0 ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SectionHeader, {
     title: /*#__PURE__*/React.createElement("span", {
@@ -4089,6 +4173,7 @@ function Dashboard({
       kind: "security",
       liveValue: usd,
       pulse: pulseAsset === asset,
+      masked: masked,
       onTap: () => onTapAsset && onTapAsset('staked', key)
     });
   })) : null, /*#__PURE__*/React.createElement("div", {
