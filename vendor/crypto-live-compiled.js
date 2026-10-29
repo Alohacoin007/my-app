@@ -2918,9 +2918,10 @@ function ActionRow({
 // dropdown / Accounts / withdraw / transfer reflect money the user can actually move.
 // Falls back to the raw balance if equity hasn't been published (e.g. fresh device).
 function fxEquityUsd() {
+  // #5: server FX equity (cash + open P/L) lives in MEMORY only (window.__srvBal.fxEquity, set by pullBalances) — never localStorage (stale · cross-account leak).
   try {
-    var v = parseFloat(localStorage.getItem('alpexa.fxEquity'));
-    return isFinite(v) ? v : null;
+    var v = window.__srvBal && +window.__srvBal.fxEquity;
+    return isFinite(v) && window.__srvBal.fxEquity != null ? v : null;
   } catch (e) {
     return null;
   }
@@ -18238,51 +18239,45 @@ function Account({
   const [subSub, setSubSub] = React.useState(null);
   const [alertsOpen, setAlertsOpen] = React.useState(false);
 
-  // SINGLE live ticker: drive ONE shared value (window.__cryptoLiveUsd) and fire the
-  // event so BOTH the Accounts row and the server-switcher dropdown read the exact same
-  // number (no independent drift → they always match). FX/Sports are cash pools (static).
+  // 2026-10-29 사장님 "계좌 발란스가 실시간으로 … 안 맞는 거 같아" — REAL values only:
+  // Crypto = holdings (server qty × live price, re-adopted every 8s) + staked — the same value
+  // the home hero shows. No simulated wobble (the old ±0.018% sine made total ≠ rows by ~$924).
   const [, _balTick] = React.useState(0);
-  // Anchor to the LIVE crypto wallet total (holdings + staked) — the same value the home
-  // hero and the server-switcher prop use — so the Accounts row matches the wallet.
-  // (serverBalances.crypto gets overwritten by pullBalances with the server account
-  // balance, which can differ from the live holdings → the mismatch the user saw.)
   const _cryptoAnchor = Object.values(balances).reduce((a, v) => a + (+v || 0), 0) + Object.values(staked).reduce((a, s) => a + (s && s.usd || 0), 0);
   React.useEffect(() => {
-    const iv = setInterval(() => {
-      if (_cryptoAnchor > 0) {
-        window.__cryptoLiveUsd = _cryptoAnchor * (1 + 0.00018 * Math.sin(Date.now() / 640));
-        try {
-          window.dispatchEvent(new Event('alpexa-crypto-live'));
-        } catch (e) {}
-      }
-      _balTick(x => x + 1);
-    }, 700);
-    return () => clearInterval(iv);
+    // Publish the same real value so the server switcher matches this row.
+    window.__cryptoLiveUsd = _cryptoAnchor;
+    try {
+      window.dispatchEvent(new Event('alpexa-crypto-live'));
+    } catch (e) {}
   }, [_cryptoAnchor]);
+  React.useEffect(() => {
+    // While Account is open: pull FX / Sports from the server every 3s (page-level poll is 10s)
+    // and re-render on every server balance change.
+    const bump = () => _balTick(x => x + 1);
+    const pull = () => {
+      if (!document.hidden && window.__alpexaSyncBalances) window.__alpexaSyncBalances();
+    };
+    pull();
+    const iv = setInterval(pull, 3000);
+    window.addEventListener('alpexa-balance-change', bump);
+    return () => {
+      clearInterval(iv);
+      window.removeEventListener('alpexa-balance-change', bump);
+    };
+  }, []);
   // #20 SINGLE SOURCE: cross-app (FX / Sports) balances come from window.__srvBal — the SAME
   // source the server switcher reads (~1561) — overlaid on the prop. Reading the bare
   // serverBalances prop here let the breakdown/total drift from the switcher (Sport $0 vs
   // $254). __srvBal wins; the prop is only a fallback before the first pull populates it.
   const _xsb = Object.assign({}, serverBalances, typeof window !== 'undefined' && window.__srvBal || {});
   const effBalances = {
-    crypto: typeof window.__cryptoLiveUsd === 'number' && window.__cryptoLiveUsd > 0 ? window.__cryptoLiveUsd : _cryptoAnchor,
+    crypto: _cryptoAnchor,
     fx: effBal('fx', _xsb.fx || 0),
     sports: _xsb.sports || 0
   };
-  // Portfolio total — sums Crypto wallet (balances + staked) + non-crypto
-  // server pools (FX + Sports). Shows the full multi-account picture.
-  const baseTotal = React.useMemo(() => {
-    let t = 0;
-    Object.values(balances).forEach(v => {
-      t += v || 0;
-    });
-    Object.values(staked).forEach(s => {
-      if (s && s.usd) t += s.usd;
-    });
-    t += effBal('fx', _xsb.fx || 0);
-    t += _xsb.sports || 0;
-    return t;
-  }, [balances, staked, serverBalances]);
+  // Portfolio total = EXACTLY the three rows shown (one computation → total can't drift from rows).
+  const baseTotal = effBalances.crypto + effBalances.fx + effBalances.sports;
   // TRUTHFUL total — no fabricated history. A multi-account total's value-over-time isn't
   // stored, so we draw a FLAT line at the CURRENT total instead of a synthetic random walk
   // ("chart has to have data" → fake movement on a money screen, #5) or a fabricated opening
@@ -23767,6 +23762,7 @@ function App() {
               if (b.fx != null) o.fx = b.fx;
               if (b.sports != null) o.sports = b.sports;
               if (b.crypto != null) o.crypto = b.crypto;
+              if (b.fxEquity != null) o.fxEquity = b.fxEquity;
               window.__srvBal = o;
             } catch (e) {}
           });

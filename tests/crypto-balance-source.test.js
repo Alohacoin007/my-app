@@ -13,9 +13,11 @@ const fs = require('fs');
 const path = require('path');
 const src = (fs.readFileSync(path.join(__dirname, '..', 'crypto-live.html'), 'utf8') + fs.readFileSync(path.join(__dirname, '..', 'src/crypto-live-app.jsx'), 'utf8'));
 
-// Locate the Account-page balance region: effBalances {...} through baseTotal's memo end.
+// Locate the Account-page balance region: effBalances {...} through the baseTotal line.
+// (2026-10-29: baseTotal is no longer a useMemo — it is exactly the sum of the three rows.)
 const i = src.indexOf('const effBalances');
-const j = src.indexOf('}, [balances, staked, serverBalances]);', i);
+const k = src.indexOf('const baseTotal = effBalances.crypto + effBalances.fx + effBalances.sports;', i);
+const j = k < 0 ? -1 : src.indexOf('\n', k);
 if (i < 0 || j < 0) { console.error('🔴 FAIL: could not locate the Account effBalances/baseTotal region'); process.exit(1); }
 const region = src.slice(i, j);
 

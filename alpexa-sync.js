@@ -216,6 +216,8 @@ window.AlpexaSync = (function () {
   // Server-authoritative balances: fetch THIS user's current per-server balances
   // straight from the accounts table. Apps poll this (on load / focus / timer) so
   // every device converges to the server's value — no logout/login needed.
+  // #5 cleanup: older builds cached FX equity in localStorage — drop it so no stale/other-account value lingers.
+  try { localStorage.removeItem('alpexa.fxEquity'); } catch (e) {}
   function pullBalances() {
     if (!db) return Promise.resolve(null);
     var m = me(); var a = m.accts || {};
@@ -230,14 +232,13 @@ window.AlpexaSync = (function () {
         // FX equity (server-side) = cash balance + Σ floating P/L of OPEN fx positions.
         // The FX app writes each open position's live pnl to `positions` every ~3s, so
         // this reflects unrealised P/L without re-doing the lot/FX math here. We publish
-        // it to localStorage('alpexa.fxEquity') so the Crypto app shows equity (not raw
-        // cash) for FX in the dropdown / Accounts / withdraw / transfer — cross-device.
+        // it as out.fxEquity; callers keep it in MEMORY (window.__srvBal.fxEquity) so the Crypto
+        // app shows equity (not raw cash) for FX — never localStorage (#5: stale · cross-account leak).
         if (!fxAcct || out.fx == null) return out;
         return db.from('positions').select('pnl').eq('acct_no', fxAcct).eq('server', 'fx').eq('status', 'open')
           .then(function (pr) {
             var sum = 0; if (pr && pr.data) pr.data.forEach(function (p) { sum += (+p.pnl || 0); });
             out.fxEquity = (+out.fx || 0) + sum;
-            try { localStorage.setItem('alpexa.fxEquity', String(out.fxEquity)); } catch (e) {}
             return out;
           }, function () { return out; });
       }, function () { return null; });

@@ -2691,11 +2691,9 @@ function AppHeader({accent,account,onAccountClick,livePnl=0,prevPnl=0,usedMargin
   const cur=window.getCurrency?window.getCurrency(prefs.currency||'USD'):{code:'USD',symbol:'$',rate:1};
   const equityUsd=balanceNum+livePnl;
   const freeUsd=balanceNum+livePnl-usedMargin;
-  // Publish FX equity + free margin so the Crypto app (server dropdown / Accounts /
-  // withdraw / transfer) can show EQUITY instead of raw balance — otherwise a user
-  // with floating losses could withdraw/transfer money that isn't really there.
+  // Publish free margin for fxAvail(). FX equity is NOT cached in localStorage any more (#5):
+  // the Crypto app gets it from the server (pullBalances: cash + Σ open positions.pnl), in memory.
   useEffect(()=>{ try{ if(a.id==='live'){
-    localStorage.setItem('alpexa.fxEquity', String(equityUsd));
     localStorage.setItem('alpexa.fxFree', String(Math.max(0,freeUsd)));
   } }catch(e){} },[equityUsd,freeUsd,a.id]);
   const equity=equityUsd*cur.rate;
