@@ -178,10 +178,11 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
     ok('푸터 런타임: .tab 히트 영역 바닥 = 뷰포트 바닥 (' + Math.round(tb.y + tb.height) + '/' + vh + ') · 높이 ≥ 44px', tb && Math.abs((tb.y + tb.height) - vh) <= 1 && tb.height >= 44, JSON.stringify(tb)); }
   // 2026-10-28 사장님 "스프레드가 미세한 차이로 짤려서 보여" → "점 대신 숫자 보이게" — 이름·스프레드 둘 다 글자 그대로(… 금지).
   //   넘치는 줄만 글자를 줄여 한 줄(iOS fit-to-width, 최소 9.5px) · 그래도 안 되면 스프레드만 통째로 다음 줄.
+  // + iOS SF 흉내: 작은 크기일수록 글자 간격이 넓어짐(비례 축소 계산이 모자람 — 2026-10-28 사장님 아이폰 캡처: ~10.5px 로 줄였는데도 줄바꿈).
   // 넓은 서체(DejaVu·Liberation — CI 러너 기본)로 고정해 로컬=CI 같은 조건. 같은 페이지에서 폭을 바꿔 가며(회전 등) 잰다 —
   //   2026-10-28 CI 실측: 폭 변경 뒤 이미 줄인 글자로 재서 "맞음" 오판 → 12px 로 되돌아가 줄바꿈 (EURUSD·GBPUSD 등).
-  await page.addStyleTag({ content: ".row .sub, .row .sub *, .row .btn, .row .btn * { font-family: 'DejaVu Sans', 'Liberation Sans', sans-serif !important; }" }); await page.waitForTimeout(150);
-  for (const w of [360, 375, 393]) {
+  await page.addStyleTag({ content: ".row .sub, .row .sub *, .row .btn, .row .btn * { font-family: 'Liberation Sans', 'DejaVu Sans', sans-serif !important; } .row .sub { letter-spacing: calc((12px - 1em) * 0.3); } .row .btn { letter-spacing: calc((23px - 1em) * 0.08); }" }); await page.waitForTimeout(150);
+  for (const w of [360, 366, 372, 375, 380, 386, 393]) {   // 폭을 촘촘히 — '조금만 줄이면 되는' 폭에서 SF 자간 효과가 드러남
     await page.setViewportSize({ width: w, height: 900 }); await page.waitForTimeout(250);
     const r = await page.evaluate(() => { const out = { sprCut: [], nameDots: [], wrap: [], tiny: [] };
       document.querySelectorAll('.row[data-sym] .sub').forEach(s => { const sym = s.closest('.row').dataset.sym, n = s.querySelector('.snm'), sp = s.querySelector('.spr');
