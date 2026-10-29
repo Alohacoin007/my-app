@@ -180,7 +180,7 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   //   넘치는 줄만 글자를 줄여 한 줄(iOS fit-to-width, 최소 9.5px) · 그래도 안 되면 스프레드만 통째로 다음 줄.
   // 넓은 서체(DejaVu·Liberation — CI 러너 기본)로 고정해 로컬=CI 같은 조건. 같은 페이지에서 폭을 바꿔 가며(회전 등) 잰다 —
   //   2026-10-28 CI 실측: 폭 변경 뒤 이미 줄인 글자로 재서 "맞음" 오판 → 12px 로 되돌아가 줄바꿈 (EURUSD·GBPUSD 등).
-  await page.addStyleTag({ content: ".row .sub, .row .sub * { font-family: 'DejaVu Sans', 'Liberation Sans', sans-serif !important; }" }); await page.waitForTimeout(150);
+  await page.addStyleTag({ content: ".row .sub, .row .sub *, .row .btn, .row .btn * { font-family: 'DejaVu Sans', 'Liberation Sans', sans-serif !important; }" }); await page.waitForTimeout(150);
   for (const w of [360, 375, 393]) {
     await page.setViewportSize({ width: w, height: 900 }); await page.waitForTimeout(250);
     const r = await page.evaluate(() => { const out = { sprCut: [], nameDots: [], wrap: [], tiny: [] };
@@ -199,6 +199,21 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
     //   줄이 넘어간 행은 반드시 글자를 최소(9.5px)까지 줄인 뒤에만 넘어간다 (안 줄이고 넘기거나 … 로 자르지 않음).
     ok('줄바꿈은 최소 크기에서만 (' + w + 'px): 먼저 글자를 줄여 한 줄을 시도', r.wrap.length === 0, r.wrap.join(','));
   }
+  // 2026-10-28 사장님 A안: 가격 OFF 23px · ON 22px. 칸보다 긴 종목(USDMXN 등)만 그 줄 가격을 줄여 맞춤 — 가격이 칸을 넘치면 🔴.
+  { const r = await page.evaluate(async () => { const S = window.__rh, was = S.oneClick, out = {};
+      for (const on of [false, true]) { S.oneClick = on; render(true); await new Promise(r => setTimeout(r, 120)); render(true); await new Promise(r => setTimeout(r, 120));
+        const btns = [...document.querySelectorAll('.row[data-sym] .btn')]; const over = []; let eur = 0;
+        btns.forEach(b => { const rg = document.createRange(); rg.selectNodeContents(b); const tw = rg.getBoundingClientRect().width, cw = b.clientWidth; if (tw > cw + 0.5) over.push(b.closest('.row').dataset.sym + ':' + Math.round(tw - cw)); if (b.closest('.row').dataset.sym === 'EURUSD') eur = parseFloat(getComputedStyle(b).fontSize); });
+        out[on ? 'on' : 'off'] = { n: btns.length, over, eur }; }
+      S.oneClick = was; render(true); return out; });
+    ok('가격 크기 A안: OFF EURUSD 23px · ON 22px', r.off.eur === 23 && r.on.eur === 22, JSON.stringify(r));
+    ok('가격이 칸을 안 넘침 (OFF·ON, 375px · 넓은 서체) — 긴 종목은 그 줄만 줄여 맞춤', r.off.n > 0 && r.off.over.length === 0 && r.on.over.length === 0, JSON.stringify(r));
+    // 줄이기 경로를 실제로 태움: 기본 크기를 34px 로 강제 → 전 행이 넘침 → fit 이 각 칸을 줄여 0 넘침이어야 (줄인 글자 ≥ 14px)
+    const st = await page.evaluate(async () => { const S = window.__rh, was = S.oneClick; S.oneClick = false; const tag = document.createElement('style'); tag.textContent = '#app.app:not(.oc-on) .row .btn { font-size: 34px; }';   /* !important 면 줄인 인라인 크기까지 눌러 버려 검사가 무의미 */ document.head.appendChild(tag);
+      render(true); for (let k = 0; k < 4; k++) { await new Promise(r => setTimeout(r, 120)); render(true); }
+      const res = [...document.querySelectorAll('.row[data-sym] .btn')].map(b => { const rg = document.createRange(); rg.selectNodeContents(b); return { over: rg.getBoundingClientRect().width - b.clientWidth, inl: b.style.fontSize }; });
+      tag.remove(); S.oneClick = was; render(true); return { n: res.length, over: res.filter(x => x.over > 0.5).length, shrunk: res.filter(x => x.inl).length, minPx: Math.min(...res.filter(x => x.inl).map(x => parseFloat(x.inl))) }; });
+    ok('줄이기 경로: 기본 34px 강제 → 넘치는 칸 0 · 줄인 칸 > 0 · 최소 14px 이상', st.n > 0 && st.over === 0 && st.shrunk > 0 && st.minPx >= 14, JSON.stringify(st)); }
   await page.setViewportSize({ width: 430, height: 900 }); await page.waitForTimeout(150);
   // 월드클락 스킨 (2026-10-25 사장님 "버튼 클릭이 잘 안되는 버그 만들지 말고"): 떠 있는 알약·선택 캡슐은 ::before 그림 — 실제 손가락 지점이 탭을 맞는지 히트테스트.
   //   각 탭의 아이콘·글자·좌우 끝·바닥 1px 위, 그리고 홈 SELL/BUY 칸 한가운데 → elementFromPoint 가 그 요소(또는 자식)여야 한다.
@@ -249,7 +264,7 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   { const boxes = await page.locator('.stat').evaluateAll(els => els.map(e => e.getBoundingClientRect())); const host = await page.locator('.stats').boundingBox();
     ok('홈 3칸 카드가 가로 전체를 균등 분할 (첫 칸 왼쪽 = 컨테이너 왼쪽 · 마지막 칸 오른쪽 = 컨테이너 오른쪽 ±1px)', boxes.length === 3 && Math.abs(boxes[0].x - host.x) < 1 && Math.abs((boxes[2].x + boxes[2].width) - (host.x + host.width)) < 1, JSON.stringify([host, boxes.map(b => [Math.round(b.x), Math.round(b.width)])]));
     const offPx = await page.locator('.row[data-sym="EURUSD"] .btn.sell').evaluate(el => parseFloat(getComputedStyle(el).fontSize));
-    ok('1-Click OFF 시세 글자 21px (2026-10-25 사장님 "시세가 작아보여" — 17→21, 칸 220px)', offPx === 21, String(offPx)); }
+    ok('1-Click OFF 시세 글자 23px (2026-10-28 사장님 "시세 더 키워" A안 — 21→23, 칸 220px)', offPx === 23, String(offPx)); }
   // M5 one-click OFF → no boxes; toggle → ack sheet → ON → boxes; tapping → toast, no rpc
   ok('M5 OFF: 상자 없음 (app.oc-on 미적용)', !(await page.locator('.app.oc-on').count()));
   await page.locator('.oc').click(); await page.waitForTimeout(100);
