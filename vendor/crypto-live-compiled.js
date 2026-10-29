@@ -18232,33 +18232,8 @@ function Account({
   tabBar
 }) {
   const [range, setRange] = React.useState('1D');
-  // REAL multi-account history (portfolio_snapshots via get_portfolio_total_history). null =
-  // loading, [] = loaded-but-empty (fall back to flat). Drives the truthful moving chart.
-  const [totalHist, setTotalHist] = React.useState(null);
-  React.useEffect(() => {
-    let cancelled = false;
-    setTotalHist(null);
-    try {
-      if (typeof window !== 'undefined' && window.AlpexaSync && AlpexaSync.db) {
-        AlpexaSync.db.rpc('get_portfolio_total_history', {
-          p_range: range
-        }).then(r => {
-          if (cancelled) return;
-          const pts = r && r.data && r.data.ok && Array.isArray(r.data.points) ? r.data.points : [];
-          setTotalHist(pts.map(p => +p.v || 0));
-        }, () => {
-          if (!cancelled) setTotalHist([]);
-        });
-      } else {
-        setTotalHist([]);
-      }
-    } catch (e) {
-      setTotalHist([]);
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [range]);
+  // 2026-10-29 사장님 "아카운트 페이지 챠트를 없애자" — 차트·기간 버튼·변동 줄 제거. 차트용 총액 기록 조회 RPC 도 안 부름.
+  const totalHist = [];
   const [subPage, setSubPage] = React.useState(null);
   const [subSub, setSubSub] = React.useState(null);
   const [alertsOpen, setAlertsOpen] = React.useState(false);
@@ -18562,73 +18537,11 @@ function Account({
         color: RH.textMute
       }
     }, s.slice(i)));
-  })()), /*#__PURE__*/React.createElement("div", {
+  })())), /*#__PURE__*/React.createElement("div", {
     style: {
-      marginTop: 6,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 6,
-      fontSize: 14.5,
-      fontWeight: 600,
-      fontFamily: FONT_UI,
-      fontVariantNumeric: 'tabular-nums'
+      height: 18
     }
-  }, /*#__PURE__*/React.createElement("svg", {
-    width: "9",
-    height: "9",
-    viewBox: "0 0 24 24",
-    fill: accent
-  }, isUp ? /*#__PURE__*/React.createElement("path", {
-    d: "M12 4 L20 16 H4 Z"
-  }) : /*#__PURE__*/React.createElement("path", {
-    d: "M12 20 L4 8 H20 Z"
-  })), /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: accent
-    }
-  }, "$", Math.abs(change).toFixed(2)), /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: accent
-    }
-  }, "(", isUp ? '+' : '-', Math.abs(changePct).toFixed(2), "%)"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: 'relative',
-      marginTop: 10
-    }
-  }, /*#__PURE__*/React.createElement(Chart, {
-    series: series,
-    color: accent,
-    baseline: baseline
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: '4px 14px 14px'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      gap: 4
-    }
-  }, ['1D', '1W', '1M', '3M', 'YTD', '1Y', 'ALL'].map(r => {
-    const active = r === range;
-    return /*#__PURE__*/React.createElement("button", {
-      key: r,
-      onClick: () => setRange(r),
-      style: {
-        flex: 1,
-        height: 32,
-        padding: 0,
-        borderRadius: 16,
-        background: active ? RH.acc : 'transparent',
-        border: 'none',
-        color: active ? RH.onAcc : RH.textDim,
-        fontSize: 14,
-        fontWeight: active ? 600 : 500,
-        fontFamily: FONT_UI,
-        cursor: 'pointer'
-      }
-    }, r);
-  }))), /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '8px 22px 0'
     }

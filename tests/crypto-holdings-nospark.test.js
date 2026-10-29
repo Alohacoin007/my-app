@@ -20,4 +20,8 @@ ok('① 소스 AssetRow: 3칸 그리드 ASSET_GRID (아이콘·이름·금액)',
 ok('② 컴파일본 AssetRow 찾음', bb.length > 500, bb.length);
 ok('② 컴파일본 AssetRow: MiniSpark 0 (재컴파일 반영)', bb && !/MiniSpark/.test(bb));
 ok('③ 홈 큰 차트·기간 버튼 유지 (priceSeries · RangeTabs)', /const priceSeries = React\.useMemo/.test(src) && /function RangeTabs\(/.test(src) && /<RangeTabs/.test(src));
+// 2026-10-29 사장님 "아카운트 페이지 챠트를 없애자" — Account: 차트·기간 버튼·변동 줄·기록 조회 0 (소스·컴파일본)
+const acct = (x) => { const i = x.indexOf('function Account('); const j = x.indexOf('\nfunction ', i + 20); return i >= 0 && j > i ? x.slice(i, j) : ''; };
+for (const [nm, x] of [['소스', src], ['컴파일본', bin]]) { const b = acct(x);
+  ok(`④ ${nm} Account: 차트·기간 버튼(1D..ALL)·기록 조회 0`, b.length > 2000 && !/<Chart\b|React\.createElement\(Chart\b|\(Chart,/.test(b) && !/'1D',\s*'1W'/.test(b) && !/get_portfolio_total_history/.test(b), b.length); }
 console.log(`\n${fail ? '🔴' : '🟢'} crypto-holdings-nospark — ${pass} pass, ${fail} fail`); process.exit(fail ? 1 : 0);
