@@ -879,13 +879,14 @@ function screenHome(){
     '<div class="hd">'+(S.oneClick?'<div class="lots"><b data-act="lots:-">−</b><span>'+S.lots.toFixed(2)+'<small>lot</small></span><b data-act="lots:+">+</b></div>':'<div></div>')+'<div class="cols"><span>SELL</span><span>BUY</span></div></div>'+
     '<div class="list">'+homeRows()+'</div>';
 }
-/* 현재가 태그 — 차트 그림(봉·선)은 그대로 두고 오른쪽 위에 얹기만 한다. */
+/* 오른쪽 TAGW(뷰박스 단위)는 현재가 태그 자리 — 봉/선은 PW 안에만 그린다. scrubAt 은 data-pw 로 같은 비율을 쓴다. */
+var TAGW=64;
 function pxTag(y, H, v, up){ return '<div class="pxtag'+(up?' up':'')+'" data-pxtag style="top:'+(y/H*100).toFixed(2)+'%">'+fmtPx(v,S.sym)+'</div>'; }
 function lineChart(rows, opts){
   var W=390, H=200, pad=10, top=pad+22, bot=H-pad-14;
   if(!rows||rows.length<2) return '<div class="empty">'+(opts.loading?'Loading chart…':'No chart data')+'</div>';
   var vals=rows.map(function(c){return +c.c;}); var lo=Math.min.apply(null,vals), hi=Math.max.apply(null,vals); var n=vals.length;
-  var pts=vals.map(function(v,i){ return [i*(W/(n-1)), bot-(v-lo)/((hi-lo)||1)*(bot-top)]; });
+  var PW=W-TAGW; var pts=vals.map(function(v,i){ return [i*(PW/(n-1)), bot-(v-lo)/((hi-lo)||1)*(bot-top)]; });
   var up=vals[n-1]>=vals[0], c=up?'var(--up)':'var(--down)';
   var d=pts.map(function(p,i){return (i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1);}).join(' ');
   var base=pts[0][1], ex=pts[n-1][0], ey=pts[n-1][1];
@@ -896,9 +897,10 @@ function lineChart(rows, opts){
       '<circle cx="'+sx.toFixed(1)+'" cy="'+sy.toFixed(1)+'" r="5" fill="'+c+'" stroke="var(--bg)" stroke-width="2.5"/>'+
       '<text x="'+lx+'" y="14" text-anchor="middle" font-family="Geist Mono, monospace" font-size="11.5" font-weight="700" fill="var(--text)">'+vals[i].toFixed(digitsOf(S.sym))+'</text>'+
       '<text x="'+lx+'" y="'+(H-2)+'" text-anchor="middle" font-family="Geist, sans-serif" font-size="10" fill="var(--dim)">'+esc(tl)+'</text>'; }
-  return '<div class="cbox"><svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" data-n="'+n+'">'+
+  return '<div class="cbox"><svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" data-n="'+n+'" data-pw="'+(PW/W).toFixed(4)+'">'+
     '<line x1="0" y1="'+base.toFixed(1)+'" x2="'+W+'" y2="'+base.toFixed(1)+'" stroke="var(--line)" stroke-width="1" stroke-dasharray="2 4"/>'+
     '<path d="'+d+'" fill="none" stroke="'+c+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+
+    '<line x1="'+ex.toFixed(1)+'" y1="'+ey.toFixed(1)+'" x2="'+W+'" y2="'+ey.toFixed(1)+'" stroke="var(--mute)" stroke-width="1" stroke-dasharray="2 4" vector-effect="non-scaling-stroke"/>'+
     (S.scrub==null?'<circle cx="'+ex.toFixed(1)+'" cy="'+ey.toFixed(1)+'" r="3.5" fill="'+c+'"/>':'')+scrub+'</svg>'+pxTag(ey,H,vals[n-1],up)+'</div>';
 }
 /* 캔들 차트 (2026-10-25 사장님 시안 승인) — 표시 전용. 봉 = fetchCandles 의 실제 o/h/l/c (합성 0). 화면 폭에 읽히게 최근 CANDLE_N 개만.
@@ -922,7 +924,7 @@ function candleChart(rows, opts){
   var K=rs.map(function(k){ var c=+k.c, o=+k.o>0?+k.o:c, h=Math.max(+k.h>0?+k.h:c,o,c), l=Math.min(+k.l>0?+k.l:c,o,c); return {o:o,h:h,l:l,c:c,t:k.t}; });
   var lo=Infinity, hi=-Infinity; K.forEach(function(k){ if(k.h>hi) hi=k.h; if(k.l<lo) lo=k.l; });
   var Y=function(v){ return bot-(v-lo)/((hi-lo)||1)*(bot-top); };
-  var sx=W/n, bw=Math.max(1.5,sx*0.62);
+  var PW=W-TAGW, sx=PW/n, bw=Math.max(1.5,sx*0.62);
   var grid=[0.25,0.5,0.75].map(function(f){ var y=(top+(bot-top)*f).toFixed(1); return '<line x1="0" y1="'+y+'" x2="'+W+'" y2="'+y+'" stroke="var(--surface)" stroke-width="1" vector-effect="non-scaling-stroke"/>'; }).join('');
   var bars=K.map(function(k,i){ var col=k.c>=k.o?'var(--up)':'var(--down)', cx=sx*(i+0.5), y1=Y(Math.max(k.o,k.c)), y2=Y(Math.min(k.o,k.c));
     return '<line x1="'+cx.toFixed(1)+'" y1="'+Y(k.h).toFixed(1)+'" x2="'+cx.toFixed(1)+'" y2="'+Y(k.l).toFixed(1)+'" stroke="'+col+'" stroke-width="1" vector-effect="non-scaling-stroke"/>'+
@@ -933,7 +935,7 @@ function candleChart(rows, opts){
   if(S.scrub!=null&&S.scrub>=0&&S.scrub<n){ var sxp=(sx*(S.scrub+0.5)).toFixed(1);
     scrub='<line x1="'+sxp+'" y1="'+top+'" x2="'+sxp+'" y2="'+bot+'" stroke="var(--mute)" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>'; }
   var kl=K[n-1];
-  return '<div class="cbox"><svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" data-n="'+n+'" data-mode="candle">'+grid+last+bars+scrub+'</svg>'+pxTag(+lc,H,kl.c,kl.c>=kl.o)+'</div>';
+  return '<div class="cbox"><svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" data-n="'+n+'" data-mode="candle" data-pw="'+(PW/W).toFixed(4)+'">'+grid+last+bars+scrub+'</svg>'+pxTag(+lc,H,kl.c,kl.c>=kl.o)+'</div>';
 }
 /* O·H·L·C 한 줄: 보이는 봉 구간 전체(시가=첫 봉 시가 · 고/저=구간 최고/최저 · 종가=마지막 봉), 스크럽 중이면 그 봉 하나 */
 function ohlcLine(rows, sym){ var rs=candleRows(rows); if(rs.length<2) return '';
@@ -1327,7 +1329,7 @@ document.addEventListener('click', function(e){ var el=e.target.closest('[data-a
 document.addEventListener('input', function(e){ if(e.target&&e.target.id==='pq'){ S.q=e.target.value; var pl=document.querySelector('.sheet .plist'); if(pl) pl.innerHTML=pairList(); }
   if(e.target&&e.target.id==='amtIn'){ S.amt=Math.max(0, Math.round((parseFloat(String(e.target.value).replace(/[^0-9.]/g,''))||0)*100)/100); var c=document.querySelector('.sheet .cta[data-act^="fund:"]'); if(c) c.textContent=fundCta(); } });   // 금액 입력: 포커스 유지 위해 CTA 글자만 제자리 갱신
 // chart scrub (touch / mouse)
-function scrubAt(x){ var ch=document.getElementById('chart'); var svg=ch&&ch.querySelector('svg'); if(!svg) return; var n=+svg.getAttribute('data-n')||0; var r=svg.getBoundingClientRect(); var f=(x-r.left)/r.width; var i=svg.getAttribute('data-mode')==='candle'?Math.floor(f*n):Math.round(f*(n-1)); S.scrub=Math.max(0,Math.min(n-1,i)); render(); }
+function scrubAt(x){ var ch=document.getElementById('chart'); var svg=ch&&ch.querySelector('svg'); if(!svg) return; var n=+svg.getAttribute('data-n')||0; var r=svg.getBoundingClientRect(); var f=(x-r.left)/(r.width*(+svg.getAttribute('data-pw')||1)); var i=svg.getAttribute('data-mode')==='candle'?Math.floor(f*n):Math.round(f*(n-1)); S.scrub=Math.max(0,Math.min(n-1,i)); render(); }
 document.addEventListener('pointerdown', function(e){ if(e.target.closest('#chart')) scrubAt(e.clientX); });
 document.addEventListener('pointermove', function(e){ if(S.scrub!=null&&e.buttons&&e.target.closest('#chart')) scrubAt(e.clientX); });
 document.addEventListener('pointerup', function(){ if(S.scrub!=null){ S.scrub=null; render(); } });
