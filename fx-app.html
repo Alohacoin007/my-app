@@ -879,14 +879,17 @@ function screenHome(){
     '<div class="hd">'+(S.oneClick?'<div class="lots"><b data-act="lots:-">−</b><span>'+S.lots.toFixed(2)+'<small>lot</small></span><b data-act="lots:+">+</b></div>':'<div></div>')+'<div class="cols"><span>SELL</span><span>BUY</span></div></div>'+
     '<div class="list">'+homeRows()+'</div>';
 }
-/* 오른쪽 TAGW(뷰박스 단위)는 현재가 태그 자리 — 봉/선은 PW 안에만 그린다. scrubAt 은 data-pw 로 같은 비율을 쓴다. */
-var TAGW=64;
+/* 오른쪽은 현재가 태그 자리 — 봉/선은 PW 안에만 그린다. scrubAt 은 data-pw 로 같은 비율을 쓴다.
+   자리 폭은 고정값이 아니라 실측: render 뒤 태그·차트 폭을 재서(TAGM) 다르면 한 번 더 그린다 — 폰 폭·글꼴·가격 자릿수(BTC·JPY)와 무관하게 안 겹침.
+   (2026-10-30 사장님 "박스가 겹쳐서 보여" — 고정 64 단위 ≈ 55px < 태그 57px 이었다) */
+var TAGM={chart:330, px:58, ch:7};
+function tagW(v){ var ch=fmtPx(v,S.sym).length, px=TAGM.px*ch/(TAGM.ch||ch)+8; return Math.ceil(px*390/Math.max(200,TAGM.chart)); }
 function pxTag(y, H, v, up){ return '<div class="pxtag'+(up?' up':'')+'" data-pxtag style="top:'+(y/H*100).toFixed(2)+'%">'+fmtPx(v,S.sym)+'</div>'; }
 function lineChart(rows, opts){
   var W=390, H=200, pad=10, top=pad+22, bot=H-pad-14;
   if(!rows||rows.length<2) return '<div class="empty">'+(opts.loading?'Loading chart…':'No chart data')+'</div>';
   var vals=rows.map(function(c){return +c.c;}); var lo=Math.min.apply(null,vals), hi=Math.max.apply(null,vals); var n=vals.length;
-  var PW=W-TAGW; var pts=vals.map(function(v,i){ return [i*(PW/(n-1)), bot-(v-lo)/((hi-lo)||1)*(bot-top)]; });
+  var PW=W-tagW(vals[n-1]); var pts=vals.map(function(v,i){ return [i*(PW/(n-1)), bot-(v-lo)/((hi-lo)||1)*(bot-top)]; });
   var up=vals[n-1]>=vals[0], c=up?'var(--up)':'var(--down)';
   var d=pts.map(function(p,i){return (i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1);}).join(' ');
   var base=pts[0][1], ex=pts[n-1][0], ey=pts[n-1][1];
@@ -924,7 +927,7 @@ function candleChart(rows, opts){
   var K=rs.map(function(k){ var c=+k.c, o=+k.o>0?+k.o:c, h=Math.max(+k.h>0?+k.h:c,o,c), l=Math.min(+k.l>0?+k.l:c,o,c); return {o:o,h:h,l:l,c:c,t:k.t}; });
   var lo=Infinity, hi=-Infinity; K.forEach(function(k){ if(k.h>hi) hi=k.h; if(k.l<lo) lo=k.l; });
   var Y=function(v){ return bot-(v-lo)/((hi-lo)||1)*(bot-top); };
-  var PW=W-TAGW, sx=PW/n, bw=Math.max(1.5,sx*0.62);
+  var PW=W-tagW(K[n-1].c), sx=PW/n, bw=Math.max(1.5,sx*0.62);
   var grid=[0.25,0.5,0.75].map(function(f){ var y=(top+(bot-top)*f).toFixed(1); return '<line x1="0" y1="'+y+'" x2="'+W+'" y2="'+y+'" stroke="var(--surface)" stroke-width="1" vector-effect="non-scaling-stroke"/>'; }).join('');
   var bars=K.map(function(k,i){ var col=k.c>=k.o?'var(--up)':'var(--down)', cx=sx*(i+0.5), y1=Y(Math.max(k.o,k.c)), y2=Y(Math.min(k.o,k.c));
     return '<line x1="'+cx.toFixed(1)+'" y1="'+Y(k.h).toFixed(1)+'" x2="'+cx.toFixed(1)+'" y2="'+Y(k.l).toFixed(1)+'" stroke="'+col+'" stroke-width="1" vector-effect="non-scaling-stroke"/>'+
@@ -1232,6 +1235,9 @@ var render=function(force){
   var acts=app.querySelectorAll('[data-act]'); for(var i=0;i<acts.length;i++){ if(acts[i].onclick!==tapNoop) acts[i].onclick=tapNoop; }
   S.keepScroll=true;
   if(S.tab==='home') fitMeasure();
+  var csv=app.querySelector('#chart svg'), ctg=app.querySelector('#chart .pxtag');
+  if(csv&&ctg){ var cw=csv.getBoundingClientRect().width, tw=ctg.getBoundingClientRect().width, tch=(ctg.textContent||'').length;
+    if(cw>0&&tw>0&&(Math.abs(cw-TAGM.chart)>1||Math.abs(tw-TAGM.px*tch/(TAGM.ch||tch))>1)){ TAGM={chart:cw, px:tw, ch:tch}; render(true); return; } }
   var tbs=app.querySelector('.tabs'); if(tbs){ var th=tbs.offsetHeight+'px'; if(document.documentElement.style.getPropertyValue('--tabh')!==th) document.documentElement.style.setProperty('--tabh', th); }   // 고정 Sell·Buy 바탕 높이 (탭바 실측)
 };
 function tapNoop(){}

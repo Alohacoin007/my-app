@@ -467,6 +467,14 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
     const tg = await tagChk();
     ok('현재가 태그(캔들): 값 = 마지막 봉 종가 C · 점선 높이(±1px) · 차트 오른쪽 끝 · 마지막 봉 안 가림', tg.txt && tg.txt === tg.C && tg.dy <= 1 && Math.abs(tg.right) <= 1 && tg.clear >= 0, JSON.stringify(tg));
     if (process.env.SHOT_DIR) await page.locator('.det').screenshot({ path: path.join(process.env.SHOT_DIR, 'fx-pxtag-candle.png'), clip: undefined }).catch(() => {});
+    // 2026-10-30 사장님 "박스가 겹쳐서 보여" (폰 실화면) — 고정 자리(≈55px)가 태그(≈57px)보다 좁았다. 자리 = 실측 → 좁은 폰·넓은 글꼴·긴 가격에서도 안 겹침.
+    { const vp0 = page.viewportSize(); const res = [];
+      for (const w of [320, 360, 393]) { await page.setViewportSize({ width: w, height: 900 }); await page.waitForTimeout(250); await page.evaluate(() => render(true)); await page.waitForTimeout(100); const r = await tagChk(); res.push(w + ':' + r.clear); }
+      await page.addStyleTag({ content: '#chart .pxtag{ font-family: "DejaVu Sans Mono", monospace !important; font-size: 13px !important; }' }); await page.evaluate(() => render(true)); await page.waitForTimeout(100);
+      const wide = await tagChk(); res.push('wide-font:' + wide.clear);
+      ok('현재가 박스: 320·360·393px · 넓은 글꼴에서도 마지막 봉과 안 겹침 (간격 ≥ 0)', res.every((x) => +x.split(':')[1] >= 0), res.join(' '));
+      await page.evaluate(() => { const st = [...document.querySelectorAll('style')].pop(); if (st && /pxtag/.test(st.textContent)) st.remove(); render(true); });
+      await page.setViewportSize(vp0); await page.waitForTimeout(200); }
     await page.locator('.cmode span[data-act="cmode:line"]').click(); await page.waitForTimeout(150);
     const tl = await tagChk();
     ok('현재가 태그(라인): 같은 태그 · 끝점 높이 · 오른쪽 끝', tl.txt && tl.mode === null && tl.dy <= 1 && Math.abs(tl.right) <= 1, JSON.stringify(tl));
