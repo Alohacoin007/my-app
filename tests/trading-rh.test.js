@@ -454,7 +454,24 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
       S.cmode = null; const m2 = +(lastC * 1.05).toFixed(5); S.feed[sym] = Object.assign({}, f, { mid: m2, ts: Date.now() }); render(true); const c2 = C();
       S.feed[sym] = save; render(true); return { c1, want1: fmtPx(m1, sym), c2, want2: fmtPx(lastC, sym) }; });
     ok('실시간: 마지막 봉 종가(C) = 실시간 가격 — 시세가 움직이면 차트도 움직임', lv.c1 && lv.c1 === lv.want1, JSON.stringify(lv));
-    ok('실시간: 봉과 2% 넘게 어긋난 시세는 합치지 않음 (가짜 봉 늘리기 금지)', lv.c2 && lv.c2 === lv.want2, JSON.stringify(lv)); }
+    ok('실시간: 봉과 2% 넘게 어긋난 시세는 합치지 않음 (가짜 봉 늘리기 금지)', lv.c2 && lv.c2 === lv.want2, JSON.stringify(lv));
+    // 2026-10-30 사장님 "모바일 fx 챠트에 이거 넣어줘봐" — 점선 끝 오른쪽 현재가 태그 (터미널 Legend 2 와 같은 문법).
+    //   값 = 마지막 봉 종가(실시간 mid) · 점선과 같은 높이 · 차트 오른쪽 끝 · 마지막 봉을 가리지 않음 · 색 = 마지막 봉 방향 · 라인 차트도 같음.
+    const tagChk = () => page.evaluate(() => { const t = document.querySelector('#chart .pxtag'), svg = document.querySelector('#chart svg'); if (!t || !svg) return { err: 'no tag' };
+      const a = t.getBoundingClientRect(), s = svg.getBoundingClientRect(), b = [...document.querySelectorAll('.det .ohlc b')];
+      const dash = [...svg.querySelectorAll('line[stroke-dasharray="2 4"]')].pop(), ly = dash ? s.top + (+dash.getAttribute('y1')) / 200 * s.height : null;
+      const rects = [...svg.querySelectorAll('rect')], lr = rects.length ? rects[rects.length - 1].getBoundingClientRect() : null;
+      const k = (window.__rh.candles[window.__rh.sym + '|' + window.__rh.tf] || {}).rows || [];
+      return { txt: t.textContent, C: b.length === 4 ? b[3].textContent : null, up: t.classList.contains('up'), right: Math.round(s.right - a.right), dy: ly == null ? null : Math.round(Math.abs((a.top + a.height / 2) - ly)),
+        clear: lr ? Math.round(a.left - lr.right) : null, mode: svg.getAttribute('data-mode') }; });
+    const tg = await tagChk();
+    ok('현재가 태그(캔들): 값 = 마지막 봉 종가 C · 점선 높이(±1px) · 차트 오른쪽 끝 · 마지막 봉 안 가림', tg.txt && tg.txt === tg.C && tg.dy <= 1 && Math.abs(tg.right) <= 1 && tg.clear >= 0, JSON.stringify(tg));
+    if (process.env.SHOT_DIR) await page.locator('.det').screenshot({ path: path.join(process.env.SHOT_DIR, 'fx-pxtag-candle.png'), clip: undefined }).catch(() => {});
+    await page.locator('.cmode span[data-act="cmode:line"]').click(); await page.waitForTimeout(150);
+    const tl = await tagChk();
+    ok('현재가 태그(라인): 같은 태그 · 끝점 높이 · 오른쪽 끝', tl.txt && tl.mode === null && tl.dy <= 1 && Math.abs(tl.right) <= 1, JSON.stringify(tl));
+    if (process.env.SHOT_DIR) await page.locator('.det').screenshot({ path: path.join(process.env.SHOT_DIR, 'fx-pxtag-line.png') }).catch(() => {});
+    await page.locator('.cmode span[data-act="cmode:candle"]').click(); await page.waitForTimeout(150); }
   candReq.length = 0; await page.locator('.ranges span[data-act="tf:H4"]').click(); await page.waitForTimeout(300);
   ok('4h 탭 → fx-prices ?tf=H4&n=200 실봉 요청 · 차트 렌더', candReq.some(q => q.tf === 'H4' && q.n === '200') && (await page.locator('#chart svg').count()) === 1 && (await page.locator('.ranges span.on').innerText()) === '4h', JSON.stringify(candReq));
   ok('ALL·30m 버튼 없음 (6칸으로 줄임 — 2026-10-25)', (await page.locator('.ranges span[data-act="tf:ALL"]').count()) === 0 && (await page.locator('.ranges span[data-act="tf:M30"]').count()) === 0);
