@@ -7828,13 +7828,13 @@ function SupportPanel() {
   }, [{
     icon: 'call',
     label: 'Phone',
-    sub: '+41 22 555 9900',
-    href: 'tel:+41225559900'
+    sub: '+1 917-826-7505',
+    href: 'tel:+19178267505'
   }, {
     icon: 'mail',
     label: 'Email',
-    sub: 'support@alpexa.com',
-    href: 'mailto:support@alpexa.com'
+    sub: 'support@alpexa-fx.com',
+    href: 'mailto:support@alpexa-fx.com'
   }].map(o => /*#__PURE__*/React.createElement("button", {
     key: o.label,
     onClick: () => {
@@ -7936,7 +7936,7 @@ function SupportPanel() {
       if (!topic || !msg) return;
       const subj = encodeURIComponent('ALPEXA Support — ' + topic);
       const body = encodeURIComponent(msg + '\n\n— sent from ALPEXA-FX');
-      window.location.href = 'mailto:support@alpexa.com?subject=' + subj + '&body=' + body;
+      window.location.href = 'mailto:support@alpexa-fx.com?subject=' + subj + '&body=' + body;
     },
     style: {
       width: '100%',
