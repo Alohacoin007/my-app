@@ -38,7 +38,7 @@ const ALLOW = ['pamm_investor_report', 'fx_open', 'fx_modify', 'fx_close', 'fx_p
   // 풀 앱 (2026-09-21): 남은 비돈 기능 이관 — 차트 TF 전부 실봉 · 주식/지수 실봉 · Security/Support 실동작만
   ok('풀앱 소스: 차트 TF 6개 전부 활성 (null 0 · 2026-10-25 사장님 "8개→6개" — 30m·ALL 뺌) · "coming soon" 문구 0', /var TF = \[\['1m','M1'\],\['5m','M5'\],\['1h','H1'\],\['4h','H4'\],\['1D','D1'\],\['1W','W1'\]\];/.test(src) && !/coming soon/i.test(src));
   ok('풀앱 소스: 봉 출처 3종 전부 실봉 (크립토 Binance · FX Polygon · 주식/지수 Twelve Data) · 합성 봉 생성 0 · ALL = D1 1000봉', /api\.twelvedata\.com\/time_series/.test(src) && /data-api\.binance\.vision\/api\/v3\/klines/.test(src) && /FX_FN_URL\+'\?candles='/.test(src) && !/Math\.random\(\)[^\n]*(candle|bar|ohlc)/i.test(src) && /tf==='ALL'\?1000:200/.test(src));
-  ok('풀앱 소스: Security = auth.updateUser + signOut(global) 만 (테이블 쓰기 0) · Support = tel/mailto 만 (백엔드 0)', /auth\.updateUser\(\{ password:p1 \}\)/.test(src) && /signOut\(\{ scope:'global' \}\)/.test(src) && /mailto:support@alpexa\.com\?subject=/.test(src) && /go:tel:\+41225559900/.test(src) && !/2-Factor|Active Sessions/.test(src));
+  ok('풀앱 소스: Security = auth.updateUser + signOut(global) 만 (테이블 쓰기 0) · Support = tel/mailto 만 (백엔드 0)', /auth\.updateUser\(\{ password:p1 \}\)/.test(src) && /signOut\(\{ scope:'global' \}\)/.test(src) && /mailto:support@alpexa-fx\.com\?subject=/.test(src) && /go:tel:\+19178267505/.test(src) && !/2-Factor|Active Sessions/.test(src));
   ok('M1 소스: 잔고·손익을 클라가 계산해 저장하는 코드 0 (S\.cash 는 서버 pull 에서만 대입)', (src.match(/S\.cash\s*=/g) || []).length === 1 && /S\.cash=\+r\.data\[0\]\.balance/.test(src)); }
 ok('M1 소스: ledger / positions / fx_pending 에 insert·update·upsert·delete 없음', !/\.from\(['"](ledger|positions|fx_pending|accounts)['"]\)[\s\S]{0,200}\.(insert|update|upsert|delete)\(/.test(src));
 ok('M1 소스: 승인 밖 돈 경로 0 (place_bet · admin RPC · functions.invoke fx/broker/withdraw)', !/rpc\(\s*['"](place_bet|fx_open_admin|fx_admin|admin_set_balance|crypto_trade|withdraw_hold)/.test(src) && !/functions\.invoke\(\s*['"](fx|broker|withdraw)/.test(src));
@@ -585,7 +585,7 @@ const fmt = (v) => (v < 0 ? '−' : '') + '$' + Math.abs(v).toFixed(2).replace(/
   // Support sheet — phone / email cards + topic chips + message → mail app (no backend)
   await page.locator('.srow[data-act="sheet:support"]').click(); await page.waitForTimeout(150);
   const sup = await page.locator('.sheet').innerText().catch(() => '');
-  ok('Support 시트: 전화 · 이메일 카드 + 주제 칩 5 + 메시지 입력', /\+41 22 555 9900/.test(sup) && /support@alpexa\.com/.test(sup) && (await page.locator('.sheet .chips span').count()) === 5 && (await page.locator('#smsg').count()) === 1, sup.replace(/\n/g, ' ').slice(0, 200));
+  ok('Support 시트: 전화 +1 917-826-7505 · 이메일 support@alpexa-fx.com 카드 (2026-10-31 사장님 변경) + 주제 칩 5 + 메시지 입력', /\+1 917-826-7505/.test(sup) && /support@alpexa-fx\.com/.test(sup) && !/\+41|support@alpexa\.com/.test(sup) && (await page.locator('.sheet .chips span').count()) === 5 && (await page.locator('#smsg').count()) === 1, sup.replace(/\n/g, ' ').slice(0, 200));
   await page.locator('.sheet .cta').click(); await page.waitForTimeout(120);
   ok('주제 없이 Send → 토스트 (Pick a topic first)', /Pick a topic/.test(await page.locator('.toast').innerText().catch(() => '')));
   await page.locator('#smsg').fill('hello there');

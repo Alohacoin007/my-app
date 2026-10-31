@@ -2062,7 +2062,7 @@ function SupportPanel(){
         <option value="other">Other</option>
       </select>
       <textarea value={msg} onChange={e=>setMsg(e.target.value)} placeholder="Describe your issue…" style={{width:'100%',padding:'10px 12px',borderRadius:8,border:'1px solid var(--line-2)',background:'var(--surface)',fontSize:13,color:'var(--ink)',minHeight:90,outline:'none',resize:'vertical',fontFamily:'inherit',marginBottom:10}}/>
-      <button disabled={!topic||!msg} onClick={()=>{ if(!topic||!msg) return; const subj=encodeURIComponent('ALPEXA Support — '+topic); const body=encodeURIComponent(msg+'\n\n— sent from ALPEXA FX'); window.location.href='mailto:support@alpexa.com?subject='+subj+'&body='+body; }} style={{width:'100%',padding:'12px 0',borderRadius:10,fontSize:13,fontWeight:700,color:'#fff',background:(topic&&msg)?'var(--acc)':'var(--muted)',display:'flex',alignItems:'center',justifyContent:'center',gap:6,cursor:(topic&&msg)?'pointer':'not-allowed'}}><Mi name="send" size={14}/>Submit Ticket</button>
+      <button disabled={!topic||!msg} onClick={()=>{ if(!topic||!msg) return; const subj=encodeURIComponent('ALPEXA Support — '+topic); const body=encodeURIComponent(msg+'\n\n— sent from ALPEXA-FX'); window.location.href='mailto:support@alpexa.com?subject='+subj+'&body='+body; }} style={{width:'100%',padding:'12px 0',borderRadius:10,fontSize:13,fontWeight:700,color:'#fff',background:(topic&&msg)?'var(--acc)':'var(--muted)',display:'flex',alignItems:'center',justifyContent:'center',gap:6,cursor:(topic&&msg)?'pointer':'not-allowed'}}><Mi name="send" size={14}/>Submit Ticket</button>
       <div style={{fontSize:10.5,color:'var(--text-3)',textAlign:'center',marginTop:8}}>Typical response time: 4 hours · 24/7 support</div>
     </div>
   );

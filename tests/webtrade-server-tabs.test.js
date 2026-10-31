@@ -16,8 +16,8 @@ const pin = (re, m) => { if (!re.test(wt)) bad(m); };
 const ban = (re, m) => { if (re.test(wt)) bad('[금지] ' + m); };
 
 // 새 설계 (2026-08-13 사장님 "드랍다운 불편"): 드랍다운 폐지 → 크립토·스포츠 직접 이동 버튼 2개(심플 아이콘)
-pin(/title="Alpexa Crypto" onClick=\{\(\)=>goSrv\('\/dev\/crypto-dashboard\.html'\)\}/, '크립토 버튼 → 크립토 대시보드 직접 이동(goSrv)');
-pin(/title="Alpexa Sports" onClick=\{\(\)=>goSrv\('\/sports-dashboard\.html'\)\}/, '스포츠 버튼 → 스포츠 대시보드 직접 이동(goSrv)');
+pin(/title="Alpexa-Crypto" onClick=\{\(\)=>goSrv\('\/dev\/crypto-dashboard\.html'\)\}/, '크립토 버튼 → 크립토 대시보드 직접 이동(goSrv)');
+pin(/title="Alpexa-Sports" onClick=\{\(\)=>goSrv\('\/sports-dashboard\.html'\)\}/, '스포츠 버튼 → 스포츠 대시보드 직접 이동(goSrv)');
 pin(/window\.top[\s\S]{0,120}location\.href|top\.location\.href/, '이동은 window.top — iframe 중첩 방지');
 ban(/onClick=\{\(e\)=>\{e\.stopPropagation\(\);setSrvMenu/, '드랍다운 토글 폐지 — 직접 이동 버튼만 (불편한 드랍다운 제거)');
 ban(/iframe[^>]{0,80}sports-dashboard/, '터미널 안에 대시보드 iframe 중첩 — 이동(navigation)만 허용');

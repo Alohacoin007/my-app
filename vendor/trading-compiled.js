@@ -7935,7 +7935,7 @@ function SupportPanel() {
     onClick: () => {
       if (!topic || !msg) return;
       const subj = encodeURIComponent('ALPEXA Support — ' + topic);
-      const body = encodeURIComponent(msg + '\n\n— sent from ALPEXA FX');
+      const body = encodeURIComponent(msg + '\n\n— sent from ALPEXA-FX');
       window.location.href = 'mailto:support@alpexa.com?subject=' + subj + '&body=' + body;
     },
     style: {
