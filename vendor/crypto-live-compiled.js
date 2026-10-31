@@ -615,15 +615,15 @@ const RANGE_META = {
 // Server id → display name
 const SERVERS = {
   crypto: {
-    label: 'Alpexa Crypto',
+    label: 'Alpexa-Crypto',
     code: 'CR'
   },
   fx: {
-    label: 'Alpexa FX',
+    label: 'Alpexa-FX',
     code: 'FX'
   },
   sports: {
-    label: 'Alpexa Sports',
+    label: 'Alpexa-Sports',
     code: 'SP'
   }
 };
@@ -3060,19 +3060,19 @@ function ServerSwitcher({
   });
   const servers = [{
     id: 'crypto',
-    label: 'Alpexa Crypto',
+    label: 'Alpexa-Crypto',
     desc: 'Crypto · securities',
     code: 'CR',
     bal: SB.crypto
   }, {
     id: 'fx',
-    label: 'Alpexa FX',
+    label: 'Alpexa-FX',
     desc: 'FX · Stocks · Indices',
     code: 'FX',
     bal: effBal('fx', SB.fx)
   }, {
     id: 'sports',
-    label: 'Alpexa Sports',
+    label: 'Alpexa-Sports',
     desc: 'Sports markets',
     code: 'SP',
     bal: SB.sports
@@ -3778,19 +3778,19 @@ function Dashboard({
     }
   }, "Switch server"), [{
     id: 'crypto',
-    label: 'Alpexa Crypto',
+    label: 'Alpexa-Crypto',
     desc: 'Crypto · securities',
     balance: _xsb.crypto || 0,
     code: 'CR'
   }, {
     id: 'fx',
-    label: 'Alpexa FX',
+    label: 'Alpexa-FX',
     desc: 'FX · Stocks · Indices',
     balance: effBal('fx', _xsb.fx || 0),
     code: 'FX'
   }, {
     id: 'sports',
-    label: 'Alpexa Sports',
+    label: 'Alpexa-Sports',
     desc: 'Sports markets',
     balance: _xsb.sports || 0,
     code: 'SP'
@@ -9222,7 +9222,7 @@ function Withdraw({
       value: `$${fmtUsd(netAmt)}`
     }, {
       label: 'From',
-      value: sourceId === 'crypto' ? 'Alpexa Crypto' : sourceId === 'fx' ? 'Alpexa FX' : 'Alpexa Sports'
+      value: sourceId === 'crypto' ? 'Alpexa-Crypto' : sourceId === 'fx' ? 'Alpexa-FX' : 'Alpexa-Sports'
     }, {
       label: 'Arrival',
       value: arrival
@@ -9385,7 +9385,7 @@ function Withdraw({
         value: m.label
       }, {
         label: 'From',
-        value: sourceId === 'crypto' ? 'Alpexa Crypto' : sourceId === 'fx' ? 'Alpexa FX' : 'Alpexa Sports'
+        value: sourceId === 'crypto' ? 'Alpexa-Crypto' : sourceId === 'fx' ? 'Alpexa-FX' : 'Alpexa-Sports'
       }, {
         label: 'Fee',
         value: `$${fmtUsd(calcFee(m, amount))}`
@@ -17421,7 +17421,7 @@ function SubSubDetail({
       return /*#__PURE__*/React.createElement(SupportChatPanel, null);
     }
     if (id === 'support-tos') {
-      return /*#__PURE__*/React.createElement(AcctPolicyText, null, "By using Alpexa, you agree to comply with applicable laws and these terms. Alpexa Crypto LLC offers digital-asset trading, custody, and related services subject to eligibility requirements. We may update these terms; continued use after an update means you accept the revised terms. Disputes are resolved through binding arbitration in accordance with the rules of the American Arbitration Association.");
+      return /*#__PURE__*/React.createElement(AcctPolicyText, null, "By using Alpexa, you agree to comply with applicable laws and these terms. Alpexa-Crypto LLC offers digital-asset trading, custody, and related services subject to eligibility requirements. We may update these terms; continued use after an update means you accept the revised terms. Disputes are resolved through binding arbitration in accordance with the rules of the American Arbitration Association.");
     }
     if (id === 'support-privacy') {
       return /*#__PURE__*/React.createElement(AcctPolicyText, null, "Alpexa collects information you provide (KYC, transaction data) and information generated automatically (device, usage, IP). We use it to operate the service, prevent fraud, comply with law, and improve features. We do not sell your personal data. You may request access, correction, or deletion of your data subject to legal retention requirements.");

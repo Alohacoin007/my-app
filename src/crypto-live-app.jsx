@@ -275,9 +275,9 @@ const RANGE_META = {
 
 // Server id → display name
 const SERVERS = {
-  crypto: { label: 'Alpexa Crypto', code: 'CR' },
-  fx:     { label: 'Alpexa FX',   code: 'FX' },
-  sports: { label: 'Alpexa Sports', code: 'SP' },
+  crypto: { label: 'Alpexa-Crypto', code: 'CR' },
+  fx:     { label: 'Alpexa-FX',   code: 'FX' },
+  sports: { label: 'Alpexa-Sports', code: 'SP' },
 };
 
 // Stake — stakeable assets, base APYs, period-bonus structure
@@ -1467,9 +1467,9 @@ function ServerSwitcher({ cryptoBal }) {
   else if (typeof cryptoBal === 'number') SB.crypto = cryptoBal;
   const money = (n) => '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const servers = [
-    { id: 'crypto', label: 'Alpexa Crypto', desc: 'Crypto · securities', code: 'CR', bal: SB.crypto },
-    { id: 'fx',     label: 'Alpexa FX',   desc: 'FX · Stocks · Indices', code: 'FX', bal: effBal('fx', SB.fx) },
-    { id: 'sports', label: 'Alpexa Sports', desc: 'Sports markets',      code: 'SP', bal: SB.sports },
+    { id: 'crypto', label: 'Alpexa-Crypto', desc: 'Crypto · securities', code: 'CR', bal: SB.crypto },
+    { id: 'fx',     label: 'Alpexa-FX',   desc: 'FX · Stocks · Indices', code: 'FX', bal: effBal('fx', SB.fx) },
+    { id: 'sports', label: 'Alpexa-Sports', desc: 'Sports markets',      code: 'SP', bal: SB.sports },
   ];
   const go = (id) => { if (id === 'fx') { window.location.href = 'fx-app.html'; return; } if (id === 'sports') { window.location.href = 'sports-live.html'; return; } setOpen(false); };
   return (
@@ -1832,9 +1832,9 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
                 }}>Switch server</div>
 
                 {[
-                  { id: 'crypto', label: 'Alpexa Crypto', desc: 'Crypto · securities', balance: _xsb.crypto || 0, code: 'CR' },
-                  { id: 'fx',     label: 'Alpexa FX',   desc: 'FX · Stocks · Indices', balance: effBal('fx', _xsb.fx || 0), code: 'FX' },
-                  { id: 'sports', label: 'Alpexa Sports', desc: 'Sports markets',      balance: _xsb.sports || 0, code: 'SP' },
+                  { id: 'crypto', label: 'Alpexa-Crypto', desc: 'Crypto · securities', balance: _xsb.crypto || 0, code: 'CR' },
+                  { id: 'fx',     label: 'Alpexa-FX',   desc: 'FX · Stocks · Indices', balance: effBal('fx', _xsb.fx || 0), code: 'FX' },
+                  { id: 'sports', label: 'Alpexa-Sports', desc: 'Sports markets',      balance: _xsb.sports || 0, code: 'SP' },
                 ].map((s) => {
                   const active = server === s.id;
                   return (
@@ -4904,7 +4904,7 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
                 { label: 'You send', value: `$${fmtUsd(amount)}` },
                 { label: 'Fee',     value: `$${fmtUsd(fee)}` },
                 { label: 'You receive', value: `$${fmtUsd(netAmt)}` },
-                { label: 'From',    value: sourceId === 'crypto' ? 'Alpexa Crypto' : sourceId === 'fx' ? 'Alpexa FX' : 'Alpexa Sports' },
+                { label: 'From',    value: sourceId === 'crypto' ? 'Alpexa-Crypto' : sourceId === 'fx' ? 'Alpexa-FX' : 'Alpexa-Sports' },
                 { label: 'Arrival', value: arrival },
               ].map((r, i) => (
                 <div key={i}>
@@ -4990,7 +4990,7 @@ function Withdraw({ onBack, serverBalances = {}, onWithdrawn }) {
         subtitle={`Withdrawal scheduled via ${m.label}`}
         details={[
           { label: 'Method',  value: m.label },
-          { label: 'From',    value: sourceId === 'crypto' ? 'Alpexa Crypto' : sourceId === 'fx' ? 'Alpexa FX' : 'Alpexa Sports' },
+          { label: 'From',    value: sourceId === 'crypto' ? 'Alpexa-Crypto' : sourceId === 'fx' ? 'Alpexa-FX' : 'Alpexa-Sports' },
           { label: 'Fee',     value: `$${fmtUsd(calcFee(m, amount))}` },
           { label: 'Net',     value: `$${fmtUsd(net(m, amount))}` },
         ]}
@@ -9544,7 +9544,7 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
       return (
         <AcctPolicyText>
           By using Alpexa, you agree to comply with applicable laws and these
-          terms. Alpexa Crypto LLC offers digital-asset trading, custody, and
+          terms. Alpexa-Crypto LLC offers digital-asset trading, custody, and
           related services subject to eligibility requirements. We may update
           these terms; continued use after an update means you accept the
           revised terms. Disputes are resolved through binding arbitration in

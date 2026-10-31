@@ -2243,7 +2243,7 @@ function Watchlist({
         letterSpacing: 0.1,
         color: 'var(--ink)'
       }
-    }, "Bring your crypto into Alpexa FX"), /*#__PURE__*/React.createElement("span", {
+    }, "Bring your crypto into Alpexa-FX"), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 10.5,
         fontWeight: 700,
@@ -9190,7 +9190,7 @@ function AcctSheet({
         fontWeight: 700,
         color: 'var(--ink)'
       }
-    }, "Alpexa FX"), /*#__PURE__*/React.createElement("div", {
+    }, "Alpexa-FX"), /*#__PURE__*/React.createElement("div", {
       className: "mono",
       style: {
         fontSize: 10,
@@ -9202,12 +9202,12 @@ function AcctSheet({
       options: [{
         v: 'crypto',
         icon: 'currency_bitcoin',
-        label: 'Alpexa Crypto',
+        label: 'Alpexa-Crypto',
         sub: '#21084712 · ' + fmtBalance(bal.crypto)
       }, {
         v: 'sports',
         icon: 'sports_soccer',
-        label: 'Alpexa Sports',
+        label: 'Alpexa-Sports',
         sub: '#44219982 · ' + fmtBalance(bal.sports)
       }]
     }), /*#__PURE__*/React.createElement(AmountField, {
@@ -9805,7 +9805,7 @@ function LotsPopover({
 // ── Account switcher (3 servers) ──
 const ACCOUNTS = [{
   id: 'live',
-  name: 'Alpexa FX',
+  name: 'Alpexa-FX',
   url: 'fx.alpexa.com:443',
   tag: 'FX Stock',
   tags: [{
@@ -9821,7 +9821,7 @@ const ACCOUNTS = [{
   color: '#15A36C'
 }, {
   id: 'crypto',
-  name: 'Alpexa Crypto',
+  name: 'Alpexa-Crypto',
   url: 'crypto.alpexa.com:443',
   tag: 'CRYPTO',
   acct: 'BNX-2841759',
@@ -9830,7 +9830,7 @@ const ACCOUNTS = [{
   color: '#F59E0B'
 }, {
   id: 'sports',
-  name: 'Alpexa Sports',
+  name: 'Alpexa-Sports',
   url: 'sports.alpexa.com:443',
   tag: 'SPORTS',
   acct: 'SP-194820',

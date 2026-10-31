@@ -796,7 +796,7 @@ function Watchlist({market,onSelect,current,onDepositCrypto}){
                   <span style={{fontSize:8.5,fontWeight:700,color:'var(--text-3)',letterSpacing:0.4}}>CRYPTO WALLET</span>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:10}}>
-                  <div style={{flex:1,fontSize:12.5,fontWeight:700,lineHeight:1.3,letterSpacing:0.1,color:'var(--ink)'}}>Bring your crypto into Alpexa FX</div>
+                  <div style={{flex:1,fontSize:12.5,fontWeight:700,lineHeight:1.3,letterSpacing:0.1,color:'var(--ink)'}}>Bring your crypto into Alpexa-FX</div>
                   <span style={{fontSize:10.5,fontWeight:700,color:'#fff',background:'var(--acc)',padding:'6px 11px',borderRadius:3,display:'inline-flex',alignItems:'center',gap:4,letterSpacing:0.3,flexShrink:0,whiteSpace:'nowrap',border:'1px solid #0F2742'}}>Deposit <Mi name="arrow_forward" size={11}/></span>
                 </div>
               </button>
@@ -2309,10 +2309,10 @@ function AcctSheet({kind,presetMethod,onNavigate,onClose,account}){
                 <><SheetLabel>From</SheetLabel>
                 <div style={{background:'var(--bg)',borderRadius:9,padding:'10px 12px',marginBottom:14,display:'flex',alignItems:'center',gap:10}}>
                   <div style={{width:34,height:34,borderRadius:9,background:'var(--buy)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:11,fontWeight:800,letterSpacing:0.5}}>FX</div>
-                  <div style={{flex:1}}><div style={{fontSize:12.5,fontWeight:700,color:'var(--ink)'}}>Alpexa FX</div><div className="mono" style={{fontSize:10,color:'var(--text-3)'}}>#08471293 · {fmtBalance(bal.live)}</div></div>
+                  <div style={{flex:1}}><div style={{fontSize:12.5,fontWeight:700,color:'var(--ink)'}}>Alpexa-FX</div><div className="mono" style={{fontSize:10,color:'var(--text-3)'}}>#08471293 · {fmtBalance(bal.live)}</div></div>
                 </div>
                 <SheetLabel>To</SheetLabel>
-                <MethodGrid value={destAcct} onChange={setDestAcct} options={[{v:'crypto',icon:'currency_bitcoin',label:'Alpexa Crypto',sub:'#21084712 · '+fmtBalance(bal.crypto)},{v:'sports',icon:'sports_soccer',label:'Alpexa Sports',sub:'#44219982 · '+fmtBalance(bal.sports)}]}/>
+                <MethodGrid value={destAcct} onChange={setDestAcct} options={[{v:'crypto',icon:'currency_bitcoin',label:'Alpexa-Crypto',sub:'#21084712 · '+fmtBalance(bal.crypto)},{v:'sports',icon:'sports_soccer',label:'Alpexa-Sports',sub:'#44219982 · '+fmtBalance(bal.sports)}]}/>
                 <AmountField amount={amount} setAmount={setAmount} quick={QUICK} currency="USD" max={Math.floor(fxAvail())}/>
                 <div style={{background:'var(--acc-3)',borderRadius:9,padding:'10px 12px',fontSize:11.5,color:'var(--acc-2)',display:'flex',alignItems:'center',gap:8}}><Mi name="info" size={14}/><span>Instant transfer · No fees · 24/7</span></div></>
                 );
@@ -2469,9 +2469,9 @@ function LotsPopover({lots,setLots,cls='FX',onClose}){
 
 // ── Account switcher (3 servers) ──
 const ACCOUNTS=[
-  {id:'live',   name:'Alpexa FX',   url:'fx.alpexa.com:443',     tag:'FX Stock', tags:[{t:'FX',c:'#15A36C'},{t:'Stock',c:'#2D6CDF'}], acct:'FX-50112847',  type:'Standard',   balance:'€0.00',color:'#15A36C'},
-  {id:'crypto', name:'Alpexa Crypto', url:'crypto.alpexa.com:443', tag:'CRYPTO', acct:'BNX-2841759',  type:'Crypto', balance:'$0.00',color:'#F59E0B'},
-  {id:'sports', name:'Alpexa Sports', url:'sports.alpexa.com:443', tag:'SPORTS', acct:'SP-194820',    type:'Sports',     balance:'$0.00',color:'#7C3AED'},
+  {id:'live',   name:'Alpexa-FX',   url:'fx.alpexa.com:443',     tag:'FX Stock', tags:[{t:'FX',c:'#15A36C'},{t:'Stock',c:'#2D6CDF'}], acct:'FX-50112847',  type:'Standard',   balance:'€0.00',color:'#15A36C'},
+  {id:'crypto', name:'Alpexa-Crypto', url:'crypto.alpexa.com:443', tag:'CRYPTO', acct:'BNX-2841759',  type:'Crypto', balance:'$0.00',color:'#F59E0B'},
+  {id:'sports', name:'Alpexa-Sports', url:'sports.alpexa.com:443', tag:'SPORTS', acct:'SP-194820',    type:'Sports',     balance:'$0.00',color:'#7C3AED'},
 ];
 // Logged-in customers see their REAL account numbers (issued at signup, same as
 // the back office); the hardcoded ones above are only the logged-out fallback.
