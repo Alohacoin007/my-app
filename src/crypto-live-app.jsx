@@ -795,9 +795,35 @@ function chartYScale(series, baseline, H, padY) {
   return (v) => H - padY - ((v - lo) / (2 * half)) * (H - padY * 2);
 }
 
-function Chart({ series, color, baseline, scrubIdx, onScrub }) {
+// 현재가 박스 (2026-10-31 사장님 "Crypto 모바일 챠트에도 현재가 박스 넣어줘" — FX 앱과 같은 문법, 표시 전용).
+// 값 = 차트 마지막 값(실시간가). 자리 폭은 실측: 박스·차트 폭을 재서 뷰박스 단위로 환산 → 폰 폭·글꼴·가격 자릿수와 무관하게 봉/선과 안 겹침.
+function usePxTagGutter(text, W) {
+  const svgRef = React.useRef(null), tagRef = React.useRef(null);
+  const [gut, setGut] = React.useState(() => Math.ceil((String(text).length * 7.5 + 22) * W / 360));
+  React.useLayoutEffect(() => {
+    const sv = svgRef.current, tg = tagRef.current; if (!sv || !tg) return;
+    const sw = sv.getBoundingClientRect().width, tw = tg.getBoundingClientRect().width;
+    if (sw > 0 && tw > 0) { const want = Math.ceil((tw + 10) * W / sw); if (Math.abs(want - gut) > 1) setGut(want); }
+  });
+  return [gut, svgRef, tagRef];
+}
+function PxTag({ tagRef, y, H, text, up }) {
+  return (
+    <div ref={tagRef} data-pxtag style={{
+      position: 'absolute', right: 0, top: (y / H * 100).toFixed(2) + '%', transform: 'translateY(-50%)',
+      padding: '2px 6px', borderRadius: 5, background: up ? RH.green : RH.red, color: '#fff',
+      fontFamily: FONT_UI, fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums', lineHeight: 1.25,
+      whiteSpace: 'nowrap', pointerEvents: 'none',
+    }}>{text}</div>
+  );
+}
+const pxTagText = (v) => fmtUsd(v).replace('$', '');
+
+function Chart({ series, color, baseline, scrubIdx, onScrub, pxTag = false }) {
   const W = 390, H = 220;
-  const padLeft = 16, padRight = 56, padY = 22;
+  const tagText = pxTagText(series[series.length - 1]);
+  const [gut, ref, tagRef] = usePxTagGutter(tagText, W);
+  const padLeft = 16, padRight = pxTag ? Math.max(56, gut) : 56, padY = 22;   // 박스는 코인 상세 차트만 (홈 포트폴리오 차트는 그대로)
 
   const xAt = (i) => padLeft + (i / (series.length - 1)) * (W - padLeft - padRight);
   const yAt = chartYScale(series, baseline, H, padY);
@@ -808,7 +834,6 @@ function Chart({ series, color, baseline, scrubIdx, onScrub }) {
   const baselineY = yAt(baseline);
   const areaPath = linePath + ` L ${xAt(series.length - 1).toFixed(2)} ${H} L ${xAt(0).toFixed(2)} ${H} Z`;
 
-  const ref = React.useRef(null);
   const onPointer = (e) => {
     const rect = ref.current.getBoundingClientRect();
     const px = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
@@ -824,6 +849,7 @@ function Chart({ series, color, baseline, scrubIdx, onScrub }) {
   const isScrubbing = scrubIdx !== null && scrubIdx !== undefined;
 
   return (
+    <div style={{ position: 'relative' }}>
     <svg
       ref={ref} viewBox={`0 0 ${W} ${H}`} width="100%" height={H}
       style={{ display: 'block', touchAction: 'none', userSelect: 'none', overflow: 'visible' }}
@@ -878,7 +904,10 @@ function Chart({ series, color, baseline, scrubIdx, onScrub }) {
           <circle cx={xAt(scrubIdx)} cy={yAt(series[scrubIdx])} r="3" fill={RH.bg}/>
         </g>
       ) : null}
+      {pxTag ? <line x1={endX} y1={endY} x2={W} y2={endY} stroke={RH.textMute} strokeWidth="1" strokeDasharray="2 4"/> : null}
     </svg>
+    {pxTag ? <PxTag tagRef={tagRef} y={endY} H={H} text={tagText} up={series[series.length - 1] >= baseline}/> : null}
+    </div>
   );
 }
 
@@ -902,29 +931,32 @@ function alpexaFetchCandles(sym, range) {
 function CandleChart({ candles, scrubIdx, onScrub }) {
   const W = 390, H = 220, padX = 16, padY = 22;
   const n = candles.length;
+  const lastK = candles[n - 1], tagText = pxTagText(lastK.c);
+  const [gut, ref, tagRef] = usePxTagGutter(tagText, W);
+  const plotW = W - padX - gut;   // 봉은 왼쪽 padX ~ (W - 박스 자리) 안에만
   let lo = Infinity, hi = -Infinity;
   candles.forEach((k) => { if (k.h > hi) hi = k.h; if (k.l < lo) lo = k.l; });
   const yAt = (v) => (H - padY) - ((v - lo) / Math.max(1e-9, hi - lo)) * (H - padY * 2);
-  const sx = (W - padX * 2) / n, bw = Math.max(1.5, sx * 0.62);
+  const sx = plotW / n, bw = Math.max(1.5, sx * 0.62);
   const xAt = (i) => padX + sx * (i + 0.5);
-  const ref = React.useRef(null);
   const onPointer = (e) => {
     const rect = ref.current.getBoundingClientRect();
     const px = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-    const ratio = Math.max(0, Math.min(0.9999, (px - padX * rect.width / W) / (rect.width - padX * 2 * rect.width / W)));
+    const ratio = Math.max(0, Math.min(0.9999, (px - padX * rect.width / W) / (plotW * rect.width / W)));
     onScrub(Math.floor(ratio * n));
   };
   const endScrub = () => onScrub(null);
   const isScrubbing = scrubIdx !== null && scrubIdx !== undefined && scrubIdx < n;
   const lastY = yAt(candles[n - 1].c);
   return (
+    <div style={{ position: 'relative' }}>
     <svg ref={ref} viewBox={`0 0 ${W} ${H}`} width="100%" height={H} data-mode="candle"
       style={{ display: 'block', touchAction: 'none', userSelect: 'none' }}
       onMouseDown={onPointer} onMouseMove={(e) => e.buttons === 1 && onPointer(e)}
       onMouseUp={endScrub} onMouseLeave={endScrub}
       onTouchStart={onPointer} onTouchMove={onPointer} onTouchEnd={endScrub}>
       {[0.25, 0.5, 0.75].map((f) => { const y = padY + (H - padY * 2) * f; return <line key={f} x1={padX} y1={y} x2={W - padX} y2={y} stroke={RH.surface} strokeWidth="1"/>; })}
-      <line x1={padX} y1={lastY} x2={W - padX} y2={lastY} stroke={RH.textMute} strokeWidth="1" strokeDasharray="2 4"/>
+      <line x1={padX} y1={lastY} x2={W} y2={lastY} stroke={RH.textMute} strokeWidth="1" strokeDasharray="2 4"/>
       {candles.map((k, i) => {
         const col = k.c >= k.o ? RH.green : RH.red;
         const y1 = yAt(Math.max(k.o, k.c)), y2 = yAt(Math.min(k.o, k.c));
@@ -939,6 +971,8 @@ function CandleChart({ candles, scrubIdx, onScrub }) {
         <line x1={xAt(scrubIdx)} y1={padY} x2={xAt(scrubIdx)} y2={H - padY} stroke={RH.textDim} strokeWidth="1" strokeDasharray="2 3" opacity="0.7"/>
       ) : null}
     </svg>
+    <PxTag tagRef={tagRef} y={lastY} H={H} text={tagText} up={lastK.c >= lastK.o}/>
+    </div>
   );
 }
 
@@ -11308,7 +11342,7 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
         <div style={{ marginTop: 14, position: 'relative' }}>
           {useCandles
             ? <CandleChart candles={candles} scrubIdx={scrubIdx} onScrub={setScrubIdx}/>
-            : <Chart series={series} color={accentColor} baseline={baseline}
+            : <Chart pxTag series={series} color={accentColor} baseline={baseline}
                  scrubIdx={scrubIdx} onScrub={setScrubIdx}/>}
 
         </div>
