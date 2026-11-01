@@ -124,8 +124,12 @@ const fmtT = (ms) => new Date(ms).toISOString().replace('T', ' ').slice(0, 16) +
     }
 
     // ② 아무도 안 가져간 프로바이더 이벤트 (= 붙일 수 있었던 라인)
+    //   머니라인(h2h)이 없는 이벤트는 제외 (2026-11-01 오탐 2회째 — NCAAB 개막 대량 경기, -40점 같은 일방 경기는 북이 ML 을 안 낸다).
+    //   sports-games 는 ML 없는 경기를 팔지 않는다(oddsOnlyGames "머니라인 없는 시장만 있으면 안 판다", 매칭돼도 Army@Duke 처럼 잠금)
+    //   → 그런 이벤트는 매칭이 고쳐져도 잠금 그대로라 "붙일 수 있었던 라인"이 아니다.
+    const hasML = (e) => (e.bookmakers || []).some((b) => (b.markets || []).some((m) => m.key === 'h2h' && (m.outcomes || []).length >= 2));
     const leftover = pool.map((e, i) => ({ e, i, t: Date.parse(e.commence_time || '') }))
-      .filter((x) => !consumed.has(x.i) && isFinite(x.t) && x.t >= now - 3600e3 && x.t <= horizon);
+      .filter((x) => !consumed.has(x.i) && hasML(x.e) && isFinite(x.t) && x.t >= now - 3600e3 && x.t <= horizon);
 
     // ③ 잠긴 경기의 킥오프 슬롯에 잔여 이벤트가 있으면 = 있는데 못 붙인 것
     const locked = mine.filter((g) => g.oddsReal !== true && !g.oid);   // oid 있음 = 매칭은 됨(잠금 사유는 매칭 밖)

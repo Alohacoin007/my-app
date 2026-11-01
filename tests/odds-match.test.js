@@ -254,7 +254,9 @@ ok('가드는 라인을 고치지 않고 버린다 (delete/조건부 생략)', /
 { const CC = require('fs').readFileSync(require('path').join(__dirname, 'odds-crosscheck.js'), 'utf8');
   ok('crosscheck: oid 로 프로바이더 이벤트를 소비한다', /String\(e\.id\) === String\(g\.oid\)/.test(CC));
   ok('crosscheck: oid 있는 잠금 경기는 매칭 용의자에서 제외', /g\.oddsReal !== true && !g\.oid/.test(CC));
-  ok('원본: oid 는 매칭된 이벤트 id 로만 찍힌다', /g\.oid\s*=\s*String\(ev\.id/.test(SRC)); }
+  ok('원본: oid 는 매칭된 이벤트 id 로만 찍힌다', /g\.oid\s*=\s*String\(ev\.id/.test(SRC));
+  // 2026-11-01 오탐 2회째: ML 없는 프로바이더 이벤트(일방 경기)는 서버가 안 파는 시장 → 잔여 라인에서 제외 (서버 규칙과 락스텝)
+  ok('crosscheck: 머니라인(h2h) 없는 이벤트는 잔여 라인에서 제외 (서버 oddsOnlyGames "ML 없으면 안 판다" 와 락스텝)', /hasML\(x\.e\)/.test(CC) && /m\.key === 'h2h'/.test(CC) && /머니라인\/1X2 없는 시장만 있으면 안 판다/.test(SRC)); }
 
 console.log('\n' + (pass ? '🟢 team matching recovers soccer odds without cross-matching' : '🔴 matcher broken') + '\n');
 process.exit(pass ? 0 : 1);
