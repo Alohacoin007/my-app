@@ -7828,8 +7828,8 @@ function SupportPanel() {
   }, [{
     icon: 'call',
     label: 'Phone',
-    sub: '+1 917-826-7505',
-    href: 'tel:+19178267505'
+    sub: '+41 22 555 9900',
+    href: 'tel:+41225559900'
   }, {
     icon: 'mail',
     label: 'Email',

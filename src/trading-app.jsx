@@ -2044,7 +2044,7 @@ function SupportPanel(){
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:14}}>
         {/* Only the channels that actually work with no backend: real phone + email links.
             (Live Chat / Help Center removed — no chat server or articles site to point to.) */}
-        {[{icon:'call',label:'Phone',sub:'+1 917-826-7505',href:'tel:+19178267505'},{icon:'mail',label:'Email',sub:'support@alpexa-fx.com',href:'mailto:support@alpexa-fx.com'}].map(o=>(
+        {[{icon:'call',label:'Phone',sub:'+41 22 555 9900',href:'tel:+41225559900'},{icon:'mail',label:'Email',sub:'support@alpexa-fx.com',href:'mailto:support@alpexa-fx.com'}].map(o=>(
           <button key={o.label} onClick={()=>{ window.location.href=o.href; }} style={{padding:'14px 12px',borderRadius:10,background:'var(--bg)',border:'1px solid var(--line)',display:'flex',flexDirection:'column',alignItems:'flex-start',gap:4,textAlign:'left',cursor:'pointer'}}>
             <div style={{width:30,height:30,borderRadius:7,background:'var(--acc-3)',color:'var(--acc-2)',display:'flex',alignItems:'center',justifyContent:'center'}}><Mi name={o.icon} size={16}/></div>
             <div style={{fontSize:12.5,fontWeight:700,color:'var(--ink)',marginTop:4}}>{o.label}</div>
