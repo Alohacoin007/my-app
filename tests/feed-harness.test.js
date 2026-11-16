@@ -43,7 +43,7 @@ const ok = (n, c, d) => { if (c) { pass++; console.log('  ✅ ' + n); } else { f
   const PORT = 8869, server = await serve(PORT);
   const browser = await chromium.launch({ executablePath: exe, headless: true, args: ['--no-sandbox'] });
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
-  await page.goto(`http://localhost:${PORT}/dev/crypto-dashboard.html`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`http://localhost:${PORT}/crypto-dashboard.html`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(800);
   console.log('feed-harness — freeze → detect → heal → recover');
 

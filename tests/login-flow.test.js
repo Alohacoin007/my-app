@@ -78,7 +78,7 @@ const initStub = badPw => ({
   const me = await page.evaluate(() => localStorage.getItem('alpexa.me'));
   ok('alpexa.me written with accts.crypto', !!me && me.includes('"crypto":"CR-1"'), me && me.slice(0, 100));
   await page.waitForTimeout(1300);
-  ok('dest2=crypto-dashboard → redirects to dev/crypto-dashboard.html', page.url().includes('dev/crypto-dashboard.html'), page.url());
+  ok('dest2=crypto-dashboard → redirects to crypto-dashboard.html', page.url().includes('crypto-dashboard.html'), page.url());
   ok('no page errors end-to-end', errs.length === 0, errs.join(' | '));
   await page.close();
 

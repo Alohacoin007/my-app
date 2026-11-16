@@ -68,7 +68,7 @@ const PAGES = [
   { f: 'crypto-live.html',          minCtl: 5, drivers: ['__alpexaForceRender'] },   // React — 강제 리렌더
   { f: 'trading.html',              minCtl: 5, drivers: ['__alpexaForceRender'] },   // React — 강제 리렌더
   { f: 'webtrade.html',             minCtl: 5, drivers: ['renderAll', 'render', 'paint'] },
-  { f: 'dev/crypto-dashboard.html', minCtl: 5, drivers: ['mkRender', 'renderAll'] },
+  { f: 'crypto-dashboard.html', minCtl: 5, drivers: ['mkRender', 'renderAll'] },
   { f: 'sportsbook-desk.html',      minCtl: 3, drivers: ['renderAll', 'renderKpi'] },
   { f: 'pamm-desk.html',            minCtl: 3, drivers: ['renderAll', 'renderKpi'] },
 ];
@@ -216,7 +216,7 @@ const CHECK = `(tagged) => {
   if (fail) {
     console.log(`\n🔴 FAIL — ${fail}개 화면에서 클릭 타깃이 불안정하다.`);
     console.log('   고치는 법: 목록을 innerHTML 로 통째로 다시 만들지 말고, 구성이 같으면');
-    console.log('   노드를 유지한 채 숫자만 칠한다 (dev/crypto-dashboard.html 의 mkPaintRow 패턴).');
+    console.log('   노드를 유지한 채 숫자만 칠한다 (crypto-dashboard.html 의 mkPaintRow 패턴).');
     process.exit(1);
   }
   console.log(`\n🟢 PASS — ${checked}개 화면, 시세가 흘러도 버튼이 살아있다.` + (skipped ? ` (환경 제약 ${skipped}개 건너뜀)` : ''));

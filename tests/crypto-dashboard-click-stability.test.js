@@ -69,7 +69,7 @@ const TICK = `(n)=>{ const syms=mk.list.filter(s=>s!=='ALPXS');
   const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
   console.log('crypto-dashboard click stability — behavior gate');
 
-  await page.goto(`http://localhost:${PORT}/dev/crypto-dashboard.html`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`http://localhost:${PORT}/crypto-dashboard.html`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(700);
 
   // 워치리스트를 알려진 상태로 고정하고 한 번 그린다.

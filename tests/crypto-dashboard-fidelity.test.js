@@ -16,7 +16,7 @@ function ok(name, cond, extra) {
   else { failN++; console.log('  ❌ ' + name + (extra ? (' — ' + extra) : '')); }
 }
 
-const CAND = ['dev/crypto-dashboard.html', 'crypto-dashboard.html'];
+const CAND = ['crypto-dashboard.html', 'crypto-dashboard.html'];
 const rel = CAND.find(p => fs.existsSync(path.join(__dirname, '..', p)));
 if (!rel) { console.error('❌ crypto-dashboard.html not found (dev/ or root)'); process.exit(1); }
 const html = fs.readFileSync(path.join(__dirname, '..', rel), 'utf8');

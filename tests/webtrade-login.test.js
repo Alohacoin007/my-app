@@ -52,7 +52,7 @@ if (/get\('dest'\)/.test(lg)) bad('the dest= override must be fully gone (no ope
     if(pc(0)!=='webtrade.html') bad('FX on a PC must land on the WebTrade terminal');
     if(mob(0)!=='fx-app.html') bad('FX on a phone must land on the mobile FX app (fx-app.html, 2026-09-21 교체)');
     // 2026-07-17: crypto now device-routes like FX/Sports — PC dashboard, phone app.
-    if(pc(1)!=='dev/crypto-dashboard.html'||mob(1)!=='crypto-live.html') bad('Crypto landing: PC=dashboard, phone=app');
+    if(pc(1)!=='crypto-dashboard.html'||mob(1)!=='crypto-live.html') bad('Crypto landing: PC=dashboard, phone=app');
     // Sports mirrors FX device routing (2026-07-15): PC → widget dashboard, phone → app.
     if(pc(2)!=='sports-dashboard.html') bad('Sports on a PC must land on the widget dashboard (컴퓨터용)');
     if(mob(2)!=='sports-live.html') bad('Sports on a phone must land on the mobile app');

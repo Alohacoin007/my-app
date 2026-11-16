@@ -44,7 +44,7 @@ async function probeCrypto(browser) {
   // 크립토 대시보드 — Markets 행(bid 셀) 움직임 + mk.lastTick 신선도
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   try {
-    await page.goto(BASE + '/dev/crypto-dashboard.html', { waitUntil: 'domcontentloaded', timeout: 45000 });
+    await page.goto(BASE + '/crypto-dashboard.html', { waitUntil: 'domcontentloaded', timeout: 45000 });
     await page.waitForTimeout(6000);   // 피드 워밍업 (WS 접속 or 첫 폴백 폴)
     const snap = () => page.$$eval('#mkList .mrow', rows =>
       rows.slice(0, 8).map(r => (r.dataset.sym || '') + ':' + r.textContent.replace(/\s+/g, '')));

@@ -60,7 +60,7 @@ const STUB = `(sessOn)=>{
 
   // ── ③ 미로그인: CTA (헐벗은 ··· 금지) ──
   let page = await browser.newPage({ viewport: { width: 1000, height: 800 } });
-  await page.goto(`http://localhost:${PORT}/dev/crypto-dashboard.html`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`http://localhost:${PORT}/crypto-dashboard.html`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(600);
   ok('signed-out → Sign-in CTA (not bare ···)',
      await page.evaluate(() => !!document.querySelector('#walAmt [data-signin]')));

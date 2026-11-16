@@ -31,8 +31,19 @@ const EXCLUDE_EXT = /\.(md|sql|ts|py)$/i;
 // 기기 규칙은 login.html 의 FX 라우팅과 같다 (폰 → fx-app.html · PC → webtrade.html).
 const RETIRED_PAGES = { 'trading.html': { mobile: 'fx-app.html', desktop: 'webtrade.html' } };
 const RETIRED_ASSETS = new Set(['vendor/trading-compiled.js', 'src/trading-app.jsx']);
+// 주소가 바뀐 화면 (2026-11-16 정리 3단계 ③): 옛 주소 → 새 주소 (옛 주소 기준 상대 경로). 주소 뒤 ?… #… 는 그대로 넘긴다.
+const MOVED_PAGES = { 'dev/crypto-dashboard.html': '../crypto-dashboard.html' };
 function retiredStubs() {
   const out = {};
+  for (const [page, to] of Object.entries(MOVED_PAGES)) {
+    out[page] = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Alpexa</title>
+<script>location.replace('${to}'+location.search+location.hash);</script>
+<noscript><meta http-equiv="refresh" content="0;url=${to}"></noscript></head>
+<body style="background:#000;color:#8a97ac;font:14px -apple-system,Segoe UI,Roboto,sans-serif;padding:24px">
+This page has moved. <a href="${to}" style="color:#6aa5e8">Open Alpexa Crypto</a></body></html>
+`;
+  }
   for (const [page, to] of Object.entries(RETIRED_PAGES)) {
     out[page] = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Alpexa</title>
@@ -56,7 +67,7 @@ function publicFiles() {
   });
 }
 
-module.exports = { publicFiles, retiredStubs, EXCLUDE_TOP, EXCLUDE_EXT, RETIRED_PAGES, RETIRED_ASSETS };
+module.exports = { publicFiles, retiredStubs, EXCLUDE_TOP, EXCLUDE_EXT, RETIRED_PAGES, RETIRED_ASSETS, MOVED_PAGES };
 
 if (require.main === module) {
   const dest = path.resolve(ROOT, process.argv[2] || '_site');
@@ -68,6 +79,6 @@ if (require.main === module) {
     fs.copyFileSync(path.join(ROOT, f), to);
   }
   const stubs = retiredStubs();
-  for (const [page, html] of Object.entries(stubs)) fs.writeFileSync(path.join(dest, page), html);
+  for (const [page, html] of Object.entries(stubs)) { fs.mkdirSync(path.dirname(path.join(dest, page)), { recursive: true }); fs.writeFileSync(path.join(dest, page), html); }
   console.log(`site bundle → ${path.relative(ROOT, dest) || dest}: ${files.length} files + ${Object.keys(stubs).length} moved-page stub(s)`);
 }

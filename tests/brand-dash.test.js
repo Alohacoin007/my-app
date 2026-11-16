@@ -6,7 +6,7 @@
 const fs = require('fs'), path = require('path');
 const REPO = path.resolve(__dirname, '..');
 const FILES = ['fx-app.html', 'sports-live.html', 'login.html', 'signup.html', 'src/crypto-live-app.jsx', 'src/trading-app.jsx', 'vendor/crypto-live-compiled.js', 'vendor/trading-compiled.js',
-  'webtrade.html', 'terminal.html', 'sports-dashboard.html', 'dev/crypto-dashboard.html', 'index.html', 'about.html', 'fx.html', 'fx-risk.html', 'ib.html', 'markets.html',
+  'webtrade.html', 'terminal.html', 'sports-dashboard.html', 'crypto-dashboard.html', 'index.html', 'about.html', 'fx.html', 'fx-risk.html', 'ib.html', 'markets.html',
   'support.html', 'statement.html', 'manager-mobile.html', 'site/index.html', 'site/sports.html', 'site/legal.html', 'site/promotions.html', 'site/introducing-broker.html'];
 let fail = 0;
 for (const f of FILES) {

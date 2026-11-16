@@ -51,7 +51,7 @@ eq('PC + FX = webtrade 터미널',   makeFxDest(PC)(3), 'webtrade.html');
 eq('Mobile + FX = 새 FX 앱(fx-app)', makeFxDest(PHONE)(3), 'fx-app.html');
 
 // 5) Crypto (server 1) — 2026-07-17 계약 변경(사장님 지시): 크립토도 기기 라우팅.
-eq('Crypto PC = 크립토 대시보드', makeFxDest(PC)(1), 'dev/crypto-dashboard.html');
+eq('Crypto PC = 크립토 대시보드', makeFxDest(PC)(1), 'crypto-dashboard.html');
 eq('Crypto 폰 = crypto-live 앱', makeFxDest(PHONE)(1), 'crypto-live.html');
 
 // 6) Explicit return tokens still win (dashboard round-trip + a way back to the app).

@@ -11,7 +11,7 @@ const REPO = path.resolve(__dirname, '..');
 let pass = 0, fail = 0;
 const ok = (n, c, x) => { if (c) pass++; else fail++; console.log(`  ${c ? '✅' : '❌'} ${n}${!c && x ? '  ' + x : ''}`); };
 const FILES = ['webtrade.html', 'terminal.html', 'fx-app.html', 'login.html', 'signup.html', 'fx.html', 'markets.html',
-  'about.html', 'support.html', 'ib.html', 'crypto-live.html', 'src/crypto-live-app.jsx', 'dev/crypto-dashboard.html',
+  'about.html', 'support.html', 'ib.html', 'crypto-live.html', 'src/crypto-live-app.jsx', 'crypto-dashboard.html',
   'sports-live.html', 'sports-dashboard.html', 'index.html'];
 // 태그 본문(>…) 또는 따옴표 문자열 안의 상표. 주석(<!-- … -->, // …, /* … */)은 > ' " 로 시작하지 않아 안 걸린다.
 const SHOWN = /(>|'|"|`)[^<'"`\n]*(MetaTrader|MetaQuotes)/;
