@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // REGRESSION (webtrade) — the MT5 "Insert" menu must actually work (it was all disabled). Its
 // entries arm the real drawing tools we have: Lines → trend/hline/vline, Fibonacci → fib, Text →
-// text; Indicators → a live submenu of the applied indicators (+ Remove All). Channels/Shapes stay
-// disabled placeholders (no such tool built) — honest, not faked. Submenus fly out on hover.
+// text; Indicators → a live submenu of the applied indicators (+ Remove All). Channels/Shapes have no
+// tool built → they are NOT listed at all (2026-11-16 정리 2단계: 회색 자리표시도 걷어냄 — 기능이 생기면
+// 그때 메뉴에 올린다). Submenus fly out on hover.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -23,9 +24,9 @@ if (!/\{l:'Vertical Line', tool:'vline'\}/.test(ins)) bad('Lines → Vertical Li
 if (!/\{l:'Fibonacci', children:\[ \{l:'Fibonacci Retracement', tool:'fib'\}/.test(ins)) bad('Insert → Fibonacci → Retracement must arm the fib tool');
 if (!/\{l:'Text', tool:'text'\}/.test(ins)) bad('Insert → Text must arm the text tool');
 if (!/\{l:'Indicators', indicators:1\}/.test(ins)) bad('Insert → Indicators must open the (dynamic) indicators submenu');
-// unbuilt tools are honest disabled placeholders (not faked)
-if (!/\{l:'Channels', dis:1\}/.test(ins)) bad('Channels has no tool yet → must be a disabled placeholder');
-if (!/\{l:'Shapes', dis:1\}/.test(ins)) bad('Shapes has no tool yet → must be a disabled placeholder');
+// unbuilt tools are not listed (neither faked nor greyed out)
+if (/Channels|Shapes/.test(ins)) bad('Channels/Shapes have no tool yet → must not be in the Insert menu');
+if (/dis:1/.test(ins)) bad('Insert menu must have no greyed-out placeholder items');
 
 // MenuBar must actually render fly-out submenus and route their clicks
 if (!/const kids = it\.indicators \? indChildren\(\) : it\.children/.test(src)) bad('MenuBar Row must resolve submenu children (incl. dynamic indicators)');
@@ -40,4 +41,4 @@ const mz = (src.match(/\.mdrop\{[^}]*z-index:(\d+)/) || [])[1];
 if (!mz || +mz < 10000) bad('menu dropdown (.mdrop) z-index must be very high so it renders above floating charts (was 40)');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} Insert-menu problem(s).`); process.exit(1); }
-console.log('🟢 PASS: Insert menu is live — Lines/Fibonacci/Text arm real tools, Indicators is a dynamic submenu; Channels/Shapes are honest disabled placeholders.');
+console.log('🟢 PASS: Insert menu is live — Lines/Fibonacci/Text arm real tools, Indicators is a dynamic submenu; no greyed-out placeholders.');

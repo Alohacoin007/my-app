@@ -44,5 +44,28 @@ for (const [nm, src] of [['소스', jsx], ['컴파일본', bin]]) {
 }
 ok('③ 크립토 소스: 세금 서류 화면 분기(personal-tax)도 없음', !/id === 'personal-tax'/.test(jsx));
 
+// ── ④ PC 웹트레이드: 눌러도 아무 일 없는 메뉴·탭·버튼 삭제 ─────────────────────
+// 왜: 회색 처리된(눌러지지 않는) 메뉴 13개 · 내용 없는 툴박스 탭 5개(News·Calendar·Articles·Code Base·Experts) ·
+//     눌러도 색만 바뀌는 "Algo Trading" 버튼 · 체크해도 아무것도 안 켜지는 View → Status Bar.
+//     기능이 생기면 그때 메뉴에 올린다 (없는 기능을 메뉴에 걸어 두지 않는다).
+const wt = rd('webtrade.html');
+const menuDef = (wt.match(/const MENU_DEF = \{[\s\S]*?\n\};/) || [''])[0];
+ok('④ 웹트레이드: 메뉴 정의를 찾았다', !!menuDef);
+ok('④ 웹트레이드: 회색(눌러지지 않는) 메뉴 항목 0', !!menuDef && !/dis:1/.test(menuDef), (menuDef.match(/\{l:'[^']+'[^}]*dis:1\}/g) || []).join(' '));
+ok('④ 웹트레이드: 항목이 하나도 없는 Help 메뉴는 메뉴줄에서 뺌', /const MENUS=\['File','View','Insert','Charts','Tools','Window'\];/.test(wt) && !/\n  Help:\s*\[/.test(menuDef));
+ok('④ 웹트레이드: 차트 우클릭 메뉴의 회색 Properties... 없음', !/\{l:'Properties\.\.\.', dis:1\}/.test(wt));
+ok('④ 웹트레이드: 툴박스 탭 = 내용 있는 8개만',
+   /const TBX_TABS=\['Trade','Exposure','History','PAMM','Mailbox','Company','Alerts','Journal'\];/.test(wt));
+ok('④ 웹트레이드: 빈 탭 안내(TAB_EMPTY · EmptyTab) 없음', !/TAB_EMPTY/.test(wt) && !/EmptyTab/.test(wt));
+ok('④ 웹트레이드: Algo Trading 버튼·상태·명령 없음', !/Algo Trading/.test(wt) && !/algo\.toggle/.test(wt) && !/setAlgo/.test(wt) && !/\.tbtn\.algo/.test(wt));
+ok('④ 웹트레이드: Status Bar 메뉴·컴포넌트·스타일 없음', !/Status Bar/.test(wt) && !/function StatusBar\(/.test(wt) && !/\.statusbar/.test(wt) && !/statusbar:true/.test(wt));
+ok('④ 웹트레이드: 살아 있는 메뉴는 그대로 (New Chart Window · New Order · Tile Windows · Toolbars · Full Screen)',
+   /\{l:'New Chart Window', cmd:'chart\.new'\}/.test(menuDef) && /\{l:'New Order', cmd:'order\.new', k:'F9'\}/.test(menuDef) &&
+   /\{l:'Tile Windows', cmd:'window\.tile'\}/.test(menuDef) && /\{l:'Toolbars', v:'toolbars', keep:1\}/.test(menuDef) && /\{l:'Full Screen', k:'F11', cmd:'view\.fullscreen'\}/.test(menuDef));
+ok('④ 웹트레이드: 내비게이터 = 내용 있는 폴더만 (Accounts · Indicators) — 눌러도 빈 Expert Advisors·Scripts·Services·Market·VPS 없음',
+   /const NAV_FOLDERS=\[\['Accounts','👤'\],\['Indicators','📈'\]\];/.test(wt));
+ok('④ 웹트레이드: 인디케이터 트리에 빈 폴더 없음 (Volumes · Bill Williams · Examples · Free Indicators)',
+   !/\['(Volumes|Bill Williams|Examples|Free Indicators)', \[\]\]/.test(wt) && /\['Trend', \[\['MA20'/.test(wt) && /\['Oscillators', \[\['RSI14'/.test(wt));
+
 console.log(`\n${fail ? '🔴' : '🟢'} cleanup-phase2 — ${pass} pass, ${fail} fail`);
 process.exit(fail ? 1 : 0);

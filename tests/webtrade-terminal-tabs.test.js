@@ -2,8 +2,9 @@
 // REGRESSION (webtrade) — the terminal tabs that had no data binding are now activated with REAL
 // data: Journal = a live in-memory event log (terminal/login/order/close/SL-TP/errors), Exposure =
 // per-symbol notional + % of equity, Mailbox = the account's non-trade settlements (deposits/bonuses/
-// adjustments) with click-to-expand. News/Calendar have NO platform feed → honest "not connected"
-// state (no fake data). Trade + History are untouched. Tab switch swaps only the content (no reflow).
+// adjustments) with click-to-expand. News/Calendar have NO platform feed → the tabs are not listed at
+// all (2026-11-16 정리 2단계: 빈 "not connected" 탭도 걷어냄 — never fake data, never an empty shell).
+// Trade + History are untouched. Tab switch swaps only the content (no reflow).
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -33,13 +34,14 @@ if (!/\.from\('settlements'\)\.select\('kind,symbol,pnl,detail,created_at'\)\.eq
 if (!/x\.kind!=='fx_close' && x\.kind!=='fx_open'/.test(src)) bad('Mailbox must exclude trade opens/closes (notices only)');
 if (!/tab==='Mailbox' \? <MailboxTab \/>/.test(src)) bad('Mailbox tab must render MailboxTab');
 
-// 4) News / Calendar — honest "feed not connected" (NO fake data)
-if (!/News:\['📰','News feed not connected'\]/.test(src)) bad('News must show an honest feed-not-connected state (no mock)');
-if (!/Calendar:\['📅','Economic calendar not connected'\]/.test(src)) bad('Calendar must show an honest feed-not-connected state (no mock)');
+// 4) News / Calendar — no feed → no tab (neither fake data nor an empty shell)
+const tabs = (src.match(/const TBX_TABS=\[[^\]]*\];/) || [''])[0];
+if (!tabs) bad('TBX_TABS not found');
+if (/'News'|'Calendar'/.test(tabs)) bad('News/Calendar have no feed → must not be listed as tabs');
 
 // 5) Trade + History cores untouched (still routed to the real table)
 if (!/tab==='Trade' && pos\.map\(p=>\{/.test(src)) bad('Trade table core must remain');
 if (!/tab==='History' && histShown\.slice\(histV\.start,histV\.end\)\.map\(h=>\(/.test(src)) bad('History table core must remain');
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} terminal-tab problem(s).`); process.exit(1); }
-console.log('🟢 PASS: Journal (live log) + Exposure (notional/%) + Mailbox (real settlements) activated; News/Calendar honest feed-pending; Trade/History cores intact.');
+console.log('🟢 PASS: Journal (live log) + Exposure (notional/%) + Mailbox (real settlements) activated; News/Calendar not listed (no feed); Trade/History cores intact.');
