@@ -67,5 +67,26 @@ ok('④ 웹트레이드: 내비게이터 = 내용 있는 폴더만 (Accounts · 
 ok('④ 웹트레이드: 인디케이터 트리에 빈 폴더 없음 (Volumes · Bill Williams · Examples · Free Indicators)',
    !/\['(Volumes|Bill Williams|Examples|Free Indicators)', \[\]\]/.test(wt) && /\['Trend', \[\['MA20'/.test(wt) && /\['Oscillators', \[\['RSI14'/.test(wt));
 
+// ── ⑤ 옛 FX 모바일 앱(trading.html) 은퇴 — 고객 사이트에서 내림 ──────────────────
+// 왜: 2026-09-21 모바일 FX 가 fx-app.html 로 교체된 뒤 trading.html 로 가는 링크는 0. 그런데도 주소를 직접 치면
+//     옛 앱(주문·입출금 가능)이 그대로 열렸다 = 관리 안 하는 화면이 고객에게 열려 있음 + 77만 바이트 배포.
+// 방법: 파일은 리포에 남긴다 (스프레드·계약 락스텝 테스트 20여 개가 이 파일을 기준으로 읽는다).
+//       공개 묶음(tools/build-site.js)에서만 빼고, 그 주소엔 **새 앱으로 보내는 쪽지**를 넣는다 (즐겨찾기 고객이 404 를 보지 않게).
+const bs = require('../tools/build-site.js');
+const pubNow = new Set(bs.publicFiles());
+ok('⑤ 묶음: 옛 FX 앱 원본 3개(trading.html · 컴파일본 · 소스)가 공개 묶음에 없다',
+   !pubNow.has('trading.html') && !pubNow.has('vendor/trading-compiled.js') && !pubNow.has('src/trading-app.jsx'));
+ok('⑤ 묶음: 리포에는 그대로 있다 (락스텝 테스트 기준 파일)', ['trading.html', 'vendor/trading-compiled.js', 'src/trading-app.jsx'].every((f) => fs.existsSync(path.join(REPO, f))));
+const stubs = typeof bs.retiredStubs === 'function' ? bs.retiredStubs() : {};
+const stub = stubs['trading.html'] || '';
+ok('⑤ 묶음: trading.html 주소엔 이동 쪽지가 들어간다 (폰 → fx-app.html · PC → webtrade.html — login.html 과 같은 기기 규칙)',
+   /location\.replace\(/.test(stub) && /fx-app\.html/.test(stub) && /webtrade\.html/.test(stub) &&
+   /Android\|iPhone\|iPad\|iPod\|Mobile\|IEMobile\|Opera Mini/.test(stub));
+ok('⑤ 묶음: 쪽지는 옛 앱 코드를 싣지 않는다 (스크립트 파일 0 · 2KB 미만) · 이동 대상은 묶음 안에 있다',
+   !!stub && !/<script[^>]+src=/.test(stub) && stub.length < 2048 && pubNow.has('fx-app.html') && pubNow.has('webtrade.html'));
+const refs = [...pubNow].filter((f) => /\.(html|js|json)$/.test(f) && !f.startsWith('vendor/') && !f.startsWith('src/'))
+  .filter((f) => /(href|src)\s*=\s*["'][^"']*trading\.html|location[^\n;]{0,40}['"][^'"]*trading\.html|trading-compiled\.js/.test(rd(f)));
+ok('⑤ 묶음: 공개 화면 어디에도 옛 FX 앱으로 가는 링크·이동이 없다', refs.length === 0, refs.join(', '));
+
 console.log(`\n${fail ? '🔴' : '🟢'} cleanup-phase2 — ${pass} pass, ${fail} fail`);
 process.exit(fail ? 1 : 0);
