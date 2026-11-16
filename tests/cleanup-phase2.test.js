@@ -20,5 +20,17 @@ ok('① 대시보드: Add widget 메뉴가 은퇴 위젯을 뺀다', /Object\.ke
 ok('① 대시보드: 예전에 꺼내 둔 고객 화면에서도 강제로 숨긴다 (저장된 배치 무시)',
    /RETIRED_WIDGETS\.forEach\(id=>\{ if\(layout\[id\]\) layout\[id\]\.hidden=true; \}\)/.test(cd));
 
+// ── ② 스포츠 모바일: 경기 시뮬레이터 삭제 ──────────────────────────────────────
+// 왜: 시안 시절엔 가짜 경기(g.real 없음)의 점수·시계·배당을 랜덤으로 굴렸다. 지금 GAMES 에 들어오는 경기는
+//     전부 real:true (서버 live_games · ESPN 폴백 · UFC) 라서 그 루프는 한 번도 돌지 않는다 = 죽은 코드 약 170줄.
+//     살아 있으면 "누가 real 을 빼먹는 순간 가짜 점수·가짜 배당이 고객 화면에서 돈다"는 지뢰이기도 하다.
+const sp = rd('sports-live.html');
+ok('② 스포츠: 시뮬레이터 함수·선수 풀 없음 (PLAYERS · scoreEvent · nonScoringPlay · advanceClock · reactOddsToScore · clkLabel)',
+   !/const PLAYERS=\{/.test(sp) && !/function (scoreEvent|nonScoringPlay|advanceClock|reactOddsToScore|clkLabel)\(/.test(sp));
+ok('② 스포츠: 가짜 경기(!g.real)를 굴리는 루프 없음', !/GAMES\.filter\(g=>g\.live && !g\.real\)/.test(sp));
+ok('② 스포츠: 화면 갱신 틱은 그대로 (renderGames · 실황 · 슬립 · 캐시아웃 재계산)',
+   /renderGames\(\);if\(_lcovId\)renderCoverage\(\);if\(!legsEl\.dataset\.props&&legs\.length\)drawLegs\(\);calc\(\);/.test(sp));
+ok('② 스포츠: 들어오는 경기는 전부 real:true (서버 · ESPN 폴백 · UFC 3곳)', (sp.match(/real:\s*true/g) || []).length === 3);
+
 console.log(`\n${fail ? '🔴' : '🟢'} cleanup-phase2 — ${pass} pass, ${fail} fail`);
 process.exit(fail ? 1 : 0);
