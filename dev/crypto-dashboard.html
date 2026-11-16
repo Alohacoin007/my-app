@@ -641,6 +641,11 @@ function loadLayout(){ try{ const raw=localStorage.getItem(LKEY); if(!raw) retur
   return p;
 }catch(e){ return deepLayout(DEFAULT_LAYOUT); } }
 let layout=loadLayout();
+/* 은퇴 위젯 (2026-11-15 사장님 "2단계 진행해"): Open orders 는 모바일 앱이 폰에 저장한 지정가·스탑 주문을 읽어
+   보여주기만 했다. 그 주문은 아무도 체결하지 않아 1단계에서 모바일의 탭을 숨겼다 → 이제 영원히 빈 위젯.
+   Add widget 메뉴에서 빼고, 예전에 꺼내 둔 화면에서도 숨긴다. 서버 지정가 주문이 생기면 여기서 빼면 된다(코드는 보존). */
+const RETIRED_WIDGETS = new Set(['orders']);
+RETIRED_WIDGETS.forEach(id=>{ if(layout[id]) layout[id].hidden=true; });
 Object.keys(layout).forEach(id=>{ const m=MIN_SIZE[id]; if(!m) return;
   if(layout[id].w<m.w) layout[id].w=m.w; if(layout[id].h<m.h) layout[id].h=m.h; });
 function saveLayout(){ try{ localStorage.setItem(LKEY, JSON.stringify(layout)); }catch(e){} }
@@ -676,7 +681,7 @@ const WIDGET_TITLES={ balance:'Account', portfolio:'Portfolio', markets:'Markets
   settings:'Settings' };
 function setHidden(id, hidden){ layout[id].hidden=hidden; applyGeo(id); saveLayout(); renderAddMenu(); }
 function renderAddMenu(){ const m=document.getElementById('addMenu'); if(!m) return;
-  m.innerHTML=Object.keys(WIDGET_TITLES).map(id=>{
+  m.innerHTML=Object.keys(WIDGET_TITLES).filter(id=>!RETIRED_WIDGETS.has(id)).map(id=>{
     const off=!!layout[id].hidden;
     return '<div class="addrow" data-id="'+id+'" style="display:flex; align-items:center; gap:8px; padding:8px 10px;'+
       ' border-radius:6px; cursor:pointer'+(off?'':'; color:var(--lgd-dim)')+'">'+
