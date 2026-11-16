@@ -2387,12 +2387,10 @@ function SendReview({ recipient, asset, assetId, amount, memo, state, onConfirm,
   const sending = state === 'sending';
   const sent    = state === 'sent';
   const [receiptOpen, setReceiptOpen] = React.useState(false);
-  // Generate a stable transaction reference + fake hash for this open of the screen
-  const refData = React.useMemo(() => ({
-    ref: 'ALPX-' + Math.random().toString(36).slice(2, 7).toUpperCase(),
-    hash: '0x' + Array.from({ length: 16 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
-    when: new Date(),
-  }), []);
+  // 영수증에 찍는 시각만 고정한다. (2026-11-15) 예전엔 Math.random() 으로 만든 Reference·체인 해시를 같이
+  // 보여줬는데, 내부 이체(crypto_send_internal)에는 체인 해시가 없고 그 Reference 는 서버 기록과 이어지지
+  // 않는 지어낸 값이었다 — 고객이 문의할 때 대도 찾을 수 없다. 핀: tests/no-fake-content.test.js
+  const sentAt = React.useMemo(() => new Date(), []);
 
   if (receiptOpen) {
     return (
@@ -2462,7 +2460,7 @@ function SendReview({ recipient, asset, assetId, amount, memo, state, onConfirm,
               marginTop: 8, fontSize: 11.5, color: RH.textDim,
               fontFamily: FONT_UI, letterSpacing: 0.4,
             }}>
-              sent · {refData.when.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+              sent · {sentAt.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
             </div>
           </div>
 
@@ -2520,13 +2518,9 @@ function SendReview({ recipient, asset, assetId, amount, memo, state, onConfirm,
             borderRadius: 14, padding: '14px 16px',
             marginBottom: 14, fontVariantNumeric: 'tabular-nums',
           }}>
-            <Row label="Reference"   value={refData.ref}/>
-            <div style={{ height: 1, background: RH.line, margin: '10px 0' }}/>
             <Row label="Recipient"   value={recipient.handle}/>
             <div style={{ height: 1, background: RH.line, margin: '10px 0' }}/>
-            <Row label="Network"     value={assetId === 'USDT' ? 'Internal' : assetId === 'BTC' ? 'Bitcoin' : 'Ethereum'}/>
-            <div style={{ height: 1, background: RH.line, margin: '10px 0' }}/>
-            <Row label="Tx hash"     value={refData.hash.slice(0, 10) + '…' + refData.hash.slice(-4)}/>
+            <Row label="Network"     value="Alpexa internal transfer"/>
           </div>
 
           {memo ? (
@@ -2661,9 +2655,7 @@ function SendReview({ recipient, asset, assetId, amount, memo, state, onConfirm,
             fontFamily: FONT_UI, fontSize: 10.5,
             color: RH.textDim, letterSpacing: 0.4,
           }}>
-            <Row label="REFERENCE" value={refData.ref}/>
-            <div style={{ height: 1, background: RH.line, margin: '8px 0' }}/>
-            <Row label="WHEN"      value={refData.when.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}/>
+            <Row label="WHEN"      value={sentAt.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}/>
             <div style={{ height: 1, background: RH.line, margin: '8px 0' }}/>
             <Row label="STATUS"    value="Completed"/>
           </div>
@@ -6621,11 +6613,11 @@ const ACCOUNT_CATEGORIES = [
     desc: 'Order history, deposits, stakes, fee tiers, limits, statements',
     items: ['Order history', 'Open orders', 'Filled orders', 'Deposits / withdrawals', 'Staking activity', 'Fee schedule', 'Limits', 'Statements'] },
   { id: 'personal',  title: 'Personal',
-    desc: 'Profile, identity verification, tax documents',
-    items: ['Profile · name and email', 'Identity verification', 'Tax documents', 'Beneficiaries'] },
+    desc: 'Profile, identity verification, beneficiaries',
+    items: ['Profile · name and email', 'Identity verification', 'Beneficiaries'] },
   { id: 'security',  title: 'Security & privacy',
-    desc: 'Password, two-factor auth, devices, data',
-    items: ['Change password', 'Two-factor authentication', 'Trusted devices', 'Data & privacy', 'App permissions'] },
+    desc: 'Password, devices, data',
+    items: ['Change password', 'Trusted devices', 'Data & privacy', 'App permissions'] },
   { id: 'crypto',    title: 'Crypto',
     desc: 'Wallets, networks, allowlisting, fee tiers',
     items: ['Wallet addresses', 'Networks & memos', 'Allowlist transfers', 'Fee tier', 'Tax lots'] },
@@ -6923,15 +6915,11 @@ const HELP_ARTICLES = {
   ],
   trading: [
     { q: 'What order types are supported?',
-      a: `Market, Limit, Stop-loss, and Stop-limit orders are supported on every tradeable asset.\n\n• Market — fills immediately at the best available price.\n• Limit — only fills at your specified price or better.\n• Stop — triggers a market order when the price crosses your stop level.\n• Stop-limit — triggers a limit order when the stop is hit; protects against slippage during volatile moves.\n\nOpen orders appear in Account → Trading & orders and can be cancelled anytime before they fill.` },
+      a: `Market orders. A market order fills immediately at the current price.\n\nLimit and stop orders are not available yet.` },
     { q: 'When does the market open?',
-      a: `Crypto markets on Alpexa trade 24/7/365, including weekends and US holidays.\n\nTokenized securities (ALPX-RE1, ALPX-CR2) trade during US equity market hours: 9:30 AM – 4:00 PM ET, Monday through Friday. Limit orders placed outside hours queue for the next session.` },
-    { q: 'Why is my order not filling?',
-      a: `Common reasons for an unfilled limit order:\n\n• Your limit price is on the wrong side of the spread (a buy below the bid, or a sell above the ask).\n• The market hasn't moved through your price yet.\n• The asset has low liquidity at your price level.\n\nFor stop orders: the trigger condition hasn't been met. Stop-loss for a long position triggers when the price falls to your stop level.` },
+      a: `Crypto markets on Alpexa trade 24/7/365, including weekends and US holidays.\n\nTokenized securities (ALPX-RE1, ALPX-CR2) trade during US equity market hours: 9:30 AM – 4:00 PM ET, Monday through Friday.` },
     { q: 'What is the spread?',
-      a: `The spread is the difference between the highest buy bid and the lowest sell ask in the order book. Alpexa adds a 2 bps (0.02%) markup on each side of the mid-price for routing and quoting.\n\nSpreads widen during high-volatility events. Limit orders let you control the exact price you transact at, sidestepping spread costs at the risk of not filling.` },
-    { q: 'Can I cancel a pending order?',
-      a: `Yes. Go to Account → Trading & orders → tap the open order → "Cancel order". Cancellations are usually instant but may take a few seconds during peak volume. Once an order has filled (partially or fully), the filled portion cannot be cancelled.` },
+      a: `The spread is the difference between the highest buy bid and the lowest sell ask in the order book. Alpexa adds a 2 bps (0.02%) markup on each side of the mid-price for routing and quoting.\n\nSpreads widen during high-volatility events.` },
   ],
   staking: [
     { q: 'How does staking work?',
@@ -6946,10 +6934,6 @@ const HELP_ARTICLES = {
       a: `In the US, staking rewards are generally taxed as ordinary income at the fair market value on the day they're received. Alpexa issues a 1099-MISC for total staking rewards $600 or more per year (Account → Tax documents).\n\nConsult a tax professional for guidance specific to your situation.` },
   ],
   security: [
-    { q: 'How do I enable two-factor authentication?',
-      a: `Account → Security & sign-in → Two-factor authentication. We support:\n\n• Authenticator apps (Google Authenticator, 1Password, Authy) — recommended.\n• Hardware keys (YubiKey, Titan) — strongest protection.\n• SMS — convenient but vulnerable to SIM-swap attacks; only as backup.\n\nWe strongly recommend at least one app-based or hardware factor in addition to SMS.` },
-    { q: 'What if I lose my 2FA device?',
-      a: `Use the recovery codes you saved when 2FA was set up — each code works once. Without recovery codes, contact support: we'll verify your identity via a video call with your government ID before re-issuing access. This process takes 2–5 business days for security reasons.\n\nNever share your recovery codes or 2FA codes with anyone, including Alpexa support — we will never ask.` },
     { q: 'How do I report a suspicious email or call?',
       a: `Forward suspicious emails to phishing@alpexa-suisse.com and delete them. Alpexa will never call or email asking for your password, 2FA code, recovery phrase, or to install remote-access software.\n\nIf you suspect your account has been compromised, immediately: change your password, revoke all sessions (Account → Security → Sign out all devices), and contact support.` },
     { q: 'Are my crypto deposits insured?',
@@ -9092,10 +9076,12 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
             <AcctDivider/>
             <AcctRow label="Selfie verification" sub="Not submitted" chevron={false}/>
           </AcctSection>
-          <AcctSection title="Verify your identity">
-            <AcctRow label="Start verification"
+          {/* (2026-11-15) 예전엔 여기 누르면 "팀이 연락드립니다" 토스트만 뜨는 가짜 시작 버튼이 있었다 — 요청이
+              어디에도 기록되지 않았다. 실제 KYC 업체가 연동되기 전까지는 눌리지 않는 안내 줄만 둔다. */}
+          <AcctSection title="How verification works">
+            <AcctRow label="Not available in the app yet"
               sub="Identity verification is being rolled out — our team will contact you to complete it"
-              onClick={() => flashAndClose('Thanks — our team will reach out to complete your verification.')}/>
+              chevron={false}/>
           </AcctSection>
         </>
       );
@@ -9620,27 +9606,8 @@ function AccountSubPageContent({ subPage, setSubSub, transactions = [], setTrans
   const [price,    setPrice]    = usePersistedState('alpexa.notif.price',    true);
   const [fills,    setFills]    = usePersistedState('alpexa.notif.fills',    true);
   const [market,   setMarket]   = usePersistedState('alpexa.notif.market',   false);
-  const [twofa,    setTwofaRaw] = usePersistedState('alpexa.sec.twofa',      true);
-  const [bio,      setBioRaw]   = usePersistedState('alpexa.sec.bio',        true);
-  const [autoLock, setAutoLockRaw] = usePersistedState('alpexa.sec.autoLock', true);
-  const alpexa = React.useContext(ModalContext);
-  // Confirm before disabling security features — bypass when turning on.
-  const guardedToggle = (currentVal, setter, label, riskMsg) => async (next) => {
-    if (currentVal && !next) {
-      const ok = await alpexa.confirm(riskMsg, { title: 'Disable ' + label + '?' });
-      if (!ok) return;
-    }
-    setter(next);
-  };
-  const setTwofa    = guardedToggle(twofa,    setTwofaRaw,
-    'two-factor authentication',
-    'Disabling 2FA significantly reduces your account security. Anyone with your password could sign in. Are you sure?');
-  const setBio      = guardedToggle(bio,      setBioRaw,
-    'biometric unlock',
-    'Without Face ID, large orders won\'t require an extra biometric step. Are you sure?');
-  const setAutoLock = guardedToggle(autoLock, setAutoLockRaw,
-    'auto-lock',
-    'Your account will stay signed in indefinitely. Anyone with your unlocked device can access it. Are you sure?');
+  // (2026-11-15) 보안 토글 3개(2단계 인증·생체 잠금해제·자동 잠금)는 뺐다 — 켜고 꺼도 읽는 코드가 하나도 없는
+  // 장식이었다. 출금 인증코드는 이 토글과 무관하게 서버(withdraw-otp)가 강제한다. 핀: tests/no-fake-content.test.js
 
   const go = (id) => () => setSubSub(id);
 
@@ -9672,8 +9639,6 @@ function AccountSubPageContent({ subPage, setSubSub, transactions = [], setTrans
           <AcctDivider/>
           <AcctRow label="Address" value="San Francisco, CA" onClick={go('personal-address')}/>
           <AcctDivider/>
-          <AcctRow label="Tax documents" sub="Annual statements & trade history" onClick={go('personal-tax')}/>
-          <AcctDivider/>
           <AcctRow label="Beneficiaries" sub={(beneficiaries || []).length === 0 ? 'No beneficiaries on file' : ((beneficiaries || []).length + ' beneficiar' + ((beneficiaries || []).length === 1 ? 'y' : 'ies'))} onClick={go('personal-beneficiaries')}/>
         </AcctSection>
         <AcctSection title="Payment methods">
@@ -9700,12 +9665,6 @@ function AccountSubPageContent({ subPage, setSubSub, transactions = [], setTrans
               return 'Changed ' + d + ' days ago';
             } catch (_) { return 'Recommended every 90 days'; }
           })()} onClick={go('security-password')}/>
-          <AcctDivider/>
-          <AcctToggle label="Two-factor authentication" sub="Verification code on withdrawals" on={twofa} onChange={setTwofa}/>
-          <AcctDivider/>
-          <AcctToggle label="Biometric unlock" sub="Face ID for orders > $1,000" on={bio} onChange={setBio}/>
-          <AcctDivider/>
-          <AcctToggle label="Auto-lock after 5 min" on={autoLock} onChange={setAutoLock}/>
         </AcctSection>
         <AcctSection title="Devices & sessions">
           <AcctRow label="This device" sub="Signed in now" status="Active" statusColor={RH.green} chevron={false}/>
@@ -9716,8 +9675,6 @@ function AccountSubPageContent({ subPage, setSubSub, transactions = [], setTrans
           <AcctRow label="Data sharing" onClick={go('security-data-sharing')}/>
           <AcctDivider/>
           <AcctRow label="Marketing preferences" onClick={go('security-marketing')}/>
-          <AcctDivider/>
-          <AcctRow label="Download my data" onClick={go('security-download')}/>
         </AcctSection>
       </>
     );
@@ -11802,6 +11759,13 @@ const AudioFX = {
   },
 };
 
+// 주문 유형 — 지금은 시장가만 (2026-11-15 사장님 "1단계로 해").
+// 왜: 지정가·스탑 주문은 이 폰(localStorage 'alpexa.pendingOrders')에만 저장되고 서버·크론 어디에서도 체결하지
+// 않았다. 그런데 화면은 "가격에 도달하면 체결됩니다"라고 안내했다 = 고객이 주문이 걸렸다고 믿고 기다리게 됨.
+// 서버 지정가 주문(FX 의 fx_place_pending 같은 것)이 생기면 그때 이 목록에 유형을 다시 넣는다.
+// 유형이 하나뿐이면 탭 줄 자체를 그리지 않는다. 핀: tests/no-fake-content.test.js
+const ORDER_TYPES = ['Market'];
+
 function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiquidate, side = 'buy', initialAssetId }) {
   const { fees } = React.useContext(FeeConfigContext);
   const isSell = side === 'sell';
@@ -12291,9 +12255,10 @@ function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiq
           })}
         </div>
 
-        {/* Order type tabs */}
+        {/* Order type tabs — 유형이 둘 이상일 때만 (지금은 시장가 하나라 숨김, ORDER_TYPES 주석 참고) */}
+        {ORDER_TYPES.length > 1 ? (
         <div style={{ margin: '6px 16px 0', padding: 2, display: 'flex', gap: 2, borderRadius: 18, background: RH.surface }}>
-          {['Market','Limit','Stop'].map((t) => {
+          {ORDER_TYPES.map((t) => {
             const active = t === orderType;
             return (
               <button key={t} onClick={() => setOrderType(t)} style={{
@@ -12307,6 +12272,7 @@ function Buy({ onBack, balances = {}, transactions = [], onBought, onSold, onLiq
             );
           })}
         </div>
+        ) : null}
 
         {/* Trigger price stepper — visible for Limit / Stop */}
         {orderType !== 'Market' ? (() => {

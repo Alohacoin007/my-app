@@ -145,9 +145,8 @@ if (!/\.obox\{[^}]*border:none;box-shadow/.test(src)) bad('the .obox one-shell c
 // (4) UI label renamed to Legend (no "Light / Dark" left)
 // 2026-07-23 버전 스위처: 테마 토글 폐지 → View 메뉴는 Legend 1(여기·체크)/Legend 2(터미널 이동).
 if (/cmd:'theme\.toggle'/.test(src)) bad('theme.toggle must be gone — the dark/legend toggle was replaced by the Legend 1/2 version switcher');
-if (!/\{l:'Legend 1 — Classic', cmd:'ver\.set', arg:'legend1', ver:'legend1'/.test(src)) bad("View menu must offer 'Legend 1 — Classic' (checked via ver:'legend1')");
-if (!/\{l:'Legend 2 — Terminal', cmd:'ver\.set', arg:'legend2'/.test(src)) bad("View menu must offer 'Legend 2 — Terminal'");
-if (!/cmd==='ver\.set'/.test(src) || !/alpexa\.fx\.version/.test(src) || !/location\.href='terminal\.html'/.test(src)) bad('ver.set must persist alpexa.fx.version and navigate to terminal.html for legend2');
+// 2026-11-15 Legend 2 숨김 (사장님 "레전드는 숨기는 걸로") — 버전 스위처 자체를 뺐다. 계약은 tests/fx-version-switch.test.js.
+if (/Legend 2 — Terminal/.test(src) || /ver\.set/.test(src) || /location\.(replace|href)\s*(=|\()\s*'terminal\.html'/.test(src)) bad('Legend 2 is hidden — webtrade must not offer or navigate to terminal.html');
 
 // (5) integrity: the order-popup pipette accel timer + spread box + 7-arg slippage are still present
 if (!/p_requested_price/.test(src) || !/p_max_slippage/.test(src)) bad('order pipette/7-arg slippage binding must remain intact');

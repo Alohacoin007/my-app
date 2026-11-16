@@ -1028,11 +1028,11 @@ const CANDLE_THEME = {
 // No param → fall back to the saved UI setting. UI setting only, no money involved.
 const WT_URL_THEME = (()=>{ try{ const p=(new URLSearchParams(location.search).get('theme')||'').toLowerCase();
   if(p==='legend'||p==='light') return 'light'; if(p==='dark'||p==='mt5') return 'dark'; }catch(e){} return null; })();
-/* Legend 1/2 체제 (2026-07-23 사장님 "고고"): webtrade 기본 = 레전드 고정(다크는 ?theme=dark 백도어만),
-   마지막으로 레전드 2(터미널)를 쓰던 고객은 여기 진입 시 바로 terminal.html로. ?stay=1 = 개발용 탈출구. */
-try{ if(localStorage.getItem('alpexa.fx.version')==='legend2' && !/[?&]stay=1/.test(location.search)){ location.replace('terminal.html'); }
-     else { localStorage.setItem('alpexa.fx.version','legend1'); }   // 리다이렉트 안 됐으면 = 지금 쓰는 버전은 Legend 1 (replace 후에도 다음 줄이 실행되므로 else 필수)
-}catch(e){}
+/* 레전드 2(터미널) 숨김 (2026-11-15 사장님 "레전드는 숨기는 걸로"): webtrade 기본 = 레전드 고정(다크는 ?theme=dark 백도어만).
+   터미널은 손익·마진 계산을 여기서 손으로 복사해 써서 서버와 어긋났다(원클릭 DEMO 체결 · 계약크기 · 레버리지 상한).
+   계산 코드를 하나로 합치기 전까지 고객을 터미널로 보내지 않는다 — 예전에 터미널을 쓰던 고객도 여기 남는다.
+   (터미널 파일은 보존. 다시 켤 때는 tests/fx-version-switch.test.js 의 ② 계약부터 되돌릴 것.) */
+try{ localStorage.setItem('alpexa.fx.version','legend1'); }catch(e){}
 const themeBus = { theme: WT_URL_THEME || 'light', listeners:new Set(),
   set(t){ this.theme=(t==='light'?'light':'dark'); this.listeners.forEach(fn=>{ try{fn(this.theme);}catch(e){} }); },
   subscribe(fn){ this.listeners.add(fn); return ()=>this.listeners.delete(fn); } };
@@ -3418,8 +3418,6 @@ const MENU_DEF = {
            {l:'Market Watch', v:'marketwatch', k:'Ctrl+M', keep:1},
            {l:'Navigator', v:'navigator', k:'Ctrl+N', keep:1},
            {l:'Toolbox', v:'toolbox', k:'Ctrl+T', keep:1}, {sep:1},
-           {l:'Legend 1 — Classic', cmd:'ver.set', arg:'legend1', ver:'legend1', keep:1},
-           {l:'Legend 2 — Terminal', cmd:'ver.set', arg:'legend2', keep:1}, {sep:1},
            {l:'Full Screen', k:'F11', cmd:'view.fullscreen'} ],
   Insert:[ {l:'Indicators', indicators:1}, {sep:1},
            {l:'Lines', children:[ {l:'Trend Line', tool:'trend'}, {l:'Horizontal Line', tool:'hline'}, {l:'Vertical Line', tool:'vline'} ]},
@@ -3649,7 +3647,7 @@ function Navigator({ indicators }){
     <div className="nav">
       <div className="navhd"><span>{t('Navigator')}</span><span className="x" title="Close (Ctrl+N)" onClick={()=>terminalBus.emit('view.toggle','navigator')}>✕</span></div>
       <ul>
-        <li className="root"><span className="ic">💠</span>Alpexa MetaTrader 5</li>
+        <li className="root"><span className="ic">💠</span>Alpexa WebTrade</li>
         {NAV_FOLDERS.map(([name,ic])=>(
           <React.Fragment key={name}>
             <li className="navf" style={{paddingLeft:14}} onClick={()=>tog(name)}>
@@ -4232,9 +4230,6 @@ function App(){
     else if(cmd==='chart.new') addChart();
     else if(cmd==='chart.tool') setTool(arg);
     else if(cmd==='view.toggle') setView(v=>({ ...v, [arg]: !v[arg] }));
-    else if(cmd==='ver.set'){   // View → Legend 1(여기)/Legend 2(터미널로 이동) — 다크 토글은 폐지(2026-07-23)
-      try{ localStorage.setItem('alpexa.fx.version', arg==='legend2'?'legend2':'legend1'); }catch(e){}
-      if(arg==='legend2') location.href='terminal.html'; }
     else if(cmd==='lang.set'){ LANG.cur=arg; setLang(arg); }                  // View → Languages (en/ko/ja/zh)
     else if(cmd==='view.fullscreen'){ toggleFullscreen(); }
     else if(cmd==='chart.indicator'){   // PER-CHART: apply to the ACTIVE chart only (not all 4)

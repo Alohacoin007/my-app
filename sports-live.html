@@ -2003,8 +2003,9 @@
     el.querySelector('.lcov-body').innerHTML=
       '<div class="lcov-score">'+teamRow(g.away,'away')+teamRow(g.home,'home')+'</div>'+
       lcovStateHTML(g)+
-      '<div class="lcov-lbl">PLAY-BY-PLAY <span class="lcov-livedot"></span>LIVE</div>'+
-      '<div class="lcov-feed">'+lcovFeedHTML(g)+'</div>'+
+      // 실황 구역은 실제 플레이가 있을 때만 — 없으면 "LIVE" 라벨만 뜬 빈 칸을 보여주지 않는다 (2026-11-15)
+      (g._feed&&g._feed.length?'<div class="lcov-lbl">PLAY-BY-PLAY <span class="lcov-livedot"></span>LIVE</div>'+
+      '<div class="lcov-feed">'+lcovFeedHTML(g)+'</div>':'')+
       '<div class="lcov-lbl">BET LIVE</div>'+
       lcovBetRow(g,g.away,1)+lcovBetRow(g,g.home,0);
     el.querySelectorAll('.lcb.bet').forEach(b=>{ b.onclick=()=>toggle(b.dataset.game,b.dataset.market,b.dataset.sel,+b.dataset.am); });
@@ -3245,21 +3246,9 @@
     }
     return null;
   }
-  // Generic live commentary for REAL (ESPN-fed) games — no player pool needed and
-  // no score/odds changes. Pure flavour so a real live card still feels live.
-  function genericPlay(g){
-    const t=Math.random()<0.5?g.home:g.away;
-    const nm=t.ab||t.nm||'';
-    const L={
-      MLB:[`${nm} base hit`,'Strikeout swinging','Full count',`${nm} walks`,'Fly out to center','Ground out 6-3',`${nm} doubles to the gap`,'Pitching change',`${nm} steals second`,'Foul ball'],
-      NBA:[`${nm} bucket`,`${nm} misses the three`,'Turnover',`${nm} grabs the rebound`,'Trip to the line',`Timeout · ${nm}`,`Fast break · ${nm}`,'Shot clock violation',`${nm} and-one!`],
-      NCAAB:[`${nm} bucket`,`${nm} misses the three`,'Turnover',`${nm} grabs the rebound`,'Trip to the line',`Timeout · ${nm}`,`Fast break · ${nm}`,'Shot clock violation',`${nm} and-one!`],
-      NFL:[`${nm} 1st down`,'Incomplete pass',`${nm} run up the middle`,'Punt','Sack!','Field goal is good',`${nm} 3rd & long`,'Flag on the play',`${nm} deep shot`,'Two-minute warning'],
-      NHL:[`${nm} shot on goal`,'Big save!',`Faceoff won by ${nm}`,`${nm} on the power play`,'Icing',`${nm} hit along the boards`,'Puck behind the net',`${nm} breakaway!`]
-    };
-    const arr=L[g.lg]||[`${nm} possession`,'Play under review',`${nm} on the attack`];
-    return {team:t.ab||'',txt:arr[Math.floor(Math.random()*arr.length)]};
-  }
+  // (2026-11-15 사장님 "1단계로 해") 실제(ESPN) 경기용 랜덤 실황 문구 생성기는 삭제했다 — 실제 경기에 없는
+  // 플레이("Sack!", "Big save!" …)를 종목별 목록에서 무작위로 뽑아 LIVE 실황처럼 보여주던 가짜였다.
+  // 실제 플레이 데이터 소스가 붙기 전까지 실황은 비워 둔다. 핀: tests/no-fake-content.test.js
   // shift moneyline + spread in response to a score
   function reactOddsToScore(g,scoredSide){
     g.core.ml.forEach(b=>{
@@ -3358,14 +3347,7 @@
         }
       }
     });
-    // Real (ESPN) live games: add commentary ONLY — never touch the real score or
-    // odds. The 30s loadLive refresh keeps the real score/time accurate.
-    GAMES.filter(g=>g.live && g.real).forEach(g=>{
-      if(Math.random()<0.55){
-        const np=genericPlay(g);
-        if(np)g.lastPlay={kind:'play',team:np.team,txt:np.txt,pts:0,seq:(g._seq=(g._seq||0)+1)};
-      }
-    });
+    // Real (ESPN) live games: 실황을 지어내지 않는다 (2026-11-15) — 점수·시간은 30초 loadLive 가 실제 값으로 갱신.
     renderGames();if(_lcovId)renderCoverage();if(!legsEl.dataset.props&&legs.length)drawLegs();calc();
     // recompute cashout from live odds: cashout = baseCash × (d0 / dNow)
     openBets.forEach(b=>{
