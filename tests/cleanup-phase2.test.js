@@ -32,5 +32,17 @@ ok('② 스포츠: 화면 갱신 틱은 그대로 (renderGames · 실황 · 슬�
    /renderGames\(\);if\(_lcovId\)renderCoverage\(\);if\(!legsEl\.dataset\.props&&legs\.length\)drawLegs\(\);calc\(\);/.test(sp));
 ok('② 스포츠: 들어오는 경기는 전부 real:true (서버 · ESPN 폴백 · UFC 3곳)', (sp.match(/real:\s*true/g) || []).length === 3);
 
+// ── ③ 크립토 모바일: 아무도 안 쓰는 화면·함수 삭제 ────────────────────────────
+// 방법: 소스를 구문 분석해 "최상위 선언인데 파일 전체에서 그 이름이 정의 한 번뿐"인 것만 골랐다 (추측 아님).
+//       테스트가 이름을 직접 읽는 것(WatchRow·MiniSpark)은 남겼다.
+const jsx = rd('src/crypto-live-app.jsx'), bin = rd('vendor/crypto-live-compiled.js');
+const DEAD = ['SellPicker', 'AccountMenuSheet', 'BuyChart', 'SendAvatar', 'alpexaPortfolioSeries', 'getGreeting', 'darken',
+  'stakeApyFor', 'useSmoothNumber', 'CATEGORIES', 'fmtMcap', 'RECENT_RECIPIENTS', 'alpexaRefDisplay', 'TaxDocsPanel'];
+for (const [nm, src] of [['소스', jsx], ['컴파일본', bin]]) {
+  const left = DEAD.filter((n) => new RegExp('(^|[^\\w$.])' + n + '(?![\\w$])').test(src));
+  ok(`③ 크립토 ${nm}: 죽은 선언 ${DEAD.length}개 없음`, left.length === 0, '남음: ' + left.join(', '));
+}
+ok('③ 크립토 소스: 세금 서류 화면 분기(personal-tax)도 없음', !/id === 'personal-tax'/.test(jsx));
+
 console.log(`\n${fail ? '🔴' : '🟢'} cleanup-phase2 — ${pass} pass, ${fail} fail`);
 process.exit(fail ? 1 : 0);

@@ -242,22 +242,6 @@ function cryptoStakeSig(obj){
       .join('|');
   }catch(e){ return ''; }
 }
-const CATEGORIES = [
-  { id: 'All',     label: 'All' },
-  { id: 'L1',      label: 'Layer 1' },
-  { id: 'DeFi',    label: 'DeFi' },
-  { id: 'Stables', label: 'Stablecoins' },
-  { id: 'Memes',   label: 'Memes' },
-  { id: 'AI',      label: 'AI' },
-  { id: 'RWA',     label: 'Real-World' },
-];
-const fmtMcap = (v) => {
-  if (v >= 1e12) return `$${(v / 1e12).toFixed(2)}T`;
-  if (v >= 1e9)  return `$${(v / 1e9).toFixed(1)}B`;
-  if (v >= 1e6)  return `$${(v / 1e6).toFixed(0)}M`;
-  return `$${v.toFixed(0)}`;
-};
-
 // ─── Time-range definitions ──────────────────────────────────────
 const RANGES = ['1D', '1W', '1M', '3M', 'YTD', '1Y', 'ALL'];
 
@@ -313,10 +297,6 @@ function stakeMaxApy(sym){ var r = STAKE_RATES[sym] || STAKE_RATE_DEFAULT; retur
 function stakeLockDays(id){ var p=STAKE_PERIODS.find(function(x){return x.id===id;}); return p?(p.lockDays||0):0; }
 function stakeMaturity(info){ return (info&&info.since)?(info.since+stakeLockDays(info.period)*86400000):0; }
 function stakeIsLocked(info){ var d=stakeLockDays(info&&info.period); return d>0 && Date.now()<stakeMaturity(info); }
-// Real time-based staking interest: principal grows at the APY rate for the
-// time elapsed since the stake started. 18% APY ≈ 1.5%/month ≈ 0.049%/day.
-const STAKE_APY = { ALPXS: 18.0, ETH: 4.5, SOL: 7.2, USDT: 9.8 };
-function stakeApyFor(sym){ return (STAKE_APY[sym]!=null?STAKE_APY[sym]:((STAKE_ASSETS[sym]&&STAKE_ASSETS[sym].apy)||5)); }
 // Interest is added once per full day at the daily rate (APY ÷ 365), so it
 // steps up once every 24h instead of ticking continuously.
 function stakeAccruedUsd(info, apy){
@@ -430,8 +410,7 @@ function alpexaFetchChart(sym, range){
   }catch(e){ return Promise.resolve(null); }
 }
 
-// Send screen — recent recipients + asset balances used in the Send flow
-const RECENT_RECIPIENTS = [];  // no fake sample recipients (real send-history could populate this later)
+  // no fake sample recipients (real send-history could populate this later)
 // #5: metadata only (name/color/symbol). Amounts ALWAYS come from the real `balances`
 // (crypto_holdings) at render time — no hardcoded demo balances (those showed a fake
 // $21,903 BTC / $2,290 ETH in the Send list for accounts that held neither).
@@ -647,27 +626,6 @@ function useLiveAssetTicks(bases, { interval = 1200 } = {}) {
     return () => clearInterval(id);
   }, [interval]);
   return basesRef.current;
-}
-
-// Continuous rAF tween — eases displayed value toward target each frame.
-// Used so the balance keeps rolling between ticks (not just at tick boundaries).
-function useSmoothNumber(target, duration = 1500) {
-  const [v, setV] = React.useState(target);
-  React.useEffect(() => {
-    let raf;
-    const start = performance.now();
-    const from  = v;
-    const ease  = (t) => 1 - Math.pow(1 - t, 3);
-    const step = (now) => {
-      const t = Math.min(1, (now - start) / duration);
-      setV(from + (target - from) * ease(t));
-      if (t < 1) raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target, duration]);
-  return v;
 }
 
 // Each digit slot is a clipped 0-9 column that slides to its target digit
@@ -2109,15 +2067,6 @@ function Dashboard({ onAction, balances = {}, staked = {}, pulseAsset = null, se
   );
 }
 
-// Time-of-day greeting
-function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 5)  return 'Good night';
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
-  return 'Good evening';
-}
-
 // Friendly label like "9:32 AM" / "Mar 12" / "May 2024" based on range + index
 function scrubLabel(range, idx, n) {
   const t = idx / (n - 1);
@@ -2153,35 +2102,6 @@ function scrubLabel(range, idx, n) {
     }
   }
   return '';
-}
-
-// ─── Send screen ───────────────────────────────────────────────────
-// Darken a hex colour by a factor (0..1).
-function _hx(c) { return c.replace('#','').match(/.{2}/g).map((h) => parseInt(h, 16)); }
-function _toHex(n) { return Math.round(Math.max(0, Math.min(255, n))).toString(16).padStart(2,'0'); }
-function darken(hex, f) {
-  const [r,g,b] = _hx(hex);
-  return '#' + _toHex(r*(1-f)) + _toHex(g*(1-f)) + _toHex(b*(1-f));
-}
-
-// Avatar — soft radial gradient orb with an inner highlight rim + inset shadow.
-// Self-contained (no helper functions), reads as a refined 3D bead.
-// Avatar — minimal outlined disc with a colored initial. Dark interior,
-// thin colored ring, brand-colored letter. Reads as an iOS Wallet contact chip.
-function SendAvatar({ initials, color, size = 40 }) {
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: size/2,
-      background: RH.surface,
-      border: `1.5px solid ${color}`,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      color,
-      fontWeight: 600, fontSize: Math.round(size * 0.36),
-      letterSpacing: 0.2, flexShrink: 0,
-      fontFamily: FONT_UI,
-      boxShadow: `0 0 0 3px ${color}1A`,    // very faint outer glow ring
-    }}>{initials}</div>
-  );
 }
 
 // QR scanner — opens camera, runs jsQR on frames. When the camera isn't
@@ -5761,34 +5681,6 @@ function SuccessOverlay({ state }) {
   );
 }
 
-// ─── Buy screen — Robinhood-style trade flow ──────────────────────
-function BuyChart({ seed, color, w = 350, h = 110 }) {
-  const n = 60;
-  const pts = makeChartSeries(50, 55, n, seed);
-  const min = Math.min(...pts), max = Math.max(...pts);
-  const padX = 4, padY = 6;
-  const xAt = (i) => padX + (i / (n - 1)) * (w - padX * 2);
-  const yAt = (v) => h - padY - ((v - min) / Math.max(0.0001, max - min)) * (h - padY * 2);
-  const linePath = pts.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i).toFixed(2)} ${yAt(v).toFixed(2)}`).join(' ');
-  const areaPath = linePath + ` L ${xAt(n - 1)} ${h} L ${xAt(0)} ${h} Z`;
-  const endX = xAt(n - 1), endY = yAt(pts[n - 1]);
-  const gradId = 'buy-area-' + seed;
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} style={{ display: 'block' }}>
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor={color} stopOpacity="0.18"/>
-          <stop offset="100%" stopColor={color} stopOpacity="0"/>
-        </linearGradient>
-      </defs>
-      <path d={areaPath} fill={`url(#${gradId})`}/>
-      <path d={linePath} fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-      <circle cx={endX} cy={endY} r="3" fill={color}/>
-      <circle cx={endX} cy={endY} r="6" fill={color} opacity="0.25"/>
-    </svg>
-  );
-}
-
 const BUY_RANGES = ['1m','5m','30m','1h','4h','1D','1W'];
 const BUY_RANGE_META = {
   '1m':  { points: 60,  label: 'Past Minute' },
@@ -7379,126 +7271,6 @@ function SupportChatPanel() {
 }
 
 
-// ─── TaxDocsPanel — region-aware annual statements ────────────────
-function TaxDocsPanel({ onDownload }) {
-  const [region, setRegion] = React.useState(() => {
-    try { return localStorage.getItem('alpexa.taxRegion') || 'US'; } catch (_) { return 'US'; }
-  });
-  React.useEffect(() => {
-    try { localStorage.setItem('alpexa.taxRegion', region); } catch (_) {}
-  }, [region]);
-
-  // Region → forms catalog. Use real form names from each jurisdiction.
-  const CATALOGS = {
-    US: { label: 'United States', currency: 'USD', forms: [
-      { year: 2024, name: '1099-B',    desc: 'Cryptocurrency trades · 14 pages' },
-      { year: 2023, name: '1099-B',    desc: 'Cryptocurrency trades · 8 pages' },
-      { year: 2023, name: '1099-MISC', desc: 'Staking rewards · 1 page' },
-    ]},
-    KR: { label: '한국 (Korea)', currency: 'KRW', forms: [
-      { year: 2024, name: '거래내역서',         desc: '암호화폐 거래내역 · 18페이지' },
-      { year: 2024, name: '연간 수익 요약',     desc: '실현 손익 · 3페이지' },
-      { year: 2023, name: '거래내역서',         desc: '암호화폐 거래내역 · 12페이지' },
-      { year: 2023, name: '원천징수영수증',     desc: '스테이킹 보상 · 1페이지' },
-    ]},
-    UK: { label: 'United Kingdom', currency: 'GBP', forms: [
-      { year: 2024, name: 'Annual gains summary', desc: 'Capital gains report · 11 pages' },
-      { year: 2024, name: 'SA108 helper',         desc: 'Self-assessment companion · 3 pages' },
-      { year: 2023, name: 'Annual gains summary', desc: 'Capital gains report · 7 pages' },
-    ]},
-    EU: { label: 'European Union', currency: 'EUR', forms: [
-      { year: 2024, name: 'DAC8 annual report',   desc: 'Reportable transactions · 16 pages' },
-      { year: 2024, name: 'Annual gains summary', desc: 'Realised gains · 4 pages' },
-      { year: 2023, name: 'Annual gains summary', desc: 'Realised gains · 6 pages' },
-    ]},
-    SG: { label: 'Singapore', currency: 'SGD', forms: [
-      { year: 2024, name: 'Annual trade summary', desc: 'All trades · 9 pages' },
-      { year: 2024, name: 'Staking income report', desc: 'Rewards received · 2 pages' },
-      { year: 2023, name: 'Annual trade summary', desc: 'All trades · 6 pages' },
-    ]},
-    AU: { label: 'Australia', currency: 'AUD', forms: [
-      { year: 2024, name: 'CGT report',           desc: 'Capital gains by lot · 13 pages' },
-      { year: 2024, name: 'Income summary',       desc: 'Staking + airdrops · 2 pages' },
-      { year: 2023, name: 'CGT report',           desc: 'Capital gains by lot · 8 pages' },
-    ]},
-  };
-
-  const cur = CATALOGS[region] || CATALOGS.US;
-
-  return (
-    <>
-      <AcctSection title="Region">
-        <div style={{
-          padding: 6, display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr', gap: 4,
-        }}>
-          {Object.keys(CATALOGS).map((r) => {
-            const active = r === region;
-            return (
-              <button key={r} onClick={() => setRegion(r)} style={{
-                background: active ? RH.surfaceUp : 'transparent',
-                color: active ? RH.text : RH.textDim,
-                border: 'none', borderRadius: 8, padding: '8px 4px',
-                fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
-                fontFamily: FONT_UI, letterSpacing: 0.6,
-              }}>
-                <div>{r}</div>
-                <div style={{ marginTop: 2, fontSize: 9, fontWeight: 600, color: active ? RH.accent : RH.textMute, letterSpacing: 0.4 }}>{CATALOGS[r].currency}</div>
-              </button>
-            );
-          })}
-        </div>
-      </AcctSection>
-
-      <div style={{
-        marginBottom: 12, padding: '10px 14px',
-        background: `${RH.accent}10`, border: `1px solid ${RH.accent}33`,
-        borderRadius: 12, fontFamily: FONT_UI,
-      }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: RH.accent, fontFamily: FONT_UI, letterSpacing: 1, textTransform: 'uppercase' }}>{cur.label}</div>
-        <div style={{ marginTop: 2, fontSize: 11.5, color: RH.text }}>
-          Forms below are formatted for {cur.label} tax reporting.
-        </div>
-      </div>
-
-      <AcctSection title="Available">
-        {cur.forms.map((f, i) => (
-          <React.Fragment key={i}>
-            {i > 0 ? <AcctDivider/> : null}
-            <AcctRow
-              label={`${f.year} · ${f.name}`}
-              sub={f.desc}
-              status="PDF"
-              statusColor={RH.textDim}
-              onClick={() => onDownload && onDownload(`${f.year} ${f.name}`)}
-            />
-          </React.Fragment>
-        ))}
-      </AcctSection>
-
-      <AcctSection title="Export">
-        <AcctRow label="Full transaction history (CSV)" sub="Compatible with most tax software"
-          status="CSV" statusColor={RH.textDim}
-          onClick={() => onDownload && onDownload('transactions.csv')}/>
-        <AcctDivider/>
-        <AcctRow label="Account statement (PDF)" sub="All activity, year-to-date"
-          status="PDF" statusColor={RH.textDim}
-          onClick={() => onDownload && onDownload('statement.pdf')}/>
-      </AcctSection>
-
-      <div style={{
-        marginTop: 14, padding: '11px 14px',
-        background: RH.surface, border: `1px solid ${RH.line}`,
-        borderRadius: 12, fontSize: 11.5, color: RH.textDim, lineHeight: 1.5,
-        fontFamily: FONT_UI,
-      }}>
-        Forms are issued automatically each year after the relevant tax deadline. Tax treatment of digital assets varies by jurisdiction — consult a tax professional for guidance specific to your situation.
-      </div>
-    </>
-  );
-}
-
-
 function AppearancePanel() {
   const { theme, setTheme } = React.useContext(ThemeContext);
   const opts = [
@@ -8799,8 +8571,6 @@ function alpexaRefLink(){
     return 'https://app.alpexa-suisse.com/signup.html'+(code?('?ref='+encodeURIComponent(code)):'');
   }catch(e){ return 'https://app.alpexa-suisse.com/signup.html'; }
 }
-function alpexaRefDisplay(){ return alpexaRefLink().replace(/^https:\/\//,''); }
-
 // Referral link with working Copy button + flash feedback.
 function ReferralLinkPanel() {
   const URL = alpexaRefLink();
@@ -8932,7 +8702,6 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
     'personal-dob':   { title: 'Date of birth',      intro: 'Date of birth is locked. Contact support to make changes.' },
     'personal-kyc':   { title: 'Identity verification', intro: 'Verification status, documents, and history.' },
     'personal-address': { title: 'Mailing address',  intro: 'Residential address on file for tax documents.' },
-    'personal-tax':   { title: 'Tax documents',      intro: 'Annual statements and trade history by year. Format varies by region — pick yours below.' },
     'personal-cards': { title: 'Saved cards',        intro: 'Debit cards you can use for instant deposits and payouts.' },
     'personal-appearance': { title: 'Appearance',       intro: 'Switch between dark and light themes.' },
     'personal-beneficiaries': { title: 'Beneficiaries', intro: 'Designate who receives your assets on death.' },
@@ -9123,9 +8892,6 @@ function SubSubDetail({ id, onBack, transactions = [], setTransactions, savedCar
     }
         if (id === 'personal-cards') {
       return <PaymentCardsPanel cards={savedCards} setCards={setSavedCards}/>;
-    }
-    if (id === 'personal-tax') {
-      return <TaxDocsPanel onDownload={(label) => flashAndClose('Downloading ' + label + '…')}/>;
     }
     if (id === 'rewards-tier') {
       const TIERS = [
@@ -10484,82 +10250,6 @@ function StakeInfo({ onBack, sym, onStartStake }) {
 }
 
 
-// Quick menu — slides up from the bottom. Shortcuts to the most-used
-// Account categories so the user can jump in without scrolling.
-function AccountMenuSheet({ onClose, onJumpSubpage }) {
-  const ITEMS = [
-    { id: 'orders',    label: 'Trading & orders',  desc: 'Order history, fills, statements' },
-    { id: 'transfers', label: 'Transfers',         desc: 'Deposits, withdrawals' },
-    { id: 'rewards',   label: 'Rewards',           desc: 'Referrals, ALPXS, tier' },
-    { id: 'personal',  label: 'Personal',          desc: 'Profile, identity' },
-    { id: 'security',  label: 'Security & privacy', desc: 'Password, devices' },
-    { id: 'support',   label: 'Help & support',    desc: 'Contact' },
-    { id: 'signout',   label: 'Sign out',          desc: '', red: true },
-  ];
-  return (
-    <div style={{
-      position: 'absolute', inset: 0, zIndex: 200,
-      background: 'rgba(0,0,0,0.55)',
-      display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-    }} onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} style={{
-        background: RH.bg,
-        borderTopLeftRadius: 22, borderTopRightRadius: 22,
-        border: `1px solid ${RH.line}`,
-        maxHeight: '75%',
-        display: 'flex', flexDirection: 'column',
-        fontFamily: FONT_UI,
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 4px' }}>
-          <div style={{ width: 38, height: 4, borderRadius: 2, background: RH.line }}/>
-        </div>
-        <div style={{
-          padding: '6px 18px 12px', display: 'flex',
-          alignItems: 'center', justifyContent: 'space-between',
-        }}>
-          <span style={{ fontSize: 16, fontWeight: 700, color: RH.text, letterSpacing: -0.2 }}>Quick menu</span>
-          <button onClick={onClose} aria-label="Close" style={{
-            width: 30, height: 30, borderRadius: 15,
-            background: 'transparent', border: 'none', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-          }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={RH.text} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 6 L18 18 M18 6 L6 18"/>
-            </svg>
-          </button>
-        </div>
-        <div className="alpexa-hide-scrollbar" style={{ overflowY: 'auto', padding: '0 0 22px' }}>
-          {ITEMS.map((it, i) => (
-            <button key={it.id} onClick={() => onJumpSubpage(it.id)} style={{
-              width: '100%', textAlign: 'left',
-              background: 'transparent', border: 'none',
-              borderTop: i === 0 ? 'none' : `1px solid ${RH.line}`,
-              padding: '14px 18px',
-              display: 'flex', alignItems: 'center', gap: 12,
-              cursor: 'pointer',
-              color: it.red ? RH.red : RH.text,
-              fontFamily: FONT_UI,
-            }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: -0.15 }}>{it.label}</div>
-                {it.desc ? (
-                  <div style={{ marginTop: 2, fontSize: 11.5, color: RH.textDim }}>{it.desc}</div>
-                ) : null}
-              </div>
-              {!it.red ? (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={RH.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 6 L15 12 L9 18"/>
-                </svg>
-              ) : null}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
 // Full-screen confirmation surface — colored hero panel + detail grid + Done CTA.
 // Used after Buy, Sell, Unstake, Redeem so every action ends in the same
 // premium surface.
@@ -11517,152 +11207,6 @@ function AssetDetail({ onBack, kind, sym, balances = {}, staked = {}, transactio
     </Phone>
   );
 }
-
-// Sell entry — list holdings (balance > 0) and let user pick what to sell.
-// Tap a row → App opens the Sell ticket pre-selected to that asset.
-function SellPicker({ onBack, onPick, balances = {} }) {
-  // Universe = crypto assets + ALPXS (security). Owned = balance > 0.
-  const ALPXS_SEC = PORTFOLIO.securities.find((s) => s.sym === 'ALPXS');
-  const UNIVERSE = ALPXS_SEC ? [...PORTFOLIO.assets, ALPXS_SEC] : PORTFOLIO.assets;
-  const owned = UNIVERSE
-    .filter((a) => !a.stable && (balances[a.sym] || 0) > 0)
-    .map((a) => ({ ...a, owned: balances[a.sym] || 0 }))
-    .sort((x, y) => y.owned - x.owned);
-
-  // Also surface stakeable Securities the user owns (e.g. ALPXS).
-  // (Securities currently are not 'sellable' in the same flow — display only
-  //  the crypto assets here.)
-  const totalOwned = owned.reduce((s, a) => s + a.owned, 0);
-
-  if (owned.length === 0) {
-    return (
-      <Phone width={390} height={844} bg={RH.bg}>
-        <StatusBar/>
-        <div style={{ padding: '6px 16px 10px', display: 'flex', alignItems: 'center' }}>
-          <button onClick={onBack} aria-label="Back" style={{
-            width: 36, height: 36, borderRadius: 18,
-            background: 'transparent', border: 'none', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-          }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={RH.text} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 6 L9 12 L15 18"/>
-            </svg>
-          </button>
-          <span style={{ fontSize: 16, fontWeight: 700, color: RH.text, marginLeft: 4 }}>Sell</span>
-        </div>
-        <div style={{
-          flex: 1, display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', padding: '0 36px',
-          textAlign: 'center', fontFamily: FONT_UI,
-        }}>
-          <div style={{
-            width: 64, height: 64, borderRadius: 32,
-            background: RH.surface, border: `1px solid ${RH.line}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            marginBottom: 18,
-          }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={RH.textDim} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="9"/><path d="M8 12 H16"/>
-            </svg>
-          </div>
-          <div style={{ fontSize: 17, fontWeight: 600, color: RH.text, marginBottom: 8 }}>Nothing to sell</div>
-          <div style={{ fontSize: 13, color: RH.textDim, lineHeight: 1.5, marginBottom: 22 }}>
-            You need to own a crypto asset before you can sell it.
-          </div>
-          <button onClick={onBack} style={{
-            padding: '11px 22px', borderRadius: 999,
-            background: RH.text, color: RH.bg, border: 'none',
-            fontSize: 13, fontWeight: 700, letterSpacing: 0.2, cursor: 'pointer',
-          }}>Back to portfolio</button>
-        </div>
-      </Phone>
-    );
-  }
-
-  return (
-    <Phone width={390} height={844} bg={RH.bg}>
-      <StatusBar/>
-      <div style={{
-        padding: '6px 16px 10px', display: 'flex',
-        alignItems: 'center', justifyContent: 'space-between',
-      }}>
-        <button onClick={onBack} aria-label="Back" style={{
-          width: 36, height: 36, borderRadius: 18,
-          background: 'transparent', border: 'none', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-        }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={RH.text} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 6 L9 12 L15 18"/>
-          </svg>
-        </button>
-        <span style={{ fontSize: 16, fontWeight: 700, color: RH.text }}>Sell</span>
-        <div style={{ width: 36 }}/>
-      </div>
-
-      <div style={{ padding: '8px 22px 18px', fontFamily: FONT_UI }}>
-        <div style={{
-          fontFamily: FONT_UI, fontSize: 10.5, color: RH.textDim,
-          letterSpacing: 1.4, textTransform: 'uppercase', fontWeight: 700,
-          marginBottom: 6,
-        }}>Total holdings</div>
-        <div style={{
-          fontSize: 32, fontWeight: 600, color: RH.text,
-          letterSpacing: -1, fontVariantNumeric: 'tabular-nums',
-        }}>${totalOwned.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-        <div style={{ marginTop: 4, fontSize: 12, color: RH.textDim }}>
-          Pick a coin to sell · {owned.length} {owned.length === 1 ? 'asset' : 'assets'}
-        </div>
-      </div>
-
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 14px 22px' }} className="alpexa-hide-scrollbar">
-        {owned.map((a, i) => {
-          const coinAmt = a.price > 0 ? a.owned / a.price : 0;
-          return (
-            <button key={a.sym} onClick={() => onPick(a.sym)} style={{
-              width: '100%', textAlign: 'left', background: 'transparent',
-              border: 'none', borderTop: i === 0 ? 'none' : `1px solid ${RH.line}`,
-              padding: '14px 8px', display: 'flex', alignItems: 'center', gap: 14,
-              cursor: 'pointer', fontFamily: FONT_UI,
-            }}>
-              <AssetIcon sym={a.sym} size={34}/>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
-                  fontSize: 14.5, fontWeight: 600, color: RH.text,
-                  letterSpacing: -0.2,
-                }}>{a.name}</div>
-                <div style={{
-                  marginTop: 2, fontSize: 11.5, color: RH.textDim,
-                  fontFamily: FONT_UI, letterSpacing: 0.3,
-                  fontVariantNumeric: 'tabular-nums',
-                }}>
-                  {coinAmt.toFixed(coinAmt < 1 ? 6 : 4).replace(/\.?0+$/, '')} {a.sym}
-                  <span style={{ opacity: 0.5 }}> · </span>
-                  ${a.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{
-                  fontSize: 14.5, fontWeight: 600, color: RH.text,
-                  fontVariantNumeric: 'tabular-nums', letterSpacing: -0.2,
-                }}>${a.owned.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                <div style={{
-                  marginTop: 2, fontSize: 11.5, fontWeight: 600,
-                  fontFamily: FONT_UI, letterSpacing: 0.3,
-                  fontVariantNumeric: 'tabular-nums',
-                  color: a.chg >= 0 ? RH.green : RH.red,
-                }}>{a.chg >= 0 ? '+' : ''}{a.chg.toFixed(2)}%</div>
-              </div>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={RH.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 6 L15 12 L9 18"/>
-              </svg>
-            </button>
-          );
-        })}
-      </div>
-    </Phone>
-  );
-}
-
 
 // Tiny WebAudio FX — a crisp tap for successful order placement and a
 // short descending buzz for rejected / blocked orders.
@@ -14383,29 +13927,6 @@ function alpexaDownsample(arr, n) {
   const out = [];
   for (let i = 0; i < n; i++) out.push(arr[Math.round(i * (arr.length - 1) / (n - 1))]);
   return out;
-}
-
-// Real portfolio value history = sum of (qty x each holding's 7-day price line),
-// 1D uses the last ~24h slice, then normalized to end at the current total.
-function alpexaPortfolioSeries(range, n, endValue) {
-  const spark = window.__alpexaSpark || {};
-  const assets = (typeof PORTFOLIO !== 'undefined' && PORTFOLIO.assets) ? PORTFOLIO.assets : [];
-  let len = 0;
-  assets.forEach((a) => { const s = spark[a.sym]; if (s && s.length > len) len = s.length; });
-  if (len < 4) return null;
-  let W = new Array(len).fill(0); let any = false;
-  assets.forEach((a) => {
-    const s = spark[a.sym];
-    if (s && s.length) {
-      any = true;
-      for (let i = 0; i < len; i++) W[i] += (a.qty || 0) * s[Math.round(i * (s.length - 1) / (len - 1))];
-    }
-  });
-  if (!any) return null;
-  if (range === '1D' && W.length > 24) W = W.slice(-24);
-  const last = W[W.length - 1] || 1;
-  const factor = (endValue && last) ? endValue / last : 1;
-  return alpexaDownsample(W.map((v) => v * factor), n);
 }
 
 (async () => {
