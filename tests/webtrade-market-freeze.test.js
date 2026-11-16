@@ -4,7 +4,8 @@
 // closed Forex/US-stock candles — "거래는 닫혔는데 차트만 산다". Fix (lockstep):
 //   [1] onTick aborts (return) when !marketOpen(symbol) → the live bar freezes at the Fri/close price.
 //   [2] crypto is 24/7 (marketOpen === true) → chart + quotes keep flowing.
-//   [3] _simulate() must NOT random-walk a closed symbol — it freezes it at its last/close price.
+//   [3] (2026-11-15) 시세 저장소는 **어떤 종목도** 지어내 움직이지 않는다 — 예전의 랜덤워크 폴백은 통째로 삭제.
+//       닫힌 시장뿐 아니라 열린 시장도, 시세를 못 받으면 마지막 값에서 멈춘다. 행위 핀 = tests/webtrade-feed-down.test.js
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -16,8 +17,8 @@ const grab = (re, label) => { const m = src.match(re); if (!m) bad(label + ' not
 // ── static: both gates are present ──
 if (!/const onTick=throttle\(\(mids\)=>\{\s*\n\s*if\(!marketOpen\(symbol\)\) return;/.test(src))
   bad('[1] onTick must abort at the top when the symbol session is closed');
-if (!/if\(!marketOpen\(sym\)\)\{ if\(!this\.mids\[sym\]\) this\._set\(sym, cur, halfPx\(sym, cur, sp, mk\), sp, now\); return; \}/.test(src))
-  bad('[3] _simulate must freeze (not random-walk) a closed symbol');
+if (/_simulate\(/.test(src) || /\(Math\.random\(\)-0\.5\)\*0\.0006/.test(src))
+  bad('[3] the random-walk price fallback must be gone — prices move only on received feed data');
 
 // ── behavioural: marketOpen is correct (crypto 24/7, FX weekend closed, stock weekend closed) ──
 // 2026-08-15: marketOpen 이 ET 벽시계 헬퍼(etWall)·반일 셋과 한 몸이 됐다 → 함수만 뽑으면
@@ -37,22 +38,9 @@ if (!fail) {
   if (marketOpen('SPACEX', SAT) !== false) bad('dynamic stock SPACEX must be CLOSED on Saturday (catOf classification)');
 }
 
-// ── behavioural: _simulate FREEZES a closed symbol but WALKS an open one (crypto) ──
-const set_src = grab(/_set\(sym,mid,half,spr,now,jit\)\{[\s\S]*?\n  \},/, '_set');
-const sim_src = grab(/_simulate\(\)\{[\s\S]*?\n  \},/, '_simulate');
-if (!fail) {
-  const store = new Function('marketOpen','WATCH','BASE','pip','tickSize','seedSpread','halfPx',
-    'const store={ mids:{}, drift:null,\n' + set_src + '\n' + sim_src + '\n};\nreturn store;'
-  )((sym)=> sym==='BTCUSD',              // BTCUSD open (crypto), EURUSD closed (weekend FX)
-    ['EURUSD','BTCUSD'], {EURUSD:1.1, BTCUSD:64000}, ()=>0.0001, ()=>0.00001, ()=>1, ()=>0.00005);   // tickSize/seedSpread/halfPx stubs (freeze/walk test ignores the spread value)
-  store._simulate();
-  const eur1 = store.mids.EURUSD.mid, btc1 = store.mids.BTCUSD.mid;
-  store._simulate();
-  const eur2 = store.mids.EURUSD.mid, btc2 = store.mids.BTCUSD.mid;
-  if (eur1 !== 1.1 || eur2 !== 1.1) bad(`closed FX must freeze at 1.1 (got ${eur1} then ${eur2}) — simulator moved a closed market`);
-  if (btc1 === 64000) bad('open crypto must random-walk off its base (it froze)');
-  if (btc2 === btc1) bad('open crypto must keep walking each tick (it froze after one)');
-}
+// ── (옛 행위 핀 삭제, 2026-11-15) 예전엔 여기서 "닫힌 종목은 멈추고 열린 크립토는 랜덤워크한다"를 강제했다.
+//    그 랜덤워크 자체가 결함이었다(시세 끊김 중 가짜 시세·가짜 손익). 새 계약 "아무 종목도 안 움직인다"의
+//    행위 테스트는 tests/webtrade-feed-down.test.js (A·B·C) 에 있다.
 
 if (fail) { console.error(`\n🔴 FAIL — ${fail} market-freeze problem(s).`); process.exit(1); }
-console.log('🟢 PASS: Method A — onTick + _simulate honour marketOpen; closed Forex/stock candles freeze at the last close, crypto keeps flowing 24/7.');
+console.log('🟢 PASS: Method A — onTick honours marketOpen; closed Forex/stock candles freeze at the last close, crypto keeps flowing 24/7; no random-walk price fallback.');

@@ -22,8 +22,7 @@ if (/prev\.spr\s*:\s*\d/.test(src)) bad('_apply cold seed is still a hardcoded n
 if (/this\.mids\[sym\]\.spr\s*:\s*\d/.test(src)) bad('_simulate cold seed is still a hardcoded number — must be seedSpread(sym)');
 const applyLine = grab(/const spr=\(p\.spr_pts[^\n]*/, '_apply spread chain');
 if (applyLine && !/seedSpread\(sym\)/.test(applyLine)) bad('_apply chain must end in seedSpread(sym)');
-const simLine = grab(/const sp=\(this\.mids\[sym\][^\n]*/, '_simulate spread chain');
-if (simLine && !/seedSpread\(sym\)/.test(simLine)) bad('_simulate chain must end in seedSpread(sym)');
+// (2026-11-15) 랜덤워크 폴백 삭제로 그쪽 스프레드 사슬도 없어졌다 — 시세를 쓰는 길은 _apply 하나뿐 (tests/webtrade-feed-down.test.js).
 if (seed_src && /\|\|\s*\d|\?\s*\d+(\.\d+)?\s*:\s*\d/.test(seed_src.replace(/DEFAULT_SPREAD\[[^\]]*\]/g, 'T')))
   bad('seedSpread must read ONLY the table (no bare numeric fallback in the accessor)');
 

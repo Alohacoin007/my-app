@@ -25,8 +25,7 @@ const pip_src   = grab(/const pip   = \(s\)=>[^\n]*/, 'pip');
 if (/spr\s*\*\s*tickSize\(/.test(src)) bad('uniform spr×tickSize conversion must be gone (units differ per class at the source)');
 if (/sp\s*\*\s*ts\s*\/\s*2/.test(src)) bad('_simulate uniform sp×ts/2 conversion must be gone');
 if (!/this\._set\(sym, mid, halfPx\(sym, mid, spr/.test(src)) bad('_apply must derive the half-gap via halfPx');
-const simBody = grab(/_simulate\(\)\{[\s\S]*?\n  \},/, '_simulate');
-if (simBody && !/halfPx\(sym/.test(simBody)) bad('_simulate must derive the half-gap via halfPx');
+// (2026-11-15) 랜덤워크 폴백 삭제 — half-gap 을 만드는 길은 _apply 의 halfPx 하나뿐 (tests/webtrade-feed-down.test.js).
 if (floor_src && !/Crypto\s*:\s*10\b/.test(floor_src)) bad('Crypto floor must be 10 bps (ALPEXA_SPREAD_BPS lockstep)');
 if (floor_src && !/Stocks\s*:\s*8\b/.test(floor_src)) bad('Stocks floor must be 8 bps (ALPEXA_SPREAD_BPS lockstep)');
 
