@@ -12567,8 +12567,8 @@ const ACCOUNT_CATEGORIES = [{
 }, {
   id: 'support',
   title: 'Help & support',
-  desc: 'Help center, contact, chat history',
-  items: ['Help center', 'Contact us', 'Chat with support', 'About Alpexa']
+  desc: 'Contact us, app info, policies',
+  items: ['Contact us', 'About Alpexa']
 }];
 
 // ─── Shared Robinhood-style row + section primitives ─────────────────
@@ -17800,19 +17800,9 @@ function AccountSubPageContent({
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(AcctSection, {
       title: "Get help"
     }, /*#__PURE__*/React.createElement(AcctRow, {
-      label: "Help center",
-      sub: "Articles & FAQs",
-      onClick: go('support-help')
-    }), /*#__PURE__*/React.createElement(AcctDivider, null), /*#__PURE__*/React.createElement(AcctRow, {
       label: "Contact us",
       sub: "Email \xB7 response in 24h",
       onClick: go('support-contact')
-    }), /*#__PURE__*/React.createElement(AcctDivider, null), /*#__PURE__*/React.createElement(AcctRow, {
-      label: "AI assistant",
-      sub: "Instant answers \xB7 24/7",
-      status: "Online",
-      statusColor: RH.green,
-      onClick: go('support-chat')
     })), /*#__PURE__*/React.createElement(AcctSection, {
       title: "About"
     }, /*#__PURE__*/React.createElement(AcctRow, {
@@ -19003,11 +18993,11 @@ function AccountMenuSheet({
   }, {
     id: 'security',
     label: 'Security & privacy',
-    desc: 'Password, 2FA, devices'
+    desc: 'Password, devices'
   }, {
     id: 'support',
     label: 'Help & support',
-    desc: 'Chat, contact'
+    desc: 'Contact'
   }, {
     id: 'signout',
     label: 'Sign out',

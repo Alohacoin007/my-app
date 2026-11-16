@@ -40,6 +40,12 @@ for (const [nm, s] of [['소스', jsx], ['컴파일본', bin]]) {
   ok(`크립토 ${nm}: KYC "Start verification" 가짜 버튼 없음`, !/Start verification/.test(s));
   ok(`크립토 ${nm}: 도움말이 지정가·스탑 주문을 지원한다고 말하지 않는다`,
      !/Stop-limit orders are supported/.test(s) && !/unfilled limit order/.test(s));
+  // 2026-11-15 사장님 "도움말은 통째로 숨겨" — 도움말 글에 근거 없는 문구가 많았다(보험 $250M · 1099 세금 양식 ·
+  // 스프레드 2bps · 자체 밸리데이터 등). "AI assistant" 는 같은 글을 키워드로 찾아 그대로 읽어 주는 화면이라 같이 숨긴다
+  // (AI 가 아니고, "Online · 24/7" 도 사실이 아니었다). 실제로 동작하는 문의 경로(Contact us = 이메일)는 남긴다.
+  ok(`크립토 ${nm}: 도움말(Help center)·AI assistant 로 들어가는 메뉴 없음`,
+     !/go\(['"]support-help['"]\)/.test(s) && !/go\(['"]support-chat['"]\)/.test(s) && !/Instant answers · 24\/7/.test(s));
+  ok(`크립토 ${nm}: 문의(Contact us)는 그대로`, /go\(['"]support-contact['"]\)/.test(s));
 }
 // 시장가 매매 경로는 그대로 (돈 코드 무변경 확인용 닻)
 ok('크립토 소스: 시장가 = 서버 crypto_trade RPC 경로 그대로', /Market orders settle on the SERVER \(crypto_trade RPC\)/.test(jsx));

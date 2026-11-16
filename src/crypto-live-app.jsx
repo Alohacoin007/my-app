@@ -6631,8 +6631,8 @@ const ACCOUNT_CATEGORIES = [
     desc: 'Push, email, price alerts, watchlists',
     items: ['Push notifications', 'Email preferences', 'Price alerts', 'Order fill alerts', 'Marketing'] },
   { id: 'support',   title: 'Help & support',
-    desc: 'Help center, contact, chat history',
-    items: ['Help center', 'Contact us', 'Chat with support', 'About Alpexa'] },
+    desc: 'Contact us, app info, policies',
+    items: ['Contact us', 'About Alpexa'] },
 ];
 
 
@@ -9803,12 +9803,13 @@ function AccountSubPageContent({ subPage, setSubSub, transactions = [], setTrans
   if (subPage === 'support') {
     return (
       <>
+        {/* (2026-11-15 사장님 "도움말은 통째로 숨겨") Help center 와 AI assistant 줄을 뺐다.
+            도움말 글(HELP_ARTICLES)에 근거 없는 문구가 많았다 — 보험 $250M · 1099 세금 양식 · 스프레드 2bps ·
+            자체 밸리데이터 등. AI assistant 는 그 글을 키워드로 찾아 그대로 읽어 주는 화면이라(AI 아님,
+            "Online · 24/7" 도 사실 아님) 같이 숨긴다. 화면 코드(HelpCenterPanel·SupportChatPanel)는 남겨 두었으니
+            사실 확인된 글로 바꾼 뒤 이 두 줄만 되살리면 된다. 핀: tests/no-fake-content.test.js */}
         <AcctSection title="Get help">
-          <AcctRow label="Help center" sub="Articles & FAQs" onClick={go('support-help')}/>
-          <AcctDivider/>
           <AcctRow label="Contact us" sub="Email · response in 24h" onClick={go('support-contact')}/>
-          <AcctDivider/>
-          <AcctRow label="AI assistant" sub="Instant answers · 24/7" status="Online" statusColor={RH.green} onClick={go('support-chat')}/>
         </AcctSection>
         <AcctSection title="About">
           <AcctRow label="App version" value="v2026.5.29" onClick={go('support-version')}/>
@@ -10491,8 +10492,8 @@ function AccountMenuSheet({ onClose, onJumpSubpage }) {
     { id: 'transfers', label: 'Transfers',         desc: 'Deposits, withdrawals' },
     { id: 'rewards',   label: 'Rewards',           desc: 'Referrals, ALPXS, tier' },
     { id: 'personal',  label: 'Personal',          desc: 'Profile, identity' },
-    { id: 'security',  label: 'Security & privacy', desc: 'Password, 2FA, devices' },
-    { id: 'support',   label: 'Help & support',    desc: 'Chat, contact' },
+    { id: 'security',  label: 'Security & privacy', desc: 'Password, devices' },
+    { id: 'support',   label: 'Help & support',    desc: 'Contact' },
     { id: 'signout',   label: 'Sign out',          desc: '', red: true },
   ];
   return (
