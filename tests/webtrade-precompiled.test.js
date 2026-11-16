@@ -90,9 +90,13 @@ else (async () => {
     const errs = [], babelReq = [];
     page.on('pageerror', (e) => errs.push(String(e.message).slice(0, 160)));
     const VENDOR = { 'lightweight-charts': 'lightweight-charts.standalone.production.js', 'react-dom': 'react-dom.production.min.js', 'react@': 'react.production.min.js' };
-    await page.route((u) => !String(u).startsWith(base), (route) => {
+    // 네트워크 0 (tests/browser-test-isolation.test.js 계약): localhost 밖은 전부 막고 웹소켓도 닫는다 — 실시세가 판정에 못 끼어든다.
+    await page.route(u => !/^(http:\/\/localhost|data:|blob:)/.test(String(u)), r => r.abort());
+    await page.routeWebSocket(/.*/, ws => ws.close());
+    // CDN 라이브러리만 로컬 사본으로 (나중에 건 route 가 먼저 적용된다). Babel 은 주지 않는다 — 없어도 떠야 한다.
+    await page.route(/https:\/\/(unpkg\.com|cdn\.jsdelivr\.net)\/.*/, (route) => {
       const u = route.request().url();
-      if (/babel/i.test(u)) { babelReq.push(u); return route.abort(); }          // Babel 은 아예 막는다 — 없어도 떠야 한다
+      if (/babel/i.test(u)) { babelReq.push(u); return route.abort(); }
       const hit = Object.keys(VENDOR).find((k) => u.includes(k));
       if (hit) return route.fulfill({ contentType: 'application/javascript', body: fs.readFileSync(path.join(REPO, 'tests', 'vendor', VENDOR[hit])) });
       return route.abort();
