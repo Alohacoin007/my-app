@@ -57,6 +57,26 @@ This page has moved. <a href="${to.mobile}" style="color:#6aa5e8">Open Alpexa FX
   return out;
 }
 
+// 미리 컴파일해서 싣는 화면 (2026-11-16 정리 3단계 ②): 리포의 html 은 JSX 인라인 **원본 그대로** 두고
+// (그 파일을 읽는 테스트·로컬 실행 무변경), 묶음을 만들 때만 JSX 블록을 컴파일해 별도 파일로 빼고 Babel 태그를 지운다.
+// 고객 PC 가 3MB Babel 을 내려받아 그 자리에서 컴파일하던 것을 없앤다. 핀: tests/webtrade-precompiled.test.js
+// 전제가 어긋나면 **던진다** (빌드 실패 = 배포 중단 · 옛 버전 유지) — 깨진 화면을 싣지 않는다.
+const PRECOMPILED_PAGES = { 'webtrade.html': 'vendor/webtrade-compiled.js' };
+const BABEL_BLOCK = /<script type="text\/babel"[^>]*>([\s\S]*?)<\/script>/g;
+const BABEL_TAG = /[ \t]*<script[^>]*@babel\/standalone[^>]*><\/script>\n?/g;
+function precompilePage(html, outPath) {
+  const blocks = [...html.matchAll(BABEL_BLOCK)];
+  if (blocks.length !== 1) throw new Error(`precompile: text/babel 블록이 ${blocks.length}개 (정확히 1개여야 한다)`);
+  const tags = html.match(BABEL_TAG) || [];
+  if (tags.length !== 1) throw new Error(`precompile: Babel 스크립트 태그가 ${tags.length}개 (정확히 1개여야 한다)`);
+  const { compile } = require('./precompile-jsx.js');          // 브라우저가 쓰던 것과 같은 변환 (react 프리셋 · sourceType script)
+  const js = `// ⚠️ 생성 파일 — 원본: ${path.basename(outPath).replace('-compiled.js', '.html')} 의 JSX 블록 → tools/build-site.js\n` + compile(blocks[0][1]) + '\n';
+  new (require('vm').Script)(js);                               // 컴파일 결과가 일반 자바스크립트인지 한 번 더 확인
+  const hash = require('crypto').createHash('sha1').update(js).digest('hex').slice(0, 8);
+  const out = html.replace(BABEL_TAG, '').replace(BABEL_BLOCK, () => `<script defer src="${outPath}?v=${hash}"></script>`);
+  return { html: out, js, hash };
+}
+
 function publicFiles() {
   const out = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT }).toString('utf8');
   return out.split('\0').filter(Boolean).filter((f) => {
@@ -67,7 +87,7 @@ function publicFiles() {
   });
 }
 
-module.exports = { publicFiles, retiredStubs, EXCLUDE_TOP, EXCLUDE_EXT, RETIRED_PAGES, RETIRED_ASSETS, MOVED_PAGES };
+module.exports = { publicFiles, retiredStubs, EXCLUDE_TOP, EXCLUDE_EXT, RETIRED_PAGES, RETIRED_ASSETS, MOVED_PAGES, PRECOMPILED_PAGES, precompilePage };
 
 if (require.main === module) {
   const dest = path.resolve(ROOT, process.argv[2] || '_site');
@@ -76,6 +96,15 @@ if (require.main === module) {
   for (const f of files) {
     const to = path.join(dest, f);
     fs.mkdirSync(path.dirname(to), { recursive: true });
+    if (PRECOMPILED_PAGES[f]) {
+      const r = precompilePage(fs.readFileSync(path.join(ROOT, f), 'utf8'), PRECOMPILED_PAGES[f]);   // 실패하면 던진다 → 빌드 실패
+      fs.writeFileSync(to, r.html);
+      const jsTo = path.join(dest, PRECOMPILED_PAGES[f]);
+      fs.mkdirSync(path.dirname(jsTo), { recursive: true });
+      fs.writeFileSync(jsTo, r.js);
+      console.log(`precompiled ${f} → ${PRECOMPILED_PAGES[f]} (${Math.round(r.js.length / 1024)}KB, v=${r.hash})`);
+      continue;
+    }
     fs.copyFileSync(path.join(ROOT, f), to);
   }
   const stubs = retiredStubs();
