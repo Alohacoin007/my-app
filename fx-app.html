@@ -693,6 +693,54 @@ function lotVal(input){
   if(!(c>=1) || c>10000) return null;
   return c/100;
 }
+// ── 트레일링 스탑 (2026-11-17) — MT5 와 같은 방식: **앱이 켜져 있는 동안** 앱이 손절가를 시세 뒤로 따라 올린다.
+// 서버 변경 없음: 손절가를 옮기는 길은 기존 fx_modify 하나, 손절 집행은 지금처럼 서버. 핀: tests/fx-trailing-stop.test.js
+// 불변식: ① 유리한 쪽으로만 ② 이익이 거리만큼 난 뒤에만(= 항상 본전 이상) ③ 항상 현재가 뒤 "거리"만큼.
+// trailNext 는 webtrade.html 과 글자 그대로 같다 (테스트가 강제 — 한쪽만 고치지 말 것).
+function trailNext(side, open, bid, ask, sl, dist, step, digits){
+  if(!(dist>0) || !(open>0)) return null;
+  var buy=String(side).toUpperCase()!=='SELL', px=buy?bid:ask;
+  if(!(px>0)) return null;
+  var cand=buy ? px-dist : px+dist;
+  if(buy ? cand<open-1e-12 : cand>open+1e-12) return null;      // 이익이 아직 거리만큼 안 났다 → 시작 안 함 (MT5 와 같음)
+  var f=Math.pow(10, digits), c=buy ? Math.floor(cand*f+1e-7)/f : Math.ceil(cand*f-1e-7)/f;   // 반올림은 시장에서 먼 쪽으로 (서버가 거절하지 않게)
+  if(buy ? c<open-1e-12 : c>open+1e-12) return null;            // 반올림 때문에 진입가보다 불리해지면 한 틱 더 기다린다 (항상 본전 이상)
+  if(sl==null || !(sl>0)) return c;
+  if(buy ? c>=sl+step-1e-9 : c<=sl-step+1e-9) return c;         // 유리한 쪽으로 step 이상 움직였을 때만 (서버 호출 남발 방지)
+  return null;
+}
+// 설정 { 포지션 id: 거리(가격) } 은 sessionStorage — 돈이 아니라 "이 탭이 켜져 있는 동안"의 지시다.
+var TRAIL={ map:{}, wait:{}, busy:{} };
+(function(){ try{ var m=JSON.parse(sessionStorage.getItem('alpexa.fx.trail')||'{}'); if(m&&typeof m==='object') TRAIL.map=m; }catch(e){} })();
+function trailGet(id){ var e=TRAIL.map[String(id)]; return (e&&e.d>0)?e.d:0; }
+function trailSet(id, dist){ if(dist>0) TRAIL.map[String(id)]={ d:dist }; else delete TRAIL.map[String(id)];
+  try{ sessionStorage.setItem('alpexa.fx.trail', JSON.stringify(TRAIL.map)); }catch(e){} }
+function trailLabel(sym, d){ return clsOf(sym)==='FX' ? (d/fxPip(sym)).toFixed(0)+' pips' : d.toFixed(digitsOf(sym)); }
+function trailMin(sym){ var st=stepOf(sym), spr=askOf(sym)-bidOf(sym); return Math.max(st, Math.ceil((spr*2)/st-1e-9)*st); }   // 스프레드 2배보다 가까우면 서버가 거절한다
+async function trailTick(){
+  if(S.busy || !db() || !fxAcct()) return;                       // 다른 요청(주문·청산) 중엔 끼어들지 않는다
+  var ids=Object.keys(TRAIL.map);
+  for(var i=0;i<ids.length;i++){ var id=ids[i], p=S.positions.find(function(x){ return x.id===id; });
+    if(!p || TRAIL.busy[id] || (TRAIL.wait[id]||0)>Date.now() || !isFresh(p.sym)) continue;   // ⑥ 시세가 낡았으면 안 보낸다
+    var bid=bidOf(p.sym), ask=askOf(p.sym), d=TRAIL.map[id].d, step=Math.max(stepOf(p.sym), d/10), dg=digitsOf(p.sym);
+    if(trailNext(p.side, p.open, bid, ask, p.sl>0?p.sl:null, d, step, dg)==null) continue;      // 화면 값으로 봐도 옮길 게 없으면 서버에 묻지 않는다
+    TRAIL.busy[id]=true;
+    try{
+      // ⑤ 보내기 직전에 서버에서 다시 읽는다 — 다른 기기에서 바꾼 TP 를 옛 값으로 덮지 않고, 닫힌 포지션이면 추적을 끝낸다.
+      var fr=await withTimeout(db().from('positions').select('local_id,side,open_price,meta').eq('server','fx').eq('acct_no',fxAcct()).eq('status','open').eq('local_id',id).limit(1));
+      if(!fr || fr.error || !fr.data){ TRAIL.wait[id]=Date.now()+10000; }
+      else if(!fr.data.length){ trailSet(id, 0); }
+      else { var row=fr.data[0], mt=row.meta||{};
+        var next=trailNext(String(row.side||'').toUpperCase(), +row.open_price, bid, ask, mt.sl!=null?+mt.sl:null, d, step, dg);
+        if(next==null){ p.sl=mt.sl!=null?+mt.sl:0; TRAIL.wait[id]=Date.now()+2000; }
+        else { var r=await rpc('fx_modify',{ p_local_id:id, p_sl:next, p_tp:(mt.tp!=null?+mt.tp:null) });
+          if(r && r.ok===true){ p.sl=next; p.tp=mt.tp!=null?+mt.tp:0; TRAIL.wait[id]=Date.now()+2000; render(); }
+          else TRAIL.wait[id]=Date.now()+10000; }   // 서버가 거절(시세가 그새 움직임 등) → 10초 뒤 다시 본다
+      }
+    }catch(e){ TRAIL.wait[id]=Date.now()+10000; }
+    TRAIL.busy[id]=false; }
+}
+setInterval(function(){ trailTick(); }, 1000);
 async function doModify(kind, id, sl, tp){
   if(!lock('mod')) return;
   try{ var d=await rpc(kind==='pos'?'fx_modify':'fx_modify_pending',{ p_local_id:id, p_sl:sl>0?sl:null, p_tp:tp>0?tp:null }); if(!d.ok){ toast(errText(d.error,d)); return; }
@@ -1030,7 +1078,7 @@ function screenActivity(){
     body+= S.positions.length>=2 ? '<div class="callrow"><span data-act="sheet:closeall">Close all</span></div>' : '';
     if(!S.positions.length) body+='<div class="empty">No open positions</div>';
     S.positions.forEach(function(p){ var pnl=posPnl(p); var cur=closePx(p.sym,p.side);
-      var d='@ '+fmtPx(p.open,p.sym)+' · '+(p.sl?'SL '+fmtPx(p.sl,p.sym):'')+(p.sl&&p.tp?' · ':'')+(p.tp?'TP '+fmtPx(p.tp,p.sym):'')+(!p.sl&&!p.tp?'no SL/TP':'')+(p.swap!=null?'<span class="sw">Swap '+fmtSigned(p.swap)+'</span>':'');
+      var d='@ '+fmtPx(p.open,p.sym)+' · '+(p.sl?'SL '+fmtPx(p.sl,p.sym):'')+(p.sl&&p.tp?' · ':'')+(p.tp?'TP '+fmtPx(p.tp,p.sym):'')+(!p.sl&&!p.tp?'no SL/TP':'')+(trailGet(p.id)?' · trailing '+trailLabel(p.sym,trailGet(p.id)):'')+(p.swap!=null?'<span class="sw">Swap '+fmtSigned(p.swap)+'</span>':'');
       body+=arow('<b class="'+(p.side==='BUY'?'b':'s')+'">'+(p.side==='BUY'?'Buy':'Sell')+'</b> '+p.vol.toFixed(2)+' '+p.sym+clsTag(p.sym), d, fmtSigned(pnl), pnl>=0?'pos':'neg', (cur?fmtPx(cur,p.sym):'—')+' now', 'close:'+p.id, 'sheet:pos:'+p.id); });
   } else if(S.actTab==='orders'){
     body='<div class="sum"><span class="k">Pending · '+S.pending.length+' order'+(S.pending.length===1?'':'s')+'</span><span class="v">—</span></div>';
@@ -1180,7 +1228,17 @@ function sheetHtml(){
       '<div class="r" style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:.5px solid var(--line);font-size:13px"><span style="color:var(--dim)">'+(clsOf(p.sym)==='FX'?'Pip value':'Value per 1.00 move')+'</span><span class="mono">'+fmtMoney(clsOf(p.sym)==='FX'?pv:contractOf(p.sym)*p.vol)+'</span></div>'+
       '<div class="r" style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px"><span style="color:var(--dim)">Swap accrued</span><span class="mono '+(p.swap!=null&&p.swap<0?'down':'')+'">'+(p.swap==null?'—':fmtSigned(p.swap))+'</span></div></div>'+
       '<div class="cta" style="margin-top:14px" data-act="sheet:sltp:pos:'+p.id+'">'+(p.sl||p.tp?'Edit stop loss / take profit':'Set stop loss / take profit')+'</div>'+
+      '<div class="ghost" style="padding:12px 0 2px" data-act="trailopen:'+p.id+'">Trailing stop · '+(trailGet(p.id)?trailLabel(p.sym,trailGet(p.id))+' ›':'Off ›')+'</div>'+
       '<div class="acts" style="margin-top:0;grid-template-columns:'+(p.vol>=0.02?'1fr 1fr 1fr':'1fr 1fr')+'">'+(p.vol>=0.02?'<div data-act="sheet:pclose:'+p.id+'">Close part</div>':'')+'<div style="border-color:var(--down);color:var(--down)" data-act="close:'+p.id+'">Close position</div><div data-act="sheet:">Cancel</div></div>';
+  } else if(S.sheet.indexOf('trail:')===0){
+    var tp0=S.positions.find(function(x){return x.id===S.sheet.slice(6);}); if(!tp0) return '';
+    var tOn=trailGet(tp0.id);
+    inner='<div class="sttl">Trailing stop<span class="x" data-act="sheet:">✕</span></div>'+
+      '<div class="body" style="padding-bottom:6px"><b class="'+(tp0.side==='BUY'?'up':'down')+'">'+(tp0.side==='BUY'?'Buy':'Sell')+'</b> '+tp0.vol.toFixed(2)+' '+tp0.sym+' · @ '+fmtPx(tp0.open,tp0.sym)+' · now '+fmtPx(closePx(tp0.sym,tp0.side),tp0.sym)+'</div>'+
+      '<div class="lotrow"><span>Distance<small>behind the price'+(tOn?' · on now: '+trailLabel(tp0.sym,tOn):'')+'</small></span><div class="lots"><b data-act="tdist:-">−</b><span>'+trailLabel(tp0.sym,S.tDist)+'</span><b data-act="tdist:+">+</b></div></div>'+
+      '<div class="body" style="padding-top:10px">Once your profit reaches this distance, the stop loss follows the price and never moves back. Works only while the app is open on this device.</div>'+
+      '<div class="cta" style="margin-top:4px" data-act="trailon:'+tp0.id+'">'+(tOn?'Update':'Turn on')+'</div>'+
+      '<div class="acts" style="margin-top:0;grid-template-columns:'+(tOn?'1fr 1fr':'1fr')+'">'+(tOn?'<div data-act="trailoff:'+tp0.id+'">Turn off</div>':'')+'<div data-act="sheet:">Cancel</div></div>';
   } else if(S.sheet==='closeall'){
     // 전체 청산 확인 — 여기서 누른 버튼만 실제 청산을 시작한다. 예상 손익은 표시용(실현은 서버).
     var nAll=S.positions.length, flAll=floating();
@@ -1306,6 +1364,13 @@ function act(a){
   else if(k==='gop'){ doPending(parts[1], parts[2], S.otype, S.lots, S.limitPx||defLimit(parts[2], parts[1])); return; }
   else if(k==='close'){ doClose(v); return; }
   else if(k==='closeall'){ doCloseAll(); return; }
+  else if(k==='trailopen'){ var tq=S.positions.find(function(x){return x.id===v;}); if(!tq) return;
+    S.tDist=trailGet(v)||Math.max(trailMin(tq.sym), stepOf(tq.sym)*20); S.sheet='trail:'+v; }
+  else if(k==='tdist'){ var tr=S.positions.find(function(x){return x.id===String(S.sheet||'').slice(6);}); if(!tr) return;
+    S.tDist=+Math.max(trailMin(tr.sym), (S.tDist||0)+(v==='+'?1:-1)*stepOf(tr.sym)).toFixed(digitsOf(tr.sym)); }
+  else if(k==='trailon'){ var tn=S.positions.find(function(x){return x.id===v;}); if(!tn||!(S.tDist>0)) return;
+    trailSet(v, S.tDist); S.sheet=null; toast('Trailing stop on · '+trailLabel(tn.sym,S.tDist)); return; }
+  else if(k==='trailoff'){ trailSet(v, 0); S.sheet=null; toast('Trailing stop off'); return; }
   else if(k==='lotchip'){ var lc=document.getElementById('lotIn'); if(lc) lc.value=(+v).toFixed(2); return; }   // 칩 → 입력칸만 채운다 (Set 을 눌러야 반영)
   else if(k==='lotset'){ var li=document.getElementById('lotIn'), lv=lotVal(li?li.value:'');
     if(lv==null){ toast('Enter 0.01 – 100.00 in 0.01 steps'); return; }
@@ -1368,7 +1433,8 @@ document.addEventListener('click', function(e){ var el=e.target.closest('[data-a
 // stepper press-and-hold: 350ms → repeat, then accelerate (1 → 5 → 10 steps per tick). Patches the stepper text in place —
 // a full render() would replace the pressed element and cancel the touch. Full render on release.
 (function(){ var t=null, iv=null, fired=false, swallow=false, n=0, cur=null;
-  function stepperText(k){ if(k==='lots') return S.lots.toFixed(2)+'<small>lot</small>'; if(k==='amt') return fmtMoney(S.amt); if(k==='pvol') return S.pVol.toFixed(2)+'<small>lot</small>';
+  function stepperText(k){ if(k==='lots') return S.lots.toFixed(2)+'<small>lot</small>';
+    if(k==='tdist'){ var tx=S.positions.find(function(x){return x.id===String(S.sheet||'').slice(6);}); return tx?trailLabel(tx.sym,S.tDist):''; } if(k==='amt') return fmtMoney(S.amt); if(k==='pvol') return S.pVol.toFixed(2)+'<small>lot</small>';
     if(k==='msl'||k==='mtp') return fmtPx((k==='msl'?S.mSl:S.mTp)||(k==='msl'?defSL(S.mSym,S.mRef,S.mSide):defTP(S.mSym,S.mRef,S.mSide)), S.mSym);
     var sym=S.sym, ref=S.limitPx||midOf(sym);
     return fmtPx(k==='lim'?(S.limitPx||defLimit(sym)):k==='sl'?(S.slPx||defSL(sym,ref)):(S.tpPx||defTP(sym,ref)), sym); }
