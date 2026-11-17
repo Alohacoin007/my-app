@@ -18,7 +18,8 @@ jobs:
       - name: Install headless Chromium (browser tests)
         run: |
           # 한 번에 설치 — 따로 npm i 하면 두 번째가 첫 번째(--no-save)를 지워 JSX 파싱 검사가 조용히 SKIP 됐다.
-          npm i @babel/parser playwright-core@1.63.0 --no-save
+          # @electric-sql/pglite = 내장 Postgres. 돈 SQL(tests/crypto-pending-sql.test.js)을 게이트에서 **실제로 실행**해 본다 (없으면 그 구간 SKIP).
+          npm i @babel/parser playwright-core@1.63.0 @electric-sql/pglite@0.5.16 --no-save
           PLAYWRIGHT_BROWSERS_PATH=$HOME/pw npx playwright-core install --with-deps chromium
           for d in $HOME/pw/chromium-*; do
             [ -e "$d/chrome-linux/chrome" ] || { [ -d "$d/chrome-linux64" ] && ln -s chrome-linux64 "$d/chrome-linux"; } || true

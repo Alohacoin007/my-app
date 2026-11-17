@@ -58,6 +58,7 @@
 ## 💰 돈 불변식 (현재 진실)
 - `accounts.balance == 오프닝 + Σ(ledger)` — ledger 트리거 `trg_apply_ledger`가 적용.
 - 모든 돈 이동은 **서버 RPC**로: `place_bet`, `cash_out`, `app_transfer`, `crypto_trade`, `swap_crypto`, `stake_crypto`, `unstake_crypto`. 정산은 Edge `sports-settle`.
+- **크립토 지정가·스탑 주문 (2026-11-17, `supabase/sql/crypto_pending.sql`)** — ⚠️ **SQL 배포 여부는 사장님께 확인** (앱은 서버에 기능이 있을 때만 Limit/Stop 탭을 띄운다: `window.__alpexaCryptoPending`). 체결 엔진은 한 곳 `crypto_fill_internal`(시장가 `crypto_trade` = 본인 확인 래퍼 · 대기주문 스윕 `crypto_pending_fill` 1분 크론 — 둘 다 이 코어만 부른다). 주문 id = 체결 ref(이중 체결 불가) · 잔고는 **체결 순간** 확인(부족 = `rejected`) · BUY=달러/SELL=코인 수량 · 앱은 `crypto_pending` 읽기만(접수 `crypto_place_pending` · 취소 `crypto_cancel_pending`). **`crypto_trade` 본문을 고치면 `crypto_pending.sql` 맨 위 가드의 md5 두 개도 같이 갱신**(안 하면 `tests/crypto-pending-sql.test.js` 🔴 + 배포 가드가 멈춘다). 그 테스트는 SQL 을 내장 Postgres(PGlite)로 **실제 실행**한다 — 로컬은 `<scratch>/pg` 에 `npm i @electric-sql/pglite`, CI 는 deploy.yml 이 설치.
 - 멱등: 베팅 지급 `betpay-<id>`, 이체 `xfer-...`, 보정 `fix-...` 등 **ref로 중복 차단**.
 - 정산 이중지급 방지: 서버·앱이 `positions` 행을 **삭제로 선점(claim)** → 먼저 지운 쪽만 지급.
 - ✅ (구 약점 폐쇄 확인 2026-07-28) 클라 `syncSportsBal`의 ledger 델타 push는 제거 완료 — 지금은 표시 전용, 모든 잔고 변동은 서버 RPC/Edge만. 2026-07-27 전수감사로 "클라가 보낸 값이 돈 수식에 들어가는 지점" 전 서버 0개 (핀: money-client-trust 외 12계약).

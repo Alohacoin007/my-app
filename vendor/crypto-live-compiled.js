@@ -4054,7 +4054,7 @@ function Dashboard({
         color: RH.text,
         letterSpacing: -0.1
       }
-    }, /*#__PURE__*/React.createElement("span", null, "Buy ", name), /*#__PURE__*/React.createElement("span", {
+    }, /*#__PURE__*/React.createElement("span", null, o.side === 'sell' ? 'Sell' : 'Buy', " ", name), /*#__PURE__*/React.createElement("span", {
       style: {
         padding: '1px 6px',
         borderRadius: 999,
@@ -4075,7 +4075,9 @@ function Dashboard({
         fontFamily: FONT_UI,
         letterSpacing: 0.2
       }
-    }, o.type === 'Limit' ? '≤' : '≥', " $", o.trigger.toFixed(2), " \xB7 $", o.usd.toFixed(2))), /*#__PURE__*/React.createElement("div", {
+    }, o.type === 'Limit' === (o.side !== 'sell') ? '≤' : '≥', " $", (+o.trigger || 0).toLocaleString('en-US', {
+      maximumFractionDigits: 6
+    }), " \xB7 ", o.side === 'sell' ? `${+(+o.coin || 0).toFixed(8)} ${o.sym}` : `$${(+o.usd || 0).toFixed(2)}`)), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 9.5,
         fontWeight: 700,
@@ -20314,12 +20316,29 @@ const AudioFX = {
   }
 };
 
-// 주문 유형 — 지금은 시장가만 (2026-11-15 사장님 "1단계로 해").
-// 왜: 지정가·스탑 주문은 이 폰(localStorage 'alpexa.pendingOrders')에만 저장되고 서버·크론 어디에서도 체결하지
-// 않았다. 그런데 화면은 "가격에 도달하면 체결됩니다"라고 안내했다 = 고객이 주문이 걸렸다고 믿고 기다리게 됨.
-// 서버 지정가 주문(FX 의 fx_place_pending 같은 것)이 생기면 그때 이 목록에 유형을 다시 넣는다.
-// 유형이 하나뿐이면 탭 줄 자체를 그리지 않는다. 핀: tests/no-fake-content.test.js
-const ORDER_TYPES = ['Market'];
+// 주문 유형 — 시장가는 항상. 지정가·스탑은 **서버에 대기주문 기능이 깔려 있을 때만** 보인다.
+// 역사: 2026-11-15 까지 지정가·스탑은 이 폰에만 저장되고 아무도 체결하지 않아 숨겼다.
+// 2026-11-17 서버 대기주문(supabase/sql/crypto_pending.sql — crypto_place_pending · 1분 스윕)으로 옮겼다.
+// App 이 crypto_pending 을 읽어 보고 되면 window.__alpexaCryptoPending=true 로 표시한다 (SQL 배포 전엔 시장가만).
+// 유형이 하나뿐이면 탭 줄 자체를 그리지 않는다. 핀: tests/crypto-pending-client.test.js · tests/no-fake-content.test.js
+const orderTypes = () => window.__alpexaCryptoPending ? ['Market', 'Limit', 'Stop'] : ['Market'];
+// 주문 번호 — 서버 형식 ^cp-[A-Za-z0-9-]{6,40}$. 이 번호가 체결 기록의 ref 가 된다 (한 주문 = 한 번 체결).
+function cryptoPendingId() {
+  return 'cp-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10).padEnd(8, '0');
+}
+// 서버 행(crypto_pending) → 화면 모양. BUY 는 달러(usd) · SELL 은 코인 수량(coin).
+function cryptoPendingRow(x) {
+  return {
+    id: x.id,
+    sym: x.asset,
+    side: x.side,
+    type: x.otype === 'limit' ? 'Limit' : 'Stop',
+    trigger: +x.trigger || 0,
+    usd: x.usd != null ? +x.usd : null,
+    coin: x.qty != null ? +x.qty : null,
+    placedAt: Date.parse(x.created_at) || 0
+  };
+}
 function Buy({
   onBack,
   balances = {},
@@ -20541,6 +20560,7 @@ function Buy({
   })();
   const triggerOk = triggerTier === 'ok' || triggerTier === 'warn';
   const submittingRef = React.useRef(false);
+  const pendIdRef = React.useRef(null); // 지정가·스탑 주문 번호 — 이 화면에서 한 번만 만든다 (더블탭·재시도 = 같은 번호 → 서버 duplicate)
   const doBuy = async () => {
     if (submittingRef.current) return; // ignore double-taps while a trade is in flight
     if (window.__alpexaHalt) {
@@ -20571,14 +20591,29 @@ function Buy({
         return;
       }
     } else {
-      // Limit / Stop orders become pending — placed in the App's queue,
-      // shown in Dashboard's Open Orders section.
-      if (cb) cb(assetId, usdAmount, {
-        type: orderType,
-        triggerPrice,
-        coinAmount,
-        side
-      });
+      // Limit / Stop = 서버 대기주문 (crypto_place_pending). 결과를 기다린다 — 서버가 거절했는데 "접수됨"을 보여주지 않는다.
+      if (!pendIdRef.current) pendIdRef.current = cryptoPendingId();
+      let res;
+      submittingRef.current = true;
+      try {
+        res = cb ? await cb(assetId, usdAmount, {
+          type: orderType,
+          triggerPrice,
+          coinAmount,
+          side,
+          id: pendIdRef.current
+        }) : {
+          ok: false,
+          error: 'unavailable'
+        };
+      } finally {
+        submittingRef.current = false;
+      }
+      if (!res || res.ok === false) {
+        AudioFX.reject();
+        alert('Order not placed: ' + (res && res.error || 'please try again'));
+        return;
+      }
     }
     AudioFX.success();
     setConfirmed(true);
@@ -20621,7 +20656,7 @@ function Buy({
         label: 'Total',
         value: `$${total.toFixed(2)}`
       }],
-      footnote: isMarket ? `${verbPast} ${coinAmount.toFixed(6).replace(/\.?0+$/, '')} ${assetId} at $${scrubPrice.toFixed(2)}. Network fee of $${fee.toFixed(2)} was added.` : `Your ${orderType.toLowerCase()} ${verbNoun} order is queued. It will execute when ${assetId} reaches your trigger price.`,
+      footnote: isMarket ? `${verbPast} ${coinAmount.toFixed(6).replace(/\.?0+$/, '')} ${assetId} at $${scrubPrice.toFixed(2)}. Network fee of $${fee.toFixed(2)} was added.` : `Your ${orderType.toLowerCase()} ${verbNoun} order is placed. It is checked every minute and fills at the market price once ${assetId} reaches your trigger — if your balance covers it at that moment. Cancel it anytime from Home → Open Orders.`,
       onDone: onBack
     });
   }
@@ -21028,7 +21063,7 @@ function Buy({
         transition: 'color 160ms ease, background 160ms ease'
       }
     }, r);
-  })), ORDER_TYPES.length > 1 ? /*#__PURE__*/React.createElement("div", {
+  })), orderTypes().length > 1 ? /*#__PURE__*/React.createElement("div", {
     style: {
       margin: '6px 16px 0',
       padding: 2,
@@ -21037,7 +21072,7 @@ function Buy({
       borderRadius: 18,
       background: RH.surface
     }
-  }, ORDER_TYPES.map(t => {
+  }, orderTypes().map(t => {
     const active = t === orderType;
     return /*#__PURE__*/React.createElement("button", {
       key: t,
@@ -22638,7 +22673,7 @@ function App() {
   // crypto_holdings and `staked` from crypto_stakes on load (+ 8s poll + realtime).
   const [balances, setBalances] = React.useState(() => ({}));
   const [staked, setStaked] = React.useState({});
-  const [pendingOrders, setPendingOrders] = usePersistedState('alpexa.pendingOrders', []);
+  const [pendingOrders, setPendingOrders] = React.useState([]); // 서버(crypto_pending)에서 읽는다 — 폰에 저장하지 않는다 (아래 loadPendingOrders)
   const [detail, setDetail] = React.useState(null); // { kind, sym } | null
   const [tab, setTab] = React.useState('home'); // home | trade | discover | account
   const [tradeAsset, setTradeAsset] = React.useState('BTC');
@@ -23484,6 +23519,94 @@ function App() {
       cryptoAcctRef.current = me && me.accts && me.accts.crypto || null;
     } catch (e) {}
   }, []);
+  // ── 지정가·스탑 주문 = 서버 대기주문 (2026-11-17, supabase/sql/crypto_pending.sql) ──────────────────────────
+  // 목록은 crypto_pending 을 읽기만 한다 (RLS 본인 것). 접수·취소는 RPC. 체결은 서버 스윕(1분) — 앱은 돈을 움직이지 않는다.
+  // 읽기가 실패하면(SQL 미배포·권한 없음·통신) 기능을 끈다 = 시장가만 (탭이 사라진다). 핀: tests/crypto-pending-client.test.js
+  const pendSeenRef = React.useRef(null);
+  const loadPendingOrders = React.useCallback(async () => {
+    const acct = cryptoAcctRef.current;
+    if (!(window.AlpexaSync && AlpexaSync.db && acct)) return;
+    try {
+      const r = await AlpexaSync.db.from('crypto_pending').select('id,asset,side,otype,usd,qty,trigger,status,created_at').eq('acct_no', acct).eq('status', 'pending').order('created_at', {
+        ascending: false
+      }).limit(50);
+      if (!r || r.error || !Array.isArray(r.data)) {
+        window.__alpexaCryptoPending = false;
+        return;
+      }
+      window.__alpexaCryptoPending = true;
+      const rows = r.data.map(cryptoPendingRow);
+      setPendingOrders(rows);
+      // 목록에서 사라진 주문 = 체결·거절·취소됨 → 결과를 알려 준다 (조용히 사라지지 않게) + 잔고 다시 읽기
+      const now = new Set(rows.map(o => o.id)),
+        gone = pendSeenRef.current ? [...pendSeenRef.current].filter(id => !now.has(id)) : [];
+      pendSeenRef.current = now;
+      if (gone.length) {
+        const d = await AlpexaSync.db.from('crypto_pending').select('id,asset,side,otype,status,reason,fill_price,fill_qty').in('id', gone.slice(0, 20));
+        (d && d.data || []).forEach(x => {
+          const what = (x.side === 'sell' ? 'Sell ' : 'Buy ') + (x.otype === 'limit' ? 'limit' : 'stop') + ' · ' + x.asset;
+          try {
+            if (x.status === 'filled') cryptoNotify({
+              type: 'fill',
+              title: 'Order filled',
+              body: what + ' at $' + (+x.fill_price || 0).toLocaleString('en-US', {
+                maximumFractionDigits: 2
+              })
+            });else if (x.status === 'rejected') cryptoNotify({
+              type: 'fill',
+              title: 'Order rejected',
+              body: what + ' — ' + (x.reason || 'not filled')
+            });
+          } catch (e) {}
+        });
+        forceCryptoAdopt();
+      }
+    } catch (e) {}
+  }, []);
+  React.useEffect(() => {
+    try {
+      localStorage.removeItem('alpexa.pendingOrders');
+    } catch (e) {} // 옛 폰 저장 주문(아무도 체결하지 않던 것)을 지운다
+    loadPendingOrders();
+    const iv = setInterval(loadPendingOrders, 20000);
+    return () => clearInterval(iv);
+  }, [loadPendingOrders]);
+  const placeCryptoPending = async o => {
+    const acct = cryptoAcctRef.current;
+    if (!(window.AlpexaSync && AlpexaSync.db && acct)) return {
+      ok: false,
+      error: 'not signed in'
+    };
+    try {
+      const r = await AlpexaSync.db.rpc('crypto_place_pending', {
+        p_id: o.id || cryptoPendingId(),
+        p_acct: acct,
+        p_symbol: o.sym,
+        p_side: o.side,
+        p_otype: String(o.type).toLowerCase(),
+        p_trigger: +o.trigger,
+        p_usd: o.side === 'buy' ? Math.round((+o.usd || 0) * 100) / 100 : null,
+        p_qty: o.side === 'sell' ? +(+o.qty || 0).toFixed(8) : null
+      });
+      const d = r && r.data;
+      if (!r || r.error || !d || d.ok === false) {
+        const err = d && d.error || r && r.error && r.error.message || 'order not placed';
+        return {
+          ok: false,
+          error: (d && d.code) === 'WRONG_SIDE' ? 'that price would fill right away — use a Market order, or move the trigger' : err
+        };
+      }
+      loadPendingOrders();
+      return {
+        ok: true
+      };
+    } catch (e) {
+      return {
+        ok: false,
+        error: 'network error'
+      };
+    }
+  };
   const holdingsSyncRef = React.useRef({
     prev: null,
     first: true,
@@ -24021,17 +24144,15 @@ function App() {
         error: 'network error'
       }));
     } else {
-      // Limit / Stop: queue as pending order. Funds aren't moved until fill.
-      setPendingOrders(p => [...p, {
-        id: Date.now(),
+      // Limit / Stop = 서버 대기주문. 돈은 체결 순간(서버 스윕)에만 움직인다. BUY 는 쓸 달러로 건다.
+      return placeCryptoPending({
+        id: order.id,
         sym: assetId,
         side: 'buy',
         type: order.type,
         trigger: order.triggerPrice,
-        usd: usdAmount,
-        coin: order.coinAmount,
-        placedAt: Date.now()
-      }]);
+        usd: usdAmount
+      });
     }
   };
   // Sell mirror of onBoughtConfirmed.
@@ -24148,16 +24269,15 @@ function App() {
         error: 'network error'
       }));
     } else {
-      setPendingOrders(p => [...p, {
-        id: Date.now(),
+      // Limit / Stop = 서버 대기주문. SELL 은 팔 코인 수량으로 건다 (달러로 걸면 가격이 내려간 뒤 스탑이 '보유 부족'으로 거절된다).
+      return placeCryptoPending({
+        id: order.id,
         sym: assetId,
         side: 'sell',
         type: order.type,
         trigger: order.triggerPrice,
-        usd: usdAmount,
-        coin: order.coinAmount,
-        placedAt: Date.now()
-      }]);
+        qty: order.coinAmount
+      });
     }
   };
   // Securities redemption tracking — USD already taken out per sym.
@@ -24460,7 +24580,19 @@ function App() {
       flashAsset('USDT');
     });
   };
-  const cancelOrder = id => setPendingOrders(p => p.filter(o => o.id !== id));
+  const cancelOrder = async id => {
+    // 서버 취소 (본인 pending 만). 이미 체결됐으면 서버가 거절한다 → 목록을 다시 읽어 진실을 보여준다.
+    try {
+      const r = await AlpexaSync.db.rpc('crypto_cancel_pending', {
+        p_id: id
+      });
+      const d = r && r.data;
+      if (!r || r.error || !d || d.ok === false) alert('Not cancelled: ' + ((d && d.code) === 'NOT_PENDING' ? 'this order is no longer pending' : d && d.error || 'please try again'));
+    } catch (e) {
+      alert('Not cancelled: network error');
+    }
+    loadPendingOrders();
+  };
   const onAction = id => {
     if (id === 'send') setScreen('send');
     if (id === 'receive') setScreen('receive');

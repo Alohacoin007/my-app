@@ -28,8 +28,11 @@ ok('스포츠: 실황 화면의 PLAY-BY-PLAY 구역은 실제 플레이가 있�
 // ── 크립토 모바일 (소스 + 배포 컴파일본 둘 다) ──────────────────────────────────
 const jsx = rd('src/crypto-live-app.jsx'), bin = rd('vendor/crypto-live-compiled.js');
 for (const [nm, s] of [['소스', jsx], ['컴파일본', bin]]) {
-  ok(`크립토 ${nm}: 주문 유형 = 시장가만 (ORDER_TYPES) — Limit/Stop 탭 없음`,
-     /ORDER_TYPES\s*=\s*\[['"]Market['"]\]/.test(s) && !/\[['"]Market['"],\s*['"]Limit['"],\s*['"]Stop['"]\]/.test(s));
+  // 2026-11-17: 지정가·스탑이 서버 대기주문(crypto_pending.sql)으로 옮겨졌다 → 탭은 **서버에 그 기능이 있을 때만** 보인다.
+  // 폰에만 저장하던 옛 방식(아무도 체결 안 함)은 금지 그대로. 상세 계약: tests/crypto-pending-client.test.js
+  ok(`크립토 ${nm}: Limit/Stop 탭은 서버 대기주문 기능이 있을 때만 (없으면 시장가만) · 폰에 주문을 저장하지 않는다`,
+     /window\.__alpexaCryptoPending\s*\?\s*\[\s*['"]Market['"],\s*['"]Limit['"],\s*['"]Stop['"]\s*\]\s*:\s*\[\s*['"]Market['"]\s*\]/.test(s) &&
+     !/setItem\(\s*['"]alpexa\.pendingOrders['"]/.test(s) && !/usePersistedState\(\s*['"]alpexa\.pendingOrders['"]/.test(s));
   ok(`크립토 ${nm}: 송금 영수증에 랜덤 Tx hash·Reference 없음`,
      !/Tx hash/.test(s) && !/['"]ALPX-['"]\s*\+\s*Math\.random/.test(s) && !/refData/.test(s));
   ok(`크립토 ${nm}: 동작 안 하는 보안 토글(2FA·생체인증·자동잠금) 없음`,
