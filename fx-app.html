@@ -222,6 +222,9 @@ function rhToLogin(q){ try{ sessionStorage.setItem("alpexa.dest2","fx-rh"); }cat
   .seg span.on { background: var(--text); color: var(--bg); }
   .sum { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 22px 6px; }
   .sum .k { font-size: 12px; color: var(--dim); font-weight: 500; }
+  .callrow { display: flex; justify-content: flex-end; padding: 2px 20px 0; }
+  .callrow span { font-size: 12.5px; font-weight: 700; color: var(--down); padding: 8px 0 8px 14px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .lots span[data-act] { cursor: pointer; text-decoration: underline dotted var(--mute); text-underline-offset: 3px; }
   .sum .v { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.4px; }
   .grp { padding: 14px 22px 4px; font-size: 11px; font-weight: 800; letter-spacing: .8px; color: var(--mute); text-transform: uppercase; }
   .arow { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 10px; padding: 11px 22px; border-bottom: 0.5px solid var(--line); }
@@ -662,6 +665,34 @@ async function doClosePartial(id, lots){
   try{ var d=await rpc('fx_close_partial',{ p_local_id:id, p_size:lots, p_ref:ref }); if(!d.ok){ S.sheet=null; toast(errText(d.error,d)); return; }
     S.sheet=null; toast('Closed '+(+d.closed||lots).toFixed(2)+' '+p.sym+(d.pnl!=null?' · '+fmtSigned(+d.pnl):'')+(d.remaining!=null?' · '+(+d.remaining).toFixed(2)+' left':''));
   }catch(e){ toast('Close failed — '+e.message); } finally{ unlock(); pullHistory(); refresh(); } }
+// ── 거래 관리 (2026-11-17 사장님 "FX 거래 관리 진행해") · 핀: tests/fx-app-trade-mgmt.test.js ──
+// 전체 청산 실행기: 포지션마다 **한 번씩, 차례로** closeOne(=기존 fx_close)을 부른다. 한 건이 실패해도 멈추지 않고 이유를 모은다.
+// 새 돈 경로 없음 — "한 포지션 = 한 번 청산"은 서버(fx_close 행 잠금 · ALREADY_CLOSED)가 보장한다.
+async function closeAllRun(list, closeOne){
+  var seen={}, res={ closed:0, pnl:0, failed:[] };
+  for(var i=0;i<list.length;i++){ var p=list[i], id=String(p.id); if(seen[id]) continue; seen[id]=1;
+    var d; try{ d=await closeOne(p); }catch(e){ d={ ok:false, error:(e&&e.message)||'connection issue' }; }
+    if(d&&d.ok){ res.closed++; if(d.pnl!=null) res.pnl+=+d.pnl; } else res.failed.push({ sym:p.sym, why:d||{ ok:false, error:'no response' } }); }
+  return res;
+}
+async function doCloseAll(){
+  var list=S.positions.slice(); if(!list.length){ S.sheet=null; render(); return; }
+  if(!lock('closeall')) return;
+  try{ var r=await closeAllRun(list, function(p){ S.busySince=Date.now(); return rpc('fx_close',{ p_local_id:p.id }); });   // busySince 갱신 = 여러 건을 닫는 동안 감시자가 잠금을 풀지 않게
+    S.sheet=null;
+    var f=r.failed[0];
+    toast(r.failed.length ? 'Closed '+r.closed+' of '+list.length+' · '+f.sym+': '+String(errText(f.why.error,f.why)).replace(' for '+f.sym,'')+(r.failed.length>1?' +'+(r.failed.length-1)+' more':'')
+                          : 'Closed '+r.closed+' position'+(r.closed===1?'':'s')+' · '+fmtSigned(r.pnl));   // 실패는 숨기지 않는다 (한 줄에 들어가게 짧게)
+  }catch(e){ toast('Close failed — '+e.message); } finally{ unlock(); pullHistory(); refresh(); } }
+// 랏 직접 입력 검증: 0.01 단위 · 0.01 ~ 100. 반올림해서 받지 않는다 (친 숫자 = 나가는 수량). 아니면 null.
+// 100 랏 상한은 오타 방지용 입력 한계다 — 진짜 관문은 서버 fx_open 의 증거금 검사.
+function lotVal(input){
+  var s=String(input==null?'':input).trim();
+  if(!/^(\d+(\.\d{1,2})?|\.\d{1,2})$/.test(s)) return null;
+  var c=Math.round(parseFloat(s)*100);
+  if(!(c>=1) || c>10000) return null;
+  return c/100;
+}
 async function doModify(kind, id, sl, tp){
   if(!lock('mod')) return;
   try{ var d=await rpc(kind==='pos'?'fx_modify':'fx_modify_pending',{ p_local_id:id, p_sl:sl>0?sl:null, p_tp:tp>0?tp:null }); if(!d.ok){ toast(errText(d.error,d)); return; }
@@ -876,7 +907,7 @@ function screenHome(){
     (function(){ var lg=liveGroups(); if(lg.indexOf(S.homeSeg)<0) S.homeSeg='FX';   // saved group lost its feed → fall back
       return lg.length>1 ? '<div class="sseg hseg">'+lg.map(function(g){ return '<span class="'+(S.homeSeg===g?'on':'')+'" data-act="hseg:'+g+'">'+g+'</span>'; }).join('')+'</div>' : ''; })()+
     /* 랏 스테퍼는 1-Click ON 일 때만 (사장님 2026-09-22 "2번 실행"): OFF 면 탭이 Trade 화면으로 가서 거기서 수량을 정하므로 홈의 스테퍼는 쓰이지 않는 컨트롤 */
-    '<div class="hd">'+(S.oneClick?'<div class="lots"><b data-act="lots:-">−</b><span>'+S.lots.toFixed(2)+'<small>lot</small></span><b data-act="lots:+">+</b></div>':'<div></div>')+'<div class="cols"><span>SELL</span><span>BUY</span></div></div>'+
+    '<div class="hd">'+(S.oneClick?'<div class="lots"><b data-act="lots:-">−</b><span data-act="sheet:lots">'+S.lots.toFixed(2)+'<small>lot</small></span><b data-act="lots:+">+</b></div>':'<div></div>')+'<div class="cols"><span>SELL</span><span>BUY</span></div></div>'+
     '<div class="list">'+homeRows()+'</div>';
 }
 /* 오른쪽은 현재가 태그 자리 — 봉/선은 PW 안에만 그린다. scrubAt 은 data-pw 로 같은 비율을 쓴다.
@@ -984,7 +1015,7 @@ function screenTrade(){
     '<div class="foot">'+
     '<div class="otype">'+['MARKET','LIMIT','STOP'].map(function(o){ return '<span class="'+(S.otype===o?'on':'')+'" data-act="otype:'+o+'">'+o[0]+o.slice(1).toLowerCase()+'</span>'; }).join('')+'</div>'+
     (S.otype==='MARKET'?'':'<div class="lotrow"><span>'+(S.otype==='LIMIT'?'Limit':'Stop')+' price<small>'+(mid?distLabel(sym,mid,limitPx).replace(/^[+−]/,'')+' '+(limitPx<mid?'below':'above')+' market':'')+'</small></span><div class="lots"><b data-act="lim:-">−</b><span>'+fmtPx(limitPx,sym)+'</span><b data-act="lim:+">+</b></div></div>')+
-    '<div class="lotrow"><span>Volume</span><div class="lots"><b data-act="lots:-">−</b><span>'+S.lots.toFixed(2)+'<small>lot</small></span><b data-act="lots:+">+</b></div></div>'+
+    '<div class="lotrow"><span>Volume</span><div class="lots"><b data-act="lots:-">−</b><span data-act="sheet:lots">'+S.lots.toFixed(2)+'<small>lot</small></span><b data-act="lots:+">+</b></div></div>'+
     sltpBlock+
     '<div class="half"><div class="btn sell'+tickCls(sym,'b')+'" data-act="order:SELL:'+sym+'"><div class="k">SELL'+lbl+'</div>'+fmtPx(limitPx||bid,sym,true)+'</div><div class="btn buy'+tickCls(sym,'a')+'" data-act="order:BUY:'+sym+'"><div class="k">BUY'+lbl+'</div>'+fmtPx(limitPx||ask,sym,true)+'</div></div>'+
     '</div></div>';
@@ -996,6 +1027,7 @@ function screenActivity(){
   if(S.actTab==='positions'){
     var fl=floating();
     body='<div class="sum"><span class="k">Open P&amp;L · '+S.positions.length+' position'+(S.positions.length===1?'':'s')+'</span><span class="v '+(fl>=0?'up':'down')+'">'+fmtSigned(fl)+'</span></div>';
+    body+= S.positions.length>=2 ? '<div class="callrow"><span data-act="sheet:closeall">Close all</span></div>' : '';
     if(!S.positions.length) body+='<div class="empty">No open positions</div>';
     S.positions.forEach(function(p){ var pnl=posPnl(p); var cur=closePx(p.sym,p.side);
       var d='@ '+fmtPx(p.open,p.sym)+' · '+(p.sl?'SL '+fmtPx(p.sl,p.sym):'')+(p.sl&&p.tp?' · ':'')+(p.tp?'TP '+fmtPx(p.tp,p.sym):'')+(!p.sl&&!p.tp?'no SL/TP':'')+(p.swap!=null?'<span class="sw">Swap '+fmtSigned(p.swap)+'</span>':'');
@@ -1149,6 +1181,22 @@ function sheetHtml(){
       '<div class="r" style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px"><span style="color:var(--dim)">Swap accrued</span><span class="mono '+(p.swap!=null&&p.swap<0?'down':'')+'">'+(p.swap==null?'—':fmtSigned(p.swap))+'</span></div></div>'+
       '<div class="cta" style="margin-top:14px" data-act="sheet:sltp:pos:'+p.id+'">'+(p.sl||p.tp?'Edit stop loss / take profit':'Set stop loss / take profit')+'</div>'+
       '<div class="acts" style="margin-top:0;grid-template-columns:'+(p.vol>=0.02?'1fr 1fr 1fr':'1fr 1fr')+'">'+(p.vol>=0.02?'<div data-act="sheet:pclose:'+p.id+'">Close part</div>':'')+'<div style="border-color:var(--down);color:var(--down)" data-act="close:'+p.id+'">Close position</div><div data-act="sheet:">Cancel</div></div>';
+  } else if(S.sheet==='closeall'){
+    // 전체 청산 확인 — 여기서 누른 버튼만 실제 청산을 시작한다. 예상 손익은 표시용(실현은 서버).
+    var nAll=S.positions.length, flAll=floating();
+    inner='<div class="sttl">Close all positions<span class="x" data-act="sheet:">✕</span></div>'+
+      '<div class="kvs"><div class="r"><span class="k">Open positions</span><span class="v">'+nAll+'</span></div><div class="r"><span class="k">Est. P&amp;L now</span><span class="v '+(flAll>=0?'up':'down')+'">'+fmtSigned(flAll)+'</span></div></div>'+
+      '<div class="body" style="padding-top:10px">Each position is closed at the live server price, one after another. Pending orders stay. A position whose market is closed stays open.</div>'+
+      '<div class="cta sell" style="margin-top:4px" data-act="closeall">'+(S.busy?'Working…':'Close '+nAll+' position'+(nAll===1?'':'s'))+'</div>'+
+      '<div class="acts" style="margin-top:0;grid-template-columns:1fr"><div data-act="sheet:">Cancel</div></div>';
+  } else if(S.sheet==='lots'){
+    // 랏 직접 입력 — 스테퍼(±0.01)로 멀리 가기 힘든 수량을 숫자로 친다. Set 을 눌러야 반영된다(lotVal 검증).
+    inner='<div class="sttl">Volume<span class="x" data-act="sheet:">✕</span></div>'+
+      '<div class="lbl">Lots</div><input class="fld mono" id="lotIn" type="text" inputmode="decimal" autocomplete="off" placeholder="0.10" value="'+S.lots.toFixed(2)+'">'+
+      '<div class="chips" style="justify-content:flex-start;padding-top:0">'+[0.01,0.1,0.5,1,5].map(function(q){ return '<span data-act="lotchip:'+q+'">'+q.toFixed(2)+'</span>'; }).join('')+'</div>'+
+      '<div class="body" style="padding-top:10px">0.01 to 100.00 lots, in 0.01 steps. Margin is checked by the server when the order is placed.</div>'+
+      '<div class="cta" style="margin-top:4px" data-act="lotset">Set volume</div>'+
+      '<div class="acts" style="margin-top:0;grid-template-columns:1fr"><div data-act="sheet:">Cancel</div></div>';
   } else if(S.sheet.indexOf('pclose:')===0){
     // 부분청산 — MT5 Close By Volume. 수량 = [0.01, vol−0.01] (전량은 Close position). 슬라이스 예상 P&L = 표시 P&L × 비율 (표시용; 실현은 서버).
     var pv=S.positions.find(function(x){return x.id===S.sheet.slice(7);}); if(!pv) return '';
@@ -1257,6 +1305,11 @@ function act(a){
   else if(k==='go2'){ doOpen(parts[1], parts[2], S.lots, S.sltp?curSL(parts[1]):0, S.sltp?curTP(parts[1]):0); return; }
   else if(k==='gop'){ doPending(parts[1], parts[2], S.otype, S.lots, S.limitPx||defLimit(parts[2], parts[1])); return; }
   else if(k==='close'){ doClose(v); return; }
+  else if(k==='closeall'){ doCloseAll(); return; }
+  else if(k==='lotchip'){ var lc=document.getElementById('lotIn'); if(lc) lc.value=(+v).toFixed(2); return; }   // 칩 → 입력칸만 채운다 (Set 을 눌러야 반영)
+  else if(k==='lotset'){ var li=document.getElementById('lotIn'), lv=lotVal(li?li.value:'');
+    if(lv==null){ toast('Enter 0.01 – 100.00 in 0.01 steps'); return; }
+    S.lots=lv; S.sheet=null; }
   else if(k==='pclose'){ doClosePartial(v, S.pVol); return; }
   else if(k==='pvol'||k==='pvolset'){ var pv=S.positions.find(function(x){return x.id===String(S.sheet||'').slice(7);}); if(!pv) return;
     var want = k==='pvol' ? S.pVol+(v==='+'?0.01:-0.01) : pv.vol*(+v||0.5);
