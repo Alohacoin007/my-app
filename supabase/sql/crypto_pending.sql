@@ -31,8 +31,12 @@
 -- 되돌리기: 맨 아래 주석.
 -- ============================================================================================
 
--- 0) 배포 전 가드 — 배포된 crypto_trade 본문이 (a) 리포의 crypto_trade.sql 또는 (b) 이 파일의 새 래퍼와 같아야 한다.
---    다르면 = 누군가 SQL editor 에서 직접 고친 것 → 이 파일이 그 수정을 덮어쓰게 되므로 중단한다. (공백 차이는 무시)
+-- 0) 배포 전 가드 — 배포된 crypto_trade 본문이 아래 셋 중 하나와 같아야 한다 (공백 차이는 무시):
+--      (a) 97da35b7… 리포의 crypto_trade.sql
+--      (b) 30fce10b… 운영에 실제로 깔려 있던 본문 (2026-11-17 사장님이 pg_get_functiondef 로 확인). (a) 와 **주석 9줄만** 다르고
+--          로직은 한 글자도 같다 — tests/fixtures/crypto_trade.prod-2026-11-17.sql + tests/crypto-pending-sql.test.js 가 핀.
+--      (c) 71497982… 이 파일의 새 래퍼 (재실행)
+--    그 밖의 값 = 누군가 SQL editor 에서 직접 고친 것 → 이 파일이 그 수정을 덮어쓰게 되므로 중단한다.
 do $guard$
 declare v_src text; v_h text;
 begin
@@ -44,7 +48,7 @@ begin
     raise exception 'crypto_pending: crypto_trade(7 args) not found — deploy crypto_trade.sql first. Nothing was changed.';
   end if;
   v_h := md5(regexp_replace(v_src, '\s+', '', 'g'));
-  if v_h not in ('97da35b76e27189e0c55a63663544217', '7149798288d40b21e6531b6f5cd80491') then
+  if v_h not in ('97da35b76e27189e0c55a63663544217', '30fce10bac44ee7e4c2fa6d21ac5e6a7', '7149798288d40b21e6531b6f5cd80491') then
     raise exception 'crypto_pending: deployed crypto_trade differs from the repo (md5 %). Stopped — nothing was changed.', v_h;
   end if;
 end $guard$;

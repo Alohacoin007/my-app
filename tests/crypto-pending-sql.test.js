@@ -25,9 +25,20 @@ const bodyOf = (sql, name) => { const m = sql.match(new RegExp('create or replac
 // ── 정적 핀 ──────────────────────────────────────────────────────────────────
 const oldBody = bodyOf(OLD_SQL, 'crypto_trade'), newBody = bodyOf(NEW_SQL, 'crypto_trade'), coreBody = bodyOf(NEW_SQL, 'crypto_fill_internal');
 ok('본문 3개를 찾았다 (옛 crypto_trade · 새 crypto_trade · 코어)', !!(oldBody && newBody && coreBody));
-const guardHashes = (NEW_SQL.match(/v_h not in \('([0-9a-f_A-Z]+)', '([0-9a-f_A-Z]+)'\)/) || []).slice(1);
-ok('가드의 해시 2개 = 실제 본문의 해시 (옛 crypto_trade.sql · 새 래퍼) — 본문을 고치면 여기서 🔴',
-   guardHashes[0] === md5n(oldBody) && guardHashes[1] === md5n(newBody), JSON.stringify({ file: guardHashes, old: md5n(oldBody), new: md5n(newBody) }));
+// 운영 DB 에 실제로 깔려 있던 본문 (2026-11-17 사장님이 pg_get_functiondef 로 뽑아 준 것 그대로).
+// 리포 파일과 주석 9줄이 달라 해시가 달랐고, 가드가 운영 배포를 막았다 (결함-로그 2026-11-17).
+const PROD_SQL = rd('tests/fixtures/crypto_trade.prod-2026-11-17.sql');
+const prodBody = (PROD_SQL.match(/AS \$function\$([\s\S]*?)\$function\$/) || [])[1] || '';
+const noComments = (s) => s.split('\n').map((l) => l.replace(/--.*$/, '')).join('\n');
+const guardHashes = ((NEW_SQL.match(/v_h not in \(([^)]*)\)/) || [])[1] || '').split(',').map((x) => x.trim().replace(/^'|'$/g, ''));
+ok('가드의 해시 3개 = 실제 본문의 해시 (리포 crypto_trade.sql · 운영 배포본 · 새 래퍼) — 본문을 고치면 여기서 🔴',
+   guardHashes.length === 3 && guardHashes[0] === md5n(oldBody) && guardHashes[1] === md5n(prodBody) && guardHashes[2] === md5n(newBody),
+   JSON.stringify({ file: guardHashes, old: md5n(oldBody), prod: md5n(prodBody), new: md5n(newBody) }));
+ok('운영 배포본 자료의 해시 = 가드가 운영에서 보고한 값 (30fce10b…) — 받아 적은 글자가 운영과 같다',
+   md5n(prodBody) === '30fce10bac44ee7e4c2fa6d21ac5e6a7', md5n(prodBody));
+ok('운영 배포본과 리포 crypto_trade.sql 의 차이는 주석뿐이다 (주석을 지우면 한 글자도 다르지 않다)',
+   !!prodBody && md5n(prodBody) !== md5n(oldBody) && md5n(noComments(prodBody)) === md5n(noComments(oldBody)) &&
+   !/'[^'\n]*--[^'\n]*'/.test(prodBody) && !/'[^'\n]*--[^'\n]*'/.test(oldBody));
 ok('체결(crypto_trades insert · crypto_holdings 이동)은 코어 한 곳에만 있다',
    (NEW_SQL.match(/insert into public\.crypto_trades/g) || []).length === 1 && /insert into public\.crypto_trades/.test(coreBody) &&
    (NEW_SQL.match(/update public\.crypto_holdings/g) || []).length === 2 && !/crypto_holdings/.test(newBody));
@@ -95,8 +106,19 @@ else (async () => {
   const hold = async (db, acct) => { const o = {}; (await q(db, `select asset, qty::float8 as qty from public.crypto_holdings where acct_no = $1`, [acct])).forEach((r) => { o[r.asset] = r.qty; }); return o; };
 
   try {
-    // ════ A. 시장가 동등성 ════
-    const dbOld = await mk(false), dbNew = await mk(true);
+    // ════ A0. 운영과 같은 출발점 ════ 운영 배포본(주석만 다른 crypto_trade)이 깔린 DB 에 새 SQL 을 실행한다.
+    //   이게 2026-11-17 운영에서 실제로 일어난 일이다 — 가드가 "리포와 다르다"며 멈췄다.
+    const dbProd = new PGlite(); await dbProd.exec(BASE); await dbProd.exec(OLD_SQL); await dbProd.exec(PROD_SQL); await dbProd.exec(SEED);
+    ok('A0. DB 가 계산한 운영 배포본 해시 = 운영 가드가 보고한 값 (30fce10b…)',
+       (await one(dbProd, `select md5(regexp_replace(prosrc, '\\s+', '', 'g')) from pg_proc where proname = 'crypto_trade'`)) === '30fce10bac44ee7e4c2fa6d21ac5e6a7');
+    let prodRun = true; try { await dbProd.exec(NEW_SQL); } catch (e) { prodRun = e.message; }
+    ok('A0. 운영 배포본 위에서 새 SQL 이 끝까지 실행된다 (가드 통과 · 테이블 · 코어 · 크론)', prodRun === true &&
+       (await one(dbProd, `select to_regclass('public.crypto_pending')::text`)) !== null && (await one(dbProd, `select count(*)::int from pg_proc where proname='crypto_fill_internal'`)) === 1 &&
+       (await one(dbProd, `select count(*)::int from cron.job where jobname='crypto_pending_fill'`)) === 1, String(prodRun));
+
+    // ════ A. 시장가 동등성 ════ 옛 함수는 **운영 배포본**으로 돌린다 (운영에서 실제로 바뀌는 것이 이것이다).
+    const dbOld = new PGlite(); await dbOld.exec(BASE); await dbOld.exec(OLD_SQL); await dbOld.exec(PROD_SQL); await dbOld.exec(SEED);
+    const dbNew = prodRun === true ? dbProd : await mk(true);
     const trade = (db, a) => one(db, `select public.crypto_trade($1,$2,$3,$4,$5,$6,$7)`, a);
     const STEPS = [
       [UA,   ['m-1', 'CR-1', 'BTC', 1000, 'buy', 0, false], '매수 $1000 (수수료 1.5%)'],
