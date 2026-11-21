@@ -13,6 +13,18 @@ const URL = process.env.ALPEXA_URL || 'https://grxnbgtfnaayeluenvqh.supabase.co'
 const KEY = process.env.ALPEXA_ANON || 'sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu';
 const AUDIT_TOKEN = process.env.ALPEXA_AUDIT_TOKEN || 'alpexa-welcome-2026';
 const H = { apikey: KEY, Authorization: 'Bearer ' + KEY };
+// 요청마다 시간 상한 + 검진 전체 상한 (2026-11-21 DB 4시간 장애: 상한이 없어 검진이 끝나지 않았다 —
+// 빨강도 초록도 못 냈고, 같은 스크립트를 도는 GitHub 무음 게이트는 매달린 채 메일도 못 보낸다).
+// 핀: tests/selfcheck-timeout.test.js (답 안 하는 서버를 세워 실제로 돌려 본다).
+const REQ_MS = +process.env.ALPEXA_SELFCHECK_TIMEOUT_MS || 20000;
+const TOTAL_MS = +process.env.ALPEXA_SELFCHECK_TOTAL_MS || 150000;
+const _fetch = globalThis.fetch;
+const fetch = (u, o) => _fetch(u, Object.assign({ signal: AbortSignal.timeout(REQ_MS) }, o || {}))
+  .catch((e) => { throw (e && (e.name === 'TimeoutError' || e.name === 'AbortError')) ? new Error(`응답 없음 — 시간 초과 ${Math.round(REQ_MS / 1000)}초`) : e; });
+setTimeout(() => {
+  console.log(`  🔴 전체 상한 ${Math.round(TOTAL_MS / 1000)}초 초과 — 서버가 응답하지 않아 검진을 끝내지 못했다`);
+  console.log('\n🔴 자가검진 중단 (응답 없음)'); process.exit(1);
+}, TOTAL_MS).unref();
 let red = 0;
 const flag = (bad, line) => { console.log((bad ? '  🔴 ' : '  ✅ ') + line); if (bad) red++; };
 
