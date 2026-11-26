@@ -20,7 +20,20 @@ const REQ_MS = +process.env.ALPEXA_SELFCHECK_TIMEOUT_MS || 20000;
 const TOTAL_MS = +process.env.ALPEXA_SELFCHECK_TOTAL_MS || 150000;
 const _fetch = globalThis.fetch;
 const fetch = (u, o) => _fetch(u, Object.assign({ signal: AbortSignal.timeout(REQ_MS) }, o || {}))
-  .catch((e) => { throw (e && (e.name === 'TimeoutError' || e.name === 'AbortError')) ? new Error(`응답 없음 — 시간 초과 ${Math.round(REQ_MS / 1000)}초`) : e; });
+  .catch((e) => { throw (e && (e.name === 'TimeoutError' || e.name === 'AbortError')) ? new Error(`응답 없음 — 시간 초과 ${Math.round(REQ_MS / 1000)}초`) : e; })
+  // 서버 오류(5xx)는 여기서 한 번에 원인으로 바꾼다 (2026-11-25~26 DB 18시간 장애).
+  // 그때 Cloudflare 522(HTML)·PostgREST 503 PGRST002(JSON)를 각 점검이 제각각 읽어서
+  // PAMM·RUM 은 "미배포 — SQL 실행 대기"(거짓 안내), 나머지는 "Unexpected token '<'"·"map is not a function" 을 냈다.
+  // REST 5xx = DB 가 답을 못 함. 그 밖(Edge)은 JSON 오류 본문이면 상세가 들어 있으니 그대로 넘긴다.
+  // 핀: tests/selfcheck-5xx.test.js
+  .then(async (r) => {
+    if (r.status < 500) return r;
+    const isJson = /json/i.test(r.headers.get('content-type') || '');
+    if (!String(u).includes('/rest/v1/') && isJson) return r;
+    let code = '';
+    if (isJson) { try { code = ' ' + ((await r.clone().json()).code || ''); } catch (_) {} }
+    throw new Error(`${String(u).includes('/rest/v1/') ? 'DB 응답 불가' : '서버 연결 불가'} — HTTP ${r.status}${code.trim() ? code : ''}`);
+  });
 setTimeout(() => {
   console.log(`  🔴 전체 상한 ${Math.round(TOTAL_MS / 1000)}초 초과 — 서버가 응답하지 않아 검진을 끝내지 못했다`);
   console.log('\n🔴 자가검진 중단 (응답 없음)'); process.exit(1);
