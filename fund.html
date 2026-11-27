@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alpha Fund · Alpexa-FX</title>
+<meta name="description" content="Alpha Fund — a managed PAMM fund on Alpexa-FX. Join with your FX balance and follow your share by net asset value.">
+<link rel="canonical" href="https://alpexa-sports.com/fund.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css?v=2">
+<style>
+  /* Alpha Fund 고유 모양만 (v3 디자인 · 2026-11-27 사장님 "알파 펀드 페이지 진행해").
+     이 페이지는 투자 권유물이다: 숫자는 서버의 실제 값만(pamm_funds · pamm_health) · 수익 약속 금지 · 손실 가능 명시.
+     공용(메뉴·푸터·링크·제원 줄)은 assets/site.css. 계약: tests/fund-page.test.js · tests/site-shell.test.js */
+  .page-hero{padding-bottom:0}
+  .specs{grid-template-columns:repeat(5,1fr);margin:64px 0 0;transition:opacity .4s ease}
+  #fund:not(.ready) .specs b,#fund:not(.ready) .specs span[data-f],#fund:not(.ready) .status{opacity:0}   /* 받기 전에는 비워 둔다 (대기용 숫자 없음) — 자리는 유지 */
+  .specs b,.specs span[data-f],.status{transition:opacity .4s ease}
+  .spec b{min-height:1.05em}
+  .status{margin-top:34px;display:inline-flex;flex-direction:column;gap:6px;font-size:15px;color:var(--soft);border:1px solid var(--line);padding:11px 16px;min-height:46px;max-width:100%}
+  .status [data-f="detail"]{font-size:13.5px;color:var(--mute)}
+  .status [data-f="detail"]:empty{display:none}
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);margin:0 var(--gut);border-top:1px solid var(--ink)}
+  .step{padding:30px 40px 10px 0;border-right:1px solid var(--line-l)}.step + .step{padding-left:40px}.step:last-child{border-right:0}
+  .step i{display:block;font-style:normal;font-weight:300;font-size:clamp(64px,8vw,120px);letter-spacing:-.04em;line-height:1}
+  .step h3{margin-top:26px;font-weight:400;font-size:28px;letter-spacing:-.02em}.step p{margin-top:8px;color:var(--mute-d);font-size:17px}
+  .rows{margin:0 var(--gut);border-top:1px solid #fff}
+  .row{display:grid;grid-template-columns:1fr 1.4fr;gap:40px;padding:32px 0;border-bottom:1px solid var(--line);align-items:baseline}
+  .row h3{font-size:clamp(26px,2.8vw,40px);letter-spacing:-.025em}.row p{font-size:19px;color:var(--soft);max-width:31em}
+  .terms{margin:0 var(--gut);border-top:1px solid var(--ink)}
+  .terms div{display:flex;justify-content:space-between;gap:30px;padding:20px 0;border-bottom:1px solid var(--line-l);font-size:19px}
+  .terms dt{color:var(--mute-d)}.terms dd{margin:0;font-weight:500;text-align:right;min-height:1.5em}
+  .mgr-sec{padding-top:0}
+  .mgr{display:grid;grid-template-columns:1fr 1.4fr;gap:60px;margin:0 var(--gut);padding-top:34px;border-top:1px solid var(--ink)}
+  .mgr h3{font-size:34px;letter-spacing:-.025em}.mgr span{display:block;margin-top:6px;font-size:14px;color:var(--mute-d)}.mgr p{font-size:21px;line-height:1.5;font-weight:300}
+  .risk{background:var(--ink);padding:170px var(--gut) 150px}
+  .risk h2{max-width:13em;font-size:clamp(36px,6vw,92px);line-height:1.02}.risk p{margin-top:40px;max-width:36em;color:var(--soft);font-size:19px}
+  @media (prefers-reduced-motion:reduce){.specs b,.specs span[data-f],.status{transition:none}}
+  @media (max-width:820px){
+    .specs{grid-template-columns:1fr 1fr;margin-top:44px}.spec:nth-child(n+3){border-bottom:1px solid var(--line)}.spec:nth-child(4){border-right:0}.spec:nth-child(5){padding-left:0;border-bottom:0;border-right:0}
+    .steps{grid-template-columns:1fr}.step,.step + .step{padding:26px 0 30px;border-right:0;border-bottom:1px solid var(--line-l)}
+    .row,.mgr{grid-template-columns:1fr;gap:12px}.terms div{font-size:17px}.risk{padding:92px var(--gut)}
+  }
+</style>
+</head>
+<body>
+<header class="nav">
+    <a class="logo" href="/">Alpexa-FX</a>
+    <nav class="menu" aria-label="Main">
+      <div class="has-dd">
+        <button class="dd-t" type="button" aria-haspopup="true" aria-expanded="false">What We Offer</button>
+        <div class="dd">
+          <a href="markets.html">Markets<small>FX · Metals · Indices · Stocks · Crypto</small></a>
+          <a href="webtrade.html">WebTrade Terminal<small>Pro desktop trading</small></a>
+          <a href="fund.html">Managed Fund<small>Alpha &middot; traded by our desk</small></a>
+        </div>
+      </div>
+      <a href="markets.html">Markets</a>
+      <a href="ib.html">IB</a>
+      <a href="about.html">About</a>
+      <a href="support.html">Support</a>
+    </nav>
+    <div class="nav-r">
+      <a href="login.html?switch=1">My Account</a>
+      <a class="link" href="signup.html" target="_blank" rel="noopener">Open account</a>
+      <button class="burger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="sheet"></button>
+    </div>
+  </header>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Menu">
+    <div class="sheet-top"><a class="logo" href="/">Alpexa-FX</a><button class="sheet-x" type="button" aria-label="Close menu"></button></div>
+    <nav aria-label="Mobile">
+      <a href="markets.html">Markets<small>FX · Metals · Indices · Stocks · Crypto</small></a>
+      <a href="webtrade.html">WebTrade Terminal<small>Pro desktop trading</small></a>
+      <a href="fund.html">Managed Fund<small>Alpha &middot; traded by our desk</small></a>
+      <a href="ib.html">IB</a>
+      <a href="about.html">About</a>
+      <a href="support.html">Support</a>
+    </nav>
+    <div class="sheet-cta">
+      <a class="link" href="login.html?switch=1">My Account</a>
+      <a class="link" href="signup.html" target="_blank" rel="noopener">Open account</a>
+    </div>
+  </div>
+
+  <section class="page-hero" id="fund">
+    <span class="eyebrow">Managed fund &middot; PAMM</span>
+    <h1>Alpha Fund</h1>
+    <p class="hero-sub">Join with your FX balance. Our desk trades one pooled account, and your share moves with the fund&rsquo;s net asset value. You watch it in your own account.</p>
+    <div class="hero-cta"><a class="link" href="signup.html" target="_blank" rel="noopener">Open account</a><a class="link" href="login.html?switch=1">Log in to join</a></div>
+    <div class="status" aria-live="polite"><span data-f="status"></span><span data-f="detail"></span></div>
+    <div class="specs">
+      <div class="spec"><b data-f="nav"></b><span data-f="navLabel">NAV per unit</span></div>
+      <div class="spec"><b data-f="fee"></b><span>Performance fee, above the high&#8209;water mark</span></div>
+      <div class="spec"><b data-f="min"></b><span>Minimum to join</span></div>
+      <div class="spec"><b data-f="investors"></b><span>Investors</span></div>
+      <div class="spec"><b data-f="opened"></b><span>Fund opened</span></div>
+    </div>
+  </section>
+
+  <section class="sec paper">
+    <div class="sec-head"><h2>How it works</h2><p>One account, one price for everyone in the fund.</p></div>
+    <div class="steps">
+      <div class="step"><i>1</i><h3>Open an FX account</h3><p>The fund is joined from your Alpexa-FX balance.</p></div>
+      <div class="step"><i>2</i><h3>Join the fund</h3><p>Your money buys units at that moment&rsquo;s NAV.</p></div>
+      <div class="step"><i>3</i><h3>Watch your share</h3><p>Your units and their value show in your account, with a statement by email every month.</p></div>
+    </div>
+  </section>
+
+  <section class="sec dark">
+    <div class="sec-head"><h2>Built so the structure protects you</h2><p>These are rules of the system, not promises.</p></div>
+    <div class="rows">
+      <div class="row"><h3>The manager cannot withdraw your money</h3><p>Money leaves the fund account only through redemptions and trading results. Ordinary withdrawals and transfers are blocked.</p></div>
+      <div class="row"><h3>One NAV for everyone</h3><p>Gains and losses are shared by units. Every holder, the manager included, is priced at the same NAV.</p></div>
+      <div class="row"><h3>Fees only on new profit</h3><p>The performance fee applies above your high&#8209;water mark. A recovery from a loss is not charged twice.</p></div>
+      <div class="row"><h3>Fair entry and exit</h3><p>Joins and redemptions happen only when the fund has no open positions, so nobody enters or leaves on unrealised numbers.</p></div>
+    </div>
+  </section>
+
+  <section class="sec paper">
+    <div class="sec-head"><h2>Terms</h2><p>The same for every investor.</p></div>
+    <dl class="terms">
+      <div><dt>Performance fee</dt><dd data-f="termFee"></dd></div>
+      <div><dt>Management fee</dt><dd>None</dd></div>
+      <div><dt>Minimum to join</dt><dd data-f="termMin"></dd></div>
+      <div><dt>Joining and redeeming</dt><dd>When the fund has no open positions</dd></div>
+      <div><dt>Reporting</dt><dd>Live in your account, monthly statement by email</dd></div>
+    </dl>
+  </section>
+
+  <section class="sec paper mgr-sec">
+    <div class="mgr"><div><h3>Christian Rossi</h3><span>Fund manager &middot; Chief Executive Officer, Alpexa-FX</span></div>
+      <p>Christian Rossi started Alpexa after years on the trading side of the screen, to build a broker that prices honestly, executes fairly and keeps client money separate.</p></div>
+  </section>
+
+  <section class="risk">
+    <h2>You can lose money in this fund.</h2>
+    <p>The fund trades leveraged FX. Its value moves both ways and past results do not predict future results. Only invest money you can afford to lose.</p>
+  </section>
+
+  <footer class="site-foot">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <div class="fb-top">
+          <a class="logo foot-logo" href="/">Alpexa-FX</a>
+          <div class="award" title="Best Forex Broker 2026" aria-label="Best Forex Broker 2026">
+            <svg viewBox="12 8 84 112" xmlns="http://www.w3.org/2000/svg" role="img" fill="none" stroke="currentColor">
+              <path d="M16 12 H92 V72 C92 96 66 110 54 116 C42 110 16 96 16 72 Z" stroke-width="1.1" stroke-linejoin="round"/>
+              <path d="M54 23 L55.9 28.4 L61.6 28.5 L57 32 L58.7 37.5 L54 34.2 L49.3 37.5 L51 32 L46.4 28.5 L52.1 28.4 Z" fill="currentColor" stroke="none"/>
+              <text x="54" y="62" text-anchor="middle" font-family="Inter,sans-serif" font-size="23" font-weight="300" letter-spacing="-.6" fill="currentColor" stroke="none">2026</text>
+              <path d="M36 70 H72" stroke-width=".7" opacity=".45"/>
+              <text x="54" y="82" text-anchor="middle" font-family="Inter,sans-serif" font-size="7.4" font-weight="600" letter-spacing="1.1" fill="currentColor" stroke="none">BEST FOREX</text>
+              <text x="54" y="92" text-anchor="middle" font-family="Inter,sans-serif" font-size="5.6" font-weight="500" letter-spacing=".7" fill="currentColor" stroke="none" opacity=".7">ECN/STP BROKER</text>
+            </svg>
+          </div>
+          <div class="award" title="Best Forex Broker 2025" aria-label="Best Forex Broker 2025">
+            <svg viewBox="12 8 84 112" xmlns="http://www.w3.org/2000/svg" role="img" fill="none" stroke="currentColor">
+              <path d="M16 12 H92 V72 C92 96 66 110 54 116 C42 110 16 96 16 72 Z" stroke-width="1.1" stroke-linejoin="round"/>
+              <path d="M54 23 L55.9 28.4 L61.6 28.5 L57 32 L58.7 37.5 L54 34.2 L49.3 37.5 L51 32 L46.4 28.5 L52.1 28.4 Z" fill="currentColor" stroke="none"/>
+              <text x="54" y="62" text-anchor="middle" font-family="Inter,sans-serif" font-size="23" font-weight="300" letter-spacing="-.6" fill="currentColor" stroke="none">2025</text>
+              <path d="M36 70 H72" stroke-width=".7" opacity=".45"/>
+              <text x="54" y="82" text-anchor="middle" font-family="Inter,sans-serif" font-size="7.4" font-weight="600" letter-spacing="1.1" fill="currentColor" stroke="none">BEST FOREX</text>
+              <text x="54" y="92" text-anchor="middle" font-family="Inter,sans-serif" font-size="5.6" font-weight="500" letter-spacing=".7" fill="currentColor" stroke="none" opacity=".7">ECN/STP BROKER</text>
+            </svg>
+          </div>
+          <div class="award" title="Best Forex Broker 2024" aria-label="Best Forex Broker 2024">
+            <svg viewBox="12 8 84 112" xmlns="http://www.w3.org/2000/svg" role="img" fill="none" stroke="currentColor">
+              <path d="M16 12 H92 V72 C92 96 66 110 54 116 C42 110 16 96 16 72 Z" stroke-width="1.1" stroke-linejoin="round"/>
+              <path d="M54 23 L55.9 28.4 L61.6 28.5 L57 32 L58.7 37.5 L54 34.2 L49.3 37.5 L51 32 L46.4 28.5 L52.1 28.4 Z" fill="currentColor" stroke="none"/>
+              <text x="54" y="62" text-anchor="middle" font-family="Inter,sans-serif" font-size="23" font-weight="300" letter-spacing="-.6" fill="currentColor" stroke="none">2024</text>
+              <path d="M36 70 H72" stroke-width=".7" opacity=".45"/>
+              <text x="54" y="82" text-anchor="middle" font-family="Inter,sans-serif" font-size="7.4" font-weight="600" letter-spacing="1.1" fill="currentColor" stroke="none">BEST FOREX</text>
+              <text x="54" y="92" text-anchor="middle" font-family="Inter,sans-serif" font-size="5.6" font-weight="500" letter-spacing=".7" fill="currentColor" stroke="none" opacity=".7">ECN/STP BROKER</text>
+            </svg>
+          </div>
+          <div class="award" title="Best Forex Broker 2023" aria-label="Best Forex Broker 2023">
+            <svg viewBox="12 8 84 112" xmlns="http://www.w3.org/2000/svg" role="img" fill="none" stroke="currentColor">
+              <path d="M16 12 H92 V72 C92 96 66 110 54 116 C42 110 16 96 16 72 Z" stroke-width="1.1" stroke-linejoin="round"/>
+              <path d="M54 23 L55.9 28.4 L61.6 28.5 L57 32 L58.7 37.5 L54 34.2 L49.3 37.5 L51 32 L46.4 28.5 L52.1 28.4 Z" fill="currentColor" stroke="none"/>
+              <text x="54" y="62" text-anchor="middle" font-family="Inter,sans-serif" font-size="23" font-weight="300" letter-spacing="-.6" fill="currentColor" stroke="none">2023</text>
+              <path d="M36 70 H72" stroke-width=".7" opacity=".45"/>
+              <text x="54" y="82" text-anchor="middle" font-family="Inter,sans-serif" font-size="7.4" font-weight="600" letter-spacing="1.1" fill="currentColor" stroke="none">BEST FOREX</text>
+              <text x="54" y="92" text-anchor="middle" font-family="Inter,sans-serif" font-size="5.6" font-weight="500" letter-spacing=".7" fill="currentColor" stroke="none" opacity=".7">ECN/STP BROKER</text>
+            </svg>
+          </div>
+          <div class="award" title="Best Forex Broker 2022" aria-label="Best Forex Broker 2022">
+            <svg viewBox="12 8 84 112" xmlns="http://www.w3.org/2000/svg" role="img" fill="none" stroke="currentColor">
+              <path d="M16 12 H92 V72 C92 96 66 110 54 116 C42 110 16 96 16 72 Z" stroke-width="1.1" stroke-linejoin="round"/>
+              <path d="M54 23 L55.9 28.4 L61.6 28.5 L57 32 L58.7 37.5 L54 34.2 L49.3 37.5 L51 32 L46.4 28.5 L52.1 28.4 Z" fill="currentColor" stroke="none"/>
+              <text x="54" y="62" text-anchor="middle" font-family="Inter,sans-serif" font-size="23" font-weight="300" letter-spacing="-.6" fill="currentColor" stroke="none">2022</text>
+              <path d="M36 70 H72" stroke-width=".7" opacity=".45"/>
+              <text x="54" y="82" text-anchor="middle" font-family="Inter,sans-serif" font-size="7.4" font-weight="600" letter-spacing="1.1" fill="currentColor" stroke="none">BEST FOREX</text>
+              <text x="54" y="92" text-anchor="middle" font-family="Inter,sans-serif" font-size="5.6" font-weight="500" letter-spacing=".7" fill="currentColor" stroke="none" opacity=".7">ECN/STP BROKER</text>
+            </svg>
+          </div>
+        </div>
+        <div class="cpy">© 2026, Alpexa-FX · An Alpexa Suisse company<br><a href="fx-risk.html">Risk Disclosure</a></div>
+      </div>
+      <div class="foot-col">
+        <h4>Menu</h4>
+        <a href="markets.html">Markets</a><a href="ib.html">IB</a><a href="about.html">About</a>
+      </div>
+      <div class="foot-col">
+        <h4>Account</h4>
+        <a href="webtrade.html?theme=legend" target="_blank" rel="noopener">Log in</a><a href="signup.html" target="_blank" rel="noopener">Open account</a><a href="agent.html" rel="noopener">IB Portal</a><a href="pamm-desk.html" target="_blank" rel="noopener">PAMM</a>
+      </div>
+    </div>
+    <div class="wordmark" aria-hidden="true"><span>ALPEXA</span></div>
+    <div class="resp-bar">Trading forex and CFDs on margin carries a high level of risk and may not be suitable for all investors. Leverage can work against you — only trade with capital you can afford to lose.</div>
+  </footer>
+
+  <script>
+  /* 펀드 숫자 (2026-11-27). 원칙: **서버의 실제 값만** — pamm_funds(보수 · 최소 금액 · 상태 · 개설일) + pamm_health(NAV · 투자자 수 · 열린 포지션).
+     · "marked to market" = nav = Equity ÷ units (열린 포지션 포함 · 투자자 계좌 화면과 같은 정의)
+     · "realised" = nav_trade = 잔고 ÷ units (가입 · 환매가 쓰는 값). 열린 포지션의 값을 모르면(nav=null) 추측하지 않고 이 값만 보인다.
+     · 열린 포지션이 있으면 그 수와 미실현 비중을 같이 적는다 — 미실현 수익을 실현된 것처럼 보이지 않게.
+     받기 전에는 비워 두고, 못 받으면 "—". 보이는 동안 30초마다 새로 읽는다. 읽기 전용. */
+  (function(){
+    var root=document.getElementById('fund'); if(!root||!window.fetch) return;
+    var BASE='https://grxnbgtfnaayeluenvqh.supabase.co', KEY='sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu', H={apikey:KEY,Authorization:'Bearer '+KEY};
+    var FUND='Alpha', EVERY=+window.__FUND_POLL_MS||30000, MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], fails=0, got=false;
+    function get(url,opt){ var c=('AbortController' in window)?new AbortController():null, t=c&&setTimeout(function(){ c.abort(); },8000);
+      return fetch(url,Object.assign({signal:c?c.signal:undefined,headers:H},opt||{})).then(function(r){ if(t) clearTimeout(t); return r.ok?r.json():null; },function(){ if(t) clearTimeout(t); return null; }); }
+    function put(k,v,asHtml){ var e=document.querySelectorAll('[data-f="'+k+'"]'); for(var i=0;i<e.length;i++){ if(asHtml) e[i].innerHTML=v; else e[i].textContent=v; } }
+    function num(v){ return (v!=null&&isFinite(+v))?+v:null; }
+    function money(v){ return '$'+(+v).toLocaleString('en-US',{maximumFractionDigits:2}); }
+    function render(f,h){
+      var fee=f?num(f.perf_fee_pct):null, min=f?num(f.min_join):null;
+      put('fee',fee!=null?fee+'<i>%</i>':'\u2014',true); put('termFee',fee!=null?fee+'% of profit above the high\u2011water mark':'\u2014');
+      put('min',min!=null?money(min):'\u2014'); put('termMin',min!=null?money(min):'\u2014');
+      var d=f&&f.created_at?new Date(f.created_at):null;
+      put('opened',d&&!isNaN(d)?d.getUTCDate()+' '+MON[d.getUTCMonth()]+'<i>'+d.getUTCFullYear()+'</i>':'\u2014',true);
+      put('investors',h&&num(h.members)!=null?String(h.members):'\u2014');
+      var nav=h?num(h.nav):null, real=h?num(h.nav_trade):null, open=h?num(h.open_positions)||0:0, flt=h?num(h.float_pct):null, status='', detail='';
+      if(h&&h.nav!=null&&nav!=null){ put('nav',nav.toFixed(4)); put('navLabel','NAV per unit, marked to market (started at 1.0000)'); }
+      else if(real!=null){ put('nav',real.toFixed(4)); put('navLabel','NAV per unit, realised \u2014 open positions are not priced right now (started at 1.0000)'); }   // nav_trade
+      else { put('nav','\u2014'); put('navLabel','NAV per unit'); }
+      var st=(f&&f.status)||(h&&h.status)||'';
+      if(!f&&!h) status='Live fund figures are unavailable right now.';
+      else if(st&&st!=='active') status='Joins: '+String(st).replace(/[^a-z ]/gi,'')+' \u2014 the fund is not taking new joins right now';
+      else if(h&&h.join_leave_locked) status='Joins and redemptions: closed while positions are open ('+open+' open)';
+      else if(h) status='Joins and redemptions: open';
+      else status='Join status is unavailable right now.';
+      if(h&&open>0&&h.nav!=null&&nav!=null){ var parts=[];
+        if(flt!=null) parts.push(Math.round(Math.abs(flt))+'% of the fund\u2019s value is unrealised (open positions)');
+        if(real!=null) parts.push('Realised NAV '+real.toFixed(4));
+        detail=parts.join(' \u00b7 '); }
+      put('status',status); put('detail',detail);
+      root.classList.add('ready');
+    }
+    function load(){ if(document.hidden) return;
+      Promise.all([ get(BASE+'/rest/v1/pamm_funds?name=eq.'+FUND+'&select=name,perf_fee_pct,min_join,status,created_at'),
+                    get(BASE+'/rest/v1/rpc/pamm_health',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},H),body:'{}'}) ]).then(function(r){
+        var f=Array.isArray(r[0])&&r[0][0]?r[0][0]:null, h=null;
+        if(r[1]&&r[1].ok&&Array.isArray(r[1].funds)) for(var i=0;i<r[1].funds.length;i++) if(r[1].funds[i].name===FUND) h=r[1].funds[i];
+        if(f||h){ got=true; fails=0; render(f,h); }
+        else if(!got||++fails>=3){ render(null,null); }            // 처음부터 못 받았거나 연속 3번 실패: 숫자를 내린다 (낡은 값을 지금 것처럼 두지 않는다)
+      }); }
+    load(); setInterval(load,EVERY);
+    document.addEventListener('visibilitychange',function(){ if(!document.hidden) load(); });
+  })();
+  </script>
+  <script>
+  (function(){
+    // 하위 메뉴: 마우스는 CSS(:hover)로, 터치·키보드는 버튼으로 연다
+    var dd=document.querySelector('.has-dd'), t=dd&&dd.querySelector('.dd-t');
+    if(t){ t.addEventListener('click',function(e){ e.stopPropagation(); var o=dd.classList.toggle('open'); t.setAttribute('aria-expanded',o?'true':'false'); });
+      document.addEventListener('click',function(){ dd.classList.remove('open'); t.setAttribute('aria-expanded','false'); }); }
+    // 지금 보고 있는 페이지를 메뉴에 표시 (aria-current)
+    try{ var here=location.pathname.split('/').pop(); document.querySelectorAll('header.nav .menu>a').forEach(function(a){ if(here&&a.getAttribute('href')===here) a.setAttribute('aria-current','page'); }); }catch(e){}
+    // 모바일 메뉴
+    var sheet=document.getElementById('sheet'), burger=document.querySelector('.burger'), x=sheet&&sheet.querySelector('.sheet-x');
+    function set(open){ if(!sheet||!burger) return; sheet.classList.toggle('open',open); burger.setAttribute('aria-expanded',open?'true':'false');
+      document.documentElement.style.overflow=open?'hidden':''; if(open&&x) x.focus(); else burger.focus(); }
+    if(burger) burger.addEventListener('click',function(){ set(true); });
+    if(x) x.addEventListener('click',function(){ set(false); });
+    if(sheet) sheet.addEventListener('click',function(e){ if(e.target.closest('a')) set(false); });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&sheet&&sheet.classList.contains('open')) set(false); });
+  })();
+  </script>
+</body>
+</html>

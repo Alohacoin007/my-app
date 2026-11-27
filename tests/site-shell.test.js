@@ -9,7 +9,7 @@
 'use strict';
 const fs = require('fs'), path = require('path'), http = require('http');
 const REPO = path.resolve(__dirname, '..');
-const PAGES = ['fx.html', 'about.html', 'ib.html', 'support.html', 'markets.html'];
+const PAGES = ['fx.html', 'about.html', 'ib.html', 'support.html', 'markets.html', 'fund.html'];
 let pass = 0, fail = 0;
 const ok = (n, c, x) => { if (c) pass++; else fail++; console.log(`  ${c ? '✅' : '❌'} ${n}${!c && x ? '  ' + x : ''}`); };
 const read = (f) => fs.readFileSync(path.join(REPO, f), 'utf8');
@@ -98,7 +98,7 @@ else (async () => {
       ok(`${f} 모바일: 가로 스크롤 0 · 페이지 에러 0 · 햄버거 보임 · 큰 ALPEXA 가운데`, mm.overflow <= 0 && p.errs.length === 0 && !mm.menu && mm.burger && !!mm.word && Math.abs(mm.word.l - (mm.vw - mm.word.r)) <= 6, JSON.stringify({ overflow: mm.overflow, errs: p.errs, menu: mm.menu, burger: mm.burger, word: mm.word }));
       await p.page.click('.burger');
       const links = await p.page.evaluate(() => { const s = document.querySelector('.sheet'); return getComputedStyle(s).display !== 'none' ? [...s.querySelectorAll('a')].map((a) => a.getAttribute('href')) : []; });
-      ok(`${f} 모바일: 햄버거를 누르면 메뉴가 열리고 모든 목적지가 있다`, ['markets.html', 'webtrade.html', 'fx.html#vip', 'ib.html', 'about.html', 'support.html', 'login.html?switch=1', 'signup.html'].every((x) => links.includes(x)), JSON.stringify(links));
+      ok(`${f} 모바일: 햄버거를 누르면 메뉴가 열리고 모든 목적지가 있다`, ['markets.html', 'webtrade.html', 'fund.html', 'ib.html', 'about.html', 'support.html', 'login.html?switch=1', 'signup.html'].every((x) => links.includes(x)), JSON.stringify(links));
       await p.page.click('.sheet .sheet-x');
       ok(`${f} 모바일: 닫기를 누르면 닫힌다`, await p.page.evaluate(() => getComputedStyle(document.querySelector('.sheet')).display === 'none'));
       await p.page.close();

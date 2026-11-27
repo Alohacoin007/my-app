@@ -60,7 +60,8 @@ ok('시장 3면 링크 유지: markets.html?tab=fx · stock · crypto', ['fx', '
 ok('가입 링크는 전부 새 창 (target=_blank rel=noopener) · 6개 이상', count(/href="signup\.html" target="_blank" rel="noopener"/g) >= 6 && count(/href="signup\.html"/g) === count(/href="signup\.html" target="_blank" rel="noopener"/g));
 // 2026-11-27 사장님: "my account 를 클릭하면 새로운 페이지가 뜨는데… 연결된 전체 페이지로 넘어가게" → 같은 창에서 이동 (가입 링크는 종전대로 새 창)
 ok('My Account → login.html?switch=1 · 같은 창에서 이동 (새 창 아님) · 메뉴와 모바일 메뉴 2곳', count(/href="login\.html\?switch=1"[^>]*>My Account</g) === 2 && !/href="login\.html\?switch=1"[^>]*target=/.test(html));
-ok('메뉴 유지: What We Offer(Markets · WebTrade Terminal · Account Tiers) · Markets · IB · About · Support', ['href="markets.html"', 'href="webtrade.html"', 'href="fx.html#vip"', 'href="ib.html"', 'href="about.html"', 'href="support.html"'].every(has) && has('What We Offer'));
+// 2026-11-27 사장님: What We Offer 3번째 = Account Tiers → Managed Fund(fund.html). 홈의 #vip 구역은 그대로.
+ok('메뉴: What We Offer(Markets · WebTrade Terminal · Managed Fund) · Markets · IB · About · Support', ['href="markets.html"', 'href="webtrade.html"', 'href="fund.html"', 'href="ib.html"', 'href="about.html"', 'href="support.html"'].every(has) && has('What We Offer'));
 ok('푸터 유지: Log in(레전드 터미널) · IB Portal · PAMM · Risk Disclosure · 수상 배지 5개(2026~2022) · 저작권', has('<a href="webtrade.html?theme=legend" target="_blank" rel="noopener">Log in</a>') && has('href="agent.html"') && has('href="pamm-desk.html"') && has('href="fx-risk.html"') &&
    ['2026', '2025', '2024', '2023', '2022'].every((y) => has('Best Forex Broker ' + y)) && has('© 2026, Alpexa-FX · An Alpexa Suisse company'));
 const awardsHtml = (html.match(/<div class="award"[\s\S]*?<\/svg>\s*<\/div>/g) || []).join('');
@@ -185,7 +186,7 @@ else (async () => {
     await p.page.click('.burger');
     const sheet = await p.page.evaluate(() => { const s = document.querySelector('.sheet'); const vis = !!s && getComputedStyle(s).display !== 'none' && s.getBoundingClientRect().height > 200;
       return { vis, links: [...(s ? s.querySelectorAll('a') : [])].map((a) => a.getAttribute('href')) }; });
-    ok('모바일: 햄버거를 누르면 메뉴가 열리고 모든 목적지가 있다', sheet.vis && ['markets.html', 'webtrade.html', 'fx.html#vip', 'ib.html', 'about.html', 'support.html', 'login.html?switch=1', 'signup.html'].every((h) => sheet.links.includes(h)), JSON.stringify(sheet));
+    ok('모바일: 햄버거를 누르면 메뉴가 열리고 모든 목적지가 있다', sheet.vis && ['markets.html', 'webtrade.html', 'fund.html', 'ib.html', 'about.html', 'support.html', 'login.html?switch=1', 'signup.html'].every((h) => sheet.links.includes(h)), JSON.stringify(sheet));
     await p.page.click('.sheet .sheet-x');
     ok('모바일: 닫기를 누르면 메뉴가 닫힌다', await p.page.evaluate(() => getComputedStyle(document.querySelector('.sheet')).display === 'none'));
     await p.page.close();
