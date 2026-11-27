@@ -20,7 +20,7 @@ const fontLink = (html.match(/<link href="https:\/\/fonts\.googleapis\.com\/css2
 ok('글꼴은 Inter 하나 (Space Grotesk · Source Serif · Roboto Mono 제거 · 가는 굵기 300 포함)', /family=Inter:/.test(fontLink) && !/Space\+Grotesk|Source\+Serif|Roboto\+Mono/.test(fontLink) && /300/.test(fontLink), fontLink.slice(0, 160));
 ok('첫 화면 제목 = "Tight spreads. Nothing hidden."', /<h1[^>]*>Tight spreads\.<br>Nothing hidden\.<\/h1>/.test(html));
 ok('첫 화면 그림 = 실제 터미널 차트 캡처 (파일이 리포에 있다 · 설명글 있음)', /<img class="art"[^>]*src="assets\/img\/home-hero-chart\.jpg"[^>]*alt="[^"]{10,}"/.test(html) &&
-   ['home-hero-chart.jpg', 'home-hero-chart-1000.jpg', 'home-platform.jpg', 'home-platform-1200.jpg'].every((f) => fs.existsSync(path.join(REPO, 'assets/img', f))));
+   ['home-hero-chart.jpg', 'home-hero-chart-1000.jpg'].every((f) => fs.existsSync(path.join(REPO, 'assets/img', f))));
 ok('캡처 이미지를 "Live" 라고 표시하지 않는다', !/class="shot-label"[^>]*>[^<]*\bLive\b/i.test(html) && !/<figcaption[^>]*>[^<]*\blive\b/i.test(html) && /class="shot-label"/.test(html));
 const specs = [['0.0', 'Spreads from'], ['500:1', 'Leverage up to'], ['$100', 'Minimum deposit'], ['3', 'One account, one platform']];
 ok('제원 줄 4칸: 0.0 pips · 500:1 · $100 · 3 asset classes', specs.every(([n, l]) => new RegExp('<div class="spec"><b>' + n.replace(/[$.]/g, '\\$&') + '(<i>[^<]*</i>)?</b><span>' + l + '</span></div>').test(html)));
@@ -51,7 +51,15 @@ const acct = (html.match(/<section class="accounts" id="vip">[\s\S]*?<\/section>
 ok('계좌 3종의 사실만: Standard $100 · 0.8 pips · 수수료 없음 / Raw ECN 0.0 pips · $3.50 per lot · 24/5 / Pro $10,000 · VPS & API',
    ['Standard', 'Raw ECN', 'Pro', '$100', '0.8 pips', 'None', '0.0 pips', '$3.50 per lot', '24/5', '$10,000', 'Deepest tier', 'Custom', 'Dedicated', 'VPS &amp; API'].every((t) => acct.includes(t)), acct.slice(0, 120));
 ok('지어낸 항목 없음 (시안에 있던 "Support: Standard" 줄 · 강조 점 제거)', !/<dt>Support<\/dt><dd>Standard<\/dd>/.test(acct) && !/class="tag"/.test(acct));
-ok('플랫폼 구역: 터미널 화면 · 늦게 불러오기 · 크기 지정(화면 밀림 방지) · WebTrade 링크', /<img[^>]*src="assets\/img\/home-platform\.jpg"[^>]*loading="lazy"[^>]*width="2400" height="1076"/.test(html) && /class="platform"[\s\S]*?href="webtrade\.html"/.test(html));
+// 터미널 전체 캡처 구역 → CEO 의 한 문장 (2026-11-27 사장님 "이거 말고 다른 거" → 시안 중 "1번으로 진행해").
+// 문장은 About 의 CEO 인사말에 실제로 있는 것만 쓴다 — 인사말이 바뀌면 여기서 걸리게 락스텝.
+const QUOTE = 'Your orders are filled at the market, not at a number invented to work against you.';
+const about = fs.readFileSync(path.join(REPO, 'about.html'), 'utf8');
+const qsec = (html.match(/<section class="quote">[\s\S]*?<\/section>/) || [''])[0];
+ok('인용 구역: CEO 의 한 문장 (blockquote) · 이름과 직함 · 인사말 전문 링크(about.html#ceo)', qsec.includes('<blockquote>') && qsec.includes('&ldquo;' + QUOTE + '&rdquo;') &&
+   /<b>Christian Rossi<\/b>/.test(qsec) && /Chief Executive Officer, Alpexa-FX/.test(qsec) && /<a class="link" href="about\.html#ceo">Read the full letter<\/a>/.test(qsec), qsec.slice(0, 200));
+ok('인용문은 About 의 CEO 인사말에 실제로 있는 문장이다 (지어낸 말 아님) · #ceo 앵커 존재', about.includes(QUOTE) && /<article class="letter-card" id="ceo">/.test(about));
+ok('터미널 전체 캡처 구역은 없다 (구역 · 이미지 · 파일 모두 제거)', !/class="platform"/.test(html) && !/home-platform/.test(html) && !fs.existsSync(path.join(REPO, 'assets/img/home-platform.jpg')) && !fs.existsSync(path.join(REPO, 'assets/img/home-platform-1200.jpg')));
 ok('쓰지 않는 스크립트 제거 (supabase — 홈은 로그인·데이터 호출이 없다)', !/supabase/i.test(html));
 
 // ── ③ 실브라우저 ──
@@ -89,6 +97,7 @@ else (async () => {
     return { vw: document.documentElement.clientWidth, vh: innerHeight, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       hero: r(q('.hero')), h1px: h1 ? parseFloat(getComputedStyle(h1).fontSize) : 0, h1w: h1 ? +getComputedStyle(h1).fontWeight : 0,
       imgOk: !!img && img.complete && img.naturalWidth > 0, headPos: head ? getComputedStyle(head).position : '', headBg: head ? getComputedStyle(head).backgroundColor : '',
+      quote: (() => { const e = q('.quote blockquote p'); return e ? { px: parseFloat(getComputedStyle(e).fontSize), w: +getComputedStyle(e).fontWeight, box: r(q('.quote')) } : null; })(),
       panels: [...document.querySelectorAll('.panels .panel')].map(r), cols: [...document.querySelectorAll('.cmp .col')].map(r), specs: [...document.querySelectorAll('.specs .spec')].map(r),
       menuShown: (() => { const m = q('header.nav .menu'); return !!m && getComputedStyle(m).display !== 'none' && m.getBoundingClientRect().width > 0; })(),
       burgerShown: (() => { const b = q('.burger'); return !!b && getComputedStyle(b).display !== 'none'; })() };
@@ -102,6 +111,7 @@ else (async () => {
     ok('PC: 메뉴가 첫 화면 위에 투명하게 얹힌다 (메뉴 보임 · 햄버거 숨김)', m.headPos === 'absolute' && /rgba\(0, 0, 0, 0\)|transparent/.test(m.headBg) && m.menuShown && !m.burgerShown, JSON.stringify({ pos: m.headPos, bg: m.headBg, menu: m.menuShown, burger: m.burgerShown }));
     ok('PC: 제원 4칸이 한 줄', m.specs.length === 4 && m.specs.every((s) => s.t === m.specs[0].t), JSON.stringify(m.specs));
     ok('PC: 시장 3면이 한 줄 · 화면 좌우 끝까지', m.panels.length === 3 && m.panels.every((p) => p.t === m.panels[0].t) && m.panels[0].l === 0 && m.panels[2].r === m.vw, JSON.stringify(m.panels));
+    ok('PC: 인용문이 크고 가늘게 보인다 (≥ 60px · 굵기 300 · 구역이 좌우 끝까지)', !!m.quote && m.quote.px >= 60 && m.quote.w === 300 && m.quote.box.l === 0 && m.quote.box.r === m.vw, JSON.stringify(m.quote));
     ok('PC: 계좌 3종이 한 줄', m.cols.length === 3 && m.cols.every((c) => c.t === m.cols[0].t), JSON.stringify(m.cols));
     await d.page.hover('header.nav .menu .has-dd'); const dd = await d.page.evaluate(() => { const e = document.querySelector('header.nav .dd'); return getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().height > 0; });
     ok('PC: What We Offer 에 올리면 하위 메뉴가 열린다', dd);
@@ -110,6 +120,7 @@ else (async () => {
     const p = await open(390, 844, true), mm = await measure(p.page);
     ok('모바일: 가로 스크롤 없음 · 페이지 에러 0', mm.overflow <= 0 && p.errs.length === 0, JSON.stringify({ overflow: mm.overflow, errs: p.errs }));
     ok('모바일: 시장 3면 · 계좌 3종이 세로로 쌓인다', mm.panels.length === 3 && mm.panels[1].t > mm.panels[0].t && mm.cols.length === 3 && mm.cols[1].t > mm.cols[0].t, JSON.stringify({ p: mm.panels.map((x) => x.t), c: mm.cols.map((x) => x.t) }));
+    ok('모바일: 인용문이 화면 안에 들어온다 (≥ 30px)', !!mm.quote && mm.quote.px >= 30 && mm.quote.box.r <= mm.vw, JSON.stringify(mm.quote));
     ok('모바일: 제원은 2칸씩 2줄', mm.specs.length === 4 && mm.specs[0].t === mm.specs[1].t && mm.specs[2].t > mm.specs[0].t, JSON.stringify(mm.specs.map((x) => x.t)));
     ok('모바일: 가로 메뉴 숨김 · 햄버거 보임', !mm.menuShown && mm.burgerShown, JSON.stringify({ menu: mm.menuShown, burger: mm.burgerShown }));
     await p.page.click('.burger');
