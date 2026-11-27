@@ -9,7 +9,7 @@
 'use strict';
 const fs = require('fs'), path = require('path'), http = require('http');
 const REPO = path.resolve(__dirname, '..');
-const PAGES = ['fx.html', 'about.html', 'ib.html', 'support.html'];
+const PAGES = ['fx.html', 'about.html', 'ib.html', 'support.html', 'markets.html'];
 let pass = 0, fail = 0;
 const ok = (n, c, x) => { if (c) pass++; else fail++; console.log(`  ${c ? '✅' : '❌'} ${n}${!c && x ? '  ' + x : ''}`); };
 const read = (f) => fs.readFileSync(path.join(REPO, f), 'utf8');
