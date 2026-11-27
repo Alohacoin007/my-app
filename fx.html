@@ -111,7 +111,7 @@
       <a href="support.html">Support</a>
     </nav>
     <div class="nav-r">
-      <a href="login.html?switch=1" target="_blank" rel="noopener">My Account</a>
+      <a href="login.html?switch=1">My Account</a>
       <a class="link" href="signup.html" target="_blank" rel="noopener">Open account</a>
       <button class="burger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="sheet"></button>
     </div>
@@ -127,7 +127,7 @@
       <a href="support.html">Support</a>
     </nav>
     <div class="sheet-cta">
-      <a class="link" href="login.html?switch=1" target="_blank" rel="noopener">My Account</a>
+      <a class="link" href="login.html?switch=1">My Account</a>
       <a class="link" href="signup.html" target="_blank" rel="noopener">Open account</a>
     </div>
   </div>
@@ -147,7 +147,7 @@
       </div>
     </div>
     <div class="specs">
-      <div class="spec"><b>0.0<i>pips</i></b><span>Spreads from</span></div>
+      <div class="spec"><b id="heroSpread">0.0<i>pips</i></b><span id="heroSpreadL">Spreads from</span></div>
       <div class="spec"><b>500:1</b><span>Leverage up to</span></div>
       <div class="spec"><b>$100</b><span>Minimum deposit</span></div>
       <div class="spec"><b>3<i>asset classes</i></b><span>One account, one platform</span></div>
@@ -298,7 +298,10 @@
   /* 첫 화면 라이브 차트 (2026-11-27 사장님 "시세가 위로 움직이면 초록, 내려가면 빨강… 심플한 액션").
      원칙: **실제 시세만.** 봉 = 우리 fx-prices 의 실제 EUR/USD 1시간봉, 현재가 = prices 테이블의 실제 mid (터미널과 같은 피드).
      난수·가짜 움직임 없음. 시세가 30초 넘게 안 바뀌면(휴장·피드 정지) "Live" 표시와 색 반응을 끈다.
-     못 받으면 캡처 이미지가 그대로 남는다. 화면에 보일 때만 3초 간격으로 읽는다. 계약: tests/fx-home.test.js */
+     못 받으면 캡처 이미지가 그대로 남는다. 화면에 보일 때만 3초 간격으로 읽는다. 계약: tests/fx-home.test.js
+     실시간 스프레드 (같은 날 사장님 "스프레드가 실시간으로 움직이게"): 제원 줄 첫 칸 = EUR/USD 의 **고객이 실제로 내는** 스프레드.
+     식은 서버 청산(fx_close.sql v_half)과 같다 — max(0.1, prices.spr_pts + pricing_marks.markup_pts) 핍. 시세와 같은 응답에서 읽는다(추가 요청 0).
+     시세가 멈췄거나 마크업을 못 받았으면 추측하지 않고 원래 글("0.0 pips · Spreads from")로 돌아간다. */
   (function(){
     var hero=document.getElementById('top'), cv=document.getElementById('heroChart'), label=document.getElementById('heroLabel');
     if(!hero||!cv||!cv.getContext||!window.fetch) return;
@@ -306,6 +309,8 @@
     var SYM='EURUSD', HOUR=3600e3, POLL=+window.__HERO_POLL_MS||3000, FRESH=30000, FLASH=900;
     var UP='#22c55e', DOWN='#ef4444', CAPTURE=label?label.textContent:'';
     var bars=[], price=null, live=false, flash=null, raf=0, timer=0, inView=true, fails=0;
+    var HEAD={headers:{apikey:KEY,Authorization:'Bearer '+KEY}}, sprB=document.getElementById('heroSpread'), sprL=document.getElementById('heroSpreadL');
+    var SPR0=sprB?sprB.firstChild.nodeValue:'', SPRL0=sprL?sprL.textContent:'', mk=null, polls=0;
     function get(url,opt){ var c=('AbortController' in window)?new AbortController():null, t=c&&setTimeout(function(){ c.abort(); },6000);
       return fetch(url,Object.assign({signal:c?c.signal:undefined},opt||{})).then(function(r){ if(t) clearTimeout(t); return r.ok?r.json():null; },function(){ if(t) clearTimeout(t); return null; }); }
     function mix(a,b,k){ var p=function(h,i){ return parseInt(h.substr(1+i*2,2),16); }, o='#';
@@ -342,24 +347,30 @@
     function paint(){ if(!raf) raf=requestAnimationFrame(loop); }
     function setLive(on){ live=on; hero.classList.toggle('has-chart',bars.length>0);
       hero.setAttribute('data-live',on?'1':'0'); if(label&&bars.length) label.textContent=(on?'Live · ':'')+'EUR/USD · H1 · '+(on?'Alpexa price feed':'last price'); }
+    function marks(){ get(BASE+'/rest/v1/pricing_marks?symbol=eq.'+SYM+'&select=markup_pts',HEAD).then(function(j){ if(Array.isArray(j)) mk=j[0]?(+j[0].markup_pts||0):0; }); }   // 행 없음 = 0 (서버 coalesce 와 같게)
+    function setSpread(row,fresh){ if(!sprB||!sprL) return;
+      var s=(row&&row.spr_pts!=null)?+row.spr_pts:NaN, on=!!fresh&&mk!=null&&s>=0, v=on?Math.max(0.1, s+mk).toFixed(1):'';
+      sprB.firstChild.nodeValue=on?v:SPR0; sprL.textContent=on?'EUR/USD spread · live':SPRL0;
+      if(on) hero.setAttribute('data-spread',v); else hero.removeAttribute('data-spread'); }
     function onPrice(row){
-      if(!row||!(+row.mid>0)){ if(++fails>=3) setLive(false); return; } fails=0;
+      if(!row||!(+row.mid>0)){ if(++fails>=3){ setLive(false); setSpread(null,false); } return; } fails=0;
       var mid=+(+row.mid).toFixed(5), ts=Date.parse(row.updated_at)||0, fresh=Date.now()-ts<FRESH, prev=price;
       price=mid; hero.setAttribute('data-price',mid.toFixed(5));
       var last=bars[bars.length-1], slot=Math.floor(ts/HOUR)*HOUR;
       if(fresh&&last){ if(slot>last.t) bars.push({t:slot,o:mid,h:mid,l:mid,c:mid}); else { last.c=mid; if(mid>last.h) last.h=mid; if(mid<last.l) last.l=mid; } }
       var dir=(fresh&&prev!=null&&mid!==prev)?(mid>prev?1:-1):0;
       if(dir){ flash={dir:dir,t:Date.now()}; hero.setAttribute('data-tick',dir>0?'up':'down'); }
-      setLive(fresh); paint();
+      setLive(fresh); setSpread(row,fresh); paint();
     }
     function poll(){ if(document.hidden||!inView) return;
-      get(BASE+'/rest/v1/prices?symbol=eq.'+SYM+'&select=mid,updated_at',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}}).then(function(j){ onPrice(j&&j[0]); }); }
+      if(++polls%(mk==null?10:100)===0) marks();                             // 마크업: 못 받았으면 30초마다 다시, 받았으면 5분마다 새로
+      get(BASE+'/rest/v1/prices?symbol=eq.'+SYM+'&select=mid,spr_pts,updated_at',HEAD).then(function(j){ onPrice(j&&j[0]); }); }
     function start(){
       get(BASE+'/functions/v1/fx-prices?candles='+SYM+'&tf=H1&n=160').then(function(j){
         var c=j&&j.candles; if(!c||c.length<20) return;                       // 못 받으면 캡처 그대로
         bars=c.map(function(b){ return {t:+b.t,o:+b.o,h:+b.h,l:+b.l,c:+b.c}; }).filter(function(b){ return b.t&&b.o>0&&b.h>=b.l; });
         if(bars.length<20){ bars=[]; return; }
-        setLive(false); paint(); poll(); timer=setInterval(poll,POLL);
+        setLive(false); paint(); marks(); poll(); timer=setInterval(poll,POLL);
         document.addEventListener('visibilitychange',function(){ if(!document.hidden) poll(); });
         if('IntersectionObserver' in window) new IntersectionObserver(function(e){ inView=e[0].isIntersecting; if(inView) poll(); }).observe(hero);
         window.addEventListener('resize',paint);

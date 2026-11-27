@@ -28,10 +28,15 @@ ok('첫 화면 그림 = 실제 터미널 차트 캡처 (파일이 리포에 있�
    ['home-hero-chart.jpg', 'home-hero-chart-1000.jpg'].every((f) => fs.existsSync(path.join(REPO, 'assets/img', f))));
 ok('캡처 이미지를 "Live" 라고 표시하지 않는다', !/class="shot-label"[^>]*>[^<]*\bLive\b/i.test(html) && !/<figcaption[^>]*>[^<]*\blive\b/i.test(html) && /class="shot-label"/.test(html));
 const specs = [['0.0', 'Spreads from'], ['500:1', 'Leverage up to'], ['$100', 'Minimum deposit'], ['3', 'One account, one platform']];
-ok('제원 줄 4칸: 0.0 pips · 500:1 · $100 · 3 asset classes', specs.every(([n, l]) => new RegExp('<div class="spec"><b>' + n.replace(/[$.]/g, '\\$&') + '(<i>[^<]*</i>)?</b><span>' + l + '</span></div>').test(html)));
+ok('제원 줄 4칸: 0.0 pips · 500:1 · $100 · 3 asset classes', specs.every(([n, l]) => new RegExp('<div class="spec"><b(?: id="[^"]*")?>' + n.replace(/[$.]/g, '\\$&') + '(<i>[^<]*</i>)?</b><span(?: id="[^"]*")?>' + l + '</span></div>').test(html)));
 ok('로고는 글자만 — 네모 "A" 표식 없음 (2026-11-27 사장님 "이거 빼자") · 헤더·모바일 메뉴·푸터 3곳', !/class="mark"/.test(html) && !/\.logo \.mark/.test(all) && count(/<a class="logo[^"]*" href="\/">Alpexa-FX<\/a>/g) === 3);
 const liveJs = (html.match(/<script>\s*\/\* 첫 화면 라이브 차트[\s\S]*?<\/script>/) || [''])[0];
 ok('라이브 차트: 가짜 움직임 없음 (Math.random 0) · 우리 피드만 읽는다 (fx-prices 봉 + prices 현재가) · 공개 키만', liveJs.length > 500 && !/Math\.random/.test(html) && /functions\/v1\/fx-prices\?candles=/.test(liveJs) && /rest\/v1\/prices\?symbol=eq\./.test(liveJs) && /sb_publishable_/.test(liveJs) && !/service_role|eyJ[A-Za-z0-9_-]{20,}/.test(html));
+// 실시간 스프레드 (2026-11-27 사장님 "스프레드가 실시간으로 움직이게 해야해") — 고객이 실제로 내는 값 = 서버 청산식과 같은 식
+const sqlClose = fs.readFileSync(path.join(REPO, 'supabase/sql/fx_close.sql'), 'utf8');
+ok('실시간 스프레드: 자리와 기본 글이 있다 (못 받으면 남는 글 = "0.0 pips · Spreads from")', /<b id="heroSpread">0\.0<i>pips<\/i><\/b><span id="heroSpreadL">Spreads from<\/span>/.test(html));
+ok('실시간 스프레드: 식이 서버 청산(fx_close)과 같다 — max(0.1, spr_pts + markup_pts) · 같은 두 테이블에서 읽는다',
+  /Math\.max\(0\.1,\s*s\+mk\)/.test(liveJs) && /greatest\(0\.1, coalesce\(v_spr,0\) \+ coalesce\(v_mk,0\)\)/.test(sqlClose) && /select=mid,spr_pts,updated_at/.test(liveJs) && /pricing_marks\?symbol=eq\.'\+SYM\+'&select=markup_pts/.test(liveJs));
 ok('라이브 차트: 보일 때만 읽는다 (탭 숨김 · 화면 밖이면 멈춤) · 요청에 시간 상한', /document\.hidden/.test(liveJs) && /IntersectionObserver/.test(liveJs) && /AbortController/.test(liveJs));
 ok('라이브 차트: 못 받으면 캡처가 남도록 — 캔버스는 기본이 투명, 봉을 받은 뒤에만 보인다', /\.hero canvas\.chart\{[^}]*opacity:0/.test(html) && /\.hero\.has-chart canvas\.chart\{opacity:1\}/.test(html) && /\.hero\.has-chart img\.art\{opacity:0\}/.test(html));
 ok('회전 배너(슬라이드) 제거 — 첫 화면은 한 문장', !has('id="hslides"') && !has('h-dots'));
@@ -47,7 +52,8 @@ ok('둥근 형광 버튼 대신 밑줄 링크 (btn-lg 없음)', !has('btn-lg') &
 ok('앵커 유지: #top · #crypto · #vip · #trust (다른 페이지가 fx.html#vip 로 들어온다)', ['top', 'crypto', 'vip', 'trust'].every((i) => count(new RegExp('id="' + i + '"', 'g')) === 1));
 ok('시장 3면 링크 유지: markets.html?tab=fx · stock · crypto', ['fx', 'stock', 'crypto'].every((t) => has('href="markets.html?tab=' + t + '"')));
 ok('가입 링크는 전부 새 창 (target=_blank rel=noopener) · 6개 이상', count(/href="signup\.html" target="_blank" rel="noopener"/g) >= 6 && count(/href="signup\.html"/g) === count(/href="signup\.html" target="_blank" rel="noopener"/g));
-ok('My Account → login.html?switch=1 (새 창)', has('href="login.html?switch=1" target="_blank" rel="noopener"'));
+// 2026-11-27 사장님: "my account 를 클릭하면 새로운 페이지가 뜨는데… 연결된 전체 페이지로 넘어가게" → 같은 창에서 이동 (가입 링크는 종전대로 새 창)
+ok('My Account → login.html?switch=1 · 같은 창에서 이동 (새 창 아님) · 메뉴와 모바일 메뉴 2곳', count(/href="login\.html\?switch=1"[^>]*>My Account</g) === 2 && !/href="login\.html\?switch=1"[^>]*target=/.test(html));
 ok('메뉴 유지: What We Offer(Markets · WebTrade Terminal · Account Tiers) · Markets · IB · About · Support', ['href="markets.html"', 'href="webtrade.html"', 'href="fx.html#vip"', 'href="ib.html"', 'href="about.html"', 'href="support.html"'].every(has) && has('What We Offer'));
 ok('푸터 유지: Log in(레전드 터미널) · IB Portal · PAMM · Risk Disclosure · 수상 배지 2개 · 저작권', has('<a href="webtrade.html?theme=legend" target="_blank" rel="noopener">Log in</a>') && has('href="agent.html"') && has('href="pamm-desk.html"') && has('href="fx-risk.html"') &&
    has('Best Forex Broker 2026') && has('Best Forex Broker 2025') && has('© 2026, Alpexa-FX · An Alpexa Suisse company'));
@@ -181,7 +187,8 @@ else (async () => {
     const feed = (st) => async (page) => {
       await page.addInitScript(() => { window.__HERO_POLL_MS = 150; });
       await page.route(/functions\/v1\/fx-prices\?candles/, (r) => st.candlesFail ? r.fulfill({ status: 502, contentType: 'application/json', body: '{"ok":false}' }) : r.fulfill({ contentType: 'application/json', body: JSON.stringify(CANDLES) }));
-      await page.route(/rest\/v1\/prices/, (r) => { st.calls++; return r.fulfill({ contentType: 'application/json', body: JSON.stringify([{ mid: st.mid, updated_at: new Date(Date.now() - (st.ageMs || 0)).toISOString() }]) }); });
+      if (st.mk !== undefined) await page.route(/rest\/v1\/pricing_marks/, (r) => r.fulfill({ contentType: 'application/json', body: JSON.stringify(st.mk === null ? [] : [{ markup_pts: st.mk }]) }));
+      await page.route(/rest\/v1\/prices/, (r) => { st.calls++; return r.fulfill({ contentType: 'application/json', body: JSON.stringify([{ mid: st.mid, spr_pts: st.spr, updated_at: new Date(Date.now() - (st.ageMs || 0)).toISOString() }]) }); });
     };
     const state = (page) => page.evaluate(() => { const h = document.getElementById('top'), cv = document.getElementById('heroChart'), g = cv.getContext('2d');
       // 가격축 왼쪽 가장자리의 세로 한 줄에서 가장 색이 진한 점을 찾는다 (가격표가 물들었는지)
@@ -222,6 +229,36 @@ else (async () => {
     await until(lm.page, (x) => x.chart && x.live === '1'); M.mid = 1.09041; const m2 = await until(lm.page, (x) => x.tick === 'up');
     ok('모바일: 라이브 차트가 뜨고 오르면 반응한다 · 가로 스크롤 없음', m2.chart && m2.tick === 'up' && (await lm.page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 0 && lm.errs.length === 0, JSON.stringify(m2));
     await lm.page.close();
+    // ── ⑤ 실시간 스프레드 (스텁 피드) ──
+    const spr = (page) => page.evaluate(() => ({ v: document.getElementById('heroSpread').firstChild.nodeValue, unit: document.querySelector('#heroSpread i').textContent, l: document.getElementById('heroSpreadL').textContent, d: document.getElementById('top').dataset.spread || '',
+      w: Math.round(document.querySelector('.specs .spec').getBoundingClientRect().width * 10) / 10, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }));
+    const sprUntil = async (page, fn, ms) => { const t = Date.now(); for (;;) { const x = await spr(page); if (fn(x) || Date.now() - t > (ms || 4000)) return x; await page.waitForTimeout(60); } };
+    const S = { mid: 1.0903, calls: 0, spr: 0.5, mk: 0 }, ls = await open(1440, 900, false, feed(S));
+    const p0 = await spr(ls.page);
+    const p1 = await sprUntil(ls.page, (x) => x.v === '0.5');
+    ok('스프레드: 실제 값이 뜨고 "EUR/USD spread · live" 로 표시된다 (피드 0.5 + 마크업 0 = 0.5)', p1.v === '0.5' && p1.unit === 'pips' && p1.l === 'EUR/USD spread · live' && p1.d === '0.5', JSON.stringify(p1));
+    S.spr = 0.2; const p2 = await sprUntil(ls.page, (x) => x.v === '0.2'); S.spr = 0.7; const p3 = await sprUntil(ls.page, (x) => x.v === '0.7');
+    ok('스프레드: 피드 값이 바뀌면 따라 움직인다 (0.5 → 0.2 → 0.7) · 칸 폭은 그대로', p2.v === '0.2' && p3.v === '0.7' && p1.w === p2.w && p2.w === p3.w && p3.w === p0.w, JSON.stringify({ p0, p2, p3 }));
+    S.spr = 0; const p4 = await sprUntil(ls.page, (x) => x.v === '0.1');
+    ok('스프레드: 피드가 0 이어도 0.1 로 표시한다 (서버 청산의 최소값 — 0.0 이라고 속이지 않는다)', p4.v === '0.1', JSON.stringify(p4));
+    ok('스프레드: 추가 요청 없이 시세와 같은 응답에서 읽는다 · 페이지 에러 0', ls.errs.length === 0 && S.calls >= 3, JSON.stringify({ errs: ls.errs, calls: S.calls }));
+    await ls.page.close();
+    const S2 = { mid: 1.0903, calls: 0, spr: 0.5, mk: 0.3 }, ls2 = await open(1440, 900, false, feed(S2));
+    const q1 = await sprUntil(ls2.page, (x) => x.v === '0.8');
+    ok('스프레드: 딜링 마크업을 더한 값 = 고객이 실제로 내는 값 (0.5 + 0.3 = 0.8)', q1.v === '0.8' && /live/.test(q1.l), JSON.stringify(q1));
+    await ls2.page.close();
+    const S3 = { mid: 1.0903, calls: 0, spr: 0.5, mk: 0, ageMs: 10 * 60e3 }, ls3 = await open(1440, 900, false, feed(S3));
+    await until(ls3.page, (x) => x.chart && x.live === '0'); await ls3.page.waitForTimeout(500); const q2 = await spr(ls3.page);
+    ok('스프레드: 휴장·정지(10분 전 시세)면 실시간 표시를 하지 않는다 — 원래 글로', q2.v === '0.0' && q2.l === 'Spreads from' && q2.d === '' && S3.calls >= 2, JSON.stringify(q2));
+    await ls3.page.close();
+    const S4 = { mid: 1.0903, calls: 0, spr: 0.5 }, ls4 = await open(1440, 900, false, feed(S4));   // 마크업을 못 받음 (요청 차단)
+    await until(ls4.page, (x) => x.chart && x.live === '1'); await ls4.page.waitForTimeout(500); const q3 = await spr(ls4.page);
+    ok('스프레드: 마크업을 못 받으면 추측하지 않는다 — 원래 글로 (차트는 정상)', q3.v === '0.0' && q3.l === 'Spreads from' && ls4.errs.length === 0, JSON.stringify(q3));
+    await ls4.page.close();
+    const S5 = { mid: 1.0903, calls: 0, spr: 0.4, mk: null }, ls5 = await open(390, 844, true, feed(S5));   // 마크업 행 없음 = 0 (서버 coalesce 와 같게)
+    const q4 = await sprUntil(ls5.page, (x) => x.v === '0.4');
+    ok('스프레드 모바일: 값이 뜨고 가로 스크롤 없음 (마크업 행이 없으면 0 으로 — 서버와 같게)', q4.v === '0.4' && q4.overflow <= 0 && ls5.errs.length === 0, JSON.stringify(q4));
+    await ls5.page.close();
   } catch (e) { ok('실브라우저 측정', false, String(e.message).slice(0, 220)); }
   await browser.close(); server.close(); done();
 })();

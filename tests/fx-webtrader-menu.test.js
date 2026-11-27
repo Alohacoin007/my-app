@@ -20,7 +20,8 @@ const bad = (m) => { console.error('🔴 ' + m); fail++; };
 // ── fx.html: NO separate WebTrader launcher (2026-07-14 — device routing made it redundant;
 //    the plain Log in sends PC users to the terminal automatically) ──
 if (/wt-pill|wtlogin/.test(fx)) bad('the retired WebTrader launcher must stay gone (device routing owns the landing)');
-if (!/href="login\.html\?switch=1" target="_blank" rel="noopener"/.test(fx)) bad('Log in must open in a NEW page (target=_blank, like Sign up)');
+// 2026-11-27 사장님 지시로 변경: My Account 는 같은 창에서 로그인 화면으로 넘어간다 (예전 = 새 창). 가입(Open account)은 종전대로 새 창.
+if (!/href="login\.html\?switch=1"[^>]*>My Account</.test(fx) || /href="login\.html\?switch=1"[^>]*target=/.test(fx)) bad('My Account must go to login.html?switch=1 in the SAME page (no target=_blank)');
 
 // ── login.html: ONE createClient on sessionStorage (the 3-file storage lockstep survives) ──
 const clients = (lg.match(/createClient\(/g) || []).length;
