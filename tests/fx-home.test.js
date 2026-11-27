@@ -36,6 +36,10 @@ ok('My Account → login.html?switch=1 (새 창)', has('href="login.html?switch=
 ok('메뉴 유지: What We Offer(Markets · WebTrade Terminal · Account Tiers) · Markets · IB · About · Support', ['href="markets.html"', 'href="webtrade.html"', 'href="fx.html#vip"', 'href="ib.html"', 'href="about.html"', 'href="support.html"'].every(has) && has('What We Offer'));
 ok('푸터 유지: Log in(레전드 터미널) · IB Portal · PAMM · Risk Disclosure · 수상 배지 2개 · 저작권', has('<a href="webtrade.html?theme=legend" target="_blank" rel="noopener">Log in</a>') && has('href="agent.html"') && has('href="pamm-desk.html"') && has('href="fx-risk.html"') &&
    has('Best Forex Broker 2026') && has('Best Forex Broker 2025') && has('© 2026, Alpexa-FX · An Alpexa Suisse company'));
+const awardsHtml = (html.match(/<div class="award"[\s\S]*?<\/svg>\s*<\/div>/g) || []).join('');
+ok('수상 배지 = 흑백 (2026-11-27 사장님 "흰색을 블랙으로 블랙을 흰색으로"): 흰 바탕 상자 없음 · 파란색 없음 · 선과 글자는 currentColor', (html.match(/<div class="award"/g) || []).length === 2 &&
+   !/awBlue|#1e40d8|#4a6bf0|#1631a8|#0e1726/i.test(html) && !/\.award\{[^}]*background/.test(html) && /currentColor/.test(awardsHtml) && !/#[0-9a-f]{3,6}/i.test(awardsHtml) &&
+   />2026<\/text>/.test(awardsHtml) && />2025<\/text>/.test(awardsHtml) && (awardsHtml.match(/>BEST FOREX<\/text>/g) || []).length === 2 && (awardsHtml.match(/>ECN\/STP BROKER<\/text>/g) || []).length === 2, awardsHtml.slice(0, 160));
 ok('위험 고지 문구 그대로', has('Trading forex and CFDs on margin carries a high level of risk and may not be suitable for all investors. Leverage can work against you — only trade with capital you can afford to lose.'));
 const COPY = [
   'Majors, minors and exotics — deep ECN liquidity aggregated from 80 tier&#8209;1 banks, spreads from 0.0 pips.',
@@ -98,6 +102,7 @@ else (async () => {
       hero: r(q('.hero')), h1px: h1 ? parseFloat(getComputedStyle(h1).fontSize) : 0, h1w: h1 ? +getComputedStyle(h1).fontWeight : 0,
       imgOk: !!img && img.complete && img.naturalWidth > 0, headPos: head ? getComputedStyle(head).position : '', headBg: head ? getComputedStyle(head).backgroundColor : '',
       quote: (() => { const e = q('.quote blockquote p'); return e ? { px: parseFloat(getComputedStyle(e).fontSize), w: +getComputedStyle(e).fontWeight, box: r(q('.quote')) } : null; })(),
+      award: (() => { const e = q('.award'); if (!e) return null; const c = getComputedStyle(e), b = e.getBoundingClientRect(); return { bg: c.backgroundColor, color: c.color, w: Math.round(b.width), h: Math.round(b.height) }; })(),
       panels: [...document.querySelectorAll('.panels .panel')].map(r), cols: [...document.querySelectorAll('.cmp .col')].map(r), specs: [...document.querySelectorAll('.specs .spec')].map(r),
       menuShown: (() => { const m = q('header.nav .menu'); return !!m && getComputedStyle(m).display !== 'none' && m.getBoundingClientRect().width > 0; })(),
       burgerShown: (() => { const b = q('.burger'); return !!b && getComputedStyle(b).display !== 'none'; })() };
@@ -112,6 +117,7 @@ else (async () => {
     ok('PC: 제원 4칸이 한 줄', m.specs.length === 4 && m.specs.every((s) => s.t === m.specs[0].t), JSON.stringify(m.specs));
     ok('PC: 시장 3면이 한 줄 · 화면 좌우 끝까지', m.panels.length === 3 && m.panels.every((p) => p.t === m.panels[0].t) && m.panels[0].l === 0 && m.panels[2].r === m.vw, JSON.stringify(m.panels));
     ok('PC: 인용문이 크고 가늘게 보인다 (≥ 60px · 굵기 300 · 구역이 좌우 끝까지)', !!m.quote && m.quote.px >= 60 && m.quote.w === 300 && m.quote.box.l === 0 && m.quote.box.r === m.vw, JSON.stringify(m.quote));
+    ok('PC: 수상 배지가 검정 바탕 위 흰 선으로 보인다 (바탕 투명 · 흰색 · 폭 80px 이상)', !!m.award && /rgba\(0, 0, 0, 0\)|transparent/.test(m.award.bg) && m.award.color === 'rgb(255, 255, 255)' && m.award.w >= 80, JSON.stringify(m.award));
     ok('PC: 계좌 3종이 한 줄', m.cols.length === 3 && m.cols.every((c) => c.t === m.cols[0].t), JSON.stringify(m.cols));
     await d.page.hover('header.nav .menu .has-dd'); const dd = await d.page.evaluate(() => { const e = document.querySelector('header.nav .dd'); return getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().height > 0; });
     ok('PC: What We Offer 에 올리면 하위 메뉴가 열린다', dd);
