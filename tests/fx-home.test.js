@@ -141,6 +141,11 @@ else (async () => {
     ok('PC: 화살표는 transform 으로만 움직인다', /transform/.test(arrow), arrow);
     await d.page.hover('header.nav .menu .has-dd'); const dd = await d.page.evaluate(() => { const e = document.querySelector('header.nav .dd'); return getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().height > 0; });
     ok('PC: What We Offer 에 올리면 하위 메뉴가 열린다', dd);
+    // 하위 메뉴 각 줄은 한 줄씩 (2026-11-27 사장님 "서브 메뉴가 2줄로 되어있는데 한줄로"): 설명글이 좁은 상자에서 줄바꿈되어 Markets 만 3줄이 됐었다
+    const ddLines = await d.page.evaluate(() => [...document.querySelectorAll('header.nav .dd a')].map((a) => { const s = a.querySelector('small'); const one = (e) => { const r = document.createRange(); r.selectNodeContents(e); return new Set([...r.getClientRects()].map((x) => Math.round(x.top))).size; };
+      return { text: a.firstChild.textContent, small: s ? one(s) : 0, h: Math.round(a.getBoundingClientRect().height) }; }));
+    ok('PC: 하위 메뉴 항목의 설명글이 전부 한 줄 · 세 항목 높이가 같다 · 화면 밖으로 안 나간다', ddLines.length === 3 && ddLines.every((x) => x.small === 1) && new Set(ddLines.map((x) => x.h)).size === 1 &&
+      await d.page.evaluate(() => { const b = document.querySelector('header.nav .dd').getBoundingClientRect(); return b.left >= 0 && b.right <= innerWidth; }), JSON.stringify(ddLines));
     await d.page.close();
     const wd = await open(1920, 1080), mw = await measure(wd.page);
     ok('넓은 모니터(1920): 큰 ALPEXA 글자가 가운데 · 화면 폭의 70% 이상을 채운다', centered(mw.word, mw.vw) && (mw.word.r - mw.word.l) >= mw.vw * 0.7, JSON.stringify({ word: mw.word, vw: mw.vw }));
