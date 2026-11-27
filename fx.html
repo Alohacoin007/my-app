@@ -22,14 +22,19 @@
   /* 홈 고유 모양만 (2026-11-27 홈 v3). 메뉴·푸터·링크·제원 줄 등 공용은 assets/site.css — 계약: tests/fx-home.test.js · tests/site-shell.test.js */
   /* 첫 화면 — 화면 전체 · 실제 터미널 차트 */
   .hero{position:relative;height:100vh;min-height:720px;background:var(--ink);overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end}
-  .hero img.art{position:absolute;top:0;right:0;width:82%;height:100%;object-fit:cover;object-position:right center;transition:opacity .6s ease}
+  .hero img.art{position:absolute;top:0;right:0;width:82%;height:100%;object-fit:cover;object-position:right center;opacity:0;transition:opacity .6s ease}   /* 캡처는 대기용이 아니다 — 시세를 못 받았을 때만 보인다 */
   /* 라이브 차트 — 실제 시세가 들어올 때만 캡처 이미지 위로 나타난다 (못 받으면 캡처가 그대로 남는다) */
   .hero canvas.chart{position:absolute;top:0;right:0;width:82%;height:100%;opacity:0;transition:opacity .6s ease}
   .hero.has-chart canvas.chart{opacity:1}
-  .hero.has-chart img.art{opacity:0}
-  @media (prefers-reduced-motion:reduce){.hero img.art,.hero canvas.chart{transition:none}}
+  .hero.no-feed img.art{opacity:1}
+  .hero.instant canvas.chart{transition:none}   /* 새로고침: 방금 본 실제 봉으로 바로 — 서서히 나타나지 않는다 */
+  @media (prefers-reduced-motion:reduce){.hero img.art,.hero canvas.chart,.shot-label,#heroSpread,#heroSpreadL{transition:none}}
   .shade{position:absolute;inset:0;background:linear-gradient(90deg,#0a0a0b 0%,#0a0a0b 30%,rgba(10,10,11,.93) 44%,rgba(10,10,11,.3) 63%,rgba(10,10,11,0) 80%),linear-gradient(0deg,#0a0a0b 0%,rgba(10,10,11,.92) 17%,rgba(10,10,11,0) 40%),linear-gradient(180deg,rgba(10,10,11,.94) 0%,rgba(10,10,11,.6) 9%,rgba(10,10,11,0) 17%)}
-  .shot-label{position:absolute;right:calc(var(--gut) + 64px);top:104px;font-size:13px;color:#d0d0d4;display:flex;align-items:center;gap:9px}
+  .shot-label{position:absolute;right:calc(var(--gut) + 64px);top:104px;font-size:13px;color:#d0d0d4;display:flex;align-items:center;gap:9px;opacity:0;transition:opacity .4s ease}
+  .hero.has-chart .shot-label,.hero.no-feed .shot-label{opacity:1}
+  /* 스프레드 칸: 실제 값인지 원래 글인지 정해지기 전에는 보이지 않는다 ("0.0" 이 먼저 보였다가 바뀌지 않게). 자리는 그대로라 밀림 없음 */
+  #heroSpread,#heroSpreadL{transition:opacity .3s ease}
+  .hero:not(.spr-ready) #heroSpread,.hero:not(.spr-ready) #heroSpreadL{opacity:0}
   .shot-label::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent)}
   .hero-copy{position:relative;padding:0 var(--gut) 56px}
   .hero h1{font-size:clamp(46px,8.2vw,124px)}
@@ -133,8 +138,10 @@
   </div>
 
   <section class="hero" id="top">
-    <!-- 실제 Alpexa WebTrade 화면 캡처(2026-11-27, EUR/USD H1). 정지 이미지라 "Live" 라고 쓰지 않는다 — tests/fx-home.test.js -->
-    <img class="art" src="assets/img/home-hero-chart.jpg" srcset="assets/img/home-hero-chart-1000.jpg 1000w, assets/img/home-hero-chart.jpg 2000w" sizes="(max-width:820px) 100vw, 82vw" width="2000" height="897" alt="EUR/USD one-hour candlestick chart on the Alpexa WebTrade terminal" fetchpriority="high">
+    <!-- 실제 Alpexa WebTrade 화면 캡처(2026-11-27, EUR/USD H1). **대기용이 아니다** — 시세를 못 받았을 때만 스크립트가 불러와 보여 준다
+         (처음부터 그려 두면 새로고침 때 "다른 차트가 먼저 보였다가 바뀐다" — 결함-로그 2026-11-27). 정지 이미지라 "Live" 라고 쓰지 않는다. tests/fx-home.test.js -->
+    <img class="art" data-src="assets/img/home-hero-chart.jpg" data-srcset="assets/img/home-hero-chart-1000.jpg 1000w, assets/img/home-hero-chart.jpg 2000w" sizes="(max-width:820px) 100vw, 82vw" width="2000" height="897" alt="EUR/USD one-hour candlestick chart on the Alpexa WebTrade terminal">
+    <noscript><img class="art" style="opacity:1" src="assets/img/home-hero-chart.jpg" width="2000" height="897" alt="EUR/USD one-hour candlestick chart on the Alpexa WebTrade terminal"><style>.shot-label,#heroSpread,#heroSpreadL{opacity:1!important}</style></noscript>
     <canvas class="chart" id="heroChart" aria-hidden="true"></canvas>
     <div class="shade"></div>
     <div class="shot-label" id="heroLabel">EUR/USD · H1 · Alpexa WebTrade</div>
@@ -328,19 +335,26 @@
   /* 첫 화면 라이브 차트 (2026-11-27 사장님 "시세가 위로 움직이면 초록, 내려가면 빨강… 심플한 액션").
      원칙: **실제 시세만.** 봉 = 우리 fx-prices 의 실제 EUR/USD 1시간봉, 현재가 = prices 테이블의 실제 mid (터미널과 같은 피드).
      난수·가짜 움직임 없음. 시세가 30초 넘게 안 바뀌면(휴장·피드 정지) "Live" 표시와 색 반응을 끈다.
-     못 받으면 캡처 이미지가 그대로 남는다. 화면에 보일 때만 3초 간격으로 읽는다. 계약: tests/fx-home.test.js
+     화면에 보일 때만 3초 간격으로 읽는다. 계약: tests/fx-home.test.js
+     깜빡임 없음 (같은 날 사장님 "새로 고침 하면 다른 챠트가 보인후에 이게 나타나"): 봉이 오기 전엔 아무 차트도 그리지 않는다.
+     새로고침 때는 방금 받은 실제 봉(이 탭 안 sessionStorage, 2시간까지 — 공개 시세라 돈 아님)으로 바로 그리고 새 봉으로 이어 간다.
+     캡처 이미지는 봉을 못 받았을 때만 불러와 보여 준다.
      실시간 스프레드 (같은 날 사장님 "스프레드가 실시간으로 움직이게"): 제원 줄 첫 칸 = EUR/USD 의 **고객이 실제로 내는** 스프레드.
      식은 서버 청산(fx_close.sql v_half)과 같다 — max(0.1, prices.spr_pts + pricing_marks.markup_pts) 핍. 시세와 같은 응답에서 읽는다(추가 요청 0).
      시세가 멈췄거나 마크업을 못 받았으면 추측하지 않고 원래 글("0.0 pips · Spreads from")로 돌아간다. */
   (function(){
     var hero=document.getElementById('top'), cv=document.getElementById('heroChart'), label=document.getElementById('heroLabel');
-    if(!hero||!cv||!cv.getContext||!window.fetch) return;
+    if(!hero) return;
+    function fallback(){ hero.classList.add('spr-ready'); if(hero.classList.contains('has-chart')) return;       // 못 받았을 때만: 캡처 그림을 그제야 불러와 보여 준다
+      var im=hero.querySelector('img.art'); if(im&&!im.getAttribute('src')){ var ss=im.getAttribute('data-srcset'); if(ss) im.setAttribute('srcset',ss); im.setAttribute('src',im.getAttribute('data-src')); }
+      hero.classList.add('no-feed'); }
+    if(!cv||!cv.getContext||!window.fetch){ fallback(); return; }
     var BASE='https://grxnbgtfnaayeluenvqh.supabase.co', KEY='sb_publishable_ow1DihBdAAvNtnb1H0Kojw_7vbeMKFu';
     var SYM='EURUSD', HOUR=3600e3, POLL=+window.__HERO_POLL_MS||3000, FRESH=30000, FLASH=900;
     var UP='#22c55e', DOWN='#ef4444', CAPTURE=label?label.textContent:'';
     var bars=[], price=null, live=false, flash=null, raf=0, timer=0, inView=true, fails=0;
     var HEAD={headers:{apikey:KEY,Authorization:'Bearer '+KEY}}, sprB=document.getElementById('heroSpread'), sprL=document.getElementById('heroSpreadL');
-    var SPR0=sprB?sprB.firstChild.nodeValue:'', SPRL0=sprL?sprL.textContent:'', mk=null, polls=0;
+    var SPR0=sprB?sprB.firstChild.nodeValue:'', SPRL0=sprL?sprL.textContent:'', mk=null, mkFail=false, polls=0, sprRow=null, sprFresh=false, sprAsked=false;
     function get(url,opt){ var c=('AbortController' in window)?new AbortController():null, t=c&&setTimeout(function(){ c.abort(); },6000);
       return fetch(url,Object.assign({signal:c?c.signal:undefined},opt||{})).then(function(r){ if(t) clearTimeout(t); return r.ok?r.json():null; },function(){ if(t) clearTimeout(t); return null; }); }
     function mix(a,b,k){ var p=function(h,i){ return parseInt(h.substr(1+i*2,2),16); }, o='#';
@@ -377,9 +391,13 @@
     function paint(){ if(!raf) raf=requestAnimationFrame(loop); }
     function setLive(on){ live=on; hero.classList.toggle('has-chart',bars.length>0);
       hero.setAttribute('data-live',on?'1':'0'); if(label&&bars.length) label.textContent=(on?'Live · ':'')+'EUR/USD · H1 · '+(on?'Alpexa price feed':'last price'); }
-    function marks(){ get(BASE+'/rest/v1/pricing_marks?symbol=eq.'+SYM+'&select=markup_pts',HEAD).then(function(j){ if(Array.isArray(j)) mk=j[0]?(+j[0].markup_pts||0):0; }); }   // 행 없음 = 0 (서버 coalesce 와 같게)
-    function setSpread(row,fresh){ if(!sprB||!sprL) return;
+    function marks(){ get(BASE+'/rest/v1/pricing_marks?symbol=eq.'+SYM+'&select=markup_pts',HEAD).then(function(j){
+      if(Array.isArray(j)){ mk=j[0]?(+j[0].markup_pts||0):0; mkFail=false; } else if(mk==null) mkFail=true;   // 행 없음 = 0 (서버 coalesce 와 같게)
+      if(sprAsked) setSpread(sprRow,sprFresh); }); }                                                           // 시세가 먼저 와 있었으면 바로 반영 (다음 3초를 기다리지 않는다)
+    function setSpread(row,fresh){ if(!sprB||!sprL) return; sprRow=row; sprFresh=fresh; sprAsked=true;
       var s=(row&&row.spr_pts!=null)?+row.spr_pts:NaN, on=!!fresh&&mk!=null&&s>=0, v=on?Math.max(0.1, s+mk).toFixed(1):'';
+      if(!on&&fresh&&s>=0&&mk==null&&!mkFail) return;                          // 마크업 답을 기다리는 중 — 아직 아무것도 보이지 않는다
+      hero.classList.add('spr-ready');
       sprB.firstChild.nodeValue=on?v:SPR0; sprL.textContent=on?'EUR/USD spread · live':SPRL0;
       if(on) hero.setAttribute('data-spread',v); else hero.removeAttribute('data-spread'); }
     function onPrice(row){
@@ -395,18 +413,27 @@
     function poll(){ if(document.hidden||!inView) return;
       if(++polls%(mk==null?10:100)===0) marks();                             // 마크업: 못 받았으면 30초마다 다시, 받았으면 5분마다 새로
       get(BASE+'/rest/v1/prices?symbol=eq.'+SYM+'&select=mid,spr_pts,updated_at',HEAD).then(function(j){ onPrice(j&&j[0]); }); }
+    var CK='alpexa.heroBars', KEEP=2*HOUR, begun=false;
+    function clean(c){ return (c&&c.length?[].slice.call(c):[]).map(function(b){ return {t:+b.t,o:+b.o,h:+b.h,l:+b.l,c:+b.c}; }).filter(function(b){ return b.t&&b.o>0&&b.h>=b.l; }); }
+    function kept(){ try{ var c=JSON.parse(sessionStorage.getItem(CK)||'null'), age=c?Date.now()-c.at:-1; if(!(age>=0&&age<KEEP)) return null; var b=clean(c.bars); return b.length>=20?b:null; }catch(e){ return null; } }
+    function keep(){ try{ sessionStorage.setItem(CK,JSON.stringify({at:Date.now(),bars:bars})); }catch(e){} }
+    function begin(){ if(begun) return; begun=true;
+      setLive(false); paint(); marks(); poll(); timer=setInterval(poll,POLL);
+      document.addEventListener('visibilitychange',function(){ if(!document.hidden) poll(); });
+      if('IntersectionObserver' in window) new IntersectionObserver(function(e){ inView=e[0].isIntersecting; if(inView) poll(); }).observe(hero);
+      window.addEventListener('resize',paint);
+      if(document.fonts&&document.fonts.ready) document.fonts.ready.then(paint);   // 글꼴이 늦게 와도 눈금 글자를 다시 그린다
+    }
     function start(){
+      var old=kept(); if(old){ hero.classList.add('instant'); bars=old; begin(); }   // 새로고침: 방금 본 실제 봉으로 바로
       get(BASE+'/functions/v1/fx-prices?candles='+SYM+'&tf=H1&n=160').then(function(j){
-        var c=j&&j.candles; if(!c||c.length<20) return;                       // 못 받으면 캡처 그대로
-        bars=c.map(function(b){ return {t:+b.t,o:+b.o,h:+b.h,l:+b.l,c:+b.c}; }).filter(function(b){ return b.t&&b.o>0&&b.h>=b.l; });
-        if(bars.length<20){ bars=[]; return; }
-        setLive(false); paint(); marks(); poll(); timer=setInterval(poll,POLL);
-        document.addEventListener('visibilitychange',function(){ if(!document.hidden) poll(); });
-        if('IntersectionObserver' in window) new IntersectionObserver(function(e){ inView=e[0].isIntersecting; if(inView) poll(); }).observe(hero);
-        window.addEventListener('resize',paint);
+        var b=clean(j&&j.candles); if(b.length<20){ if(!bars.length) fallback(); return; }   // 못 받음: 보관한 봉도 없을 때만 캡처로
+        bars=b; keep();
+        if(live&&price!=null){ var l=bars[bars.length-1]; l.c=price; if(price>l.h) l.h=price; if(price<l.l) l.l=price; }
+        if(begun) paint(); else begin();
       });
     }
-    if(document.readyState==='complete') start(); else window.addEventListener('load',start);
+    start();   // 페이지 load 를 기다리지 않는다 — 스크립트가 문서 끝에 있어 필요한 요소는 이미 있다
   })();
   </script>
   <script>

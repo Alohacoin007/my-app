@@ -24,7 +24,7 @@ const fontLink = (html.match(/<link href="https:\/\/fonts\.googleapis\.com\/css2
 ok('공용 스타일을 한 파일에서 불러온다 (assets/site.css?v=N · 파일 존재)', /<link rel="stylesheet" href="assets\/site\.css\?v=\d+">/.test(html) && css.length > 2000);
 ok('글꼴은 Inter 하나 (Space Grotesk · Source Serif · Roboto Mono 제거 · 가는 굵기 300 포함)', /family=Inter:/.test(fontLink) && !/Space\+Grotesk|Source\+Serif|Roboto\+Mono/.test(fontLink) && /300/.test(fontLink), fontLink.slice(0, 160));
 ok('첫 화면 제목 = "Tight spreads. Nothing hidden."', /<h1[^>]*>Tight spreads\.<br>Nothing hidden\.<\/h1>/.test(html));
-ok('첫 화면 그림 = 실제 터미널 차트 캡처 (파일이 리포에 있다 · 설명글 있음)', /<img class="art"[^>]*src="assets\/img\/home-hero-chart\.jpg"[^>]*alt="[^"]{10,}"/.test(html) &&
+ok('첫 화면 그림 = 실제 터미널 차트 캡처 (파일이 리포에 있다 · 설명글 있음)', /<img class="art"[^>]*data-src="assets\/img\/home-hero-chart\.jpg"[^>]*alt="[^"]{10,}"/.test(html) &&
    ['home-hero-chart.jpg', 'home-hero-chart-1000.jpg'].every((f) => fs.existsSync(path.join(REPO, 'assets/img', f))));
 ok('캡처 이미지를 "Live" 라고 표시하지 않는다', !/class="shot-label"[^>]*>[^<]*\bLive\b/i.test(html) && !/<figcaption[^>]*>[^<]*\blive\b/i.test(html) && /class="shot-label"/.test(html));
 const specs = [['0.0', 'Spreads from'], ['500:1', 'Leverage up to'], ['$100', 'Minimum deposit'], ['3', 'One account, one platform']];
@@ -38,7 +38,13 @@ ok('실시간 스프레드: 자리와 기본 글이 있다 (못 받으면 남는
 ok('실시간 스프레드: 식이 서버 청산(fx_close)과 같다 — max(0.1, spr_pts + markup_pts) · 같은 두 테이블에서 읽는다',
   /Math\.max\(0\.1,\s*s\+mk\)/.test(liveJs) && /greatest\(0\.1, coalesce\(v_spr,0\) \+ coalesce\(v_mk,0\)\)/.test(sqlClose) && /select=mid,spr_pts,updated_at/.test(liveJs) && /pricing_marks\?symbol=eq\.'\+SYM\+'&select=markup_pts/.test(liveJs));
 ok('라이브 차트: 보일 때만 읽는다 (탭 숨김 · 화면 밖이면 멈춤) · 요청에 시간 상한', /document\.hidden/.test(liveJs) && /IntersectionObserver/.test(liveJs) && /AbortController/.test(liveJs));
-ok('라이브 차트: 못 받으면 캡처가 남도록 — 캔버스는 기본이 투명, 봉을 받은 뒤에만 보인다', /\.hero canvas\.chart\{[^}]*opacity:0/.test(html) && /\.hero\.has-chart canvas\.chart\{opacity:1\}/.test(html) && /\.hero\.has-chart img\.art\{opacity:0\}/.test(html));
+ok('라이브 차트: 캔버스는 기본이 투명, 봉을 받은 뒤에만 보인다', /\.hero canvas\.chart\{[^}]*opacity:0/.test(html) && /\.hero\.has-chart canvas\.chart\{opacity:1\}/.test(html));
+// 2026-11-27 사장님: "새로 고침 하면 다른 챠트가 보인후에 이게 나타나" — 캡처 그림을 먼저 그려 놓고 실제 차트로 바꿔 끼우던 구조가 원인.
+//   캡처는 **못 받았을 때만** 보인다 (기본 투명 · 파일도 그때만 받는다). 새로고침은 방금 본 실제 봉(탭 안 보관)으로 바로 그린다.
+ok('캡처 그림은 대기용이 아니다 — 처음엔 안 그린다 (src 없음 · 기본 투명) · 못 받았을 때만 .no-feed 로 보인다 · 스크립트 없는 브라우저용 대체 있음',
+  /<img class="art"(?![^>]*\ssrc=)[^>]*data-src=/.test(html) && /\.hero img\.art\{[^}]*opacity:0/.test(html) && /\.hero\.no-feed img\.art\{opacity:1\}/.test(html) && /<noscript>[\s\S]*home-hero-chart[\s\S]*<\/noscript>/.test(html));
+ok('라이브 차트: 페이지 load 를 기다리지 않고 바로 시작 · 봉 보관은 이 탭 안에서만(sessionStorage, 공개 시세 — 돈 아님) · localStorage 안 씀',
+  !/addEventListener\('load',start\)/.test(liveJs) && /sessionStorage/.test(liveJs) && /alpexa\.heroBars/.test(liveJs) && !/localStorage/.test(liveJs));
 ok('회전 배너(슬라이드) 제거 — 첫 화면은 한 문장', !has('id="hslides"') && !has('h-dots'));
 // 올리면 자리가 밀리는 사고 (2026-11-27 사장님 "마우스 대면 메뉴 전체가 움직여"): .link:hover 가 gap 을 넓혀 링크 폭이 늘었고,
 // 양끝 정렬인 메뉴 줄 전체가 다시 배치됐다. 올림 효과는 자리를 바꾸지 않는 속성(transform·opacity·color)만 쓴다.
@@ -131,11 +137,13 @@ else (async () => {
       burgerShown: (() => { const b = q('.burger'); return !!b && getComputedStyle(b).display !== 'none'; })() };
   });
   try {
-    const d = await open(1440, 900), m = await measure(d.page);
+    const d = await open(1440, 900);
+    await d.page.waitForFunction(() => { const i = document.querySelector('.hero img.art'); return i && i.complete && i.naturalWidth > 0 && +getComputedStyle(i).opacity > 0.98; }, null, { timeout: 5000 }).catch(() => {});   // 이 페이지는 네트워크 0 → 대체 그림이 뜬다
+    const m = await measure(d.page);
     ok('PC: 가로 스크롤 없음 · 페이지 에러 0', m.overflow <= 0 && d.errs.length === 0, JSON.stringify({ overflow: m.overflow, errs: d.errs }));
     ok('PC: 첫 화면이 화면 전체를 쓴다 (좌우 끝까지 · 높이 ≥ 화면)', !!m.hero && m.hero.l === 0 && m.hero.r === m.vw && m.hero.h >= m.vh - 1, JSON.stringify(m.hero));
     ok('PC: 제목이 크고 가늘다 (≥ 96px · 굵기 300)', m.h1px >= 96 && m.h1w === 300, JSON.stringify({ px: m.h1px, w: m.h1w }));
-    ok('PC: 첫 화면 그림이 실제로 떴다', m.imgOk);
+    ok('PC: 시세를 못 받는 환경에서는 캡처 그림이 대신 뜬다 (빈 화면 없음)', m.imgOk);
     ok('PC: 메뉴가 첫 화면 위에 투명하게 얹힌다 (메뉴 보임 · 햄버거 숨김)', m.headPos === 'absolute' && /rgba\(0, 0, 0, 0\)|transparent/.test(m.headBg) && m.menuShown && !m.burgerShown, JSON.stringify({ pos: m.headPos, bg: m.headBg, menu: m.menuShown, burger: m.burgerShown }));
     ok('PC: 제원 4칸이 한 줄', m.specs.length === 4 && m.specs.every((s) => s.t === m.specs[0].t), JSON.stringify(m.specs));
     ok('PC: 시장 3면이 한 줄 · 화면 좌우 끝까지', m.panels.length === 3 && m.panels.every((p) => p.t === m.panels[0].t) && m.panels[0].l === 0 && m.panels[2].r === m.vw, JSON.stringify(m.panels));
@@ -185,8 +193,11 @@ else (async () => {
     const T0 = Math.floor(Date.now() / 3600e3) * 3600e3;
     const CANDLES = { ok: true, symbol: 'EURUSD', tf: 'H1', candles: Array.from({ length: 80 }, (_, i) => { const o = 1.09 + Math.sin(i / 7) * 0.004, c = o + (i % 2 ? 0.0006 : -0.0004); return { t: T0 - (79 - i) * 3600e3, o: +o.toFixed(5), h: +(Math.max(o, c) + 0.0005).toFixed(5), l: +(Math.min(o, c) - 0.0005).toFixed(5), c: +c.toFixed(5) }; }) };
     const feed = (st) => async (page) => {
-      await page.addInitScript(() => { window.__HERO_POLL_MS = 150; });
-      await page.route(/functions\/v1\/fx-prices\?candles/, (r) => st.candlesFail ? r.fulfill({ status: 502, contentType: 'application/json', body: '{"ok":false}' }) : r.fulfill({ contentType: 'application/json', body: JSON.stringify(CANDLES) }));
+      await page.addInitScript(() => { window.__HERO_POLL_MS = 150; window.__artMax = 0; window.__sprSeen = [];
+        const tick = () => { const i = document.querySelector('.hero img.art'); if (i) { const o = +getComputedStyle(i).opacity; if (o > window.__artMax) window.__artMax = o; }
+          const sb = document.getElementById('heroSpread'); if (sb && +getComputedStyle(sb).opacity > 0.02) { const v = sb.firstChild.nodeValue; if (!window.__sprSeen.includes(v)) window.__sprSeen.push(v); }   // 눈에 보인 스프레드 값들
+          requestAnimationFrame(tick); }; requestAnimationFrame(tick); });
+      await page.route(/functions\/v1\/fx-prices\?candles/, async (r) => { if (st.candlesDelay) await new Promise((z) => setTimeout(z, st.candlesDelay)); return st.candlesFail ? r.fulfill({ status: 502, contentType: 'application/json', body: '{"ok":false}' }) : r.fulfill({ contentType: 'application/json', body: JSON.stringify(CANDLES) }); });
       if (st.mk !== undefined) await page.route(/rest\/v1\/pricing_marks/, (r) => r.fulfill({ contentType: 'application/json', body: JSON.stringify(st.mk === null ? [] : [{ markup_pts: st.mk }]) }));
       await page.route(/rest\/v1\/prices/, (r) => { st.calls++; return r.fulfill({ contentType: 'application/json', body: JSON.stringify([{ mid: st.mid, spr_pts: st.spr, updated_at: new Date(Date.now() - (st.ageMs || 0)).toISOString() }]) }); });
     };
@@ -221,14 +232,33 @@ else (async () => {
     await lb.page.close();
 
     const C = { mid: 1.0903, calls: 0, candlesFail: true }, lc = await open(1440, 900, false, feed(C));
-    await lc.page.waitForTimeout(900); const c1 = await state(lc.page);
-    ok('수신 실패: 캡처 이미지와 원래 표시가 그대로 남는다 (빈 화면 없음 · 시세 읽기도 시작 안 함)', !c1.chart && c1.imgOpacity === 1 && c1.cvOpacity === 0 && c1.label === 'EUR/USD · H1 · Alpexa WebTrade' && C.calls === 0 && lc.errs.length === 0, JSON.stringify({ c1, calls: C.calls, errs: lc.errs }));
+    const c1 = await until(lc.page, (x) => x.imgOpacity === 1, 4000);
+    ok('수신 실패: 캡처 이미지와 원래 표시가 그대로 남는다 (빈 화면 없음 · 시세 읽기도 시작 안 함)', !c1.chart && c1.imgOpacity === 1 && c1.cvOpacity === 0 && c1.label === 'EUR/USD · H1 · Alpexa WebTrade' && C.calls === 0 && lc.errs.length === 0 && (await lc.page.evaluate(() => +getComputedStyle(document.getElementById('heroSpread')).opacity)) > 0.98, JSON.stringify({ c1, calls: C.calls, errs: lc.errs }));
     await lc.page.close();
 
     const M = { mid: 1.0903, calls: 0 }, lm = await open(390, 844, true, feed(M));
     await until(lm.page, (x) => x.chart && x.live === '1'); M.mid = 1.09041; const m2 = await until(lm.page, (x) => x.tick === 'up');
     ok('모바일: 라이브 차트가 뜨고 오르면 반응한다 · 가로 스크롤 없음', m2.chart && m2.tick === 'up' && (await lm.page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 0 && lm.errs.length === 0, JSON.stringify(m2));
     await lm.page.close();
+    // ── 새로고침 깜빡임 (2026-11-27): 다른 차트가 먼저 보였다가 바뀌면 안 된다 ──
+    const art = (page) => page.evaluate(() => ({ max: window.__artMax, lbl: +getComputedStyle(document.getElementById('heroLabel')).opacity, loaded: document.querySelector('.hero img.art').naturalWidth > 0 }));
+    const F = { mid: 1.0903, calls: 0, spr: 0.5, mk: 0, candlesDelay: 700 }, lf = await open(1440, 900, false, feed(F));
+    await lf.page.waitForTimeout(250); const f0 = await state(lf.page), a0 = await art(lf.page);
+    ok('첫 방문: 봉이 오기 전에는 아무 차트도 안 보인다 — 캡처 그림 0 · 표시 글도 숨김', !f0.chart && a0.max === 0 && a0.lbl === 0 && !a0.loaded, JSON.stringify({ f0: { chart: f0.chart, img: f0.imgOpacity }, a0 }));
+    const f1 = await until(lf.page, (x) => x.chart && x.live === '1' && x.cvOpacity > 0.98), a1 = await art(lf.page);
+    ok('첫 방문: 봉이 오면 실제 차트만 나타난다 — 캡처 그림은 끝까지 한 번도 안 보였다', f1.chart && f1.cvOpacity > 0.98 && a1.max === 0 && !a1.loaded && a1.lbl > 0.98, JSON.stringify({ a1, cv: f1.cvOpacity }));
+    F.candlesDelay = 1500; await lf.page.reload({ waitUntil: 'domcontentloaded' }); await lf.page.waitForTimeout(250);
+    const f2 = await state(lf.page), a2 = await art(lf.page);
+    ok('새로고침: 봉 응답(1.5초 뒤)을 기다리지 않고 방금 본 실제 차트가 바로 보인다 · 캡처 그림 0', f2.chart && f2.cvOpacity > 0.98 && a2.max === 0, JSON.stringify({ chart: f2.chart, cv: f2.cvOpacity, a2 }));
+    const f3 = await until(lf.page, (x) => x.live === '1'), a3 = await art(lf.page);
+    ok('새로고침: 곧 실시간으로 이어진다 · 캡처 그림은 끝까지 안 보였다 · 페이지 에러 0', f3.live === '1' && a3.max === 0 && lf.errs.length === 0, JSON.stringify({ live: f3.live, a3, errs: lf.errs }));
+    await lf.page.evaluate(() => { const k = 'alpexa.heroBars', c = JSON.parse(sessionStorage.getItem(k)); c.at = Date.now() - 3 * 3600e3; sessionStorage.setItem(k, JSON.stringify(c)); });
+    await lf.page.reload({ waitUntil: 'domcontentloaded' }); await lf.page.waitForTimeout(250); const f4 = await state(lf.page), a4 = await art(lf.page);
+    ok('보관한 봉이 오래됐으면(3시간 전) 쓰지 않는다 — 새 봉이 올 때까지 빈 화면 (낡은 차트를 지금 것처럼 안 보인다)', !f4.chart && a4.max === 0, JSON.stringify({ chart: f4.chart, a4 }));
+    await lf.page.evaluate(() => sessionStorage.setItem('alpexa.heroBars', '{bad'));
+    await lf.page.reload({ waitUntil: 'domcontentloaded' }); const f5 = await until(lf.page, (x) => x.chart && x.live === '1');
+    ok('보관 값이 깨져 있어도 정상 동작 (에러 0)', f5.chart && f5.live === '1' && lf.errs.length === 0, JSON.stringify({ chart: f5.chart, errs: lf.errs }));
+    await lf.page.close();
     // ── 상패 5개: 한 줄에 나란히 (PC 1440 · 1920 · 모바일 390) ──
     for (const [vw, vh, mob] of [[1440, 900, false], [1920, 1080, false], [390, 844, true]]) {
       const pa = await open(vw, vh, mob);
@@ -240,7 +270,7 @@ else (async () => {
       await pa.page.close();
     }
     // ── ⑤ 실시간 스프레드 (스텁 피드) ──
-    const spr = (page) => page.evaluate(() => ({ v: document.getElementById('heroSpread').firstChild.nodeValue, unit: document.querySelector('#heroSpread i').textContent, l: document.getElementById('heroSpreadL').textContent, d: document.getElementById('top').dataset.spread || '',
+    const spr = (page) => page.evaluate(() => ({ seen: window.__sprSeen.join(' '), op: +getComputedStyle(document.getElementById('heroSpread')).opacity, opL: +getComputedStyle(document.getElementById('heroSpreadL')).opacity, v: document.getElementById('heroSpread').firstChild.nodeValue, unit: document.querySelector('#heroSpread i').textContent, l: document.getElementById('heroSpreadL').textContent, d: document.getElementById('top').dataset.spread || '',
       w: Math.round(document.querySelector('.specs .spec').getBoundingClientRect().width * 10) / 10, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }));
     const sprUntil = async (page, fn, ms) => { const t = Date.now(); for (;;) { const x = await spr(page); if (fn(x) || Date.now() - t > (ms || 4000)) return x; await page.waitForTimeout(60); } };
     const S = { mid: 1.0903, calls: 0, spr: 0.5, mk: 0 }, ls = await open(1440, 900, false, feed(S));
@@ -251,6 +281,8 @@ else (async () => {
     ok('스프레드: 피드 값이 바뀌면 따라 움직인다 (0.5 → 0.2 → 0.7) · 칸 폭은 그대로', p2.v === '0.2' && p3.v === '0.7' && p1.w === p2.w && p2.w === p3.w && p3.w === p0.w, JSON.stringify({ p0, p2, p3 }));
     S.spr = 0; const p4 = await sprUntil(ls.page, (x) => x.v === '0.1');
     ok('스프레드: 피드가 0 이어도 0.1 로 표시한다 (서버 청산의 최소값 — 0.0 이라고 속이지 않는다)', p4.v === '0.1', JSON.stringify(p4));
+    const p5 = await sprUntil(ls.page, (x) => x.op > 0.98);
+    ok('스프레드: 실제 값이 오기 전에 "0.0" 을 먼저 보여 주지 않는다 (2026-11-27 깜빡임) — 눈에 보인 값은 실제 값뿐', p5.op > 0.98 && p5.opL > 0.98 && !/(^| )0\.0( |$)/.test(p5.seen) && /0\.5/.test(p5.seen), JSON.stringify({ seen: p5.seen, op: p5.op }));
     ok('스프레드: 추가 요청 없이 시세와 같은 응답에서 읽는다 · 페이지 에러 0', ls.errs.length === 0 && S.calls >= 3, JSON.stringify({ errs: ls.errs, calls: S.calls }));
     await ls.page.close();
     const S2 = { mid: 1.0903, calls: 0, spr: 0.5, mk: 0.3 }, ls2 = await open(1440, 900, false, feed(S2));
@@ -259,11 +291,11 @@ else (async () => {
     await ls2.page.close();
     const S3 = { mid: 1.0903, calls: 0, spr: 0.5, mk: 0, ageMs: 10 * 60e3 }, ls3 = await open(1440, 900, false, feed(S3));
     await until(ls3.page, (x) => x.chart && x.live === '0'); await ls3.page.waitForTimeout(500); const q2 = await spr(ls3.page);
-    ok('스프레드: 휴장·정지(10분 전 시세)면 실시간 표시를 하지 않는다 — 원래 글로', q2.v === '0.0' && q2.l === 'Spreads from' && q2.d === '' && S3.calls >= 2, JSON.stringify(q2));
+    ok('스프레드: 휴장·정지(10분 전 시세)면 실시간 표시를 하지 않는다 — 원래 글이 보인다', q2.v === '0.0' && q2.l === 'Spreads from' && q2.d === '' && S3.calls >= 2 && q2.op > 0.98 && q2.opL > 0.98, JSON.stringify(q2));
     await ls3.page.close();
     const S4 = { mid: 1.0903, calls: 0, spr: 0.5 }, ls4 = await open(1440, 900, false, feed(S4));   // 마크업을 못 받음 (요청 차단)
-    await until(ls4.page, (x) => x.chart && x.live === '1'); await ls4.page.waitForTimeout(500); const q3 = await spr(ls4.page);
-    ok('스프레드: 마크업을 못 받으면 추측하지 않는다 — 원래 글로 (차트는 정상)', q3.v === '0.0' && q3.l === 'Spreads from' && ls4.errs.length === 0, JSON.stringify(q3));
+    await until(ls4.page, (x) => x.chart && x.live === '1'); const q3 = await sprUntil(ls4.page, (x) => x.op > 0.98);
+    ok('스프레드: 마크업을 못 받으면 추측하지 않는다 — 원래 글이 보인다 (차트는 정상)', q3.v === '0.0' && q3.l === 'Spreads from' && q3.op > 0.98 && ls4.errs.length === 0, JSON.stringify(q3));
     await ls4.page.close();
     const S5 = { mid: 1.0903, calls: 0, spr: 0.4, mk: null }, ls5 = await open(390, 844, true, feed(S5));   // 마크업 행 없음 = 0 (서버 coalesce 와 같게)
     const q4 = await sprUntil(ls5.page, (x) => x.v === '0.4');
