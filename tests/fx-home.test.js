@@ -5,6 +5,8 @@
 // 이 테스트가 지키는 것:
 //   ① 모양만 바꿨다 — 기존 링크·앵커·문구(숫자 포함)는 그대로다. 새로 지어낸 숫자·주장 없음.
 //   ② 캡처 이미지에 "Live" 라고 쓰지 않는다 (정지 화면을 실시간처럼 보이게 하면 거짓 표시).
+//   ④ 첫 화면 차트는 **실제 시세로만** 움직인다 (2026-11-27 사장님 "위로 움직이면 초록, 내려가면 빨강" → "3번 진행해"):
+//      실제 봉 + 실제 현재가 · 난수/가짜 움직임 금지 · 휴장·정지 때는 Live 표시와 색 반응이 꺼진다 · 못 받으면 캡처 이미지가 남는다.
 //   ③ PC·모바일에서 실제로 그 모양으로 그려진다 (가로 스크롤 0 · 페이지 에러 0 · 모바일 메뉴가 열린다).
 'use strict';
 const fs = require('fs'), path = require('path'), http = require('http');
@@ -25,6 +27,10 @@ ok('캡처 이미지를 "Live" 라고 표시하지 않는다', !/class="shot-lab
 const specs = [['0.0', 'Spreads from'], ['500:1', 'Leverage up to'], ['$100', 'Minimum deposit'], ['3', 'One account, one platform']];
 ok('제원 줄 4칸: 0.0 pips · 500:1 · $100 · 3 asset classes', specs.every(([n, l]) => new RegExp('<div class="spec"><b>' + n.replace(/[$.]/g, '\\$&') + '(<i>[^<]*</i>)?</b><span>' + l + '</span></div>').test(html)));
 ok('로고는 글자만 — 네모 "A" 표식 없음 (2026-11-27 사장님 "이거 빼자") · 헤더·모바일 메뉴·푸터 3곳', !/class="mark"/.test(html) && !/\.logo \.mark/.test(html) && count(/<a class="logo[^"]*" href="\/">Alpexa-FX<\/a>/g) === 3);
+const liveJs = (html.match(/<script>\s*\/\* 첫 화면 라이브 차트[\s\S]*?<\/script>/) || [''])[0];
+ok('라이브 차트: 가짜 움직임 없음 (Math.random 0) · 우리 피드만 읽는다 (fx-prices 봉 + prices 현재가) · 공개 키만', liveJs.length > 500 && !/Math\.random/.test(html) && /functions\/v1\/fx-prices\?candles=/.test(liveJs) && /rest\/v1\/prices\?symbol=eq\./.test(liveJs) && /sb_publishable_/.test(liveJs) && !/service_role|eyJ[A-Za-z0-9_-]{20,}/.test(html));
+ok('라이브 차트: 보일 때만 읽는다 (탭 숨김 · 화면 밖이면 멈춤) · 요청에 시간 상한', /document\.hidden/.test(liveJs) && /IntersectionObserver/.test(liveJs) && /AbortController/.test(liveJs));
+ok('라이브 차트: 못 받으면 캡처가 남도록 — 캔버스는 기본이 투명, 봉을 받은 뒤에만 보인다', /\.hero canvas\.chart\{[^}]*opacity:0/.test(html) && /\.hero\.has-chart canvas\.chart\{opacity:1\}/.test(html) && /\.hero\.has-chart img\.art\{opacity:0\}/.test(html));
 ok('회전 배너(슬라이드) 제거 — 첫 화면은 한 문장', !has('id="hslides"') && !has('h-dots'));
 // 올리면 자리가 밀리는 사고 (2026-11-27 사장님 "마우스 대면 메뉴 전체가 움직여"): .link:hover 가 gap 을 넓혀 링크 폭이 늘었고,
 // 양끝 정렬인 메뉴 줄 전체가 다시 배치됐다. 올림 효과는 자리를 바꾸지 않는 속성(transform·opacity·color)만 쓴다.
@@ -70,7 +76,7 @@ ok('인용 구역: CEO 의 한 문장 (blockquote) · 이름과 직함 · 인사
    /<b>Christian Rossi<\/b>/.test(qsec) && /Chief Executive Officer, Alpexa-FX/.test(qsec) && /<a class="link" href="about\.html#ceo">Read the full letter<\/a>/.test(qsec), qsec.slice(0, 200));
 ok('인용문은 About 의 CEO 인사말에 실제로 있는 문장이다 (지어낸 말 아님) · #ceo 앵커 존재', about.includes(QUOTE) && /<article class="letter-card" id="ceo">/.test(about));
 ok('터미널 전체 캡처 구역은 없다 (구역 · 이미지 · 파일 모두 제거)', !/class="platform"/.test(html) && !/home-platform/.test(html) && !fs.existsSync(path.join(REPO, 'assets/img/home-platform.jpg')) && !fs.existsSync(path.join(REPO, 'assets/img/home-platform-1200.jpg')));
-ok('쓰지 않는 스크립트 제거 (supabase — 홈은 로그인·데이터 호출이 없다)', !/supabase/i.test(html));
+ok('무거운 라이브러리 없음 (supabase-js · 차트 라이브러리 미탑재 — 시세는 가벼운 fetch 로만 읽는다 · 로그인 코드 없음)', !/vendor\/supabase|supabase-js|createClient|lightweight-charts|<script[^>]+src=/i.test(html));
 
 // ── ③ 실브라우저 ──
 function findChromium() {
@@ -93,11 +99,12 @@ else (async () => {
     r.writeHead(200, { 'Content-Type': MIME[path.extname(fp)] || 'text/plain' }); r.end(fs.readFileSync(fp)); });
   await new Promise((z) => server.listen(0, z));
   const browser = await chromium.launch({ executablePath: exe, headless: true, args: ['--no-sandbox'] });
-  const open = async (vw, vh, mobile) => {
+  const open = async (vw, vh, mobile, prep) => {
     const page = await browser.newPage({ viewport: { width: vw, height: vh }, isMobile: !!mobile });
     const errs = []; page.on('pageerror', (e) => errs.push(String(e.message).slice(0, 120)));
     await page.route(u => !/^(http:\/\/localhost|data:|blob:)/.test(String(u)), r => r.abort());   // 네트워크 0 (글꼴 CDN 포함)
     await page.routeWebSocket(/.*/, ws => ws.close());                                              // 핀: browser-test-isolation.test.js
+    if (prep) await prep(page);                                                                      // 나중에 건 route 가 먼저 잡힌다 — 시세 스텁
     await page.goto('http://localhost:' + server.address().port + '/fx.html', { waitUntil: 'load' });
     return { page, errs };
   };
@@ -165,6 +172,53 @@ else (async () => {
     await p.page.click('.sheet .sheet-x');
     ok('모바일: 닫기를 누르면 메뉴가 닫힌다', await p.page.evaluate(() => getComputedStyle(document.querySelector('.sheet')).display === 'none'));
     await p.page.close();
+    // ── ④ 라이브 차트 (스텁 피드 · 네트워크 0) ──
+    const T0 = Math.floor(Date.now() / 3600e3) * 3600e3;
+    const CANDLES = { ok: true, symbol: 'EURUSD', tf: 'H1', candles: Array.from({ length: 80 }, (_, i) => { const o = 1.09 + Math.sin(i / 7) * 0.004, c = o + (i % 2 ? 0.0006 : -0.0004); return { t: T0 - (79 - i) * 3600e3, o: +o.toFixed(5), h: +(Math.max(o, c) + 0.0005).toFixed(5), l: +(Math.min(o, c) - 0.0005).toFixed(5), c: +c.toFixed(5) }; }) };
+    const feed = (st) => async (page) => {
+      await page.addInitScript(() => { window.__HERO_POLL_MS = 150; });
+      await page.route(/functions\/v1\/fx-prices\?candles/, (r) => st.candlesFail ? r.fulfill({ status: 502, contentType: 'application/json', body: '{"ok":false}' }) : r.fulfill({ contentType: 'application/json', body: JSON.stringify(CANDLES) }));
+      await page.route(/rest\/v1\/prices/, (r) => { st.calls++; return r.fulfill({ contentType: 'application/json', body: JSON.stringify([{ mid: st.mid, updated_at: new Date(Date.now() - (st.ageMs || 0)).toISOString() }]) }); });
+    };
+    const state = (page) => page.evaluate(() => { const h = document.getElementById('top'), cv = document.getElementById('heroChart'), g = cv.getContext('2d');
+      // 가격축 왼쪽 가장자리의 세로 한 줄에서 가장 색이 진한 점을 찾는다 (가격표가 물들었는지)
+      const dpr = cv.width / cv.clientWidth, x = Math.round((cv.clientWidth - 78 + 4) * dpr); let best = { d: 0, r: 0, g: 0 };
+      if (cv.width) { const col = g.getImageData(x, 0, 1, cv.height).data; for (let i = 0; i < col.length; i += 4) { const d = Math.abs(col[i] - col[i + 1]); if (d > best.d) best = { d, r: col[i], g: col[i + 1] }; } }
+      return { chart: h.classList.contains('has-chart'), live: h.dataset.live, tick: h.dataset.tick || '', price: h.dataset.price || '', label: document.getElementById('heroLabel').textContent,
+        cvOpacity: +getComputedStyle(cv).opacity, imgOpacity: +getComputedStyle(document.querySelector('.hero img.art')).opacity, tint: best.d < 40 ? 'none' : (best.g > best.r ? 'green' : 'red') }; });
+    const until = async (page, fn, ms) => { const t = Date.now(); for (;;) { const s = await state(page); if (fn(s) || Date.now() - t > (ms || 4000)) return s; await page.waitForTimeout(60); } };
+
+    const A = { mid: 1.0903, calls: 0 }, la = await open(1440, 900, false, feed(A));
+    let s1 = await until(la.page, (x) => x.chart && x.live === '1' && x.cvOpacity > 0.98);
+    ok('라이브: 봉과 시세를 받으면 차트가 캡처 위로 나타나고 "Live · EUR/USD · H1" 로 표시된다', s1.chart && s1.live === '1' && s1.cvOpacity > 0.98 && s1.imgOpacity < 0.05 && /^Live · EUR\/USD · H1/.test(s1.label) && s1.price === '1.09030', JSON.stringify(s1));
+    ok('라이브: 값이 안 바뀌는 동안은 가격표에 색이 없다', s1.tick === '' && s1.tint === 'none', JSON.stringify(s1));
+    A.mid = 1.09042; let s2 = await until(la.page, (x) => x.tick === 'up' && x.tint === 'green');
+    ok('라이브: 시세가 오르면 가격표가 초록으로 물든다', s2.tick === 'up' && s2.tint === 'green' && s2.price === '1.09042', JSON.stringify(s2));
+    A.mid = 1.09021; let s3 = await until(la.page, (x) => x.tick === 'down' && x.tint === 'red');
+    ok('라이브: 시세가 내리면 가격표가 빨강으로 물든다', s3.tick === 'down' && s3.tint === 'red' && s3.price === '1.09021', JSON.stringify(s3));
+    let s4 = await until(la.page, (x) => x.tint === 'none', 3000);
+    ok('라이브: 색은 잠깐 뒤 원래대로 돌아온다 (계속 켜져 있지 않다)', s4.tint === 'none', JSON.stringify(s4));
+    await la.page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)); await la.page.waitForTimeout(400);
+    const c0 = A.calls; await la.page.waitForTimeout(700);
+    ok('라이브: 첫 화면이 안 보이면 시세 읽기를 멈춘다', A.calls - c0 <= 1 && c0 >= 5, JSON.stringify({ before: c0, after: A.calls }));
+    ok('라이브: 페이지 에러 0', la.errs.length === 0, la.errs.join(' | '));
+    await la.page.close();
+
+    const B = { mid: 1.0903, calls: 0, ageMs: 10 * 60e3 }, lb = await open(1440, 900, false, feed(B));
+    let b1 = await until(lb.page, (x) => x.chart && x.live === '0');
+    B.mid = 1.0915; await lb.page.waitForTimeout(600); const b2 = await state(lb.page);
+    ok('휴장·정지(시세가 10분 전 것): 차트는 실제 봉으로 보이되 "Live" 표시와 색 반응이 없다', b1.chart && b2.live === '0' && !/Live/.test(b2.label) && /EUR\/USD · H1/.test(b2.label) && b2.tick === '' && b2.tint === 'none', JSON.stringify(b2));
+    await lb.page.close();
+
+    const C = { mid: 1.0903, calls: 0, candlesFail: true }, lc = await open(1440, 900, false, feed(C));
+    await lc.page.waitForTimeout(900); const c1 = await state(lc.page);
+    ok('수신 실패: 캡처 이미지와 원래 표시가 그대로 남는다 (빈 화면 없음 · 시세 읽기도 시작 안 함)', !c1.chart && c1.imgOpacity === 1 && c1.cvOpacity === 0 && c1.label === 'EUR/USD · H1 · Alpexa WebTrade' && C.calls === 0 && lc.errs.length === 0, JSON.stringify({ c1, calls: C.calls, errs: lc.errs }));
+    await lc.page.close();
+
+    const M = { mid: 1.0903, calls: 0 }, lm = await open(390, 844, true, feed(M));
+    await until(lm.page, (x) => x.chart && x.live === '1'); M.mid = 1.09041; const m2 = await until(lm.page, (x) => x.tick === 'up');
+    ok('모바일: 라이브 차트가 뜨고 오르면 반응한다 · 가로 스크롤 없음', m2.chart && m2.tick === 'up' && (await lm.page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 0 && lm.errs.length === 0, JSON.stringify(m2));
+    await lm.page.close();
   } catch (e) { ok('실브라우저 측정', false, String(e.message).slice(0, 220)); }
   await browser.close(); server.close(); done();
 })();
