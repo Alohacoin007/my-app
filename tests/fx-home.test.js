@@ -24,6 +24,7 @@ ok('첫 화면 그림 = 실제 터미널 차트 캡처 (파일이 리포에 있�
 ok('캡처 이미지를 "Live" 라고 표시하지 않는다', !/class="shot-label"[^>]*>[^<]*\bLive\b/i.test(html) && !/<figcaption[^>]*>[^<]*\blive\b/i.test(html) && /class="shot-label"/.test(html));
 const specs = [['0.0', 'Spreads from'], ['500:1', 'Leverage up to'], ['$100', 'Minimum deposit'], ['3', 'One account, one platform']];
 ok('제원 줄 4칸: 0.0 pips · 500:1 · $100 · 3 asset classes', specs.every(([n, l]) => new RegExp('<div class="spec"><b>' + n.replace(/[$.]/g, '\\$&') + '(<i>[^<]*</i>)?</b><span>' + l + '</span></div>').test(html)));
+ok('로고는 글자만 — 네모 "A" 표식 없음 (2026-11-27 사장님 "이거 빼자") · 헤더·모바일 메뉴·푸터 3곳', !/class="mark"/.test(html) && !/\.logo \.mark/.test(html) && count(/<a class="logo[^"]*" href="\/">Alpexa-FX<\/a>/g) === 3);
 ok('회전 배너(슬라이드) 제거 — 첫 화면은 한 문장', !has('id="hslides"') && !has('h-dots'));
 ok('둥근 형광 버튼 대신 밑줄 링크 (btn-lg 없음)', !has('btn-lg') && count(/class="link"/g) >= 8);
 
