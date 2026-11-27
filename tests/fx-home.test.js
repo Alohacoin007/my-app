@@ -103,6 +103,7 @@ else (async () => {
       imgOk: !!img && img.complete && img.naturalWidth > 0, headPos: head ? getComputedStyle(head).position : '', headBg: head ? getComputedStyle(head).backgroundColor : '',
       quote: (() => { const e = q('.quote blockquote p'); return e ? { px: parseFloat(getComputedStyle(e).fontSize), w: +getComputedStyle(e).fontWeight, box: r(q('.quote')) } : null; })(),
       award: (() => { const e = q('.award'); if (!e) return null; const c = getComputedStyle(e), b = e.getBoundingClientRect(); return { bg: c.backgroundColor, color: c.color, w: Math.round(b.width), h: Math.round(b.height) }; })(),
+      word: (() => { const e = q('.wordmark span'); if (!e) return null; const b = e.getBoundingClientRect(), c = getComputedStyle(e); return { l: Math.round(b.left), r: Math.round(b.right), w: +c.fontWeight }; })(),
       panels: [...document.querySelectorAll('.panels .panel')].map(r), cols: [...document.querySelectorAll('.cmp .col')].map(r), specs: [...document.querySelectorAll('.specs .spec')].map(r),
       menuShown: (() => { const m = q('header.nav .menu'); return !!m && getComputedStyle(m).display !== 'none' && m.getBoundingClientRect().width > 0; })(),
       burgerShown: (() => { const b = q('.burger'); return !!b && getComputedStyle(b).display !== 'none'; })() };
@@ -118,15 +119,21 @@ else (async () => {
     ok('PC: 시장 3면이 한 줄 · 화면 좌우 끝까지', m.panels.length === 3 && m.panels.every((p) => p.t === m.panels[0].t) && m.panels[0].l === 0 && m.panels[2].r === m.vw, JSON.stringify(m.panels));
     ok('PC: 인용문이 크고 가늘게 보인다 (≥ 60px · 굵기 300 · 구역이 좌우 끝까지)', !!m.quote && m.quote.px >= 60 && m.quote.w === 300 && m.quote.box.l === 0 && m.quote.box.r === m.vw, JSON.stringify(m.quote));
     ok('PC: 수상 배지가 검정 바탕 위 흰 선으로 보인다 (바탕 투명 · 흰색 · 폭 80px 이상)', !!m.award && /rgba\(0, 0, 0, 0\)|transparent/.test(m.award.bg) && m.award.color === 'rgb(255, 255, 255)' && m.award.w >= 80, JSON.stringify(m.award));
+    const centered = (g, vw) => !!g && Math.abs(g.l - (vw - g.r)) <= 6 && g.l >= 0 && g.r <= vw && g.w >= 600;
+    ok('PC: 푸터의 큰 ALPEXA 글자가 가운데 · 굵게 (좌우 여백 차 ≤ 6px · 굵기 ≥ 600 · 화면 안)', centered(m.word, m.vw), JSON.stringify({ word: m.word, vw: m.vw }));
     ok('PC: 계좌 3종이 한 줄', m.cols.length === 3 && m.cols.every((c) => c.t === m.cols[0].t), JSON.stringify(m.cols));
     await d.page.hover('header.nav .menu .has-dd'); const dd = await d.page.evaluate(() => { const e = document.querySelector('header.nav .dd'); return getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().height > 0; });
     ok('PC: What We Offer 에 올리면 하위 메뉴가 열린다', dd);
     await d.page.close();
+    const wd = await open(1920, 1080), mw = await measure(wd.page);
+    ok('넓은 모니터(1920): 큰 ALPEXA 글자가 가운데 · 화면 폭의 70% 이상을 채운다', centered(mw.word, mw.vw) && (mw.word.r - mw.word.l) >= mw.vw * 0.7, JSON.stringify({ word: mw.word, vw: mw.vw }));
+    await wd.page.close();
 
     const p = await open(390, 844, true), mm = await measure(p.page);
     ok('모바일: 가로 스크롤 없음 · 페이지 에러 0', mm.overflow <= 0 && p.errs.length === 0, JSON.stringify({ overflow: mm.overflow, errs: p.errs }));
     ok('모바일: 시장 3면 · 계좌 3종이 세로로 쌓인다', mm.panels.length === 3 && mm.panels[1].t > mm.panels[0].t && mm.cols.length === 3 && mm.cols[1].t > mm.cols[0].t, JSON.stringify({ p: mm.panels.map((x) => x.t), c: mm.cols.map((x) => x.t) }));
     ok('모바일: 인용문이 화면 안에 들어온다 (≥ 30px)', !!mm.quote && mm.quote.px >= 30 && mm.quote.box.r <= mm.vw, JSON.stringify(mm.quote));
+    ok('모바일: 큰 ALPEXA 글자가 가운데 · 화면 안', !!mm.word && Math.abs(mm.word.l - (mm.vw - mm.word.r)) <= 6 && mm.word.l >= 0 && mm.word.r <= mm.vw, JSON.stringify({ word: mm.word, vw: mm.vw }));
     ok('모바일: 제원은 2칸씩 2줄', mm.specs.length === 4 && mm.specs[0].t === mm.specs[1].t && mm.specs[2].t > mm.specs[0].t, JSON.stringify(mm.specs.map((x) => x.t)));
     ok('모바일: 가로 메뉴 숨김 · 햄버거 보임', !mm.menuShown && mm.burgerShown, JSON.stringify({ menu: mm.menuShown, burger: mm.burgerShown }));
     await p.page.click('.burger');
