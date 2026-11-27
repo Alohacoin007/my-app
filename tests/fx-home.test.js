@@ -26,6 +26,12 @@ const specs = [['0.0', 'Spreads from'], ['500:1', 'Leverage up to'], ['$100', 'M
 ok('제원 줄 4칸: 0.0 pips · 500:1 · $100 · 3 asset classes', specs.every(([n, l]) => new RegExp('<div class="spec"><b>' + n.replace(/[$.]/g, '\\$&') + '(<i>[^<]*</i>)?</b><span>' + l + '</span></div>').test(html)));
 ok('로고는 글자만 — 네모 "A" 표식 없음 (2026-11-27 사장님 "이거 빼자") · 헤더·모바일 메뉴·푸터 3곳', !/class="mark"/.test(html) && !/\.logo \.mark/.test(html) && count(/<a class="logo[^"]*" href="\/">Alpexa-FX<\/a>/g) === 3);
 ok('회전 배너(슬라이드) 제거 — 첫 화면은 한 문장', !has('id="hslides"') && !has('h-dots'));
+// 올리면 자리가 밀리는 사고 (2026-11-27 사장님 "마우스 대면 메뉴 전체가 움직여"): .link:hover 가 gap 을 넓혀 링크 폭이 늘었고,
+// 양끝 정렬인 메뉴 줄 전체가 다시 배치됐다. 올림 효과는 자리를 바꾸지 않는 속성(transform·opacity·color)만 쓴다.
+const hoverRules = (html.match(/[^{}]*:hover[^{}]*\{[^}]*\}/g) || []);
+const LAYOUT = /(^|[;{\s])(gap|padding[a-z-]*|margin[a-z-]*|width|height|font-size|font-weight|letter-spacing|border[a-z-]*-width|top|left|right|bottom|display)\s*:/;
+const badHover = hoverRules.filter((r) => LAYOUT.test(r.slice(r.indexOf('{'))) && !/\.dd\{display:block\}/.test(r.replace(/\s+/g, '')));
+ok('올림(hover) 효과가 자리를 바꾸지 않는다 — gap·padding·margin·크기 변경 없음 (하위 메뉴 열기 제외)', hoverRules.length >= 4 && badHover.length === 0, badHover.join(' | ').slice(0, 220));
 ok('둥근 형광 버튼 대신 밑줄 링크 (btn-lg 없음)', !has('btn-lg') && count(/class="link"/g) >= 8);
 
 // ── ① 정적: 기존 것 보존 ──
@@ -122,6 +128,17 @@ else (async () => {
     const centered = (g, vw) => !!g && Math.abs(g.l - (vw - g.r)) <= 6 && g.l >= 0 && g.r <= vw && g.w >= 600;
     ok('PC: 푸터의 큰 ALPEXA 글자가 가운데 · 굵게 (좌우 여백 차 ≤ 6px · 굵기 ≥ 600 · 화면 안)', centered(m.word, m.vw), JSON.stringify({ word: m.word, vw: m.vw }));
     ok('PC: 계좌 3종이 한 줄', m.cols.length === 3 && m.cols.every((c) => c.t === m.cols[0].t), JSON.stringify(m.cols));
+    // 실제로 올려 본다: 메뉴 줄의 모든 항목과 첫 화면 버튼들의 자리가 1px 도 안 움직여야 한다
+    const spots = () => d.page.evaluate(() => [...document.querySelectorAll('header.nav .logo, header.nav .menu > *, header.nav .nav-r > a, .hero-cta a')].map((e) => { const b = e.getBoundingClientRect(); return [Math.round(b.left * 10) / 10, Math.round(b.width * 10) / 10]; }));
+    const before = await spots();
+    await d.page.hover('header.nav .nav-r .link'); await d.page.waitForTimeout(350); const navHover = await spots();
+    await d.page.hover('.hero-cta a.link'); await d.page.waitForTimeout(350); const ctaHover = await spots();
+    await d.page.mouse.move(5, 500); await d.page.waitForTimeout(250);
+    const same = (x) => JSON.stringify(x) === JSON.stringify(before);
+    ok('PC: 메뉴의 Open account 에 올려도 메뉴 줄이 움직이지 않는다', before.length >= 9 && same(navHover), JSON.stringify({ before, navHover }));
+    ok('PC: 첫 화면 Open account 에 올려도 옆 Try demo 가 밀리지 않는다', same(ctaHover), JSON.stringify({ before, ctaHover }));
+    const arrow = await d.page.evaluate(async () => { const a = document.querySelector('.hero-cta a.link'); return getComputedStyle(a, '::after').transitionProperty; });
+    ok('PC: 화살표는 transform 으로만 움직인다', /transform/.test(arrow), arrow);
     await d.page.hover('header.nav .menu .has-dd'); const dd = await d.page.evaluate(() => { const e = document.querySelector('header.nav .dd'); return getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().height > 0; });
     ok('PC: What We Offer 에 올리면 하위 메뉴가 열린다', dd);
     await d.page.close();
