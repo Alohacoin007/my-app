@@ -13,825 +13,316 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Alpexa-FX</title>
+<meta name="description" content="Alpexa-FX — FX, stocks and crypto on one account. Spreads from 0.0 pips, leverage up to 500:1, accounts from $100.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@500;700&family=Space+Grotesk:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
-<script src="vendor/supabase.min.js?v=2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --bg:#05070f;--surface:#0c1120;--surface2:#141a2c;--line:rgba(255,255,255,.09);
-    --text:#f4f6fb;--muted:#9aa3b8;--accent:#1e40d8;--accent2:#3a5bf0;
-    --font-display:'Space Grotesk',-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  }
-  h1,h2{font-family:var(--font-display)}
-  .kicker{display:inline-flex;align-items:center;gap:11px;font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);margin-bottom:24px}
-  .kicker .kline{width:32px;height:2px;background:#1e40d8;flex:none}
-  *{box-sizing:border-box;margin:0;padding:0}
-  /* ===== Light (white) theme ===== */
-  body.light{--bg:#f4f6fb;--surface:#ffffff;--surface2:#eef1f7;--line:#e7ebf2;--text:#0e1726;--muted:#5a6478}
-  body.light .glow{display:none}
-  body.light::after{background:radial-gradient(1100px 620px at 72% 6%,rgba(30,64,216,.08),transparent 58%),linear-gradient(180deg,#f6f8fd,#eef2f8)}
-  body.light header{background:#fff;backdrop-filter:none}
-  body.light .gradient-text{background:none;-webkit-text-fill-color:var(--text);color:var(--text)}
-  body.light .pill{background:#1e40d8;color:#fff;border:none}
-  body.light .pill:hover{background:#1e40d8;filter:brightness(1.09)}
-  body.light .store{background:#fff;color:var(--text);border:2px solid var(--line);box-shadow:0 4px 14px rgba(16,24,40,.06)}
-  body.light .store .lg{color:var(--text)}
-  body.light .card{background:#fff;border:2px solid var(--line);box-shadow:0 6px 22px rgba(16,24,40,.06)}
-  body.light .ev-card{background:#fff;border:2px solid var(--line);box-shadow:0 6px 22px rgba(16,24,40,.06)}
-  body.light .ev-title{color:var(--text)}
-  body.light .ev-sport{color:#3a4658;background:#eef1f7}
-  body.light .ev-card.feat{border-color:transparent;background:linear-gradient(180deg,rgba(59,130,246,.12),#fff);box-shadow:0 0 0 1px rgba(59,130,246,.3)}
-  body.light .cta{background:linear-gradient(135deg,rgba(59,130,246,.12),rgba(124,92,255,.08));border:2px solid var(--line)}
-  body.light .cta p{color:#3a4658}
-  body.light .fb-logo{color:var(--text)}
-  body.light .foot-col a{color:#3a4658}
-  body.light .foot-col a:hover{color:var(--text)}
-  /* Light phone screen */
-  body.light .screen{background:#fff}
-  body.light .statusbar{background:#fff;color:#0e1726;border-bottom:1px solid var(--line)}
-  body.light .statusbar .time{color:#0e1726}
-  body.light .statusbar .sicons{filter:invert(1) brightness(.25)}
-  body.light .ph-appbar{background:#fff;color:#0e1726;border-bottom:1px solid var(--line)}
-  body.light .ph-appbar .brand{color:#0e1726}
-  body.light .ph-appbar .tabs{color:#6b7686}
-  body.light .ph-appbar .tabs span:first-child{color:#0e1726}
-  body.light .bal-card{background:#fff;color:#0e1726;border-bottom:1px solid var(--line)}
-  body.light .bal-icons{color:#6b7686}
-  body.light .bal-amount{background:linear-gradient(120deg,#0e1726 35%,#1e40d8);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-  body.light .bal-chip{color:#3a4658;background:#f2f4f8;border:2px solid var(--line)}
-  body.light .bal-chip b{color:#0e1726}
-  body.light .app-body{background:#fff}
-  body.light .g-card{background:#f7f9fc;border:2px solid var(--line)}
-  body.light .g-league{color:#0e1726}
-  body.light .g-team{color:#0e1726}
-  body.light .g-ab{color:#6b7686;background:#fff;border:2px solid var(--line)}
-  body.light .g-score{color:#0e1726;background:#eef1f7}
-  body.light .o-box{background:#fff;border:2px solid var(--line)}
-  body.light .o-box .ln{color:#6b7686}
-  body.light .pr.pos{color:#16a34a}
-  body.light .pr.neg{color:#3a4658}
-  body.light .app-nav{background:#fff;border-top:1px solid var(--line)}
-  .theme-toggle{width:36px;height:36px;border-radius:50%;border:2px solid var(--line);background:rgba(255,255,255,.06);color:var(--text);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;transition:background .15s}
-  .theme-toggle:hover{background:rgba(255,255,255,.12)}
-  body.light .theme-toggle{background:#eef1f7}
-  body.light .theme-toggle:hover{background:#e3e8f0}
-  html{scroll-behavior:smooth}
-  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--text);background:var(--bg);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  /* 홈 v3 (2026-11-27 사장님 "이 버전으로 홈부터 진행해") — 화면 전체를 쓰는 첫 화면 · 글꼴 하나 ·
+     검정/흰색/회색 + 라임 한 점 · 상자 대신 가는 선 · 밑줄 링크. 계약: tests/fx-home.test.js */
+  :root{--ink:#0a0a0b;--paper:#f3f2ef;--white:#fff;--mute:#8b8b8f;--mute-d:#6d6d72;--soft:#c2c2c7;
+    --line:rgba(255,255,255,.16);--line-l:rgba(10,10,11,.14);--accent:#CDF138;
+    --font:'Inter','Inter Display',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;--gut:clamp(20px,4.4vw,64px)}
+  *{box-sizing:border-box;margin:0}
+  html{-webkit-text-size-adjust:100%}
+  body{font-family:var(--font);font-optical-sizing:auto;background:var(--ink);color:var(--white);-webkit-font-smoothing:antialiased;font-size:18px;line-height:1.5}
   a{color:inherit;text-decoration:none}
-  button{font-family:inherit;cursor:pointer}
-  .eyebrow{display:none}
-  .gradient-text{background:none;-webkit-text-fill-color:#fff;color:#fff}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+  .link{display:inline-flex;align-items:center;gap:10px;font-size:17px;font-weight:500;padding-bottom:6px;border-bottom:1px solid currentColor;transition:gap .18s ease}
+  .link::after{content:"\2192";font-weight:400}
+  .link:hover{gap:16px}
+  @media (prefers-reduced-motion:reduce){.link{transition:none}}
+  h1,h2,h3{font-weight:300;text-wrap:balance}
 
-  /* glow */
-  .glow{position:fixed;inset:0;z-index:-2;pointer-events:none}
-  .glow::before{content:"";position:absolute;top:-200px;left:50%;transform:translateX(-50%);width:900px;height:700px;background:radial-gradient(circle at center,rgba(59,130,246,.35),rgba(124,92,255,.12) 40%,transparent 70%);filter:blur(20px)}
-  body::after{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(1100px 620px at 72% 6%,rgba(30,64,216,.20),transparent 58%),linear-gradient(180deg,#0a0d17,#070a12 58%,#05070d)}
+  /* 메뉴 — 첫 화면 위에 투명하게 */
+  header.nav{position:absolute;inset:0 0 auto 0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:24px var(--gut);background:transparent}
+  .logo{display:flex;align-items:center;gap:10px;font-size:19px;font-weight:600;letter-spacing:-.01em;white-space:nowrap}
+  .logo .mark{width:26px;height:26px;display:flex;align-items:center;justify-content:center;background:#fff;color:var(--ink);font-size:14px;font-weight:700;border-radius:2px}
+  .menu{display:flex;align-items:center;gap:36px;font-size:15px;font-weight:500}
+  .menu>a,.menu .dd-t{opacity:.88;cursor:pointer;background:none;border:0;color:inherit;font:inherit;padding:8px 0;display:inline-flex;align-items:center;gap:7px}
+  .menu>a:hover,.menu .dd-t:hover{opacity:1}
+  .dd-t::after{content:"";width:7px;height:7px;border-right:1.4px solid currentColor;border-bottom:1.4px solid currentColor;transform:rotate(45deg) translateY(-3px)}
+  .has-dd{position:relative}
+  .dd{display:none;position:absolute;left:-20px;top:100%;min-width:270px;background:var(--ink);border:1px solid var(--line);padding:8px 0}
+  .has-dd:hover .dd,.has-dd:focus-within .dd,.has-dd.open .dd{display:block}
+  .dd a{display:block;padding:12px 20px;font-size:15px}
+  .dd a:hover{background:rgba(255,255,255,.07)}
+  .dd small{display:block;margin-top:2px;font-size:13px;font-weight:400;color:var(--mute)}
+  .nav-r{display:flex;align-items:center;gap:28px;font-size:15px;font-weight:500;white-space:nowrap}
+  .nav-r .link{font-size:15px;padding-bottom:4px}
+  .burger{display:none;width:44px;height:44px;margin-right:-9px;background:none;border:0;cursor:pointer;position:relative}
+  .burger::before,.burger::after{content:"";position:absolute;left:9px;right:9px;height:1.5px;background:#fff}
+  .burger::before{top:16px}.burger::after{top:27px}
+  /* 모바일 메뉴 (전체 화면) */
+  .sheet{display:none;position:fixed;inset:0;z-index:50;background:var(--ink);padding:24px var(--gut) 40px;overflow:auto}
+  .sheet.open{display:block}
+  .sheet-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:34px}
+  .sheet-x{width:44px;height:44px;margin-right:-9px;background:none;border:0;cursor:pointer;position:relative}
+  .sheet-x::before,.sheet-x::after{content:"";position:absolute;left:9px;right:9px;top:21px;height:1.5px;background:#fff}
+  .sheet-x::before{transform:rotate(45deg)}.sheet-x::after{transform:rotate(-45deg)}
+  .sheet nav a{display:block;padding:17px 0;border-top:1px solid var(--line);font-size:26px;font-weight:300;letter-spacing:-.02em}
+  .sheet nav a small{display:block;font-size:14px;font-weight:400;letter-spacing:0;color:var(--mute);margin-top:2px}
+  .sheet nav a:last-child{border-bottom:1px solid var(--line)}
+  .sheet-cta{display:flex;gap:30px;margin-top:34px}
 
-  /* Header */
-  header{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:20px;padding:14px 26px;background:rgba(5,7,15,.6);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
-  /* Header matches the Markets page (markets.html) so switching pages shows an identical bar. */
-  .logo{font-size:16px;font-weight:800;letter-spacing:.4px;display:flex;align-items:center;gap:10px}
-  .logo .mark{width:26px;height:26px;border-radius:6px;background:#1e40d8;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff;letter-spacing:0;flex:none}
-  nav{display:flex;gap:26px;flex:1}
-  nav a{color:var(--muted);font-size:14px;transition:color .15s}
-  nav a:hover{color:var(--text)}
-  /* Identical to the Markets page nav (markets.html) so the bar doesn't shift between pages. */
-  .cmenu{display:flex;gap:26px;flex:1}
-  .cmenu a{color:#d4dbe8;font-size:14px;font-weight:600;line-height:normal;padding:4px 0;border-bottom:2px solid transparent;
-    transition:color .15s;white-space:nowrap;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-  .cmenu a:hover{color:#fff}
-  body.light .cmenu a{color:#5a6478}
-  body.light .cmenu a:hover{color:#0e1726}
-  @media(max-width:820px){ .cmenu{display:none} header>a[href*="login.html"]{margin-left:auto} }
-  .pill{display:inline-flex;align-items:center;gap:7px;background:#1e40d8;color:#fff;font-size:13px;font-weight:600;letter-spacing:.2px;padding:9px 16px;border:none;border-radius:0;transition:filter .15s,transform .05s}
-  .pill:hover{filter:brightness(1.09)}
-  .pill:active{transform:translateY(1px)}
-  .pill:hover{background:rgba(255,255,255,.12);border-color:rgba(123,150,255,.5)}
-  .pill .arrow{width:20px;height:20px;border-radius:4px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center}
-  .pill .arrow svg{display:block}
+  /* 첫 화면 — 화면 전체 · 실제 터미널 차트 */
+  .hero{position:relative;height:100vh;min-height:720px;background:var(--ink);overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end}
+  .hero img.art{position:absolute;top:0;right:0;width:82%;height:100%;object-fit:cover;object-position:right center}
+  .shade{position:absolute;inset:0;background:linear-gradient(90deg,#0a0a0b 0%,#0a0a0b 30%,rgba(10,10,11,.93) 44%,rgba(10,10,11,.3) 63%,rgba(10,10,11,0) 80%),linear-gradient(0deg,#0a0a0b 0%,rgba(10,10,11,.92) 17%,rgba(10,10,11,0) 40%),linear-gradient(180deg,rgba(10,10,11,.94) 0%,rgba(10,10,11,.6) 9%,rgba(10,10,11,0) 17%)}
+  .shot-label{position:absolute;right:calc(var(--gut) + 64px);top:104px;font-size:13px;color:#d0d0d4;display:flex;align-items:center;gap:9px}
+  .shot-label::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent)}
+  .hero-copy{position:relative;padding:0 var(--gut) 56px}
+  h1{font-size:clamp(46px,8.2vw,124px);line-height:.98;letter-spacing:-.035em}
+  .hero-sub{margin-top:26px;max-width:30em;color:#c9c9cd;font-size:clamp(17px,1.5vw,21px);line-height:1.45}
+  .hero-cta{display:flex;gap:40px;margin-top:38px}
+  .specs{position:relative;display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);margin:0 var(--gut)}
+  .spec{padding:26px 28px 34px 0;border-right:1px solid var(--line)}
+  .spec + .spec{padding-left:28px}
+  .spec:last-child{border-right:0}
+  .spec b{display:block;font-weight:300;font-size:clamp(30px,3.6vw,54px);letter-spacing:-.03em;line-height:1.05;font-variant-numeric:tabular-nums}
+  .spec b i{font-style:normal;font-size:.42em;letter-spacing:0;margin-left:6px;color:#d7d7da}
+  .spec span{display:block;margin-top:8px;font-size:14px;color:var(--mute)}
 
-  /* Hero */
-  .hero{max-width:1120px;margin:0 auto;padding:80px 28px 64px;display:grid;grid-template-columns:1.1fr .9fr;gap:56px;align-items:center}
-  .hero h1{font-size:clamp(48px,7.8vw,88px);font-weight:700;letter-spacing:-2.8px;line-height:1.0;margin-bottom:22px}
-  .hero .sub{color:var(--muted);font-size:clamp(15px,1.7vw,17px);line-height:1.6;margin-bottom:30px;max-width:400px}
-  .hero-cta{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
-  .cta-primary{background:#1e40d8;color:#fff;font-size:15px;font-weight:700;letter-spacing:.2px;padding:15px 30px;border:none;border-radius:0;cursor:pointer;transition:filter .15s,transform .05s}
-  .cta-primary:hover{filter:brightness(1.09)}
-  .cta-primary:active{transform:translateY(1px)}
-  .cta-secondary{font-size:14px;font-weight:600;color:var(--muted);transition:color .15s}
-  .cta-secondary:hover{color:#fff}
-  .stores{display:flex;gap:12px;flex-wrap:wrap}
-  .store{display:inline-flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);border:2px solid var(--line);color:#fff;padding:12px 20px;border-radius:14px;transition:background .15s}
-  .store:hover{background:rgba(255,255,255,.12)}
-  .store .st{font-size:10px;color:var(--muted);line-height:1.1}
-  .store .lg{font-size:16px;font-weight:600;line-height:1.1}
+  /* 시장 3면 — 상자 없이 가장자리까지 */
+  .lineup{background:var(--paper);color:var(--ink);padding:120px 0 0}
+  .sec-head{display:flex;justify-content:space-between;align-items:flex-end;gap:40px;padding:0 var(--gut) 56px}
+  h2{font-size:clamp(34px,4.6vw,68px);line-height:1.02;letter-spacing:-.03em;max-width:13em}
+  .sec-head p{max-width:24em;color:var(--mute-d);font-size:18px}
+  .panels{display:grid;grid-template-columns:repeat(3,1fr);gap:2px}
+  .panel{position:relative;height:660px;background:var(--ink);color:#fff;padding:36px 36px 40px;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden}
+  .panel:first-child{padding-left:var(--gut)}
+  .panel:nth-child(2){background:#18181b}
+  .panel:nth-child(3){background:#222226}
+  .panel-art{position:absolute;right:4%;top:9%;width:62%;height:auto;opacity:.5;transition:opacity .25s ease,transform .25s ease}
+  .panel:hover .panel-art{opacity:.85;transform:translateY(-6px)}
+  @media (prefers-reduced-motion:reduce){.panel-art{transition:none}.panel:hover .panel-art{transform:none}}
+  .panel h3{font-size:clamp(40px,4.4vw,66px);letter-spacing:-.03em;line-height:1}
+  .panel p{margin:16px 0 26px;max-width:21em;color:var(--soft);font-size:17px;line-height:1.45}
+  .panel .link{align-self:flex-start}
 
-  /* Phone */
-  .phone-wrap{display:flex;justify-content:center;position:relative}
-  .phone-wrap::before{content:"";position:absolute;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(30,64,216,.45),transparent 65%);filter:blur(30px);z-index:0}
-  .phone{position:relative;z-index:1;width:286px;max-width:80vw;padding:10px;border-radius:54px;background:linear-gradient(150deg,#3a3d43,#0a0b0e 50%,#202227);box-shadow:0 34px 80px rgba(0,0,0,.65),inset 0 0 0 1.5px rgba(255,255,255,.06),inset 0 0 0 3px #050608}
-  .phone::before{content:"";position:absolute;left:-2px;top:120px;width:2.5px;height:32px;background:#16181d;border-radius:3px 0 0 3px;box-shadow:0 52px 0 #16181d}
-  .phone::after{content:"";position:absolute;right:-2px;top:152px;width:2.5px;height:72px;background:#16181d;border-radius:0 3px 3px 0}
-  .screen{position:relative;border-radius:42px;overflow:hidden;background:#0a0e1a}
-  .statusbar{position:relative;height:44px;background:#0c1120;display:flex;align-items:center;justify-content:space-between;padding:0 22px;color:#fff}
-  .statusbar .time{font-size:13px;font-weight:600;letter-spacing:.3px}
-  .statusbar .sicons{display:flex;align-items:center;gap:6px}
-  .island{position:absolute;top:9px;left:50%;transform:translateX(-50%);width:80px;height:23px;background:#000;border-radius:999px}
-  .island::after{content:"";position:absolute;right:11px;top:50%;transform:translateY(-50%);width:8px;height:8px;border-radius:50%;background:#0c1f38;box-shadow:inset 0 0 0 1.5px rgba(120,160,255,.45)}
-  .ph-appbar{background:#0c1120;color:#f4f6fb;padding:16px 16px 14px;border-bottom:1px solid var(--line)}
-  .ph-appbar .brand{font-size:16px;font-weight:700;letter-spacing:-.3px;display:flex;align-items:center;gap:7px}
-  .ph-appbar .brand .m{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center}
-  .ph-appbar .tabs{display:flex;gap:14px;margin-top:14px;font-size:11px;color:var(--muted)}
-  .ph-appbar .tabs span:first-child{font-weight:600;color:#fff;border-bottom:2px solid var(--accent);padding-bottom:4px}
-  .ph-body{padding:14px}
-  .live-dot{width:6px;height:6px;border-radius:50%;background:#fff;display:inline-block;animation:pulse 1.4s infinite}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-  .sect{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:10px}
-  .feat{position:relative;border:2px solid var(--line);border-radius:18px;padding:15px;overflow:hidden;background:linear-gradient(160deg,rgba(59,130,246,.12),rgba(124,92,255,.04))}
-  .feat::before{content:"";position:absolute;top:-44px;right:-34px;width:130px;height:130px;background:radial-gradient(circle,rgba(99,140,255,.4),transparent 70%);filter:blur(8px)}
-  .feat-top{position:relative;display:flex;justify-content:space-between;align-items:center}
-  .livepill{display:inline-flex;align-items:center;gap:5px;font-size:9px;font-weight:700;letter-spacing:.6px;color:#fff;background:linear-gradient(135deg,#ff4d4f,#ff7a45);padding:4px 9px;border-radius:999px}
-  .qtime{font-size:10px;color:var(--muted)}
-  .teams{position:relative;display:flex;align-items:center;justify-content:space-between;margin:16px 4px 14px}
-  .team{display:flex;flex-direction:column;align-items:center;gap:7px;width:60px}
-  .badge{width:40px;height:40px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.4)}
-  .badge.kc{background:linear-gradient(135deg,#e23744,#9e1124)}
-  .badge.phi{background:linear-gradient(135deg,#2a915c,#0c3b24)}
-  .tname{font-size:11px;color:#cdd4e4;font-weight:500}
-  .score{font-size:24px;font-weight:800;letter-spacing:1px;color:#fff}
-  .score span{color:var(--muted);margin:0 6px;font-weight:300}
-  .mk-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;position:relative}
-  .mk-row .mk{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;font-weight:600}
-  .mk-row .more{font-size:10px;color:#9bc2ff}
-  .odds2{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .o2{display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px;border-radius:13px;border:2px solid var(--line);background:rgba(255,255,255,.03);transition:transform .12s}
-  .o2:active{transform:scale(.97)}
-  .o2 .ol{font-size:9px;color:var(--muted)}
-  .o2 .ov{font-size:16px;font-weight:700;color:#dce6ff}
-  .o2.sel{border-color:transparent;background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 8px 20px rgba(59,130,246,.45)}
-  .o2.sel .ol{color:rgba(255,255,255,.85)}
-  .o2.sel .ov{color:#fff}
-  .ph-slip{margin-top:12px;display:flex;align-items:center;justify-content:space-between;padding:11px 12px;border-radius:15px;background:linear-gradient(135deg,rgba(59,130,246,.2),rgba(124,92,255,.12));border:2px solid var(--line)}
-  .ph-slip .sl1{font-size:9px;color:var(--muted);letter-spacing:.5px}
-  .ph-slip .sl2{font-size:13px;font-weight:700;color:#fff;margin-top:1px}
-  .ph-slip .slgo{width:32px;height:32px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(59,130,246,.4)}
-  /* App: balance card */
-  .bal-card{position:relative;overflow:hidden;padding:34px 14px 8px;color:#fff;background:#0a0e1a;border-bottom:1px solid var(--line)}
-  .bal-card::before{content:"";position:absolute;top:-70px;right:-55px;width:150px;height:150px;background:radial-gradient(circle,rgba(30,64,216,.28),transparent 70%);filter:blur(8px)}
-  .bal-top{position:relative;display:flex;justify-content:space-between;align-items:center}
-  .bal-brand{font-size:12.5px;font-weight:700;letter-spacing:-.2px}
-  .bal-icons{display:flex;gap:9px;color:#cdd4e4}
-  .bal-icons svg{display:block;width:13px;height:13px}
-  .bal-label{position:relative;font-size:7px;letter-spacing:1.1px;color:var(--muted);margin-top:5px;font-weight:600}
-  .bal-amount{position:relative;font-size:16px;font-weight:800;letter-spacing:-.5px;margin-top:0;background:linear-gradient(120deg,#fff 35%,#7d93f0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-  .bal-row{position:relative;display:flex;align-items:center;gap:4px;margin-top:6px;width:100%}
-  .bal-chip{display:inline-flex;align-items:center;height:21px;font-size:7px;letter-spacing:.2px;color:#cdd4e4;background:rgba(255,255,255,.06);border:2px solid var(--line);padding:0 7px;border-radius:6px;font-weight:600;white-space:nowrap}
-  .bal-chip b{font-weight:800;margin-left:2px;color:#fff}
-  .bal-chip .grn{color:#3ddc84}
-  .bal-dep{margin-left:auto;display:inline-flex;align-items:center;justify-content:center;gap:2px;height:21px;font-size:8px;font-weight:700;color:#fff;background:#1e40d8;border:none;padding:0 10px;border-radius:6px;cursor:pointer;white-space:nowrap}
-  /* App: match list */
-  .app-body{padding:11px 11px 4px;background:#0a0e1a}
-  .mkt-head{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:4px;font-size:9px;color:var(--muted);font-weight:600;padding:2px 6px 8px}
-  .mkt-head span{text-align:center}
-  .mkt-head span:first-child{text-align:left}
-  .g-card{border:2px solid var(--line);border-radius:14px;padding:11px;background:rgba(255,255,255,.03)}
-  .g-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-  .g-league{font-size:10px;color:#cdd4e4;font-weight:600}
-  .g-time{font-size:9px;color:var(--muted)}
-  .g-row{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:4px;align-items:center;margin-bottom:6px}
-  .g-row:last-child{margin-bottom:0}
-  .g-team{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#f4f6fb}
-  .g-ab{font-size:7px;font-weight:700;color:var(--muted);background:rgba(255,255,255,.07);border:2px solid var(--line);border-radius:5px;padding:3px 4px;letter-spacing:.5px}
-  .o-box{border:2px solid var(--line);border-radius:8px;padding:0 2px;text-align:center;background:rgba(255,255,255,.02);height:40px;display:flex;flex-direction:column;justify-content:center;gap:2px}
-  .o-box .ln{font-size:8px;color:#aeb6c8;font-weight:600}
-  .o-box .pr{font-size:11px;font-weight:700}
-  .pr.pos{color:#3ddc84}
-  .pr.neg{color:#dce6ff}
-  .pr{transition:color .25s}
-  .g-livepill{display:inline-flex;align-items:center;gap:4px;font-size:7px;font-weight:700;letter-spacing:.5px;color:#fff;background:linear-gradient(135deg,#ff4d4f,#ff7a45);padding:2px 6px;border-radius:999px;vertical-align:middle;margin-left:4px}
-  .g-livedot{width:5px;height:5px;border-radius:50%;background:#fff;display:inline-block;animation:pulse 1.3s infinite}
-  .g-score{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;margin-left:7px;font-size:11px;font-weight:800;color:#fff;background:rgba(255,255,255,.08);border-radius:5px;padding:0 4px}
-  .g-score.bump{animation:scorebump .6s ease}
-  @keyframes scorebump{0%{transform:scale(1)}40%{transform:scale(1.4);color:#3ddc84}100%{transform:scale(1)}}
-  .o-box{transition:border-color .3s,background .3s}
-  .o-box.flash{animation:oddsflash .9s ease}
-  @keyframes oddsflash{0%{background:rgba(30,64,216,.32);border-color:#1e40d8}100%{background:rgba(255,255,255,.02);border-color:var(--line)}}
-  /* App: bottom nav */
-  .app-nav{display:grid;grid-template-columns:repeat(4,1fr);padding:9px 4px 11px;margin-top:10px;background:#0c1120;border-top:1px solid var(--line)}
-  .nav-i{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:9px;color:var(--muted);font-weight:500}
-  .nav-i.on{color:#3a5bf0}
-  .nav-i svg{display:block}
+  /* 플랫폼 — 실제 화면을 가장자리까지 */
+  .platform{background:var(--ink);padding:140px 0 110px}
+  .platform .sec-head p{color:#b9b9be}
+  .platform figure{margin:0 0 0 var(--gut);border-top:1px solid var(--line);border-left:1px solid var(--line);overflow:hidden}
+  .platform figure img{display:block;width:100%;height:auto}
+  .plat-foot{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:26px var(--gut) 0;font-size:14px;color:var(--mute)}
+  .plat-foot .link{color:#fff}
 
-  /* Stats */
-  .stats{max-width:1120px;margin:0 auto;padding:24px 28px 64px;display:grid;grid-template-columns:repeat(4,1fr);gap:20px;border-top:1px solid var(--line)}
-  .stat .n{font-size:clamp(28px,4vw,40px);font-weight:700;letter-spacing:-1px}
-  .stat .l{color:var(--muted);font-size:13px;margin-top:2px}
+  /* 계좌 비교 — 가는 선만 */
+  .accounts{background:var(--paper);color:var(--ink);padding:150px var(--gut) 140px;scroll-margin-top:0}
+  .accounts h2{margin-bottom:64px}
+  .cmp{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--ink)}
+  .col{padding:30px 40px 0 0;border-right:1px solid var(--line-l);display:flex;flex-direction:column}
+  .col + .col{padding-left:40px}
+  .col:last-child{border-right:0;padding-right:0}
+  .col h3{font-weight:400;font-size:30px;letter-spacing:-.02em}
+  .col .from{margin:34px 0 4px;font-weight:300;font-size:clamp(40px,4.6vw,64px);letter-spacing:-.035em;line-height:1;font-variant-numeric:tabular-nums}
+  .col .from-l{font-size:14px;color:var(--mute-d)}
+  .col dl{margin:36px 0 34px}
+  .col dl div{display:flex;justify-content:space-between;gap:20px;padding:15px 0;border-top:1px solid var(--line-l);font-size:16px}
+  .col dl div:last-child{border-bottom:1px solid var(--line-l)}
+  .col dt{color:var(--mute-d)} .col dd{margin:0;font-weight:500;text-align:right}
+  .col .link{align-self:flex-start;margin-top:auto}
 
-  /* Features */
-  .features{max-width:1120px;margin:0 auto;padding:72px 28px}
-  .features .head{text-align:center;margin-bottom:48px}
-  .features h2{font-size:clamp(28px,4vw,40px);font-weight:700;letter-spacing:-1px}
-  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
-  .card{padding:30px;border:2px solid var(--line);border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.01));transition:transform .2s,border-color .2s}
-  .card:hover{transform:translateY(-4px);border-color:#1e40d8}
-  .card .num{display:none}
-  .card h3{font-size:19px;font-weight:600;margin-bottom:10px}
-  .card p{color:var(--muted);font-size:14px}
+  /* 한 문장 — 화면 전체 */
+  .state{background:var(--ink);padding:190px var(--gut) 180px}
+  .state h2{max-width:11em;font-size:clamp(40px,7vw,108px);line-height:1}
+  .state .rc-sub{margin:44px 0 0;max-width:30em;color:#e4e4e7;font-size:20px}
+  .state .rc-fn{margin:16px 0 0;max-width:38em;color:var(--mute);font-size:15px;line-height:1.6}
 
-  /* (VIP tiers 구 카드 CSS 삭제 — 2026-07-15 vipband로 대체) */
+  /* 마지막 권유 */
+  .cta{background:var(--paper);color:var(--ink);padding:130px var(--gut);display:flex;justify-content:space-between;align-items:flex-end;gap:40px;flex-wrap:wrap}
+  .cta p{margin-top:20px;color:var(--mute-d);font-size:18px}
+  .cta-links{display:flex;gap:40px}
 
-  /* Event calendar */
-  .events{max-width:1120px;margin:0 auto;padding:8px 28px 72px}
-  .events .head{text-align:center;margin-bottom:36px}
-  .events h2{font-size:clamp(28px,4vw,40px);font-weight:700;letter-spacing:-1px}
-  .events .lead{text-align:center;color:var(--muted);margin-top:8px}
-  .ev-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-  .ev-card{position:relative;border:2px solid var(--line);border-radius:18px;padding:20px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.01));transition:transform .2s,border-color .2s;display:flex;flex-direction:column;gap:14px;min-height:170px}
-  .ev-card:hover{transform:translateY(-4px);border-color:rgba(59,130,246,.5)}
-  .ev-date{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:52px;height:56px;border-radius:13px;background:rgba(59,130,246,.12);color:#9bc2ff}
-  .ev-date .m{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
-  .ev-date .d{font-size:19px;font-weight:800;line-height:1}
-  .ev-title{font-size:16px;font-weight:600;line-height:1.3}
-  .ev-meta{display:flex;align-items:center;gap:8px;margin-top:auto}
-  .ev-sport{font-size:11px;color:#cdd4e4;background:rgba(255,255,255,.05);border:2px solid var(--line);padding:3px 9px;border-radius:999px}
-  .ev-go{font-size:12px;color:#9bc2ff;margin-left:auto}
-  .ev-card.feat{border-color:transparent;background:linear-gradient(180deg,rgba(59,130,246,.2),rgba(124,92,255,.1));box-shadow:0 0 0 1px rgba(123,150,255,.4)}
-  .ev-card.feat .ev-date{background:rgba(255,255,255,.14);color:#fff}
-  .ev-tag{position:absolute;top:14px;right:14px;font-size:10px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));padding:3px 9px;border-radius:999px}
-
-  /* CTA */
-  .cta{max-width:1120px;margin:0 auto 28px;padding:56px 28px;text-align:center;border-radius:28px;background:linear-gradient(135deg,rgba(59,130,246,.22),rgba(124,92,255,.18));border:2px solid var(--line);position:relative;overflow:hidden}
-  .cta h2{font-size:clamp(26px,4vw,38px);font-weight:700;letter-spacing:-1px;margin-bottom:12px}
-  .cta p{color:#c5cde0;margin-bottom:28px}
-  .cta .stores{justify-content:center}
-
-  footer{border-top:1px solid var(--line);padding:56px 36px 80px;color:var(--muted);overflow:hidden}
-  .foot-grid{position:relative;z-index:2;max-width:1200px;margin:0 auto;display:grid;grid-template-columns:2.3fr 1fr 1fr;gap:32px}
-  .fb-logo{font-size:19px;font-weight:700;letter-spacing:1px;color:#f4f6fb;line-height:1.1}
-  .fb-logo small{display:block;font-size:10px;letter-spacing:3px;color:var(--muted);font-weight:600;margin-top:2px}
-  .fb-top{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
-  .award{width:80px;flex:none}
+  footer.site-foot{background:var(--ink);padding:64px var(--gut) 28px;overflow:hidden}
+  .foot-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:40px;font-size:15px}
+  .fb-top{display:flex;align-items:center;gap:26px;flex-wrap:wrap}
+  .award{width:62px;flex:none;background:#fff;padding:6px 4px 2px}
   .award svg{display:block;width:100%;height:auto}
-  .foot-logo{color:var(--text)}
-  body.light .foot-logo{color:var(--text)}
-  .foot-brand .cpy{margin-top:22px;font-size:12px;color:var(--muted)}
-  .foot-brand .cpy a{display:inline-block;margin-top:6px;border-bottom:1px solid var(--muted);letter-spacing:1px;text-transform:uppercase;font-size:11px}
-  .foot-col h4{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:20px}
-  .foot-col a{display:block;font-size:15px;color:#cdd4e4;margin-bottom:13px;transition:color .15s}
-  .foot-col a:hover{color:#fff}
-  .foot-col a .arr{color:var(--muted);font-size:12px;margin-left:2px}
-  .wordmark{position:relative;z-index:1;pointer-events:none;text-align:center;font-size:clamp(90px,26vw,380px);font-weight:700;letter-spacing:-5px;color:rgba(255,255,255,.05);line-height:.78;margin-top:24px;user-select:none;white-space:nowrap}
-  .resp-bar{text-align:center;font-size:11px;color:var(--muted);padding:16px;border-top:1px solid var(--line);margin-top:14px}
+  .cpy{margin-top:26px;font-size:13px;color:var(--mute);line-height:1.7}
+  .cpy a{border-bottom:1px solid currentColor}
+  .foot-col h4{font-size:13px;font-weight:500;color:var(--mute);margin-bottom:16px}
+  .foot-col a{display:block;margin-bottom:10px;opacity:.9}
+  .foot-col a:hover{opacity:1}
+  .wordmark{margin:56px 0 0;font-weight:300;font-size:clamp(72px,21.5vw,340px);letter-spacing:-.05em;line-height:.8;color:rgba(255,255,255,.1);white-space:nowrap;user-select:none;pointer-events:none}
+  .resp-bar{margin-top:30px;padding-top:20px;border-top:1px solid var(--line);font-size:12.5px;color:var(--mute);line-height:1.5}
 
-  @media(max-width:880px){
-    nav{display:none}
-    /* Tighten the header so the logo + Log in / Sign up stay on ONE line on phones */
-    header{padding:10px 16px;gap:14px}
-    .logo{font-size:13.5px;letter-spacing:.4px;white-space:nowrap}
-    .logo .mark{width:22px;height:22px;font-size:12px;border-radius:6px}
-    .theme-toggle{width:30px;height:30px}
-    .theme-toggle svg{width:15px;height:15px}
-    /* Stop the Log in link + Sign up button from wrapping to two lines */
-    header>a,header .pill,header .theme-toggle{white-space:nowrap;flex:none}
-    header>a[href="login.html"]{font-size:12px!important;font-weight:600!important;margin-right:0!important}
-    /* Match Sign up to the Log in size — same font, slim height */
-    header .pill{padding:6px 13px;font-size:12px;font-weight:600;line-height:1.4}
-    header .pill .arrow{display:none}
-    .hero{grid-template-columns:1fr;text-align:center;gap:44px;padding-top:48px}
-    .hero .sub{margin-left:auto;margin-right:auto}
-    .stores{justify-content:center}
-    .phone-wrap{order:-1}
-    .stats{grid-template-columns:repeat(2,1fr)}
-    .grid{grid-template-columns:1fr}
-    .vip-grid{grid-template-columns:1fr 1fr}
-    .ev-grid{grid-template-columns:1fr 1fr}
-    .trust-grid{grid-template-columns:1fr 1fr}
-    .foot-grid{grid-template-columns:1fr 1fr;gap:28px}
-    .foot-brand{grid-column:1 / -1}
-    .foot-brand .cpy{margin-top:20px}
-    .wordmark{font-size:24vw}
+  @media (max-width:980px){ .menu{gap:24px} .nav-r>a:first-child{display:none} }
+  @media (max-width:820px){
+    header.nav{padding:14px var(--gut)}
+    .menu{display:none}.burger{display:block}.nav-r{gap:14px}
+    .hero{min-height:680px}.hero img.art{width:100%;height:39%;top:20px}
+    .shade{background:linear-gradient(0deg,#0a0a0b 0%,#0a0a0b 57%,rgba(10,10,11,0) 70%),linear-gradient(180deg,rgba(10,10,11,.85) 0%,rgba(10,10,11,0) 12%)}
+    .shot-label{top:66px;left:var(--gut);right:auto;font-size:11.5px}
+    .hero-copy{padding-bottom:34px}.hero-cta{gap:26px}
+    .specs{grid-template-columns:1fr 1fr}.spec{padding:18px 14px 20px 0;border-bottom:1px solid var(--line)}.spec + .spec{padding-left:14px}.spec:nth-child(2){border-right:0}.spec:nth-child(3){padding-left:0}.spec:nth-child(n+3){border-bottom:0}
+    .lineup{padding-top:72px}.sec-head{display:block;padding-bottom:34px}.sec-head p{margin-top:18px}
+    .panels{grid-template-columns:1fr}.panel,.panel:first-child{height:440px;padding:28px var(--gut) 32px}
+    .platform{padding:80px 0 64px}.platform figure{margin-left:0;border-left:0}.platform figure img{width:190%;max-width:none}.plat-foot{flex-direction:column;align-items:flex-start}
+    .accounts{padding:84px var(--gut) 80px}.accounts h2{margin-bottom:36px}
+    .cmp{grid-template-columns:1fr;border-top:0}.col,.col + .col{padding:28px 0 44px;border-right:0;border-top:1px solid var(--ink)}
+    .state{padding:96px var(--gut) 92px}.state .rc-sub{font-size:18px;margin-top:28px}
+    .cta{padding:84px var(--gut);display:block}.cta-links{margin-top:34px;gap:26px}
+    .foot-grid{grid-template-columns:1fr 1fr}.foot-brand{grid-column:1/-1}
   }
-  /* ===== visual simplify ===== */
-  .hero .stores{display:none}
-  /* Content sheet — a clear break from the hero ad above (gap + white sheet + top edge). */
-  .lp-body{position:relative;z-index:2;background:#fff;margin-top:0;padding-top:0}
-  body.light .lp-body{background:#fff}
-  /* Simple final CTA — no box, just centered text + the hero's buttons */
-  .lp-cta{max-width:720px;margin:0 auto;padding:64px 28px 88px;text-align:center}
-  .lp-cta h2{font-size:clamp(26px,3.6vw,34px);font-weight:800;letter-spacing:-1px;color:var(--text)}
-  .lp-cta p{color:var(--muted);margin-top:12px;font-size:15px}
-  .lp-cta-btns{display:flex;gap:14px;justify-content:center;margin-top:28px;flex-wrap:wrap}
-  .pill .arrow{display:none}
-  .pill{padding:9px 16px}
-  /* Mobile: stack the trust badges instead of a 4-col row */
-  .store{box-shadow:none!important}
-  .card{box-shadow:inset 0 1px 0 rgba(255,255,255,.05)!important}
-  body.light .card{box-shadow:inset 0 1px 0 rgba(255,255,255,.7)!important}
-  .card:hover{box-shadow:inset 0 1px 0 rgba(30,64,216,.4)!important}
-  .bal-icons{display:none}
-  .cta{background:rgba(255,255,255,.04)!important;border:2px solid var(--line)!important}
-  body.light .cta{background:#f6f8fc!important}
-  .liveboard{max-width:1120px;margin:0 auto;padding:36px 28px 64px}
-  .lb-head{margin-bottom:22px}
-  .lb-head h2{font-size:clamp(26px,4vw,42px);font-weight:700;letter-spacing:-1.2px;margin-top:4px}
-  .lb-grid{display:grid;grid-template-columns:1fr 338px;gap:20px;align-items:start}
-  .lb-game{border:2px solid var(--line);border-radius:16px;background:var(--surface);padding:15px 16px;margin-bottom:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
-  .lb-gtop{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:12px}
-  .lb-league{color:var(--muted);font-weight:600;letter-spacing:.3px}
-  .lb-live{display:inline-flex;align-items:center;gap:5px;color:#e5484d;font-weight:700;font-size:11px}
-  .lb-live::before{content:"";width:6px;height:6px;border-radius:50%;background:#e5484d;animation:lbpulse 1.3s infinite}
-  .lb-time{color:var(--muted)}
-  @keyframes lbpulse{0%,100%{opacity:1}50%{opacity:.25}}
-  .lb-mkhead{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:6px;font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;padding:0 2px 8px}
-  .lb-mkhead span{text-align:center}.lb-mkhead span:first-child{text-align:left}
-  .lb-r{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:6px;align-items:center;margin-bottom:6px}
-  .lb-r:last-child{margin-bottom:0}
-  .lb-team{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--text)}
-  .lb-ab{width:27px;height:27px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;flex:none}
-  .lb-sc{font-size:12px;font-weight:800;color:var(--text);background:var(--surface2);border-radius:5px;padding:1px 6px}
-  .lb-odd{border:2px solid var(--line);border-radius:9px;background:var(--surface2);padding:0 3px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;height:46px;display:flex;flex-direction:column;justify-content:center;gap:2px}
-  .lb-odd .ln{font-size:9.5px;color:var(--muted)}
-  .lb-odd .v{font-size:13px;font-weight:700;color:var(--text)}
-  .lb-odd:hover{border-color:#1e40d8}
-  .lb-odd.sel{background:#1e40d8;border-color:#1e40d8}
-  .lb-odd.sel .v,.lb-odd.sel .ln{color:#fff}
-  .oarr{font-size:8px;margin-left:6px}.oarr.up{color:#16a34a}.oarr.down{color:#e5484d}
-  @keyframes lbflash{0%{background:rgba(30,64,216,.32)}100%{background:var(--surface2)}}
-  .lb-odd.upd:not(.sel){animation:lbflash .9s ease-out}
-  .lb-slip{border:2px solid var(--line);border-radius:16px;background:var(--surface);overflow:hidden;position:sticky;top:80px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
-  .lb-shead{padding:13px 16px;border-bottom:1px solid var(--line);font-size:14px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
-  .lb-scnt{font-size:12px;color:var(--muted);font-weight:600}
-  .lb-sbody{padding:8px 16px;max-height:260px;overflow:auto}
-  .lb-empty{text-align:center;color:var(--muted);font-size:12.5px;padding:28px 8px;line-height:1.5}
-  .lb-sel{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:11px 0;border-bottom:1px solid var(--line)}
-  .lb-sel:last-child{border-bottom:none}
-  .lb-sel .pk{font-size:13px;font-weight:600;color:var(--text)}.lb-sel .sb{font-size:11px;color:var(--muted);margin-top:2px}
-  .lb-right{display:flex;align-items:center;gap:9px}
-  .lb-sel .so{font-size:13px;font-weight:700;color:#7d93f0}
-  .lb-sel .rm{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1}
-  .lb-sfoot{padding:13px 16px;border-top:1px solid var(--line);background:rgba(255,255,255,.02)}
-  .lb-stake{display:flex;align-items:center;gap:8px;margin-bottom:11px}
-  .lb-stake label{font-size:12px;color:var(--muted)}
-  .lb-stake input{flex:1;height:36px;border:2px solid var(--line);border-radius:8px;background:var(--surface2);color:var(--text);padding:0 11px;font-size:16px;outline:none}
-  .lb-stake input:focus{border-color:#1e40d8}
-  .lb-calc{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px}
-  .lb-calc.tot{font-size:15px;color:var(--text);font-weight:700}
-  .lb-calc.tot span:last-child{color:#7d93f0}
-  .lb-place{width:100%;background:#1e40d8;color:#fff;border:none;border-radius:5px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;margin-top:9px;transition:filter .15s}
-  .lb-place:hover{filter:brightness(1.08)}
-  .lb-place:disabled{background:#2c3346;color:#6b7488;cursor:not-allowed}
-  .lb-note{font-size:10px;color:var(--muted);text-align:center;margin-top:9px}
-  @media(max-width:820px){.lb-grid{grid-template-columns:1fr}.lb-slip{position:static}}
-  .js .reveal-t{opacity:0;transform:translateY(28px);transition:opacity .8s cubic-bezier(.2,.6,.2,1),transform .8s cubic-bezier(.2,.6,.2,1)}
-  .js .reveal-t.in{opacity:1;transform:none}
-  .js .reveal-t.d1{transition-delay:.08s}.js .reveal-t.d2{transition-delay:.16s}.js .reveal-t.d3{transition-delay:.24s}
-  @media(prefers-reduced-motion:reduce){.js .reveal-t{opacity:1!important;transform:none!important}}
-  /* ── Hero (landing) — left: strengths ad · right: live quotes ── */
-  /* 히어로 밴드 (2026-07-15 사용자 확정): 로빈후드 리브랜딩풍 뮤트 페리윙클 + 필름 그레인.
-     스와치 실측 근사 #8FA0C3 — 텍스트는 잉크 유지(대비 ✓), 브랜드 블루 CTA 유지. */
-  .heroband{position:relative;background:linear-gradient(180deg,#97A6C8 0%,#8FA0C3 55%,#8B9CC0 100%)}
-  .heroband::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.08;mix-blend-mode:overlay;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
-  .heroband .hero{position:relative;z-index:1}
-  .heroband .h-dots button{background:rgba(255,255,255,.55)}
-  .heroband .h-dots button.on{background:var(--accent)}
-  .heroband .h-strength{color:#101828}
-  /* 레퍼런스 실물(로빈후드 크립토 히어로) 색·폰트 번역 — 광고 콘텐츠는 유지:
-     헤드라인 = 세리프(Source Serif 4 ≈ Martina Plantijn) 잉크, 문장 케이스 ·
-     CTA = 네온 필 + 잉크 텍스트 (레퍼런스 Get started 문법) */
-  .heroband .big0{font-family:'Source Serif 4',Georgia,'Times New Roman',serif;
-    font-weight:600;color:#16191F;letter-spacing:-6px}  /* 폰트: Source Serif 4 w600 (2026-07-15 사용자 레퍼런스 ≈ Martina Plantijn) */
-  .heroband .big0.n2{letter-spacing:-5px}
-  .heroband .nk{font-family:'Source Serif 4',Georgia,'Times New Roman',serif;
-    font-weight:700;text-transform:none;letter-spacing:-1.2px;color:#16191F}  /* 볼드 (2026-07-15 사용자) */
-  .heroband .btn-lg.solid{background:#CDF138;color:#101418;border-radius:999px}
-  .heroband .btn-lg.solid:hover{filter:brightness(1.05)}
-  .heroband .btn-lg.outline{color:#16191F;border:2px solid rgba(22,25,31,.55);border-radius:999px}
-  .heroband .btn-lg.outline:hover{background:rgba(22,25,31,.06);border-color:#16191F}
-  .heroband .h-dots button.on{background:#16191F}
-  .heroband .h-strength .dot{color:#16191F}
-  /* 아래 섹션 v2 (2026-07-15 사용자 확정): 섹션 헤드라인 = 세리프 잉크 (히어로와 동일 언어) */
-  .features .head h2,.events .head h2,.lp-cta h2{
-    font-family:'Source Serif 4',Georgia,'Times New Roman',serif;font-weight:600;letter-spacing:-.8px}  /* 레퍼런스 세리프 컷 w600 (2026-07-15 사용자) */
-  .lp-cta h2{color:#16191F;font-size:clamp(30px,4.2vw,42px)}
-  .lp-cta p{color:#2A3242}
-  .heroband .lp-cta{position:relative;z-index:1;padding:84px 28px 92px}
-  .hero{max-width:1180px;margin:0 auto;padding:96px 36px 66px;display:block;text-align:center}
-  .h-left{min-width:0}
-  .h-eyebrow{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11px;letter-spacing:3px;
-    text-transform:uppercase;color:var(--accent);margin-bottom:22px}
-  .h-title{font-family:var(--font-display);font-size:clamp(34px,4.4vw,56px);font-weight:600;line-height:1.02;
-    letter-spacing:-1.6px;text-transform:uppercase;color:var(--text)}
-  .h-strength{margin-top:44px;font-size:16px;font-weight:600;color:var(--text);letter-spacing:.2px}
-  .h-strength .dot{color:var(--accent);margin:0 8px}
-  .numwrap{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:nowrap}
-  @media(max-width:560px){ .numwrap{flex-wrap:wrap} }
-  .big0{font-family:var(--font-display);font-size:clamp(116px,17vw,252px);font-weight:600;line-height:.7;letter-spacing:-9px;color:var(--accent)}
-  .num-r{padding-bottom:0}
-  .nk{font-family:var(--font-display);font-size:clamp(34px,5.1vw,68px);font-weight:700;line-height:.95;letter-spacing:-2px;text-transform:uppercase;color:var(--text);text-align:left}
-  .nu{margin-top:9px;font-size:10.5px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted)}
-  /* crossfade slogans — both stacked in one grid cell, fade in place (no horizontal motion → never clips into the widget). slide 1 fixed content; slide 2 = 500:1 */
-  .h-slides{display:grid}
-  .h-slide{grid-area:1/1;display:flex;flex-direction:column;justify-content:center;opacity:0;transition:opacity 1.1s ease;pointer-events:none}
-  .h-slide.on{opacity:1;pointer-events:auto}
-  /* Mobile: no cross-fade — instant switch so the big rotating slides never overlap. */
-  @media(max-width:600px){ .h-slide{transition:none} .h-slide:not(.on){visibility:hidden} }
-  .big0.n2{font-size:clamp(100px,14.5vw,216px);letter-spacing:-7px}
-  .big0.n3b{font-size:clamp(116px,17vw,252px);letter-spacing:-9px}
-  .h-dots{margin-top:46px;display:flex;justify-content:center;gap:9px}
-  .h-dots button{width:9px;height:9px;border-radius:50%;border:none;background:#cfd6e2;cursor:pointer;padding:0;transition:width .25s,background .25s}
-  .h-dots button.on{background:var(--accent);width:26px;border-radius:5px}
-  .h-cta{margin-top:40px;display:flex;justify-content:center;gap:14px;flex-wrap:wrap}
-  .btn-lg{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:700;letter-spacing:.2px;
-    padding:13px 24px;border-radius:0;text-decoration:none;transition:filter .15s,background .15s,color .15s}
-  .btn-lg.solid{background:var(--accent);color:#fff}
-  .btn-lg.solid:hover{filter:brightness(1.08)}
-  .btn-lg.outline{background:transparent;color:#1e40d8;border:4px solid #1e40d8;border-radius:0}
-  .btn-lg.outline:hover{background:rgba(30,64,216,.07);border-color:#1e40d8}
-
-  /* ── Live spreads strip — full-width proof band under the hero ── */
-  .livestrip{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--surface)}
-  .ls-in{max-width:1180px;margin:0 auto;padding:26px 36px 30px}
-  .ls-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-  .ls-title{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text)}
-  .ls-dot{width:8px;height:8px;border-radius:50%;background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.16)}
-  .ls-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-  .ls-tile{background:#fff;border:1px solid #eaedf3;border-radius:0;padding:15px 18px;box-shadow:0 4px 16px rgba(16,24,40,.04)}
-  .ls-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:13px}
-  .ls-vals{display:grid;grid-template-columns:1fr .74fr 1fr;align-items:center}
-  .ls-v{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;padding:0 8px}
-  .ls-v:nth-child(n+2){border-left:1px solid #eef1f6}
-  .ls-k{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#9aa3b2}
-  .ls-v.fl{animation:qfl .6s ease}
-  @keyframes qfl{0%{background:rgba(47,107,246,.10)}100%{background:transparent}}
-  .ls-foot{margin-top:18px;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted)}
-  .ls-foot a{color:var(--accent);text-decoration:none;font-weight:700}
-  /* shared cell styling (reused by tiles) */
-  .q-toggle{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:.5px;color:#5a6478;cursor:pointer;user-select:none}
-  .q-sw{width:32px;height:17px;border-radius:9px;background:#cfd5e0;position:relative;transition:background .2s;flex:none}
-  .q-sw::after{content:'';position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
-  .q-sw.on{background:#16a34a}
-  .q-sw.on::after{left:17px}
-  .q-sym{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:#0e1726}
-  .q-sym .star{color:#c7ccd6;flex:none}
-  .fxb{font-size:8px;font-weight:800;letter-spacing:.5px;color:#6b7280;background:#f2f4f8;padding:2px 5px;border-radius:3px}
-  .q-name{font-size:11px;color:#8a94a6;font-weight:500;text-align:right}
-  .q-price{display:flex;align-items:baseline;justify-content:center;font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1;color:#3a4658}
-  .q-price .big{font-size:17px;font-weight:800;letter-spacing:-.3px}
-  .q-bid .q-price{color:#e5484d}
-  .q-ask .q-price{color:#2f6bf6}
-  .q-spr{font-family:ui-monospace,monospace;font-size:17px;font-weight:800;color:#3a4658}
-  @media(max-width:820px){ .ls-grid{grid-template-columns:1fr 1fr} }
-  @media(max-width:900px){ .hero{padding:56px 20px 36px} .ls-in{padding:24px 20px 28px} }
-  @media(max-width:520px){ .ls-grid{grid-template-columns:1fr} }
-
-  /* ── Economic calendar + news ── */
-  .calnews{max-width:1180px;margin:0 auto;padding:64px 36px 20px}
-  .cn-eyebrow{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
-  .cn-h{font-family:var(--font-display);font-size:clamp(26px,3.4vw,40px);font-weight:600;letter-spacing:-1px;margin-bottom:28px;color:var(--text)}
-  .cn-grid{display:grid;grid-template-columns:1.5fr 1fr;gap:24px}
-  .cn-card{background:var(--surface);border:2px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 6px 22px rgba(16,24,40,.04)}
-  .cn-head{display:flex;align-items:baseline;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line)}
-  .cn-title{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text)}
-  .cn-dot{width:8px;height:8px;border-radius:50%;background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.15)}
-  .cn-sub{font-size:11px;color:var(--muted)}
-  .cn-widget{height:480px}
-  .cn-widget .tradingview-widget-container,.cn-widget .tradingview-widget-container__widget{height:100%}
-  .cn-note{margin-top:14px;font-size:11px;color:var(--muted);opacity:.7}
-  /* custom economic calendar (free feed) */
-  .cal-headrow,.cal-row{display:grid;grid-template-columns:50px 40px 1fr 48px 56px 56px;gap:10px;align-items:center;padding:11px 20px;border-bottom:1px solid var(--line)}
-  .cal-headrow{font-size:9.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
-  .cal-row{font-size:13px}
-  .calbody{max-height:474px;overflow:auto}
-  .cal-day{padding:7px 20px;background:var(--surface2);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)}
-  .cal-time{font-family:ui-monospace,monospace;color:var(--muted)}
-  .cal-cur{font-weight:700;color:var(--text)}
-  .cal-ev{color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .cal-imp{display:flex;gap:3px}
-  .cal-imp i{width:5px;height:5px;border-radius:50%;background:#e5484d}
-  .cal-imp i.m{background:#f5a623}.cal-imp i.l{background:#3a9bdc}.cal-imp i.o{background:#e2e6ee}
-  .cal-v{font-family:ui-monospace,monospace;text-align:right;color:var(--text);font-weight:600;font-size:12.5px}
-  .cal-v.f{color:var(--muted);font-weight:500}
-  .cal-empty{padding:44px 20px;text-align:center;color:var(--muted);font-size:13px}
-  @media(max-width:820px){ .calnews{padding:52px 20px 12px} .cn-grid{grid-template-columns:1fr} }
-
-  /* ── Footer (sports-style wordmark, white version) ── */
-  .site-foot{position:relative;overflow:hidden;background:var(--surface);border-top:1px solid var(--line);padding:64px 36px 24px}
-  .foot-grid{position:relative;z-index:2;max-width:1200px;margin:0 auto;display:grid;grid-template-columns:2.3fr 1fr 1fr;gap:32px}
-  .fb-logo{font-family:var(--font-display);font-size:19px;font-weight:700;letter-spacing:1px;color:var(--text);line-height:1.1;text-transform:uppercase}
-  .fb-logo small{display:block;font-size:10px;letter-spacing:3px;color:var(--muted);font-weight:600;margin-top:3px}
-  .foot-brand .cpy{margin-top:72px;font-size:12px;color:var(--muted);line-height:1.7}
-  .foot-brand .cpy a{display:inline-block;margin-top:6px;border-bottom:1px solid #b9c1d0;letter-spacing:1px;text-transform:uppercase;font-size:11px;color:var(--muted);text-decoration:none}
-  .foot-col h4{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:20px}
-  .foot-col a{display:block;font-size:15px;color:var(--text);margin-bottom:13px;text-decoration:none;transition:color .15s}
-  .foot-col a:hover{color:var(--accent)}
-  .wordmark{position:relative;z-index:1;pointer-events:none;text-align:center;font-family:var(--font-display);font-size:clamp(72px,21vw,300px);font-weight:700;letter-spacing:-4px;color:#0B0C09;line-height:.78;margin-top:18px;user-select:none;white-space:nowrap}  /* 검은 워드마크 (2026-07-15 사용자 확정) */
-  .resp-bar{position:relative;z-index:2;text-align:center;font-size:11px;color:var(--muted);padding:18px 20px 0;border-top:1px solid var(--line);margin-top:6px;max-width:1200px;margin-left:auto;margin-right:auto;line-height:1.5}
-  @media(max-width:820px){ .site-foot{padding:52px 20px 20px} .foot-grid{grid-template-columns:1fr 1fr;gap:28px 24px} }
-
 </style>
 </head>
-<body class="light">
-<script>document.documentElement.classList.add('js')</script>
-  <div class="glow"></div>
-
-  <!-- 헤더 v2 (2026-07-15 사용자 확정): 로빈후드 웹 헤더 컨셉의 알펙사 번역 —
-       블랙 바 · 중앙 네비(드롭다운 셰브런) · 우측 🌐 로케일 + 화이트 필 My Account.
-       브랜드·링크는 전부 우리 것 (상표 차용 없음). -->
-  <style>
-    header{background:#000;border-bottom:none;gap:0;padding:0 22px;height:64px}
-    body.light header{background:#000}  /* 컨셉 고정: 헤더는 항상 블랙 바 */
-    .logo{flex:none}
-    header .logo .mark{background:#fff;color:#0B0C09}  /* 레전드: 헤더 로고 화이트 (2026-07-15 사용자 확정) */
-    .cmenu{flex:1;justify-content:center;gap:8px;align-items:center}
-    .cmenu>div{position:relative}
-    .cmenu a.mi, .cmenu span.mi{display:flex;align-items:center;gap:5px;color:#fff;font-size:13.5px;font-weight:700;
-      padding:9px 13px;border-radius:999px;cursor:pointer;border:none;white-space:nowrap;text-decoration:none;transition:background .12s}
-    .cmenu a.mi:hover, .cmenu span.mi:hover{background:rgba(255,255,255,.12);color:#fff}
-    body.light .cmenu a.mi, body.light .cmenu span.mi{color:#fff}
-    .chev{width:9px;height:9px;border-right:1.8px solid currentColor;border-bottom:1.8px solid currentColor;
-      transform:rotate(45deg) translateY(-2px);margin-left:1px;opacity:.9}
-    .ddm{display:none;position:absolute;left:0;top:calc(100% + 6px);min-width:210px;background:#101318;
-      border:1px solid rgba(255,255,255,.12);border-radius:12px;box-shadow:0 14px 36px rgba(0,0,0,.5);padding:6px;z-index:60}
-    .cmenu>div:hover .ddm, .cmenu>div.open .ddm{display:block}
-    .cmenu .ddm a, body.light .cmenu .ddm a{display:block;padding:9px 12px;border-radius:8px;color:#fff;font-size:13px;font-weight:700;text-decoration:none}
-    .cmenu .ddm a:hover, body.light .cmenu .ddm a:hover{background:rgba(255,255,255,.09);color:#fff}
-    .ddm a small{display:block;color:#c2c9d4;font-weight:500;font-size:11.5px;margin-top:1px}
-    .acctpill{flex:none;display:inline-flex;align-items:center;background:#fff;color:#000;font-size:12.5px;font-weight:700;
-      padding:8px 14px;border:none;border-radius:999px;cursor:pointer;letter-spacing:.1px;transition:transform .06s,box-shadow .12s;text-decoration:none}
-    .acctpill:hover{box-shadow:0 4px 16px rgba(255,255,255,.22);transform:translateY(-1px)}
-    @media(max-width:820px){ header{height:56px;padding:0 14px} .acctpill{font-size:12px;padding:7px 12px} }
-  </style>
-  <header>
-    <a class="logo" href="/" style="color:#fff"><span class="mark">A</span>Alpexa-FX</a>
-    <nav class="cmenu">
-      <div>
-        <span class="mi">What We Offer<i class="chev"></i></span>
-        <div class="ddm">
+<body>
+  <header class="nav">
+    <a class="logo" href="/"><span class="mark">A</span>Alpexa-FX</a>
+    <nav class="menu" aria-label="Main">
+      <div class="has-dd">
+        <button class="dd-t" type="button" aria-haspopup="true" aria-expanded="false">What We Offer</button>
+        <div class="dd">
           <a href="markets.html">Markets<small>FX · Metals · Indices · Stocks · Crypto</small></a>
           <a href="webtrade.html">WebTrade Terminal<small>Pro desktop trading</small></a>
           <a href="fx.html#vip">Account Tiers<small>An account for every trader</small></a>
         </div>
       </div>
-      <a class="mi" href="markets.html">Markets</a>
-      <a class="mi" href="ib.html">IB</a>
-      <a class="mi" href="about.html">About</a>
-      <a class="mi" href="support.html">Support</a>
+      <a href="markets.html">Markets</a>
+      <a href="ib.html">IB</a>
+      <a href="about.html">About</a>
+      <a href="support.html">Support</a>
     </nav>
-    <a class="acctpill" href="login.html?switch=1" target="_blank" rel="noopener">My Account</a>
+    <div class="nav-r">
+      <a href="login.html?switch=1" target="_blank" rel="noopener">My Account</a>
+      <a class="link" href="signup.html" target="_blank" rel="noopener">Open account</a>
+      <button class="burger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="sheet"></button>
+    </div>
   </header>
-  <script>
-  (function(){ // 모바일: 드롭다운 부모 탭 토글
-    document.querySelectorAll('.cmenu>div>span.mi').forEach(function(s){
-      s.addEventListener('click',function(e){ e.stopPropagation();
-        var p=s.parentElement; p.classList.toggle('open'); }); });
-    document.addEventListener('click',function(){ document.querySelectorAll('.cmenu>div.open').forEach(function(d){ d.classList.remove('open'); }); });
-  })();
-  </script>
-
-  <!-- (티커 밴드 제거 — 2026-07-15 사용자 확정. markets 페이지로 이동) -->
-
-  <div class="heroband"><section class="hero" id="top">
-    <div class="h-left">
-      <div class="h-slides" id="hslides">
-        <div class="h-slide on">
-          <div class="numwrap">
-            <div class="big0">0.0</div>
-            <div class="num-r"><div class="nk">Tight<br>Spreads.</div></div>
-          </div>
-        </div>
-        <div class="h-slide">
-          <div class="numwrap">
-            <div class="big0 n2">500:1</div>
-            <div class="num-r"><div class="nk">Max<br>Leverage.</div></div>
-          </div>
-        </div>
-        <div class="h-slide">
-          <div class="numwrap">
-            <div class="big0 n3b">80</div>
-            <div class="num-r"><div class="nk">Liquidity<br>Banks.</div></div>
-          </div>
-        </div>
-      </div>
-      <div class="h-strength">0.0 spreads<span class="dot">·</span>500:1 leverage<span class="dot">·</span>ECN execution</div>
-      <div class="h-cta">
-        <a class="btn-lg solid" href="signup.html" target="_blank" rel="noopener">Open account</a>
-        <a class="btn-lg outline" href="signup.html" target="_blank" rel="noopener">Try demo</a>
-      </div>
-      <div class="h-dots" id="hdots"><button class="on" aria-label="Slide: tight spreads"></button><button aria-label="Slide: 500:1 leverage"></button><button aria-label="Slide: ECN aggregation"></button></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Menu">
+    <div class="sheet-top"><a class="logo" href="/"><span class="mark">A</span>Alpexa-FX</a><button class="sheet-x" type="button" aria-label="Close menu"></button></div>
+    <nav aria-label="Mobile">
+      <a href="markets.html">Markets<small>FX · Metals · Indices · Stocks · Crypto</small></a>
+      <a href="webtrade.html">WebTrade Terminal<small>Pro desktop trading</small></a>
+      <a href="fx.html#vip">Account Tiers<small>An account for every trader</small></a>
+      <a href="ib.html">IB</a>
+      <a href="about.html">About</a>
+      <a href="support.html">Support</a>
+    </nav>
+    <div class="sheet-cta">
+      <a class="link" href="login.html?switch=1" target="_blank" rel="noopener">My Account</a>
+      <a class="link" href="signup.html" target="_blank" rel="noopener">Open account</a>
     </div>
-  </section></div>
+  </div>
 
-  <!-- (은행 LP 스트립 삭제 — 2026-07-15 사용자 확정) -->
+  <section class="hero" id="top">
+    <!-- 실제 Alpexa WebTrade 화면 캡처(2026-11-27, EUR/USD H1). 정지 이미지라 "Live" 라고 쓰지 않는다 — tests/fx-home.test.js -->
+    <img class="art" src="assets/img/home-hero-chart.jpg" srcset="assets/img/home-hero-chart-1000.jpg 1000w, assets/img/home-hero-chart.jpg 2000w" sizes="(max-width:820px) 100vw, 82vw" width="2000" height="897" alt="EUR/USD one-hour candlestick chart on the Alpexa WebTrade terminal" fetchpriority="high">
+    <div class="shade"></div>
+    <div class="shot-label">EUR/USD · H1 · Alpexa WebTrade</div>
+    <div class="hero-copy">
+      <h1>Tight spreads.<br>Nothing hidden.</h1>
+      <p class="hero-sub">You see the same price our engine sees. FX, stocks and crypto on one account, filled at the market.</p>
+      <div class="hero-cta">
+        <a class="link" href="signup.html" target="_blank" rel="noopener">Open account</a>
+        <a class="link" href="signup.html" target="_blank" rel="noopener">Try demo</a>
+      </div>
+    </div>
+    <div class="specs">
+      <div class="spec"><b>0.0<i>pips</i></b><span>Spreads from</span></div>
+      <div class="spec"><b>500:1</b><span>Leverage up to</span></div>
+      <div class="spec"><b>$100</b><span>Minimum deposit</span></div>
+      <div class="spec"><b>3<i>asset classes</i></b><span>One account, one platform</span></div>
+    </div>
+  </section>
 
-  <div class="lp-body">
-  <style>
-   /* Markets cards — 레퍼런스 카드 문법 (2026-07-15 사용자 확정): 블랙 라운드 카드 +
-      네온 타이틀 + 화이트 본문 + 화이트 아이소메트릭 라인아트 (일러스트 자체 제작) */
-   .features .card{position:relative;overflow:hidden;background:#0B0C09!important;border:none!important;
-     border-radius:22px!important;box-shadow:none!important;text-align:center;padding:42px 26px 36px;
-     transition:transform .22s ease,box-shadow .22s ease}
-   .features .card:hover{transform:translateY(-6px)!important;box-shadow:0 18px 38px rgba(11,12,9,.28)!important}
-   .features .card h3{color:#CDF138;font-size:25px;font-weight:800;letter-spacing:-.4px}
-   .features .card p{color:#E9EDF3}
-   .mcard-art{display:block;width:min(210px,78%);margin:30px auto 8px;opacity:.95}
-   .mcard-go{margin-top:20px;font-weight:800;font-size:14px;color:#fff}
-   .features .card:hover .mcard-go{color:#CDF138}
-  </style>
   <!-- Markets (multi-asset) -->
-  <section class="features" id="crypto">
-    <div class="head">
-      <h2>Trade the world&rsquo;s markets</h2>
-    </div>
-    <div class="grid">
-      <a class="card mcard mcard-fx" href="markets.html?tab=fx">
+  <section class="lineup" id="crypto">
+    <div class="sec-head"><h2>Trade the world&rsquo;s markets</h2><p>Three asset classes, priced live and held in a single account. Choose where to start.</p></div>
+    <div class="panels">
+      <a class="panel" href="markets.html?tab=fx">
+        <svg class="panel-art" viewBox="0 0 240 180" role="img" aria-label="Isometric coin stack line art">
+        <g fill="none" stroke="#fff" stroke-width="1.1">
+        <ellipse cx="120" cy="132" rx="55" ry="26"/>
+        <ellipse cx="120" cy="112" rx="55" ry="26"/>
+        <ellipse cx="120" cy="92" rx="55" ry="26"/>
+        <ellipse cx="120" cy="72" rx="55" ry="26"/>
+        <line x1="65" y1="72" x2="65" y2="132"/><line x1="175" y1="72" x2="175" y2="132"/>
+        <ellipse cx="120" cy="72" rx="34" ry="15.5"/>
+        </g>
+        </svg>
         <h3>Forex</h3>
         <p>Majors, minors and exotics — deep ECN liquidity aggregated from 80 tier&#8209;1 banks, spreads from 0.0 pips.</p>
-        <svg class="mcard-art" viewBox="0 0 240 180" role="img" aria-label="Isometric coin stack line art">
-          <g fill="none" stroke="#fff" stroke-width="1.1">
-            <ellipse cx="120" cy="132" rx="55" ry="26"/>
-            <ellipse cx="120" cy="112" rx="55" ry="26"/>
-            <ellipse cx="120" cy="92" rx="55" ry="26"/>
-            <ellipse cx="120" cy="72" rx="55" ry="26"/>
-            <line x1="65" y1="72" x2="65" y2="132"/><line x1="175" y1="72" x2="175" y2="132"/>
-            <ellipse cx="120" cy="72" rx="34" ry="15.5"/>
-          </g>
-        </svg>
-        <div class="mcard-go">Explore FX &rarr;</div>
+        <span class="link">Explore FX</span>
       </a>
-      <a class="card mcard mcard-stock" href="markets.html?tab=stock">
+      <a class="panel" href="markets.html?tab=stock">
+        <svg class="panel-art" viewBox="0 0 240 180" role="img" aria-label="Isometric rising bars line art">
+        <g fill="none" stroke="#fff" stroke-width="1.1">
+        <path d="M50 130 L76 145 L50 160 L24 145 Z"/><path d="M50 85 L76 100 L50 115 L24 100 Z"/>
+        <line x1="50" y1="130" x2="50" y2="85"/><line x1="76" y1="145" x2="76" y2="100"/>
+        <line x1="50" y1="160" x2="50" y2="115"/><line x1="24" y1="145" x2="24" y2="100"/>
+        <path d="M120 118 L146 133 L120 148 L94 133 Z"/><path d="M120 43 L146 58 L120 73 L94 58 Z"/>
+        <line x1="120" y1="118" x2="120" y2="43"/><line x1="146" y1="133" x2="146" y2="58"/>
+        <line x1="120" y1="148" x2="120" y2="73"/><line x1="94" y1="133" x2="94" y2="58"/>
+        <path d="M190 106 L216 121 L190 136 L164 121 Z"/><path d="M190 11 L216 26 L190 41 L164 26 Z"/>
+        <line x1="190" y1="106" x2="190" y2="11"/><line x1="216" y1="121" x2="216" y2="26"/>
+        <line x1="190" y1="136" x2="190" y2="41"/><line x1="164" y1="121" x2="164" y2="26"/>
+        </g>
+        </svg>
         <h3>Stocks</h3>
         <p>US blue chips and high&#8209;momentum names, priced live — trade the moves that make the headlines.</p>
-        <svg class="mcard-art" viewBox="0 0 240 180" role="img" aria-label="Isometric rising bars line art">
-          <g fill="none" stroke="#fff" stroke-width="1.1">
-            <path d="M50 130 L76 145 L50 160 L24 145 Z"/><path d="M50 85 L76 100 L50 115 L24 100 Z"/>
-            <line x1="50" y1="130" x2="50" y2="85"/><line x1="76" y1="145" x2="76" y2="100"/>
-            <line x1="50" y1="160" x2="50" y2="115"/><line x1="24" y1="145" x2="24" y2="100"/>
-            <path d="M120 118 L146 133 L120 148 L94 133 Z"/><path d="M120 43 L146 58 L120 73 L94 58 Z"/>
-            <line x1="120" y1="118" x2="120" y2="43"/><line x1="146" y1="133" x2="146" y2="58"/>
-            <line x1="120" y1="148" x2="120" y2="73"/><line x1="94" y1="133" x2="94" y2="58"/>
-            <path d="M190 106 L216 121 L190 136 L164 121 Z"/><path d="M190 11 L216 26 L190 41 L164 26 Z"/>
-            <line x1="190" y1="106" x2="190" y2="11"/><line x1="216" y1="121" x2="216" y2="26"/>
-            <line x1="190" y1="136" x2="190" y2="41"/><line x1="164" y1="121" x2="164" y2="26"/>
-          </g>
-        </svg>
-        <div class="mcard-go">Explore stocks &rarr;</div>
+        <span class="link">Explore stocks</span>
       </a>
-      <a class="card mcard mcard-crypto" href="markets.html?tab=crypto">
+      <a class="panel" href="markets.html?tab=crypto">
+        <svg class="panel-art" viewBox="0 0 240 180" role="img" aria-label="Isometric cube cluster line art">
+        <g fill="none" stroke="#fff" stroke-width="1.1">
+        <path d="M120 100 L168 128 L120 156 L72 128 Z"/><path d="M120 44 L168 72 L120 100 L72 72 Z"/>
+        <line x1="120" y1="100" x2="120" y2="44"/><line x1="168" y1="128" x2="168" y2="72"/>
+        <line x1="120" y1="156" x2="120" y2="100"/><line x1="72" y1="128" x2="72" y2="72"/>
+        <path d="M144 46 L168 60 L144 74 L120 60 Z"/><path d="M144 18 L168 32 L144 46 L120 32 Z"/>
+        <line x1="144" y1="46" x2="144" y2="18"/><line x1="168" y1="60" x2="168" y2="32"/>
+        <line x1="144" y1="74" x2="144" y2="46"/><line x1="120" y1="60" x2="120" y2="32"/>
+        </g>
+        </svg>
         <h3>Crypto</h3>
         <p>Bitcoin, Ethereum and the majors — 24/7, on the same account and the same platform as FX.</p>
-        <svg class="mcard-art" viewBox="0 0 240 180" role="img" aria-label="Isometric cube cluster line art">
-          <g fill="none" stroke="#fff" stroke-width="1.1">
-            <path d="M120 100 L168 128 L120 156 L72 128 Z"/><path d="M120 44 L168 72 L120 100 L72 72 Z"/>
-            <line x1="120" y1="100" x2="120" y2="44"/><line x1="168" y1="128" x2="168" y2="72"/>
-            <line x1="120" y1="156" x2="120" y2="100"/><line x1="72" y1="128" x2="72" y2="72"/>
-            <path d="M144 46 L168 60 L144 74 L120 60 Z"/><path d="M144 18 L168 32 L144 46 L120 32 Z"/>
-            <line x1="144" y1="46" x2="144" y2="18"/><line x1="168" y1="60" x2="168" y2="32"/>
-            <line x1="144" y1="74" x2="144" y2="46"/><line x1="120" y1="60" x2="120" y2="32"/>
-          </g>
-        </svg>
-        <div class="mcard-go">Explore crypto &rarr;</div>
+        <span class="link">Explore crypto</span>
       </a>
     </div>
+  </section>
+
+  <!-- Platform — 실제 터미널 화면 -->
+  <section class="platform">
+    <div class="sec-head"><h2>One platform.<br>Every market.</h2><p>Alpexa WebTrade runs in your browser. Multi-chart layouts, one-click trading and prices across FX, stocks and crypto.</p></div>
+    <figure><img src="assets/img/home-platform.jpg" srcset="assets/img/home-platform-1200.jpg 1200w, assets/img/home-platform.jpg 2400w" sizes="(max-width:820px) 190vw, 96vw" loading="lazy" decoding="async" width="2400" height="1076" alt="Alpexa WebTrade terminal showing the market watch list and four candlestick charts"></figure>
+    <div class="plat-foot"><span>Screen capture of Alpexa WebTrade.</span><a class="link" href="webtrade.html">Open the terminal</a></div>
   </section>
 
   <!-- Account tiers -->
-  <!-- Account tiers — 레퍼런스 포맷 (2026-07-15 사용자 확정): 블랙 밴드 + 화이트 헤드라인 +
-       아이소메트릭 라인아트 3열(네온 액센트) + 짧은 볼드 텍스트. 일러스트 자체 제작 -->
-  <style>
-   .vipband{background:#0B0C09;padding:96px 28px 100px;text-align:center}
-   .vipband h2{font-family:'Space Grotesk','Inter',sans-serif;font-size:clamp(28px,4.2vw,44px);font-weight:700;
-     letter-spacing:-1.2px;color:#fff;margin:0 0 70px}
-   .vip3{max-width:1150px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:44px}
-   @media(max-width:820px){ .vip3{grid-template-columns:1fr;gap:64px} }
-   .vcol{display:flex;flex-direction:column;align-items:center;text-decoration:none;
-     background:#101316;border:1px solid rgba(255,255,255,.10);border-radius:20px;padding:44px 24px 40px;
-     transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease}  /* 독립 카드 (2026-07-15 사용자) */
-   .vcol:hover{transform:translateY(-6px);border-color:rgba(205,241,56,.5);box-shadow:0 18px 38px rgba(0,0,0,.45)}
-   .vcol .vname{font-size:25px;font-weight:800;letter-spacing:-.4px;color:#CDF138;margin:0 0 30px}
-   .vcol svg{display:block;width:min(190px,64%);margin-bottom:34px;transition:transform .22s ease}
-   .vcol:hover svg{transform:translateY(-5px)}
-   .vcol p{font-size:14.5px;font-weight:700;color:#fff;line-height:1.55;max-width:290px;margin:0}
-   .vcol p b{color:#CDF138;font-weight:800}
-   .vcol .sub{display:block;margin-top:5px;font-weight:500;color:#B9BFC8}
-  </style>
-  <section class="vipband" id="vip">
+  <section class="accounts" id="vip">
     <h2>An account for every trader</h2>
-    <div class="vip3">
-      <a class="vcol" href="signup.html" target="_blank" rel="noopener">
-        <h3 class="vname">Standard</h3>
-        <svg viewBox="0 0 240 190" role="img" aria-label="Isometric steps line art">
-          <g fill="none" stroke="#fff" stroke-width="1.1">
-            <path d="M60 122 L112 152 L60 182 L8 152 Z"/><path d="M60 92 L112 122 L60 152 L8 122 Z"/>
-            <line x1="60" y1="122" x2="60" y2="92"/><line x1="112" y1="152" x2="112" y2="122"/>
-            <line x1="60" y1="182" x2="60" y2="152"/><line x1="8" y1="152" x2="8" y2="122"/>
-            <path d="M120 88 L172 118 L120 148 L68 118 Z"/><path d="M120 58 L172 88 L120 118 L68 88 Z"/>
-            <line x1="120" y1="88" x2="120" y2="58"/><line x1="172" y1="118" x2="172" y2="88"/>
-            <line x1="120" y1="148" x2="120" y2="118"/><line x1="68" y1="118" x2="68" y2="88"/>
-          </g>
-          <g fill="none" stroke="#CDF138" stroke-width="1.2">
-            <path d="M180 54 L232 84 L180 114 L128 84 Z"/><path d="M180 24 L232 54 L180 84 L128 54 Z"/>
-            <line x1="180" y1="54" x2="180" y2="24"/><line x1="232" y1="84" x2="232" y2="54"/>
-            <line x1="180" y1="114" x2="180" y2="84"/><line x1="128" y1="84" x2="128" y2="54"/>
-          </g>
-        </svg>
-        <p>Start from $100, commission&#8209;free —
-          <span class="sub">spreads from 0.8 pips across all three asset classes.</span></p>
-      </a>
-      <a class="vcol" href="signup.html" target="_blank" rel="noopener">
-        <h3 class="vname">Raw ECN</h3>
-        <svg viewBox="0 0 240 190" role="img" aria-label="Isometric depth slabs line art">
-          <g fill="none" stroke="#fff" stroke-width="1.1">
-            <path d="M120 118 L204 156 L120 186 L36 148 Z"/><path d="M120 106 L204 144 L120 174 L36 136 Z"/>
-            <line x1="120" y1="118" x2="120" y2="106"/><line x1="204" y1="156" x2="204" y2="144"/>
-            <line x1="120" y1="186" x2="120" y2="174"/><line x1="36" y1="148" x2="36" y2="136"/>
-            <path d="M120 62 L192 96 L120 124 L48 90 Z"/><path d="M120 50 L192 84 L120 112 L48 78 Z"/>
-            <line x1="120" y1="62" x2="120" y2="50"/><line x1="192" y1="96" x2="192" y2="84"/>
-            <line x1="120" y1="124" x2="120" y2="112"/><line x1="48" y1="90" x2="48" y2="78"/>
-          </g>
-          <g fill="none" stroke="#CDF138" stroke-width="1.2">
-            <path d="M120 16 L180 44 L120 68 L60 40 Z"/><path d="M120 8 L180 36 L120 60 L60 32 Z"/>
-            <line x1="120" y1="16" x2="120" y2="8"/><line x1="180" y1="44" x2="180" y2="36"/>
-            <line x1="120" y1="68" x2="120" y2="60"/><line x1="60" y1="40" x2="60" y2="32"/>
-          </g>
-        </svg>
-        <p>Raw spreads from 0.0 pips, $3.50 per lot —
-          <span class="sub">priority execution and 24/5 priority support.</span></p>
-      </a>
-      <a class="vcol" href="signup.html" target="_blank" rel="noopener">
-        <h3 class="vname">Pro</h3>
-        <svg viewBox="0 0 240 190" role="img" aria-label="Isometric pyramid line art">
-          <g fill="none" stroke="#fff" stroke-width="1.1">
-            <path d="M120 118 L216 158 L120 190 L24 150 Z"/><path d="M120 104 L216 144 L120 176 L24 136 Z"/>
-            <line x1="120" y1="118" x2="120" y2="104"/><line x1="216" y1="158" x2="216" y2="144"/>
-            <line x1="120" y1="190" x2="120" y2="176"/><line x1="24" y1="150" x2="24" y2="136"/>
-            <path d="M120 84 L184 112 L120 138 L56 110 Z"/><path d="M120 70 L184 98 L120 124 L56 96 Z"/>
-            <line x1="120" y1="84" x2="120" y2="70"/><line x1="184" y1="112" x2="184" y2="98"/>
-            <line x1="120" y1="138" x2="120" y2="124"/><line x1="56" y1="110" x2="56" y2="96"/>
-            <path d="M120 52 L156 68 L120 84 L84 68 Z"/><path d="M120 40 L156 56 L120 72 L84 56 Z"/>
-            <line x1="120" y1="52" x2="120" y2="40"/><line x1="156" y1="68" x2="156" y2="56"/>
-            <line x1="120" y1="84" x2="120" y2="72"/><line x1="84" y1="68" x2="84" y2="56"/>
-          </g>
-          <g fill="none" stroke="#CDF138" stroke-width="1.2">
-            <path d="M120 22 L142 32 L120 42 L98 32 Z"/><path d="M120 4 L142 14 L120 24 L98 14 Z"/>
-            <line x1="120" y1="22" x2="120" y2="4"/><line x1="142" y1="32" x2="142" y2="14"/>
-            <line x1="120" y1="42" x2="120" y2="24"/><line x1="98" y1="32" x2="98" y2="14"/>
-          </g>
-        </svg>
-        <p>From $10,000 — deepest liquidity tier,
-          <span class="sub">dedicated manager, custom leverage, VPS &amp; API.</span></p>
-      </a>
+    <div class="cmp">
+      <div class="col"><h3>Standard</h3><div class="from">$100</div><div class="from-l">Minimum deposit</div>
+        <dl><div><dt>Spreads from</dt><dd>0.8 pips</dd></div><div><dt>Commission</dt><dd>None</dd></div><div><dt>Markets</dt><dd>All three asset classes</dd></div></dl>
+        <a class="link" href="signup.html" target="_blank" rel="noopener">Open Standard</a></div>
+      <div class="col"><h3>Raw ECN</h3><div class="from">0.0</div><div class="from-l">Raw spreads from, in pips</div>
+        <dl><div><dt>Spreads from</dt><dd>0.0 pips</dd></div><div><dt>Commission</dt><dd>$3.50 per lot</dd></div><div><dt>Execution</dt><dd>Priority</dd></div><div><dt>Support</dt><dd>Priority, 24/5</dd></div></dl>
+        <a class="link" href="signup.html" target="_blank" rel="noopener">Open Raw ECN</a></div>
+      <div class="col"><h3>Pro</h3><div class="from">$10,000</div><div class="from-l">Minimum deposit</div>
+        <dl><div><dt>Liquidity</dt><dd>Deepest tier</dd></div><div><dt>Leverage</dt><dd>Custom</dd></div><div><dt>Manager</dt><dd>Dedicated</dd></div><div><dt>Tools</dt><dd>VPS &amp; API</dd></div></dl>
+        <a class="link" href="signup.html" target="_blank" rel="noopener">Open Pro</a></div>
     </div>
   </section>
 
-  <!-- Trust / safety — 레퍼런스 포맷 (2026-07-15 사용자 확정): 좌 볼드 헤드라인+각주 /
-       우 아이소메트릭 비교 차트 (네온 납작 다이아 = 우리, 회색 블록 = 보호 없는 계좌). 차트 자체 제작 -->
-  <style>
-   .riskcmp{max-width:1120px;margin:0 auto;padding:96px 28px 110px;display:grid;
-     grid-template-columns:1.05fr 1fr;gap:56px;align-items:center}
-   @media(max-width:860px){ .riskcmp{grid-template-columns:1fr;gap:44px} }
-   .riskcmp .rc-h{font-family:'Space Grotesk','Inter',sans-serif;font-size:clamp(26px,3.6vw,38px);font-weight:700;
-     letter-spacing:-1px;line-height:1.12;color:#16191F;margin:0 0 18px;text-wrap:balance}
-   .riskcmp .rc-sub{font-size:15px;font-weight:600;color:#16191F;margin:0 0 14px;line-height:1.6}
-   .riskcmp .rc-fn{font-size:12.5px;color:#5a6478;line-height:1.7;max-width:430px}
-   .riskcmp svg{display:block;width:min(430px,100%);margin:0 auto}
-  </style>
-  <section class="riskcmp" id="trust">
-    <div>
-      <h2 class="rc-h">You can never lose more than you deposit.</h2>
-      <p class="rc-sub">Negative balance protection resets any negative equity to zero — automatically, on every account.</p>
-      <p class="rc-fn">Client funds are segregated at tier&#8209;1 banks, every session uses 256&#8209;bit encryption,
-        and balances and execution are independently audited.</p>
-    </div>
-    <svg viewBox="0 0 460 380" role="img" aria-label="Maximum loss below deposit: zero with Alpexa versus unlimited without protection">
-      <g font-family="Inter,-apple-system,sans-serif" text-anchor="middle" fill="#16191F">
-        <text x="150" y="196" font-size="24" font-weight="800">$0</text>
-        <text x="150" y="218" font-size="16" font-weight="600">Alpexa</text>
-        <text x="330" y="34" font-size="24" font-weight="800">Unlimited</text>
-        <text x="330" y="56" font-size="16" font-weight="600">without protection</text>
-      </g>
-      <g fill="none" stroke="#16191F" stroke-width="1.4">
-        <line x1="150" y1="230" x2="150" y2="292"/><circle cx="150" cy="292" r="3.5" fill="#16191F"/>
-        <line x1="330" y1="68" x2="330" y2="122"/><circle cx="330" cy="122" r="3.5" fill="#16191F"/>
-      </g>
-      <path d="M330 108 L406 141 L330 174 L254 141 Z" fill="#DDDAD3" stroke="#16191F" stroke-width="1.4"/>
-      <path d="M254 141 L330 174 L330 334 L254 301 Z" fill="#C9C6BE" stroke="#16191F" stroke-width="1.4"/>
-      <path d="M406 141 L330 174 L330 334 L406 301 Z" fill="#D3D0C8" stroke="#16191F" stroke-width="1.4"/>
-      <path d="M150 262 L226 295 L150 328 L74 295 Z" fill="#CDF138" stroke="#16191F" stroke-width="1.4"/>
-    </svg>
+  <!-- Trust / safety -->
+  <section class="state" id="trust">
+    <h2>You can never lose more than you deposit.</h2>
+    <p class="rc-sub">Negative balance protection resets any negative equity to zero — automatically, on every account.</p>
+    <p class="rc-fn">Client funds are segregated at tier&#8209;1 banks, every session uses 256&#8209;bit encryption,
+      and balances and execution are independently audited.</p>
   </section>
 
   <!-- Final CTA -->
-  <div class="heroband"><section class="lp-cta">
-    <h2>Start trading in minutes</h2>
-    <p>Open an account in 60 seconds &mdash; or explore risk&#8209;free with a demo.</p>
-    <div class="lp-cta-btns">
-      <a class="btn-lg solid" href="signup.html" target="_blank" rel="noopener">Open account</a>
-      <a class="btn-lg outline" href="signup.html" target="_blank" rel="noopener">Try demo</a>
+  <section class="cta">
+    <div><h2>Start trading in minutes</h2>
+      <p>Open an account in 60 seconds &mdash; or explore risk&#8209;free with a demo.</p></div>
+    <div class="cta-links">
+      <a class="link" href="signup.html" target="_blank" rel="noopener">Open account</a>
+      <a class="link" href="signup.html" target="_blank" rel="noopener">Try demo</a>
     </div>
-  </section></div>
-  </div>
+  </section>
 
   <footer class="site-foot">
     <div class="foot-grid">
@@ -839,29 +330,29 @@
         <div class="fb-top">
           <a class="logo foot-logo" href="/"><span class="mark">A</span>Alpexa-FX</a>
           <div class="award" title="Best Forex Broker 2026" aria-label="Best Forex Broker 2026">
-            <svg viewBox="0 0 108 126" xmlns="http://www.w3.org/2000/svg" role="img">
-              <defs>
-                <linearGradient id="awBlue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stop-color="#4a6bf0"/><stop offset=".5" stop-color="#1e40d8"/><stop offset="1" stop-color="#1631a8"/>
-                </linearGradient>
-              </defs>
-              <path d="M16 14 H92 V72 C92 96 66 110 54 116 C42 110 16 96 16 72 Z" fill="none" stroke="url(#awBlue)" stroke-width="2.6" stroke-linejoin="round"/>
-              <path d="M22 20 H86 V70 C86 91 65 103 54 108 C43 103 22 91 22 70 Z" fill="none" stroke="url(#awBlue)" stroke-width="1"/>
-              <path d="M54 27 L55.9 32.4 L61.6 32.5 L57 36 L58.7 41.5 L54 38.2 L49.3 41.5 L51 36 L46.4 32.5 L52.1 32.4 Z" fill="url(#awBlue)"/>
-              <text x="54" y="61" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="20" font-weight="800" letter-spacing="-.5" fill="#0e1726">2026</text>
-              <text x="54" y="77" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-size="8" font-weight="800" letter-spacing=".7" fill="#1e40d8">BEST FOREX</text>
-              <text x="54" y="88" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-size="6.5" font-weight="800" letter-spacing=".1" fill="#1e40d8">ECN/STP BROKER</text>
-            </svg>
+          <svg viewBox="0 0 108 126" xmlns="http://www.w3.org/2000/svg" role="img">
+          <defs>
+          <linearGradient id="awBlue" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#4a6bf0"/><stop offset=".5" stop-color="#1e40d8"/><stop offset="1" stop-color="#1631a8"/>
+          </linearGradient>
+          </defs>
+          <path d="M16 14 H92 V72 C92 96 66 110 54 116 C42 110 16 96 16 72 Z" fill="none" stroke="url(#awBlue)" stroke-width="2.6" stroke-linejoin="round"/>
+          <path d="M22 20 H86 V70 C86 91 65 103 54 108 C43 103 22 91 22 70 Z" fill="none" stroke="url(#awBlue)" stroke-width="1"/>
+          <path d="M54 27 L55.9 32.4 L61.6 32.5 L57 36 L58.7 41.5 L54 38.2 L49.3 41.5 L51 36 L46.4 32.5 L52.1 32.4 Z" fill="url(#awBlue)"/>
+          <text x="54" y="61" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="20" font-weight="800" letter-spacing="-.5" fill="#0e1726">2026</text>
+          <text x="54" y="77" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-size="8" font-weight="800" letter-spacing=".7" fill="#1e40d8">BEST FOREX</text>
+          <text x="54" y="88" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-size="6.5" font-weight="800" letter-spacing=".1" fill="#1e40d8">ECN/STP BROKER</text>
+          </svg>
           </div>
           <div class="award" title="Best Forex Broker 2025" aria-label="Best Forex Broker 2025">
-            <svg viewBox="0 0 108 126" xmlns="http://www.w3.org/2000/svg" role="img">
-              <path d="M16 14 H92 V72 C92 96 66 110 54 116 C42 110 16 96 16 72 Z" fill="none" stroke="url(#awBlue)" stroke-width="2.6" stroke-linejoin="round"/>
-              <path d="M22 20 H86 V70 C86 91 65 103 54 108 C43 103 22 91 22 70 Z" fill="none" stroke="url(#awBlue)" stroke-width="1"/>
-              <path d="M54 27 L55.9 32.4 L61.6 32.5 L57 36 L58.7 41.5 L54 38.2 L49.3 41.5 L51 36 L46.4 32.5 L52.1 32.4 Z" fill="url(#awBlue)"/>
-              <text x="54" y="61" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="20" font-weight="800" letter-spacing="-.5" fill="#0e1726">2025</text>
-              <text x="54" y="77" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-size="8" font-weight="800" letter-spacing=".7" fill="#1e40d8">BEST FOREX</text>
-              <text x="54" y="88" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-size="6.5" font-weight="800" letter-spacing=".1" fill="#1e40d8">ECN/STP BROKER</text>
-            </svg>
+          <svg viewBox="0 0 108 126" xmlns="http://www.w3.org/2000/svg" role="img">
+          <path d="M16 14 H92 V72 C92 96 66 110 54 116 C42 110 16 96 16 72 Z" fill="none" stroke="url(#awBlue)" stroke-width="2.6" stroke-linejoin="round"/>
+          <path d="M22 20 H86 V70 C86 91 65 103 54 108 C43 103 22 91 22 70 Z" fill="none" stroke="url(#awBlue)" stroke-width="1"/>
+          <path d="M54 27 L55.9 32.4 L61.6 32.5 L57 36 L58.7 41.5 L54 38.2 L49.3 41.5 L51 36 L46.4 32.5 L52.1 32.4 Z" fill="url(#awBlue)"/>
+          <text x="54" y="61" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="20" font-weight="800" letter-spacing="-.5" fill="#0e1726">2025</text>
+          <text x="54" y="77" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-size="8" font-weight="800" letter-spacing=".7" fill="#1e40d8">BEST FOREX</text>
+          <text x="54" y="88" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-size="6.5" font-weight="800" letter-spacing=".1" fill="#1e40d8">ECN/STP BROKER</text>
+          </svg>
           </div>
         </div>
         <div class="cpy">© 2026, Alpexa-FX · An Alpexa Suisse company<br><a href="fx-risk.html">Risk Disclosure</a></div>
@@ -875,37 +366,24 @@
         <a href="webtrade.html?theme=legend" target="_blank" rel="noopener">Log in</a><a href="signup.html" target="_blank" rel="noopener">Open account</a><a href="agent.html" rel="noopener">IB Portal</a><a href="pamm-desk.html" target="_blank" rel="noopener">PAMM</a>
       </div>
     </div>
-    <div class="wordmark">ALPEXA</div>
+    <div class="wordmark" aria-hidden="true">ALPEXA</div>
     <div class="resp-bar">Trading forex and CFDs on margin carries a high level of risk and may not be suitable for all investors. Leverage can work against you — only trade with capital you can afford to lose.</div>
   </footer>
-
-    <script>
-  /* FX site is white-only — force the light theme regardless of any stored preference. */
-  try{ document.body.classList.add('light'); }catch(e){}
-  </script>
   <script>
-  /* Crossfade hero slogans — both stacked in one grid cell, fade in place (no horizontal
-     motion, so nothing ever slides into the quotes widget or gets clipped). 5s auto-advance,
-     pause on hover, dot controls, respect prefers-reduced-motion (no auto-advance). */
   (function(){
-    var host=document.getElementById('hslides'), dotsEl=document.getElementById('hdots');
-    if(!host||!dotsEl) return;
-    var slides=host.querySelectorAll('.h-slide'), dots=dotsEl.querySelectorAll('button');
-    var n=slides.length, idx=0, timer=null, paused=false, reduce=false;
-    try{ reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
-    function paint(){
-      for(var i=0;i<n;i++){ slides[i].classList.toggle('on', i===idx); }
-      for(var j=0;j<dots.length;j++){ dots[j].classList.toggle('on', j===idx); }
-    }
-    function go(i){ idx=(i+n)%n; paint(); }
-    function start(){ if(reduce) return; stop(); timer=setInterval(function(){ if(!paused) go(idx+1); }, 8500); }
-    function stop(){ if(timer){ clearInterval(timer); timer=null; } }
-    for(var k=0;k<dots.length;k++){ (function(m){ dots[m].addEventListener('click',function(){ go(m); start(); }); })(k); }
-    host.addEventListener('mouseenter',function(){ paused=true; });
-    host.addEventListener('mouseleave',function(){ paused=false; });
-    paint(); start();
+    // 하위 메뉴: 마우스는 CSS(:hover)로, 터치·키보드는 버튼으로 연다
+    var dd=document.querySelector('.has-dd'), t=dd&&dd.querySelector('.dd-t');
+    if(t){ t.addEventListener('click',function(e){ e.stopPropagation(); var o=dd.classList.toggle('open'); t.setAttribute('aria-expanded',o?'true':'false'); });
+      document.addEventListener('click',function(){ dd.classList.remove('open'); t.setAttribute('aria-expanded','false'); }); }
+    // 모바일 메뉴
+    var sheet=document.getElementById('sheet'), burger=document.querySelector('.burger'), x=sheet&&sheet.querySelector('.sheet-x');
+    function set(open){ if(!sheet||!burger) return; sheet.classList.toggle('open',open); burger.setAttribute('aria-expanded',open?'true':'false');
+      document.documentElement.style.overflow=open?'hidden':''; if(open&&x) x.focus(); else burger.focus(); }
+    if(burger) burger.addEventListener('click',function(){ set(true); });
+    if(x) x.addEventListener('click',function(){ set(false); });
+    if(sheet) sheet.addEventListener('click',function(e){ if(e.target.closest('a')) set(false); });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&sheet&&sheet.classList.contains('open')) set(false); });
   })();
   </script>
-
 </body>
 </html>
