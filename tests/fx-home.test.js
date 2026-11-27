@@ -14,11 +14,14 @@ const REPO = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(REPO, 'fx.html'), 'utf8');
 let pass = 0, fail = 0;
 const ok = (n, c, x) => { if (c) pass++; else fail++; console.log(`  ${c ? '✅' : '❌'} ${n}${!c && x ? '  ' + x : ''}`); };
+const css = fs.readFileSync(path.join(REPO, 'assets/site.css'), 'utf8');      // 공용 스타일 (메뉴·푸터·링크…) — 2026-11-27 분리
+const all = html + '\n' + css;                                               // 모양 규칙 핀은 페이지 + 공용 파일을 합쳐서 본다
 const has = (s) => html.includes(s);
 const count = (re) => (html.match(re) || []).length;
 
 // ── ① 정적: 방향 ──
 const fontLink = (html.match(/<link href="https:\/\/fonts\.googleapis\.com\/css2\?[^"]*"/) || [''])[0];
+ok('공용 스타일을 한 파일에서 불러온다 (assets/site.css?v=N · 파일 존재)', /<link rel="stylesheet" href="assets\/site\.css\?v=\d+">/.test(html) && css.length > 2000);
 ok('글꼴은 Inter 하나 (Space Grotesk · Source Serif · Roboto Mono 제거 · 가는 굵기 300 포함)', /family=Inter:/.test(fontLink) && !/Space\+Grotesk|Source\+Serif|Roboto\+Mono/.test(fontLink) && /300/.test(fontLink), fontLink.slice(0, 160));
 ok('첫 화면 제목 = "Tight spreads. Nothing hidden."', /<h1[^>]*>Tight spreads\.<br>Nothing hidden\.<\/h1>/.test(html));
 ok('첫 화면 그림 = 실제 터미널 차트 캡처 (파일이 리포에 있다 · 설명글 있음)', /<img class="art"[^>]*src="assets\/img\/home-hero-chart\.jpg"[^>]*alt="[^"]{10,}"/.test(html) &&
@@ -26,7 +29,7 @@ ok('첫 화면 그림 = 실제 터미널 차트 캡처 (파일이 리포에 있�
 ok('캡처 이미지를 "Live" 라고 표시하지 않는다', !/class="shot-label"[^>]*>[^<]*\bLive\b/i.test(html) && !/<figcaption[^>]*>[^<]*\blive\b/i.test(html) && /class="shot-label"/.test(html));
 const specs = [['0.0', 'Spreads from'], ['500:1', 'Leverage up to'], ['$100', 'Minimum deposit'], ['3', 'One account, one platform']];
 ok('제원 줄 4칸: 0.0 pips · 500:1 · $100 · 3 asset classes', specs.every(([n, l]) => new RegExp('<div class="spec"><b>' + n.replace(/[$.]/g, '\\$&') + '(<i>[^<]*</i>)?</b><span>' + l + '</span></div>').test(html)));
-ok('로고는 글자만 — 네모 "A" 표식 없음 (2026-11-27 사장님 "이거 빼자") · 헤더·모바일 메뉴·푸터 3곳', !/class="mark"/.test(html) && !/\.logo \.mark/.test(html) && count(/<a class="logo[^"]*" href="\/">Alpexa-FX<\/a>/g) === 3);
+ok('로고는 글자만 — 네모 "A" 표식 없음 (2026-11-27 사장님 "이거 빼자") · 헤더·모바일 메뉴·푸터 3곳', !/class="mark"/.test(html) && !/\.logo \.mark/.test(all) && count(/<a class="logo[^"]*" href="\/">Alpexa-FX<\/a>/g) === 3);
 const liveJs = (html.match(/<script>\s*\/\* 첫 화면 라이브 차트[\s\S]*?<\/script>/) || [''])[0];
 ok('라이브 차트: 가짜 움직임 없음 (Math.random 0) · 우리 피드만 읽는다 (fx-prices 봉 + prices 현재가) · 공개 키만', liveJs.length > 500 && !/Math\.random/.test(html) && /functions\/v1\/fx-prices\?candles=/.test(liveJs) && /rest\/v1\/prices\?symbol=eq\./.test(liveJs) && /sb_publishable_/.test(liveJs) && !/service_role|eyJ[A-Za-z0-9_-]{20,}/.test(html));
 ok('라이브 차트: 보일 때만 읽는다 (탭 숨김 · 화면 밖이면 멈춤) · 요청에 시간 상한', /document\.hidden/.test(liveJs) && /IntersectionObserver/.test(liveJs) && /AbortController/.test(liveJs));
@@ -34,7 +37,7 @@ ok('라이브 차트: 못 받으면 캡처가 남도록 — 캔버스는 기본�
 ok('회전 배너(슬라이드) 제거 — 첫 화면은 한 문장', !has('id="hslides"') && !has('h-dots'));
 // 올리면 자리가 밀리는 사고 (2026-11-27 사장님 "마우스 대면 메뉴 전체가 움직여"): .link:hover 가 gap 을 넓혀 링크 폭이 늘었고,
 // 양끝 정렬인 메뉴 줄 전체가 다시 배치됐다. 올림 효과는 자리를 바꾸지 않는 속성(transform·opacity·color)만 쓴다.
-const hoverRules = (html.match(/[^{}]*:hover[^{}]*\{[^}]*\}/g) || []);
+const hoverRules = (all.match(/[^{}]*:hover[^{}]*\{[^}]*\}/g) || []);
 const LAYOUT = /(^|[;{\s])(gap|padding[a-z-]*|margin[a-z-]*|width|height|font-size|font-weight|letter-spacing|border[a-z-]*-width|top|left|right|bottom|display)\s*:/;
 const badHover = hoverRules.filter((r) => LAYOUT.test(r.slice(r.indexOf('{'))) && !/\.dd\{display:block\}/.test(r.replace(/\s+/g, '')));
 ok('올림(hover) 효과가 자리를 바꾸지 않는다 — gap·padding·margin·크기 변경 없음 (하위 메뉴 열기 제외)', hoverRules.length >= 4 && badHover.length === 0, badHover.join(' | ').slice(0, 220));
@@ -50,7 +53,7 @@ ok('푸터 유지: Log in(레전드 터미널) · IB Portal · PAMM · Risk Disc
    has('Best Forex Broker 2026') && has('Best Forex Broker 2025') && has('© 2026, Alpexa-FX · An Alpexa Suisse company'));
 const awardsHtml = (html.match(/<div class="award"[\s\S]*?<\/svg>\s*<\/div>/g) || []).join('');
 ok('수상 배지 = 흑백 (2026-11-27 사장님 "흰색을 블랙으로 블랙을 흰색으로"): 흰 바탕 상자 없음 · 파란색 없음 · 선과 글자는 currentColor', (html.match(/<div class="award"/g) || []).length === 2 &&
-   !/awBlue|#1e40d8|#4a6bf0|#1631a8|#0e1726/i.test(html) && !/\.award\{[^}]*background/.test(html) && /currentColor/.test(awardsHtml) && !/#[0-9a-f]{3,6}/i.test(awardsHtml) &&
+   !/awBlue|#1e40d8|#4a6bf0|#1631a8|#0e1726/i.test(all) && !/\.award\{[^}]*background/.test(all) && /currentColor/.test(awardsHtml) && !/#[0-9a-f]{3,6}/i.test(awardsHtml) &&
    />2026<\/text>/.test(awardsHtml) && />2025<\/text>/.test(awardsHtml) && (awardsHtml.match(/>BEST FOREX<\/text>/g) || []).length === 2 && (awardsHtml.match(/>ECN\/STP BROKER<\/text>/g) || []).length === 2, awardsHtml.slice(0, 160));
 ok('위험 고지 문구 그대로', has('Trading forex and CFDs on margin carries a high level of risk and may not be suitable for all investors. Leverage can work against you — only trade with capital you can afford to lose.'));
 const COPY = [
@@ -93,7 +96,7 @@ const exe = findChromium();
 const done = () => { console.log(`\n${fail ? '🔴' : '🟢'} fx-home — ${pass} pass, ${fail} fail`); process.exit(fail ? 1 : 0); };
 if (!chromium || !exe) { console.log('  ⏭️  실브라우저 확인 생략 (playwright/chromium 없음)'); done(); }
 else (async () => {
-  const MIME = { '.html': 'text/html', '.jpg': 'image/jpeg', '.js': 'application/javascript', '.png': 'image/png' };
+  const MIME = { '.html': 'text/html', '.jpg': 'image/jpeg', '.js': 'application/javascript', '.png': 'image/png', '.css': 'text/css' };
   const server = http.createServer((q, r) => { const fp = path.join(REPO, decodeURIComponent(q.url.split('?')[0]));
     if (!fp.startsWith(REPO) || !fs.existsSync(fp) || fs.statSync(fp).isDirectory()) { r.writeHead(404); return r.end('nf'); }
     r.writeHead(200, { 'Content-Type': MIME[path.extname(fp)] || 'text/plain' }); r.end(fs.readFileSync(fp)); });
