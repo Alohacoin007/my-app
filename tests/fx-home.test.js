@@ -55,12 +55,12 @@ ok('가입 링크는 전부 새 창 (target=_blank rel=noopener) · 6개 이상'
 // 2026-11-27 사장님: "my account 를 클릭하면 새로운 페이지가 뜨는데… 연결된 전체 페이지로 넘어가게" → 같은 창에서 이동 (가입 링크는 종전대로 새 창)
 ok('My Account → login.html?switch=1 · 같은 창에서 이동 (새 창 아님) · 메뉴와 모바일 메뉴 2곳', count(/href="login\.html\?switch=1"[^>]*>My Account</g) === 2 && !/href="login\.html\?switch=1"[^>]*target=/.test(html));
 ok('메뉴 유지: What We Offer(Markets · WebTrade Terminal · Account Tiers) · Markets · IB · About · Support', ['href="markets.html"', 'href="webtrade.html"', 'href="fx.html#vip"', 'href="ib.html"', 'href="about.html"', 'href="support.html"'].every(has) && has('What We Offer'));
-ok('푸터 유지: Log in(레전드 터미널) · IB Portal · PAMM · Risk Disclosure · 수상 배지 2개 · 저작권', has('<a href="webtrade.html?theme=legend" target="_blank" rel="noopener">Log in</a>') && has('href="agent.html"') && has('href="pamm-desk.html"') && has('href="fx-risk.html"') &&
-   has('Best Forex Broker 2026') && has('Best Forex Broker 2025') && has('© 2026, Alpexa-FX · An Alpexa Suisse company'));
+ok('푸터 유지: Log in(레전드 터미널) · IB Portal · PAMM · Risk Disclosure · 수상 배지 5개(2026~2022) · 저작권', has('<a href="webtrade.html?theme=legend" target="_blank" rel="noopener">Log in</a>') && has('href="agent.html"') && has('href="pamm-desk.html"') && has('href="fx-risk.html"') &&
+   ['2026', '2025', '2024', '2023', '2022'].every((y) => has('Best Forex Broker ' + y)) && has('© 2026, Alpexa-FX · An Alpexa Suisse company'));
 const awardsHtml = (html.match(/<div class="award"[\s\S]*?<\/svg>\s*<\/div>/g) || []).join('');
-ok('수상 배지 = 흑백 (2026-11-27 사장님 "흰색을 블랙으로 블랙을 흰색으로"): 흰 바탕 상자 없음 · 파란색 없음 · 선과 글자는 currentColor', (html.match(/<div class="award"/g) || []).length === 2 &&
+ok('수상 배지 = 흑백 (2026-11-27 사장님 "흰색을 블랙으로 블랙을 흰색으로"): 흰 바탕 상자 없음 · 파란색 없음 · 선과 글자는 currentColor', (html.match(/<div class="award"/g) || []).length === 5 &&   // 2026-11-27 사장님 "상패 … 만들어서 넣어줘" → 연도 확인 2024·2023·2022 (총 5개)
    !/awBlue|#1e40d8|#4a6bf0|#1631a8|#0e1726/i.test(all) && !/\.award\{[^}]*background/.test(all) && /currentColor/.test(awardsHtml) && !/#[0-9a-f]{3,6}/i.test(awardsHtml) &&
-   />2026<\/text>/.test(awardsHtml) && />2025<\/text>/.test(awardsHtml) && (awardsHtml.match(/>BEST FOREX<\/text>/g) || []).length === 2 && (awardsHtml.match(/>ECN\/STP BROKER<\/text>/g) || []).length === 2, awardsHtml.slice(0, 160));
+   JSON.stringify(awardsHtml.match(/>(20\d\d)<\/text>/g)) === JSON.stringify(['>2026</text>', '>2025</text>', '>2024</text>', '>2023</text>', '>2022</text>']) && (awardsHtml.match(/>BEST FOREX<\/text>/g) || []).length === 5 && (awardsHtml.match(/>ECN\/STP BROKER<\/text>/g) || []).length === 5, awardsHtml.slice(0, 160));
 ok('위험 고지 문구 그대로', has('Trading forex and CFDs on margin carries a high level of risk and may not be suitable for all investors. Leverage can work against you — only trade with capital you can afford to lose.'));
 const COPY = [
   'Majors, minors and exotics — deep ECN liquidity aggregated from 80 tier&#8209;1 banks, spreads from 0.0 pips.',
@@ -140,7 +140,7 @@ else (async () => {
     ok('PC: 제원 4칸이 한 줄', m.specs.length === 4 && m.specs.every((s) => s.t === m.specs[0].t), JSON.stringify(m.specs));
     ok('PC: 시장 3면이 한 줄 · 화면 좌우 끝까지', m.panels.length === 3 && m.panels.every((p) => p.t === m.panels[0].t) && m.panels[0].l === 0 && m.panels[2].r === m.vw, JSON.stringify(m.panels));
     ok('PC: 인용문이 크고 가늘게 보인다 (≥ 60px · 굵기 300 · 구역이 좌우 끝까지)', !!m.quote && m.quote.px >= 60 && m.quote.w === 300 && m.quote.box.l === 0 && m.quote.box.r === m.vw, JSON.stringify(m.quote));
-    ok('PC: 수상 배지가 검정 바탕 위 흰 선으로 보인다 (바탕 투명 · 흰색 · 폭 80px 이상)', !!m.award && /rgba\(0, 0, 0, 0\)|transparent/.test(m.award.bg) && m.award.color === 'rgb(255, 255, 255)' && m.award.w >= 80, JSON.stringify(m.award));
+    ok('PC: 수상 배지가 검정 바탕 위 흰 선으로 보인다 (바탕 투명 · 흰색 · 폭 72px 이상 — 5개를 한 줄에)', !!m.award && /rgba\(0, 0, 0, 0\)|transparent/.test(m.award.bg) && m.award.color === 'rgb(255, 255, 255)' && m.award.w >= 72, JSON.stringify(m.award));
     const centered = (g, vw) => !!g && Math.abs(g.l - (vw - g.r)) <= 6 && g.l >= 0 && g.r <= vw && g.w >= 600;
     ok('PC: 푸터의 큰 ALPEXA 글자가 가운데 · 굵게 (좌우 여백 차 ≤ 6px · 굵기 ≥ 600 · 화면 안)', centered(m.word, m.vw), JSON.stringify({ word: m.word, vw: m.vw }));
     ok('PC: 계좌 3종이 한 줄', m.cols.length === 3 && m.cols.every((c) => c.t === m.cols[0].t), JSON.stringify(m.cols));
@@ -229,6 +229,16 @@ else (async () => {
     await until(lm.page, (x) => x.chart && x.live === '1'); M.mid = 1.09041; const m2 = await until(lm.page, (x) => x.tick === 'up');
     ok('모바일: 라이브 차트가 뜨고 오르면 반응한다 · 가로 스크롤 없음', m2.chart && m2.tick === 'up' && (await lm.page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 0 && lm.errs.length === 0, JSON.stringify(m2));
     await lm.page.close();
+    // ── 상패 5개: 한 줄에 나란히 (PC 1440 · 1920 · 모바일 390) ──
+    for (const [vw, vh, mob] of [[1440, 900, false], [1920, 1080, false], [390, 844, true]]) {
+      const pa = await open(vw, vh, mob);
+      const aw = await pa.page.evaluate(() => { const top = document.querySelector('.fb-top').getBoundingClientRect(), logo = document.querySelector('.fb-top .logo').getBoundingClientRect();
+        const a = [...document.querySelectorAll('.fb-top .award')].map((e) => { const b = e.getBoundingClientRect(); return { y: Math.round(b.top), l: Math.round(b.left), r: Math.round(b.right), w: Math.round(b.width), yr: e.querySelector('text').textContent }; });
+        return { n: a.length, rows: new Set(a.map((x) => x.y)).size, years: a.map((x) => x.yr).join(' '), inBox: a.every((x) => x.l >= Math.floor(top.left) && x.r <= Math.ceil(top.right) + 1), minW: Math.min(...a.map((x) => x.w)), below: a.every((x) => x.y >= Math.round(logo.bottom)), noOverlap: a.every((x, i) => !i || x.l >= a[i - 1].r),
+          overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }; });
+      ok(`상패 @${vw}: 5개가 한 줄 · 2026→2022 순서 · 서로 안 겹침 · 로고 아래 · 가로 스크롤 없음`, aw.n === 5 && aw.rows === 1 && aw.years === '2026 2025 2024 2023 2022' && aw.inBox && aw.noOverlap && aw.below && aw.minW >= (mob ? 54 : 72) && aw.overflow <= 0, JSON.stringify(aw));
+      await pa.page.close();
+    }
     // ── ⑤ 실시간 스프레드 (스텁 피드) ──
     const spr = (page) => page.evaluate(() => ({ v: document.getElementById('heroSpread').firstChild.nodeValue, unit: document.querySelector('#heroSpread i').textContent, l: document.getElementById('heroSpreadL').textContent, d: document.getElementById('top').dataset.spread || '',
       w: Math.round(document.querySelector('.specs .spec').getBoundingClientRect().width * 10) / 10, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }));
